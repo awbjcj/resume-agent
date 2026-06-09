@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     linkedin_password: str = ""
     db_url: str = "sqlite:///data/resume_agent.db"
     cheap_model: str = "claude-haiku-4-5-20251001"
+    mid_model: str = "claude-sonnet-4-6"
+    premium_model: str = "claude-opus-4-8"
 
 
 @lru_cache

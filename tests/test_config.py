@@ -35,3 +35,9 @@ def test_load_yaml_rejects_non_mapping(tmp_path):
 def test_settings_has_cheap_model_default():
     settings = Settings(_env_file=None)
     assert settings.cheap_model == "claude-haiku-4-5-20251001"
+
+
+def test_settings_has_model_tier_defaults():
+    settings = Settings(_env_file=None)
+    assert settings.mid_model == "claude-sonnet-4-6"
+    assert settings.premium_model == "claude-opus-4-8"
