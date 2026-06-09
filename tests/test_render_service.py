@@ -1,0 +1,51 @@
+from pathlib import Path
+
+from sqlmodel import Session, SQLModel, create_engine
+
+from resume_agent.models.resume import ResumeContent
+from resume_agent.models.profile import Contact
+from resume_agent.render.render_config import RenderConfig
+from resume_agent.render.service import render_version
+from resume_agent.tracking.repository import get_resume_version, save_job, save_resume_version
+from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+
+
+def _session() -> Session:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    return Session(engine)
+
+
+def test_render_version_sets_path_and_marks_rendered(tmp_path):
+    calls = {}
+
+    def fake_render(content, output_path, template_path):
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(output_path).write_bytes(b"%PDF-fake")
+        calls["content"] = content
+        calls["template_path"] = template_path
+        return Path(output_path)
+
+    config = RenderConfig(template_path="templates/resume.typ", output_dir=str(tmp_path / "out"))
+    with _session() as s:
+        job = save_job(s, Job(source="manual", jd_text="jd", company="Acme", title="Engineer",
+                              status=JobStatus.tailored.value))
+        version = save_resume_version(
+            s, ResumeVersion(job_id=job.id, round=1,
+                             content_json=ResumeContent(contact=Contact(name="Ada")).model_dump(mode="json")),
+        )
+
+        path = render_version(s, version.id, config, render_fn=fake_render)
+
+        assert path.exists()
+        assert path.suffix == ".pdf"
+        assert isinstance(calls["content"], ResumeContent)
+        refreshed = get_resume_version(s, version.id)
+        assert refreshed.pdf_path == str(path)
+        assert job.status == JobStatus.rendered.value
+
+
+def test_render_version_missing_returns_none(tmp_path):
+    config = RenderConfig(output_dir=str(tmp_path))
+    with _session() as s:
+        assert render_version(s, 4242, config, render_fn=lambda *a, **k: None) is None
