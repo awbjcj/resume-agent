@@ -1,7 +1,7 @@
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from resume_agent.tracking.tables import Job, ResumeVersion
+from resume_agent.tracking.tables import Application, Job, ResumeVersion
 
 
 def save_job(session: Session, job: Job) -> Job:
@@ -47,3 +47,53 @@ def resume_versions_for_job(session: Session, job_id: int) -> list[ResumeVersion
 
 def get_resume_version(session: Session, version_id: int) -> ResumeVersion | None:
     return session.get(ResumeVersion, version_id)
+
+
+def save_application(session: Session, application: Application) -> Application:
+    session.add(application)
+    session.commit()
+    session.refresh(application)
+    return application
+
+
+def get_application(session: Session, application_id: int) -> Application | None:
+    return session.get(Application, application_id)
+
+
+def application_for_job(session: Session, job_id: int) -> Application | None:
+    return session.exec(select(Application).where(Application.job_id == job_id)).first()
+
+
+def applications_by_status(session: Session, status: str) -> list[Application]:
+    return list(session.exec(select(Application).where(Application.status == status)).all())
+
+
+def update_application_status(
+    session: Session, application_id: int, status: str, notes: str | None = None
+) -> Application | None:
+    application = session.get(Application, application_id)
+    if application is None:
+        return None
+    application.status = status
+    if notes is not None:
+        application.notes = notes
+    session.add(application)
+    session.commit()
+    session.refresh(application)
+    return application
+
+
+def latest_resume_version(session: Session, job_id: int) -> ResumeVersion | None:
+    return session.exec(
+        select(ResumeVersion)
+        .where(ResumeVersion.job_id == job_id)
+        .order_by(ResumeVersion.round.desc())
+    ).first()
+
+
+def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersion | None:
+    return session.exec(
+        select(ResumeVersion)
+        .where(ResumeVersion.job_id == job_id, ResumeVersion.pdf_path.is_not(None))
+        .order_by(ResumeVersion.round.desc())
+    ).first()
