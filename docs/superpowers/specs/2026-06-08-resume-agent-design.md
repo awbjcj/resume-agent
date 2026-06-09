@@ -26,7 +26,7 @@ Turn "hundreds of raw postings" into "a handful of well-matched jobs, each with 
 | 3 | Job sources (v1) | **LinkedIn first** (scrape via burner account); Indeed deferred to v2 |
 | 4 | Scrape model | **Burner LinkedIn account**, persistent logged-in browser profile |
 | 5 | Sponsorship | **Hard requirement.** Inferred from JD prose. `silent` ⇒ flag (keep), `denied` ⇒ reject, `offered` ⇒ keep |
-| 6 | Resume ground truth | **Existing resume file + GitHub profile only** (the "fact-lock") |
+| 6 | Resume ground truth | **Existing resume file + GitHub profile only** (the "fact-lock"), captured **comprehensively** |
 | 7 | PDF rendering | **Typst, single-column**, ATS-parseable; content as structured data, never LLM-authored markup |
 | 8 | LLM usage | **Mixed by stage** — cheap model for bulk extraction/scoring; premium for tailoring + key reviewers |
 | 9 | Tracking | **SQLite (source of truth) + Streamlit dashboard** |
@@ -102,10 +102,25 @@ Cheap LLM screens many jobs; the human approves ~10; premium LLM + the Agno revi
 ## 5. Components
 
 ### 5.1 `profile/` — Fact-Lock
-- **`ProfileFacts`** (Pydantic): `contact`, `summary`, `experience[]` (company, title, dates, bullets[], tech[]), `projects[]` (name, desc, tech[], url, `source: resume|github`), `skills[]`, `education[]`, `certs[]`, `schema_version`, `extra`.
-- **Resume parser:** extract text (`pypdf` / `python-docx`) → cheap-LLM structures into `ProfileFacts`.
-- **GitHub ingest:** GitHub API → public repos, READMEs, languages, pinned → cheap-LLM summarizes notable projects → merged, tagged `source=github`.
-- **Output:** `data/profile/facts.json`, **human-editable and authoritative**. Generated once via `profile build`; the user corrects it; everything downstream trusts it.
+
+The fact-lock captures **everything** available from the resume and GitHub, so any present or future tailoring has the full fact set to draw from. Every atomic fact (bullet, project, skill, …) carries a stable **`id`** (for provenance) and a **`source`** (`resume | github | manual`).
+
+- **`ProfileFacts`** (Pydantic), comprehensive and extensible (`schema_version` + `extra` at every level):
+  - **`contact`** — name, headline, email, phone, location (city/region/country), `willing_to_relocate`, **`work_authorization`** (sponsorship need — also feeds the sponsorship filter), links (website, LinkedIn, GitHub, Twitter/X, Scholar, other[]).
+  - **`summary`** — professional summary / objective.
+  - **`experience[]`** — company, title, employment_type, location, start, end/current, `bullets[]` (each with `id`), `tech[]`, quantified achievements.
+  - **`education[]`** — institution, degree, field, start, end, GPA, honors[], relevant_coursework[], activities[].
+  - **`projects[]`** — name, description, role, `tech[]`, url, repo_url, highlights[], dates, `source`.
+  - **`skills`** — categorized open-ended map (languages, frameworks, tools, cloud, databases, soft-skills, …).
+  - **`certifications[]`** — name, issuer, date, credential_id, url.
+  - **`publications[]`** — title, venue, date, authors, url.
+  - **`awards[]`** — name, issuer, date, description.
+  - **`languages[]`** — spoken language + proficiency.
+  - **`volunteer[]`** — org, role, dates, description.
+  - **`interests[]`**, plus `extra` for anything not modeled.
+- **Resume parser:** extract text (`pypdf` / `python-docx`) → cheap-LLM structures into the full `ProfileFacts` (all sections above).
+- **GitHub ingest (comprehensive):** GitHub API → profile (bio, followers, public_repos, account age, top languages, total stars) + **all notable public repos** (name, description, stars, forks, primary + all languages, topics, homepage, last-updated, is_fork) + READMEs → cheap-LLM summarizes each repo into a `projects[]` entry (`source=github`) and merges profile-level signals.
+- **Output:** `data/profile/facts.json`, **human-editable and authoritative**. Generated once via `profile build`; the user corrects/augments it; everything downstream trusts it.
 
 ### 5.2 `discovery/` — the funnel
 - **`config/search.yaml`:** keywords, titles, locations, remote pref, min salary, YoE range, `sponsorship_required: true`.
