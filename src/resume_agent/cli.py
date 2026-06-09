@@ -1,3 +1,5 @@
+import os
+import subprocess
 from pathlib import Path
 
 import typer
@@ -8,6 +10,8 @@ from resume_agent.discovery.ingest import add_job
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
 from resume_agent.discovery.pipeline import discover
+from resume_agent.discovery.scraper.ingest import ingest_scraped
+from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.profile.build import build_profile
 from resume_agent.profile.store import load_facts, save_facts
@@ -99,6 +103,21 @@ def discover_cmd(
     typer.echo(f"Discovery complete. Status counts: {counts}")
 
 
+@app.command("scrape")
+def scrape_cmd(
+    search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
+    limit: int | None = typer.Option(None, help="Cap the number of jobs ingested this run."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""
+    config = load_search_config(search)
+    scraper = build_linkedin_scraper()
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        added = ingest_scraped(session, scraper, config, limit=limit)
+    typer.echo(f"Scrape complete. Added {added} new job(s).")
+
+
 DEFAULT_REVIEW = "config/review.yaml"
 
 
@@ -183,6 +202,18 @@ def render_cmd(
         typer.echo(f"Resume version #{version_id} not found.")
         raise typer.Exit(code=1)
     typer.echo(f"Rendered version #{version_id} -> {path}")
+
+
+@app.command("dashboard")
+def dashboard_cmd(
+    db_url: str = typer.Option(None, help="Override the database URL for the dashboard."),
+) -> None:
+    """Launch the Streamlit dashboard (shortlist checkpoint + pipeline board)."""
+    app_path = str(Path(__file__).parent / "dashboard" / "app.py")
+    env = dict(os.environ)
+    if db_url:
+        env["DB_URL"] = db_url
+    subprocess.run(["streamlit", "run", app_path], env=env)
 
 
 if __name__ == "__main__":
