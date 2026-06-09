@@ -1,0 +1,30 @@
+from sqlalchemy import func
+from sqlmodel import Session, select
+
+from resume_agent.tracking.tables import Job
+
+
+def save_job(session: Session, job: Job) -> Job:
+    """Insert or update a job (SQLModel ``add`` handles both)."""
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    return job
+
+
+def jobs_by_status(session: Session, status: str) -> list[Job]:
+    return list(session.exec(select(Job).where(Job.status == status)).all())
+
+
+def find_existing(session: Session, url: str | None, jd_text: str) -> Job | None:
+    """Return a matching job by URL (if given) else by identical JD text, for dedupe."""
+    if url:
+        by_url = session.exec(select(Job).where(Job.url == url)).first()
+        if by_url is not None:
+            return by_url
+    return session.exec(select(Job).where(Job.jd_text == jd_text)).first()
+
+
+def status_counts(session: Session) -> dict[str, int]:
+    rows = session.exec(select(Job.status, func.count()).group_by(Job.status)).all()
+    return {status: count for status, count in rows}
