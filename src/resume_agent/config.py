@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     linkedin_email: str = ""
     linkedin_password: str = ""
     db_url: str = "sqlite:///data/resume_agent.db"
+    cheap_model: str = "claude-haiku-4-5-20251001"
 
 
 @lru_cache

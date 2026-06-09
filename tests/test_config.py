@@ -30,3 +30,8 @@ def test_load_yaml_rejects_non_mapping(tmp_path):
     f.write_text("- just\n- a\n- list\n", encoding="utf-8")
     with pytest.raises(ValueError):
         load_yaml(f)
+
+
+def test_settings_has_cheap_model_default():
+    settings = Settings(_env_file=None)
+    assert settings.cheap_model == "claude-haiku-4-5-20251001"
