@@ -1,0 +1,24 @@
+# Reviewer roster, weights, and loop controls (see design spec §5.3).
+max_rounds: 3
+score_threshold: 85
+reviewers:
+  - name: fact-check
+    gate: true            # blocking: any unsupported claim fails the round
+    weight: 0
+    model_tier: premium
+  - name: ats-keyword
+    gate: false
+    weight: 1
+    model_tier: mid
+  - name: recruiter
+    gate: false
+    weight: 1
+    model_tier: mid
+  - name: hiring-manager
+    gate: false
+    weight: 1
+    model_tier: premium
+  - name: concision
+    gate: false
+    weight: 1
+    model_tier: mid
