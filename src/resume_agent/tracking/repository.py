@@ -1,7 +1,7 @@
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from resume_agent.tracking.tables import Job
+from resume_agent.tracking.tables import Job, ResumeVersion
 
 
 def save_job(session: Session, job: Job) -> Job:
@@ -28,3 +28,18 @@ def find_existing(session: Session, url: str | None, jd_text: str) -> Job | None
 def status_counts(session: Session) -> dict[str, int]:
     rows = session.exec(select(Job.status, func.count()).group_by(Job.status)).all()
     return {status: count for status, count in rows}
+
+
+def get_job(session: Session, job_id: int) -> Job | None:
+    return session.get(Job, job_id)
+
+
+def save_resume_version(session: Session, version: ResumeVersion) -> ResumeVersion:
+    session.add(version)
+    session.commit()
+    session.refresh(version)
+    return version
+
+
+def resume_versions_for_job(session: Session, job_id: int) -> list[ResumeVersion]:
+    return list(session.exec(select(ResumeVersion).where(ResumeVersion.job_id == job_id)).all())
