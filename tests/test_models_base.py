@@ -13,10 +13,13 @@ def test_extensible_model_defaults():
     assert m.extra == {}
 
 
-def test_extensible_model_ignores_unknown_keys():
-    # Forward-compat: older code reading newer JSON must not crash.
+def test_extensible_model_preserves_unknown_keys():
+    # Forward-compat: unknown keys are preserved (not dropped) so a load->save
+    # round-trip of newer JSON doesn't lose data the model doesn't model yet.
     m = ExtensibleModel.model_validate({"future_field": 123})
-    assert not hasattr(m, "future_field")
+    assert m.model_dump()["future_field"] == 123
+    restored = ExtensibleModel.model_validate_json(m.model_dump_json())
+    assert restored.model_dump()["future_field"] == 123
 
 
 def test_fact_item_has_auto_id_and_default_source():

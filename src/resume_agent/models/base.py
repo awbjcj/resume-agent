@@ -24,11 +24,11 @@ class ExtensibleModel(BaseModel):
     - ``schema_version`` enables explicit future migrations.
     - ``extra`` is the escape hatch for experimental fields before they are
       promoted to first-class.
-    - ``extra="ignore"`` tolerates unknown keys so older code can load newer
-      JSON without crashing.
+    - ``extra="allow"`` preserves unknown keys so a load->save round-trip of
+      newer JSON doesn't silently drop fields the model doesn't know yet.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="allow")
 
     schema_version: int = 1
     extra: dict[str, Any] = Field(default_factory=dict)
