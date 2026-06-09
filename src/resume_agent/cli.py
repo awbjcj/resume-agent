@@ -11,6 +11,11 @@ from resume_agent.discovery.pipeline import discover
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.profile.build import build_profile
 from resume_agent.profile.store import load_facts, save_facts
+from resume_agent.tailor.agents import build_reviewer_agent, build_reviser_agent, build_tailor_agent, model_for_tier
+from resume_agent.tailor.review_config import load_review_config
+from resume_agent.tailor.service import tailor_job
+from resume_agent.tracking.repository import get_job, jobs_by_status, save_job
+from resume_agent.tracking.tables import JobStatus
 
 app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
 profile_app = typer.Typer(help="Build and manage your fact-lock profile.")
@@ -90,6 +95,69 @@ def discover_cmd(
     with get_session(engine) as session:
         counts = discover(session, config, profile_facts, extract_agent, fit_agent)
     typer.echo(f"Discovery complete. Status counts: {counts}")
+
+
+DEFAULT_REVIEW = "config/review.yaml"
+
+
+def build_reviewer_agents(config) -> dict:
+    """Build one Agno reviewer agent per configured reviewer, at its model tier."""
+    return {
+        spec.name: build_reviewer_agent(spec.name, model_for_tier(spec.model_tier))
+        for spec in config.reviewers
+    }
+
+
+@app.command("approve")
+def approve(
+    job_id: int = typer.Argument(..., help="Job id to approve for tailoring."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Mark a shortlisted job as approved (the human checkpoint before tailoring)."""
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        job = get_job(session, job_id)
+        if job is None:
+            typer.echo(f"Job #{job_id} not found.")
+            raise typer.Exit(code=1)
+        job.status = JobStatus.approved.value
+        save_job(session, job)
+    typer.echo(f"Approved job #{job_id}.")
+
+
+@app.command("tailor")
+def tailor_cmd(
+    job_id: int = typer.Option(None, help="Tailor a single job by id."),
+    approved: bool = typer.Option(False, "--approved", help="Tailor all approved jobs."),
+    review: str = typer.Option(DEFAULT_REVIEW, help="Path to review.yaml."),
+    facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Run the tailor + review loop over approved job(s)."""
+    config = load_review_config(review)
+    profile_facts = load_facts(facts)
+    tailor_agent = build_tailor_agent()
+    reviser_agent = build_reviser_agent()
+    reviewer_agents = build_reviewer_agents(config)
+
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        if job_id is not None:
+            job = get_job(session, job_id)
+            targets = [job] if job is not None else []
+        elif approved:
+            targets = jobs_by_status(session, JobStatus.approved.value)
+        else:
+            typer.echo("Specify --job-id <id> or --approved.")
+            raise typer.Exit(code=1)
+
+        for job in targets:
+            versions = tailor_job(
+                session, job, profile_facts, config, tailor_agent, reviewer_agents, reviser_agent
+            )
+            typer.echo(
+                f"Job #{job.id}: {len(versions)} version(s); final fact_check_passed={versions[-1].fact_check_passed}"
+            )
 
 
 if __name__ == "__main__":
