@@ -14,6 +14,8 @@ from resume_agent.profile.store import load_facts, save_facts
 from resume_agent.tailor.agents import build_reviewer_agent, build_reviser_agent, build_tailor_agent, model_for_tier
 from resume_agent.tailor.review_config import load_review_config
 from resume_agent.tailor.service import tailor_job
+from resume_agent.render.render_config import RenderConfig, load_render_config
+from resume_agent.render.service import render_version
 from resume_agent.tracking.repository import get_job, jobs_by_status, save_job
 from resume_agent.tracking.tables import JobStatus
 
@@ -134,22 +136,25 @@ def tailor_cmd(
     db_url: str = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run the tailor + review loop over approved job(s)."""
-    config = load_review_config(review)
-    profile_facts = load_facts(facts)
-    tailor_agent = build_tailor_agent()
-    reviser_agent = build_reviser_agent()
-    reviewer_agents = build_reviewer_agents(config)
-
     engine = _engine(db_url)
     with get_session(engine) as session:
         if job_id is not None:
             job = get_job(session, job_id)
-            targets = [job] if job is not None else []
+            if job is None:
+                typer.echo(f"Job #{job_id} not found.")
+                raise typer.Exit(code=1)
+            targets = [job]
         elif approved:
             targets = jobs_by_status(session, JobStatus.approved.value)
         else:
             typer.echo("Specify --job-id <id> or --approved.")
             raise typer.Exit(code=1)
+
+        config = load_review_config(review)
+        profile_facts = load_facts(facts)
+        tailor_agent = build_tailor_agent()
+        reviser_agent = build_reviser_agent()
+        reviewer_agents = build_reviewer_agents(config)
 
         for job in targets:
             versions = tailor_job(
@@ -158,6 +163,26 @@ def tailor_cmd(
             typer.echo(
                 f"Job #{job.id}: {len(versions)} version(s); final fact_check_passed={versions[-1].fact_check_passed}"
             )
+
+
+DEFAULT_RENDER = "config/render.yaml"
+
+
+@app.command("render")
+def render_cmd(
+    version_id: int = typer.Argument(..., help="resume_versions.id to render to PDF."),
+    config: str = typer.Option(DEFAULT_RENDER, help="Path to render.yaml."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Render a stored resume version to a PDF."""
+    render_config = load_render_config(config) if Path(config).exists() else RenderConfig()
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        path = render_version(session, version_id, render_config)
+    if path is None:
+        typer.echo(f"Resume version #{version_id} not found.")
+        raise typer.Exit(code=1)
+    typer.echo(f"Rendered version #{version_id} -> {path}")
 
 
 if __name__ == "__main__":

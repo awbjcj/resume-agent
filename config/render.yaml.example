@@ -1,0 +1,3 @@
+# Render settings (see design spec §5.4).
+template_path: templates/resume.typ
+output_dir: output
