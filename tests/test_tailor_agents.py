@@ -1,0 +1,30 @@
+from agno.agent import Agent
+
+from resume_agent.models.resume import ResumeContent
+from resume_agent.models.review import ReviewCritique
+from resume_agent.tailor.agents import (
+    build_reviewer_agent,
+    build_reviser_agent,
+    build_tailor_agent,
+    model_for_tier,
+)
+
+
+def test_model_for_tier_maps_known_tiers():
+    assert model_for_tier("cheap")
+    assert model_for_tier("mid")
+    assert model_for_tier("premium")
+    # unknown tier falls back to the mid model
+    assert model_for_tier("bogus") == model_for_tier("mid")
+
+
+def test_build_tailor_and_reviser_agents(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    assert isinstance(build_tailor_agent(model_id="claude-haiku-4-5-20251001"), Agent)
+    assert isinstance(build_reviser_agent(model_id="claude-haiku-4-5-20251001"), Agent)
+
+
+def test_build_reviewer_agent(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    agent = build_reviewer_agent("fact-check", model_id="claude-haiku-4-5-20251001")
+    assert isinstance(agent, Agent)
