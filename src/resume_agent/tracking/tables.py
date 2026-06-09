@@ -77,4 +77,6 @@ class Application(SQLModel, table=True):
     status: str = Field(default=ApplicationStatus.ready.value, index=True)
     submitted_at: datetime | None = None
     notes: str | None = None
-    updated_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(
+        default_factory=utcnow, sa_column_kwargs={"onupdate": utcnow}
+    )
