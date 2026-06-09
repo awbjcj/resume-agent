@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.python-version.local
+
+# uv
+.uv/
+
+# Secrets & local config
+.env
+.env.*
+!.env.example
+
+# Generated artifacts
+output/
+data/
+*.pdf
+
+# Tooling / agent state
+.omc/
+.remember/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
