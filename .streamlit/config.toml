@@ -1,0 +1,11 @@
+# "Midnight Atelier" — editorial control-room theme for Resume Agent.
+[theme]
+base = "dark"
+primaryColor = "#e9b44c"
+backgroundColor = "#12141c"
+secondaryBackgroundColor = "#1a1d28"
+textColor = "#ece6da"
+font = "sans serif"
+
+[server]
+headless = true
