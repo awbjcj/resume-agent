@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.13, uv, Pydantic v2, pydantic-settings, SQLModel (SQLAlchemy), PyYAML, pytest.
 
-> **Commit convention:** every commit in this plan should end its message with the trailer:
+> **Commit convention:** every commit in this plan should end its message with the trailer. The commit commands below use a second `-m` paragraph so Git records it as a proper trailer:
 > `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
 
 ---
@@ -80,7 +80,7 @@ Expected: pytest appears under `[dependency-groups] dev` (or `[tool.uv] dev-depe
 
 - [ ] **Step 3: Make the project an installable src-layout package**
 
-Edit `pyproject.toml` — update the description and append the build + pytest config blocks (keep the `[project]` / `dependencies` that `uv add` wrote):
+Edit `pyproject.toml` — update the project metadata and append the build + pytest config blocks. Do not replace or remove the `dependencies` array or dev dependency group that `uv add` wrote; versions may differ from the example below.
 
 ```toml
 [project]
@@ -89,6 +89,17 @@ version = "0.1.0"
 description = "Personal AI job-hunt, resume-tailoring, and application-tracking pipeline"
 readme = "README.md"
 requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2",
+    "pydantic-settings>=2",
+    "pyyaml>=6",
+    "sqlmodel>=0.0.27",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -138,7 +149,7 @@ Expected: PASS. (`uv run` syncs the project into the venv in editable mode, maki
 
 ```bash
 git add pyproject.toml uv.lock src/resume_agent/__init__.py tests/test_smoke.py
-git commit -m "chore: src-layout package scaffold + foundation deps"
+git commit -m "chore: src-layout package scaffold + foundation deps" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -169,10 +180,13 @@ def test_extensible_model_defaults():
     assert m.extra == {}
 
 
-def test_extensible_model_ignores_unknown_keys():
-    # Forward-compat: older code reading newer JSON must not crash.
+def test_extensible_model_preserves_unknown_keys():
+    # Forward-compat: unknown keys are preserved (not dropped) so a load->save
+    # round-trip of newer JSON doesn't lose data the model doesn't model yet.
     m = ExtensibleModel.model_validate({"future_field": 123})
-    assert not hasattr(m, "future_field")
+    assert m.model_dump()["future_field"] == 123
+    restored = ExtensibleModel.model_validate_json(m.model_dump_json())
+    assert restored.model_dump()["future_field"] == 123
 
 
 def test_fact_item_has_auto_id_and_default_source():
@@ -184,7 +198,7 @@ def test_fact_item_has_auto_id_and_default_source():
 def test_fact_item_source_round_trips():
     f = FactItem(source="github")
     assert f.source == Source.github
-    assert f.model_dump()["source"] == "github"
+    assert f.model_dump(mode="json")["source"] == "github"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -230,11 +244,11 @@ class ExtensibleModel(BaseModel):
     - ``schema_version`` enables explicit future migrations.
     - ``extra`` is the escape hatch for experimental fields before they are
       promoted to first-class.
-    - ``extra="ignore"`` tolerates unknown keys so older code can load newer
-      JSON without crashing.
+    - ``extra="allow"`` preserves unknown keys so a load->save round-trip of
+      newer JSON doesn't silently drop fields the model doesn't know yet.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="allow")
 
     schema_version: int = 1
     extra: dict[str, Any] = Field(default_factory=dict)
@@ -259,7 +273,7 @@ Expected: PASS (5 tests).
 
 ```bash
 git add src/resume_agent/models/__init__.py src/resume_agent/models/base.py tests/test_models_base.py
-git commit -m "feat(models): extensible base model + provenance fact item"
+git commit -m "feat(models): extensible base model + provenance fact item" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -277,8 +291,10 @@ Create `tests/test_models_profile.py`:
 from resume_agent.models.profile import (
     Contact,
     Experience,
+    GitHubProfile,
     ProfileFacts,
     Project,
+    Skill,
 )
 
 
@@ -307,14 +323,36 @@ def test_experience_bullets_get_provenance_ids():
 def test_skills_is_an_open_ended_category_map():
     p = ProfileFacts(
         contact=Contact(name="Ada"),
-        skills={"languages": ["Python"], "cloud": ["AWS", "GCP"]},
+        skills={
+            "languages": [{"name": "Python"}],
+            "cloud": [Skill(name="AWS"), {"name": "GCP", "source": "manual"}],
+        },
     )
-    assert p.skills["cloud"] == ["AWS", "GCP"]
+    assert [skill.name for skill in p.skills["cloud"]] == ["AWS", "GCP"]
+    assert p.skills["cloud"][0].id
+    assert p.skills["cloud"][1].source.value == "manual"
 
 
-def test_github_project_tagged_with_source():
-    proj = Project(name="repo", source="github", repo_url="https://github.com/x/repo")
+def test_github_project_and_profile_signals_are_modeled():
+    proj = Project(
+        name="repo",
+        source="github",
+        repo_url="https://github.com/x/repo",
+        stars=10,
+        languages=["Python"],
+        topics=["llm"],
+        is_fork=False,
+    )
+    profile = GitHubProfile(
+        username="ada",
+        followers=42,
+        top_languages=["Python"],
+        total_stars=10,
+    )
     assert proj.source.value == "github"
+    assert proj.stars == 10
+    assert profile.source.value == "github"
+    assert profile.total_stars == 10
 
 
 def test_profile_round_trips_through_json():
@@ -338,7 +376,7 @@ Create `src/resume_agent/models/profile.py`:
 ```python
 from pydantic import Field
 
-from resume_agent.models.base import ExtensibleModel, FactItem
+from resume_agent.models.base import ExtensibleModel, FactItem, Source
 
 
 class Link(ExtensibleModel):
@@ -359,6 +397,12 @@ class Contact(ExtensibleModel):
 
 class Bullet(FactItem):
     text: str
+
+
+class Skill(FactItem):
+    name: str
+    aliases: list[str] = Field(default_factory=list)
+    context: str | None = None
 
 
 class Experience(FactItem):
@@ -395,6 +439,14 @@ class Project(FactItem):
     highlights: list[str] = Field(default_factory=list)
     start: str | None = None
     end: str | None = None
+    stars: int | None = None
+    forks: int | None = None
+    primary_language: str | None = None
+    languages: list[str] = Field(default_factory=list)
+    topics: list[str] = Field(default_factory=list)
+    homepage_url: str | None = None
+    last_updated: str | None = None
+    is_fork: bool | None = None
 
 
 class Certification(FactItem):
@@ -433,6 +485,17 @@ class Volunteer(FactItem):
     description: str | None = None
 
 
+class GitHubProfile(FactItem):
+    source: Source = Source.github
+    username: str | None = None
+    bio: str | None = None
+    followers: int | None = None
+    public_repos: int | None = None
+    account_created_at: str | None = None
+    top_languages: list[str] = Field(default_factory=list)
+    total_stars: int | None = None
+
+
 class ProfileFacts(ExtensibleModel):
     """The fact-lock: the ONLY facts any tailoring is allowed to draw from."""
 
@@ -441,12 +504,13 @@ class ProfileFacts(ExtensibleModel):
     experience: list[Experience] = Field(default_factory=list)
     education: list[Education] = Field(default_factory=list)
     projects: list[Project] = Field(default_factory=list)
-    skills: dict[str, list[str]] = Field(default_factory=dict)
+    skills: dict[str, list[Skill]] = Field(default_factory=dict)
     certifications: list[Certification] = Field(default_factory=list)
     publications: list[Publication] = Field(default_factory=list)
     awards: list[Award] = Field(default_factory=list)
     languages: list[Language] = Field(default_factory=list)
     volunteer: list[Volunteer] = Field(default_factory=list)
+    github_profile: GitHubProfile | None = None
     interests: list[str] = Field(default_factory=list)
 ```
 
@@ -462,7 +526,7 @@ Expected: PASS (5 tests).
 
 ```bash
 git add src/resume_agent/models/profile.py tests/test_models_profile.py
-git commit -m "feat(models): comprehensive ProfileFacts fact-lock schema"
+git commit -m "feat(models): comprehensive ProfileFacts fact-lock schema" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -566,7 +630,7 @@ Expected: PASS (3 tests).
 
 ```bash
 git add src/resume_agent/models/job.py tests/test_models_job.py
-git commit -m "feat(models): JobCriteria extraction schema"
+git commit -m "feat(models): JobCriteria extraction schema" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -589,6 +653,7 @@ from resume_agent.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
+    TailoredSkill,
 )
 
 
@@ -600,6 +665,12 @@ def test_tailored_bullet_requires_provenance():
 def test_tailored_bullet_provenance_is_mandatory():
     with pytest.raises(ValidationError):
         TailoredBullet(text="Built X")  # no provenance -> fabrication risk
+
+
+def test_tailored_skill_requires_provenance():
+    skill = TailoredSkill(name="Python", provenance="skill0000001")
+    assert skill.name == "Python"
+    assert skill.provenance == "skill0000001"
 
 
 def test_resume_content_assembles_from_facts_contact():
@@ -650,6 +721,14 @@ class TailoredBullet(ExtensibleModel):
     provenance: str  # id of the source Bullet/Experience/Project in ProfileFacts
 
 
+class TailoredSkill(ExtensibleModel):
+    """A selected skill. ``provenance`` MUST point to a ProfileFacts Skill id."""
+
+    name: str
+    provenance: str
+    context: str | None = None
+
+
 class TailoredExperience(ExtensibleModel):
     company: str
     title: str
@@ -676,7 +755,7 @@ class ResumeContent(ExtensibleModel):
     summary: str | None = None
     experience: list[TailoredExperience] = Field(default_factory=list)
     projects: list[TailoredProject] = Field(default_factory=list)
-    skills: dict[str, list[str]] = Field(default_factory=dict)
+    skills: dict[str, list[TailoredSkill]] = Field(default_factory=dict)
     education: list[Education] = Field(default_factory=list)  # carried verbatim
 ```
 
@@ -686,13 +765,13 @@ Run:
 ```bash
 uv run pytest tests/test_models_resume.py -v
 ```
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/resume_agent/models/resume.py tests/test_models_resume.py
-git commit -m "feat(models): ResumeContent with mandatory provenance"
+git commit -m "feat(models): ResumeContent with mandatory provenance" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -728,10 +807,16 @@ def test_critique_round_trips():
         passed=False,
         issues=[ReviewIssue(severity="major", message="Missing keyword: Kubernetes",
                             suggestion="Add it if truthfully supported")],
+        suggestions=[
+            "Only add Kubernetes if a ProfileFacts skill or project supports it",
+        ],
     )
     restored = ReviewCritique.model_validate(c.model_dump(mode="json"))
     assert restored.issues[0].severity == Severity.major
     assert restored.score == 70
+    assert restored.suggestions == [
+        "Only add Kubernetes if a ProfileFacts skill or project supports it",
+    ]
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -770,9 +855,10 @@ class ReviewCritique(ExtensibleModel):
     """One reviewer agent's structured verdict on a ResumeContent draft."""
 
     reviewer: str  # the reviewing agent's name
-    score: int  # 0-100
+    score: int = Field(ge=0, le=100)
     passed: bool  # the reviewer's pass/fail; fact-check's value is the hard gate
     issues: list[ReviewIssue] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
     summary: str | None = None
 ```
 
@@ -788,7 +874,7 @@ Expected: PASS (3 tests).
 
 ```bash
 git add src/resume_agent/models/review.py tests/test_models_review.py
-git commit -m "feat(models): ReviewCritique schema for the Agno review panel"
+git commit -m "feat(models): ReviewCritique schema for the Agno review panel" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -819,6 +905,12 @@ def _memory_engine():
     engine = create_engine("sqlite://")
     SQLModel.metadata.create_all(engine)
     return engine
+
+
+def test_table_names_match_design_spec():
+    assert Job.__tablename__ == "jobs"
+    assert ResumeVersion.__tablename__ == "resume_versions"
+    assert Application.__tablename__ == "applications"
 
 
 def test_job_defaults_and_json_column_round_trip():
@@ -931,6 +1023,8 @@ class ApplicationStatus(str, Enum):
 
 
 class Job(SQLModel, table=True):
+    __tablename__ = "jobs"
+
     id: int | None = Field(default=None, primary_key=True)
     source: str
     url: str | None = None
@@ -948,8 +1042,10 @@ class Job(SQLModel, table=True):
 
 
 class ResumeVersion(SQLModel, table=True):
+    __tablename__ = "resume_versions"
+
     id: int | None = Field(default=None, primary_key=True)
-    job_id: int = Field(foreign_key="job.id", index=True)
+    job_id: int = Field(foreign_key="jobs.id", index=True)
     round: int = 0
     content_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     pdf_path: str | None = None
@@ -961,9 +1057,11 @@ class ResumeVersion(SQLModel, table=True):
 
 
 class Application(SQLModel, table=True):
+    __tablename__ = "applications"
+
     id: int | None = Field(default=None, primary_key=True)
-    job_id: int = Field(foreign_key="job.id", index=True)
-    resume_version_id: int | None = Field(default=None, foreign_key="resumeversion.id")
+    job_id: int = Field(foreign_key="jobs.id", index=True)
+    resume_version_id: int | None = Field(default=None, foreign_key="resume_versions.id")
     status: str = Field(default=ApplicationStatus.ready.value, index=True)
     submitted_at: datetime | None = None
     notes: str | None = None
@@ -976,13 +1074,13 @@ Run:
 ```bash
 uv run pytest tests/test_tables.py -v
 ```
-Expected: PASS (3 tests).
+Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/resume_agent/tracking/__init__.py src/resume_agent/tracking/tables.py tests/test_tables.py
-git commit -m "feat(tracking): SQLModel tables with JSON columns + status enums"
+git commit -m "feat(tracking): SQLModel tables with JSON columns + status enums" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1005,7 +1103,20 @@ import pytest
 from resume_agent.config import Settings, load_yaml
 
 
-def test_settings_reads_env_file(tmp_path):
+def clear_settings_env(monkeypatch):
+    for name in (
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GITHUB_TOKEN",
+        "LINKEDIN_EMAIL",
+        "LINKEDIN_PASSWORD",
+        "DB_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_settings_reads_env_file(tmp_path, monkeypatch):
+    clear_settings_env(monkeypatch)
     env = tmp_path / ".env"
     env.write_text("ANTHROPIC_API_KEY=sk-test\nGITHUB_TOKEN=ghp-test\n", encoding="utf-8")
     settings = Settings(_env_file=str(env))
@@ -1013,7 +1124,8 @@ def test_settings_reads_env_file(tmp_path):
     assert settings.github_token == "ghp-test"
 
 
-def test_settings_have_safe_defaults():
+def test_settings_have_safe_defaults(monkeypatch):
+    clear_settings_env(monkeypatch)
     settings = Settings(_env_file=None)
     assert settings.anthropic_api_key == ""
     assert settings.db_url.startswith("sqlite:///")
@@ -1156,7 +1268,7 @@ Expected: PASS (4 tests).
 
 ```bash
 git add src/resume_agent/config.py .env.example config/search.yaml.example config/review.yaml.example tests/test_config.py
-git commit -m "feat(config): settings loader + example env/yaml configs"
+git commit -m "feat(config): settings loader + example env/yaml configs" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1265,16 +1377,16 @@ Expected: PASS — all tests across Tasks 1–9 green.
 
 ```bash
 git add src/resume_agent/db.py tests/test_db.py
-git commit -m "feat(db): engine factory, init_db, and session helper"
+git commit -m "feat(db): engine factory, init_db, and session helper" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
 
 ## Self-Review (completed during plan authoring)
 
-- **Spec coverage:** §3.1 fact-lock/provenance → `FactItem.id` (Task 2), mandatory `TailoredBullet.provenance` (Task 5). §3.2 extensibility → `ExtensibleModel` (`schema_version` + `extra` + `extra="ignore"`, Task 2), JSON columns (Task 7). §5.1 ProfileFacts (Task 3). §5.2 `JobCriteria` + `SponsorshipSignal.silent` default (Task 4) and `config/search.yaml` (Task 8). §5.3 `ReviewCritique` (Task 6) + `config/review.yaml` roster/weights/`max_rounds` (Task 8). §5.5 three tables + two status lifecycles (Task 7). §6 layout + config (Tasks 1, 8). Components profile/discovery/tailor/render/dashboard logic are **out of scope for Foundation** and covered by their own forthcoming plans.
+- **Spec coverage:** §3.1 fact-lock/provenance → `FactItem.id` (Task 2), provenance-bearing `Skill` facts (Task 3), mandatory `TailoredBullet.provenance` and `TailoredSkill.provenance` (Task 5). §3.2 extensibility → `ExtensibleModel` (`schema_version` + `extra` + `extra="allow"`, Task 2), JSON columns (Task 7). §5.1 ProfileFacts + GitHub repository/profile fields (Task 3). §5.2 `JobCriteria` + `SponsorshipSignal.silent` default (Task 4) and `config/search.yaml` (Task 8). §5.3 `ReviewCritique` with `issues[]` and `suggestions[]` (Task 6) + `config/review.yaml` roster/weights/`max_rounds` (Task 8). §5.5 three explicit plural tables + two status lifecycles (Task 7). §6 layout + config (Tasks 1, 8). Components profile/discovery/tailor/render/dashboard logic are **out of scope for Foundation** and covered by their own forthcoming plans.
 - **Placeholder scan:** none — every step has complete code and exact commands.
-- **Type consistency:** `ResumeContent` reuses `Contact`/`Education` from `profile.py`; `ResumeVersion.critique_json` stores a list of `ReviewCritique`-shaped dicts (Task 6 ↔ Task 7); FK `resumeversion.id` matches SQLModel's default lowercased table name; `JobStatus.raw`/`ApplicationStatus.ready` defaults used consistently in tables and tests.
+- **Type consistency:** `ResumeContent` reuses `Contact`/`Education` from `profile.py`; `ResumeContent.skills` stores provenance-bearing `TailoredSkill` items that point back to `ProfileFacts.skills`; `ResumeVersion.critique_json` stores a list of `ReviewCritique`-shaped dicts (Task 6 ↔ Task 7); FKs use the explicit plural table names from the design spec (`jobs.id`, `resume_versions.id`); `JobStatus.raw`/`ApplicationStatus.ready` defaults used consistently in tables and tests.
 
 ---
 

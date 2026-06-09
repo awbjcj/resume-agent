@@ -44,7 +44,7 @@ These apply to every component and must survive into the implementation.
 ### 3.1 Fact-Lock (anti-fabrication)
 The rewriter may **select, reorder, and rephrase** facts; it may **never invent**. Enforcement:
 - `ProfileFacts` (built once, human-edited) is the *only* allowed source of claims.
-- Every generated resume bullet carries a **`provenance`** pointer to the source fact ID.
+- Every generated claim-bearing resume item carries a **`provenance`** pointer to the source fact ID. Bullets and selected skills carry their own pointers; section-level items such as experiences and projects carry a pointer to the source record.
 - A dedicated **Fact-Check reviewer** is a *hard gate*: any claim not traceable to a fact fails the round regardless of other scores. Provenance makes this partially verifiable in plain code before any LLM runs.
 
 ### 3.2 Extensibility of fields & text
@@ -110,16 +110,17 @@ The fact-lock captures **everything** available from the resume and GitHub, so a
   - **`summary`** — professional summary / objective.
   - **`experience[]`** — company, title, employment_type, location, start, end/current, `bullets[]` (each with `id`), `tech[]`, quantified achievements.
   - **`education[]`** — institution, degree, field, start, end, GPA, honors[], relevant_coursework[], activities[].
-  - **`projects[]`** — name, description, role, `tech[]`, url, repo_url, highlights[], dates, `source`.
-  - **`skills`** — categorized open-ended map (languages, frameworks, tools, cloud, databases, soft-skills, …).
+  - **`projects[]`** — name, description, role, `tech[]`, url, repo_url, highlights[], dates, GitHub repository metadata when applicable (`stars`, `forks`, languages, topics, homepage, last-updated, `is_fork`), `source`.
+  - **`skills`** — categorized open-ended map (languages, frameworks, tools, cloud, databases, soft-skills, …) whose values are skill facts with `id`, `source`, `name`, optional aliases/context, not bare strings.
   - **`certifications[]`** — name, issuer, date, credential_id, url.
   - **`publications[]`** — title, venue, date, authors, url.
   - **`awards[]`** — name, issuer, date, description.
   - **`languages[]`** — spoken language + proficiency.
   - **`volunteer[]`** — org, role, dates, description.
+  - **`github_profile`** — profile-level GitHub signals (bio, followers, public repos, account age, top languages, total stars), when GitHub ingest is enabled.
   - **`interests[]`**, plus `extra` for anything not modeled.
 - **Resume parser:** extract text (`pypdf` / `python-docx`) → cheap-LLM structures into the full `ProfileFacts` (all sections above).
-- **GitHub ingest (comprehensive):** GitHub API → profile (bio, followers, public_repos, account age, top languages, total stars) + **all notable public repos** (name, description, stars, forks, primary + all languages, topics, homepage, last-updated, is_fork) + READMEs → cheap-LLM summarizes each repo into a `projects[]` entry (`source=github`) and merges profile-level signals.
+- **GitHub ingest (comprehensive):** GitHub API → profile (bio, followers, public_repos, account age, top languages, total stars) + **all notable public repos** (name, description, stars, forks, primary + all languages, topics, homepage, last-updated, is_fork) + READMEs → cheap-LLM summarizes each repo into a `projects[]` entry (`source=github`) and stores profile-level signals in `github_profile`.
 - **Output:** `data/profile/facts.json`, **human-editable and authoritative**. Generated once via `profile build`; the user corrects/augments it; everything downstream trusts it.
 
 ### 5.2 `discovery/` — the funnel
@@ -135,7 +136,7 @@ The fact-lock captures **everything** available from the resume and GitHub, so a
 ### 5.3 `tailor/` — Agno tailor + review (centerpiece)
 An **Agno `Workflow`** (premium models), run once per *approved* job. Input: `JobCriteria` + JD text + `ProfileFacts`.
 
-1. **Tailor agent** (`output_schema=ResumeContent`): selects/reorders/rephrases `ProfileFacts` to the JD; injects must-have keywords only where a real fact supports it; targeted summary. Each bullet carries a `provenance` fact ID.
+1. **Tailor agent** (`output_schema=ResumeContent`): selects/reorders/rephrases `ProfileFacts` to the JD; injects must-have keywords only where a real fact supports it; targeted summary. Each claim-bearing output item carries a `provenance` fact ID.
 2. **Review `Team`** (parallel members, each `output_schema=ReviewCritique{score, issues[], suggestions[]}`):
 
    | Agent | Role | Model tier |
@@ -204,6 +205,8 @@ templates/resume.typ   ·   data/   ·   output/   ·   tests/
 - **Runtime:** Python 3.13, `uv`.
 - **Core deps:** `agno`, `anthropic` + `openai` (model providers), `pydantic`, `playwright`, `typer`, `streamlit`, `sqlmodel`, `httpx`, `PyGithub`, `pypdf`, `python-docx`, `typst`, `pyyaml`, `tenacity`, `rich`.
 - **Dev:** `pytest`, `ruff`.
+
+Component implementation plans may add these dependencies incrementally. The Foundation plan installs only the shared-spine dependencies it directly needs.
 
 ---
 
