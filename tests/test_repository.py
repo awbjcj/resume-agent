@@ -40,3 +40,15 @@ def test_status_counts():
         counts = status_counts(s)
         assert counts[JobStatus.raw.value] == 2
         assert counts[JobStatus.shortlisted.value] == 1
+
+
+def test_get_resume_version_roundtrip():
+    from resume_agent.tracking.repository import get_resume_version, save_resume_version
+    from resume_agent.tracking.tables import ResumeVersion
+
+    with _session() as s:
+        v = save_resume_version(s, ResumeVersion(job_id=1, round=1, content_json={"contact": {"name": "Ada"}}))
+        fetched = get_resume_version(s, v.id)
+        assert fetched is not None
+        assert fetched.content_json["contact"]["name"] == "Ada"
+        assert get_resume_version(s, 9999) is None
