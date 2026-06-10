@@ -5,7 +5,7 @@ from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.panel import compose_review_input, run_panel
+from resume_agent.tailor.panel import run_panel
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.tailoring import compose_revise_input, compose_tailor_input, revise, tailor
 from resume_agent.tailor.verdict import PanelVerdict, aggregate
@@ -33,9 +33,7 @@ def run_tailor_review(
     content = tailor(compose_tailor_input(jd_text, criteria, profile_facts), tailor_agent)
     rounds: list[TailorRound] = []
     for round_num in range(1, config.max_rounds + 1):
-        critiques = run_panel(
-            compose_review_input(content, profile_facts, jd_text), config, reviewer_agents
-        )
+        critiques = run_panel(content, profile_facts, jd_text, config, reviewer_agents)
         verdict = aggregate(critiques, config)
         rounds.append(TailorRound(round_num=round_num, content=content, verdict=verdict))
         if verdict.passed or round_num == config.max_rounds:
