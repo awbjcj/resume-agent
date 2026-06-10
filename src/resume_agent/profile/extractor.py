@@ -16,7 +16,7 @@ _INSTRUCTIONS = [
 
 def build_extractor_agent(model_id: str | None = None) -> Runner:
     """Create the Agno agent that structures resume text into ProfileFacts."""
-    resolved = model_id or get_settings().cheap_model
+    resolved = model_id or get_settings().mid_model
     return AgentRunner(
         Agent(
             model=Claude(id=resolved),
