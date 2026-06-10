@@ -1,7 +1,7 @@
 from resume_agent.models.job import JobCriteria
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
 from resume_agent.models.review import Severity
-from resume_agent.models.resume import ResumeContent
+from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 from resume_agent.models.review import ReviewCritique, ReviewIssue
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
 from resume_agent.tailor.workflow import TailorRound, run_tailor_review
@@ -89,3 +89,57 @@ def test_loop_stops_at_max_rounds_when_never_passing():
     )
     assert len(rounds) == 2
     assert rounds[-1].verdict.passed is False
+
+
+def test_broken_provenance_short_circuits_panel():
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[
+            Experience(
+                id="e1",
+                company="AE",
+                title="Eng",
+                bullets=[Bullet(id="b1", text="X")],
+            )
+        ],
+    )
+
+    class _BadTailor:
+        def run(self, prompt):
+            return _Result(
+                ResumeContent(
+                    contact=Contact(name="Ada"),
+                    experience=[
+                        TailoredExperience(
+                            company="AE",
+                            title="Eng",
+                            provenance="e1",
+                            bullets=[TailoredBullet(text="X", provenance="ghost")],
+                        )
+                    ],
+                )
+            )
+
+    class _ExplodingReviewer:
+        def run(self, prompt):
+            raise AssertionError("panel should be skipped when provenance is broken")
+
+    config = ReviewConfig(
+        max_rounds=1,
+        score_threshold=1,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+
+    rounds = run_tailor_review(
+        jd_text="role",
+        criteria=JobCriteria(),
+        profile_facts=facts,
+        config=config,
+        tailor_agent=_BadTailor(),
+        reviewer_agents={"fact-check": _ExplodingReviewer()},
+        reviser_agent=_BadTailor(),
+    )
+
+    assert len(rounds) == 1
+    assert rounds[0].verdict.gate_passed is False
+    assert rounds[0].verdict.critiques[0].reviewer == "provenance"
