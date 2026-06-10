@@ -14,6 +14,7 @@ def test_settings_reads_env_file(tmp_path):
 def test_settings_have_safe_defaults():
     settings = Settings(_env_file=None)
     assert settings.anthropic_api_key == ""
+    assert settings.linkedin_user_data_dir == ".linkedin_profile"
     assert settings.db_url.startswith("sqlite:///")
 
 
