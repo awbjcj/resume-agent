@@ -34,7 +34,7 @@ def repo_to_project(repo: dict) -> Project:
         primary_language=language,
         languages=[language] if language else [],
         topics=repo.get("topics", []),
-        homepage_url=repo.get("homepage"),
+        homepage_url=repo.get("homepage") or None,
         last_updated=repo.get("updated_at"),
         is_fork=repo.get("fork"),
     )

@@ -25,4 +25,7 @@ def _read_docx(p: Path) -> str:
     from docx import Document
 
     doc = Document(str(p))
-    return "\n".join(para.text for para in doc.paragraphs)
+    parts = [para.text for para in doc.paragraphs]
+    # Many resume templates lay out content in tables; doc.paragraphs skips those.
+    parts += [cell.text for table in doc.tables for row in table.rows for cell in row.cells]
+    return "\n".join(parts)
