@@ -113,7 +113,7 @@ def discover_cmd(
 @app.command("scrape")
 def scrape_cmd(
     search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
-    limit: int | None = typer.Option(None, help="Cap the number of jobs ingested this run."),
+    limit: int | None = typer.Option(None, help="Cap the number of postings fetched this run."),
     db_url: str = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""

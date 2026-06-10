@@ -18,7 +18,11 @@ def ingest_scraped(
     config: SearchConfig,
     limit: int | None = None,
 ) -> int:
-    """Fetch scraped jobs, insert raw jobs through shared dedupe, and return count added."""
+    """Fetch scraped jobs, insert raw jobs through shared dedupe, and return count added.
+
+    ``limit`` caps how many search cards are examined (each one JD fetch), not how
+    many jobs end up added — duplicates and empty JDs still consume the budget.
+    """
     added = 0
     for index, card in enumerate(source.search(config)):
         if limit is not None and index >= limit:

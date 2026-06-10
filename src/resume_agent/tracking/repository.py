@@ -29,6 +29,8 @@ def find_existing(session: Session, url: str | None, jd_text: str) -> Job | None
         by_url = session.exec(select(Job).where(Job.url == url)).first()
         if by_url is not None:
             return by_url
+    if not jd_text:
+        return None
     return session.exec(select(Job).where(Job.jd_text == jd_text)).first()
 
 
