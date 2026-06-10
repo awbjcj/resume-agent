@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from sqlalchemy import func
 from sqlmodel import Session, select
 
@@ -91,16 +93,21 @@ def update_application_status(
 
 
 def latest_resume_version(session: Session, job_id: int) -> ResumeVersion | None:
+    round_col = cast(Any, ResumeVersion.round)
+    id_col = cast(Any, ResumeVersion.id)
     return session.exec(
         select(ResumeVersion)
         .where(ResumeVersion.job_id == job_id)
-        .order_by(ResumeVersion.round.desc(), ResumeVersion.id.desc())
+        .order_by(round_col.desc(), id_col.desc())
     ).first()
 
 
 def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersion | None:
+    pdf_path_col = cast(Any, ResumeVersion.pdf_path)
+    round_col = cast(Any, ResumeVersion.round)
+    id_col = cast(Any, ResumeVersion.id)
     return session.exec(
         select(ResumeVersion)
-        .where(ResumeVersion.job_id == job_id, ResumeVersion.pdf_path.is_not(None))
-        .order_by(ResumeVersion.round.desc(), ResumeVersion.id.desc())
+        .where(ResumeVersion.job_id == job_id, pdf_path_col.is_not(None))
+        .order_by(round_col.desc(), id_col.desc())
     ).first()

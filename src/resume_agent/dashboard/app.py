@@ -288,6 +288,10 @@ def render_shortlist_page(session) -> None:
                     st.markdown(f'<div class="rationale">{row.fit_rationale}</div>', unsafe_allow_html=True)
                 if st.button("Approve for tailoring  →", key=f"approve-{row.job_id}"):
                     job = get_job(session, row.job_id)
+                    if job is None:
+                        st.error(f"Job #{row.job_id} no longer exists.")
+                        st.rerun()
+                        return
                     job.status = JobStatus.approved.value
                     save_job(session, job)
                     st.success(f"Approved {row.title or 'job'} #{row.job_id}.")
@@ -339,6 +343,10 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
             if application is None:
                 save_application(session, _new_application(row.job_id, new_status, notes))
             else:
+                if application.id is None:
+                    st.error("Cannot update an application that has not been persisted.")
+                    st.rerun()
+                    return
                 update_application_status(session, application.id, new_status, notes or None)
             st.success("Saved.")
             st.rerun()

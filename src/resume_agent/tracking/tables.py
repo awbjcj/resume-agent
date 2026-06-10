@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
@@ -35,7 +35,7 @@ class ApplicationStatus(str, Enum):
 
 
 class Job(SQLModel, table=True):
-    __tablename__ = "jobs"
+    __tablename__ = cast(Any, "jobs")
 
     id: int | None = Field(default=None, primary_key=True)
     source: str
@@ -54,7 +54,7 @@ class Job(SQLModel, table=True):
 
 
 class ResumeVersion(SQLModel, table=True):
-    __tablename__ = "resume_versions"
+    __tablename__ = cast(Any, "resume_versions")
 
     id: int | None = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="jobs.id", index=True)
@@ -69,7 +69,7 @@ class ResumeVersion(SQLModel, table=True):
 
 
 class Application(SQLModel, table=True):
-    __tablename__ = "applications"
+    __tablename__ = cast(Any, "applications")
 
     id: int | None = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="jobs.id", index=True)

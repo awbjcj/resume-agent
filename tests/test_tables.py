@@ -15,6 +15,11 @@ def _memory_engine():
     return engine
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def test_job_defaults_and_json_column_round_trip():
     engine = _memory_engine()
     with Session(engine) as s:
@@ -28,6 +33,7 @@ def test_job_defaults_and_json_column_round_trip():
         s.refresh(job)
         assert job.id is not None
         assert job.status == JobStatus.raw.value
+        assert job.criteria_json is not None
         assert job.criteria_json["must_have_skills"] == ["Python"]
         assert job.created_at is not None
 
@@ -40,7 +46,7 @@ def test_resume_version_links_to_job_and_stores_critiques():
         s.commit()
         s.refresh(job)
         rv = ResumeVersion(
-            job_id=job.id,
+            job_id=_require_id(job.id),
             round=1,
             content_json={"contact": {"name": "Ada"}},
             critique_json=[{"reviewer": "fact-check", "score": 100, "passed": True}],
@@ -51,6 +57,7 @@ def test_resume_version_links_to_job_and_stores_critiques():
         s.commit()
         s.refresh(rv)
         assert rv.job_id == job.id
+        assert rv.critique_json is not None
         assert rv.critique_json[0]["reviewer"] == "fact-check"
 
 
@@ -61,11 +68,11 @@ def test_application_status_default_is_ready():
         s.add(job)
         s.commit()
         s.refresh(job)
-        app = Application(job_id=job.id)
+        app = Application(job_id=_require_id(job.id))
         s.add(app)
         s.commit()
         s.refresh(app)
         assert app.status == ApplicationStatus.ready.value
 
-        rows = s.exec(select(Application).where(Application.job_id == job.id)).all()
+        rows = s.exec(select(Application).where(Application.job_id == _require_id(job.id))).all()
         assert len(rows) == 1

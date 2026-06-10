@@ -1,6 +1,11 @@
 import importlib
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def test_dashboard_module_exposes_render_functions():
     app = importlib.import_module("resume_agent.dashboard.app")
     # The page renderers and entrypoint exist and are callable.
@@ -43,8 +48,9 @@ def test_dashboard_pages_render_without_error(tmp_path, monkeypatch):
                         fit_rationale="Strong match.", criteria_json={"sponsorship_signal": "offered"}))
         j2 = save_job(s, Job(source="manual", jd_text="Platform role.", company="Beta",
                              title="Platform Eng", status=JobStatus.rendered.value, fit_score=72))
-        save_resume_version(s, ResumeVersion(job_id=j2.id, round=1, content_json={"contact": {"name": "Ada"}}))
-        save_application(s, Application(job_id=j2.id, status=ApplicationStatus.submitted.value))
+        j2_id = _require_id(j2.id)
+        save_resume_version(s, ResumeVersion(job_id=j2_id, round=1, content_json={"contact": {"name": "Ada"}}))
+        save_application(s, Application(job_id=j2_id, status=ApplicationStatus.submitted.value))
 
     try:
         at = AppTest.from_file(appmod.__file__, default_timeout=30).run()

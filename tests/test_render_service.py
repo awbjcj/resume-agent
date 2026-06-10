@@ -16,6 +16,11 @@ def _session() -> Session:
     return Session(engine)
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def test_render_version_sets_path_and_marks_rendered(tmp_path):
     calls = {}
 
@@ -31,16 +36,18 @@ def test_render_version_sets_path_and_marks_rendered(tmp_path):
         job = save_job(s, Job(source="manual", jd_text="jd", company="Acme", title="Engineer",
                               status=JobStatus.tailored.value))
         version = save_resume_version(
-            s, ResumeVersion(job_id=job.id, round=1,
+            s, ResumeVersion(job_id=_require_id(job.id), round=1,
                              content_json=ResumeContent(contact=Contact(name="Ada")).model_dump(mode="json")),
         )
 
-        path = render_version(s, version.id, config, render_fn=fake_render)
+        path = render_version(s, _require_id(version.id), config, render_fn=fake_render)
 
+        assert path is not None
         assert path.exists()
         assert path.suffix == ".pdf"
         assert isinstance(calls["content"], ResumeContent)
-        refreshed = get_resume_version(s, version.id)
+        refreshed = get_resume_version(s, _require_id(version.id))
+        assert refreshed is not None
         assert refreshed.pdf_path == str(path)
         assert job.status == JobStatus.rendered.value
 
@@ -56,23 +63,29 @@ def test_render_version_uses_distinct_paths_for_versions_same_job_same_day(tmp_p
         job = save_job(s, Job(source="manual", jd_text="jd", company="Acme", title="Engineer",
                               status=JobStatus.tailored.value))
         first = save_resume_version(
-            s, ResumeVersion(job_id=job.id, round=1,
+            s, ResumeVersion(job_id=_require_id(job.id), round=1,
                              content_json=ResumeContent(contact=Contact(name="Ada")).model_dump(mode="json")),
         )
         second = save_resume_version(
-            s, ResumeVersion(job_id=job.id, round=2,
+            s, ResumeVersion(job_id=_require_id(job.id), round=2,
                              content_json=ResumeContent(contact=Contact(name="Ada")).model_dump(mode="json")),
         )
 
-        first_path = render_version(s, first.id, config, render_fn=fake_render)
-        second_path = render_version(s, second.id, config, render_fn=fake_render)
+        first_path = render_version(s, _require_id(first.id), config, render_fn=fake_render)
+        second_path = render_version(s, _require_id(second.id), config, render_fn=fake_render)
 
+        assert first_path is not None
+        assert second_path is not None
         assert first_path != second_path
-        assert f"v{first.id}" in first_path.stem
-        assert f"v{second.id}" in second_path.stem
+        assert f"v{_require_id(first.id)}" in first_path.stem
+        assert f"v{_require_id(second.id)}" in second_path.stem
 
 
 def test_render_version_missing_returns_none(tmp_path):
     config = RenderConfig(output_dir=str(tmp_path))
+
+    def fake_render(content, output_path, template_path):
+        return Path(output_path)
+
     with _session() as s:
-        assert render_version(s, 4242, config, render_fn=lambda *a, **k: None) is None
+        assert render_version(s, 4242, config, render_fn=fake_render) is None

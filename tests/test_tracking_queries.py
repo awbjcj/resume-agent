@@ -11,6 +11,11 @@ def _session() -> Session:
     return Session(engine)
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def test_shortlist_rows_only_shortlisted_with_fit_and_sponsorship():
     with _session() as s:
         save_job(s, Job(source="manual", jd_text="a", company="Acme", title="Eng",
@@ -33,18 +38,18 @@ def test_pipeline_rows_include_pdf_and_application_status():
     with _session() as s:
         job = save_job(s, Job(source="manual", jd_text="a", company="Acme", title="Eng",
                               status=JobStatus.rendered.value, fit_score=90))
-        save_resume_version(s, ResumeVersion(job_id=job.id, round=1, content_json={"x": 1}))
+        save_resume_version(s, ResumeVersion(job_id=_require_id(job.id), round=1, content_json={"x": 1}))
         save_resume_version(
             s,
             ResumeVersion(
-                job_id=job.id,
+                job_id=_require_id(job.id),
                 round=2,
                 content_json={"contact": {"name": "Ada"}},
                 critique_json=[{"reviewer": "fact-check", "passed": True}],
                 pdf_path="output/acme.pdf",
             ),
         )
-        save_application(s, Application(job_id=job.id, status=ApplicationStatus.submitted.value))
+        save_application(s, Application(job_id=_require_id(job.id), status=ApplicationStatus.submitted.value))
 
         rows = pipeline_rows(s)
         assert len(rows) == 1

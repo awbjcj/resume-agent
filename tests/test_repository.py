@@ -15,6 +15,11 @@ def _session() -> Session:
     return Session(engine)
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def test_save_and_query_by_status():
     with _session() as s:
         save_job(s, Job(source="manual", jd_text="a", status=JobStatus.raw.value))
@@ -48,7 +53,8 @@ def test_get_resume_version_roundtrip():
 
     with _session() as s:
         v = save_resume_version(s, ResumeVersion(job_id=1, round=1, content_json={"contact": {"name": "Ada"}}))
-        fetched = get_resume_version(s, v.id)
+        fetched = get_resume_version(s, _require_id(v.id))
         assert fetched is not None
+        assert fetched.content_json is not None
         assert fetched.content_json["contact"]["name"] == "Ada"
         assert get_resume_version(s, 9999) is None
