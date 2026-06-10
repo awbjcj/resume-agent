@@ -1,6 +1,6 @@
 import pytest
 
-from agno.agent import Agent
+from resume_agent.llm_runner import AgentRunner
 
 from resume_agent.models.job import JobCriteria, SponsorshipSignal
 from resume_agent.discovery.extract import build_extract_agent, extract_job_criteria
@@ -36,4 +36,4 @@ def test_extract_rejects_wrong_type():
 
 def test_build_extract_agent_is_agent(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    assert isinstance(build_extract_agent(model_id="claude-haiku-4-5-20251001"), Agent)
+    assert isinstance(build_extract_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)

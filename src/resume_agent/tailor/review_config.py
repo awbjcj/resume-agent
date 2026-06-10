@@ -14,7 +14,7 @@ class ReviewerSpec(ExtensibleModel):
 
 
 class ReviewConfig(ExtensibleModel):
-    max_rounds: int = 3
+    max_rounds: int = Field(default=3, ge=1)
     score_threshold: int = 85
     reviewers: list[ReviewerSpec] = Field(default_factory=list)
 

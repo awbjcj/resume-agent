@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from agno.agent import Agent
+from resume_agent.llm_runner import AgentRunner
 
 from resume_agent.discovery.fit import FitScore, build_fit_agent, compose_fit_input, score_fit
 from resume_agent.models.profile import Contact, ProfileFacts
@@ -45,4 +45,4 @@ def test_score_fit_rejects_wrong_type():
 
 def test_build_fit_agent_is_agent(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    assert isinstance(build_fit_agent(model_id="claude-haiku-4-5-20251001"), Agent)
+    assert isinstance(build_fit_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)

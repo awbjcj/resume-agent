@@ -1,4 +1,4 @@
-from agno.agent import Agent
+from resume_agent.llm_runner import AgentRunner
 
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
@@ -20,11 +20,11 @@ def test_model_for_tier_maps_known_tiers():
 
 def test_build_tailor_and_reviser_agents(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    assert isinstance(build_tailor_agent(model_id="claude-haiku-4-5-20251001"), Agent)
-    assert isinstance(build_reviser_agent(model_id="claude-haiku-4-5-20251001"), Agent)
+    assert isinstance(build_tailor_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
+    assert isinstance(build_reviser_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
 
 
 def test_build_reviewer_agent(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     agent = build_reviewer_agent("fact-check", model_id="claude-haiku-4-5-20251001")
-    assert isinstance(agent, Agent)
+    assert isinstance(agent, AgentRunner)
