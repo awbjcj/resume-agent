@@ -178,10 +178,10 @@
   if xs.len() > 0 {
     [
       #section-title("Volunteer")
-      #for v in xs [
-        *#v.organization*#if v.at("role", default: none) != none [ — #v.role]
-        #if v.at("description", default: none) != none [ \ #v.description]
-        #for b in v.at("bullets", default: ()) [ - #b.text ]
+      #for vol in xs [
+        *#vol.organization*#if vol.at("role", default: none) != none [ — #vol.role]
+        #if vol.at("description", default: none) != none [ \ #vol.description]
+        #for b in vol.at("bullets", default: ()) [ - #b.text ]
         #v(2pt)
       ]
     ]

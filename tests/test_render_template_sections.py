@@ -8,6 +8,7 @@ from resume_agent.models.resume import (
     TailoredCertification,
     TailoredExperience,
     TailoredPublication,
+    TailoredVolunteer,
 )
 from resume_agent.render.renderer import render_pdf
 
@@ -43,6 +44,14 @@ def _rich_content() -> ResumeContent:
         certifications=[TailoredCertification(name="Six Sigma", issuer="ASQ", provenance="cer1")],
         awards=[TailoredAward(name="Best Intern", provenance="awa1")],
         languages=[Language(language="English", proficiency="native")],
+        volunteer=[
+            TailoredVolunteer(
+                organization="Robotics Club",
+                role="Mentor",
+                provenance="vol1",
+                bullets=[TailoredBullet(text="Coached FIRST teams", provenance="volb1")],
+            )
+        ],
         section_order=[
             "summary",
             "experience",
@@ -51,6 +60,7 @@ def _rich_content() -> ResumeContent:
             "certifications",
             "awards",
             "languages",
+            "volunteer",
         ],
     )
 
@@ -70,7 +80,9 @@ def test_template_renders_all_new_sections(tmp_path):
         "AWARDS",
         "LANGUAGES",
         "EDUCATION",
+        "VOLUNTEER",
         "3.9",
         "Six Sigma",
+        "Robotics Club",
     ]:
         assert needle in text, f"missing {needle!r} in rendered PDF"
