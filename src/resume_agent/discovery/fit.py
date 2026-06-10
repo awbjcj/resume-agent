@@ -1,10 +1,9 @@
-from typing import Any, Protocol
-
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 from pydantic import Field
 
 from resume_agent.config import get_settings
+from resume_agent.llm_runner import AgentRunner, Runner
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.profile import ProfileFacts
 
@@ -14,10 +13,6 @@ class FitScore(ExtensibleModel):
     rationale: str
 
 
-class Runner(Protocol):
-    def run(self, prompt: str) -> Any: ...
-
-
 _INSTRUCTIONS = [
     "Score how well the candidate fits the job, from 0 to 100.",
     "Base the score only on the candidate facts and job description provided.",
@@ -25,13 +20,15 @@ _INSTRUCTIONS = [
 ]
 
 
-def build_fit_agent(model_id: str | None = None) -> Agent:
+def build_fit_agent(model_id: str | None = None) -> Runner:
     resolved = model_id or get_settings().cheap_model
-    return Agent(
-        model=Claude(id=resolved),
-        description="You rate how well a candidate fits a job.",
-        instructions=_INSTRUCTIONS,
-        output_schema=FitScore,
+    return AgentRunner(
+        Agent(
+            model=Claude(id=resolved),
+            description="You rate how well a candidate fits a job.",
+            instructions=_INSTRUCTIONS,
+            output_schema=FitScore,
+        )
     )
 
 

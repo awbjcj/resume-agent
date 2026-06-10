@@ -1,4 +1,5 @@
 from resume_agent.models.profile import (
+    Bullet,
     Contact,
     Experience,
     GitHubProfile,
@@ -6,6 +7,7 @@ from resume_agent.models.profile import (
     Project,
     Skill,
 )
+from resume_agent.models.base import Source
 
 
 def make_minimal_profile() -> ProfileFacts:
@@ -23,7 +25,7 @@ def test_experience_bullets_get_provenance_ids():
     exp = Experience(
         company="Analytical Engines Ltd",
         title="Engineer",
-        bullets=[{"text": "Wrote the first algorithm"}],
+        bullets=[Bullet(text="Wrote the first algorithm")],
     )
     assert exp.id  # experience itself has an id
     assert exp.bullets[0].id  # each bullet has an id
@@ -33,7 +35,10 @@ def test_experience_bullets_get_provenance_ids():
 def test_skills_is_an_open_ended_category_map():
     p = ProfileFacts(
         contact=Contact(name="Ada"),
-        skills={"languages": [{"name": "Python"}], "cloud": [Skill(name="AWS"), {"name": "GCP", "source": "manual"}]},
+        skills={
+            "languages": [Skill(name="Python")],
+            "cloud": [Skill(name="AWS"), Skill(name="GCP", source=Source.manual)],
+        },
     )
     assert [skill.name for skill in p.skills["cloud"]] == ["AWS", "GCP"]
     assert p.skills["cloud"][0].id
@@ -43,7 +48,7 @@ def test_skills_is_an_open_ended_category_map():
 def test_github_project_and_profile_signals_are_modeled():
     proj = Project(
         name="repo",
-        source="github",
+        source=Source.github,
         repo_url="https://github.com/x/repo",
         stars=10,
         languages=["Python"],

@@ -36,7 +36,9 @@ def test_fetch_readme_returns_text():
         return httpx.Response(200, text="# Engine\nThe first computer.")
 
     gh = _client(handler)
-    assert "first computer" in gh.fetch_readme("ada", "engine")
+    readme = gh.fetch_readme("ada", "engine")
+    assert readme is not None
+    assert "first computer" in readme.lower()
 
 
 def test_fetch_readme_missing_returns_none():

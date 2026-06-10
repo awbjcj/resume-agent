@@ -48,6 +48,7 @@ def test_discover_extracts_filters_scores_and_shortlists():
         rejected = jobs_by_status(s, JobStatus.rejected.value)
         assert len(shortlisted) == 1
         assert shortlisted[0].fit_score == 90
+        assert shortlisted[0].criteria_json is not None
         assert shortlisted[0].criteria_json["sponsorship_signal"] == "offered"
         assert len(rejected) == 1
         assert rejected[0].reject_reason == "sponsorship not available"

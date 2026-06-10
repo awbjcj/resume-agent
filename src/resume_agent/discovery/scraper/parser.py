@@ -13,6 +13,13 @@ def _text(node: Tag | None) -> str | None:
     return value or None
 
 
+def _href(node: Tag | None) -> str | None:
+    if node is None:
+        return None
+    href = node.get("href")
+    return href if isinstance(href, str) else None
+
+
 def _strip_query(href: str | None) -> str | None:
     if not href:
         return None
@@ -37,7 +44,7 @@ def parse_search_cards(html: str) -> list[ScrapedCard]:
     cards: list[ScrapedCard] = []
     for card in soup.select("div.base-card"):
         link = card.select_one("a.base-card__full-link")
-        url = _strip_query(link.get("href") if link else None)
+        url = _strip_query(_href(link))
         cards.append(
             ScrapedCard(
                 job_id=_job_id(card, url),

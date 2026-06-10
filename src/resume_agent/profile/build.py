@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from resume_agent.llm_runner import Runner
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.extractor import build_extractor_agent, extract_profile_facts
 from resume_agent.profile.github import GitHubClient
@@ -11,7 +12,7 @@ from resume_agent.profile.resume_reader import read_resume_text
 def build_profile(
     resume_path: str | Path,
     github_username: str | None,
-    extractor_agent=None,
+    extractor_agent: Runner | None = None,
     github_client=None,
 ) -> ProfileFacts:
     """Build a merged ProfileFacts from a resume file and (optionally) GitHub.

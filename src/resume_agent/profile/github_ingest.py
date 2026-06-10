@@ -1,5 +1,6 @@
 from collections import Counter
 
+from resume_agent.models.base import Source
 from resume_agent.models.profile import GitHubProfile, Project
 
 
@@ -23,7 +24,7 @@ def repo_to_project(repo: dict) -> Project:
     """Map a single GitHub repo dict into a Project fact (source=github)."""
     language = repo.get("language")
     return Project(
-        source="github",
+        source=Source.github,
         name=repo["name"],
         description=repo.get("description"),
         url=repo.get("homepage") or repo.get("html_url"),

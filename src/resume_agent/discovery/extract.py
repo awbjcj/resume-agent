@@ -1,14 +1,9 @@
-from typing import Any, Protocol
-
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
 from resume_agent.config import get_settings
+from resume_agent.llm_runner import AgentRunner, Runner
 from resume_agent.models.job import JobCriteria
-
-
-class Runner(Protocol):
-    def run(self, prompt: str) -> Any: ...
 
 
 _INSTRUCTIONS = [
@@ -18,13 +13,15 @@ _INSTRUCTIONS = [
 ]
 
 
-def build_extract_agent(model_id: str | None = None) -> Agent:
+def build_extract_agent(model_id: str | None = None) -> Runner:
     resolved = model_id or get_settings().cheap_model
-    return Agent(
-        model=Claude(id=resolved),
-        description="You extract structured hiring criteria from job descriptions.",
-        instructions=_INSTRUCTIONS,
-        output_schema=JobCriteria,
+    return AgentRunner(
+        Agent(
+            model=Claude(id=resolved),
+            description="You extract structured hiring criteria from job descriptions.",
+            instructions=_INSTRUCTIONS,
+            output_schema=JobCriteria,
+        )
     )
 
 

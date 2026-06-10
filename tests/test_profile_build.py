@@ -36,6 +36,7 @@ def test_build_profile_combines_resume_and_github(tmp_path):
     )
 
     assert facts.contact.name == "Ada Lovelace"
+    assert facts.github_profile is not None
     assert facts.github_profile.username == "ada"
     assert [p.name for p in facts.projects] == ["engine"]
 

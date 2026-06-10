@@ -1,6 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
+from typing import cast
 
 import typer
 
@@ -31,6 +32,12 @@ DEFAULT_SOURCES = "config/profile_sources.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
 
 
+def _require_str(value: object, name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise typer.BadParameter(f"{name} must be configured as a non-empty string.")
+    return value
+
+
 @profile_app.command("build")
 def profile_build(
     sources: str = typer.Option(DEFAULT_SOURCES, help="Path to profile_sources.yaml."),
@@ -46,8 +53,8 @@ def profile_build(
 
     cfg = load_yaml(sources)
     facts = build_profile(
-        resume_path=cfg.get("resume_path"),
-        github_username=cfg.get("github_username"),
+        resume_path=_require_str(cfg.get("resume_path"), "resume_path"),
+        github_username=cast(str | None, cfg.get("github_username")),
     )
     path = save_facts(facts, out)
     typer.echo(

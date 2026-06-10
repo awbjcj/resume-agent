@@ -29,6 +29,6 @@ def test_fact_item_has_auto_id_and_default_source():
 
 
 def test_fact_item_source_round_trips():
-    f = FactItem(source="github")
+    f = FactItem(source=Source.github)
     assert f.source == Source.github
     assert f.model_dump()["source"] == "github"

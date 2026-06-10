@@ -1,16 +1,9 @@
-from typing import Any, Protocol
-
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
 from resume_agent.config import get_settings
+from resume_agent.llm_runner import AgentRunner, Runner
 from resume_agent.models.profile import ProfileFacts
-
-
-class Runner(Protocol):
-    """Anything with Agno's ``run(prompt) -> result`` shape (result has ``.content``)."""
-
-    def run(self, prompt: str) -> Any: ...
 
 
 _INSTRUCTIONS = [
@@ -21,14 +14,16 @@ _INSTRUCTIONS = [
 ]
 
 
-def build_extractor_agent(model_id: str | None = None) -> Agent:
+def build_extractor_agent(model_id: str | None = None) -> Runner:
     """Create the Agno agent that structures resume text into ProfileFacts."""
     resolved = model_id or get_settings().cheap_model
-    return Agent(
-        model=Claude(id=resolved),
-        description="You extract structured, truthful resume facts from raw resume text.",
-        instructions=_INSTRUCTIONS,
-        output_schema=ProfileFacts,
+    return AgentRunner(
+        Agent(
+            model=Claude(id=resolved),
+            description="You extract structured, truthful resume facts from raw resume text.",
+            instructions=_INSTRUCTIONS,
+            output_schema=ProfileFacts,
+        )
     )
 
 

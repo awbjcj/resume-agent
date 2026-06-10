@@ -17,7 +17,7 @@ def test_tailored_bullet_requires_provenance():
 
 def test_tailored_bullet_provenance_is_mandatory():
     with pytest.raises(ValidationError):
-        TailoredBullet(text="Built X")  # no provenance -> fabrication risk
+        TailoredBullet.model_validate({"text": "Built X"})  # no provenance -> fabrication risk
 
 
 def test_tailored_skill_requires_provenance():

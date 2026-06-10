@@ -5,7 +5,7 @@ from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
 
 
 def test_blocking_issue_severity():
-    issue = ReviewIssue(severity="blocking", message="Claim X not in ProfileFacts")
+    issue = ReviewIssue(severity=Severity.blocking, message="Claim X not in ProfileFacts")
     assert issue.severity == Severity.blocking
 
 
@@ -20,7 +20,7 @@ def test_critique_round_trips():
         reviewer="ats-keyword",
         score=70,
         passed=False,
-        issues=[ReviewIssue(severity="major", message="Missing keyword: Kubernetes",
+        issues=[ReviewIssue(severity=Severity.major, message="Missing keyword: Kubernetes",
                             suggestion="Add it if truthfully supported")],
         suggestions=["Only add Kubernetes if a ProfileFacts skill or project supports it"],
     )

@@ -7,6 +7,7 @@ def test_sponsorship_denied_is_rejected():
     cfg = SearchConfig(sponsorship_required=True)
     decision = apply_filters(JobCriteria(sponsorship_signal=SponsorshipSignal.denied), cfg)
     assert decision.keep is False
+    assert decision.reject_reason is not None
     assert "sponsorship" in decision.reject_reason
 
 
@@ -22,6 +23,7 @@ def test_salary_below_minimum_is_rejected():
     criteria = JobCriteria(salary_range=SalaryRange(minimum=80000, maximum=100000))
     decision = apply_filters(criteria, cfg)
     assert decision.keep is False
+    assert decision.reject_reason is not None
     assert "salary" in decision.reject_reason
 
 
@@ -29,6 +31,7 @@ def test_too_much_experience_required_is_rejected():
     cfg = SearchConfig(yoe_max=5)
     decision = apply_filters(JobCriteria(yoe_min=8), cfg)
     assert decision.keep is False
+    assert decision.reject_reason is not None
     assert "experience" in decision.reject_reason
 
 
