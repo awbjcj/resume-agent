@@ -18,6 +18,7 @@ from resume_agent.tailor.provenance import (
     check_provenance,
     index_facts,
     referenced_ids,
+    resolve_evidence,
 )
 
 
@@ -73,3 +74,12 @@ def test_check_provenance_flags_fabricated_id():
     report = check_provenance(_content(bullet_prov="ghost999"), _facts())
     assert report.ok is False
     assert report.missing == ["ghost999"]
+
+
+def test_resolve_evidence_returns_only_referenced_facts():
+    facts = _facts()
+    facts.skills["languages"].append(Skill(id="s2", name="Rust"))
+    evidence = resolve_evidence(_content(), facts)
+    assert set(evidence) == {"e1", "b1", "p1", "s1"}
+    assert evidence["b1"]["text"] == "Built X"
+    assert "s2" not in evidence

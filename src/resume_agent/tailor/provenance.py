@@ -63,3 +63,13 @@ def check_provenance(content: ResumeContent, facts: ProfileFacts) -> ProvenanceR
     valid = set(index_facts(facts))
     missing = sorted(i for i in referenced_ids(content) if i not in valid)
     return ProvenanceReport(ok=not missing, missing=missing)
+
+
+def resolve_evidence(content: ResumeContent, facts: ProfileFacts) -> dict[str, Any]:
+    """Return only the profile facts cited by the resume's provenance ids."""
+    index = index_facts(facts)
+    return {
+        fact_id: index[fact_id].model_dump(mode="json")
+        for fact_id in sorted(referenced_ids(content))
+        if fact_id in index
+    }
