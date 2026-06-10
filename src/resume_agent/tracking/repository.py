@@ -1,7 +1,12 @@
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from resume_agent.tracking.tables import Application, Job, ResumeVersion
+from resume_agent.tracking.tables import Application, ApplicationStatus, Job, ResumeVersion, utcnow
+
+
+def _stamp_submitted_at(application: Application) -> None:
+    if application.status == ApplicationStatus.submitted.value and application.submitted_at is None:
+        application.submitted_at = utcnow()
 
 
 def save_job(session: Session, job: Job) -> Job:
@@ -50,6 +55,7 @@ def get_resume_version(session: Session, version_id: int) -> ResumeVersion | Non
 
 
 def save_application(session: Session, application: Application) -> Application:
+    _stamp_submitted_at(application)
     session.add(application)
     session.commit()
     session.refresh(application)
@@ -75,6 +81,7 @@ def update_application_status(
     if application is None:
         return None
     application.status = status
+    _stamp_submitted_at(application)
     if notes is not None:
         application.notes = notes
     session.add(application)
@@ -87,7 +94,7 @@ def latest_resume_version(session: Session, job_id: int) -> ResumeVersion | None
     return session.exec(
         select(ResumeVersion)
         .where(ResumeVersion.job_id == job_id)
-        .order_by(ResumeVersion.round.desc())
+        .order_by(ResumeVersion.round.desc(), ResumeVersion.id.desc())
     ).first()
 
 
@@ -95,5 +102,5 @@ def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersi
     return session.exec(
         select(ResumeVersion)
         .where(ResumeVersion.job_id == job_id, ResumeVersion.pdf_path.is_not(None))
-        .order_by(ResumeVersion.round.desc())
+        .order_by(ResumeVersion.round.desc(), ResumeVersion.id.desc())
     ).first()

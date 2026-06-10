@@ -38,13 +38,20 @@ def compose_revise_input(
         for c in critiques
         for issue in c.issues
     )
+    suggestions = "\n".join(
+        f"- [{c.reviewer}] {suggestion}"
+        for c in critiques
+        for suggestion in c.suggestions
+    )
     return (
         "CANDIDATE PROFILE (JSON):\n"
         f"{profile_facts.model_dump_json()}\n\n"
         "CURRENT RESUME (JSON):\n"
         f"{content.model_dump_json()}\n\n"
         "REVIEWER ISSUES:\n"
-        f"{issues}"
+        f"{issues}\n\n"
+        "REVIEWER SUGGESTIONS:\n"
+        f"{suggestions}"
     )
 
 

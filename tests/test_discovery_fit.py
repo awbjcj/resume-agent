@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from agno.agent import Agent
 
@@ -30,6 +31,11 @@ def test_score_fit_returns_fitscore():
     fit = FitScore(score=82, rationale="strong overlap")
     out = score_fit("input", _FakeAgent(fit))
     assert out.score == 82
+
+
+def test_fit_score_rejects_out_of_range_score():
+    with pytest.raises(ValidationError):
+        FitScore(score=101, rationale="too high")
 
 
 def test_score_fit_rejects_wrong_type():

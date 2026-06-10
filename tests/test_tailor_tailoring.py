@@ -57,11 +57,13 @@ def test_compose_revise_input_includes_issue_messages():
             score=70,
             passed=False,
             issues=[ReviewIssue(severity="major", message="Missing keyword: Kubernetes", suggestion="Add it if true")],
+            suggestions=["Tighten the summary around backend systems"],
         )
     ]
     text = compose_revise_input(rc, critiques, _facts())
     assert "Missing keyword: Kubernetes" in text
     assert "Add it if true" in text
+    assert "Tighten the summary around backend systems" in text
 
 
 def test_revise_returns_resume_content():

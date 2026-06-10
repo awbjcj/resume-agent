@@ -144,6 +144,39 @@ h1, h2, h3, h4 { font-family: 'Fraunces', Georgia, serif !important; letter-spac
   background: var(--panel) !important; border-color: var(--line) !important; border-radius: 10px !important;
 }
 [data-testid="stExpander"] summary { font-family:'JetBrains Mono', monospace; font-size: 0.76rem; letter-spacing: 0.06em; color: var(--muted); }
+
+/* ── Focus visibility (keyboard a11y) ─────────────────────── */
+.stButton > button:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
+.stDownloadButton > button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.stTextInput input:focus-visible,
+.stSelectbox [data-baseweb="select"] > div:focus-within {
+  border-color: var(--amber) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 35%, transparent) !important;
+}
+[data-testid="stSidebar"] .stRadio label:focus-within { color: var(--amber); }
+
+/* ── Empty states (themed, replaces stock st.info) ────────── */
+.empty-state { text-align:center; padding: 3.4rem 1.2rem; border: 1px dashed var(--line);
+  border-radius: 16px; margin-top: 0.4rem; background: linear-gradient(180deg, var(--panel-2), var(--panel)); }
+.empty-glyph { font-family:'Fraunces', serif; font-size: 2.6rem; color: var(--amber); opacity: .85; line-height: 1; }
+.empty-title { font-family:'Fraunces', serif; font-size: 1.34rem; color: var(--cream); margin-top: .5rem; }
+.empty-body { color: var(--muted); font-size: .96rem; margin-top: .45rem; }
+.empty-body code { font-family:'JetBrains Mono', monospace; font-size: .85em; color: var(--cream);
+  background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: .1rem .42rem; }
+
+/* ── Entrance: one orchestrated page-load reveal ──────────── */
+@keyframes atelier-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.masthead { animation: atelier-rise .5s cubic-bezier(.2,.7,.2,1) both; }
+.metric-row { animation: atelier-rise .5s cubic-bezier(.2,.7,.2,1) .07s both; }
+.rail-head { animation: atelier-rise .45s cubic-bezier(.2,.7,.2,1) .1s both; }
+[data-testid="stVerticalBlockBorderWrapper"] { animation: atelier-rise .45s cubic-bezier(.2,.7,.2,1) .12s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, .masthead, .metric-row, .rail-head, [data-testid="stVerticalBlockBorderWrapper"] {
+    animation: none !important; transition: none !important;
+  }
+}
+
 #MainMenu, footer { visibility: hidden; }
 </style>
 """
@@ -170,8 +203,14 @@ def fit_block(score: int | None) -> str:
     else:
         color = ROSE
     shown = score if score is not None else "—"
+    aria = (
+        f'role="meter" aria-valuenow="{score}" aria-valuemin="0" aria-valuemax="100" '
+        f'aria-label="Fit score {score} out of 100"'
+        if score is not None
+        else 'role="meter" aria-label="Fit score not yet computed"'
+    )
     return (
-        '<div class="fit">'
+        f'<div class="fit" {aria}>'
         f'<div class="fit-num" style="color:{color}">{shown}<span class="fit-max">/100</span></div>'
         f'<div class="fit-bar"><div class="fit-fill" style="width:{pct}%;background:{color}"></div></div>'
         '<div class="fit-cap">FIT SCORE</div>'
@@ -197,6 +236,16 @@ def _metric_row(metrics: list[tuple[str, str]]) -> None:
     st.markdown(f'<div class="metric-row">{cells}</div>', unsafe_allow_html=True)
 
 
+def _empty_state(glyph: str, title: str, body_html: str) -> None:
+    """Render a themed empty state (keeps the canvas cohesive vs. stock st.info)."""
+    st.markdown(
+        f'<div class="empty-state"><div class="empty-glyph">{glyph}</div>'
+        f'<div class="empty-title">{title}</div>'
+        f'<div class="empty-body">{body_html}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _new_application(job_id: int, status: str, notes: str) -> Application:
     return Application(job_id=job_id, status=status, notes=notes or None)
 
@@ -216,7 +265,11 @@ def render_shortlist_page(session) -> None:
                  ("Sponsorship offered", str(sponsored))])
 
     if not rows:
-        st.info("No shortlisted jobs yet. Run `resume-agent discover` to populate the funnel.")
+        _empty_state(
+            "◇",
+            "Nothing shortlisted yet",
+            "Run <code>resume-agent discover</code> to score jobs and surface the keepers here.",
+        )
         return
 
     for row in rows:
@@ -300,7 +353,11 @@ def render_pipeline_page(session) -> None:
     )
 
     if not rows:
-        st.info("No jobs yet. Start with `resume-agent addjob` or `resume-agent scrape`.")
+        _empty_state(
+            "◇",
+            "No jobs in the pipeline",
+            "Start with <code>resume-agent addjob</code> or <code>resume-agent scrape</code>.",
+        )
         return
 
     counts = {}

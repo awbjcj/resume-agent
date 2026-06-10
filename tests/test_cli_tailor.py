@@ -53,3 +53,14 @@ def test_tailor_processes_a_job(tmp_path, monkeypatch):
     result = runner.invoke(cli.app, ["tailor", "--job-id", str(job_id), "--db-url", db_url])
     assert result.exit_code == 0, result.output
     assert "1 version" in result.output
+
+
+def test_tailor_reports_missing_job(tmp_path):
+    db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
+    engine = make_engine(db_url)
+    init_db(engine)
+
+    result = runner.invoke(cli.app, ["tailor", "--job-id", "999", "--db-url", db_url])
+
+    assert result.exit_code == 1
+    assert "Job #999 not found" in result.output

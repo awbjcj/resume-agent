@@ -27,7 +27,7 @@ def render_version(
     content = ResumeContent.model_validate(version.content_json or {})
     company = (job.company if job else None) or "company"
     title = (job.title if job else None) or "role"
-    filename = output_filename(company, title, utcnow().strftime("%Y%m%d"))
+    filename = output_filename(company, title, utcnow().strftime("%Y%m%d"), f"v{version.id or version_id}")
     out_path = Path(config.output_dir) / filename
 
     render_fn(content, out_path, config.template_path)

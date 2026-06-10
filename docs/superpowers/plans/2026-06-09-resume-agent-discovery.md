@@ -631,6 +631,7 @@ git commit -m "feat(discovery): deterministic hard filter" -m "Co-Authored-By: C
 Create `tests/test_discovery_fit.py`:
 ```python
 import pytest
+from pydantic import ValidationError
 
 from agno.agent import Agent
 
@@ -664,6 +665,11 @@ def test_score_fit_returns_fitscore():
     assert out.score == 82
 
 
+def test_fit_score_rejects_out_of_range_score():
+    with pytest.raises(ValidationError):
+        FitScore(score=101, rationale="too high")
+
+
 def test_score_fit_rejects_wrong_type():
     with pytest.raises(TypeError):
         score_fit("x", _FakeAgent("nope"))
@@ -690,6 +696,7 @@ from typing import Any, Protocol
 
 from agno.agent import Agent
 from agno.models.anthropic import Claude
+from pydantic import Field
 
 from resume_agent.config import get_settings
 from resume_agent.models.base import ExtensibleModel
@@ -697,7 +704,7 @@ from resume_agent.models.profile import ProfileFacts
 
 
 class FitScore(ExtensibleModel):
-    score: int  # 0-100
+    score: int = Field(ge=0, le=100)
     rationale: str
 
 
@@ -745,7 +752,7 @@ Run:
 ```bash
 uv run pytest tests/test_discovery_fit.py -v
 ```
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 

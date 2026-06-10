@@ -38,6 +38,22 @@ def test_update_application_status_and_notes():
         assert updated.notes == "applied via portal"
 
 
+def test_submitted_status_sets_submitted_at_once():
+    with _session() as s:
+        created = save_application(s, Application(job_id=1, status=ApplicationStatus.submitted.value))
+        assert created.submitted_at is not None
+
+        ready = save_application(s, Application(job_id=2, status=ApplicationStatus.ready.value))
+        assert ready.submitted_at is None
+
+        submitted = update_application_status(s, ready.id, ApplicationStatus.submitted.value)
+        assert submitted.submitted_at is not None
+
+        first_submitted_at = submitted.submitted_at
+        updated = update_application_status(s, submitted.id, ApplicationStatus.submitted.value, notes="done")
+        assert updated.submitted_at == first_submitted_at
+
+
 def test_latest_resume_version_picks_highest_round():
     with _session() as s:
         save_resume_version(s, ResumeVersion(job_id=7, round=1, content_json={"a": 1}))

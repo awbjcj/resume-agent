@@ -2,6 +2,7 @@ from typing import Any, Protocol
 
 from agno.agent import Agent
 from agno.models.anthropic import Claude
+from pydantic import Field
 
 from resume_agent.config import get_settings
 from resume_agent.models.base import ExtensibleModel
@@ -9,7 +10,7 @@ from resume_agent.models.profile import ProfileFacts
 
 
 class FitScore(ExtensibleModel):
-    score: int  # 0-100
+    score: int = Field(ge=0, le=100)
     rationale: str
 
 

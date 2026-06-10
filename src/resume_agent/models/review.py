@@ -22,7 +22,8 @@ class ReviewCritique(ExtensibleModel):
     """One reviewer agent's structured verdict on a ResumeContent draft."""
 
     reviewer: str  # the reviewing agent's name
-    score: int  # 0-100
+    score: int = Field(ge=0, le=100)
     passed: bool  # the reviewer's pass/fail; fact-check's value is the hard gate
     issues: list[ReviewIssue] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
     summary: str | None = None

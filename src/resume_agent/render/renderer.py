@@ -10,8 +10,20 @@ def _slug(text: str) -> str:
     return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", text.lower())).strip("_")
 
 
-def output_filename(company: str, title: str, date_str: str) -> str:
-    return f"{_slug(company)}_{_slug(title)}_{date_str}.pdf"
+def output_filename(
+    company: str, title: str, date_str: str, qualifier: str | int | None = None
+) -> str:
+    """Build a slugged PDF filename.
+
+    ``qualifier`` is optional so callers that need stable unique names can avoid
+    overwriting another render for the same company/title/date.
+    """
+    parts = [_slug(company) or "company", _slug(title) or "role", date_str]
+    if qualifier is not None:
+        qualifier_slug = _slug(str(qualifier))
+        if qualifier_slug:
+            parts.append(qualifier_slug)
+    return f"{'_'.join(parts)}.pdf"
 
 
 def render_pdf(

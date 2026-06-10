@@ -45,6 +45,33 @@ def test_render_version_sets_path_and_marks_rendered(tmp_path):
         assert job.status == JobStatus.rendered.value
 
 
+def test_render_version_uses_distinct_paths_for_versions_same_job_same_day(tmp_path):
+    def fake_render(content, output_path, template_path):
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(output_path).write_bytes(b"%PDF-fake")
+        return Path(output_path)
+
+    config = RenderConfig(template_path="templates/resume.typ", output_dir=str(tmp_path / "out"))
+    with _session() as s:
+        job = save_job(s, Job(source="manual", jd_text="jd", company="Acme", title="Engineer",
+                              status=JobStatus.tailored.value))
+        first = save_resume_version(
+            s, ResumeVersion(job_id=job.id, round=1,
+                             content_json=ResumeContent(contact=Contact(name="Ada")).model_dump(mode="json")),
+        )
+        second = save_resume_version(
+            s, ResumeVersion(job_id=job.id, round=2,
+                             content_json=ResumeContent(contact=Contact(name="Ada")).model_dump(mode="json")),
+        )
+
+        first_path = render_version(s, first.id, config, render_fn=fake_render)
+        second_path = render_version(s, second.id, config, render_fn=fake_render)
+
+        assert first_path != second_path
+        assert f"v{first.id}" in first_path.stem
+        assert f"v{second.id}" in second_path.stem
+
+
 def test_render_version_missing_returns_none(tmp_path):
     config = RenderConfig(output_dir=str(tmp_path))
     with _session() as s:

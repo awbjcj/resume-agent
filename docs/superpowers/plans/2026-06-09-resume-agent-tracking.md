@@ -115,6 +115,7 @@ from resume_agent.tracking.repository import (
     applications_by_status,
     get_application,
     latest_resume_version,
+    latest_rendered_resume_version,
     save_application,
     save_resume_version,
     update_application_status,
@@ -154,6 +155,16 @@ def test_latest_resume_version_picks_highest_round():
         latest = latest_resume_version(s, 7)
         assert latest.round == 2
         assert latest_resume_version(s, 999) is None
+
+
+def test_latest_rendered_resume_version_picks_highest_round_with_pdf():
+    with _session() as s:
+        save_resume_version(s, ResumeVersion(job_id=7, round=1, content_json={"a": 1}, pdf_path="one.pdf"))
+        save_resume_version(s, ResumeVersion(job_id=7, round=2, content_json={"a": 2}))
+        save_resume_version(s, ResumeVersion(job_id=7, round=3, content_json={"a": 3}, pdf_path="three.pdf"))
+        latest = latest_rendered_resume_version(s, 7)
+        assert latest.round == 3
+        assert latest.pdf_path == "three.pdf"
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -210,6 +221,14 @@ def latest_resume_version(session: Session, job_id: int) -> ResumeVersion | None
     return session.exec(
         select(ResumeVersion)
         .where(ResumeVersion.job_id == job_id)
+        .order_by(ResumeVersion.round.desc())
+    ).first()
+
+
+def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersion | None:
+    return session.exec(
+        select(ResumeVersion)
+        .where(ResumeVersion.job_id == job_id, ResumeVersion.pdf_path.is_not(None))
         .order_by(ResumeVersion.round.desc())
     ).first()
 ```
@@ -277,8 +296,16 @@ def test_pipeline_rows_include_pdf_and_application_status():
         job = save_job(s, Job(source="manual", jd_text="a", company="Acme", title="Eng",
                               status=JobStatus.rendered.value, fit_score=90))
         save_resume_version(s, ResumeVersion(job_id=job.id, round=1, content_json={"x": 1}))
-        save_resume_version(s, ResumeVersion(job_id=job.id, round=2, content_json={"x": 2},
-                                             pdf_path="output/acme.pdf"))
+        save_resume_version(
+            s,
+            ResumeVersion(
+                job_id=job.id,
+                round=2,
+                content_json={"contact": {"name": "Ada"}},
+                critique_json=[{"reviewer": "fact-check", "passed": True}],
+                pdf_path="output/acme.pdf",
+            ),
+        )
         save_application(s, Application(job_id=job.id, status=ApplicationStatus.submitted.value))
 
         rows = pipeline_rows(s)
@@ -286,6 +313,8 @@ def test_pipeline_rows_include_pdf_and_application_status():
         row = rows[0]
         assert row.status == JobStatus.rendered.value
         assert row.pdf_path == "output/acme.pdf"
+        assert row.jd_text == "a"
+        assert row.critique_json == [{"reviewer": "fact-check", "passed": True}]
         assert row.application_status == ApplicationStatus.submitted.value
         assert row.fit_score == 90
 ```
@@ -306,7 +335,11 @@ from dataclasses import dataclass
 
 from sqlmodel import Session, select
 
-from resume_agent.tracking.repository import application_for_job, latest_resume_version
+from resume_agent.tracking.repository import (
+    application_for_job,
+    latest_rendered_resume_version,
+    latest_resume_version,
+)
 from resume_agent.tracking.tables import Job, JobStatus
 
 
@@ -328,12 +361,18 @@ class PipelineRow:
     title: str | None
     status: str
     fit_score: int | None
+    jd_text: str
+    critique_json: list[dict] | None
     pdf_path: str | None
     application_status: str | None
 
 
 def shortlist_rows(session: Session) -> list[ShortlistRow]:
-    jobs = session.exec(select(Job).where(Job.status == JobStatus.shortlisted.value)).all()
+    jobs = session.exec(
+        select(Job)
+        .where(Job.status == JobStatus.shortlisted.value)
+        .order_by(Job.fit_score.desc().nullslast())
+    ).all()
     rows = []
     for job in jobs:
         criteria = job.criteria_json or {}
@@ -352,10 +391,11 @@ def shortlist_rows(session: Session) -> list[ShortlistRow]:
 
 
 def pipeline_rows(session: Session) -> list[PipelineRow]:
-    jobs = session.exec(select(Job)).all()
+    jobs = session.exec(select(Job).order_by(Job.status, Job.company, Job.title)).all()
     rows = []
     for job in jobs:
         version = latest_resume_version(session, job.id)
+        rendered = latest_rendered_resume_version(session, job.id)
         application = application_for_job(session, job.id)
         rows.append(
             PipelineRow(
@@ -364,14 +404,16 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 title=job.title,
                 status=job.status,
                 fit_score=job.fit_score,
-                pdf_path=version.pdf_path if version else None,
+                jd_text=job.jd_text,
+                critique_json=version.critique_json if version else None,
+                pdf_path=rendered.pdf_path if rendered else None,
                 application_status=application.status if application else None,
             )
         )
     return rows
 ```
 
-> Note: `latest_resume_version` returns the highest-`round` version, which may not yet have a `pdf_path`. For the board this is acceptable (shows "no PDF yet"). A "latest *rendered* version" refinement can come later if needed.
+`latest_resume_version` drives critiques; `latest_rendered_resume_version` drives the PDF link so a newer unrendered review round does not hide an older rendered PDF.
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -484,32 +526,33 @@ def render_pipeline_page(session) -> None:
     if not rows:
         st.info("No jobs yet.")
         return
-    for row in rows:
-        with st.container(border=True):
-            st.subheader(f"{row.title or '—'} @ {row.company or '—'}")
-            st.caption(f"status: {row.status} · fit {row.fit_score or '—'} · "
-                       f"application: {row.application_status or 'none'}")
-            if row.pdf_path:
-                st.write(f"PDF: `{row.pdf_path}`")
-            statuses = [s.value for s in ApplicationStatus]
-            current = row.application_status or ApplicationStatus.ready.value
-            new_status = st.selectbox(
-                "Application status", statuses, index=statuses.index(current),
-                key=f"status-{row.job_id}",
-            )
-            notes = st.text_input("Notes", key=f"notes-{row.job_id}")
-            if st.button("Save application status", key=f"save-{row.job_id}"):
-                application = application_for_job(session, row.job_id)
-                if application is None:
-                    save_application(
-                        session,
-                        type(application_for_job(session, row.job_id) or _new_application(row.job_id, new_status, notes))
-                        if False else _new_application(row.job_id, new_status, notes),
-                    )
-                else:
-                    update_application_status(session, application.id, new_status, notes or None)
-                st.success("Saved.")
-                st.rerun()
+    for status in sorted({row.status for row in rows}):
+        st.subheader(status)
+        for row in [r for r in rows if r.status == status]:
+            with st.container(border=True):
+                st.markdown(f"**{row.title or '—'} @ {row.company or '—'}**")
+                st.caption(f"fit {row.fit_score or '—'} · application: {row.application_status or 'none'}")
+                if row.pdf_path:
+                    st.link_button("Open PDF", row.pdf_path)
+                with st.expander("Job description"):
+                    st.write(row.jd_text)
+                with st.expander("Latest critiques"):
+                    st.json(row.critique_json or [])
+                statuses = [s.value for s in ApplicationStatus]
+                current = row.application_status or ApplicationStatus.ready.value
+                new_status = st.selectbox(
+                    "Application status", statuses, index=statuses.index(current),
+                    key=f"status-{row.job_id}",
+                )
+                notes = st.text_input("Notes", key=f"notes-{row.job_id}")
+                if st.button("Save application status", key=f"save-{row.job_id}"):
+                    application = application_for_job(session, row.job_id)
+                    if application is None:
+                        save_application(session, _new_application(row.job_id, new_status, notes))
+                    else:
+                        update_application_status(session, application.id, new_status, notes or None)
+                    st.success("Saved.")
+                    st.rerun()
 
 
 def _new_application(job_id: int, status: str, notes: str):
@@ -532,16 +575,6 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
-
-> Implementation note: the `save` branch in `render_pipeline_page` should create an `Application` when none exists, else update the existing one. Simplify the convoluted conditional above to:
-> ```python
-> application = application_for_job(session, row.job_id)
-> if application is None:
->     save_application(session, _new_application(row.job_id, new_status, notes))
-> else:
->     update_application_status(session, application.id, new_status, notes or None)
-> ```
-> (The plan shows the intent; write the clean version.)
 
 - [ ] **Step 5: Run to verify it passes**
 
@@ -671,15 +704,15 @@ git commit -m "feat(tracking): dashboard CLI command" -m "Co-Authored-By: Claude
 ## Self-Review (completed during plan authoring)
 
 - **Spec coverage (§5.5):** two separate status lifecycles preserved (Foundation tables; this plan drives both); `applications` table CRUD (Task 2); Streamlit two pages — Shortlist checkpoint with approve→`approved` (Task 4) and Pipeline board with status grouping, fit score, PDF link, editable application status/notes (Tasks 3 & 4); `dashboard` CLI (Task 5). Deferred Foundation `updated_at` onupdate closed (Task 1).
-- **Placeholder scan:** the dashboard `save` branch is shown twice — once as intent, once as the clean version to actually write (Task 4 note). No `TODO`/`TBD` left; all repository/query/CLI code is complete.
-- **Type consistency:** `shortlist_rows(session) -> list[ShortlistRow]` and `pipeline_rows(session) -> list[PipelineRow]` (dataclasses with the exact fields the view reads); `save_application`/`get_application`/`application_for_job`/`applications_by_status`/`update_application_status`/`latest_resume_version` signatures match their call sites in `queries.py` and `app.py`. CLI test patches `cli.subprocess.run`; the command imports `os`/`subprocess` at module level. `ApplicationStatus`/`JobStatus` `.value` usage matches the str-enums.
+- **Placeholder scan:** none — repository/query/dashboard/CLI code is complete and no contradictory "write the clean version instead" note remains.
+- **Type consistency:** `shortlist_rows(session) -> list[ShortlistRow]` and `pipeline_rows(session) -> list[PipelineRow]` (dataclasses with the exact fields the view reads); `save_application`/`get_application`/`application_for_job`/`applications_by_status`/`update_application_status`/`latest_resume_version`/`latest_rendered_resume_version` signatures match their call sites in `queries.py` and `app.py`. CLI test patches `cli.subprocess.run`; the command imports `os`/`subprocess` at module level. `ApplicationStatus`/`JobStatus` `.value` usage matches the str-enums.
 
 ---
 
 ## Notes to carry into later plans
 - **LinkedIn scraper plan:** new scraped jobs land at `status=raw`; they flow through discovery → `shortlisted` and then appear on the Shortlist page automatically. No dashboard change needed.
 - **v2 (memo):** Gmail auto-status could write `applications.status` directly via `update_application_status`; the board already renders it.
-- A "render from the board" button can call `render.service.render_version(session, latest_resume_version(session, job_id).id, RenderConfig())` — wire it when the render flow is exercised end-to-end.
+- A "render from the board" button should call `render.service.render_version(session, latest_resume_version(session, job_id).id, RenderConfig())` only after checking that `latest_resume_version(...)` is not `None`; wire it when the render flow is exercised end-to-end.
 
 ## Execution Handoff
 After this plan is executed and green, the last v1 component is the **LinkedIn scraper** (see its plan), which requires a live-HTML calibration session.

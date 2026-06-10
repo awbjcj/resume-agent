@@ -385,11 +385,13 @@ def test_compose_revise_input_includes_issue_messages():
             score=70,
             passed=False,
             issues=[ReviewIssue(severity="major", message="Missing keyword: Kubernetes", suggestion="Add it if true")],
+            suggestions=["Tighten the summary around backend systems"],
         )
     ]
     text = compose_revise_input(rc, critiques, _facts())
     assert "Missing keyword: Kubernetes" in text
     assert "Add it if true" in text
+    assert "Tighten the summary around backend systems" in text
 
 
 def test_revise_returns_resume_content():
@@ -449,13 +451,20 @@ def compose_revise_input(
         for c in critiques
         for issue in c.issues
     )
+    suggestions = "\n".join(
+        f"- [{c.reviewer}] {suggestion}"
+        for c in critiques
+        for suggestion in c.suggestions
+    )
     return (
         "CANDIDATE PROFILE (JSON):\n"
         f"{profile_facts.model_dump_json()}\n\n"
         "CURRENT RESUME (JSON):\n"
         f"{content.model_dump_json()}\n\n"
         "REVIEWER ISSUES:\n"
-        f"{issues}"
+        f"{issues}\n\n"
+        "REVIEWER SUGGESTIONS:\n"
+        f"{suggestions}"
     )
 
 
@@ -1158,6 +1167,17 @@ def test_tailor_processes_a_job(tmp_path, monkeypatch):
     result = runner.invoke(cli.app, ["tailor", "--job-id", str(job_id), "--db-url", db_url])
     assert result.exit_code == 0, result.output
     assert "1 version" in result.output
+
+
+def test_tailor_reports_missing_job(tmp_path):
+    db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
+    engine = make_engine(db_url)
+    init_db(engine)
+
+    result = runner.invoke(cli.app, ["tailor", "--job-id", "999", "--db-url", db_url])
+
+    assert result.exit_code == 1
+    assert "Job #999 not found" in result.output
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -1220,22 +1240,25 @@ def tailor_cmd(
     db_url: str = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run the tailor + review loop over approved job(s)."""
-    config = load_review_config(review)
-    profile_facts = load_facts(facts)
-    tailor_agent = build_tailor_agent()
-    reviser_agent = build_reviser_agent()
-    reviewer_agents = build_reviewer_agents(config)
-
     engine = _engine(db_url)
     with get_session(engine) as session:
         if job_id is not None:
             job = get_job(session, job_id)
-            targets = [job] if job is not None else []
+            if job is None:
+                typer.echo(f"Job #{job_id} not found.")
+                raise typer.Exit(code=1)
+            targets = [job]
         elif approved:
             targets = jobs_by_status(session, JobStatus.approved.value)
         else:
             typer.echo("Specify --job-id <id> or --approved.")
             raise typer.Exit(code=1)
+
+        config = load_review_config(review)
+        profile_facts = load_facts(facts)
+        tailor_agent = build_tailor_agent()
+        reviser_agent = build_reviser_agent()
+        reviewer_agents = build_reviewer_agents(config)
 
         for job in targets:
             versions = tailor_job(
@@ -1252,7 +1275,7 @@ Run:
 ```bash
 uv run pytest tests/test_cli_tailor.py -v
 ```
-Expected: PASS (2 tests). (The `tailor` test patches `cli.build_reviewer_agents`, `cli.tailor_job`, etc., so no real agents run.)
+Expected: PASS (3 tests). (The `tailor` test patches `cli.build_reviewer_agents`, `cli.tailor_job`, etc., so no real agents run.)
 
 - [ ] **Step 5: Verify wiring**
 
