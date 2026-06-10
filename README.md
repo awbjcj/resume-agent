@@ -212,7 +212,7 @@ Model tiers are also configurable via env (`CHEAP_MODEL`, `MID_MODEL`,
 |------|----------|
 | `profile_sources.yaml` | Path to your resume and your GitHub username. |
 | `search.yaml` | Keywords, titles, locations, and **hard filters** (salary, years of experience, remote policy, sponsorship). |
-| `review.yaml` | The reviewer roster, their weights/model tiers, `max_rounds`, and `score_threshold`. |
+| `review.yaml` | The reviewer roster, their weights/model tiers, `max_rounds`, `score_threshold`, and optional `length_budget` one-page guidance. |
 | `render.yaml` | Typst `template_path` and the PDF `output_dir`. |
 
 Each `*.yaml.example` is annotated — copy it, then edit.
@@ -251,3 +251,6 @@ uv run pytest -k scraper   # run a subset
 
 Tests are pure and offline — the agents and the browser are faked, so the suite
 needs no API key and no network.
+
+v1.5 keeps the tailor loop synchronous. Parallel reviewer panels and job-level
+concurrency are deferred while this pass reduces cost through leaner prompts.
