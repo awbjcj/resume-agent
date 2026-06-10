@@ -1,6 +1,7 @@
 import pytest
 
 from resume_agent.models.job import JobCriteria
+from resume_agent.models.review import Severity
 from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique, ReviewIssue
@@ -56,7 +57,13 @@ def test_compose_revise_input_includes_issue_messages():
             reviewer="ats-keyword",
             score=70,
             passed=False,
-            issues=[ReviewIssue(severity="major", message="Missing keyword: Kubernetes", suggestion="Add it if true")],
+            issues=[
+                ReviewIssue(
+                    severity=Severity.major,
+                    message="Missing keyword: Kubernetes",
+                    suggestion="Add it if true",
+                )
+            ],
             suggestions=["Tighten the summary around backend systems"],
         )
     ]

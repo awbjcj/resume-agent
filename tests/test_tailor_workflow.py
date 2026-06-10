@@ -1,5 +1,6 @@
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.models.review import Severity
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique, ReviewIssue
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
@@ -27,7 +28,7 @@ class _FactCheck:
     def run(self, prompt):
         self.calls += 1
         passed = self.calls > 1
-        issues = [] if passed else [ReviewIssue(severity="blocking", message="unsupported claim")]
+        issues = [] if passed else [ReviewIssue(severity=Severity.blocking, message="unsupported claim")]
         return _Result(ReviewCritique(reviewer="fact-check", score=100 if passed else 0, passed=passed, issues=issues))
 
 

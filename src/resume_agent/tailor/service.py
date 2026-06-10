@@ -1,7 +1,8 @@
-from typing import Any, Protocol
+from collections.abc import Mapping
 
 from sqlmodel import Session
 
+from resume_agent.llm_runner import Runner
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.tailor.review_config import ReviewConfig
@@ -10,20 +11,18 @@ from resume_agent.tracking.repository import save_job, save_resume_version
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 
 
-class Runner(Protocol):
-    def run(self, prompt: str) -> Any: ...
-
-
 def tailor_job(
     session: Session,
     job: Job,
     profile_facts: ProfileFacts,
     config: ReviewConfig,
     tailor_agent: Runner,
-    reviewer_agents: dict[str, Runner],
+    reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
 ) -> list[ResumeVersion]:
     """Run the loop for one job, persist each round as a ResumeVersion, mark the job tailored."""
+    if job.id is None:
+        raise ValueError("Cannot tailor a job that has not been persisted")
     criteria = JobCriteria.model_validate(job.criteria_json or {})
     rounds = run_tailor_review(
         job.jd_text, criteria, profile_facts, config, tailor_agent, reviewer_agents, reviser_agent

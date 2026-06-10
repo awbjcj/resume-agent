@@ -1,13 +1,8 @@
-from typing import Any, Protocol
-
+from resume_agent.llm_runner import Runner
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
-
-
-class Runner(Protocol):
-    def run(self, prompt: str) -> Any: ...
 
 
 def compose_tailor_input(jd_text: str, criteria: JobCriteria, profile_facts: ProfileFacts) -> str:

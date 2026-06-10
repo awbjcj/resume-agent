@@ -8,6 +8,11 @@ from resume_agent.tracking.tables import Job, JobStatus
 runner = CliRunner()
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def _seed(db_url, status):
     engine = make_engine(db_url)
     init_db(engine)
@@ -16,7 +21,7 @@ def _seed(db_url, status):
         s.add(job)
         s.commit()
         s.refresh(job)
-        return job.id
+        return _require_id(job.id)
 
 
 def test_approve_sets_status_approved(tmp_path):
@@ -28,7 +33,9 @@ def test_approve_sets_status_approved(tmp_path):
 
     engine = make_engine(db_url)
     with get_session(engine) as s:
-        assert get_job(s, job_id).status == JobStatus.approved.value
+        job = get_job(s, job_id)
+        assert job is not None
+        assert job.status == JobStatus.approved.value
 
 
 def test_tailor_processes_a_job(tmp_path, monkeypatch):

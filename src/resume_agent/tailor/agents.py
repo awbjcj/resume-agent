@@ -2,6 +2,7 @@ from agno.agent import Agent
 from agno.models.anthropic import Claude
 
 from resume_agent.config import get_settings
+from resume_agent.llm_runner import AgentRunner, Runner
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
 
@@ -53,28 +54,34 @@ _DEFAULT_REVIEWER_INSTRUCTIONS = [
 ]
 
 
-def build_tailor_agent(model_id: str | None = None) -> Agent:
-    return Agent(
-        model=Claude(id=model_id or model_for_tier("premium")),
-        description="You are an expert resume writer who never fabricates.",
-        instructions=_TAILOR_INSTRUCTIONS,
-        output_schema=ResumeContent,
+def build_tailor_agent(model_id: str | None = None) -> Runner:
+    return AgentRunner(
+        Agent(
+            model=Claude(id=model_id or model_for_tier("premium")),
+            description="You are an expert resume writer who never fabricates.",
+            instructions=_TAILOR_INSTRUCTIONS,
+            output_schema=ResumeContent,
+        )
     )
 
 
-def build_reviser_agent(model_id: str | None = None) -> Agent:
-    return Agent(
-        model=Claude(id=model_id or model_for_tier("premium")),
-        description="You revise resume content while keeping it strictly fact-locked.",
-        instructions=_REVISER_INSTRUCTIONS,
-        output_schema=ResumeContent,
+def build_reviser_agent(model_id: str | None = None) -> Runner:
+    return AgentRunner(
+        Agent(
+            model=Claude(id=model_id or model_for_tier("premium")),
+            description="You revise resume content while keeping it strictly fact-locked.",
+            instructions=_REVISER_INSTRUCTIONS,
+            output_schema=ResumeContent,
+        )
     )
 
 
-def build_reviewer_agent(name: str, model_id: str | None = None) -> Agent:
-    return Agent(
-        model=Claude(id=model_id or model_for_tier("mid")),
-        description=f"You are the '{name}' resume reviewer.",
-        instructions=REVIEWER_INSTRUCTIONS.get(name, _DEFAULT_REVIEWER_INSTRUCTIONS),
-        output_schema=ReviewCritique,
+def build_reviewer_agent(name: str, model_id: str | None = None) -> Runner:
+    return AgentRunner(
+        Agent(
+            model=Claude(id=model_id or model_for_tier("mid")),
+            description=f"You are the '{name}' resume reviewer.",
+            instructions=REVIEWER_INSTRUCTIONS.get(name, _DEFAULT_REVIEWER_INSTRUCTIONS),
+            output_schema=ReviewCritique,
+        )
     )

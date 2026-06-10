@@ -1,5 +1,6 @@
-from typing import Any, Protocol
+from collections.abc import Mapping
 
+from resume_agent.llm_runner import Runner
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
@@ -8,10 +9,6 @@ from resume_agent.tailor.panel import compose_review_input, run_panel
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.tailoring import compose_revise_input, compose_tailor_input, revise, tailor
 from resume_agent.tailor.verdict import PanelVerdict, aggregate
-
-
-class Runner(Protocol):
-    def run(self, prompt: str) -> Any: ...
 
 
 class TailorRound(ExtensibleModel):
@@ -26,7 +23,7 @@ def run_tailor_review(
     profile_facts: ProfileFacts,
     config: ReviewConfig,
     tailor_agent: Runner,
-    reviewer_agents: dict[str, Runner],
+    reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
 ) -> list[TailorRound]:
     """Draft, then review/revise until the round passes or max_rounds is hit.

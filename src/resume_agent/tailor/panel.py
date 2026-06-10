@@ -1,13 +1,10 @@
-from typing import Any, Protocol
+from collections.abc import Mapping
 
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
+from resume_agent.llm_runner import Runner
 from resume_agent.tailor.review_config import ReviewConfig
-
-
-class Runner(Protocol):
-    def run(self, prompt: str) -> Any: ...
 
 
 def compose_review_input(content: ResumeContent, profile_facts: ProfileFacts, jd_text: str) -> str:
@@ -29,6 +26,8 @@ def review_one(input_text: str, agent: Runner) -> ReviewCritique:
     return critique
 
 
-def run_panel(input_text: str, config: ReviewConfig, reviewer_agents: dict[str, Runner]) -> list[ReviewCritique]:
+def run_panel(
+    input_text: str, config: ReviewConfig, reviewer_agents: Mapping[str, Runner]
+) -> list[ReviewCritique]:
     """Run every configured reviewer over the same input and collect their critiques."""
     return [review_one(input_text, reviewer_agents[spec.name]) for spec in config.reviewers]

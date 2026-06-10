@@ -31,6 +31,11 @@ def _session() -> Session:
     return Session(engine)
 
 
+def _require_id(value: int | None) -> int:
+    assert value is not None
+    return value
+
+
 def test_tailor_job_persists_versions_and_marks_tailored():
     config = ReviewConfig(
         max_rounds=1,
@@ -51,8 +56,9 @@ def test_tailor_job_persists_versions_and_marks_tailored():
         assert len(versions) == 1
         assert versions[0].fact_check_passed is True
         assert versions[0].round == 1
+        assert versions[0].content_json is not None
         assert versions[0].content_json["contact"]["name"] == "Ada"
 
-        stored = resume_versions_for_job(s, job.id)
+        stored = resume_versions_for_job(s, _require_id(job.id))
         assert len(stored) == 1
         assert job.status == JobStatus.tailored.value
