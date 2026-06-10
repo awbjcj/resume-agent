@@ -46,7 +46,9 @@ def run_tailor_review(
     reviser_agent: Runner,
 ) -> list[TailorRound]:
     """Draft, then gate/review/revise until the round passes or max_rounds is hit."""
-    content = tailor(compose_tailor_input(jd_text, criteria, profile_facts), tailor_agent)
+    content = tailor(
+        compose_tailor_input(jd_text, criteria, profile_facts, config.length_budget), tailor_agent
+    )
     rounds: list[TailorRound] = []
     for round_num in range(1, config.max_rounds + 1):
         provenance = check_provenance(content, profile_facts)
@@ -60,6 +62,7 @@ def run_tailor_review(
         if verdict.passed or round_num == config.max_rounds:
             break
         content = revise(
-            compose_revise_input(content, verdict.critiques, profile_facts), reviser_agent
+            compose_revise_input(content, verdict.critiques, profile_facts, config.length_budget),
+            reviser_agent,
         )
     return rounds

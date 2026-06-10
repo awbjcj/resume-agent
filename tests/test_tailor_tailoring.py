@@ -11,6 +11,7 @@ from resume_agent.tailor.tailoring import (
     revise,
     tailor,
 )
+from resume_agent.tailor.review_config import LengthBudget
 
 
 class _Result:
@@ -36,6 +37,17 @@ def test_compose_tailor_input_includes_profile_criteria_jd():
     text = compose_tailor_input("Backend role", JobCriteria(), _facts())
     assert "Ada Lovelace" in text
     assert "Backend role" in text
+
+
+def test_compose_tailor_input_includes_budget_when_given():
+    text = compose_tailor_input(
+        "Backend role",
+        JobCriteria(),
+        _facts(),
+        LengthBudget(max_experiences=3, max_bullets_per_role=4, target_total_bullets=15),
+    )
+    assert "single page" in text
+    assert "3" in text
 
 
 def test_tailor_returns_resume_content():
@@ -71,6 +83,12 @@ def test_compose_revise_input_includes_issue_messages():
     assert "Missing keyword: Kubernetes" in text
     assert "Add it if true" in text
     assert "Tighten the summary around backend systems" in text
+
+
+def test_compose_revise_input_includes_budget_when_given():
+    rc = ResumeContent(contact=Contact(name="Ada"))
+    text = compose_revise_input(rc, [], _facts(), LengthBudget())
+    assert "single page" in text
 
 
 def test_revise_returns_resume_content():
