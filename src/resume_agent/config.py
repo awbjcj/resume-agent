@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     github_token: str = ""
     linkedin_email: str = ""
     linkedin_password: str = ""
+    linkedin_user_data_dir: str = ".linkedin_profile"
     db_url: str = "sqlite:///data/resume_agent.db"
     cheap_model: str = "claude-haiku-4-5-20251001"
     mid_model: str = "claude-sonnet-4-6"

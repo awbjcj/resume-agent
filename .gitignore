@@ -17,6 +17,10 @@ output/
 data/
 *.pdf
 
+# Local browser sessions / calibration captures
+.linkedin_profile/
+tests/fixtures/linkedin/*_live.html
+
 # Tooling / agent state
 .omc/
 .remember/

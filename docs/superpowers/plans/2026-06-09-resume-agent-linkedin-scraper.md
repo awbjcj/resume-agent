@@ -34,6 +34,7 @@ src/resume_agent/discovery/scraper/
   parser.py                                     # CREATE: parse_search_cards() + parse_job_detail()
   ingest.py                                     # CREATE: JobSource protocol + ingest_scraped()
   linkedin.py                                   # CREATE: LinkedInScraper (Playwright; not CI-tested)
+.gitignore                                      # MODIFY: ignore persistent browser profile + live calibration captures
 src/resume_agent/cli.py                         # MODIFY: add `scrape` command
 tests/fixtures/linkedin/
   search.html                                   # CREATE: representative search-results HTML
@@ -49,7 +50,7 @@ tests/
 ## Task 1: Dependencies + ScrapedCard model
 
 **Files:**
-- Modify: `pyproject.toml`
+- Modify: `pyproject.toml`, `.gitignore`
 - Create: `src/resume_agent/discovery/scraper/__init__.py`, `src/resume_agent/discovery/scraper/models.py`
 - Test: `tests/test_scraper_parser.py` (model portion only this task)
 
@@ -61,7 +62,15 @@ uv add playwright beautifulsoup4
 ```
 Expected: `pyproject.toml` gains both; `uv.lock` updates; install succeeds. (Browser binaries are installed later in the calibration task, not now.)
 
-- [ ] **Step 2: Write the failing test**
+- [ ] **Step 2: Ignore local browser sessions and live captures**
+
+Add to `.gitignore`:
+```gitignore
+.linkedin_profile/
+tests/fixtures/linkedin/*_live.html
+```
+
+- [ ] **Step 3: Write the failing test**
 
 Create `tests/test_scraper_parser.py`:
 ```python
@@ -80,7 +89,7 @@ def test_scraped_card_fields():
     assert card.company == "Acme Corp"
 ```
 
-- [ ] **Step 3: Run to verify it fails**
+- [ ] **Step 4: Run to verify it fails**
 
 Run:
 ```bash
@@ -88,7 +97,7 @@ uv run pytest tests/test_scraper_parser.py -v
 ```
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.scraper'`.
 
-- [ ] **Step 4: Implement**
+- [ ] **Step 5: Implement**
 
 Create `src/resume_agent/discovery/scraper/__init__.py`:
 ```python
@@ -111,7 +120,7 @@ class ScrapedCard:
     url: str | None
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [ ] **Step 6: Run to verify it passes**
 
 Run:
 ```bash
@@ -119,10 +128,10 @@ uv run pytest tests/test_scraper_parser.py -v
 ```
 Expected: PASS (1 test).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml uv.lock src/resume_agent/discovery/scraper/__init__.py src/resume_agent/discovery/scraper/models.py tests/test_scraper_parser.py
+git add pyproject.toml uv.lock .gitignore src/resume_agent/discovery/scraper/__init__.py src/resume_agent/discovery/scraper/models.py tests/test_scraper_parser.py
 git commit -m "feat(scraper): deps + ScrapedCard model" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
@@ -502,8 +511,7 @@ class LinkedInScraper:
 
 def build_linkedin_scraper() -> LinkedInScraper:
     settings = get_settings()
-    headless = not bool(settings.linkedin_email)  # if no creds set, assume already-saved profile
-    return LinkedInScraper(headless=headless)
+    return LinkedInScraper(user_data_dir=getattr(settings, "linkedin_user_data_dir", ".linkedin_profile"))
 ```
 
 - [ ] **Step 2: Verify it imports (no browser launch)**
@@ -629,7 +637,7 @@ Run:
 ```bash
 uv run python -c "from playwright.sync_api import sync_playwright; p=sync_playwright().start(); c=p.chromium.launch_persistent_context('.linkedin_profile', headless=False); pg=c.new_page(); pg.goto('https://www.linkedin.com/login'); input('Log in with your BURNER account, then press Enter...'); c.close(); p.stop()"
 ```
-Add `.linkedin_profile/` to `.gitignore` (never commit a logged-in session).
+`.linkedin_profile/` is already ignored from Task 1; never commit a logged-in session.
 
 - [ ] **Step 3: Save real HTML and compare to the fixtures**
 
@@ -646,6 +654,7 @@ open("tests/fixtures/linkedin/search_live.html", "w", encoding="utf-8").write(pg
 open("tests/fixtures/linkedin/job_live.html", "w", encoding="utf-8").write(pg.content())
 c.close(); p.stop()
 ```
+The `*_live.html` files are ignored. Before committing any fixture update, sanitize it down to the minimum stable DOM excerpt needed by the parser tests.
 
 - [ ] **Step 4: Point the parser tests at the live fixtures and adjust selectors**
 
