@@ -4,7 +4,7 @@
 
 **Goal:** Build the `profile` component and a `resume-agent profile build` CLI command that turns your existing resume file + GitHub profile into `data/profile/facts.json` — the human-editable, authoritative fact-lock that all downstream tailoring draws from.
 
-**Architecture:** Deterministic I/O (resume text extraction, GitHub REST fetch, JSON store, merge) is separated from the single LLM step (resume-text → `ProfileFacts` via an Agno agent on the cheap model). Every unit takes its collaborators as parameters so it can be tested with fakes/fixtures — no network or API key needed in tests.
+**Architecture:** Deterministic I/O (resume text extraction, GitHub REST fetch, JSON store, merge) is separated from the cheap-model LLM structuring steps: resume text → `ProfileFacts`, and GitHub README text → `Project` summaries. Every unit takes its collaborators as parameters so it can be tested with fakes/fixtures — no network or API key needed in tests.
 
 **Tech Stack:** Python 3.13, uv, Pydantic v2, Agno (`Agent` + `Claude`), Anthropic, httpx, pypdf, python-docx, Typer, pytest.
 
@@ -21,8 +21,8 @@ Design spec: `docs/superpowers/specs/2026-06-08-resume-agent-design.md` §5.1.
 
 Plan-author decisions (documented; override if undesired):
 - **GitHub client uses `httpx` raw REST**, not PyGithub — testable against `httpx.MockTransport` fixtures with no network.
-- **GitHub ingest is deterministic in v1.** GitHub repo metadata (description, topics, languages, stars) already maps cleanly to `Project` facts. Per-README LLM summarization is deferred to v2.
-- **The only LLM call** is resume-text → `ProfileFacts` via an Agno `Agent` (cheap model, Claude Haiku, configurable).
+- **GitHub ingest is comprehensive in v1.** Repo metadata maps deterministically to `Project` facts, and README text is summarized by a cheap-model Agno agent when present. Metadata-only `repo_to_project(...)` remains the fallback when a README is missing or the summary agent is intentionally omitted in tests.
+- **LLM calls are explicit and injectable.** Resume-text → `ProfileFacts` and README-text → `Project` both use cheap-model Agno agents with fakes in tests.
 - **`facts.json` is protected**: `build` refuses to overwrite an existing file without `--refresh`.
 
 ## File Structure (created/modified by this plan)
@@ -270,6 +270,15 @@ def test_fetch_repos():
     assert repos[0]["name"] == "engine"
 
 
+def test_fetch_languages():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/repos/ada/engine/languages"
+        return httpx.Response(200, json={"Python": 12345, "Rust": 678})
+
+    gh = _client(handler)
+    assert gh.fetch_languages("ada", "engine") == {"Python": 12345, "Rust": 678}
+
+
 def test_fetch_readme_returns_text():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/repos/ada/engine/readme"
@@ -332,6 +341,11 @@ class GitHubClient:
         resp.raise_for_status()
         return resp.json()
 
+    def fetch_languages(self, owner: str, repo: str) -> dict[str, int]:
+        resp = self._client.get(f"/repos/{owner}/{repo}/languages")
+        resp.raise_for_status()
+        return resp.json()
+
     def fetch_readme(self, owner: str, repo: str) -> str | None:
         resp = self._client.get(
             f"/repos/{owner}/{repo}/readme",
@@ -349,7 +363,7 @@ Run:
 ```bash
 uv run pytest tests/test_profile_github.py -v
 ```
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -485,7 +499,7 @@ git commit -m "feat(profile): Agno agent + resume->ProfileFacts extractor" -m "C
 
 ---
 
-## Task 5: GitHub ingest (deterministic)
+## Task 5: GitHub ingest (metadata mapping + README fallback)
 
 **Files:**
 - Create: `src/resume_agent/profile/github_ingest.py`
@@ -523,6 +537,7 @@ def test_repo_to_project_maps_metadata():
         "stargazers_count": 10,
         "forks_count": 2,
         "language": "Python",
+        "languages": {"Python": 12345, "Rust": 678},
         "topics": ["compute"],
         "updated_at": "2024-01-01T00:00:00Z",
         "fork": False,
@@ -535,6 +550,7 @@ def test_repo_to_project_maps_metadata():
     assert proj.url == "https://ada.dev"
     assert proj.stars == 10
     assert proj.primary_language == "Python"
+    assert proj.languages == ["Python", "Rust"]
     assert proj.topics == ["compute"]
     assert proj.is_fork is False
 
@@ -582,6 +598,7 @@ def build_github_profile(profile: dict, repos: list[dict]) -> GitHubProfile:
 def repo_to_project(repo: dict) -> Project:
     """Map a single GitHub repo dict into a Project fact (source=github)."""
     language = repo.get("language")
+    languages = list((repo.get("languages") or {}).keys()) or ([language] if language else [])
     return Project(
         source="github",
         name=repo["name"],
@@ -591,7 +608,7 @@ def repo_to_project(repo: dict) -> Project:
         stars=repo.get("stargazers_count"),
         forks=repo.get("forks_count"),
         primary_language=language,
-        languages=[language] if language else [],
+        languages=languages,
         topics=repo.get("topics", []),
         homepage_url=repo.get("homepage"),
         last_updated=repo.get("updated_at"),
@@ -611,7 +628,145 @@ Expected: PASS (3 tests).
 
 ```bash
 git add src/resume_agent/profile/github_ingest.py tests/test_profile_github_ingest.py
-git commit -m "feat(profile): deterministic GitHub profile/repo ingest" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+git commit -m "feat(profile): GitHub profile/repo metadata ingest" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+```
+
+---
+
+## Task 5A: GitHub README project summarizer
+
+**Files:**
+- Modify: `src/resume_agent/profile/github_ingest.py`
+- Test: `tests/test_profile_github_ingest.py`
+
+- [ ] **Step 1: Add failing tests for README summaries**
+
+Append to `tests/test_profile_github_ingest.py`:
+```python
+import pytest
+
+from resume_agent.models.profile import Project
+from resume_agent.profile.github_ingest import summarize_repo_project
+
+
+class _Result:
+    def __init__(self, content):
+        self.content = content
+
+
+class _Agent:
+    def __init__(self, content):
+        self.content = content
+        self.received = None
+
+    def run(self, prompt):
+        self.received = prompt
+        return _Result(self.content)
+
+
+def test_summarize_repo_project_uses_readme_and_preserves_metadata():
+    repo = {
+        "name": "engine",
+        "html_url": "https://github.com/ada/engine",
+        "language": "Python",
+        "topics": ["compute"],
+        "stargazers_count": 10,
+    }
+    agent = _Agent(Project(name="Engine", source="github", description="README-derived summary"))
+
+    project = summarize_repo_project(repo, "# Engine\nDetailed README", agent)
+
+    assert "Detailed README" in agent.received
+    assert project.source.value == "github"
+    assert project.name == "Engine"
+    assert project.repo_url == "https://github.com/ada/engine"
+    assert project.primary_language == "Python"
+    assert project.stars == 10
+
+
+def test_summarize_repo_project_rejects_wrong_agent_type():
+    with pytest.raises(TypeError):
+        summarize_repo_project({"name": "x"}, "readme", _Agent("not a project"))
+```
+
+- [ ] **Step 2: Implement the summarizer**
+
+Add these imports near the top of `src/resume_agent/profile/github_ingest.py`:
+```python
+from typing import Any, Protocol
+
+from agno.agent import Agent
+from agno.models.anthropic import Claude
+
+from resume_agent.config import get_settings
+```
+
+Then append:
+```python
+class Runner(Protocol):
+    def run(self, prompt: str) -> Any: ...
+
+
+_README_SUMMARY_INSTRUCTIONS = [
+    "Summarize a GitHub repository README into a truthful Project fact.",
+    "Use only the README and repository metadata. Never invent claims, metrics, dates, or technologies.",
+    "Prefer concrete capabilities, technologies, and outcomes that are actually supported by the README.",
+]
+
+
+def build_repo_summary_agent(model_id: str | None = None) -> Agent:
+    return Agent(
+        model=Claude(id=model_id or get_settings().cheap_model),
+        description="You summarize GitHub READMEs into truthful project facts.",
+        instructions=_README_SUMMARY_INSTRUCTIONS,
+        output_schema=Project,
+    )
+
+
+def summarize_repo_project(repo: dict, readme_text: str, agent: Runner) -> Project:
+    """Use a cheap-model agent to turn README text into a Project fact, then preserve repo metadata."""
+    prompt = (
+        "Summarize this GitHub repository as a truthful ProfileFacts Project.\n"
+        "Use only the README and repository metadata. Do not invent claims.\n\n"
+        f"REPO METADATA:\n{repo}\n\n"
+        f"README:\n{readme_text}"
+    )
+    result = agent.run(prompt)
+    project = result.content
+    if not isinstance(project, Project):
+        raise TypeError(f"Expected Project from repo summarizer, got {type(project).__name__}")
+
+    metadata = repo_to_project(repo)
+    return project.model_copy(
+        update={
+            "source": metadata.source,
+            "repo_url": project.repo_url or metadata.repo_url,
+            "url": project.url or metadata.url,
+            "stars": metadata.stars,
+            "forks": metadata.forks,
+            "primary_language": metadata.primary_language,
+            "languages": project.languages or metadata.languages,
+            "topics": project.topics or metadata.topics,
+            "homepage_url": project.homepage_url or metadata.homepage_url,
+            "last_updated": metadata.last_updated,
+            "is_fork": metadata.is_fork,
+        }
+    )
+```
+
+- [ ] **Step 3: Run tests**
+
+Run:
+```bash
+uv run pytest tests/test_profile_github_ingest.py -v
+```
+Expected: PASS.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/resume_agent/profile/github_ingest.py tests/test_profile_github_ingest.py
+git commit -m "feat(profile): summarize GitHub READMEs into Project facts" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 ---
@@ -794,7 +949,7 @@ git commit -m "feat(profile): facts.json save/load" -m "Co-Authored-By: Claude O
 
 Create `tests/test_profile_build.py`:
 ```python
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.models.profile import Contact, ProfileFacts, Project
 from resume_agent.profile.build import build_profile
 
 
@@ -818,6 +973,12 @@ class _FakeGitHub:
     def fetch_repos(self, username):
         return [{"name": "engine", "stargazers_count": 3, "language": "Python", "html_url": "https://github.com/ada/engine"}]
 
+    def fetch_languages(self, owner, repo):
+        return {"Python": 12345}
+
+    def fetch_readme(self, owner, repo):
+        return "# Engine\nDetailed README"
+
 
 def test_build_profile_combines_resume_and_github(tmp_path):
     resume = tmp_path / "resume.txt"
@@ -829,6 +990,7 @@ def test_build_profile_combines_resume_and_github(tmp_path):
         github_username="ada",
         extractor_agent=_FakeAgent(extracted),
         github_client=_FakeGitHub(),
+        repo_summary_agent=_FakeAgent(Project(name="engine", source="github", description="README summary")),
     )
 
     assert facts.contact.name == "Ada Lovelace"
@@ -866,7 +1028,12 @@ from pathlib import Path
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.extractor import build_extractor_agent, extract_profile_facts
 from resume_agent.profile.github import GitHubClient
-from resume_agent.profile.github_ingest import build_github_profile, repo_to_project
+from resume_agent.profile.github_ingest import (
+    build_github_profile,
+    build_repo_summary_agent,
+    repo_to_project,
+    summarize_repo_project,
+)
 from resume_agent.profile.merge import merge_facts
 from resume_agent.profile.resume_reader import read_resume_text
 
@@ -875,6 +1042,7 @@ def build_profile(
     resume_path: str | Path,
     github_username: str | None,
     extractor_agent=None,
+    repo_summary_agent=None,
     github_client=None,
 ) -> ProfileFacts:
     """Build a merged ProfileFacts from a resume file and (optionally) GitHub.
@@ -892,8 +1060,17 @@ def build_profile(
     gh = github_client if github_client is not None else GitHubClient()
     profile_data = gh.fetch_profile(github_username)
     repos = gh.fetch_repos(github_username)
+    for repo in repos:
+        repo["languages"] = gh.fetch_languages(github_username, repo["name"])
     gh_profile = build_github_profile(profile_data, repos)
-    projects = [repo_to_project(repo) for repo in repos]
+    summary_agent = repo_summary_agent if repo_summary_agent is not None else build_repo_summary_agent()
+    projects = []
+    for repo in repos:
+        readme = gh.fetch_readme(github_username, repo["name"])
+        if readme:
+            projects.append(summarize_repo_project(repo, readme, summary_agent))
+        else:
+            projects.append(repo_to_project(repo))
     return merge_facts(resume_facts, github_projects=projects, github_profile=gh_profile)
 ```
 
@@ -1082,16 +1259,16 @@ git commit -m "feat(profile): profile build CLI with overwrite protection" -m "C
 
 ## Self-Review (completed during plan authoring)
 
-- **Spec coverage (§5.1):** resume parse (Task 2) + Agno-agent structuring to full `ProfileFacts` (Task 4); GitHub ingest of profile signals + all repos with metadata (Task 5); merge into one fact-lock (Task 6); human-editable `facts.json` output (Task 7); one-time/`--refresh` `profile build` (Task 9). The "every fact carries id/source" + extensibility requirements are satisfied by the Foundation models reused here. **Deviation from spec:** per-README LLM summarization is deferred to v2 (deterministic GitHub metadata used instead) — documented above and to be added to the roadmap memo.
+- **Spec coverage (§5.1):** resume parse (Task 2) + Agno-agent structuring to full `ProfileFacts` (Task 4); GitHub ingest of profile signals + all repos with metadata (Task 5) and README-derived `Project` summaries (Task 5A); merge into one fact-lock (Task 6); human-editable `facts.json` output (Task 7); one-time/`--refresh` `profile build` (Task 9). The "every fact carries id/source" + extensibility requirements are satisfied by the Foundation models reused here.
 - **Placeholder scan:** none — every step has complete code and exact commands.
-- **Type consistency:** `extract_profile_facts(text, agent) -> ProfileFacts`; `build_github_profile(profile, repos) -> GitHubProfile`; `repo_to_project(repo) -> Project`; `merge_facts(resume_facts, github_projects=None, github_profile=None) -> ProfileFacts`; `build_profile(resume_path, github_username, extractor_agent=None, github_client=None)` — keyword names match the CLI call and the tests. `GitHubClient` and the `_FakeGitHub` test double share the `fetch_profile`/`fetch_repos` method names. `save_facts`/`load_facts` paired in Task 7.
+- **Type consistency:** `extract_profile_facts(text, agent) -> ProfileFacts`; `build_github_profile(profile, repos) -> GitHubProfile`; `repo_to_project(repo) -> Project`; `summarize_repo_project(repo, readme_text, agent) -> Project`; `merge_facts(resume_facts, github_projects=None, github_profile=None) -> ProfileFacts`; `build_profile(resume_path, github_username, extractor_agent=None, repo_summary_agent=None, github_client=None)` — keyword names match the CLI call and the tests. `GitHubClient` and the `_FakeGitHub` test double share the `fetch_profile`/`fetch_repos`/`fetch_languages`/`fetch_readme` method names. `save_facts`/`load_facts` paired in Task 7.
 - **Test isolation:** no test hits the network or needs an API key — the Agno agent and GitHub client are injected as fakes; `build_extractor_agent` construction test only sets a dummy env var.
 
 ---
 
 ## Notes to carry into later plans
 - **Tracking plan:** add `updated_at` auto-update (`onupdate`) and decide tz-aware vs naive datetime storage for the SQLModel tables (deferred from the Foundation review).
-- **v2 roadmap:** per-README LLM summarization in GitHub ingest; resume-projects vs GitHub-projects dedup in `merge_facts`.
+- **v2 roadmap:** resume-projects vs GitHub-projects dedup in `merge_facts`; richer README summarization that reads repo file trees beyond the README.
 
 ## Execution Handoff
 After this plan is executed and green, the next plan is **Discovery** (LinkedIn scrape → clean → extract → filter → fit-score → shortlist).
