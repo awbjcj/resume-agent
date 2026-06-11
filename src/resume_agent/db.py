@@ -4,6 +4,7 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.config import get_settings
+from resume_agent.tracking.migrate import ensure_dedup_key_column
 
 # Import tables so their metadata is registered before create_all().
 from resume_agent.tracking import tables  # noqa: F401
@@ -26,6 +27,7 @@ def make_engine(url: str | None = None) -> Engine:
 
 def init_db(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
+    ensure_dedup_key_column(engine)
 
 
 def get_session(engine: Engine) -> Session:
