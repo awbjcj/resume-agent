@@ -24,6 +24,7 @@ tests/fixtures/linkedin/*_live.html
 # Tooling / agent state
 .omc/
 .remember/
+.worktrees/
 
 # OS / editor
 .DS_Store
