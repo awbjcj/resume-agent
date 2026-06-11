@@ -10,6 +10,7 @@ from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.connectors.config import load_connectors_config
 from resume_agent.discovery.connectors.registry import build_connectors
 from resume_agent.discovery.connectors.runner import run_pull
+from resume_agent.discovery.connectors.telemetry import read_runs
 from resume_agent.discovery.ingest import add_job, ingest_jobs
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
@@ -161,6 +162,18 @@ def pull_cmd(
     for name in (c.name for c in connectors):
         typer.echo(f"  {name:<12} +{totals.get(name, 0)}")
     typer.echo(f"Pull complete. Added {sum(totals.values())} new job(s).")
+
+
+@app.command("sources")
+def sources_cmd() -> None:
+    """Show each connector's last run: when, jobs added, and last error."""
+    runs = read_runs(CONNECTOR_RUNS_PATH)
+    if not runs:
+        typer.echo("No connector runs recorded yet. Run `resume-agent pull` first.")
+        raise typer.Exit(code=0)
+    for name, info in sorted(runs.items()):
+        status = info.get("error") or f"+{info.get('added', 0)} added"
+        typer.echo(f"  {name:<12} {info.get('last_run', '-'):<22} {status}")
 
 
 DEFAULT_REVIEW = "config/review.yaml"
