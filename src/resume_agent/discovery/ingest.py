@@ -1,5 +1,9 @@
+from collections import Counter
+from typing import Iterable
+
 from sqlmodel import Session
 
+from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.tracking.repository import find_existing, save_job
 from resume_agent.tracking.dedup import compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
@@ -41,3 +45,23 @@ def add_job(
         status=JobStatus.raw.value,
     )
     return save_job(session, job)
+
+
+def ingest_jobs(session: Session, raw_jobs: Iterable[RawJob]) -> dict[str, int]:
+    """Insert RawJobs through the shared normalize/dedupe path."""
+    added: Counter[str] = Counter()
+    for raw in raw_jobs:
+        if not raw.jd_text.strip():
+            continue
+        job = add_job(
+            session,
+            source=raw.source,
+            jd_text=raw.jd_text,
+            url=raw.url,
+            company=raw.company,
+            title=raw.title,
+            location=raw.location,
+        )
+        if job is not None:
+            added[raw.source] += 1
+    return dict(added)
