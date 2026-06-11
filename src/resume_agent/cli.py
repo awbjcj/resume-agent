@@ -7,6 +7,9 @@ import typer
 
 from resume_agent.config import load_yaml, get_settings
 from resume_agent.db import get_session, init_db, make_engine
+from resume_agent.discovery.connectors.config import load_connectors_config
+from resume_agent.discovery.connectors.registry import build_connectors
+from resume_agent.discovery.connectors.runner import run_pull
 from resume_agent.discovery.ingest import add_job, ingest_jobs
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
@@ -66,6 +69,8 @@ def profile_build(
 
 
 DEFAULT_SEARCH = "config/search.yaml"
+DEFAULT_CONNECTORS = "config/connectors.yaml"
+CONNECTOR_RUNS_PATH = "data/connector_runs.json"
 
 
 def _engine(db_url: str | None):
@@ -126,6 +131,36 @@ def scrape_cmd(
     with get_session(engine) as session:
         added = ingest_jobs(session, connector.fetch(config, limit=limit))
     typer.echo(f"Scrape complete. Added {sum(added.values())} new job(s).")
+
+
+@app.command("pull")
+def pull_cmd(
+    search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
+    connectors_path: str = typer.Option(
+        DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
+    ),
+    limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Run every enabled connector, dedupe into raw jobs, and report per-source counts."""
+    if not Path(connectors_path).exists():
+        typer.echo(
+            f"No connectors config found at {connectors_path}. "
+            "Copy config/connectors.yaml.example to config/connectors.yaml and edit it."
+        )
+        raise typer.Exit(code=1)
+    search_config = load_search_config(search)
+    connectors_config = load_connectors_config(connectors_path)
+    connectors = build_connectors(connectors_config, get_settings())
+    if not connectors:
+        typer.echo("No connectors enabled. Edit connectors.yaml (and .env) to enable some.")
+        raise typer.Exit(code=0)
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        totals = run_pull(session, connectors, search_config, CONNECTOR_RUNS_PATH, limit=limit)
+    for name in (c.name for c in connectors):
+        typer.echo(f"  {name:<12} +{totals.get(name, 0)}")
+    typer.echo(f"Pull complete. Added {sum(totals.values())} new job(s).")
 
 
 DEFAULT_REVIEW = "config/review.yaml"
