@@ -14,7 +14,7 @@ def _write_sources(tmp_path):
 
 def test_profile_build_writes_facts(tmp_path, monkeypatch):
     facts = ProfileFacts(contact=Contact(name="Ada"), projects=[Project(name="engine")])
-    monkeypatch.setattr(cli, "build_profile", lambda resume_path, github_username: facts)
+    monkeypatch.setattr(cli, "build_profile", lambda resume_path, github_username: (facts, "raw text"))
 
     sources = _write_sources(tmp_path)
     out = tmp_path / "facts.json"
@@ -28,7 +28,7 @@ def test_profile_build_writes_facts(tmp_path, monkeypatch):
 
 def test_profile_build_refuses_to_overwrite_without_refresh(tmp_path, monkeypatch):
     facts = ProfileFacts(contact=Contact(name="Ada"))
-    monkeypatch.setattr(cli, "build_profile", lambda resume_path, github_username: facts)
+    monkeypatch.setattr(cli, "build_profile", lambda resume_path, github_username: (facts, "raw text"))
 
     sources = _write_sources(tmp_path)
     out = tmp_path / "facts.json"
@@ -42,7 +42,7 @@ def test_profile_build_refuses_to_overwrite_without_refresh(tmp_path, monkeypatc
 
 def test_profile_build_refresh_overwrites(tmp_path, monkeypatch):
     facts = ProfileFacts(contact=Contact(name="Ada"))
-    monkeypatch.setattr(cli, "build_profile", lambda resume_path, github_username: facts)
+    monkeypatch.setattr(cli, "build_profile", lambda resume_path, github_username: (facts, "raw text"))
 
     sources = _write_sources(tmp_path)
     out = tmp_path / "facts.json"

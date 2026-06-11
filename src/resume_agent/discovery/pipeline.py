@@ -6,7 +6,7 @@ from resume_agent.discovery.fit import compose_fit_input, score_fit
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
-from resume_agent.tracking.repository import jobs_by_status, save_job, status_counts
+from resume_agent.tracking.repository import jobs_by_status, status_counts
 from resume_agent.tracking.tables import JobStatus
 
 
@@ -15,7 +15,8 @@ def run_extract(session: Session, agent: Runner) -> None:
         criteria = extract_job_criteria(job.jd_text, agent)
         job.criteria_json = criteria.model_dump(mode="json")
         job.status = JobStatus.extracted.value
-        save_job(session, job)
+        session.add(job)
+    session.commit()
 
 
 def run_filter(session: Session, config: SearchConfig) -> None:
@@ -27,7 +28,8 @@ def run_filter(session: Session, config: SearchConfig) -> None:
         else:
             job.status = JobStatus.rejected.value
             job.reject_reason = decision.reject_reason
-        save_job(session, job)
+        session.add(job)
+    session.commit()
 
 
 def run_score(session: Session, profile_facts: ProfileFacts, agent: Runner) -> None:
@@ -36,7 +38,8 @@ def run_score(session: Session, profile_facts: ProfileFacts, agent: Runner) -> N
         job.fit_score = fit.score
         job.fit_rationale = fit.rationale
         job.status = JobStatus.shortlisted.value
-        save_job(session, job)
+        session.add(job)
+    session.commit()
 
 
 def discover(

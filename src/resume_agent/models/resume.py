@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import Contact, Education
+from resume_agent.models.profile import Contact, Education, Language
 
 
 class TailoredBullet(ExtensibleModel):
@@ -37,6 +37,40 @@ class TailoredProject(ExtensibleModel):
     provenance: str  # id of the source Project
 
 
+class TailoredPublication(ExtensibleModel):
+    title: str
+    venue: str | None = None
+    date: str | None = None
+    authors: list[str] = Field(default_factory=list)
+    url: str | None = None
+    provenance: str  # id of the source Publication
+
+
+class TailoredCertification(ExtensibleModel):
+    name: str
+    issuer: str | None = None
+    date: str | None = None
+    url: str | None = None
+    provenance: str  # id of the source Certification
+
+
+class TailoredAward(ExtensibleModel):
+    name: str
+    issuer: str | None = None
+    date: str | None = None
+    description: str | None = None
+    provenance: str  # id of the source Award
+
+
+class TailoredVolunteer(ExtensibleModel):
+    organization: str
+    role: str | None = None
+    start: str | None = None
+    end: str | None = None
+    bullets: list[TailoredBullet] = Field(default_factory=list)
+    provenance: str  # id of the source Volunteer record
+
+
 class ResumeContent(ExtensibleModel):
     """Structured, fact-locked resume content. The renderer turns this into a PDF;
     the LLM never emits markup."""
@@ -47,3 +81,9 @@ class ResumeContent(ExtensibleModel):
     projects: list[TailoredProject] = Field(default_factory=list)
     skills: dict[str, list[TailoredSkill]] = Field(default_factory=dict)
     education: list[Education] = Field(default_factory=list)  # carried verbatim
+    publications: list[TailoredPublication] = Field(default_factory=list)
+    certifications: list[TailoredCertification] = Field(default_factory=list)
+    awards: list[TailoredAward] = Field(default_factory=list)
+    languages: list[Language] = Field(default_factory=list)  # carried verbatim
+    volunteer: list[TailoredVolunteer] = Field(default_factory=list)
+    section_order: list[str] | None = None  # optional per-JD ordering hint

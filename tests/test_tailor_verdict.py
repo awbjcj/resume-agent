@@ -47,3 +47,14 @@ def test_gate_pass_and_meets_threshold_passes():
     verdict = aggregate(critiques, _config(threshold=85))
     assert verdict.passed is True
     assert verdict.aggregate_score == 85
+
+
+def test_provenance_failure_blocks_gate_even_if_reviewers_pass():
+    critiques = [
+        ReviewCritique(reviewer="fact-check", score=100, passed=True),
+        ReviewCritique(reviewer="ats-keyword", score=100, passed=True),
+        ReviewCritique(reviewer="recruiter", score=100, passed=True),
+    ]
+    verdict = aggregate(critiques, _config(), provenance_passed=False)
+    assert verdict.gate_passed is False
+    assert verdict.passed is False
