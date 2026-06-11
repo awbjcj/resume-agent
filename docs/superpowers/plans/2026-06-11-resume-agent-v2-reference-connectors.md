@@ -26,6 +26,7 @@
 
 ```
 config/connectors.yaml.example          # CREATE
+.env.example                            # MODIFY — document ADZUNA_APP_ID/ADZUNA_APP_KEY
 src/resume_agent/config.py              # MODIFY — Settings += adzuna_app_id/app_key
 src/resume_agent/discovery/connectors/
   text.py                               # CREATE — html_to_text + search filter (pure)
@@ -84,7 +85,7 @@ def test_filter_matches_keyword_in_title_or_jd_case_insensitively():
         _job("Chef", "make pasta"),
         _job("Designer", "We use PYTHON daily"),
     ]
-    cfg = SearchConfig(keywords=["python"], titles=["engineer"])
+    cfg = SearchConfig(keywords=[" python "], titles=["engineer"])
     kept = {j.title for j in filter_by_search(jobs, cfg)}
     assert kept == {"Backend Engineer", "Designer"}
 ```
@@ -115,7 +116,7 @@ def html_to_text(raw: str) -> str:
 
 
 def _terms(search: SearchConfig) -> list[str]:
-    return [t.lower() for t in (*search.keywords, *search.titles) if t.strip()]
+    return [t.strip().lower() for t in (*search.keywords, *search.titles) if t.strip()]
 
 
 def filter_by_search(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
@@ -421,16 +422,23 @@ git commit -m "feat(connectors): Greenhouse ATS connector" -m "Co-Authored-By: C
 ## Task 4: Adzuna connector
 
 **Files:**
-- Modify: `src/resume_agent/config.py` (Settings)
+- Modify: `src/resume_agent/config.py` (Settings), `.env.example`
 - Create: `tests/fixtures/adzuna/search.json`, `src/resume_agent/discovery/connectors/adzuna.py`
 - Test: `tests/test_connector_adzuna.py`
 
-- [ ] **Step 1: Add Adzuna credentials to Settings**
+- [ ] **Step 1: Add Adzuna credentials to Settings and `.env.example`**
 
 In `src/resume_agent/config.py`, add these two fields to `class Settings` after `github_token`:
 ```python
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""
+```
+
+In `.env.example`, add:
+```dotenv
+# Adzuna API credentials for the aggregator connector.
+ADZUNA_APP_ID=
+ADZUNA_APP_KEY=
 ```
 
 - [ ] **Step 2: Create the fixture**
@@ -543,7 +551,10 @@ class AdzunaConnector:
         return jobs[:limit] if limit is not None else jobs
 
     def _get_results(self, search: SearchConfig) -> dict:  # the only un-CI-tested line
-        what = " ".join(search.titles or search.keywords)
+        terms = list(
+            dict.fromkeys(t.strip() for t in [*search.titles, *search.keywords] if t.strip())
+        )
+        what = " ".join(terms)
         params = {
             "app_id": self.app_id,
             "app_key": self.app_key,
@@ -565,7 +576,7 @@ Expected: PASS (Adzuna tests + existing config tests still green).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/config.py tests/fixtures/adzuna/ src/resume_agent/discovery/connectors/adzuna.py tests/test_connector_adzuna.py
+git add src/resume_agent/config.py .env.example tests/fixtures/adzuna/ src/resume_agent/discovery/connectors/adzuna.py tests/test_connector_adzuna.py
 git commit -m "feat(connectors): Adzuna aggregator connector" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 

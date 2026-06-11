@@ -24,9 +24,9 @@ Not a product, not multi-tenant, not an auto-submitter. Still stops before submi
 | # | Decision | Choice |
 |---|----------|--------|
 | 1 | What "different job markets" means | **Stable official/ATS APIs *and* more platforms** — reliability + breadth, not international geography (deferred) |
-| 2 | Connector interface | **One-shot `Connector.fetch(search) -> list[RawJob]`** — collapse the v1 two-phase `search()`+`fetch_jd()`; `RawJob` carries its own `source` |
+| 2 | Connector interface | **One-shot `Connector.fetch(search, limit=None) -> list[RawJob]`** — collapse the v1 two-phase `search()`+`fetch_jd()`; `RawJob` carries its own `source` |
 | 3 | ATS targeting | **Curated company watchlist** (board tokens) for company-scoped ATS boards **+ one keyword aggregator** for the wide net |
-| 4 | Cross-source dedup | **Normalized `(company, title)` key** as a third dedup signal beside URL + JD-hash; canonical copy preferred via **connector ordering**, not merge logic |
+| 4 | Cross-source dedup | **Normalized `(company, title)` key** as a third dedup signal beside URL + exact JD text; canonical copy preferred via **connector ordering**, not merge logic |
 | 5 | Widening beyond ATS + aggregator | **Feed-first** — reliable feeds/JSON as API connectors; **no new Playwright scrapers in v2**; LinkedIn stays the sole scraper |
 | 6 | New capabilities in v2 | **Cover-letter generation · Gmail auto-status · Application analytics** (match-gap report → v3) |
 | 7 | Ease-of-use in v2 | **Unified `pull` command · connector health (`sources`)** (dashboard dedup-merge UI not needed — auto-merge; init wizard → v3) |
@@ -54,15 +54,15 @@ Each connector is a self-contained unit answering "what market does it cover, ho
 ## 4. Architecture (v2)
 
 ```
-  config/connectors.yaml + companies.yaml + .env
+  config/connectors.yaml + .env
                  │  (which connectors enabled + per-connector params + secrets)
                  ▼
         build_connectors() → [ Connector ]   each pre-bound to its params
                  │
  [0] PULL  (resume-agent pull)
      for connector in ORDER(ATS → feeds → aggregator → LinkedIn):
-         raw_jobs = connector.fetch(SearchConfig)      # client-side keyword filter
-         ingest_jobs(session, raw_jobs)                # normalize + dedupe (url|jd-hash|dedup_key)
+         raw_jobs = connector.fetch(SearchConfig, limit=limit)  # client-side keyword filter
+         ingest_jobs(session, raw_jobs)                # normalize + dedupe (url|exact-JD|dedup_key)
      → per-source counts table         ──►  SQLite: jobs (status=raw, source=<connector>)
      connector telemetry (last run, added, last error)  ──► state file / connector_runs
                  │
@@ -86,7 +86,7 @@ The v1 funnel (discover/approve/tailor/render/track) is untouched. v2 adds a sou
 ```python
 class Connector(Protocol):
     name: str
-    def fetch(self, search: SearchConfig) -> list[RawJob]: ...
+    def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]: ...
 
 @dataclass
 class RawJob:
@@ -108,7 +108,7 @@ Three query models, all behind `Connector`:
 
 | Kind | v2-core | Siblings (framework-supported) | Query model | Auth |
 |------|---------|-------------------------------|-------------|------|
-| **ATS (company-scoped)** | **Greenhouse** | Lever, Ashby | iterate `companies.yaml` board tokens → fetch each board's postings → filter by `SearchConfig` keywords/titles client-side | none (public boards) |
+| **ATS (company-scoped)** | **Greenhouse** | Lever, Ashby | iterate `config/connectors.yaml` board entries → fetch each board's postings → filter by `SearchConfig` keywords/titles client-side | none (public boards) |
 | **Aggregator (keyword)** | **Adzuna** | Remotive (keyless) | `SearchConfig` keywords + location → API search | `.env`: `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` |
 | **Feed (keyword/remote)** | **RemoteOK** (JSON) | WeWorkRemotely (RSS), HN Who's-Hiring (Algolia) | fetch feed → map → filter by `SearchConfig` | none |
 | **Scraper** | LinkedIn (refactored) | — | existing | burner session |
@@ -121,11 +121,17 @@ Endpoints (reference):
 - RemoteOK: `https://remoteok.com/api`
 
 **Config split:**
-- **`config/connectors.yaml`** — which connectors are enabled + per-connector params. ATS company tokens live here under each provider's section (functionally the "company watchlist"; a separate `companies.yaml` is optional sugar, same data). Example shape:
+- **`config/connectors.yaml`** — which connectors are enabled + per-connector params. ATS company tokens live here under each provider's section (functionally the "company watchlist"; a separate `companies.yaml` is deferred optional sugar, same data). Example shape:
   ```yaml
   greenhouse:
     enabled: true
-    boards: [stripe, airbnb, datadog]
+    boards:
+      - token: stripe
+        company: Stripe
+      - token: airbnb
+        company: Airbnb
+      - token: datadog
+        company: Datadog
   adzuna:
     enabled: true
     country: us
@@ -139,8 +145,8 @@ Endpoints (reference):
 
 ### 5.3 Cross-source dedup
 
-- **New scalar column** `jobs.dedup_key` (indexed). Populated at insert as `normalize(company) + "|" + normalize(title)`, where `normalize` lowercases, strips leading seniority tokens (`Sr.`, `Senior`, `Lead`, `Staff`, `Principal`), strips punctuation, and collapses whitespace. Null company *or* title ⇒ null `dedup_key` (skip this signal; fall back to URL/JD-hash).
-- **`find_existing` extended** to check, in order: **URL → exact JD-hash → `dedup_key`**. First match ⇒ duplicate ⇒ not inserted.
+- **New scalar column** `jobs.dedup_key` (indexed). Populated at insert as `normalize(company) + "|" + normalize(title)`, where `normalize` lowercases, strips leading seniority tokens (`Sr.`, `Senior`, `Lead`, `Staff`, `Principal`), strips punctuation, and collapses whitespace. Null company *or* title ⇒ null `dedup_key` (skip this signal; fall back to URL/exact-JD dedupe).
+- **`find_existing` extended** to check, in order: **URL → exact JD text → `dedup_key`**. First match ⇒ duplicate ⇒ not inserted.
 - **Canonical-copy preference via ordering, not merge:** `pull` runs connectors in a fixed order — **ATS → feeds → aggregator → LinkedIn** — so the fullest/canonical JD (ATS) lands first and first-wins dedup keeps it. No update-on-conflict code needed. (Aggregators truncate JD text; ATS gives canonical full text; running ATS first means the good copy wins.)
 - **Migration:** existing DBs need a one-time `dedup_key` backfill (compute from stored company/title). The component plan ships a tiny backfill step; new DBs get the column from `create_all`.
 
@@ -196,7 +202,10 @@ src/resume_agent/discovery/
   connectors/                 # NEW — the connector framework
     __init__.py
     base.py                   # Connector protocol + RawJob
-    runner.py                 # build_connectors() + ORDER + pull orchestration
+    config.py                 # ConnectorsConfig + loader
+    registry.py               # build_connectors() + canonical ORDER
+    runner.py                 # pull orchestration
+    telemetry.py              # connector run state
     greenhouse.py  adzuna.py  remoteok.py     # v2-core references
     lever.py  ashby.py  weworkremotely.py  hn.py   # siblings (copy-the-reference)
   scraper/linkedin.py         # MODIFY — implement Connector.fetch
@@ -239,12 +248,12 @@ The v1 `JobSource`/`ScrapedCard`/`ingest_scraped` are removed; their tests migra
 
 Strict spine, then independent leaves:
 
-1. **Connector framework** — `Connector`/`RawJob`, `ingest_jobs`, dedup (`dedup_key` + `find_existing` + `normalize` + backfill), `connectors.yaml`, and LinkedIn refactored onto the seam. (No new sources yet; LinkedIn must keep working through the new interface.)
-2. **Reference connectors** — Greenhouse, Adzuna, RemoteOK (each fixture-tested; siblings are copy-the-reference).
+1. **Connector framework** — `Connector`/`RawJob`, `ingest_jobs`, dedup (`dedup_key` + `find_existing` + `normalize` + backfill), and LinkedIn refactored onto the seam. (No new sources or connector config yet; LinkedIn must keep working through the new interface.)
+2. **Reference connectors** — `connectors.yaml` + `ConnectorsConfig`, `build_connectors`, Greenhouse, Adzuna, RemoteOK (each fixture-tested; siblings are copy-the-reference).
 3. **`pull` + `sources`** — unified ordered run + connector telemetry/health.
 4. **Cover letters** · 5. **Gmail auto-status** · 6. **Analytics** — independent leaves, any order after (3).
 
-(1)→(2)→(3) is a hard dependency chain; (4)/(5)/(6) depend only on (3) and on existing v1 data.
+(1)→(2)→(3) is a hard dependency chain. (4)/(5)/(6) are independent leaves and should state their own narrow dependencies; they do not need to wait for new sources unless their component plan says so.
 
 ---
 
