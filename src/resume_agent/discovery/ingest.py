@@ -1,6 +1,7 @@
 from sqlmodel import Session
 
 from resume_agent.tracking.repository import find_existing, save_job
+from resume_agent.tracking.dedup import compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
 
 
@@ -24,15 +25,19 @@ def add_job(
     """Normalize, dedupe, and insert a raw job. Returns None if a duplicate exists."""
     jd_text = jd_text.strip()
     url = _clean(url)
-    if find_existing(session, url, jd_text) is not None:
+    company = _clean(company)
+    title = _clean(title)
+    dedup_key = compute_dedup_key(company, title)
+    if find_existing(session, url, jd_text, dedup_key) is not None:
         return None
     job = Job(
         source=source,
         jd_text=jd_text,
         url=url,
-        company=_clean(company),
-        title=_clean(title),
+        company=company,
+        title=title,
         location=_clean(location),
+        dedup_key=dedup_key,
         status=JobStatus.raw.value,
     )
     return save_job(session, job)

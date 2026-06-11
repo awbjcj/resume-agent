@@ -43,6 +43,7 @@ class Job(SQLModel, table=True):
     company: str | None = None
     title: str | None = None
     location: str | None = None
+    dedup_key: str | None = Field(default=None, index=True)
     jd_text: str = ""
     criteria_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     fit_score: int | None = None

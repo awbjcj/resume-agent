@@ -33,3 +33,32 @@ def test_add_job_dedupes_by_url():
         add_job(s, source="manual", jd_text="a", url="http://x/1")
         dup = add_job(s, source="manual", jd_text="b", url="http://x/1")
         assert dup is None
+
+
+def test_add_job_dedupes_same_company_title_across_sources():
+    with _session() as s:
+        first = add_job(
+            s,
+            source="greenhouse",
+            jd_text="full canonical jd",
+            url="http://gh/1",
+            company="Acme Corp",
+            title="Senior Backend Engineer",
+        )
+        dup = add_job(
+            s,
+            source="adzuna",
+            jd_text="truncated jd...",
+            url="http://adz/2",
+            company="acme corp",
+            title="Backend Engineer",
+        )
+        assert first is not None
+        assert dup is None
+
+
+def test_add_job_keeps_distinct_when_company_or_title_missing():
+    with _session() as s:
+        a = add_job(s, source="manual", jd_text="text one")
+        b = add_job(s, source="manual", jd_text="text two")
+        assert a is not None and b is not None

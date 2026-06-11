@@ -23,15 +23,21 @@ def jobs_by_status(session: Session, status: str) -> list[Job]:
     return list(session.exec(select(Job).where(Job.status == status)).all())
 
 
-def find_existing(session: Session, url: str | None, jd_text: str) -> Job | None:
-    """Return a matching job by URL (if given) else by identical JD text, for dedupe."""
+def find_existing(
+    session: Session, url: str | None, jd_text: str, dedup_key: str | None = None
+) -> Job | None:
+    """Return a matching job for dedupe: by URL, else identical JD text, else dedup_key."""
     if url:
         by_url = session.exec(select(Job).where(Job.url == url)).first()
         if by_url is not None:
             return by_url
-    if not jd_text:
-        return None
-    return session.exec(select(Job).where(Job.jd_text == jd_text)).first()
+    if jd_text:
+        by_jd = session.exec(select(Job).where(Job.jd_text == jd_text)).first()
+        if by_jd is not None:
+            return by_jd
+    if dedup_key:
+        return session.exec(select(Job).where(Job.dedup_key == dedup_key)).first()
+    return None
 
 
 def status_counts(session: Session) -> dict[str, int]:
