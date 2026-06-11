@@ -1,0 +1,16 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://boards.greenhouse.io/stripe/jobs/1",
+      "title": "Senior Backend Engineer",
+      "location": {"name": "Remote - US"},
+      "content": "&lt;p&gt;Build &lt;b&gt;payment&lt;/b&gt; systems in Python.&lt;/p&gt;"
+    },
+    {
+      "absolute_url": "https://boards.greenhouse.io/stripe/jobs/2",
+      "title": "Office Manager",
+      "location": {"name": "San Francisco"},
+      "content": "&lt;p&gt;Run the front desk.&lt;/p&gt;"
+    }
+  ]
+}
