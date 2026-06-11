@@ -54,3 +54,23 @@ def test_discover_extracts_filters_scores_and_shortlists():
         assert rejected[0].reject_reason == "sponsorship not available"
         assert counts[JobStatus.shortlisted.value] == 1
         assert counts[JobStatus.rejected.value] == 1
+
+
+def test_discover_commits_once_per_stage(monkeypatch):
+    cfg = SearchConfig(sponsorship_required=True)
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        add_job(s, source="manual", jd_text="good role, will sponsor")
+        add_job(s, source="manual", jd_text="another good role")
+
+        commits = {"n": 0}
+        real_commit = s.commit
+
+        def _counting_commit():
+            commits["n"] += 1
+            return real_commit()
+
+        monkeypatch.setattr(s, "commit", _counting_commit)
+        discover(s, cfg, facts, _ExtractAgent(), _FitAgent())
+
+    assert commits["n"] == 3

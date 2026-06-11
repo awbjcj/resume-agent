@@ -39,3 +39,24 @@ def test_build_extractor_agent_is_configured(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     agent = build_extractor_agent(model_id="claude-haiku-4-5-20251001")
     assert isinstance(agent, AgentRunner)
+
+
+def test_extractor_defaults_to_mid_tier(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    captured = {}
+
+    import resume_agent.profile.extractor as extractor_mod
+
+    class _FakeClaude:
+        def __init__(self, id):
+            captured["id"] = id
+
+    class _FakeAgent:
+        def __init__(self, **kwargs):
+            pass
+
+    monkeypatch.setattr(extractor_mod, "Claude", _FakeClaude)
+    monkeypatch.setattr(extractor_mod, "Agent", _FakeAgent)
+
+    extractor_mod.build_extractor_agent()
+    assert captured["id"] == extractor_mod.get_settings().mid_model

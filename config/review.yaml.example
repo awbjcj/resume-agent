@@ -22,3 +22,10 @@ reviewers:
     gate: false
     weight: 1
     model_tier: mid
+
+# Optional one-page budget handed to the tailor and surfaced to the concision
+# reviewer. Omit the block to accept these defaults.
+length_budget:
+  max_experiences: 4
+  max_bullets_per_role: 5
+  target_total_bullets: 20

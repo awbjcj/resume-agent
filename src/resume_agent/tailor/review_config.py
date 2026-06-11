@@ -13,10 +13,19 @@ class ReviewerSpec(ExtensibleModel):
     model_tier: str = "mid"  # cheap | mid | premium
 
 
+class LengthBudget(ExtensibleModel):
+    """One-page guidance handed to the tailor and surfaced to reviewers."""
+
+    max_experiences: int = 4
+    max_bullets_per_role: int = 5
+    target_total_bullets: int = 20
+
+
 class ReviewConfig(ExtensibleModel):
     max_rounds: int = Field(default=3, ge=1)
     score_threshold: int = 85
     reviewers: list[ReviewerSpec] = Field(default_factory=list)
+    length_budget: LengthBudget = Field(default_factory=LengthBudget)
 
 
 def load_review_config(path: str | Path) -> ReviewConfig:

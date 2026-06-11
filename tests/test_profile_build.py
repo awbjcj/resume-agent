@@ -28,13 +28,14 @@ def test_build_profile_combines_resume_and_github(tmp_path):
     resume.write_text("Ada Lovelace", encoding="utf-8")
     extracted = ProfileFacts(contact=Contact(name="Ada Lovelace"))
 
-    facts = build_profile(
+    facts, raw_text = build_profile(
         resume_path=resume,
         github_username="ada",
         extractor_agent=_FakeAgent(extracted),
         github_client=_FakeGitHub(),
     )
 
+    assert raw_text == "Ada Lovelace"
     assert facts.contact.name == "Ada Lovelace"
     assert facts.github_profile is not None
     assert facts.github_profile.username == "ada"
@@ -44,11 +45,12 @@ def test_build_profile_combines_resume_and_github(tmp_path):
 def test_build_profile_skips_github_when_no_username(tmp_path):
     resume = tmp_path / "resume.txt"
     resume.write_text("Ada", encoding="utf-8")
-    facts = build_profile(
+    facts, raw_text = build_profile(
         resume_path=resume,
         github_username="",
         extractor_agent=_FakeAgent(ProfileFacts(contact=Contact(name="Ada"))),
         github_client=_FakeGitHub(),
     )
+    assert raw_text == "Ada"
     assert facts.github_profile is None
     assert facts.projects == []

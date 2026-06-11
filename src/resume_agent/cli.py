@@ -16,6 +16,7 @@ from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.profile.build import build_profile
 from resume_agent.profile.store import load_facts, save_facts
+from resume_agent.profile.validate import validate_profile
 from resume_agent.tailor.agents import build_reviewer_agent, build_reviser_agent, build_tailor_agent, model_for_tier
 from resume_agent.tailor.review_config import load_review_config
 from resume_agent.tailor.service import tailor_job
@@ -52,14 +53,17 @@ def profile_build(
         raise typer.Exit(code=1)
 
     cfg = load_yaml(sources)
-    facts = build_profile(
+    facts, raw_text = build_profile(
         resume_path=_require_str(cfg.get("resume_path"), "resume_path"),
         github_username=cast(str | None, cfg.get("github_username")),
     )
+    report = validate_profile(facts, raw_text)
     path = save_facts(facts, out)
     typer.echo(
         f"Wrote {len(facts.experience)} experiences and {len(facts.projects)} projects to {path}"
     )
+    for warning in report.warnings:
+        typer.echo(f"  WARNING: {warning}")
 
 
 DEFAULT_SEARCH = "config/search.yaml"
