@@ -7,11 +7,10 @@ import typer
 
 from resume_agent.config import load_yaml, get_settings
 from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import add_job
+from resume_agent.discovery.ingest import add_job, ingest_jobs
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
 from resume_agent.discovery.pipeline import discover
-from resume_agent.discovery.scraper.ingest import ingest_scraped
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.profile.build import build_profile
@@ -122,11 +121,11 @@ def scrape_cmd(
 ) -> None:
     """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""
     config = load_search_config(search)
-    scraper = build_linkedin_scraper()
+    connector = build_linkedin_scraper()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        added = ingest_scraped(session, scraper, config, limit=limit)
-    typer.echo(f"Scrape complete. Added {added} new job(s).")
+        added = ingest_jobs(session, connector.fetch(config, limit=limit))
+    typer.echo(f"Scrape complete. Added {sum(added.values())} new job(s).")
 
 
 DEFAULT_REVIEW = "config/review.yaml"
