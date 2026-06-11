@@ -1,0 +1,19 @@
+[
+  {"legal": "See https://remoteok.com/api for terms"},
+  {
+    "id": "1001",
+    "url": "https://remoteok.com/remote-jobs/1001",
+    "company": "Acme",
+    "position": "Backend Engineer",
+    "location": "Worldwide",
+    "description": "<p>Build APIs in Python.</p>"
+  },
+  {
+    "id": "1002",
+    "url": "https://remoteok.com/remote-jobs/1002",
+    "company": "Beta",
+    "position": "Frontend Engineer",
+    "location": "",
+    "description": "<p>React and TypeScript.</p>"
+  }
+]
