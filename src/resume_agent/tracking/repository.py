@@ -3,7 +3,14 @@ from typing import Any, cast
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job, ResumeVersion, utcnow
+from resume_agent.tracking.tables import (
+    Application,
+    ApplicationStatus,
+    CoverLetter,
+    Job,
+    ResumeVersion,
+    utcnow,
+)
 
 
 def _stamp_submitted_at(application: Application) -> None:
@@ -23,15 +30,21 @@ def jobs_by_status(session: Session, status: str) -> list[Job]:
     return list(session.exec(select(Job).where(Job.status == status)).all())
 
 
-def find_existing(session: Session, url: str | None, jd_text: str) -> Job | None:
-    """Return a matching job by URL (if given) else by identical JD text, for dedupe."""
+def find_existing(
+    session: Session, url: str | None, jd_text: str, dedup_key: str | None = None
+) -> Job | None:
+    """Return a matching job for dedupe: by URL, else identical JD text, else dedup_key."""
     if url:
         by_url = session.exec(select(Job).where(Job.url == url)).first()
         if by_url is not None:
             return by_url
-    if not jd_text:
-        return None
-    return session.exec(select(Job).where(Job.jd_text == jd_text)).first()
+    if jd_text:
+        by_jd = session.exec(select(Job).where(Job.jd_text == jd_text)).first()
+        if by_jd is not None:
+            return by_jd
+    if dedup_key:
+        return session.exec(select(Job).where(Job.dedup_key == dedup_key)).first()
+    return None
 
 
 def status_counts(session: Session) -> dict[str, int]:
@@ -113,3 +126,14 @@ def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersi
         .where(ResumeVersion.job_id == job_id, pdf_path_col.is_not(None))
         .order_by(round_col.desc(), id_col.desc())
     ).first()
+
+
+def save_cover_letter(session: Session, cover_letter: CoverLetter) -> CoverLetter:
+    session.add(cover_letter)
+    session.commit()
+    session.refresh(cover_letter)
+    return cover_letter
+
+
+def get_cover_letter(session: Session, cover_letter_id: int) -> CoverLetter | None:
+    return session.get(CoverLetter, cover_letter_id)

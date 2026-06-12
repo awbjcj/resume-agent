@@ -15,6 +15,7 @@ __pycache__/
 # Generated artifacts
 output/
 data/
+data/gmail_token.json
 *.pdf
 
 # Local browser sessions / calibration captures

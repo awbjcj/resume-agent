@@ -1,6 +1,11 @@
+from collections import Counter
+from typing import Iterable
+
 from sqlmodel import Session
 
+from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.tracking.repository import find_existing, save_job
+from resume_agent.tracking.dedup import compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
 
 
@@ -24,15 +29,39 @@ def add_job(
     """Normalize, dedupe, and insert a raw job. Returns None if a duplicate exists."""
     jd_text = jd_text.strip()
     url = _clean(url)
-    if find_existing(session, url, jd_text) is not None:
+    company = _clean(company)
+    title = _clean(title)
+    dedup_key = compute_dedup_key(company, title)
+    if find_existing(session, url, jd_text, dedup_key) is not None:
         return None
     job = Job(
         source=source,
         jd_text=jd_text,
         url=url,
-        company=_clean(company),
-        title=_clean(title),
+        company=company,
+        title=title,
         location=_clean(location),
+        dedup_key=dedup_key,
         status=JobStatus.raw.value,
     )
     return save_job(session, job)
+
+
+def ingest_jobs(session: Session, raw_jobs: Iterable[RawJob]) -> dict[str, int]:
+    """Insert RawJobs through the shared normalize/dedupe path."""
+    added: Counter[str] = Counter()
+    for raw in raw_jobs:
+        if not raw.jd_text.strip():
+            continue
+        job = add_job(
+            session,
+            source=raw.source,
+            jd_text=raw.jd_text,
+            url=raw.url,
+            company=raw.company,
+            title=raw.title,
+            location=raw.location,
+        )
+        if job is not None:
+            added[raw.source] += 1
+    return dict(added)

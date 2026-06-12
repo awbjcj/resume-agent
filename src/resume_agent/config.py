@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     github_token: str = ""
+    adzuna_app_id: str = ""
+    adzuna_app_key: str = ""
     linkedin_email: str = ""
     linkedin_password: str = ""
     linkedin_user_data_dir: str = ".linkedin_profile"

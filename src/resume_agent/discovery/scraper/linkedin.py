@@ -4,6 +4,7 @@ import urllib.parse
 from playwright.sync_api import sync_playwright
 
 from resume_agent.config import get_settings
+from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.scraper.models import ScrapedCard
 from resume_agent.discovery.scraper.parser import parse_job_detail, parse_search_cards
 from resume_agent.discovery.search_config import SearchConfig
@@ -24,11 +25,13 @@ def _search_url(config: SearchConfig) -> str:
 
 
 class LinkedInScraper:
-    """Playwright driver over a persistent, logged-in burner profile.
+    """Connector over a persistent, logged-in burner LinkedIn profile.
 
     First run: a browser window opens; log in by hand once. The session persists
     in ``user_data_dir`` for subsequent runs. Pacing is deliberate and capped.
     """
+
+    name = "linkedin"
 
     def __init__(
         self,
@@ -56,15 +59,34 @@ class LinkedInScraper:
             finally:
                 context.close()
 
-    def search(self, config: SearchConfig) -> list[ScrapedCard]:
-        html = self._content_for_url(_search_url(config), scroll=True)
-        return parse_search_cards(html)
+    def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
+        cards = parse_search_cards(self._search_html(search))
+        if limit is not None:
+            cards = cards[:limit]
+        jobs: list[RawJob] = []
+        for card in cards:
+            jd_text = parse_job_detail(self._detail_html(card)).strip()
+            if not jd_text:
+                continue
+            jobs.append(
+                RawJob(
+                    source=self.name,
+                    url=card.url,
+                    company=card.company,
+                    title=card.title,
+                    location=card.location,
+                    jd_text=jd_text,
+                )
+            )
+        return jobs
 
-    def fetch_jd(self, card: ScrapedCard) -> str:
+    def _search_html(self, search: SearchConfig) -> str:
+        return self._content_for_url(_search_url(search), scroll=True)
+
+    def _detail_html(self, card: ScrapedCard) -> str:
         if not card.url:
             return ""
-        html = self._content_for_url(card.url)
-        return parse_job_detail(html)
+        return self._content_for_url(card.url)
 
 
 def build_linkedin_scraper() -> LinkedInScraper:

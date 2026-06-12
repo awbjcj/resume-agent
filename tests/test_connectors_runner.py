@@ -1,0 +1,41 @@
+from sqlmodel import Session, SQLModel, create_engine
+
+from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.runner import run_pull
+from resume_agent.discovery.connectors.telemetry import read_runs
+from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.tracking.repository import jobs_by_status
+from resume_agent.tracking.tables import JobStatus
+
+
+def _session():
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    return Session(engine)
+
+
+class _Good:
+    name = "greenhouse"
+
+    def fetch(self, search, limit=None):
+        return [RawJob("greenhouse", "https://gh/1", "Acme", "Backend Engineer", "Remote", "jd a")]
+
+
+class _Boom:
+    name = "adzuna"
+
+    def fetch(self, search, limit=None):
+        raise RuntimeError("HTTP 429")
+
+
+def test_run_pull_ingests_counts_and_isolates_failures(tmp_path):
+    telemetry = tmp_path / "runs.json"
+    with _session() as s:
+        counts = run_pull(s, [_Good(), _Boom()], SearchConfig(), telemetry, limit=None)
+
+        assert counts == {"greenhouse": 1}
+        assert {j.source for j in jobs_by_status(s, JobStatus.raw.value)} == {"greenhouse"}
+
+        runs = read_runs(telemetry)
+        assert runs["greenhouse"]["added"] == 1 and runs["greenhouse"]["error"] is None
+        assert runs["adzuna"]["added"] == 0 and "429" in runs["adzuna"]["error"]

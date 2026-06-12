@@ -7,13 +7,22 @@ import typer
 
 from resume_agent.config import load_yaml, get_settings
 from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.ingest import add_job
+from resume_agent.discovery.connectors.config import load_connectors_config
+from resume_agent.discovery.connectors.registry import build_connectors
+from resume_agent.discovery.connectors.runner import run_pull
+from resume_agent.discovery.connectors.telemetry import read_runs
+from resume_agent.discovery.ingest import add_job, ingest_jobs
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
 from resume_agent.discovery.pipeline import discover
-from resume_agent.discovery.scraper.ingest import ingest_scraped
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
+from resume_agent.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
+from resume_agent.cover_letter.render import render_cover_letter
+from resume_agent.cover_letter.service import generate_cover_letter
+from resume_agent.gmail.classify import classify_email
+from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
+from resume_agent.gmail.propose import propose_transitions
 from resume_agent.profile.build import build_profile
 from resume_agent.profile.store import load_facts, save_facts
 from resume_agent.profile.validate import validate_profile
@@ -22,7 +31,8 @@ from resume_agent.tailor.review_config import load_review_config
 from resume_agent.tailor.service import tailor_job
 from resume_agent.render.render_config import RenderConfig, load_render_config
 from resume_agent.render.service import render_version
-from resume_agent.tracking.repository import get_job, jobs_by_status, save_job
+from resume_agent.tracking.queries import application_job_pairs
+from resume_agent.tracking.repository import get_job, jobs_by_status, save_job, update_application_status
 from resume_agent.tracking.tables import JobStatus
 
 app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
@@ -67,6 +77,8 @@ def profile_build(
 
 
 DEFAULT_SEARCH = "config/search.yaml"
+DEFAULT_CONNECTORS = "config/connectors.yaml"
+CONNECTOR_RUNS_PATH = "data/connector_runs.json"
 
 
 def _engine(db_url: str | None):
@@ -122,11 +134,53 @@ def scrape_cmd(
 ) -> None:
     """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""
     config = load_search_config(search)
-    scraper = build_linkedin_scraper()
+    connector = build_linkedin_scraper()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        added = ingest_scraped(session, scraper, config, limit=limit)
-    typer.echo(f"Scrape complete. Added {added} new job(s).")
+        added = ingest_jobs(session, connector.fetch(config, limit=limit))
+    typer.echo(f"Scrape complete. Added {sum(added.values())} new job(s).")
+
+
+@app.command("pull")
+def pull_cmd(
+    search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
+    connectors_path: str = typer.Option(
+        DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
+    ),
+    limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Run every enabled connector, dedupe into raw jobs, and report per-source counts."""
+    if not Path(connectors_path).exists():
+        typer.echo(
+            f"No connectors config found at {connectors_path}. "
+            "Copy config/connectors.yaml.example to config/connectors.yaml and edit it."
+        )
+        raise typer.Exit(code=1)
+    search_config = load_search_config(search)
+    connectors_config = load_connectors_config(connectors_path)
+    connectors = build_connectors(connectors_config, get_settings())
+    if not connectors:
+        typer.echo("No connectors enabled. Edit connectors.yaml (and .env) to enable some.")
+        raise typer.Exit(code=0)
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        totals = run_pull(session, connectors, search_config, CONNECTOR_RUNS_PATH, limit=limit)
+    for name in (c.name for c in connectors):
+        typer.echo(f"  {name:<12} +{totals.get(name, 0)}")
+    typer.echo(f"Pull complete. Added {sum(totals.values())} new job(s).")
+
+
+@app.command("sources")
+def sources_cmd() -> None:
+    """Show each connector's last run: when, jobs added, and last error."""
+    runs = read_runs(CONNECTOR_RUNS_PATH)
+    if not runs:
+        typer.echo("No connector runs recorded yet. Run `resume-agent pull` first.")
+        raise typer.Exit(code=0)
+    for name, info in sorted(runs.items()):
+        status = info.get("error") or f"+{info.get('added', 0)} added"
+        typer.echo(f"  {name:<12} {info.get('last_run', '-'):<22} {status}")
 
 
 DEFAULT_REVIEW = "config/review.yaml"
@@ -195,6 +249,43 @@ def tailor_cmd(
             )
 
 
+@app.command("cover-letter")
+def cover_letter_cmd(
+    job_id: int = typer.Option(None, help="Write a cover letter for a single job by id."),
+    approved: bool = typer.Option(False, "--approved", help="Write cover letters for all approved jobs."),
+    facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Draft a fact-locked cover letter per job and render it to PDF."""
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        if job_id is not None:
+            job = get_job(session, job_id)
+            if job is None:
+                typer.echo(f"Job #{job_id} not found.")
+                raise typer.Exit(code=1)
+            targets = [job]
+        elif approved:
+            targets = jobs_by_status(session, JobStatus.approved.value)
+        else:
+            typer.echo("Specify --job-id <id> or --approved.")
+            raise typer.Exit(code=1)
+
+        profile_facts = load_facts(facts)
+        draft_agent = build_cover_letter_agent()
+        reviser_agent = build_cover_letter_reviser_agent()
+
+        for job in targets:
+            cover = generate_cover_letter(session, job, profile_facts, draft_agent, reviser_agent)
+            if cover.id is None:
+                raise RuntimeError("Cover letter was not persisted")
+            path = render_cover_letter(session, cover.id)
+            typer.echo(
+                f"Job #{job.id}: cover letter #{cover.id} "
+                f"(fact_check_passed={cover.fact_check_passed}) -> {path}"
+            )
+
+
 DEFAULT_RENDER = "config/render.yaml"
 
 
@@ -225,6 +316,37 @@ def dashboard_cmd(
     if db_url:
         env["DB_URL"] = db_url
     subprocess.run(["streamlit", "run", app_path], env=env)
+
+
+@app.command("sync-status")
+def sync_status_cmd(
+    apply: bool = typer.Option(
+        False, "--apply", help="Apply the proposed transitions (default: list only)."
+    ),
+    max_results: int = typer.Option(50, help="How many recent emails to scan."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Scan recent Gmail and propose application-status updates."""
+    service = build_gmail_service()
+    emails = fetch_recent_messages(service, max_results=max_results)
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        pairs = application_job_pairs(session)
+        proposals = propose_transitions(emails, pairs, classify_email)
+        if not proposals:
+            typer.echo("No status changes proposed.")
+            raise typer.Exit(code=0)
+        for proposal in proposals:
+            typer.echo(
+                f"  {proposal.label}: {proposal.current_status} -> "
+                f"{proposal.proposed_status} ({proposal.evidence})"
+            )
+        if apply:
+            for proposal in proposals:
+                update_application_status(session, proposal.application_id, proposal.proposed_status)
+            typer.echo(f"Applied {len(proposals)} transition(s).")
+        else:
+            typer.echo("Re-run with --apply to apply these transitions.")
 
 
 if __name__ == "__main__":

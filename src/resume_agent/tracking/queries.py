@@ -8,7 +8,7 @@ from resume_agent.tracking.repository import (
     latest_rendered_resume_version,
     latest_resume_version,
 )
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.tracking.tables import Application, Job, JobStatus
 
 
 def _require_job_id(job: Job) -> int:
@@ -91,3 +91,9 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
             )
         )
     return rows
+
+
+def application_job_pairs(session: Session) -> list[tuple[Application, Job]]:
+    """Every application paired with its job (one query, no N+1 per-row fetch)."""
+    statement = select(Application, Job).join(Job, Application.job_id == Job.id)
+    return [(app, job) for app, job in session.exec(statement).all()]

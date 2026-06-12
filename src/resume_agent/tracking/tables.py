@@ -43,6 +43,7 @@ class Job(SQLModel, table=True):
     company: str | None = None
     title: str | None = None
     location: str | None = None
+    dedup_key: str | None = Field(default=None, index=True)
     jd_text: str = ""
     criteria_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     fit_score: int | None = None
@@ -80,3 +81,16 @@ class Application(SQLModel, table=True):
     updated_at: datetime = Field(
         default_factory=utcnow, sa_column_kwargs={"onupdate": utcnow}
     )
+
+
+class CoverLetter(SQLModel, table=True):
+    __tablename__ = cast(Any, "cover_letters")
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: int = Field(foreign_key="jobs.id", index=True)
+    resume_version_id: int | None = Field(default=None, foreign_key="resume_versions.id")
+    content_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    pdf_path: str | None = None
+    fact_check_passed: bool = False
+    schema_version: int = 1
+    created_at: datetime = Field(default_factory=utcnow)
