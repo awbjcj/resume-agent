@@ -18,7 +18,7 @@ def parse_adzuna(payload: dict) -> list[RawJob]:
                 company=(item.get("company") or {}).get("display_name"),
                 title=item.get("title"),
                 location=(item.get("location") or {}).get("display_name"),
-                jd_text=item.get("description", ""),
+                jd_text=item.get("description") or "",
             )
         )
     return jobs

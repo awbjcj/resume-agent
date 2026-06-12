@@ -18,6 +18,10 @@ def match_email_to_application(email: EmailMessage, jobs: list[Job]) -> Job | No
         if not job.company:
             continue
         token = _company_token(job.company)
-        if token and (token in domain or token in haystack):
+        if not token:
+            continue
+        # Substring is fine inside a domain (e.g. "acme" in "mail.acmecorp.com"),
+        # but a whole-word match in free text avoids "box" hitting "dropbox".
+        if token in domain or re.search(rf"\b{re.escape(token)}\b", haystack):
             return job
     return None

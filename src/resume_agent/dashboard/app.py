@@ -428,7 +428,7 @@ def render_analytics_page(session) -> None:
         return
 
     st.markdown('<div class="rail-head">By source</div>', unsafe_allow_html=True)
-    st.table(analytics_table_rows(session, by="source"))
+    st.table(rows)
     st.markdown('<div class="rail-head">By fit-score band</div>', unsafe_allow_html=True)
     st.table(analytics_table_rows(session, by="band"))
 
