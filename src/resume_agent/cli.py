@@ -20,6 +20,9 @@ from resume_agent.discovery.search_config import load_search_config
 from resume_agent.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
 from resume_agent.cover_letter.render import render_cover_letter
 from resume_agent.cover_letter.service import generate_cover_letter
+from resume_agent.gmail.classify import classify_email
+from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
+from resume_agent.gmail.propose import propose_transitions
 from resume_agent.profile.build import build_profile
 from resume_agent.profile.store import load_facts, save_facts
 from resume_agent.profile.validate import validate_profile
@@ -28,7 +31,8 @@ from resume_agent.tailor.review_config import load_review_config
 from resume_agent.tailor.service import tailor_job
 from resume_agent.render.render_config import RenderConfig, load_render_config
 from resume_agent.render.service import render_version
-from resume_agent.tracking.repository import get_job, jobs_by_status, save_job
+from resume_agent.tracking.queries import application_job_pairs
+from resume_agent.tracking.repository import get_job, jobs_by_status, save_job, update_application_status
 from resume_agent.tracking.tables import JobStatus
 
 app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
@@ -312,6 +316,37 @@ def dashboard_cmd(
     if db_url:
         env["DB_URL"] = db_url
     subprocess.run(["streamlit", "run", app_path], env=env)
+
+
+@app.command("sync-status")
+def sync_status_cmd(
+    apply: bool = typer.Option(
+        False, "--apply", help="Apply the proposed transitions (default: list only)."
+    ),
+    max_results: int = typer.Option(50, help="How many recent emails to scan."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Scan recent Gmail and propose application-status updates."""
+    service = build_gmail_service()
+    emails = fetch_recent_messages(service, max_results=max_results)
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        pairs = application_job_pairs(session)
+        proposals = propose_transitions(emails, pairs, classify_email)
+        if not proposals:
+            typer.echo("No status changes proposed.")
+            raise typer.Exit(code=0)
+        for proposal in proposals:
+            typer.echo(
+                f"  {proposal.label}: {proposal.current_status} -> "
+                f"{proposal.proposed_status} ({proposal.evidence})"
+            )
+        if apply:
+            for proposal in proposals:
+                update_application_status(session, proposal.application_id, proposal.proposed_status)
+            typer.echo(f"Applied {len(proposals)} transition(s).")
+        else:
+            typer.echo("Re-run with --apply to apply these transitions.")
 
 
 if __name__ == "__main__":
