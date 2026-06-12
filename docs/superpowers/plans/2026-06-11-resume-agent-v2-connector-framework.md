@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the LinkedIn-shaped `JobSource` seam with a one-shot `Connector.fetch(search) -> list[RawJob]` interface, add cross-source deduplication via a normalized `(company, title)` key, and refactor the existing LinkedIn scraper onto the new seam — so every later connector (Greenhouse, Adzuna, RemoteOK, …) inherits correct source attribution and dedupe for free.
+**Goal:** Replace the LinkedIn-shaped `JobSource` seam with a one-shot `Connector.fetch(search, limit=None) -> list[RawJob]` interface, add cross-source deduplication via a normalized `(company, title)` key, and refactor the existing LinkedIn scraper onto the new seam — so every later connector (Greenhouse, Adzuna, RemoteOK, …) inherits correct source attribution and dedupe for free.
 
 **Architecture:** This is the **backbone plan** (Plan 1 of 6) for v2 — design spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`. It builds three deep modules behind small interfaces: (1) the `Connector` **seam** with `RawJob` as its single output type; (2) a dedup module whose `compute_dedup_key` + extended `find_existing` concentrate *all* cross-source identity logic in the tracking layer (so connectors never re-solve dedupe — the **deletion test**: push this into each connector and the complexity reappears N times); (3) `ingest_jobs`, which concentrates "loop → skip-empty → dedupe → attribute source → count" in one place. LinkedIn becomes the first **adapter** on the seam; Plan 2 adds the second, making it a real seam.
 
@@ -184,6 +184,7 @@ def test_dedup_key_strips_various_seniority_prefixes():
     base = compute_dedup_key("Acme", "Engineer")
     assert compute_dedup_key("Acme", "Sr. Engineer") == base
     assert compute_dedup_key("Acme", "Staff Engineer") == base
+    assert compute_dedup_key("Acme", "Senior Staff Engineer") == base
     assert compute_dedup_key("Acme", "Junior Engineer") == base
 
 
@@ -205,7 +206,7 @@ Create `src/resume_agent/tracking/dedup.py`:
 import re
 
 _SENIORITY = re.compile(
-    r"^(?:sr\.?|senior|jr\.?|junior|lead|staff|principal|entry[- ]level)\s+",
+    r"^(?:(?:sr\.?|senior|jr\.?|junior|lead|staff|principal|entry[- ]level)\s+)+",
     re.IGNORECASE,
 )
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
@@ -224,7 +225,7 @@ def compute_dedup_key(company: str | None, title: str | None) -> str | None:
     """A normalized ``company|title`` identity for cross-source dedupe.
 
     Returns ``None`` when either side is missing, so callers fall back to the
-    URL / JD-hash signals instead of collapsing unrelated rows.
+    URL / exact-JD signals instead of collapsing unrelated rows.
     """
     if not company or not company.strip() or not title or not title.strip():
         return None
@@ -392,6 +393,8 @@ def test_ensure_adds_column_and_backfills_old_jobs_table():
     with engine.connect() as conn:
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
         assert "dedup_key" in cols
+        indexes = [row[1] for row in conn.execute(text("PRAGMA index_list(jobs)"))]
+        assert "ix_jobs_dedup_key" in indexes
         key = conn.execute(text("SELECT dedup_key FROM jobs WHERE id = 1")).scalar()
         assert key == "acme corp|backend engineer"
 
@@ -430,6 +433,7 @@ def ensure_dedup_key_column(engine: Engine) -> None:
             return
         if "dedup_key" not in cols:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN dedup_key VARCHAR"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_jobs_dedup_key ON jobs (dedup_key)"))
         rows = conn.execute(
             text("SELECT id, company, title FROM jobs WHERE dedup_key IS NULL")
         ).fetchall()
@@ -549,7 +553,7 @@ Add at the end of the file:
 def ingest_jobs(session: Session, raw_jobs: Iterable[RawJob]) -> dict[str, int]:
     """Insert RawJobs through the shared normalize/dedupe path. Returns per-source added counts.
 
-    Empty JD text is skipped; duplicates (URL, JD-hash, or dedup_key) are dropped.
+    Empty JD text is skipped; duplicates (URL, exact JD text, or dedup_key) are dropped.
     Each row is attributed to ``raw.source`` — no source is assumed.
     """
     added: Counter[str] = Counter()
@@ -659,11 +663,14 @@ _SEARCH_URL = "https://www.linkedin.com/jobs/search/"
 
 
 def _search_url(config: SearchConfig) -> str:
-    params = {}
-    if config.keywords or config.titles:
-        params["keywords"] = " ".join(config.titles or config.keywords)
+    params: dict[str, str] = {}
+    terms = list(dict.fromkeys([*config.titles, *config.keywords]))
+    if terms:
+        params["keywords"] = " ".join(terms)
     if config.locations:
         params["location"] = config.locations[0]
+    if not params:
+        return _SEARCH_URL
     return _SEARCH_URL + "?" + urllib.parse.urlencode(params)
 
 
@@ -688,6 +695,22 @@ class LinkedInScraper:
         self.headless = headless
         self.pace_seconds = pace_seconds
 
+    def _content_for_url(self, url: str, *, scroll: bool = False) -> str:
+        with sync_playwright() as p:
+            context = p.chromium.launch_persistent_context(
+                self.user_data_dir, headless=self.headless
+            )
+            try:
+                page = context.new_page()
+                page.goto(url, wait_until="domcontentloaded")
+                time.sleep(self.pace_seconds)
+                if scroll:
+                    page.mouse.wheel(0, 4000)
+                    time.sleep(self.pace_seconds)
+                return page.content()
+            finally:
+                context.close()
+
     def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
         cards = parse_search_cards(self._search_html(search))
         if limit is not None:
@@ -711,28 +734,12 @@ class LinkedInScraper:
 
     # --- browser I/O seam (overridden in tests; never exercised in CI) ---
     def _search_html(self, search: SearchConfig) -> str:
-        with sync_playwright() as p:
-            context = p.chromium.launch_persistent_context(self.user_data_dir, headless=self.headless)
-            page = context.new_page()
-            page.goto(_search_url(search), wait_until="domcontentloaded")
-            time.sleep(self.pace_seconds)
-            page.mouse.wheel(0, 4000)
-            time.sleep(self.pace_seconds)
-            html = page.content()
-            context.close()
-            return html
+        return self._content_for_url(_search_url(search), scroll=True)
 
     def _detail_html(self, card: ScrapedCard) -> str:
         if not card.url:
             return ""
-        with sync_playwright() as p:
-            context = p.chromium.launch_persistent_context(self.user_data_dir, headless=self.headless)
-            page = context.new_page()
-            page.goto(card.url, wait_until="domcontentloaded")
-            time.sleep(self.pace_seconds)
-            html = page.content()
-            context.close()
-            return html
+        return self._content_for_url(card.url)
 
 
 def build_linkedin_scraper() -> LinkedInScraper:
@@ -832,6 +839,9 @@ Expected: PASS (1 test).
 Run: `uv run pytest -q`
 Expected: ALL pass — the v2 backbone is green and the v1 pipeline still works end-to-end through the new seam. (No references to `ingest_scraped`, `JobSource`, or `ScrapedCard`-as-output remain.)
 
+Run: `rg -n "ingest_scraped|JobSource" src tests`
+Expected: no output (`rg` exits 1 when there are no matches; that is expected).
+
 Run: `uv run resume-agent scrape --help`
 Expected: help text, exit 0.
 
@@ -847,7 +857,7 @@ git commit -m "feat(connectors): scrape runs via Connector.fetch + ingest_jobs" 
 ## Self-Review (completed during plan authoring)
 
 **Spec coverage (§5.1, §5.3, Decisions #2/#4):**
-- One-shot `Connector.fetch(search) -> list[RawJob]` with `RawJob.source` — Task 1 (fixes the v1 `source="linkedin"` hardcode, regression-tested in Task 5).
+- One-shot `Connector.fetch(search, limit=None) -> list[RawJob]` with `RawJob.source` — Task 1 (fixes the v1 `source="linkedin"` hardcode, regression-tested in Task 5).
 - `ingest_jobs` replacing `ingest_scraped` — Task 5.
 - Dedup: `dedup_key` + `normalize` + extended `find_existing` + backfill — Tasks 2–4. Canonical-copy-via-ordering is asserted by `test_ingest_jobs_dedupes_same_posting_across_sources` (Task 5).
 - LinkedIn refactored onto the seam, parsers/fixtures untouched — Task 6.
