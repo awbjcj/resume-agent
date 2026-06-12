@@ -8,7 +8,7 @@ from resume_agent.tracking.repository import (
     latest_rendered_resume_version,
     latest_resume_version,
 )
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.tracking.tables import Application, Job, JobStatus
 
 
 def _require_job_id(job: Job) -> int:
@@ -91,3 +91,13 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
             )
         )
     return rows
+
+
+def application_job_pairs(session: Session) -> list[tuple[Application, Job]]:
+    """Every application paired with its job."""
+    pairs: list[tuple[Application, Job]] = []
+    for app in session.exec(select(Application)).all():
+        job = session.get(Job, app.job_id)
+        if job is not None:
+            pairs.append((app, job))
+    return pairs
