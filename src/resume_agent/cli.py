@@ -17,6 +17,9 @@ from resume_agent.discovery.fit import build_fit_agent
 from resume_agent.discovery.pipeline import discover
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
+from resume_agent.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
+from resume_agent.cover_letter.render import render_cover_letter
+from resume_agent.cover_letter.service import generate_cover_letter
 from resume_agent.profile.build import build_profile
 from resume_agent.profile.store import load_facts, save_facts
 from resume_agent.profile.validate import validate_profile
@@ -239,6 +242,43 @@ def tailor_cmd(
             )
             typer.echo(
                 f"Job #{job.id}: {len(versions)} version(s); final fact_check_passed={versions[-1].fact_check_passed}"
+            )
+
+
+@app.command("cover-letter")
+def cover_letter_cmd(
+    job_id: int = typer.Option(None, help="Write a cover letter for a single job by id."),
+    approved: bool = typer.Option(False, "--approved", help="Write cover letters for all approved jobs."),
+    facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    db_url: str = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Draft a fact-locked cover letter per job and render it to PDF."""
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        if job_id is not None:
+            job = get_job(session, job_id)
+            if job is None:
+                typer.echo(f"Job #{job_id} not found.")
+                raise typer.Exit(code=1)
+            targets = [job]
+        elif approved:
+            targets = jobs_by_status(session, JobStatus.approved.value)
+        else:
+            typer.echo("Specify --job-id <id> or --approved.")
+            raise typer.Exit(code=1)
+
+        profile_facts = load_facts(facts)
+        draft_agent = build_cover_letter_agent()
+        reviser_agent = build_cover_letter_reviser_agent()
+
+        for job in targets:
+            cover = generate_cover_letter(session, job, profile_facts, draft_agent, reviser_agent)
+            if cover.id is None:
+                raise RuntimeError("Cover letter was not persisted")
+            path = render_cover_letter(session, cover.id)
+            typer.echo(
+                f"Job #{job.id}: cover letter #{cover.id} "
+                f"(fact_check_passed={cover.fact_check_passed}) -> {path}"
             )
 
 
