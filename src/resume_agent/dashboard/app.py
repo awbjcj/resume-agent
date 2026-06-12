@@ -12,6 +12,7 @@ import streamlit as st
 
 from resume_agent.config import get_settings
 from resume_agent.db import get_session, init_db, make_engine
+from resume_agent.tracking.analytics import fit_band_stats, source_stats
 from resume_agent.tracking.queries import PipelineRow, pipeline_rows, shortlist_rows
 from resume_agent.tracking.repository import (
     application_for_job,
@@ -250,6 +251,24 @@ def _new_application(job_id: int, status: str, notes: str) -> Application:
     return Application(job_id=job_id, status=status, notes=notes or None)
 
 
+def analytics_table_rows(session, by: str = "source") -> list[dict]:
+    """Pure table rows for the analytics page."""
+    stats = source_stats(session) if by == "source" else fit_band_stats(session)
+    header = "Source" if by == "source" else "Fit band"
+    return [
+        {
+            header: cohort.label,
+            "Apps": cohort.applications,
+            "Responses": cohort.responses,
+            "Interviews": cohort.interviews,
+            "Offers": cohort.offers,
+            "Interview %": cohort.interview_rate,
+            "Offer %": cohort.offer_rate,
+        }
+        for cohort in stats
+    ]
+
+
 # ── Pages ───────────────────────────────────────────────────────────────────
 def render_shortlist_page(session) -> None:
     rows = shortlist_rows(session)
@@ -383,6 +402,37 @@ def render_pipeline_page(session) -> None:
             _render_pipeline_card(session, row)
 
 
+def render_analytics_page(session) -> None:
+    rows = analytics_table_rows(session, by="source")
+    _masthead(
+        "Conversion",
+        'Analytics <span class="dot">/</span> Funnel',
+        "Which sources and fit-score bands actually convert. Rates are share of submitted applications.",
+    )
+    total_apps = sum(row["Apps"] for row in rows)
+    total_offers = sum(row["Offers"] for row in rows)
+    _metric_row(
+        [
+            ("Submitted", str(total_apps)),
+            ("Offers", str(total_offers)),
+            ("Sources tracked", str(len(rows))),
+        ]
+    )
+
+    if total_apps == 0:
+        _empty_state(
+            "◇",
+            "No applications tracked yet",
+            "Mark applications as submitted in the Pipeline board to populate analytics.",
+        )
+        return
+
+    st.markdown('<div class="rail-head">By source</div>', unsafe_allow_html=True)
+    st.table(analytics_table_rows(session, by="source"))
+    st.markdown('<div class="rail-head">By fit-score band</div>', unsafe_allow_html=True)
+    st.table(analytics_table_rows(session, by="band"))
+
+
 def _engine():
     engine = make_engine(get_settings().db_url)
     init_db(engine)
@@ -400,14 +450,16 @@ def main() -> None:
             'Atelier ◆</div>',
             unsafe_allow_html=True,
         )
-        page = st.radio("View", ["Shortlist", "Pipeline board"], label_visibility="collapsed")
+        page = st.radio("View", ["Shortlist", "Pipeline board", "Analytics"], label_visibility="collapsed")
 
     engine = _engine()
     with get_session(engine) as session:
         if page == "Shortlist":
             render_shortlist_page(session)
-        else:
+        elif page == "Pipeline board":
             render_pipeline_page(session)
+        else:
+            render_analytics_page(session)
 
 
 if __name__ == "__main__":
