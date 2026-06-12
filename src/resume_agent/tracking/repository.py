@@ -3,7 +3,14 @@ from typing import Any, cast
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from resume_agent.tracking.tables import Application, ApplicationStatus, Job, ResumeVersion, utcnow
+from resume_agent.tracking.tables import (
+    Application,
+    ApplicationStatus,
+    CoverLetter,
+    Job,
+    ResumeVersion,
+    utcnow,
+)
 
 
 def _stamp_submitted_at(application: Application) -> None:
@@ -119,3 +126,14 @@ def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersi
         .where(ResumeVersion.job_id == job_id, pdf_path_col.is_not(None))
         .order_by(round_col.desc(), id_col.desc())
     ).first()
+
+
+def save_cover_letter(session: Session, cover_letter: CoverLetter) -> CoverLetter:
+    session.add(cover_letter)
+    session.commit()
+    session.refresh(cover_letter)
+    return cover_letter
+
+
+def get_cover_letter(session: Session, cover_letter_id: int) -> CoverLetter | None:
+    return session.get(CoverLetter, cover_letter_id)
