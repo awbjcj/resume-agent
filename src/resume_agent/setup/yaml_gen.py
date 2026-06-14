@@ -46,3 +46,13 @@ def build_search(state: WizardState) -> str:
         "sponsorship_required": state.sponsorship_required,
     }
     return _header() + yaml.safe_dump(data, sort_keys=False)
+
+
+def build_connectors(state: WizardState) -> str:
+    data = {
+        "greenhouse": {"enabled": state.greenhouse_enabled, "boards": state.greenhouse_boards},
+        "adzuna": {"enabled": state.adzuna_enabled, "country": state.adzuna_country},
+        "remoteok": {"enabled": state.remoteok_enabled},
+        "linkedin": {"enabled": state.linkedin_enabled},
+    }
+    return _header() + yaml.safe_dump(data, sort_keys=False)

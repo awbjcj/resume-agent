@@ -58,3 +58,26 @@ def test_build_search_round_trips(tmp_path):
     assert cfg.min_salary == 120000
     assert cfg.sponsorship_required is True
     assert cfg.remote_policy == "remote"
+
+
+# ── Task 6 ──────────────────────────────────────────────────────────────────
+from resume_agent.discovery.connectors.config import load_connectors_config
+from resume_agent.setup.yaml_gen import build_connectors
+
+
+def test_build_connectors_round_trips(tmp_path):
+    state = WizardState(
+        greenhouse_enabled=True,
+        greenhouse_boards=[{"token": "stripe", "company": "Stripe"}],
+        adzuna_enabled=True, adzuna_country="gb",
+        remoteok_enabled=True, linkedin_enabled=False,
+    )
+    p = tmp_path / "connectors.yaml"
+    p.write_text(build_connectors(state), encoding="utf-8")
+    cfg = load_connectors_config(p)
+    assert cfg.greenhouse.enabled is True
+    assert cfg.greenhouse.boards[0].token == "stripe"
+    assert cfg.greenhouse.boards[0].company == "Stripe"
+    assert cfg.adzuna.country == "gb"
+    assert cfg.remoteok.enabled is True
+    assert cfg.linkedin.enabled is False
