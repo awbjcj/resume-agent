@@ -24,3 +24,11 @@ def parse_greenhouse_boards(text: str) -> list[dict]:
         company = company.strip() or token.title()
         boards.append({"token": token, "company": company})
     return boards
+
+
+def build_profile_sources(state: WizardState) -> str:
+    data = {
+        "resume_path": state.resume_path,
+        "github_username": state.github_username,
+    }
+    return _header() + yaml.safe_dump(data, sort_keys=False)
