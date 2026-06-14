@@ -365,6 +365,14 @@ def dashboard_cmd(
     subprocess.run(["streamlit", "run", app_path], env=env)
 
 
+@app.command("setup")
+def setup_cmd() -> None:
+    """Launch the interactive setup wizard (zero → configured → ready)."""
+    from resume_agent.setup.app import SetupApp
+
+    SetupApp().run()
+
+
 @app.command("sync-status")
 def sync_status_cmd(
     apply: bool = typer.Option(
