@@ -12,7 +12,9 @@ import streamlit as st
 
 from resume_agent.config import get_settings
 from resume_agent.db import get_session, init_db, make_engine
+from resume_agent.profile.store import load_facts
 from resume_agent.tracking.analytics import fit_band_stats, source_stats
+from resume_agent.tracking.match_gap import MatchGapReport, match_gap
 from resume_agent.tracking.queries import PipelineRow, pipeline_rows, shortlist_rows
 from resume_agent.tracking.repository import (
     application_for_job,
@@ -45,6 +47,7 @@ STATUS_COLORS = {
 
 # Human-readable order for the pipeline rails.
 _STATUS_ORDER = [s.value for s in JobStatus]
+_FACTS_PATH = "data/profile/facts.json"
 
 _CSS = """
 <style>
@@ -269,6 +272,18 @@ def analytics_table_rows(session, by: str = "source") -> list[dict]:
     ]
 
 
+def match_gap_table_rows(report: MatchGapReport) -> list[dict]:
+    """Pure table rows for the match-gap page."""
+    return [
+        {
+            "Skill": gap.skill,
+            "Demanded by": f"{gap.demand_count}/{gap.target_total}",
+            "Share %": gap.demand_share,
+        }
+        for gap in report.gaps
+    ]
+
+
 # ── Pages ───────────────────────────────────────────────────────────────────
 def render_shortlist_page(session) -> None:
     rows = shortlist_rows(session)
@@ -433,6 +448,45 @@ def render_analytics_page(session) -> None:
     st.table(analytics_table_rows(session, by="band"))
 
 
+def render_match_gap_page(session) -> None:
+    _masthead(
+        "Closed loop",
+        'Match <span class="dot">/</span> Gap',
+        "Skills your target jobs demand that your profile does not show yet. Read-only.",
+    )
+
+    if not Path(_FACTS_PATH).exists():
+        _empty_state(
+            "◇",
+            "No profile yet",
+            "Run <code>resume-agent profile build</code> to create your fact-lock profile first.",
+        )
+        return
+
+    report = match_gap(session, load_facts(_FACTS_PATH))
+    _metric_row(
+        [("Target jobs", str(report.target_total)), ("Distinct gaps", str(len(report.gaps)))]
+    )
+
+    if report.target_total == 0:
+        _empty_state(
+            "◇",
+            "No target jobs yet",
+            "Shortlist or approve jobs to populate the gap report.",
+        )
+        return
+    if not report.gaps:
+        _empty_state(
+            "◆",
+            "No gaps",
+            "Your profile covers every required skill across your target jobs.",
+        )
+        return
+
+    st.markdown('<div class="rail-head">Most-demanded missing skills</div>', unsafe_allow_html=True)
+    st.table(match_gap_table_rows(report))
+
+
 def _engine():
     engine = make_engine(get_settings().db_url)
     init_db(engine)
@@ -450,7 +504,11 @@ def main() -> None:
             'Atelier ◆</div>',
             unsafe_allow_html=True,
         )
-        page = st.radio("View", ["Shortlist", "Pipeline board", "Analytics"], label_visibility="collapsed")
+        page = st.radio(
+            "View",
+            ["Shortlist", "Pipeline board", "Analytics", "Match-gap"],
+            label_visibility="collapsed",
+        )
 
     engine = _engine()
     with get_session(engine) as session:
@@ -458,8 +516,10 @@ def main() -> None:
             render_shortlist_page(session)
         elif page == "Pipeline board":
             render_pipeline_page(session)
-        else:
+        elif page == "Analytics":
             render_analytics_page(session)
+        else:
+            render_match_gap_page(session)
 
 
 if __name__ == "__main__":

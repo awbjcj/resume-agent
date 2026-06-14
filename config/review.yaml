@@ -1,7 +1,6 @@
 # Reviewer roster, weights, and loop controls (see design spec §5.3).
 max_rounds: 3
 score_threshold: 85
-style_guide_path: config/style_guide.md
 reviewers:
   - name: fact-check
     gate: true            # blocking: any unsupported claim fails the round
