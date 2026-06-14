@@ -1,19 +1,13 @@
-from resume_agent.dashboard.ui import column_count, fit_block, status_badge
+from resume_agent.dashboard.ui import THEME_CSS, fit_block, status_badge
 
 
-def test_column_count_caps_at_max_on_4k():
-    assert column_count(3840) == 4
-
-
-def test_column_count_scales_with_width():
-    assert column_count(1280) == 3   # 1280 // 360 == 3
-    assert column_count(800) == 2    # 800 // 360 == 2
-
-
-def test_column_count_floor_is_one():
-    assert column_count(300) == 1
-    assert column_count(0) == 1
-    assert column_count(-100) == 1
+def test_theme_css_targets_keyed_cardgrid_containers():
+    # The 4K grid binds to st.container(key="cardgrid_…") via its stable
+    # st-key class, not the old injected <div class="card-grid"> marker
+    # (Streamlit sanitizes that away, so the grid never engaged).
+    assert "st-key-cardgrid" in THEME_CSS
+    assert "display: grid" in THEME_CSS
+    assert ".card-grid +" not in THEME_CSS
 
 
 def test_status_badge_returns_html_for_known_status():

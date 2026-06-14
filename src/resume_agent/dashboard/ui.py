@@ -42,8 +42,9 @@ h1, h2, h3, h4, .card-title, .nameplate, .empty-title {
 .metric-label { font-family:'IBM Plex Mono', monospace; font-size: 0.66rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-top: 0.45rem; }
 
 /* ── Responsive card grid (the 4K fill) ───────────────────────── */
-.card-grid { /* marker; the bordered containers below it flow in a grid */ }
-.card-grid + div[data-testid="stVerticalBlock"] {
+/* Keyed st.container(key="cardgrid_…") emits a stable .st-key-cardgrid…
+   class on the real DOM node; its child vertical block holds the cards. */
+[class*="st-key-cardgrid"] > div[data-testid="stVerticalBlock"] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: clamp(0.8rem, 1vw, 1.4rem);
@@ -191,10 +192,3 @@ def empty_state(glyph: str, title: str, body_html: str) -> None:
         f'<div class="empty-body">{body_html}</div></div>',
         unsafe_allow_html=True,
     )
-
-
-def column_count(width: int, card_min: int = 360, max_cols: int = 4) -> int:
-    """How many card columns fit in ``width`` px, clamped to [1, max_cols]."""
-    if width <= 0:
-        return 1
-    return max(1, min(max_cols, width // card_min))

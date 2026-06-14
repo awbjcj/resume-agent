@@ -83,32 +83,31 @@ def render_shortlist_page(session) -> None:
         )
         return
 
-    st.markdown('<div class="card-grid">', unsafe_allow_html=True)
-    for row in rows:
-        with st.container(border=True):
-            meter, body = st.columns([1, 4], vertical_alignment="center")
-            with meter:
-                st.markdown(fit_block(row.fit_score), unsafe_allow_html=True)
-            with body:
-                st.markdown(
-                    f'<div class="card-title">{row.title or "—"}</div>'
-                    f'<div class="card-meta">{row.company or "—"} · {row.location or "location n/a"} &nbsp; '
-                    f'{status_badge(row.sponsorship_signal or "unknown")}</div>',
-                    unsafe_allow_html=True,
-                )
-                if row.fit_rationale:
-                    st.markdown(f'<div class="rationale">{row.fit_rationale}</div>', unsafe_allow_html=True)
-                if st.button("Approve for tailoring  →", key=f"approve-{row.job_id}"):
-                    job = get_job(session, row.job_id)
-                    if job is None:
-                        st.error(f"Job #{row.job_id} no longer exists.")
+    with st.container(key="cardgrid_shortlist"):
+        for row in rows:
+            with st.container(border=True):
+                meter, body = st.columns([1, 4], vertical_alignment="center")
+                with meter:
+                    st.markdown(fit_block(row.fit_score), unsafe_allow_html=True)
+                with body:
+                    st.markdown(
+                        f'<div class="card-title">{row.title or "—"}</div>'
+                        f'<div class="card-meta">{row.company or "—"} · {row.location or "location n/a"} &nbsp; '
+                        f'{status_badge(row.sponsorship_signal or "unknown")}</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if row.fit_rationale:
+                        st.markdown(f'<div class="rationale">{row.fit_rationale}</div>', unsafe_allow_html=True)
+                    if st.button("Approve for tailoring  →", key=f"approve-{row.job_id}"):
+                        job = get_job(session, row.job_id)
+                        if job is None:
+                            st.error(f"Job #{row.job_id} no longer exists.")
+                            st.rerun()
+                            return
+                        job.status = JobStatus.approved.value
+                        save_job(session, job)
+                        st.success(f"Approved {row.title or 'job'} #{row.job_id}.")
                         st.rerun()
-                        return
-                    job.status = JobStatus.approved.value
-                    save_job(session, job)
-                    st.success(f"Approved {row.title or 'job'} #{row.job_id}.")
-                    st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def _render_pipeline_card(session, row: PipelineRow) -> None:
@@ -192,8 +191,9 @@ def render_pipeline_page(session) -> None:
     present += [s for s in counts if s not in _STATUS_ORDER]
     for status in present:
         st.markdown(f'<div class="rail-head">{status} · {counts[status]}</div>', unsafe_allow_html=True)
-        for row in [r for r in rows if r.status == status]:
-            _render_pipeline_card(session, row)
+        with st.container(key=f"cardgrid_pipeline_{status}"):
+            for row in [r for r in rows if r.status == status]:
+                _render_pipeline_card(session, row)
 
 
 def render_analytics_page(session) -> None:
