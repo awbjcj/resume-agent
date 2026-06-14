@@ -4,6 +4,8 @@ All functions here are pure (no Streamlit calls at import or call time) so the
 module imports cleanly and the helpers are unit-testable without a server.
 """
 
+THEME_CSS = "<style></style>"  # filled in Task 5
+
 # ── Broadsheet palette ───────────────────────────────────────────────────────
 PAPER = "#f4f1ea"
 INK = "#16130f"
