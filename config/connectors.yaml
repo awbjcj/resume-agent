@@ -1,0 +1,20 @@
+# Which job-source connectors `resume-agent pull` runs, and their parameters.
+# Copy to config/connectors.yaml and edit. Secrets (Adzuna keys) go in .env.
+
+greenhouse:
+  enabled: true
+  boards:
+    - token: stripe
+      company: Stripe
+    - token: airbnb
+      company: Airbnb
+
+adzuna:
+  enabled: true
+  country: us
+
+remoteok:
+  enabled: true
+
+linkedin:
+  enabled: false

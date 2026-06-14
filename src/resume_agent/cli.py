@@ -29,10 +29,13 @@ from resume_agent.profile.validate import validate_profile
 from resume_agent.tailor.agents import build_reviewer_agent, build_reviser_agent, build_tailor_agent, model_for_tier
 from resume_agent.tailor.review_config import load_review_config
 from resume_agent.tailor.service import tailor_job
+from resume_agent.tailor.style_guide import load_style_guide
 from resume_agent.render.render_config import RenderConfig, load_render_config
 from resume_agent.render.service import render_version
 from resume_agent.tracking.queries import application_job_pairs
 from resume_agent.tracking.repository import get_job, jobs_by_status, save_job, update_application_status
+from resume_agent.tracking.canonicalize import build_skill_canonicalizer
+from resume_agent.tracking.match_gap import match_gap
 from resume_agent.tracking.tables import JobStatus
 
 app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
@@ -183,13 +186,56 @@ def sources_cmd() -> None:
         typer.echo(f"  {name:<12} {info.get('last_run', '-'):<22} {status}")
 
 
+@app.command("match-gap")
+def match_gap_cmd(
+    job_id: int | None = typer.Option(None, help="Show gaps for one job instead of the aggregate."),
+    facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    llm: bool = typer.Option(
+        False, "--llm", help="Add a cheap-LLM synonym pass, such as k8s matching Kubernetes."
+    ),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Report skills your target jobs demand that your profile does not show."""
+    profile_facts = load_facts(facts)
+    canonicalizer = build_skill_canonicalizer() if llm else None
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        report = match_gap(session, profile_facts, canonicalizer=canonicalizer)
+
+    if report.target_total == 0:
+        typer.echo("No jobs past discovery yet. Run `discover` and shortlist/approve some first.")
+        raise typer.Exit(code=0)
+
+    if job_id is not None:
+        missing = report.per_job.get(job_id)
+        if missing is None:
+            typer.echo(f"Job #{job_id} is not among your {report.target_total} target jobs.")
+            raise typer.Exit(code=1)
+        if not missing:
+            typer.echo(f"Job #{job_id}: no skill gaps.")
+            raise typer.Exit(code=0)
+        typer.echo(f"Job #{job_id} missing skills:")
+        for skill in missing:
+            typer.echo(f"  {skill}")
+        raise typer.Exit(code=0)
+
+    if not report.gaps:
+        typer.echo(f"No gaps across your {report.target_total} target jobs.")
+        raise typer.Exit(code=0)
+    typer.echo(f"Skill gaps across {report.target_total} target jobs:")
+    for gap in report.gaps:
+        typer.echo(f"  {gap.skill:<28} demanded by {gap.demand_count}/{gap.target_total}")
+
+
 DEFAULT_REVIEW = "config/review.yaml"
 
 
-def build_reviewer_agents(config) -> dict:
+def build_reviewer_agents(config, style_guide: str | None = None) -> dict:
     """Build one Agno reviewer agent per configured reviewer, at its model tier."""
     return {
-        spec.name: build_reviewer_agent(spec.name, model_for_tier(spec.model_tier))
+        spec.name: build_reviewer_agent(
+            spec.name, model_for_tier(spec.model_tier), style_guide=style_guide
+        )
         for spec in config.reviewers
     }
 
@@ -236,9 +282,10 @@ def tailor_cmd(
 
         config = load_review_config(review)
         profile_facts = load_facts(facts)
-        tailor_agent = build_tailor_agent()
-        reviser_agent = build_reviser_agent()
-        reviewer_agents = build_reviewer_agents(config)
+        style_guide = load_style_guide(config.style_guide_path)
+        tailor_agent = build_tailor_agent(style_guide=style_guide)
+        reviser_agent = build_reviser_agent(style_guide=style_guide)
+        reviewer_agents = build_reviewer_agents(config, style_guide=style_guide)
 
         for job in targets:
             versions = tailor_job(

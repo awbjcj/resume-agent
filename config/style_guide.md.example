@@ -1,0 +1,23 @@
+# House style
+
+<!--
+Optional, opt-in resume-writing guidance.
+
+Copy this file to config/style_guide.md to activate it. Its prose is appended
+to the system message of every resume tailor-loop agent: writer, reviser, and
+reviewers. The block is appended beneath the fixed fact-lock rules.
+
+It governs how your resume is written: tone, emphasis, ordering, structure, and
+industry conventions. It cannot introduce facts. Every claim still has to trace
+to data/profile/facts.json, and the fact-check gate is unchanged.
+
+Delete this comment and write freely below. Missing or empty file = no change.
+-->
+
+Write in a crisp, results-first register suitable for senior software roles.
+
+- Lead every experience bullet with a quantified outcome, then the action.
+- Prefer strong verbs like built, shipped, and scaled.
+- Foreground systems and infrastructure work for backend roles.
+- Keep it to one page; cut hobby projects unless they show a required skill.
+- Use American spelling and the Oxford comma.

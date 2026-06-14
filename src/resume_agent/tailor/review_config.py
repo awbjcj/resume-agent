@@ -26,6 +26,7 @@ class ReviewConfig(ExtensibleModel):
     score_threshold: int = 85
     reviewers: list[ReviewerSpec] = Field(default_factory=list)
     length_budget: LengthBudget = Field(default_factory=LengthBudget)
+    style_guide_path: str = "config/style_guide.md"
 
 
 def load_review_config(path: str | Path) -> ReviewConfig:
