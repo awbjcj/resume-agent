@@ -1,10 +1,10 @@
-# "Midnight Atelier" — editorial control-room theme for Resume Agent.
+# "Broadsheet" — light editorial control-room theme for Resume Agent.
 [theme]
-base = "dark"
-primaryColor = "#e9b44c"
-backgroundColor = "#12141c"
-secondaryBackgroundColor = "#1a1d28"
-textColor = "#ece6da"
+base = "light"
+primaryColor = "#8c2f1f"
+backgroundColor = "#f4f1ea"
+secondaryBackgroundColor = "#efeae0"
+textColor = "#16130f"
 font = "sans serif"
 
 [server]

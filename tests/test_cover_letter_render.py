@@ -44,9 +44,10 @@ def test_render_cover_letter_writes_pdf_path(tmp_path):
         fetched = get_cover_letter(s, cover.id)
         assert fetched is not None
         assert fetched.pdf_path == str(out)
+        assert out is not None
         assert "acme_corp" in out.name and "cl" in out.name
 
 
 def test_render_missing_cover_letter_returns_none(tmp_path):
     with _session() as s:
-        assert render_cover_letter(s, 999, output_dir=str(tmp_path), render_fn=lambda *a: None) is None
+        assert render_cover_letter(s, 999, output_dir=str(tmp_path), render_fn=lambda *a: None) is None  # type: ignore[arg-type]

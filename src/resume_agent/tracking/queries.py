@@ -95,5 +95,5 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
 
 def application_job_pairs(session: Session) -> list[tuple[Application, Job]]:
     """Every application paired with its job (one query, no N+1 per-row fetch)."""
-    statement = select(Application, Job).join(Job, Application.job_id == Job.id)
+    statement = select(Application, Job).join(Job, Application.job_id == Job.id)  # type: ignore[arg-type]
     return [(app, job) for app, job in session.exec(statement).all()]

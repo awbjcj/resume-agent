@@ -53,7 +53,7 @@ def _band(score: int | None) -> str:
 def _rows(session: Session) -> list[tuple[str, int | None, str]]:
     statement = (
         select(Application.status, Job.fit_score, Job.source)
-        .join(Job, Application.job_id == Job.id)
+        .join(Job, Application.job_id == Job.id)  # type: ignore[arg-type]
         .where(Application.status != ApplicationStatus.ready.value)
     )
     return list(session.exec(statement).all())

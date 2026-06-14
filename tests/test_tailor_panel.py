@@ -103,5 +103,7 @@ def test_run_panel_routes_gate_to_evidence_and_others_to_lean():
     critiques = run_panel(_content(), _facts(), "Backend role", config, agents)
 
     assert [c.reviewer for c in critiques] == ["fact-check", "ats-keyword"]
+    assert agents["ats-keyword"].received is not None
+    assert agents["fact-check"].received is not None
     assert "SecretRust" not in agents["ats-keyword"].received
     assert "SUPPORTING FACTS" in agents["fact-check"].received

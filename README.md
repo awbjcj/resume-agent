@@ -65,6 +65,9 @@ points where *you* (not the agent) make the call.
 # 1. Install dependencies into a managed virtualenv
 uv sync
 
+# 1a. (Recommended) Run the guided setup wizard instead of hand-editing config
+uv run resume-agent setup
+
 # 2. Install the browser the scraper drives (only needed if you'll use `scrape`)
 uv run playwright install chromium
 
@@ -81,6 +84,8 @@ cp config/connectors.yaml.example      config/connectors.yaml   # only if you'll
 ```
 
 > **Windows PowerShell:** use `Copy-Item .env.example .env` instead of `cp`.
+
+`resume-agent setup` walks you through secrets, search criteria, and connectors, then writes `.env` and `config/*.yaml` for you — the manual steps below are the alternative.
 
 Everything else (the SQLite database, the `output/` and `data/` folders) is
 created automatically on first run.
