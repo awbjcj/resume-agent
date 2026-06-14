@@ -69,6 +69,15 @@ def test_load_existing_state_round_trips_what_was_written(tmp_path):
     assert reloaded.greenhouse_boards == [{"token": "stripe", "company": "Stripe"}]
 
 
+def test_load_existing_state_restores_custom_models(tmp_path):
+    # managed_env writes the model keys, so a re-run must read them back or it
+    # would clobber a customized model with the WizardState default.
+    _seed_examples(tmp_path)
+    atomic_write_all(WizardState(premium_model="claude-custom-prem"), root=tmp_path)
+    reloaded = load_existing_state(root=tmp_path)
+    assert reloaded.premium_model == "claude-custom-prem"
+
+
 def test_missing_example_degrades_to_error_status_not_crash(tmp_path):
     # No .example files seeded → render_from_example raises FileNotFoundError.
     # atomic_write_all must report it per-file, not crash, and still write the rest.

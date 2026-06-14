@@ -77,6 +77,11 @@ def load_existing_state(root: str | Path = ".") -> WizardState:
         state.linkedin_email = env.get("LINKEDIN_EMAIL", "")
         state.linkedin_password = env.get("LINKEDIN_PASSWORD", "")
         state.db_url = env.get("DB_URL", state.db_url)
+        # managed_env writes these, so restore them too or a re-run reverts
+        # any customized model to the WizardState default.
+        state.cheap_model = env.get("CHEAP_MODEL", state.cheap_model)
+        state.mid_model = env.get("MID_MODEL", state.mid_model)
+        state.premium_model = env.get("PREMIUM_MODEL", state.premium_model)
 
     sources = root / "config" / "profile_sources.yaml"
     if sources.exists():

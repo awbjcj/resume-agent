@@ -42,12 +42,15 @@ h1, h2, h3, h4, .card-title, .nameplate, .empty-title {
 .metric-label { font-family:'IBM Plex Mono', monospace; font-size: 0.66rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-top: 0.45rem; }
 
 /* ── Responsive card grid (the 4K fill) ───────────────────────── */
-/* Keyed st.container(key="cardgrid_…") emits a stable .st-key-cardgrid…
-   class on the real DOM node; its child vertical block holds the cards. */
-[class*="st-key-cardgrid"] > div[data-testid="stVerticalBlock"] {
+/* st.container(key="cardgrid_…") puts a stable st-key-cardgrid… class on the
+   SAME node that carries data-testid="stVerticalBlock" (Streamlit ≥1.39), so the
+   grid must be the keyed element itself — a child combinator matches nothing.
+   Its direct children (the bordered st.container cards) become the grid items. */
+div[data-testid="stVerticalBlock"][class*="st-key-cardgrid"] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: clamp(0.8rem, 1vw, 1.4rem);
+  align-items: start;
 }
 
 /* ── Badges ───────────────────────────────────────────────────── */
@@ -67,12 +70,15 @@ h1, h2, h3, h4, .card-title, .nameplate, .empty-title {
 .rail-head { font-family:'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: 0.24em; font-size: 0.74rem; color: var(--muted); margin: 1.5rem 0 0.4rem; display:flex; align-items:center; gap: 0.7rem; }
 .rail-head::after { content:""; flex:1; height:1px; background: var(--rule); }
 
-/* ── Cards (Streamlit bordered containers) ────────────────────── */
-[data-testid="stVerticalBlockBorderWrapper"] {
+/* ── Cards (bordered st.container inside a cardgrid) ───────────── */
+/* Streamlit 1.58 has no stVerticalBlockBorderWrapper testid; the grid items
+   are the bordered containers themselves, so style them as the keyed grid's
+   direct children. */
+div[class*="st-key-cardgrid"] > div[data-testid="stVerticalBlock"] {
   background: var(--paper-2); border: 1px solid var(--rule) !important; border-radius: 6px;
   box-shadow: 0 1px 0 rgba(22,19,15,0.04); transition: border-color .18s ease;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:hover { border-color: var(--oxblood) !important; }
+div[class*="st-key-cardgrid"] > div[data-testid="stVerticalBlock"]:hover { border-color: var(--oxblood) !important; }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
 .stButton > button { font-family:'IBM Plex Mono', monospace; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 3px; border: 1px solid var(--oxblood); background: var(--oxblood); color: var(--paper); font-weight: 600; padding: 0.45rem 1.1rem; transition: all .15s ease; }
