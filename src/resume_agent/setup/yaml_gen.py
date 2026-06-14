@@ -1,4 +1,5 @@
 import datetime as _dt
+from pathlib import Path
 
 import yaml
 
@@ -56,3 +57,9 @@ def build_connectors(state: WizardState) -> str:
         "linkedin": {"enabled": state.linkedin_enabled},
     }
     return _header() + yaml.safe_dump(data, sort_keys=False)
+
+
+def render_from_example(example_path: str | Path) -> str:
+    """Return the maintained .example content with a provenance header prepended."""
+    body = Path(example_path).read_text(encoding="utf-8")
+    return _header() + body
