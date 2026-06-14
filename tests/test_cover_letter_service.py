@@ -50,6 +50,7 @@ def test_generate_revises_until_provenance_clean_then_persists():
         cover = generate_cover_letter(s, job, _facts(), draft_agent, reviser_agent, max_rounds=2)
         assert cover.id is not None
         assert cover.fact_check_passed is True
+        assert cover.content_json is not None
         assert cover.content_json["paragraphs"][0]["provenance"] == ["exp1"]
 
 

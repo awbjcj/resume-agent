@@ -38,6 +38,7 @@ def test_tailor_agent_includes_style_and_keeps_factlock(monkeypatch):
         model_id="claude-haiku-4-5-20251001",
         style_guide="Use British spelling.",
     )
+    assert isinstance(agent, AgentRunner)
     rendered = str(agent._agent.instructions)
 
     assert _TAILOR_INSTRUCTIONS[1] in rendered
@@ -54,6 +55,7 @@ def test_reviewer_agent_includes_style(monkeypatch):
         style_guide="Prefer STAR phrasing.",
     )
 
+    assert isinstance(agent, AgentRunner)
     assert "Prefer STAR phrasing." in str(agent._agent.instructions)
 
 
@@ -62,4 +64,5 @@ def test_reviser_agent_without_style_is_unchanged(monkeypatch):
 
     agent = build_reviser_agent(model_id="claude-haiku-4-5-20251001")
 
+    assert isinstance(agent, AgentRunner)
     assert "HOUSE STYLE" not in str(agent._agent.instructions)

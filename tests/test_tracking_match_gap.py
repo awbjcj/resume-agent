@@ -99,6 +99,7 @@ def test_match_gap_alias_is_not_a_gap():
         )
 
         assert report.gaps == []
+        assert job.id is not None
         assert report.per_job[job.id] == []
 
 
@@ -108,6 +109,7 @@ def test_match_gap_per_job_lists_missing():
 
         report = match_gap(session, _facts({"lang": [Skill(name="Python")]}))
 
+        assert job.id is not None
         assert report.per_job[job.id] == ["Kubernetes"]
 
 
