@@ -38,3 +38,23 @@ def test_build_profile_sources_round_trips(tmp_path):
     data = load_yaml(p)
     assert data["resume_path"] == "resume.pdf"
     assert data["github_username"] == "octocat"
+
+
+# ── Task 5 ──────────────────────────────────────────────────────────────────
+from resume_agent.discovery.search_config import load_search_config
+from resume_agent.setup.yaml_gen import build_search
+
+
+def test_build_search_round_trips(tmp_path):
+    state = WizardState(
+        keywords=["python"], titles=["Backend Engineer"], locations=["Remote"],
+        remote_policy="remote", min_salary=120000, yoe_min=0, yoe_max=5,
+        sponsorship_required=True,
+    )
+    p = tmp_path / "search.yaml"
+    p.write_text(build_search(state), encoding="utf-8")
+    cfg = load_search_config(p)
+    assert cfg.keywords == ["python"]
+    assert cfg.min_salary == 120000
+    assert cfg.sponsorship_required is True
+    assert cfg.remote_policy == "remote"

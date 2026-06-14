@@ -32,3 +32,17 @@ def build_profile_sources(state: WizardState) -> str:
         "github_username": state.github_username,
     }
     return _header() + yaml.safe_dump(data, sort_keys=False)
+
+
+def build_search(state: WizardState) -> str:
+    data = {
+        "keywords": state.keywords,
+        "titles": state.titles,
+        "locations": state.locations,
+        "remote_policy": state.remote_policy,
+        "min_salary": state.min_salary,
+        "yoe_min": state.yoe_min,
+        "yoe_max": state.yoe_max,
+        "sponsorship_required": state.sponsorship_required,
+    }
+    return _header() + yaml.safe_dump(data, sort_keys=False)
