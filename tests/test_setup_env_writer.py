@@ -21,3 +21,9 @@ def test_format_quotes_values_with_spaces():
 def test_round_trip_parse_format():
     data = {"A": "1", "B": "two words"}
     assert parse_env(format_env(data)) == {"A": "1", "B": "two words"}
+
+
+def test_round_trip_value_containing_double_quote():
+    # e.g. a LinkedIn password like:  pa"ss word
+    data = {"LINKEDIN_PASSWORD": 'pa"ss word'}
+    assert parse_env(format_env(data)) == {"LINKEDIN_PASSWORD": 'pa"ss word'}

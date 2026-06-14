@@ -10,7 +10,10 @@ def parse_env(text: str) -> dict[str, str]:
         key, _, value = stripped.partition("=")
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            quote = value[0]
             value = value[1:-1]
+            if quote == '"':
+                value = value.replace('\\"', '"')  # undo format_env's escaping
         out[key.strip()] = value
     return out
 

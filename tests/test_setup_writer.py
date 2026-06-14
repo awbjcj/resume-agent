@@ -67,3 +67,16 @@ def test_load_existing_state_round_trips_what_was_written(tmp_path):
     assert reloaded.remote_policy == "hybrid"
     assert reloaded.greenhouse_enabled is True
     assert reloaded.greenhouse_boards == [{"token": "stripe", "company": "Stripe"}]
+
+
+def test_missing_example_degrades_to_error_status_not_crash(tmp_path):
+    # No .example files seeded → render_from_example raises FileNotFoundError.
+    # atomic_write_all must report it per-file, not crash, and still write the rest.
+    (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+    report = atomic_write_all(WizardState(anthropic_api_key="sk-test"), root=tmp_path)
+
+    review = str(tmp_path / "config" / "review.yaml")
+    assert report[review].startswith("error")          # missing example → error status
+    assert report[str(tmp_path / "config" / "search.yaml")] == "written"  # others still written
+    assert (tmp_path / "config" / "search.yaml").exists()
+    assert not list(tmp_path.rglob("*.tmp"))            # no litter

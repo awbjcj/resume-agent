@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Callable
 
 from resume_agent.config import load_yaml
 from resume_agent.discovery.connectors.config import load_connectors_config
@@ -35,17 +36,30 @@ def _env_content(state: WizardState, root: Path) -> str:
 
 
 def atomic_write_all(state: WizardState, root: str | Path = ".") -> dict[str, str]:
-    """Write .env + the five config files, each atomically. Returns per-file status."""
+    """Write .env + the five config files, each atomically. Returns per-file status.
+
+    Content is generated lazily per file so a generator failure (e.g. a missing
+    ``.example`` scaffold) degrades to a per-file ``"error: ..."`` status rather
+    than crashing the whole write.
+    """
     root = Path(root)
-    plan: dict[Path, str] = {
-        root / ".env": _env_content(state, root),
-        root / "config" / "profile_sources.yaml": build_profile_sources(state),
-        root / "config" / "search.yaml": build_search(state),
-        root / "config" / "connectors.yaml": build_connectors(state),
-        root / "config" / "review.yaml": render_from_example(root / "config" / "review.yaml.example"),
-        root / "config" / "render.yaml": render_from_example(root / "config" / "render.yaml.example"),
+    builders: dict[Path, Callable[[], str]] = {
+        root / ".env": lambda: _env_content(state, root),
+        root / "config" / "profile_sources.yaml": lambda: build_profile_sources(state),
+        root / "config" / "search.yaml": lambda: build_search(state),
+        root / "config" / "connectors.yaml": lambda: build_connectors(state),
+        root / "config" / "review.yaml": lambda: render_from_example(root / "config" / "review.yaml.example"),
+        root / "config" / "render.yaml": lambda: render_from_example(root / "config" / "render.yaml.example"),
     }
-    return {str(path): _atomic_write(path, content) for path, content in plan.items()}
+    report: dict[str, str] = {}
+    for path, build in builders.items():
+        try:
+            content = build()
+        except OSError as exc:
+            report[str(path)] = f"error: {exc}"
+            continue
+        report[str(path)] = _atomic_write(path, content)
+    return report
 
 
 def load_existing_state(root: str | Path = ".") -> WizardState:
