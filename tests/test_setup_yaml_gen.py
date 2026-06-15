@@ -1,4 +1,16 @@
-from resume_agent.setup.yaml_gen import parse_greenhouse_boards
+from resume_agent.setup.yaml_gen import parse_greenhouse_boards, parse_list
+
+
+def test_parse_list_splits_on_commas_and_newlines():
+    assert parse_list("python, kafka\ngo") == ["python", "kafka", "go"]
+
+
+def test_parse_list_trims_and_drops_blanks():
+    assert parse_list("  python ,, \n , go \n\n") == ["python", "go"]
+
+
+def test_parse_list_empty_is_empty_list():
+    assert parse_list("") == []
 
 
 def test_parses_token_and_company():
