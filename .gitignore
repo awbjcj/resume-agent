@@ -27,9 +27,20 @@ tests/fixtures/linkedin/*_live.html
 .omc/
 .remember/
 .worktrees/
+.ruff_cache/
+.pytest_cache/
+.claude/
+
 
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
+.streamlit/
 resume-latex/
+config/render.yaml
+config/connectors.yaml
+config/profile_sources.yaml
+config/review.yaml
+config/search.yaml
+config/style_guide.md
