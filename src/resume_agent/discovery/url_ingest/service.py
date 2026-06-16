@@ -9,6 +9,10 @@ from resume_agent.discovery.url_ingest.models import ExtractedJob
 from resume_agent.llm_runner import Runner
 
 
+def _matches(host: str, domain: str) -> bool:
+    return host == domain or host.endswith("." + domain)
+
+
 def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJob | None:
     """Fetch a posting URL, route to the right extractor, and build a RawJob.
 
@@ -16,7 +20,7 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
     """
     page = fetch_page(url, allow_browser=allow_browser)
     host = urlsplit(page.final_url).netloc.lower()
-    if "linkedin.com" in host:
+    if _matches(host, "linkedin.com"):
         meta = parse_detail_meta(page.html)
         extracted = ExtractedJob(
             title=meta.title,
@@ -24,7 +28,7 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
             location=meta.location,
             jd_text=parse_job_detail(page.html),
         )
-    elif "greenhouse.io" in host:
+    elif _matches(host, "greenhouse.io"):
         extracted = parse_greenhouse(page.html)
     else:
         extracted = extract_fields(html_to_text(page.html), agent)

@@ -71,3 +71,22 @@ def test_empty_jd_returns_none(monkeypatch):
     job = service.job_from_url("https://boards.greenhouse.io/x", agent=_Agent())
 
     assert job is None
+
+
+def test_spoof_host_does_not_route_to_known_parser(monkeypatch):
+    _patch_fetch(
+        monkeypatch,
+        "<html><body><p>Some role.</p></body></html>",
+        "https://notlinkedin.com.evil.io/job",
+    )
+
+    class _LLM:
+        def run(self, prompt):
+            class _R:
+                content = ExtractedJob(title="X", company="Y", jd_text="real jd")
+            return _R()
+
+    job = service.job_from_url("https://notlinkedin.com.evil.io/job", agent=_LLM())
+
+    assert job is not None
+    assert job.jd_text == "real jd"
