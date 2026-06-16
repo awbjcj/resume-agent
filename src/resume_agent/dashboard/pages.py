@@ -13,12 +13,15 @@ from resume_agent.dashboard.filtering import (
 )
 from resume_agent.dashboard.ui import (
     AMBER,
+    clamp_text,
     empty_state,
     fit_block,
     masthead,
     meta_line,
     metric_row,
+    salary_label,
     skill_chip,
+    skill_strip,
     status_badge,
 )
 from resume_agent.profile.store import load_facts
@@ -82,54 +85,68 @@ def match_gap_table_rows(report: MatchGapReport) -> list[dict]:
 
 
 def _control_desk(rows) -> FilterState:
-    st.markdown('<div class="controldesk">', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        salary_min = st.number_input("Min salary", min_value=0, step=10000, value=0, key="f_salary")
-        fit_min = st.slider("Min fit", 0, 100, 0, key="f_fit")
-    with c2:
-        remote = set(st.multiselect("Remote", ["remote", "hybrid", "onsite"], key="f_remote"))
-        sponsorship = set(
-            st.multiselect("Sponsorship", ["offered", "silent", "denied"], key="f_sponsor")
-        )
-    with c3:
-        seniority = set(
-            st.multiselect(
-                "Seniority",
-                ["junior", "mid", "senior", "staff", "principal"],
-                key="f_sen",
+    # A real keyed container (not a bare "<div>" marker, which Streamlit
+    # sanitizes into an empty box, stranding the controls below it). The CSS
+    # styles div[...][class*="st-key-controldesk"] as the bordered panel.
+    with st.container(key="controldesk"):
+        st.markdown('<div class="controldesk-head">Filter &amp; sort</div>', unsafe_allow_html=True)
+        # Even 4×2 grid: one control per cell so rows align top and bottom
+        # (the old layout stacked 1–3 widgets per column, leaving ragged gaps).
+        r1 = st.columns(4)
+        with r1[0]:
+            salary_min = st.number_input(
+                "Min salary", min_value=0, step=10000, value=0, key="f_salary"
             )
-        )
-        employment = set(
-            st.multiselect(
-                "Type",
-                ["full_time", "contract", "internship", "part_time"],
-                key="f_emp",
+        with r1[1]:
+            fit_min = st.slider("Min fit", 0, 100, 0, key="f_fit")
+        with r1[2]:
+            remote = set(st.multiselect("Remote", ["remote", "hybrid", "onsite"], key="f_remote"))
+        with r1[3]:
+            sponsorship = set(
+                st.multiselect("Sponsorship", ["offered", "silent", "denied"], key="f_sponsor")
             )
-        )
-        industry_options = sorted({r.industry for r in rows if r.industry})
-        industry = set(st.multiselect("Industry", industry_options, key="f_industry"))
-    with c4:
-        sort = st.selectbox(
-            "Sort by",
-            list(_SORT_LABELS),
-            format_func=_SORT_LABELS.get,
-            key="f_sort",
-        )
-        preset = "balanced"
-        if sort == "composite":
-            preset = st.radio(
-                "Preset",
-                list(_PRESET_LABELS),
-                format_func=_PRESET_LABELS.get,
-                horizontal=True,
-                key="f_preset",
+        r2 = st.columns(4)
+        with r2[0]:
+            seniority = set(
+                st.multiselect(
+                    "Seniority", ["junior", "mid", "senior", "staff", "principal"], key="f_sen"
+                )
+            )
+        with r2[1]:
+            employment = set(
+                st.multiselect(
+                    "Type", ["full_time", "contract", "internship", "part_time"], key="f_emp"
+                )
+            )
+        with r2[2]:
+            industry_options = sorted({r.industry for r in rows if r.industry})
+            industry = set(st.multiselect("Industry", industry_options, key="f_industry"))
+        with r2[3]:
+            sort = st.selectbox(
+                "Sort by",
+                list(_SORT_LABELS),
+                format_func=lambda key: _SORT_LABELS[key],
+                key="f_sort",
             )
 
-    cloud = available_skill_cloud(rows)
-    chosen = st.multiselect("Skills (any match)", [t.name for t in cloud], key="f_skills")
-    skills = {normalize_skill(skill) for skill in chosen}
-    st.markdown("</div>", unsafe_allow_html=True)
+        # Skills spans the row; the composite preset shares it (only shown then).
+        skill_names = [t.name for t in available_skill_cloud(rows)]
+        preset = "balanced"
+        if sort == "composite":
+            sk_col, preset_col = st.columns([2, 2])
+            with sk_col:
+                chosen = st.multiselect("Skills (any match)", skill_names, key="f_skills")
+            with preset_col:
+                preset = st.radio(
+                    "Preset",
+                    list(_PRESET_LABELS),
+                    format_func=lambda key: _PRESET_LABELS[key],
+                    horizontal=True,
+                    key="f_preset",
+                )
+        else:
+            chosen = st.multiselect("Skills (any match)", skill_names, key="f_skills")
+        skills = {normalize_skill(skill) for skill in chosen}
 
     return FilterState(
         salary_min=salary_min or None,
@@ -177,7 +194,10 @@ def render_shortlist_page(session) -> None:
     with st.container(key="cardgrid_shortlist"):
         for row in visible:
             with st.container(border=True):
-                meter, body = st.columns([1, 4], vertical_alignment="center")
+                # Top-align so content anchors at the card top regardless of how
+                # much body it has — a content-light card no longer floats its
+                # text to the vertical centre when the grid stretches it.
+                meter, body = st.columns([1, 4], vertical_alignment="top")
                 with meter:
                     st.markdown(fit_block(row.fit_score), unsafe_allow_html=True)
                 with body:
@@ -188,14 +208,18 @@ def render_shortlist_page(session) -> None:
                         f'<div class="metaline">{meta_line(row)}</div>',
                         unsafe_allow_html=True,
                     )
+                    # Skills: one-row preview with an explicit "+N more" toggle that
+                    # reveals the rest inline (keeps cards a uniform height).
                     if row.skills:
-                        chips = "".join(
+                        chips = [
                             skill_chip(tag, active=normalize_skill(tag.name) in state.skills)
                             for tag in row.skills
-                        )
-                        st.markdown(f'<div class="skills">{chips}</div>', unsafe_allow_html=True)
+                        ]
+                        st.markdown(skill_strip(chips), unsafe_allow_html=True)
+                    # Rationale: a 2-line preview that expands in place — the reason a
+                    # job fits is worth a glance without forcing a click.
                     if row.fit_rationale:
-                        st.markdown(f'<div class="rationale">{row.fit_rationale}</div>', unsafe_allow_html=True)
+                        st.markdown(clamp_text(row.fit_rationale, lines=2), unsafe_allow_html=True)
                 # Footer button lives OUTSIDE the columns so it spans the full card
                 # width and (via CSS margin-top:auto) sits flush at the bottom of
                 # every equal-height card — aligning across the row.
@@ -215,11 +239,7 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
     with st.container(border=True):
         head, badges = st.columns([3, 2], vertical_alignment="center")
         with head:
-            salary = None
-            if row.salary_min is not None or row.salary_max is not None:
-                lo = f"{row.salary_min // 1000}k" if row.salary_min is not None else None
-                hi = f"{row.salary_max // 1000}k" if row.salary_max is not None else None
-                salary = "$" + (f"{lo}-{hi}" if lo and hi else (lo or hi or ""))
+            salary = salary_label(row.salary_min, row.salary_max)
             bits = [bit for bit in (salary, row.remote_policy, row.seniority) if bit]
             lean = " · ".join(str(bit).replace("_", " ") for bit in bits)
             st.markdown(
@@ -245,8 +265,11 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
         elif row.pdf_path:
             st.caption(f"PDF expected at {row.pdf_path} (file not found)")
 
-        with st.expander("Job description"):
-            st.write(row.jd_text or "—")
+        st.markdown('<div class="rail-head">Job description</div>', unsafe_allow_html=True)
+        st.markdown(
+            clamp_text(row.jd_text or "—", lines=3, body_class="jd-text", pre=True, min_chars=160),
+            unsafe_allow_html=True,
+        )
         with st.expander("Latest review critiques"):
             st.json(row.critique_json or [])
 
