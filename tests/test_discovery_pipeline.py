@@ -99,15 +99,38 @@ def test_reextract_rewrites_criteria_without_changing_status():
                 fit_score=70,
             ),
         )
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="rejected-jd",
+                status=JobStatus.rejected.value,
+                criteria_json={"seniority": None},
+            ),
+        )
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="   ",
+                status=JobStatus.filtered.value,
+                criteria_json={"seniority": None},
+            ),
+        )
         save_job(s, Job(source="manual", jd_text="raw-jd", status=JobStatus.raw.value))
 
         updated = reextract(s, agent)
 
         shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
+        rejected = jobs_by_status(s, JobStatus.rejected.value)
+        filtered = jobs_by_status(s, JobStatus.filtered.value)
         raw = jobs_by_status(s, JobStatus.raw.value)
-        assert updated == 1
+        assert updated == 2
         assert shortlisted[0].criteria_json["seniority"] == "staff"
         assert shortlisted[0].status == JobStatus.shortlisted.value
         assert shortlisted[0].fit_score == 70
+        assert rejected[0].criteria_json["seniority"] == "staff"
+        assert rejected[0].status == JobStatus.rejected.value
+        assert filtered[0].criteria_json == {"seniority": None}
         assert raw and raw[0].criteria_json is None
-        assert agent.prompts == ["jd"]
+        assert agent.prompts == ["rejected-jd", "jd"]

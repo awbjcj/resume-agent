@@ -13,6 +13,7 @@ from resume_agent.tracking.tables import JobStatus
 _REEXTRACT_STATUSES = (
     JobStatus.extracted.value,
     JobStatus.filtered.value,
+    JobStatus.rejected.value,
     JobStatus.shortlisted.value,
     JobStatus.approved.value,
     JobStatus.tailored.value,
