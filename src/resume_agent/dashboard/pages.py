@@ -215,9 +215,17 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
     with st.container(border=True):
         head, badges = st.columns([3, 2], vertical_alignment="center")
         with head:
+            salary = None
+            if row.salary_min is not None or row.salary_max is not None:
+                lo = f"{row.salary_min // 1000}k" if row.salary_min is not None else None
+                hi = f"{row.salary_max // 1000}k" if row.salary_max is not None else None
+                salary = "$" + (f"{lo}-{hi}" if lo and hi else (lo or hi or ""))
+            bits = [bit for bit in (salary, row.remote_policy, row.seniority) if bit]
+            lean = " · ".join(str(bit).replace("_", " ") for bit in bits)
             st.markdown(
                 f'<div class="card-title">{row.title or "—"}</div>'
-                f'<div class="card-meta">{row.company or "—"}</div>',
+                f'<div class="card-meta">{row.company or "—"}</div>'
+                + (f'<div class="metaline">{lean}</div>' if lean else ""),
                 unsafe_allow_html=True,
             )
         with badges:
