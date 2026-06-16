@@ -9,6 +9,11 @@ from resume_agent.models.job import JobCriteria
 _INSTRUCTIONS = [
     "Extract structured hiring criteria from the job description text.",
     "Infer the sponsorship signal: 'offered', 'denied', or 'silent' when the text says nothing.",
+    "Infer seniority as one of: junior, mid, senior, staff, principal -- leave null if unclear.",
+    "Infer employment type as one of: full_time, contract, internship, part_time -- leave null if unclear.",
+    "List the concrete tech stack (languages, frameworks, tools) named in the post.",
+    "Capture the industry or domain (e.g. fintech, healthcare) when stated.",
+    "Capture company size or stage (startup, scaleup, enterprise) when stated.",
     "Use only what the text supports; leave unknown fields null.",
 ]
 
