@@ -2,7 +2,7 @@ from sqlalchemy import text
 from sqlmodel import create_engine
 
 from resume_agent.db import init_db
-from resume_agent.tracking.migrate import ensure_dedup_key_column
+from resume_agent.tracking.migrate import ensure_dedup_key_column, ensure_posted_at_column
 
 
 def test_ensure_adds_column_and_backfills_old_jobs_table():
@@ -36,3 +36,24 @@ def test_ensure_is_noop_on_current_schema():
     engine = create_engine("sqlite://")
     init_db(engine)
     ensure_dedup_key_column(engine)
+
+
+def test_ensure_posted_at_column_adds_missing_column():
+    engine = create_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
+    ensure_posted_at_column(engine)
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+    assert "posted_at" in cols
+
+
+def test_ensure_posted_at_column_is_idempotent():
+    engine = create_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
+    ensure_posted_at_column(engine)
+    ensure_posted_at_column(engine)
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+    assert cols.count("posted_at") == 1
