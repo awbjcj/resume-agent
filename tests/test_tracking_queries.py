@@ -92,6 +92,31 @@ def test_shortlist_row_flattens_metadata_and_tags_coverage():
         assert names["Docker"].required is False
 
 
+def test_shortlist_row_surfaces_tech_stack_as_nonrequired_deduped():
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="a",
+                status=JobStatus.shortlisted.value,
+                criteria_json={
+                    "must_have_skills": ["Python"],
+                    "tech_stack": ["Python", "Kafka"],  # Python dup -> stays required
+                },
+            ),
+        )
+        rows = shortlist_rows(s, facts=_facts_with_python())
+        names = {t.name: t for t in rows[0].skills}
+        # Python appears once, keeping its must-have (required) slot.
+        assert [t.name for t in rows[0].skills].count("Python") == 1
+        assert names["Python"].required is True
+        assert names["Python"].covered is True
+        # Kafka surfaces from tech_stack as a non-required, filterable tag.
+        assert names["Kafka"].required is False
+        assert names["Kafka"].covered is False
+
+
 def test_shortlist_row_without_facts_marks_all_uncovered():
     with _session() as s:
         save_job(

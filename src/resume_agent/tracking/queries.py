@@ -66,19 +66,23 @@ class PipelineRow:
 
 
 def _skill_tags(criteria: dict, tokens: set[str]) -> list[SkillTag]:
+    # tech_stack (techs the post names) is also surfaced as non-required tags so
+    # the skill cloud and "Skills (any match)" filter can match on it; deduped by
+    # normalized token, with must_have > nice_to_have > tech_stack taking the slot.
     tags: list[SkillTag] = []
-    for key, required in (("must_have_skills", True), ("nice_to_have_skills", False)):
+    seen: set[str] = set()
+    for key, required in (
+        ("must_have_skills", True),
+        ("nice_to_have_skills", False),
+        ("tech_stack", False),
+    ):
         for raw_name in criteria.get(key) or []:
             name = str(raw_name).strip()
-            if not name:
+            token = normalize_skill(name)
+            if not token or token in seen:
                 continue
-            tags.append(
-                SkillTag(
-                    name=name,
-                    covered=normalize_skill(name) in tokens,
-                    required=required,
-                )
-            )
+            seen.add(token)
+            tags.append(SkillTag(name=name, covered=token in tokens, required=required))
     return tags
 
 
