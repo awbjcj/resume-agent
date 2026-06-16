@@ -18,7 +18,7 @@ from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
-from resume_agent.discovery.pipeline import discover
+from resume_agent.discovery.pipeline import discover, reextract
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
@@ -166,8 +166,21 @@ def discover_cmd(
     search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
+    reextract_existing: bool = typer.Option(
+        False,
+        "--reextract",
+        help="Re-extract metadata for already-processed jobs (backfill new fields). Does not change status or fit.",
+    ),
 ) -> None:
     """Run the discovery funnel over current jobs and report status counts."""
+    if reextract_existing:
+        extract_agent = build_extract_agent()
+        engine = _engine(db_url)
+        with get_session(engine) as session:
+            updated = reextract(session, extract_agent)
+        typer.echo(f"Re-extracted metadata for {updated} job(s).")
+        return
+
     config = load_search_config(search)
     profile_facts = load_facts(facts)
     extract_agent = build_extract_agent()

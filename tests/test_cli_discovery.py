@@ -55,3 +55,34 @@ def test_discover_runs_and_reports_counts(tmp_path, monkeypatch):
     result = runner.invoke(cli.app, ["discover", "--db-url", db_url])
     assert result.exit_code == 0, result.output
     assert "shortlisted" in result.output
+
+
+def test_discover_reextract_invokes_reextract(tmp_path, monkeypatch):
+    db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
+    called = {}
+
+    def fake_reextract(session, agent):
+        called["agent"] = agent
+        return 3
+
+    extract_agent = object()
+    monkeypatch.setattr(cli, "build_extract_agent", lambda: extract_agent)
+    monkeypatch.setattr(cli, "reextract", fake_reextract)
+
+    # These should not be needed for --reextract.
+    monkeypatch.setattr(
+        cli,
+        "load_search_config",
+        lambda path: (_ for _ in ()).throw(AssertionError("search loaded")),
+    )
+    monkeypatch.setattr(
+        cli, "load_facts", lambda path: (_ for _ in ()).throw(AssertionError("facts loaded"))
+    )
+    monkeypatch.setattr(
+        cli, "build_fit_agent", lambda: (_ for _ in ()).throw(AssertionError("fit built"))
+    )
+
+    result = runner.invoke(cli.app, ["discover", "--reextract", "--db-url", db_url])
+    assert result.exit_code == 0, result.output
+    assert called["agent"] is extract_agent
+    assert "Re-extracted metadata for 3 job(s)." in result.output
