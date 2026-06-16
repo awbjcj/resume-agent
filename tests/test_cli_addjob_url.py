@@ -60,6 +60,24 @@ def test_addjob_url_with_jd_file_skips_extraction(monkeypatch, tmp_path):
     assert "Added job" in result.output
 
 
+def test_addjob_url_fetch_error_exits_cleanly(monkeypatch, tmp_path):
+    import httpx
+
+    def _raise(*a, **k):
+        raise httpx.ConnectError("boom")
+
+    monkeypatch.setattr(cli, "build_url_extract_agent", lambda: object())
+    monkeypatch.setattr(cli, "job_from_url", _raise)
+    db = f"sqlite:///{tmp_path/'t.db'}"
+
+    result = runner.invoke(
+        cli.app, ["addjob", "--url", "https://acme.test/job", "--db-url", db]
+    )
+
+    assert result.exit_code == 1
+    assert "Couldn't fetch" in result.output
+
+
 def test_addjob_url_no_extraction_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "build_url_extract_agent", lambda: object())
     monkeypatch.setattr(cli, "job_from_url", lambda *a, **k: None)

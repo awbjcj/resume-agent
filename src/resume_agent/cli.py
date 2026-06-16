@@ -3,7 +3,9 @@ import subprocess
 from pathlib import Path
 from typing import cast
 
+import httpx
 import typer
+from playwright.sync_api import Error as PlaywrightError
 
 from resume_agent.config import load_yaml, get_settings
 from resume_agent.db import get_session, init_db, make_engine
@@ -111,7 +113,13 @@ def addjob(
     without --jd-file, any piped stdin is ignored.
     """
     if url and not jd_file:
-        raw = job_from_url(url, agent=build_url_extract_agent(), allow_browser=not no_browser)
+        try:
+            raw = job_from_url(
+                url, agent=build_url_extract_agent(), allow_browser=not no_browser
+            )
+        except (httpx.HTTPError, PlaywrightError) as exc:
+            typer.echo(f"Couldn't fetch {url}: {exc}")
+            raise typer.Exit(code=1) from exc
         if raw is None:
             typer.echo("Couldn't extract a job description from that URL.")
             raise typer.Exit(code=1)
