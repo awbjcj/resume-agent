@@ -96,15 +96,15 @@ def _engine(db_url: str | None):
 
 @app.command("addjob")
 def addjob(
-    url: str = typer.Option(None, help="Posting URL. With no JD source, the page is fetched and fields are auto-extracted."),
-    company: str = typer.Option(None, help="Company name (overrides extracted)."),
-    title: str = typer.Option(None, help="Job title (overrides extracted)."),
-    location: str = typer.Option(None, help="Location (overrides extracted)."),
-    jd_file: str = typer.Option(None, help="Read the JD from this file instead of stdin/URL."),
+    url: str | None = typer.Option(None, help="Posting URL. With no JD source, the page is fetched and fields are auto-extracted."),
+    company: str | None = typer.Option(None, help="Company name (overrides extracted)."),
+    title: str | None = typer.Option(None, help="Job title (overrides extracted)."),
+    location: str | None = typer.Option(None, help="Location (overrides extracted)."),
+    jd_file: str | None = typer.Option(None, help="Read the JD from this file instead of stdin/URL."),
     no_browser: bool = typer.Option(
         False, "--no-browser", help="Force HTTP-only fetching (skip the Playwright fallback)."
     ),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Add a job from a URL (auto-extract), a --jd-file, or JD pasted on stdin.
 
@@ -152,7 +152,7 @@ def addjob(
 def discover_cmd(
     search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run the discovery funnel over current jobs and report status counts."""
     config = load_search_config(search)
@@ -169,7 +169,7 @@ def discover_cmd(
 def scrape_cmd(
     search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
     limit: int | None = typer.Option(None, help="Cap the number of postings fetched this run."),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""
     config = load_search_config(search)
@@ -187,7 +187,7 @@ def pull_cmd(
         DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
     ),
     limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run every enabled connector, dedupe into raw jobs, and report per-source counts."""
     if not Path(connectors_path).exists():
@@ -279,7 +279,7 @@ def build_reviewer_agents(config, style_guide: str | None = None) -> dict:
 @app.command("approve")
 def approve(
     job_id: int = typer.Argument(..., help="Job id to approve for tailoring."),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Mark a shortlisted job as approved (the human checkpoint before tailoring)."""
     engine = _engine(db_url)
@@ -295,11 +295,11 @@ def approve(
 
 @app.command("tailor")
 def tailor_cmd(
-    job_id: int = typer.Option(None, help="Tailor a single job by id."),
+    job_id: int | None = typer.Option(None, help="Tailor a single job by id."),
     approved: bool = typer.Option(False, "--approved", help="Tailor all approved jobs."),
     review: str = typer.Option(DEFAULT_REVIEW, help="Path to review.yaml."),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run the tailor + review loop over approved job(s)."""
     engine = _engine(db_url)
@@ -334,10 +334,10 @@ def tailor_cmd(
 
 @app.command("cover-letter")
 def cover_letter_cmd(
-    job_id: int = typer.Option(None, help="Write a cover letter for a single job by id."),
+    job_id: int | None = typer.Option(None, help="Write a cover letter for a single job by id."),
     approved: bool = typer.Option(False, "--approved", help="Write cover letters for all approved jobs."),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Draft a fact-locked cover letter per job and render it to PDF."""
     engine = _engine(db_url)
@@ -376,7 +376,7 @@ DEFAULT_RENDER = "config/render.yaml"
 def render_cmd(
     version_id: int = typer.Argument(..., help="resume_versions.id to render to PDF."),
     config: str = typer.Option(DEFAULT_RENDER, help="Path to render.yaml."),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Render a stored resume version to a PDF."""
     render_config = load_render_config(config) if Path(config).exists() else RenderConfig()
@@ -391,7 +391,7 @@ def render_cmd(
 
 @app.command("dashboard")
 def dashboard_cmd(
-    db_url: str = typer.Option(None, help="Override the database URL for the dashboard."),
+    db_url: str | None = typer.Option(None, help="Override the database URL for the dashboard."),
 ) -> None:
     """Launch the Streamlit dashboard (shortlist checkpoint + pipeline board)."""
     app_path = str(Path(__file__).parent / "dashboard" / "app.py")
@@ -415,7 +415,7 @@ def sync_status_cmd(
         False, "--apply", help="Apply the proposed transitions (default: list only)."
     ),
     max_results: int = typer.Option(50, help="How many recent emails to scan."),
-    db_url: str = typer.Option(None, help="Override the database URL."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Scan recent Gmail and propose application-status updates."""
     service = build_gmail_service()
