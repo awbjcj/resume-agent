@@ -47,6 +47,7 @@ def test_linkedin_host_uses_browser(monkeypatch):
     assert page.rendered is True
     assert page.html == "<html>browser</html>"
     assert browser_calls["url"] == "https://www.linkedin.com/jobs/view/123"
+    assert browser_calls["wait_selector"] == fetch._LINKEDIN_DETAIL_SELECTOR
 
 
 def test_js_shell_falls_back_to_browser(monkeypatch):
