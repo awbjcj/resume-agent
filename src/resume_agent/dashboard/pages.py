@@ -5,17 +5,25 @@ from pathlib import Path
 
 import streamlit as st
 
+from resume_agent.dashboard.filtering import (
+    FilterState,
+    apply_filters,
+    available_skill_cloud,
+    sort_rows,
+)
 from resume_agent.dashboard.ui import (
     AMBER,
     empty_state,
     fit_block,
     masthead,
+    meta_line,
     metric_row,
+    skill_chip,
     status_badge,
 )
 from resume_agent.profile.store import load_facts
 from resume_agent.tracking.analytics import fit_band_stats, source_stats
-from resume_agent.tracking.match_gap import MatchGapReport, match_gap
+from resume_agent.tracking.match_gap import MatchGapReport, match_gap, normalize_skill
 from resume_agent.tracking.queries import PipelineRow, pipeline_rows, shortlist_rows
 from resume_agent.tracking.repository import (
     application_for_job,
@@ -28,6 +36,17 @@ from resume_agent.tracking.tables import Application, ApplicationStatus, JobStat
 
 _STATUS_ORDER = [s.value for s in JobStatus]
 _FACTS_PATH = "data/profile/facts.json"
+_SORT_LABELS = {
+    "fit": "Fit",
+    "salary": "Salary",
+    "recency": "Recency",
+    "composite": "Composite",
+}
+_PRESET_LABELS = {
+    "balanced": "Balanced",
+    "pay_first": "Pay-first",
+    "freshest": "Freshest",
+}
 
 
 def _new_application(job_id: int, status: str, notes: str) -> Application:
@@ -62,8 +81,73 @@ def match_gap_table_rows(report: MatchGapReport) -> list[dict]:
     ]
 
 
+def _control_desk(rows) -> FilterState:
+    st.markdown('<div class="controldesk">', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        salary_min = st.number_input("Min salary", min_value=0, step=10000, value=0, key="f_salary")
+        fit_min = st.slider("Min fit", 0, 100, 0, key="f_fit")
+    with c2:
+        remote = set(st.multiselect("Remote", ["remote", "hybrid", "onsite"], key="f_remote"))
+        sponsorship = set(
+            st.multiselect("Sponsorship", ["offered", "silent", "denied"], key="f_sponsor")
+        )
+    with c3:
+        seniority = set(
+            st.multiselect(
+                "Seniority",
+                ["junior", "mid", "senior", "staff", "principal"],
+                key="f_sen",
+            )
+        )
+        employment = set(
+            st.multiselect(
+                "Type",
+                ["full_time", "contract", "internship", "part_time"],
+                key="f_emp",
+            )
+        )
+        industry_options = sorted({r.industry for r in rows if r.industry})
+        industry = set(st.multiselect("Industry", industry_options, key="f_industry"))
+    with c4:
+        sort = st.selectbox(
+            "Sort by",
+            list(_SORT_LABELS),
+            format_func=_SORT_LABELS.get,
+            key="f_sort",
+        )
+        preset = "balanced"
+        if sort == "composite":
+            preset = st.radio(
+                "Preset",
+                list(_PRESET_LABELS),
+                format_func=_PRESET_LABELS.get,
+                horizontal=True,
+                key="f_preset",
+            )
+
+    cloud = available_skill_cloud(rows)
+    chosen = st.multiselect("Skills (any match)", [t.name for t in cloud], key="f_skills")
+    skills = {normalize_skill(skill) for skill in chosen}
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    return FilterState(
+        salary_min=salary_min or None,
+        remote=remote,
+        sponsorship=sponsorship,
+        seniority=seniority,
+        employment_type=employment,
+        industry=industry,
+        fit_min=fit_min or None,
+        skills=skills,
+        sort=sort,
+        preset=preset,
+    )
+
+
 def render_shortlist_page(session) -> None:
-    rows = shortlist_rows(session)
+    facts = load_facts(_FACTS_PATH) if Path(_FACTS_PATH).exists() else None
+    rows = shortlist_rows(session, facts=facts)
     avg = round(sum(r.fit_score or 0 for r in rows) / len(rows)) if rows else 0
     sponsored = sum(1 for r in rows if r.sponsorship_signal == "offered")
 
@@ -83,8 +167,15 @@ def render_shortlist_page(session) -> None:
         )
         return
 
+    state = _control_desk(rows)
+    visible = sort_rows(apply_filters(rows, state), state)
+
+    if not visible:
+        empty_state("◇", "No jobs match these filters", "Loosen a filter or clear the skill tags.")
+        return
+
     with st.container(key="cardgrid_shortlist"):
-        for row in rows:
+        for row in visible:
             with st.container(border=True):
                 meter, body = st.columns([1, 4], vertical_alignment="center")
                 with meter:
@@ -93,9 +184,16 @@ def render_shortlist_page(session) -> None:
                     st.markdown(
                         f'<div class="card-title">{row.title or "—"}</div>'
                         f'<div class="card-meta">{row.company or "—"} · {row.location or "location n/a"} &nbsp; '
-                        f'{status_badge(row.sponsorship_signal or "unknown")}</div>',
+                        f'{status_badge(row.sponsorship_signal or "unknown")}</div>'
+                        f'<div class="metaline">{meta_line(row)}</div>',
                         unsafe_allow_html=True,
                     )
+                    if row.skills:
+                        chips = "".join(
+                            skill_chip(tag, active=normalize_skill(tag.name) in state.skills)
+                            for tag in row.skills
+                        )
+                        st.markdown(f'<div class="skills">{chips}</div>', unsafe_allow_html=True)
                     if row.fit_rationale:
                         st.markdown(f'<div class="rationale">{row.fit_rationale}</div>', unsafe_allow_html=True)
                 # Footer button lives OUTSIDE the columns so it spans the full card
