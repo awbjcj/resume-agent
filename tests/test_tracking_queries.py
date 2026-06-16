@@ -1,5 +1,9 @@
+from datetime import datetime, timezone
+
 from sqlmodel import Session, SQLModel, create_engine
 
+from resume_agent.models.base import Source
+from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.tracking.repository import save_application, save_job, save_resume_version
 from resume_agent.tracking.queries import pipeline_rows, shortlist_rows
 from resume_agent.tracking.tables import Application, ApplicationStatus, Job, JobStatus, ResumeVersion
@@ -14,6 +18,13 @@ def _session() -> Session:
 def _require_id(value: int | None) -> int:
     assert value is not None
     return value
+
+
+def _facts_with_python() -> ProfileFacts:
+    return ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"lang": [Skill(name="Python", source=Source.resume)]},
+    )
 
 
 def test_shortlist_rows_only_shortlisted_with_fit_and_sponsorship():
@@ -32,6 +43,68 @@ def test_shortlist_rows_only_shortlisted_with_fit_and_sponsorship():
         assert row.fit_score == 82
         assert row.fit_rationale == "strong python match"
         assert row.sponsorship_signal == "offered"
+
+
+def test_shortlist_row_flattens_metadata_and_tags_coverage():
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="a",
+                company="Acme",
+                title="Eng",
+                status=JobStatus.shortlisted.value,
+                fit_score=80,
+                posted_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+                criteria_json={
+                    "salary_range": {
+                        "minimum": 150000,
+                        "maximum": 190000,
+                        "currency": "USD",
+                    },
+                    "remote_policy": "remote",
+                    "seniority": "senior",
+                    "employment_type": "full_time",
+                    "industry": "fintech",
+                    "company_size": "scaleup",
+                    "must_have_skills": ["Python", "Go"],
+                    "nice_to_have_skills": ["Docker"],
+                },
+            ),
+        )
+        rows = shortlist_rows(s, facts=_facts_with_python())
+        row = rows[0]
+        assert row.salary_min == 150000
+        assert row.salary_max == 190000
+        assert row.salary_currency == "USD"
+        assert row.remote_policy == "remote"
+        assert row.seniority == "senior"
+        assert row.employment_type == "full_time"
+        assert row.industry == "fintech"
+        assert row.company_size == "scaleup"
+        assert row.posted_at == datetime(2026, 6, 1)
+        names = {t.name: t for t in row.skills}
+        assert names["Python"].covered is True
+        assert names["Python"].required is True
+        assert names["Go"].covered is False
+        assert names["Go"].required is True
+        assert names["Docker"].required is False
+
+
+def test_shortlist_row_without_facts_marks_all_uncovered():
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="a",
+                status=JobStatus.shortlisted.value,
+                criteria_json={"must_have_skills": ["Python"]},
+            ),
+        )
+        rows = shortlist_rows(s, facts=None)
+        assert rows[0].skills[0].covered is False
 
 
 def test_pipeline_rows_include_pdf_and_application_status():
@@ -60,3 +133,28 @@ def test_pipeline_rows_include_pdf_and_application_status():
         assert row.critique_json == [{"reviewer": "fact-check", "passed": True}]
         assert row.application_status == ApplicationStatus.submitted.value
         assert row.fit_score == 90
+
+
+def test_pipeline_rows_include_lean_metadata_fields():
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="a",
+                company="Acme",
+                title="Eng",
+                status=JobStatus.filtered.value,
+                criteria_json={
+                    "salary_range": {"minimum": 140000, "maximum": 180000},
+                    "remote_policy": "hybrid",
+                    "seniority": "staff",
+                },
+            ),
+        )
+
+        row = pipeline_rows(s)[0]
+        assert row.salary_min == 140000
+        assert row.salary_max == 180000
+        assert row.remote_policy == "hybrid"
+        assert row.seniority == "staff"

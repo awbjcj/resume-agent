@@ -1,8 +1,11 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, cast
 
 from sqlmodel import Session, select
 
+from resume_agent.models.profile import ProfileFacts
+from resume_agent.tracking.match_gap import normalize_skill, profile_skill_tokens
 from resume_agent.tracking.repository import (
     application_for_job,
     latest_rendered_resume_version,
@@ -18,6 +21,13 @@ def _require_job_id(job: Job) -> int:
 
 
 @dataclass
+class SkillTag:
+    name: str
+    covered: bool
+    required: bool
+
+
+@dataclass
 class ShortlistRow:
     job_id: int
     company: str | None
@@ -26,6 +36,16 @@ class ShortlistRow:
     fit_score: int | None
     fit_rationale: str | None
     sponsorship_signal: str | None
+    salary_min: int | None
+    salary_max: int | None
+    salary_currency: str | None
+    remote_policy: str | None
+    seniority: str | None
+    employment_type: str | None
+    industry: str | None
+    company_size: str | None
+    posted_at: datetime | None
+    skills: list[SkillTag]
 
 
 @dataclass
@@ -39,19 +59,42 @@ class PipelineRow:
     critique_json: list[dict] | None
     pdf_path: str | None
     application_status: str | None
+    salary_min: int | None
+    salary_max: int | None
+    remote_policy: str | None
+    seniority: str | None
 
 
-def shortlist_rows(session: Session) -> list[ShortlistRow]:
+def _skill_tags(criteria: dict, tokens: set[str]) -> list[SkillTag]:
+    tags: list[SkillTag] = []
+    for key, required in (("must_have_skills", True), ("nice_to_have_skills", False)):
+        for raw_name in criteria.get(key) or []:
+            name = str(raw_name).strip()
+            if not name:
+                continue
+            tags.append(
+                SkillTag(
+                    name=name,
+                    covered=normalize_skill(name) in tokens,
+                    required=required,
+                )
+            )
+    return tags
+
+
+def shortlist_rows(session: Session, facts: ProfileFacts | None = None) -> list[ShortlistRow]:
     fit_score_col = cast(Any, Job.fit_score)
     jobs = session.exec(
         select(Job)
         .where(Job.status == JobStatus.shortlisted.value)
         .order_by(fit_score_col.desc().nullslast())
     ).all()
+    tokens = profile_skill_tokens(facts) if facts is not None else set()
     rows = []
     for job in jobs:
         job_id = _require_job_id(job)
         criteria = job.criteria_json or {}
+        salary = criteria.get("salary_range") or {}
         rows.append(
             ShortlistRow(
                 job_id=job_id,
@@ -61,6 +104,16 @@ def shortlist_rows(session: Session) -> list[ShortlistRow]:
                 fit_score=job.fit_score,
                 fit_rationale=job.fit_rationale,
                 sponsorship_signal=criteria.get("sponsorship_signal"),
+                salary_min=salary.get("minimum"),
+                salary_max=salary.get("maximum"),
+                salary_currency=salary.get("currency"),
+                remote_policy=criteria.get("remote_policy"),
+                seniority=criteria.get("seniority"),
+                employment_type=criteria.get("employment_type"),
+                industry=criteria.get("industry"),
+                company_size=criteria.get("company_size"),
+                posted_at=job.posted_at,
+                skills=_skill_tags(criteria, tokens),
             )
         )
     return rows
@@ -74,6 +127,8 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
     rows = []
     for job in jobs:
         job_id = _require_job_id(job)
+        criteria = job.criteria_json or {}
+        salary = criteria.get("salary_range") or {}
         version = latest_resume_version(session, job_id)
         rendered = latest_rendered_resume_version(session, job_id)
         application = application_for_job(session, job_id)
@@ -88,6 +143,10 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 critique_json=version.critique_json if version else None,
                 pdf_path=rendered.pdf_path if rendered else None,
                 application_status=application.status if application else None,
+                salary_min=salary.get("minimum"),
+                salary_max=salary.get("maximum"),
+                remote_policy=criteria.get("remote_policy"),
+                seniority=criteria.get("seniority"),
             )
         )
     return rows
