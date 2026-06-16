@@ -10,8 +10,16 @@ def test_theme_css_targets_keyed_cardgrid_containers():
     assert ".card-grid +" not in THEME_CSS
     # In Streamlit ≥1.39 the st-key class sits on the SAME node as the
     # stVerticalBlock testid, so the grid is the keyed element itself; a child
-    # combinator would match nothing.
-    assert 'div[data-testid="stVerticalBlock"][class*="st-key-cardgrid"]' in THEME_CSS
+    # combinator would match nothing. Shortlist (scannable summary cards) and
+    # pipeline (full-width detail cards with expandable JDs) get distinct grids.
+    assert (
+        'div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_shortlist"]'
+        in THEME_CSS
+    )
+    assert (
+        'div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_pipeline"]'
+        in THEME_CSS
+    )
     # stVerticalBlockBorderWrapper does not exist in current Streamlit; card
     # styling must not be hung off that (nonexistent) testid selector.
     assert '[data-testid="stVerticalBlockBorderWrapper"]' not in THEME_CSS

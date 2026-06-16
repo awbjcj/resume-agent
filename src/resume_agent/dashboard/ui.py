@@ -14,43 +14,73 @@ THEME_CSS = """
 }
 
 .stApp { background: var(--paper); color: var(--ink); }
-.block-container { padding-top: 2.2rem; max-width: 2400px; }
+
+/* Fluid root: every rem-based size (including the sidebar and Streamlit's own
+   header) scales with the viewport. ~16px on a 14" laptop (~1366px wide) up to
+   ~22px on a 32" 4K — one declaration instead of a media-query ladder. */
+html { font-size: clamp(16px, calc(11px + 0.42vw), 22px) !important; }
+
+/* Streamlit's top chrome is a FIXED bar that floats over content. Make it
+   blend into the paper and hold enough top padding so the masthead clears it. */
+[data-testid="stHeader"] { background: transparent; box-shadow: none; }
+[data-testid="stDecoration"] { display: none; }
+/* min(95vw, …) fills a 4K screen instead of stranding content in a narrow
+   centered column, while still capping line length on ultrawide displays. */
+/* Trim Streamlit's wide default side padding so the grid uses the full canvas
+   (cuts the sparse margins, and lets a laptop fit 2 columns). */
+.block-container { padding: 5rem 2rem 4rem; max-width: min(95vw, 2040px); }
 
 html, body, [class*="css"], .stMarkdown, p, li, label,
 .stTextInput input, .stSelectbox div, .stDataFrame, table {
   font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  font-size: 1.05rem;
 }
 h1, h2, h3, h4, .card-title, .nameplate, .empty-title {
   font-family: 'Newsreader', Georgia, serif !important; letter-spacing: -0.01em;
 }
 
 /* ── Masthead / nameplate ─────────────────────────────────────── */
-.nameplate { font-family:'Newsreader',serif; font-size: 1.7rem; font-weight: 700; margin-bottom: 1rem; }
+/* Sidebar is a fixed width, so the fluid root can blow the nameplate past it on
+   a 4K screen (wrapping "Broadsheet" mid-word). Keep it generous but contained. */
+.nameplate { font-family:'Newsreader',serif; font-size: 1.55rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.1; overflow-wrap: normal; word-break: normal; }
 .masthead { margin: 0 0 1.6rem 0; padding-bottom: 1.0rem; border-bottom: 2px solid var(--ink); }
 .masthead-kicker {
-  font-family:'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.34em;
+  font-family:'IBM Plex Mono', monospace; font-size: 0.86rem; letter-spacing: 0.3em;
   text-transform: uppercase; color: var(--oxblood); margin-bottom: 0.5rem;
 }
 .masthead-title { font-size: clamp(2.2rem, 2.4vw, 3.0rem); font-weight: 700; line-height: 1.02; margin: 0; color: var(--ink); }
 .masthead-title .dot { color: var(--oxblood); }
-.masthead-sub { color: var(--muted); margin-top: 0.5rem; font-size: 1.0rem; max-width: 70ch; }
+.masthead-sub { color: var(--muted); margin-top: 0.5rem; font-size: 1.1rem; max-width: 70ch; }
 
 /* ── Metric strip ─────────────────────────────────────────────── */
 .metric-row { display:flex; gap: 1.0rem; margin: 0.4rem 0 1.6rem 0; flex-wrap: wrap; }
 .metric { flex:1; min-width: 150px; background: var(--paper-2); border:1px solid var(--rule); border-radius: 4px; padding: 1.0rem 1.2rem; }
 .metric-value { font-family:'Newsreader', serif; font-size: clamp(1.8rem, 1.8vw, 2.4rem); font-weight: 700; color: var(--ink); line-height:1; }
-.metric-label { font-family:'IBM Plex Mono', monospace; font-size: 0.66rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-top: 0.45rem; }
+.metric-label { font-family:'IBM Plex Mono', monospace; font-size: 0.74rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-top: 0.45rem; }
 
-/* ── Responsive card grid (the 4K fill) ───────────────────────── */
+/* ── Responsive card grids ────────────────────────────────────── */
 /* st.container(key="cardgrid_…") puts a stable st-key-cardgrid… class on the
    SAME node that carries data-testid="stVerticalBlock" (Streamlit ≥1.39), so the
    grid must be the keyed element itself — a child combinator matches nothing.
    Its direct children (the bordered st.container cards) become the grid items. */
-div[data-testid="stVerticalBlock"][class*="st-key-cardgrid"] {
+
+/* Shortlist — scannable summary cards. A 520px min-track keeps this to a
+   regulated 2–3 columns from a 14" laptop up to a 4K canvas (rather than 5
+   cramped ones or 2 lost in whitespace); align-items:stretch equalises height. */
+div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_shortlist"] {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: clamp(0.8rem, 1vw, 1.4rem);
-  align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr));
+  gap: clamp(1rem, 1.4vw, 1.6rem);
+  align-items: stretch;
+}
+
+/* Pipeline — detail cards. One per row: they carry an expandable job
+   description, status selector and notes field that need the full width and
+   look broken (and absurdly tall) when squeezed into a narrow grid column. */
+div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_pipeline"] {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(0.8rem, 1vw, 1.2rem);
 }
 
 /* ── Badges ───────────────────────────────────────────────────── */
@@ -64,21 +94,44 @@ div[data-testid="stVerticalBlock"][class*="st-key-cardgrid"] {
 .fit-fill { height: 100%; border-radius: 999px; }
 .fit-cap { font-family:'IBM Plex Mono', monospace; font-size: 0.6rem; letter-spacing: 0.22em; color: var(--muted); }
 
-.card-title { font-size: 1.32rem; font-weight: 600; color: var(--ink); margin: 0; }
-.card-meta { color: var(--muted); font-size: 0.92rem; margin-top: 0.15rem; }
-.rationale { color: #3f382e; font-size: 0.95rem; line-height: 1.5; margin-top: 0.5rem; border-left: 2px solid var(--oxblood); padding-left: 0.8rem; }
+.card-title { font-size: 1.5rem; font-weight: 600; color: var(--ink); margin: 0; line-height: 1.2; }
+.card-meta { color: var(--muted); font-size: 1.0rem; margin-top: 0.3rem; }
+.rationale { color: #3f382e; font-size: 1.02rem; line-height: 1.6; margin-top: 0.7rem; border-left: 2px solid var(--oxblood); padding-left: 0.9rem; }
 .rail-head { font-family:'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: 0.24em; font-size: 0.74rem; color: var(--muted); margin: 1.5rem 0 0.4rem; display:flex; align-items:center; gap: 0.7rem; }
 .rail-head::after { content:""; flex:1; height:1px; background: var(--rule); }
 
 /* ── Cards (bordered st.container inside a cardgrid) ───────────── */
-/* Streamlit 1.58 has no stVerticalBlockBorderWrapper testid; the grid items
-   are the bordered containers themselves, so style them as the keyed grid's
-   direct children. */
-div[class*="st-key-cardgrid"] > div[data-testid="stVerticalBlock"] {
+/* Streamlit 1.58 wraps each grid item in an stLayoutWrapper; the bordered card
+   is the stVerticalBlock just inside it (NOT a direct child of the keyed grid). */
+div[class*="st-key-cardgrid"] > div[data-testid="stLayoutWrapper"]
+  > div[data-testid="stVerticalBlock"] {
   background: var(--paper-2); border: 1px solid var(--rule) !important; border-radius: 6px;
   box-shadow: 0 1px 0 rgba(22,19,15,0.04); transition: border-color .18s ease;
+  padding: 0.6rem 0.7rem 0.3rem;
 }
-div[class*="st-key-cardgrid"] > div[data-testid="stVerticalBlock"]:hover { border-color: var(--oxblood) !important; }
+div[class*="st-key-cardgrid"] > div[data-testid="stLayoutWrapper"]
+  > div[data-testid="stVerticalBlock"]:hover { border-color: var(--oxblood) !important; }
+
+/* Pin the Approve button to the bottom of every (equal-height) shortlist card so
+   the buttons line up across a row regardless of rationale length. Cascade height
+   from the grid-stretched layout wrapper down through the card, then push the
+   keyed approve-button container down with margin-top:auto. The button is a
+   full-width footer (rendered outside the meter|body columns). */
+div[class*="st-key-cardgrid_shortlist"] > div[data-testid="stLayoutWrapper"] { display: flex; }
+div[class*="st-key-cardgrid_shortlist"] > div[data-testid="stLayoutWrapper"]
+  > div[data-testid="stVerticalBlock"] { flex: 1; display: flex; flex-direction: column; }
+div[class*="st-key-cardgrid_shortlist"] > div[data-testid="stLayoutWrapper"]
+  > div[data-testid="stVerticalBlock"] > div[data-testid="stLayoutWrapper"] {
+  flex: 1; display: flex; flex-direction: column;
+}
+div[class*="st-key-cardgrid_shortlist"]
+  div[data-testid="stElementContainer"][class*="st-key-approve"] {
+  margin-top: auto; border-top: 1px solid var(--rule); padding-top: 0.7rem;
+}
+div[class*="st-key-cardgrid_shortlist"]
+  div[data-testid="stElementContainer"][class*="st-key-approve"] .stButton,
+div[class*="st-key-cardgrid_shortlist"]
+  div[data-testid="stElementContainer"][class*="st-key-approve"] .stButton > button { width: 100%; }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
 .stButton > button { font-family:'IBM Plex Mono', monospace; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 3px; border: 1px solid var(--oxblood); background: var(--oxblood); color: var(--paper); font-weight: 600; padding: 0.45rem 1.1rem; transition: all .15s ease; }
@@ -88,7 +141,15 @@ div[class*="st-key-cardgrid"] > div[data-testid="stVerticalBlock"]:hover { borde
 
 /* ── Sidebar ──────────────────────────────────────────────────── */
 [data-testid="stSidebar"] { background: var(--paper-2); border-right: 2px solid var(--ink); }
-[data-testid="stSidebar"] .stRadio label { font-family:'IBM Plex Sans'; }
+[data-testid="stSidebar"] > div { padding-top: 2.4rem; }
+/* The nav radio is the primary sidebar control — size it up generously so it
+   reads on both a dense 4K canvas and a small laptop (scales via the rem root). */
+[data-testid="stSidebar"] .stRadio label,
+[data-testid="stSidebar"] .stRadio label p {
+  font-family:'IBM Plex Sans'; font-size: 1.12rem; font-weight: 500;
+}
+[data-testid="stSidebar"] .stRadio label { padding: 0.28rem 0; }
+[data-testid="stSidebar"] .masthead-kicker { font-size: 0.78rem; }
 
 /* ── Inputs / tables / expander (re-themed for paper) ─────────── */
 .stTextInput input, .stSelectbox [data-baseweb="select"] > div { background: #fff !important; border-color: var(--rule) !important; border-radius: 3px !important; color: var(--ink) !important; }

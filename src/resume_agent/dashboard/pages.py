@@ -98,16 +98,19 @@ def render_shortlist_page(session) -> None:
                     )
                     if row.fit_rationale:
                         st.markdown(f'<div class="rationale">{row.fit_rationale}</div>', unsafe_allow_html=True)
-                    if st.button("Approve for tailoring  →", key=f"approve-{row.job_id}"):
-                        job = get_job(session, row.job_id)
-                        if job is None:
-                            st.error(f"Job #{row.job_id} no longer exists.")
-                            st.rerun()
-                            return
-                        job.status = JobStatus.approved.value
-                        save_job(session, job)
-                        st.success(f"Approved {row.title or 'job'} #{row.job_id}.")
+                # Footer button lives OUTSIDE the columns so it spans the full card
+                # width and (via CSS margin-top:auto) sits flush at the bottom of
+                # every equal-height card — aligning across the row.
+                if st.button("Approve for tailoring  →", key=f"approve-{row.job_id}"):
+                    job = get_job(session, row.job_id)
+                    if job is None:
+                        st.error(f"Job #{row.job_id} no longer exists.")
                         st.rerun()
+                        return
+                    job.status = JobStatus.approved.value
+                    save_job(session, job)
+                    st.success(f"Approved {row.title or 'job'} #{row.job_id}.")
+                    st.rerun()
 
 
 def _render_pipeline_card(session, row: PipelineRow) -> None:
@@ -154,14 +157,16 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
             application = application_for_job(session, row.job_id)
             if application is None:
                 save_application(session, _new_application(row.job_id, new_status, notes))
+            elif application.id is None:
+                st.error("Cannot update an application that has not been persisted.")
+                return
             else:
-                if application.id is None:
-                    st.error("Cannot update an application that has not been persisted.")
-                    st.rerun()
-                    return
                 update_application_status(session, application.id, new_status, notes or None)
-            st.success("Saved.")
-            st.rerun()
+            # No st.rerun() here: an immediate rerun restarts the script and
+            # discards this message, so the click appears to do nothing. The
+            # selectbox keeps its value via widget state, so a rerun is needless.
+            saved = f"Saved — status set to “{new_status}”"
+            st.success(saved + (f" · note: {notes}" if notes else ""))
 
 
 def render_pipeline_page(session) -> None:
