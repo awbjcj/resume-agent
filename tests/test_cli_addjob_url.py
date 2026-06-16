@@ -1,6 +1,10 @@
-import resume_agent.cli as cli
-from resume_agent.discovery.connectors.base import RawJob
+from sqlmodel import select
 from typer.testing import CliRunner
+
+import resume_agent.cli as cli
+from resume_agent.db import get_session, init_db, make_engine
+from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.tracking.tables import Job
 
 runner = CliRunner()
 
@@ -58,6 +62,30 @@ def test_addjob_url_with_jd_file_skips_extraction(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert "Added job" in result.output
+
+
+def test_addjob_url_with_piped_stdin_skips_extraction(monkeypatch, tmp_path):
+    def _boom(*a, **k):
+        raise AssertionError("job_from_url must not run when stdin is given")
+
+    monkeypatch.setattr(cli, "build_url_extract_agent", lambda: object())
+    monkeypatch.setattr(cli, "job_from_url", _boom)
+    db = f"sqlite:///{tmp_path/'t.db'}"
+
+    result = runner.invoke(
+        cli.app,
+        ["addjob", "--url", "https://acme.test/job", "--db-url", db],
+        input="Manual JD from stdin.",
+    )
+
+    assert result.exit_code == 0, result.output
+    engine = make_engine(db)
+    init_db(engine)
+    with get_session(engine) as session:
+        job = session.exec(select(Job)).one()
+        assert job.source == "manual"
+        assert job.url == "https://acme.test/job"
+        assert job.jd_text == "Manual JD from stdin."
 
 
 def test_addjob_url_fetch_error_exits_cleanly(monkeypatch, tmp_path):

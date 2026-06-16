@@ -94,6 +94,14 @@ def _engine(db_url: str | None):
     return engine
 
 
+def _read_piped_stdin() -> str | None:
+    stream = typer.get_text_stream("stdin")
+    if stream.isatty():
+        return None
+    text = stream.read()
+    return text if text.strip() else None
+
+
 @app.command("addjob")
 def addjob(
     url: str | None = typer.Option(None, help="Posting URL. With no JD source, the page is fetched and fields are auto-extracted."),
@@ -108,11 +116,13 @@ def addjob(
 ) -> None:
     """Add a job from a URL (auto-extract), a --jd-file, or JD pasted on stdin.
 
-    Precedence: --url (with no --jd-file) fetches the page and auto-extracts.
-    Otherwise --jd-file or stdin supplies the JD. Note: when --url is given
-    without --jd-file, any piped stdin is ignored.
+    Precedence: --jd-file, non-empty piped stdin, then URL extraction.
     """
-    if url and not jd_file:
+    stdin_text = None if jd_file else _read_piped_stdin()
+    if jd_file or stdin_text is not None:
+        jd_text = Path(jd_file).read_text(encoding="utf-8") if jd_file else stdin_text or ""
+        source = "manual"
+    elif url:
         try:
             raw = job_from_url(
                 url, agent=build_url_extract_agent(), allow_browser=not no_browser
@@ -130,11 +140,7 @@ def addjob(
         source = "url"
         typer.echo(f"Extracted: {title or '?'} @ {company or '?'} ({location or '?'})")
     else:
-        jd_text = (
-            Path(jd_file).read_text(encoding="utf-8")
-            if jd_file
-            else typer.get_text_stream("stdin").read()
-        )
+        jd_text = typer.get_text_stream("stdin").read()
         source = "manual"
     engine = _engine(db_url)
     with get_session(engine) as session:
