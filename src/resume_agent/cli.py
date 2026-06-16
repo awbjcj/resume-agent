@@ -104,7 +104,12 @@ def addjob(
     ),
     db_url: str = typer.Option(None, help="Override the database URL."),
 ) -> None:
-    """Add a job: from a URL (auto-extract), a --jd-file, or JD pasted on stdin."""
+    """Add a job from a URL (auto-extract), a --jd-file, or JD pasted on stdin.
+
+    Precedence: --url (with no --jd-file) fetches the page and auto-extracts.
+    Otherwise --jd-file or stdin supplies the JD. Note: when --url is given
+    without --jd-file, any piped stdin is ignored.
+    """
     if url and not jd_file:
         raw = job_from_url(url, agent=build_url_extract_agent(), allow_browser=not no_browser)
         if raw is None:
