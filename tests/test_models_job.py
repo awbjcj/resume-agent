@@ -1,4 +1,10 @@
-from resume_agent.models.job import JobCriteria, SalaryRange, SponsorshipSignal
+from resume_agent.models.job import (
+    EmploymentType,
+    JobCriteria,
+    SalaryRange,
+    Seniority,
+    SponsorshipSignal,
+)
 
 
 def test_sponsorship_defaults_to_silent():
@@ -28,3 +34,29 @@ def test_salary_range_defaults():
     assert s.currency == "USD"
     assert s.period == "year"
     assert s.maximum is None
+
+
+def test_job_criteria_new_fields_default_empty():
+    c = JobCriteria()
+    assert c.seniority is None
+    assert c.employment_type is None
+    assert c.tech_stack == []
+    assert c.industry is None
+    assert c.company_size is None
+
+
+def test_job_criteria_new_fields_roundtrip():
+    c = JobCriteria(
+        seniority=Seniority.senior,
+        employment_type=EmploymentType.full_time,
+        tech_stack=["python", "aws"],
+        industry="fintech",
+        company_size="scaleup",
+    )
+    dumped = c.model_dump(mode="json")
+    restored = JobCriteria.model_validate(dumped)
+    assert restored.seniority == Seniority.senior
+    assert restored.employment_type == EmploymentType.full_time
+    assert restored.tech_stack == ["python", "aws"]
+    assert restored.industry == "fintech"
+    assert restored.company_size == "scaleup"

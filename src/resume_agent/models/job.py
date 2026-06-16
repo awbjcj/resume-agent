@@ -13,6 +13,21 @@ class SponsorshipSignal(str, Enum):
     silent = "silent"
 
 
+class Seniority(str, Enum):
+    junior = "junior"
+    mid = "mid"
+    senior = "senior"
+    staff = "staff"
+    principal = "principal"
+
+
+class EmploymentType(str, Enum):
+    full_time = "full_time"
+    contract = "contract"
+    internship = "internship"
+    part_time = "part_time"
+
+
 class SalaryRange(ExtensibleModel):
     minimum: int | None = None
     maximum: int | None = None
@@ -24,6 +39,11 @@ class JobCriteria(ExtensibleModel):
     """Structured fields extracted from a raw job description."""
 
     sponsorship_signal: SponsorshipSignal = SponsorshipSignal.silent
+    seniority: Seniority | None = None
+    employment_type: EmploymentType | None = None
+    tech_stack: list[str] = Field(default_factory=list)
+    industry: str | None = None
+    company_size: str | None = None
     yoe_min: int | None = None
     salary_range: SalaryRange | None = None
     remote_policy: str | None = None  # remote | hybrid | onsite
