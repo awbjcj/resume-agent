@@ -125,11 +125,15 @@ def test_reextract_rewrites_criteria_without_changing_status():
         rejected = jobs_by_status(s, JobStatus.rejected.value)
         filtered = jobs_by_status(s, JobStatus.filtered.value)
         raw = jobs_by_status(s, JobStatus.raw.value)
+        shortlisted_criteria = shortlisted[0].criteria_json
+        rejected_criteria = rejected[0].criteria_json
         assert updated == 2
-        assert shortlisted[0].criteria_json["seniority"] == "staff"
+        assert shortlisted_criteria is not None
+        assert shortlisted_criteria["seniority"] == "staff"
         assert shortlisted[0].status == JobStatus.shortlisted.value
         assert shortlisted[0].fit_score == 70
-        assert rejected[0].criteria_json["seniority"] == "staff"
+        assert rejected_criteria is not None
+        assert rejected_criteria["seniority"] == "staff"
         assert rejected[0].status == JobStatus.rejected.value
         assert filtered[0].criteria_json == {"seniority": None}
         assert raw and raw[0].criteria_json is None
