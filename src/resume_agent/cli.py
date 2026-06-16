@@ -65,6 +65,13 @@ def profile_build(
     ),
 ) -> None:
     """Build facts.json from your resume + GitHub."""
+    if not get_settings().anthropic_api_key:
+        typer.echo(
+            "ANTHROPIC_API_KEY is not set. Add it to .env:\n"
+            "  ANTHROPIC_API_KEY=sk-ant-..."
+        )
+        raise typer.Exit(code=1)
+
     if Path(out).exists() and not refresh:
         typer.echo(f"{out} already exists. Use --refresh to rebuild (this discards manual edits).")
         raise typer.Exit(code=1)
