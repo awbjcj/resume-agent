@@ -2,6 +2,7 @@ import httpx
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.config import GreenhouseBoard
+from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.text import filter_by_search, html_to_text
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -21,6 +22,7 @@ def parse_greenhouse(payload: dict, company: str) -> list[RawJob]:
                 title=item.get("title"),
                 location=location,
                 jd_text=html_to_text(item.get("content", "")),
+                posted_at=parse_iso_datetime(item.get("updated_at")),
             )
         )
     return jobs

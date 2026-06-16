@@ -1,6 +1,7 @@
 import httpx
 
 from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.text import filter_by_search, html_to_text
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -21,6 +22,7 @@ def parse_remoteok(payload: list) -> list[RawJob]:
                 title=item.get("position"),
                 location=item.get("location") or "Remote",
                 jd_text=html_to_text(item.get("description", "")),
+                posted_at=parse_iso_datetime(item.get("date")),
             )
         )
     return jobs

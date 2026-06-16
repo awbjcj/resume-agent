@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from resume_agent.discovery.connectors.config import GreenhouseBoard
@@ -18,6 +19,27 @@ def test_parse_greenhouse_maps_and_decodes_content():
     assert first.location == "Remote - US"
     assert first.url == "https://boards.greenhouse.io/stripe/jobs/1"
     assert "payment" in first.jd_text and "<" not in first.jd_text
+
+
+def test_parse_greenhouse_sets_posted_at_from_updated_at():
+    payload = {
+        "jobs": [
+            {
+                "title": "Eng",
+                "absolute_url": "u",
+                "location": {"name": "Remote"},
+                "content": "hi",
+                "updated_at": "2026-06-01T00:00:00Z",
+            }
+        ]
+    }
+    jobs = parse_greenhouse(payload, "Acme")
+    assert jobs[0].posted_at == datetime(2026, 6, 1, tzinfo=timezone.utc)
+
+
+def test_parse_greenhouse_posted_at_none_when_absent():
+    payload = {"jobs": [{"title": "Eng", "absolute_url": "u", "content": "hi"}]}
+    assert parse_greenhouse(payload, "Acme")[0].posted_at is None
 
 
 class _FakeGreenhouse(GreenhouseConnector):

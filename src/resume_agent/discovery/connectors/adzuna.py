@@ -1,6 +1,7 @@
 import httpx
 
 from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.text import filter_by_search
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -19,6 +20,7 @@ def parse_adzuna(payload: dict) -> list[RawJob]:
                 title=item.get("title"),
                 location=(item.get("location") or {}).get("display_name"),
                 jd_text=item.get("description") or "",
+                posted_at=parse_iso_datetime(item.get("created")),
             )
         )
     return jobs

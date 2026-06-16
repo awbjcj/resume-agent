@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 from resume_agent.discovery.connectors.base import RawJob
@@ -26,3 +27,30 @@ def test_linkedin_fetch_returns_rawjobs_attributed_to_linkedin():
 
 def test_linkedin_fetch_respects_limit():
     assert len(_FakeBrowserScraper().fetch(SearchConfig(), limit=1)) == 1
+
+
+def test_linkedin_fetch_threads_search_card_posted_at():
+    class _FakeDatedScraper(LinkedInScraper):
+        def _search_html(self, search):
+            return """
+            <html><body>
+              <div class="base-card" data-entity-urn="urn:li:jobPosting:3700000001">
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000001/?trk=public_jobs_jserp-result_search-card"></a>
+                <h3 class="base-search-card__title">Senior Backend Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme Corp</h4>
+                <span class="job-search-card__location">Remote, United States</span>
+                <time class="job-search-card__listdate" datetime="2026-06-01">2 weeks ago</time>
+              </div>
+            </body></html>
+            """
+
+        def _detail_html(self, card):
+            return """
+            <html><body>
+              <div class="show-more-less-html__markup">Build pipelines.</div>
+            </body></html>
+            """
+
+    assert _FakeDatedScraper().fetch(SearchConfig())[0].posted_at == datetime(
+        2026, 6, 1, tzinfo=timezone.utc
+    )
