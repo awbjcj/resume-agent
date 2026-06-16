@@ -1,6 +1,7 @@
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
+from resume_agent.config import get_settings
 from resume_agent.llm_runner import AgentRunner, Runner
 from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.tailor.agents import model_for_tier
@@ -20,22 +21,26 @@ _REVISE_INSTRUCTIONS = [
 
 
 def build_cover_letter_agent(model_id: str | None = None) -> Runner:
+    s = get_settings()
     return AgentRunner(
         Agent(
-            model=Claude(id=model_id or model_for_tier("premium")),
+            model=Claude(id=model_id or model_for_tier("premium"), api_key=s.anthropic_api_key or None),
             description="You are an expert cover-letter writer who never fabricates.",
             instructions=_DRAFT_INSTRUCTIONS,
             output_schema=CoverLetterContent,
+            use_json_mode=True,
         )
     )
 
 
 def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
+    s = get_settings()
     return AgentRunner(
         Agent(
-            model=Claude(id=model_id or model_for_tier("mid")),
+            model=Claude(id=model_id or model_for_tier("mid"), api_key=s.anthropic_api_key or None),
             description="You revise cover letters to keep every claim fact-locked.",
             instructions=_REVISE_INSTRUCTIONS,
             output_schema=CoverLetterContent,
+            use_json_mode=True,
         )
     )

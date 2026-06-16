@@ -48,7 +48,7 @@ def test_extractor_defaults_to_mid_tier(monkeypatch):
     import resume_agent.profile.extractor as extractor_mod
 
     class _FakeClaude:
-        def __init__(self, id):
+        def __init__(self, id, **kwargs):
             captured["id"] = id
 
     class _FakeAgent:

@@ -16,13 +16,15 @@ _INSTRUCTIONS = [
 
 def build_extractor_agent(model_id: str | None = None) -> Runner:
     """Create the Agno agent that structures resume text into ProfileFacts."""
-    resolved = model_id or get_settings().mid_model
+    s = get_settings()
+    resolved = model_id or s.mid_model
     return AgentRunner(
         Agent(
-            model=Claude(id=resolved),
+            model=Claude(id=resolved, api_key=s.anthropic_api_key or None),
             description="You extract structured, truthful resume facts from raw resume text.",
             instructions=_INSTRUCTIONS,
             output_schema=ProfileFacts,
+            use_json_mode=True,
         )
     )
 

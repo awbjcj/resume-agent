@@ -14,10 +14,11 @@ _INSTRUCTIONS = [
 
 
 def build_url_extract_agent(model_id: str | None = None) -> Runner:
-    resolved = model_id or get_settings().cheap_model
+    s = get_settings()
+    resolved = model_id or s.cheap_model
     return AgentRunner(
         Agent(
-            model=Claude(id=resolved),
+            model=Claude(id=resolved, api_key=s.anthropic_api_key or None),
             description="You extract a job posting's fields from page text.",
             instructions=_INSTRUCTIONS,
             output_schema=ExtractedJob,

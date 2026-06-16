@@ -38,7 +38,7 @@ def _default_agent() -> Runner:
     settings = get_settings()
     return AgentRunner(
         Agent(
-            model=Claude(id=settings.cheap_model),
+            model=Claude(id=settings.cheap_model, api_key=settings.anthropic_api_key or None),
             description="You canonicalize skill names into synonym clusters.",
             instructions=_INSTRUCTIONS,
             output_schema=SkillClusters,
