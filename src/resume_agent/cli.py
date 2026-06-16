@@ -12,6 +12,8 @@ from resume_agent.discovery.connectors.registry import build_connectors
 from resume_agent.discovery.connectors.runner import run_pull
 from resume_agent.discovery.connectors.telemetry import read_runs
 from resume_agent.discovery.ingest import add_job, ingest_jobs
+from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
+from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
 from resume_agent.discovery.pipeline import discover
@@ -92,24 +94,45 @@ def _engine(db_url: str | None):
 
 @app.command("addjob")
 def addjob(
-    url: str = typer.Option(None, help="Posting URL (used for dedupe)."),
-    company: str = typer.Option(None, help="Company name."),
-    title: str = typer.Option(None, help="Job title."),
-    location: str = typer.Option(None, help="Location."),
-    jd_file: str = typer.Option(None, help="Read the JD from this file instead of stdin."),
+    url: str = typer.Option(None, help="Posting URL. With no JD source, the page is fetched and fields are auto-extracted."),
+    company: str = typer.Option(None, help="Company name (overrides extracted)."),
+    title: str = typer.Option(None, help="Job title (overrides extracted)."),
+    location: str = typer.Option(None, help="Location (overrides extracted)."),
+    jd_file: str = typer.Option(None, help="Read the JD from this file instead of stdin/URL."),
+    no_browser: bool = typer.Option(
+        False, "--no-browser", help="Force HTTP-only fetching (skip the Playwright fallback)."
+    ),
     db_url: str = typer.Option(None, help="Override the database URL."),
 ) -> None:
-    """Manually add a job (paste the JD on stdin, or pass --jd-file)."""
-    jd_text = Path(jd_file).read_text(encoding="utf-8") if jd_file else typer.get_text_stream("stdin").read()
+    """Add a job: from a URL (auto-extract), a --jd-file, or JD pasted on stdin."""
+    if url and not jd_file:
+        raw = job_from_url(url, agent=build_url_extract_agent(), allow_browser=not no_browser)
+        if raw is None:
+            typer.echo("Couldn't extract a job description from that URL.")
+            raise typer.Exit(code=1)
+        jd_text = raw.jd_text
+        company = company or raw.company
+        title = title or raw.title
+        location = location or raw.location
+        source = "url"
+        typer.echo(f"Extracted: {title or '?'} @ {company or '?'} ({location or '?'})")
+    else:
+        jd_text = (
+            Path(jd_file).read_text(encoding="utf-8")
+            if jd_file
+            else typer.get_text_stream("stdin").read()
+        )
+        source = "manual"
     engine = _engine(db_url)
     with get_session(engine) as session:
         job = add_job(
-            session, source="manual", jd_text=jd_text, url=url, company=company, title=title, location=location
+            session, source=source, jd_text=jd_text, url=url,
+            company=company, title=title, location=location,
         )
     if job is None:
         typer.echo("Duplicate job (same URL or JD already present); not added.")
         raise typer.Exit(code=0)
-    typer.echo(f"Added job #{job.id} (status={job.status}).")
+    typer.echo(f"Added job #{job.id} ({company or '?'} — status={job.status}).")
 
 
 @app.command("discover")
