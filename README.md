@@ -2,7 +2,7 @@
 
 A personal, command-line job-hunt pipeline. It pulls job posts from multiple
 sources (job-board connectors, LinkedIn, or hand-pasted), scores them against a
-**fact-locked** profile of *your* real experience, helps you tailor a resume
+**fact-locked** profile of _your_ real experience, helps you tailor a resume
 through a panel of reviewer agents, drafts a matching cover letter, renders both
 to PDF, and tracks every application — auto-syncing statuses from your Gmail —
 all on your own machine, in one SQLite database.
@@ -16,7 +16,7 @@ invent.
 ## How it works
 
 Jobs flow through a funnel. Each stage has one command that advances it, and two
-points where *you* (not the agent) make the call.
+points where _you_ (not the agent) make the call.
 
 ```
               ┌─ pull ───┐
@@ -35,15 +35,15 @@ points where *you* (not the agent) make the call.
                                          sync-status (Gmail proposes the moves)
 ```
 
-| Stage | Command | What happens |
-|-------|---------|--------------|
-| **Ingest** | `pull` / `scrape` / `addjob` | Raw jobs land in the DB (deduped by URL or JD text). `pull` runs every enabled job-board connector; `scrape` drives LinkedIn; `addjob` takes one by hand. |
-| **Discover** | `discover` | Agents extract structured criteria, apply your hard filters, and score fit → `shortlisted`. |
-| **👤 Approve** | dashboard or `approve` | The cost gate: you approve only the jobs worth paying to tailor. |
-| **Tailor** | `tailor` | A writer agent drafts a fact-locked resume; a reviewer panel critiques and a reviser loops until it passes. |
-| **Cover letter** | `cover-letter` | Drafts a fact-locked cover letter per job, gated by a deterministic provenance check, and renders it to PDF. |
-| **Render** | `render` | A chosen resume version becomes a PDF in `output/`. |
-| **👤 Track** | dashboard / `sync-status` | Log submission status and notes by hand, or let `sync-status` read Gmail and **propose** status moves for you to apply. |
+| Stage            | Command                      | What happens                                                                                                                                              |
+| ---------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Ingest**       | `pull` / `scrape` / `addjob` | Raw jobs land in the DB (deduped by URL or JD text). `pull` runs every enabled job-board connector; `scrape` drives LinkedIn; `addjob` takes one by hand. |
+| **Discover**     | `discover`                   | Agents extract structured criteria, apply your hard filters, and score fit → `shortlisted`.                                                               |
+| **👤 Approve**   | dashboard or `approve`       | The cost gate: you approve only the jobs worth paying to tailor.                                                                                          |
+| **Tailor**       | `tailor`                     | A writer agent drafts a fact-locked resume; a reviewer panel critiques and a reviser loops until it passes.                                               |
+| **Cover letter** | `cover-letter`               | Drafts a fact-locked cover letter per job, gated by a deterministic provenance check, and renders it to PDF.                                              |
+| **Render**       | `render`                     | A chosen resume version becomes a PDF in `output/`.                                                                                                       |
+| **👤 Track**     | dashboard / `sync-status`    | Log submission status and notes by hand, or let `sync-status` read Gmail and **propose** status moves for you to apply.                                   |
 
 ---
 
@@ -52,10 +52,10 @@ points where *you* (not the agent) make the call.
 - **Python 3.13+**
 - **[uv](https://docs.astral.sh/uv/)** for dependency and environment management
 - An **Anthropic API key** (the discover, tailor, and cover-letter steps call Claude)
-- *Optional:* a **GitHub token** (enriches your profile from your repos)
-- *Optional:* a **burner LinkedIn account** (only needed for `scrape`)
-- *Optional:* **job-board connector keys** for `pull` — e.g. [Adzuna API](https://developer.adzuna.com/) credentials (Greenhouse and RemoteOK need no key)
-- *Optional:* **Gmail OAuth credentials** (only needed for `sync-status`; read-only access — see [Gmail setup](#gmail-setup-for-sync-status))
+- _Optional:_ a **GitHub token** (enriches your profile from your repos)
+- _Optional:_ a **burner LinkedIn account** (only needed for `scrape`)
+- _Optional:_ **job-board connector keys** for `pull` — e.g. [Adzuna API](https://developer.adzuna.com/) credentials (Greenhouse and RemoteOK need no key)
+- _Optional:_ **Gmail OAuth credentials** (only needed for `sync-status`; read-only access — see [Gmail setup](#gmail-setup-for-sync-status))
 
 ---
 
@@ -98,7 +98,7 @@ updates. It authenticates with a Google OAuth client — there is no password in
 
 1. In the [Google Cloud console](https://console.cloud.google.com/), create (or
    reuse) a project, enable the **Gmail API**, and create an **OAuth client ID**
-   of type *Desktop app*.
+   of type _Desktop app_.
 2. Download the client-secret JSON and save it as `config/gmail_credentials.json`.
 3. The first `sync-status` run opens a browser consent screen once; the granted
    token is cached to `data/gmail_token.json` (git-ignored) and reused after that.
@@ -153,35 +153,42 @@ any single command. Every command accepts `--db-url` to point at a different
 database (handy for testing).
 
 ### `profile build` — create your fact-lock profile
+
 Reads your resume (and GitHub, if configured) into `data/profile/facts.json`.
 This file is the **ground truth** every later step is allowed to draw from.
 
 ```bash
 uv run resume-agent profile build [--sources config/profile_sources.yaml] [--out data/profile/facts.json] [--refresh]
 ```
+
 `--refresh` rebuilds the file and **discards any manual edits** — otherwise the
 command refuses to overwrite an existing `facts.json`.
 
 ### `addjob` — add one job by hand
+
 The job description is read from `--jd-file`, or from stdin if you omit it.
 
 ```bash
 uv run resume-agent addjob --company "Acme" --title "Backend Engineer" --url "https://…" --jd-file jd.txt
 ```
+
 Duplicates (same URL or identical JD text) are detected and skipped.
 
 ### `scrape` — pull jobs from LinkedIn
+
 Searches LinkedIn using your `search.yaml`, then ingests matching posts as raw
 jobs. **First run:** a real browser window opens — log in to your burner account
-by hand *once*. The session is saved to `.linkedin_profile/` and reused after
+by hand _once_. The session is saved to `.linkedin_profile/` and reused after
 that.
 
 ```bash
 uv run resume-agent scrape [--search config/search.yaml] [--limit 25]
 ```
+
 `--limit` caps how many postings are processed this run (be a polite scraper).
 
 ### `pull` — pull jobs from job-board connectors
+
 Runs every connector enabled in `connectors.yaml` (Greenhouse, Adzuna, RemoteOK,
 …), dedupes the results into `raw` jobs, and prints a per-source count. Secrets
 (e.g. Adzuna keys) come from `.env`; which boards/sources to hit come from
@@ -190,10 +197,12 @@ Runs every connector enabled in `connectors.yaml` (Greenhouse, Adzuna, RemoteOK,
 ```bash
 uv run resume-agent pull [--connectors config/connectors.yaml] [--search config/search.yaml] [--limit 25]
 ```
+
 `--limit` caps postings **per connector** this run. If `config/connectors.yaml`
 is missing, the command tells you to copy it from the example first.
 
 ### `sources` — connector run history
+
 Shows each connector's last run: when it ran, how many jobs it added, and the
 last error (if any). A quick health check after `pull`.
 
@@ -202,6 +211,7 @@ uv run resume-agent sources
 ```
 
 ### `discover` — extract, filter, and score
+
 Runs the funnel over every `raw` job already in the DB: extracts structured
 criteria, drops anything failing your hard filters, and assigns each survivor a
 0–100 fit score with a rationale → `shortlisted`.
@@ -211,6 +221,7 @@ uv run resume-agent discover [--search config/search.yaml] [--facts data/profile
 ```
 
 ### `match-gap` — target-job skills your profile does not show
+
 Compares the `must_have_skills` of every job that survived discovery
 (`shortlisted` / `approved` / `tailored` / `rendered`) against your profile's
 skill names and aliases. Gaps are ranked by how many target jobs demand them.
@@ -223,6 +234,7 @@ uv run resume-agent match-gap --llm           # optional synonym pass, e.g. k8s/
 ```
 
 ### `approve` — the cost gate (CLI alternative to the dashboard)
+
 Marks a shortlisted job `approved` so it's eligible for tailoring.
 
 ```bash
@@ -230,6 +242,7 @@ uv run resume-agent approve 7
 ```
 
 ### `tailor` — draft + review loop
+
 Tailors one job (`--job-id`) or every approved job (`--approved`). Each round is
 saved as a `ResumeVersion`; the reviewer panel runs until a draft passes or
 `max_rounds` is hit. The **fact-check** reviewer is a hard gate. Optional
@@ -242,6 +255,7 @@ uv run resume-agent tailor --job-id 7
 ```
 
 ### `cover-letter` — draft a fact-locked cover letter
+
 Writes a cover letter for one job (`--job-id`) or every approved job
 (`--approved`), then renders it to a PDF in `output/`. A writer agent drafts only
 from your `facts.json`; a **deterministic provenance gate** checks that every
@@ -255,6 +269,7 @@ uv run resume-agent cover-letter --job-id 7
 ```
 
 ### `render` — version → PDF
+
 Renders a stored resume version (by id) through the Typst template into
 `output/`. Filenames are unique per version, so re-rendering never clobbers an
 earlier PDF.
@@ -264,8 +279,10 @@ uv run resume-agent render 12 [--config config/render.yaml]
 ```
 
 ### `dashboard` — the visual control room
+
 Launches the Streamlit app with four views:
-- **Shortlist** — fit scores + rationales, with an *Approve for tailoring* button.
+
+- **Shortlist** — fit scores + rationales, with an _Approve for tailoring_ button.
 - **Pipeline board** — every job by stage, with its PDF download, review
   critiques, and an editable application status + notes.
 - **Analytics** — response / interview / offer rates sliced by **source** and by
@@ -279,6 +296,7 @@ uv run resume-agent dashboard [--db-url …]
 ```
 
 ### `sync-status` — let Gmail propose status updates
+
 Scans recent inbox mail (read-only), matches each message to a tracked
 application by company, classifies it (rejection / interview / assessment /
 offer) with deterministic rules plus an optional cheap-LLM fallback, and
@@ -297,16 +315,17 @@ uv run resume-agent sync-status --max-results 100
 ## Configuration
 
 ### `.env` — secrets and models
+
 Copied from `.env.example`. Loaded automatically.
 
-| Key | Purpose |
-|-----|---------|
-| `ANTHROPIC_API_KEY` | **Required** for `discover`, `tailor`, and `cover-letter`. |
-| `GITHUB_TOKEN` | Optional; enriches `profile build`. |
-| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | Optional; enable the Adzuna connector for `pull`. |
-| `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | Burner credentials for `scrape`. |
-| `LINKEDIN_USER_DATA_DIR` | Where the logged-in browser session is cached (default `.linkedin_profile`). |
-| `DB_URL` | Database location (default `sqlite:///data/resume_agent.db`). |
+| Key                                    | Purpose                                                                      |
+| -------------------------------------- | ---------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`                    | **Required** for `discover`, `tailor`, and `cover-letter`.                   |
+| `GITHUB_TOKEN`                         | Optional; enriches `profile build`.                                          |
+| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`     | Optional; enable the Adzuna connector for `pull`.                            |
+| `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | Burner credentials for `scrape`.                                             |
+| `LINKEDIN_USER_DATA_DIR`               | Where the logged-in browser session is cached (default `.linkedin_profile`). |
+| `DB_URL`                               | Database location (default `sqlite:///data/resume_agent.db`).                |
 
 Model tiers are also configurable via env (`CHEAP_MODEL`, `MID_MODEL`,
 `PREMIUM_MODEL`) and default to Claude Haiku / Sonnet / Opus.
@@ -315,14 +334,15 @@ Model tiers are also configurable via env (`CHEAP_MODEL`, `MID_MODEL`,
 > `.env` key — see [Gmail setup](#gmail-setup-for-sync-status).
 
 ### `config/*.yaml`
-| File | Controls |
-|------|----------|
-| `profile_sources.yaml` | Path to your resume and your GitHub username. |
-| `search.yaml` | Keywords, titles, locations, and **hard filters** (salary, years of experience, remote policy, sponsorship). |
-| `connectors.yaml` | Which job-board connectors `pull` runs and their parameters (Greenhouse board tokens, Adzuna country, RemoteOK, LinkedIn on/off). Secrets stay in `.env`. |
-| `review.yaml` | The reviewer roster, their weights/model tiers, `max_rounds`, `score_threshold`, optional `length_budget` one-page guidance, and optional `style_guide_path`. |
-| `render.yaml` | Typst `template_path` and the PDF `output_dir`. |
-| `style_guide.md` | Optional house-style prose appended to the resume tailor loop. Governs how resumes are written, never what is claimed. Missing or empty means no change. |
+
+| File                   | Controls                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profile_sources.yaml` | Path to your resume and your GitHub username.                                                                                                                 |
+| `search.yaml`          | Keywords, titles, locations, and **hard filters** (salary, years of experience, remote policy, sponsorship).                                                  |
+| `connectors.yaml`      | Which job-board connectors `pull` runs and their parameters (Greenhouse board tokens, Adzuna country, RemoteOK, LinkedIn on/off). Secrets stay in `.env`.     |
+| `review.yaml`          | The reviewer roster, their weights/model tiers, `max_rounds`, `score_threshold`, optional `length_budget` one-page guidance, and optional `style_guide_path`. |
+| `render.yaml`          | Typst `template_path` and the PDF `output_dir`.                                                                                                               |
+| `style_guide.md`       | Optional house-style prose appended to the resume tailor loop. Governs how resumes are written, never what is claimed. Missing or empty means no change.      |
 
 Each `*.yaml.example` is annotated — copy it, then edit.
 
@@ -335,16 +355,16 @@ client-secret you download from Google Cloud (see [Gmail setup](#gmail-setup-for
 
 ## Where things live
 
-| Path | Contents |
-|------|----------|
-| `data/resume_agent.db` | All jobs, resume versions, cover letters, and applications (SQLite). |
-| `data/profile/facts.json` | Your fact-lock profile. |
-| `data/connector_runs.json` | Per-connector run history that `sources` reads. |
-| `data/gmail_token.json` | Cached Gmail OAuth token for `sync-status` (git-ignored). |
-| `output/` | Rendered resume **and** cover-letter PDFs (cover letters are suffixed `cl<id>`). |
-| `.linkedin_profile/` | Cached LinkedIn browser session (git-ignored). |
-| `config/gmail_credentials.json` | Your Gmail OAuth client secret (git-ignored; you provide it). |
-| `templates/resume.typ` / `templates/cover_letter.typ` | The Typst templates the renderers use. |
+| Path                                                  | Contents                                                                         |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `data/resume_agent.db`                                | All jobs, resume versions, cover letters, and applications (SQLite).             |
+| `data/profile/facts.json`                             | Your fact-lock profile.                                                          |
+| `data/connector_runs.json`                            | Per-connector run history that `sources` reads.                                  |
+| `data/gmail_token.json`                               | Cached Gmail OAuth token for `sync-status` (git-ignored).                        |
+| `output/`                                             | Rendered resume **and** cover-letter PDFs (cover letters are suffixed `cl<id>`). |
+| `.linkedin_profile/`                                  | Cached LinkedIn browser session (git-ignored).                                   |
+| `config/gmail_credentials.json`                       | Your Gmail OAuth client secret (git-ignored; you provide it).                    |
+| `templates/resume.typ` / `templates/cover_letter.typ` | The Typst templates the renderers use.                                           |
 
 `data/`, `output/`, `.env`, `.linkedin_profile/`, and `config/gmail_credentials.json`
 are all git-ignored.
@@ -352,6 +372,26 @@ are all git-ignored.
 ---
 
 ## A note on scraping responsibly
+
+`scrape` is built for **personal, low-volume** use against a **burner** account:
+it drives a real logged-in browser, paces its requests deliberately, and caps
+how much it pulls per run. Keep `--limit` modest and don't point it at an account
+you care about. Manual `addjob` is always available if you'd rather skip scraping.
+
+---
+
+## Development
+
+```bash
+uv run pytest          # run the full test suite
+uv run pytest -k scraper   # run a subset
+```
+
+Tests are pure and offline — the agents and the browser are faked, so the suite
+needs no API key and no network.
+
+v1.5 keeps the tailor loop synchronous. Parallel reviewer panels and job-level
+concurrency are deferred while this pass reduces cost through leaner prompts.
 
 `scrape` is built for **personal, low-volume** use against a **burner** account:
 it drives a real logged-in browser, paces its requests deliberately, and caps
