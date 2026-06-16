@@ -13,18 +13,19 @@ NOW = datetime(2026, 6, 16, tzinfo=timezone.utc)
 
 
 def _row(
-    job_id=1,
-    fit=80,
-    salary_min=None,
-    salary_max=None,
-    remote=None,
-    seniority=None,
-    emp=None,
-    industry=None,
-    sponsorship=None,
-    posted=None,
-    skills=None,
-):
+    job_id: int = 1,
+    fit: int | None = 80,
+    salary_min: int | None = None,
+    salary_max: int | None = None,
+    remote: str | None = None,
+    seniority: str | None = None,
+    emp: str | None = None,
+    industry: str | None = None,
+    sponsorship: str | None = None,
+    posted: datetime | None = None,
+    skills: list[SkillTag] | None = None,
+    currency: str | None = "USD",
+) -> ShortlistRow:
     return ShortlistRow(
         job_id=job_id,
         company="C",
@@ -35,7 +36,7 @@ def _row(
         sponsorship_signal=sponsorship,
         salary_min=salary_min,
         salary_max=salary_max,
-        salary_currency="USD",
+        salary_currency=currency,
         remote_policy=remote,
         seniority=seniority,
         employment_type=emp,
@@ -54,6 +55,18 @@ def test_salary_floor_excludes_only_known_below():
     ]
     out = apply_filters(rows, FilterState(salary_min=150000))
     assert {r.job_id for r in out} == {2, 3}
+
+
+def test_salary_floor_skips_non_usd_currencies():
+    # A USD min-salary threshold can't be compared against a raw non-USD amount,
+    # so non-USD rows are kept (neutral) rather than excluded on a bogus compare.
+    rows = [
+        _row(job_id=1, salary_max=100000, currency="USD"),   # below, USD -> excluded
+        _row(job_id=2, salary_max=100000, currency="EUR"),   # below in EUR -> kept
+        _row(job_id=3, salary_max=100000, currency=None),    # unknown -> USD -> excluded
+    ]
+    out = apply_filters(rows, FilterState(salary_min=150000))
+    assert {r.job_id for r in out} == {2}
 
 
 def test_remote_and_seniority_and_together():
@@ -125,6 +138,16 @@ def test_composite_salary_capped_at_ceiling():
     over = _row(salary_max=900000)
     assert composite_score(capped, "pay_first", now=NOW) == composite_score(
         over, "pay_first", now=NOW
+    )
+
+
+def test_composite_recency_clamped_for_future_posting():
+    # A future-dated / clock-skewed posting must not out-rank a brand-new one:
+    # recency is clamped at 100, so both score identically under any preset.
+    future = _row(job_id=1, fit=None, salary_max=None, posted=NOW + timedelta(days=10))
+    fresh = _row(job_id=2, fit=None, salary_max=None, posted=NOW)
+    assert composite_score(future, "freshest", now=NOW) == composite_score(
+        fresh, "freshest", now=NOW
     )
 
 

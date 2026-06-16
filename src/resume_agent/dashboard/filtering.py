@@ -33,7 +33,11 @@ class FilterState:
 
 def _passes(row: ShortlistRow, state: FilterState) -> bool:
     if state.salary_min is not None and row.salary_max is not None:
-        if row.salary_max < state.salary_min:
+        # The min-salary input is USD; comparing a raw non-USD amount against it
+        # would hide/keep jobs incorrectly, so only gate USD-denominated salaries
+        # (unknown currency assumed USD) and leave the rest neutral, like nulls.
+        currency = (row.salary_currency or "USD").upper()
+        if currency == "USD" and row.salary_max < state.salary_min:
             return False
     if state.fit_min is not None and row.fit_score is not None:
         if row.fit_score < state.fit_min:
@@ -86,8 +90,10 @@ def composite_score(row: ShortlistRow, preset: str, now: datetime) -> float:
     )
 
     age = _age_days(row, now)
+    # Clamp both ends: a future-dated/clock-skewed posting has negative age and
+    # would otherwise score >100, over-ranking it above genuinely fresh jobs.
     recency_n = (
-        max(0.0, 100.0 - (age / RECENCY_WINDOW_DAYS * 100.0))
+        min(100.0, max(0.0, 100.0 - (age / RECENCY_WINDOW_DAYS * 100.0)))
         if age is not None
         else NEUTRAL
     )
