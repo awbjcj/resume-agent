@@ -3,7 +3,7 @@ from urllib.parse import urlsplit, urlunsplit
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from resume_agent.discovery.scraper.models import ScrapedCard
+from resume_agent.discovery.scraper.models import DetailMeta, ScrapedCard
 
 
 def _text(node: Tag | None) -> str | None:
@@ -72,3 +72,13 @@ def parse_job_detail(html: str) -> str:
         return ""
     lines = [line.strip() for line in markup.get_text("\n", strip=True).splitlines()]
     return "\n".join(line for line in lines if line)
+
+
+def parse_detail_meta(html: str) -> DetailMeta:
+    """Read title/company/location from a LinkedIn job-detail page's top card."""
+    soup = BeautifulSoup(html, "html.parser")
+    return DetailMeta(
+        title=_text(soup.select_one("h1.top-card-layout__title")),
+        company=_text(soup.select_one("a.topcard__org-name-link")),
+        location=_text(soup.select_one("span.topcard__flavor--bullet")),
+    )
