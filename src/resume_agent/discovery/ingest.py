@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime
 from typing import Iterable
 
 from sqlmodel import Session
@@ -25,6 +26,7 @@ def add_job(
     company: str | None = None,
     title: str | None = None,
     location: str | None = None,
+    posted_at: datetime | None = None,
 ) -> Job | None:
     """Normalize, dedupe, and insert a raw job. Returns None if a duplicate exists."""
     jd_text = jd_text.strip()
@@ -41,6 +43,7 @@ def add_job(
         company=company,
         title=title,
         location=_clean(location),
+        posted_at=posted_at,
         dedup_key=dedup_key,
         status=JobStatus.raw.value,
     )
@@ -61,6 +64,7 @@ def ingest_jobs(session: Session, raw_jobs: Iterable[RawJob]) -> dict[str, int]:
             company=raw.company,
             title=raw.title,
             location=raw.location,
+            posted_at=raw.posted_at,
         )
         if job is not None:
             added[raw.source] += 1
