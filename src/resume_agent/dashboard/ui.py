@@ -4,6 +4,8 @@ All functions here are pure (no Streamlit calls at import or call time) so the
 module imports cleanly and the helpers are unit-testable without a server.
 """
 
+from html import escape
+
 THEME_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
@@ -169,6 +171,21 @@ tbody td { border-bottom: 1px solid var(--rule) !important; }
 .empty-body { color: var(--muted); font-size: .96rem; margin-top: .45rem; }
 .empty-body code { font-family:'IBM Plex Mono', monospace; font-size: .85em; color: var(--ink); background: #fff; border: 1px solid var(--rule); border-radius: 3px; padding: .1rem .42rem; }
 
+/* ── Control desk + skill chips ───────────────────────────────── */
+.controldesk { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 0.8rem 1rem; margin: 0 0 1.2rem; }
+.metaline { font-family:'IBM Plex Mono', monospace; font-size: 0.84rem; color: var(--ink);
+  margin-top: 0.45rem; }
+.skills { display:flex; flex-wrap:wrap; gap: 0.3rem; margin-top: 0.5rem; }
+.chip { display:inline-block; font-family:'IBM Plex Mono', monospace; font-size: 0.66rem;
+  letter-spacing: 0.04em; padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid var(--rule);
+  background:#fff; color: var(--muted); }
+.chip-have { color: var(--emerald, #2f7d4f); border-color: var(--emerald, #2f7d4f);
+  background: color-mix(in srgb, var(--emerald, #2f7d4f) 10%, #fff); }
+.chip-gap { color: var(--muted); border-color: var(--rule); }
+.chip-nice { border-style: dashed; font-size: 0.6rem; opacity: 0.92; }
+.chip-sel { box-shadow: 0 0 0 2px color-mix(in srgb, var(--oxblood) 60%, transparent); font-weight: 700; }
+
 @media (prefers-reduced-motion: reduce) { *, .masthead { animation: none !important; transition: none !important; } }
 #MainMenu, footer { visibility: hidden; }
 </style>
@@ -229,6 +246,43 @@ def fit_block(score: int | None) -> str:
         '<div class="fit-cap">FIT SCORE</div>'
         "</div>"
     )
+
+
+def skill_chip(tag, active: bool) -> str:
+    """Render a skill chip with coverage, requirement, and active-filter channels."""
+    classes = ["chip", "chip-have" if tag.covered else "chip-gap"]
+    if not tag.required:
+        classes.append("chip-nice")
+    if active:
+        classes.append("chip-sel")
+    label = tag.name if tag.required else f"+{tag.name}"
+    return f'<span class="{" ".join(classes)}">{escape(label)}</span>'
+
+
+def meta_line(row) -> str:
+    """One null-omitting meta string: salary, seniority, type, industry, recency."""
+    parts: list[str] = []
+    if row.salary_min is not None or row.salary_max is not None:
+        lo = f"{row.salary_min // 1000}k" if row.salary_min is not None else None
+        hi = f"{row.salary_max // 1000}k" if row.salary_max is not None else None
+        parts.append("$" + (f"{lo}-{hi}" if lo and hi else (lo or hi or "")))
+    if row.seniority:
+        parts.append(str(row.seniority).replace("_", " ").title())
+    if getattr(row, "employment_type", None):
+        parts.append(str(row.employment_type).replace("_", " ").title())
+    if getattr(row, "industry", None):
+        parts.append(str(row.industry))
+    if getattr(row, "posted_at", None) is not None:
+        from datetime import datetime, timezone
+
+        posted = row.posted_at
+        if posted.tzinfo is None:
+            posted = posted.replace(tzinfo=timezone.utc)
+        else:
+            posted = posted.astimezone(timezone.utc)
+        days = max(0, (datetime.now(timezone.utc) - posted).days)
+        parts.append("today" if days == 0 else f"{days}d ago")
+    return " · ".join(escape(part) for part in parts)
 
 
 def masthead(kicker: str, title_html: str, subtitle: str) -> None:
