@@ -29,6 +29,10 @@ def test_returns_none_on_garbage_or_empty():
     assert parse_iso_datetime(None) is None
 
 
+def test_returns_none_on_non_string_value():
+    assert parse_iso_datetime(123) is None
+
+
 def test_parse_relative_posted_at_days_hours_minutes():
     now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
     assert parse_relative_posted_at("2 days ago", now=now) == datetime(

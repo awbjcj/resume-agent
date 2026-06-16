@@ -4,9 +4,9 @@ from datetime import datetime, timedelta, timezone
 _RELATIVE_RE = re.compile(r"^\s*(\d+)\s+(minute|hour|day|week)s?\s+ago\s*$", re.I)
 
 
-def parse_iso_datetime(value: str | None) -> datetime | None:
+def parse_iso_datetime(value: object | None) -> datetime | None:
     """Parse source ISO timestamps as aware UTC datetimes."""
-    if value is None:
+    if not isinstance(value, str):
         return None
     text = value.strip()
     if not text:
