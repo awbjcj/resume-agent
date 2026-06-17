@@ -3,7 +3,11 @@ from sqlmodel import Session, SQLModel, create_engine
 from resume_agent.discovery.ingest import add_job
 from resume_agent.discovery.pipeline import discover, reextract
 from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.models.job import JobCriteria, Seniority, SponsorshipSignal
+from resume_agent.models.job import (
+    JobCriteriaExtract,
+    Seniority,
+    SponsorshipSignal,
+)
 from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.discovery.fit import FitScore
 from resume_agent.tracking.repository import jobs_by_status, save_job
@@ -21,13 +25,32 @@ class _Result:
         self.content = content
 
 
+def _extract(**overrides) -> JobCriteriaExtract:
+    base = dict(
+        sponsorship_signal=SponsorshipSignal.offered,
+        seniority=None,
+        employment_type=None,
+        tech_stack=[],
+        industry=None,
+        company_size=None,
+        yoe_min=None,
+        salary_range=None,
+        remote_policy=None,
+        location=None,
+        must_have_skills=[],
+        nice_to_have_skills=[],
+    )
+    base.update(overrides)
+    return JobCriteriaExtract(**base)
+
+
 class _ExtractAgent:
     """Returns denied criteria when the JD mentions 'nosponsor', else offered."""
 
     def run(self, prompt):
         if "nosponsor" in prompt:
-            return _Result(JobCriteria(sponsorship_signal=SponsorshipSignal.denied))
-        return _Result(JobCriteria(sponsorship_signal=SponsorshipSignal.offered))
+            return _Result(_extract(sponsorship_signal=SponsorshipSignal.denied))
+        return _Result(_extract(sponsorship_signal=SponsorshipSignal.offered))
 
 
 class _FitAgent:
@@ -87,7 +110,7 @@ def test_discover_commits_once_per_stage(monkeypatch):
 
 
 def test_reextract_rewrites_criteria_without_changing_status():
-    agent = _ReextractAgent(JobCriteria(seniority=Seniority.staff))
+    agent = _ReextractAgent(_extract(seniority=Seniority.staff))
     with _session() as s:
         save_job(
             s,

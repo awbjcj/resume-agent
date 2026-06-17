@@ -3,7 +3,7 @@ from agno.models.anthropic import Claude
 
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import AgentRunner, Runner
-from resume_agent.models.job import JobCriteria
+from resume_agent.models.job import JobCriteria, JobCriteriaExtract
 
 
 _INSTRUCTIONS = [
@@ -26,14 +26,16 @@ def build_extract_agent(model_id: str | None = None) -> Runner:
             model=Claude(id=resolved, api_key=s.anthropic_api_key or None),
             description="You extract structured hiring criteria from job descriptions.",
             instructions=_INSTRUCTIONS,
-            output_schema=JobCriteria,
+            output_schema=JobCriteriaExtract,
         )
     )
 
 
 def extract_job_criteria(jd_text: str, agent: Runner) -> JobCriteria:
     result = agent.run(jd_text)
-    criteria = result.content
-    if not isinstance(criteria, JobCriteria):
-        raise TypeError(f"Expected JobCriteria from agent, got {type(criteria).__name__}")
-    return criteria
+    extracted = result.content
+    if not isinstance(extracted, JobCriteriaExtract):
+        raise TypeError(
+            f"Expected JobCriteriaExtract from agent, got {type(extracted).__name__}"
+        )
+    return extracted.to_criteria()
