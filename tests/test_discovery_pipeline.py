@@ -41,7 +41,7 @@ def _extract(**overrides) -> JobCriteriaExtract:
         nice_to_have_skills=[],
     )
     base.update(overrides)
-    return JobCriteriaExtract(**base)
+    return JobCriteriaExtract.model_validate(base)
 
 
 class _ExtractAgent:

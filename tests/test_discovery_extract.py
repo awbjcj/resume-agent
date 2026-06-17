@@ -46,7 +46,7 @@ def _extract(**overrides):
         nice_to_have_skills=[],
     )
     base.update(overrides)
-    return JobCriteriaExtract(**base)
+    return JobCriteriaExtract.model_validate(base)
 
 
 def test_extract_maps_to_criteria_and_passes_text():

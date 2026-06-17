@@ -1,6 +1,5 @@
 import time
 import urllib.parse
-from typing import Protocol
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
@@ -25,29 +24,6 @@ _DETAIL_SELECTOR = "div.show-more-less-html__markup, .description__text"
 # giving up, when credentials are absent or LinkedIn throws a checkpoint.
 _MANUAL_LOGIN_TIMEOUT_MS = 180_000
 
-
-class _MouseLike(Protocol):
-    def wheel(self, x: int, y: int) -> None: ...
-
-
-class _LoginPageLike(Protocol):
-    url: str
-
-    def goto(self, url: str, wait_until: str | None = None) -> None: ...
-
-    def fill(self, selector: str, value: str) -> None: ...
-
-    def click(self, selector: str) -> None: ...
-
-    def wait_for_url(self, predicate, timeout: int | None = None) -> None: ...
-
-
-class _RenderPageLike(_LoginPageLike, Protocol):
-    mouse: _MouseLike
-
-    def wait_for_selector(self, selector: str, timeout: int | None = None) -> None: ...
-
-    def content(self) -> str: ...
 
 
 def _is_authenticated(url: str) -> bool:
@@ -125,7 +101,7 @@ class LinkedInScraper:
         # re-verify login on its fresh browser rather than trust this flag.
         self._logged_in = False
 
-    def _ensure_logged_in(self, page: _LoginPageLike) -> None:
+    def _ensure_logged_in(self, page: Page) -> None:
         """Establish a logged-in session before the first scrape navigation.
 
         Order: reuse a persisted session if the profile already holds one; else
@@ -145,7 +121,7 @@ class LinkedInScraper:
             self._await_manual_login(page)
         self._logged_in = True
 
-    def _login_with_credentials(self, page: _LoginPageLike) -> None:
+    def _login_with_credentials(self, page: Page) -> None:
         page.goto(_LOGIN_URL, wait_until="domcontentloaded")
         try:
             page.fill("#username", self.email)
@@ -160,7 +136,7 @@ class LinkedInScraper:
             # the caller can offer the manual-login fallback instead of crashing.
             pass
 
-    def _await_manual_login(self, page: _LoginPageLike) -> None:
+    def _await_manual_login(self, page: Page) -> None:
         """Block for a human to log in (or clear a checkpoint) in the window.
 
         Headless mode has no window to log in through, so failing fast with a
@@ -196,7 +172,7 @@ class LinkedInScraper:
         time.sleep(self.pace_seconds)
         return page.content()
 
-    def _wait_for(self, page: _RenderPageLike, selector: str | None) -> None:
+    def _wait_for(self, page: Page, selector: str | None) -> None:
         """Block until ``selector`` renders, or give up after the render timeout.
 
         A timeout is swallowed on purpose: the parsers treat a missing container
