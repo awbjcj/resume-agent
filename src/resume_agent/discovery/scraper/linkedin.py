@@ -35,7 +35,9 @@ class _LoginPageLike(Protocol):
         self,
         url: str,
         *,
-        wait_until: Literal["commit", "domcontentloaded", "load", "networkidle"] | None = None,
+        wait_until: (
+            Literal["commit", "domcontentloaded", "load", "networkidle"] | None
+        ) = None,
     ) -> object: ...
 
     def fill(self, selector: str, value: str) -> None: ...
@@ -181,7 +183,7 @@ class LinkedInScraper:
         self, url: str, *, wait_selector: str | None = None, scroll: bool = False
     ) -> str:
         page = self._ensure_page()
-        self._ensure_logged_in(page)
+        self._ensure_logged_in(page)  # type: ignore
         page.goto(url, wait_until="domcontentloaded")
         self._wait_for(page, wait_selector)
         if scroll:
