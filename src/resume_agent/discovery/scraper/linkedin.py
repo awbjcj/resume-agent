@@ -1,5 +1,6 @@
 import time
 import urllib.parse
+from typing import Protocol
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
@@ -24,6 +25,15 @@ _DETAIL_SELECTOR = "div.show-more-less-html__markup, .description__text"
 # giving up, when credentials are absent or LinkedIn throws a checkpoint.
 _MANUAL_LOGIN_TIMEOUT_MS = 180_000
 
+
+class _LoginPageLike(Protocol):
+    @property
+    def url(self) -> str: ...
+
+    def goto(self, url: str, *, wait_until: str | None = None) -> object: ...
+    def fill(self, selector: str, value: str) -> None: ...
+    def click(self, selector: str) -> None: ...
+    def wait_for_url(self, predicate: object, *, timeout: int | None = None) -> None: ...
 
 
 def _is_authenticated(url: str) -> bool:
@@ -101,7 +111,7 @@ class LinkedInScraper:
         # re-verify login on its fresh browser rather than trust this flag.
         self._logged_in = False
 
-    def _ensure_logged_in(self, page: Page) -> None:
+    def _ensure_logged_in(self, page: _LoginPageLike) -> None:
         """Establish a logged-in session before the first scrape navigation.
 
         Order: reuse a persisted session if the profile already holds one; else
@@ -121,7 +131,7 @@ class LinkedInScraper:
             self._await_manual_login(page)
         self._logged_in = True
 
-    def _login_with_credentials(self, page: Page) -> None:
+    def _login_with_credentials(self, page: _LoginPageLike) -> None:
         page.goto(_LOGIN_URL, wait_until="domcontentloaded")
         try:
             page.fill("#username", self.email)
@@ -136,7 +146,7 @@ class LinkedInScraper:
             # the caller can offer the manual-login fallback instead of crashing.
             pass
 
-    def _await_manual_login(self, page: Page) -> None:
+    def _await_manual_login(self, page: _LoginPageLike) -> None:
         """Block for a human to log in (or clear a checkpoint) in the window.
 
         Headless mode has no window to log in through, so failing fast with a
