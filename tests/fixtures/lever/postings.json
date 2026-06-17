@@ -1,0 +1,24 @@
+[
+  {
+    "id": "abc-123",
+    "text": "Senior Backend Engineer",
+    "hostedUrl": "https://jobs.lever.co/acme/abc-123",
+    "categories": {"location": "Remote - US", "team": "Engineering"},
+    "createdAt": 1748736000000,
+    "description": "<p>Build <b>payment</b> systems.</p>",
+    "lists": [
+      {"text": "Requirements", "content": "<ul><li>5+ years of Python.</li></ul>"}
+    ],
+    "additional": "<p>We offer great benefits.</p>"
+  },
+  {
+    "id": "def-456",
+    "text": "Office Manager",
+    "hostedUrl": "https://jobs.lever.co/acme/def-456",
+    "categories": {"location": "San Francisco"},
+    "createdAt": 1748736000000,
+    "description": "<p>Run the front desk.</p>",
+    "lists": [],
+    "additional": ""
+  }
+]
