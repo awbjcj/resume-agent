@@ -10,7 +10,6 @@ def test_new_id_is_unique_and_short():
 def test_extensible_model_defaults():
     m = ExtensibleModel()
     assert m.schema_version == 1
-    assert m.extra == {}
 
 
 def test_extensible_model_preserves_unknown_keys():

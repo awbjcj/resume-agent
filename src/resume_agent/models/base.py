@@ -1,6 +1,5 @@
 import uuid
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,7 +30,6 @@ class ExtensibleModel(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     schema_version: int = 1
-    extra: dict[str, Any] = Field(default_factory=dict)
 
 
 class FactItem(ExtensibleModel):
