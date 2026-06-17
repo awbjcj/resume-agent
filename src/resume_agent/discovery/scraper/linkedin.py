@@ -1,6 +1,7 @@
+import re
 import time
 import urllib.parse
-from typing import Protocol
+from typing import Callable, Literal, Protocol
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
@@ -30,10 +31,22 @@ class _LoginPageLike(Protocol):
     @property
     def url(self) -> str: ...
 
-    def goto(self, url: str, *, wait_until: str | None = None) -> object: ...
+    def goto(
+        self,
+        url: str,
+        *,
+        wait_until: Literal["commit", "domcontentloaded", "load", "networkidle"] | None = None,
+    ) -> object: ...
+
     def fill(self, selector: str, value: str) -> None: ...
     def click(self, selector: str) -> None: ...
-    def wait_for_url(self, predicate: object, *, timeout: int | None = None) -> None: ...
+
+    def wait_for_url(
+        self,
+        predicate: str | re.Pattern[str] | Callable[[str], bool],
+        *,
+        timeout: int | None = None,
+    ) -> None: ...
 
 
 def _is_authenticated(url: str) -> bool:
