@@ -22,6 +22,16 @@ def parse_iso_datetime(value: object | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def parse_epoch_millis(value: object | None) -> datetime | None:
+    """Parse an epoch-milliseconds timestamp (e.g. Lever ``createdAt``) as UTC."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
 def parse_relative_posted_at(
     value: str | None, now: datetime | None = None
 ) -> datetime | None:

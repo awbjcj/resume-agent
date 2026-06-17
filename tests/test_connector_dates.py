@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from resume_agent.discovery.connectors.dates import (
+    parse_epoch_millis,
     parse_iso_datetime,
     parse_relative_posted_at,
 )
@@ -50,3 +51,15 @@ def test_parse_relative_posted_at_returns_none_for_unknown():
     now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
     assert parse_relative_posted_at("promoted", now=now) is None
     assert parse_relative_posted_at(None, now=now) is None
+
+
+def test_parse_epoch_millis_returns_utc_datetime():
+    assert parse_epoch_millis(1748736000000) == datetime(
+        2025, 6, 1, tzinfo=timezone.utc
+    )
+
+
+def test_parse_epoch_millis_returns_none_for_non_numeric_or_bool():
+    assert parse_epoch_millis(None) is None
+    assert parse_epoch_millis("1748736000000") is None
+    assert parse_epoch_millis(True) is None
