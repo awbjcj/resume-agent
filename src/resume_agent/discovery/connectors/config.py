@@ -19,6 +19,19 @@ class GreenhouseConfig(ExtensibleModel):
     boards: list[GreenhouseBoard] = Field(default_factory=list)
 
 
+class LeverBoard(ExtensibleModel):
+    token: str
+    company: str | None = None
+
+    def display(self) -> str:
+        return self.company or self.token
+
+
+class LeverConfig(ExtensibleModel):
+    enabled: bool = False
+    boards: list[LeverBoard] = Field(default_factory=list)
+
+
 class AdzunaConfig(ExtensibleModel):
     enabled: bool = False
     country: str = "us"
@@ -34,6 +47,7 @@ class LinkedInConfig(ExtensibleModel):
 
 class ConnectorsConfig(ExtensibleModel):
     greenhouse: GreenhouseConfig = Field(default_factory=GreenhouseConfig)
+    lever: LeverConfig = Field(default_factory=LeverConfig)
     adzuna: AdzunaConfig = Field(default_factory=AdzunaConfig)
     remoteok: RemoteOKConfig = Field(default_factory=RemoteOKConfig)
     linkedin: LinkedInConfig = Field(default_factory=LinkedInConfig)

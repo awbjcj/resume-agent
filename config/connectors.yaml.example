@@ -9,6 +9,13 @@ greenhouse:
     - token: airbnb
       company: Airbnb
 
+# Lever boards. token = the jobs.lever.co/<token> slug.
+lever:
+  enabled: true
+  boards:
+    - token: palantir
+      company: Palantir
+
 adzuna:
   enabled: true
   country: us

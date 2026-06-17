@@ -16,6 +16,10 @@ def _cfg(**enabled):
             "enabled": enabled.get("greenhouse", False),
             "boards": [{"token": "stripe"}],
         },
+        "lever": {
+            "enabled": enabled.get("lever", False),
+            "boards": [{"token": "palantir"}],
+        },
         "adzuna": {"enabled": enabled.get("adzuna", False)},
         "remoteok": {"enabled": enabled.get("remoteok", False)},
         "linkedin": {"enabled": enabled.get("linkedin", False)},
@@ -30,10 +34,16 @@ def test_only_enabled_connectors_are_built():
 
 
 def test_canonical_order_is_ats_feed_aggregator_linkedin():
-    cfg = _cfg(greenhouse=True, adzuna=True, remoteok=True, linkedin=True)
+    cfg = _cfg(greenhouse=True, lever=True, adzuna=True, remoteok=True, linkedin=True)
     settings = _settings(adzuna_app_id="x", adzuna_app_key="y")
     names = [c.name for c in build_connectors(cfg, settings)]
-    assert names == ["greenhouse", "remoteok", "adzuna", "linkedin"]
+    assert names == ["greenhouse", "lever", "remoteok", "adzuna", "linkedin"]
+
+
+def test_lever_skipped_without_boards():
+    cfg = ConnectorsConfig.model_validate({"lever": {"enabled": True, "boards": []}})
+    names = [c.name for c in build_connectors(cfg, _settings())]
+    assert names == []
 
 
 def test_adzuna_skipped_without_credentials():
