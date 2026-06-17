@@ -233,6 +233,11 @@ def pull_cmd(
         totals = run_pull(session, connectors, search_config, CONNECTOR_RUNS_PATH, limit=limit)
     for name in (c.name for c in connectors):
         typer.echo(f"  {name:<12} +{totals.get(name, 0)}")
+    for connector in connectors:
+        failures = getattr(connector, "failures", None)
+        if failures:
+            joined = ", ".join(f"{tok} ({reason})" for tok, reason in failures.items())
+            typer.echo(f"  {connector.name}: skipped {len(failures)} dead source(s): {joined}")
     typer.echo(f"Pull complete. Added {sum(totals.values())} new job(s).")
 
 

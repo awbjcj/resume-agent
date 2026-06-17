@@ -2,6 +2,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
+
 from resume_agent.discovery.connectors.config import GreenhouseBoard
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector, parse_greenhouse
 from resume_agent.discovery.search_config import SearchConfig
@@ -52,3 +54,29 @@ def test_connector_fetches_boards_and_filters_by_search():
     jobs = connector.fetch(SearchConfig(keywords=["python"]))
     assert {j.title for j in jobs} == {"Senior Backend Engineer"}
     assert connector.name == "greenhouse"
+
+
+class _PartlyBrokenGreenhouse(GreenhouseConnector):
+    """First board 404s; the rest return the fixture payload."""
+
+    def _get_board(self, token):
+        if token == "dead":
+            raise httpx.HTTPStatusError(
+                "404", request=httpx.Request("GET", "http://x"),
+                response=httpx.Response(404),
+            )
+        return FIXTURE
+
+
+def test_connector_isolates_failing_board_and_records_it():
+    connector = _PartlyBrokenGreenhouse(
+        [
+            GreenhouseBoard(token="dead", company="Dead Co"),
+            GreenhouseBoard(token="stripe", company="Stripe"),
+        ]
+    )
+    jobs = connector.fetch(SearchConfig(keywords=["python"]))
+    # A 404 on the first board must NOT abort the remaining boards.
+    assert {j.company for j in jobs} == {"Stripe"}
+    assert "dead" in connector.failures
+    assert "404" in connector.failures["dead"]

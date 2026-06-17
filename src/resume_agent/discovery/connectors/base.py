@@ -2,7 +2,19 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
+import httpx
+
 from resume_agent.discovery.search_config import SearchConfig
+
+
+def board_error(exc: httpx.HTTPError) -> str:
+    """A compact reason for a per-board fetch failure (e.g. 'HTTP 404').
+
+    Shared by company-ATS connectors (Greenhouse, Lever) that fan out over many
+    boards and isolate each one, recording why a board was skipped.
+    """
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    return f"HTTP {status}" if status else type(exc).__name__
 
 
 @dataclass

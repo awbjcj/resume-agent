@@ -1,6 +1,6 @@
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.base import RawJob, board_error
 from resume_agent.discovery.connectors.config import GreenhouseBoard
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.text import filter_by_search, html_to_text
@@ -29,17 +29,29 @@ def parse_greenhouse(payload: dict, company: str) -> list[RawJob]:
 
 
 class GreenhouseConnector:
-    """Pulls every open role from each configured Greenhouse board, then filters."""
+    """Pulls every open role from each configured Greenhouse board, then filters.
+
+    Boards are isolated: one bad token (a 404, a timeout) is recorded in
+    ``failures`` and skipped, so the remaining boards still contribute jobs.
+    """
 
     name = "greenhouse"
 
     def __init__(self, boards: list[GreenhouseBoard]):
         self.boards = boards
+        # token -> reason for boards that failed on the most recent fetch.
+        self.failures: dict[str, str] = {}
 
     def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
         jobs: list[RawJob] = []
+        self.failures = {}
         for board in self.boards:
-            jobs.extend(parse_greenhouse(self._get_board(board.token), board.display()))
+            try:
+                payload = self._get_board(board.token)
+            except httpx.HTTPError as exc:
+                self.failures[board.token] = board_error(exc)
+                continue
+            jobs.extend(parse_greenhouse(payload, board.display()))
         jobs = filter_by_search(jobs, search)
         return jobs[:limit] if limit is not None else jobs
 
