@@ -194,25 +194,50 @@ tbody td { border-bottom: 1px solid var(--rule) !important; }
    the same fix the card grids use. */
 div[data-testid="stVerticalBlock"][class*="st-key-controldesk"] {
   background: var(--paper-2); border: 1px solid var(--rule); border-radius: var(--radius);
-  padding: 0.85rem 1.1rem 0.95rem; margin: 0 0 1.4rem; gap: 0.5rem !important;
+  padding: 0.95rem 1.1rem 1.05rem; margin: 0 0 1.4rem; gap: 0.65rem !important;
 }
 .controldesk-head {
   font-family:'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: 0.22em;
   font-size: 0.72rem; color: var(--muted); margin: 0;
   padding-bottom: 0.55rem; border-bottom: 1px solid var(--rule);
 }
+div[class*="st-key-controldesk"] div[data-testid="stElementContainer"]:has(.controldesk-head) {
+  margin-bottom: 0.55rem;
+}
+div[class*="st-key-controldesk"]
+  > div[data-testid="stElementContainer"]:has(.controldesk-head)
+  + div[data-testid="stLayoutWrapper"] {
+  padding-top: 0.55rem;
+}
+div[class*="st-key-controldesk"] [data-testid="stHorizontalBlock"] {
+  gap: clamp(0.65rem, 1.1vw, 1rem);
+  align-items: flex-start;
+}
+div[class*="st-key-controldesk"] .stNumberInput,
+div[class*="st-key-controldesk"] .stSlider,
+div[class*="st-key-controldesk"] .stSelectbox,
+div[class*="st-key-controldesk"] .stMultiSelect,
+div[class*="st-key-controldesk"] .stRadio { min-width: 0; }
 /* Compact, uniform widget labels inside the panel (mono caps, tight to control). */
 div[class*="st-key-controldesk"] [data-testid="stWidgetLabel"] { margin-bottom: 0.15rem; }
 div[class*="st-key-controldesk"] [data-testid="stWidgetLabel"] p {
   font-family:'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--muted);
+  text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
 }
 .metaline { font-family:'IBM Plex Mono', monospace; font-size: 0.84rem; color: var(--ink);
   margin-top: 0.45rem; }
-.skills { display:flex; flex-wrap:wrap; gap: 0.3rem; margin-top: 0.5rem; }
-.chip { display:inline-block; font-family:'IBM Plex Mono', monospace; font-size: 0.66rem;
-  letter-spacing: 0.04em; padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid var(--rule);
-  background:#fff; color: var(--muted); }
+.skills {
+  display:flex; flex-wrap:wrap; align-items:center; gap: 0.3rem; margin-top: 0.55rem;
+  max-width: 100%; min-width: 0;
+}
+.chip {
+  display:inline-flex; align-items:center; max-width: 100%; min-width: 0; min-height: 1.45rem;
+  font-family:'IBM Plex Mono', monospace; font-size: 0.66rem; line-height: 1;
+  letter-spacing: 0.04em; padding: 0.16rem 0.5rem; border-radius: 999px; border: 1px solid var(--rule);
+  background:#fff; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chip-text { display:block; min-width: 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .chip-have { color: var(--emerald, #2f7d4f); border-color: var(--emerald, #2f7d4f);
   background: color-mix(in srgb, var(--emerald, #2f7d4f) 10%, #fff); }
 .chip-gap { color: var(--muted); border-color: var(--rule); }
@@ -238,6 +263,9 @@ details.xt-skills > summary::-webkit-details-marker { display: none; }
   -webkit-box-orient: vertical; overflow: hidden;
 }
 details.xt[open] .xt-clamp { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.xt-full { display: none; }
+details.xt[open] .xt-excerpt { display: none; }
+details.xt[open] .xt-full { display: block; overflow: visible; }
 .xt-pre { white-space: pre-wrap; }
 .jd-text { color: var(--muted); font-size: 0.95rem; line-height: 1.55; margin-top: 0.2rem; }
 .xt-cue {
@@ -249,18 +277,31 @@ details.xt[open] .xt-cue::after { content: "▾ less"; }
 
 /* Skills strip: a single clipped row + a "+N more" pill that reveals the rest
    inline. The count is exact (computed server-side, not from CSS clipping). */
-details.xt-skills { margin: 0; }
-details.xt-skills > summary.skills-line { display: flex; align-items: center; gap: 0.4rem; }
+details.xt-skills { margin: 0.45rem 0 0; max-width: 100%; }
+details.xt-skills > summary.skills-line {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  gap: 0.4rem; max-width: 100%; min-width: 0;
+}
+details.xt-skills > summary.skills-line .skills { margin-top: 0; }
 .skills-clip {
-  flex-wrap: nowrap; overflow: hidden; min-width: 0;
+  flex-wrap: nowrap; overflow: hidden; min-width: 0; max-width: 100%; height: 1.55rem;
   -webkit-mask: linear-gradient(90deg, #000 88%, transparent);
           mask: linear-gradient(90deg, #000 88%, transparent);
 }
+.skills-clip .chip { flex: 0 0 auto; max-width: min(16ch, 42vw); }
 details.xt-skills[open] .skills-clip {
-  flex-wrap: wrap; overflow: visible; -webkit-mask: none; mask: none;
+  flex-wrap: wrap; overflow: visible; height: auto; min-height: 1.55rem;
+  -webkit-mask: none; mask: none;
+}
+details.xt-skills[open] .skills-clip .chip,
+details.xt-skills[open] .skills-rest .chip { max-width: 100%; }
+details.xt-skills[open] .skills-clip .chip-text,
+details.xt-skills[open] .skills-rest .chip-text {
+  overflow: visible; text-overflow: clip; white-space: normal; line-height: 1.25;
 }
 .chip-more {
-  flex: 0 0 auto; cursor: pointer; color: var(--oxblood);
+  flex: 0 0 auto; cursor: pointer; color: var(--oxblood); max-width: none;
+  justify-content: center; white-space: nowrap;
   border-color: color-mix(in srgb, var(--oxblood) 45%, transparent);
   background: color-mix(in srgb, var(--oxblood) 8%, #fff);
 }
@@ -339,7 +380,8 @@ def skill_chip(tag, active: bool) -> str:
     if active:
         classes.append("chip-sel")
     label = tag.name if tag.required else f"+{tag.name}"
-    return f'<span class="{" ".join(classes)}">{escape(label)}</span>'
+    safe = escape(label)
+    return f'<span class="{" ".join(classes)}" title="{safe}"><span class="chip-text">{safe}</span></span>'
 
 
 def salary_label(salary_min: int | None, salary_max: int | None) -> str | None:
@@ -351,16 +393,34 @@ def salary_label(salary_min: int | None, salary_max: int | None) -> str | None:
     return "$" + (f"{lo}-{hi}" if lo and hi else (lo or hi or ""))
 
 
-def clamp_text(text: str, *, lines: int = 2, body_class: str = "rationale",
-               pre: bool = False, min_chars: int = 90) -> str:
-    """Clamp ``text`` to ``lines`` lines behind a native <details> more/less toggle.
+def clamp_text(
+    text: str,
+    *,
+    lines: int = 2,
+    body_class: str = "rationale",
+    pre: bool = False,
+    min_chars: int = 90,
+    preview_words: int | None = None,
+) -> str:
+    """Render a native <details> preview with either line or word limits.
 
-    Short text (≤ ``min_chars``) is rendered plain — no toggle — so a "more" cue
-    never appears on content that already fits. ``<details>``/``<summary>`` survive
-    Streamlit's HTML sanitizer, giving an in-place expand with no script or rerun.
+    Short text is rendered plain so a "more" cue never appears on content that
+    already fits. ``<details>``/``<summary>`` survive Streamlit's HTML sanitizer,
+    giving an in-place expand with no script or rerun.
     """
     safe = escape(text)
     pre_cls = " xt-pre" if pre else ""
+    if preview_words is not None:
+        words = text.split()
+        if len(words) <= preview_words:
+            return f'<div class="{body_class}{pre_cls}">{safe}</div>'
+        preview = escape(" ".join(words[:preview_words]) + "...")
+        return (
+            '<details class="xt"><summary>'
+            f'<div class="{body_class} xt-excerpt{pre_cls}">{preview}</div>'
+            f'<div class="{body_class} xt-full{pre_cls}">{safe}</div>'
+            '<span class="xt-cue"></span></summary></details>'
+        )
     if len(text) <= min_chars:
         return f'<div class="{body_class}{pre_cls}">{safe}</div>'
     return (
@@ -370,7 +430,7 @@ def clamp_text(text: str, *, lines: int = 2, body_class: str = "rationale",
     )
 
 
-def skill_strip(chips: list[str], *, head: int = 5) -> str:
+def skill_strip(chips: list[str], *, head: int = 6) -> str:
     """Render skill chips as a one-row preview with a "+N more" expand toggle.
 
     ``chips`` are pre-rendered chip spans (the caller knows active-filter state).

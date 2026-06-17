@@ -90,9 +90,9 @@ def _control_desk(rows) -> FilterState:
     # styles div[...][class*="st-key-controldesk"] as the bordered panel.
     with st.container(key="controldesk"):
         st.markdown('<div class="controldesk-head">Filter &amp; sort</div>', unsafe_allow_html=True)
-        # Even 4×2 grid: one control per cell so rows align top and bottom
-        # (the old layout stacked 1–3 widgets per column, leaving ragged gaps).
-        r1 = st.columns(4)
+        # Balanced rows: three controls per row keeps the panel aligned without
+        # forcing selectboxes into narrow 4-column cells on laptop/tablet widths.
+        r1 = st.columns(3, gap="medium", vertical_alignment="top")
         with r1[0]:
             salary_min = st.number_input(
                 "Min salary", min_value=0, step=10000, value=0, key="f_salary"
@@ -100,28 +100,6 @@ def _control_desk(rows) -> FilterState:
         with r1[1]:
             fit_min = st.slider("Min fit", 0, 100, 0, key="f_fit")
         with r1[2]:
-            remote = set(st.multiselect("Remote", ["remote", "hybrid", "onsite"], key="f_remote"))
-        with r1[3]:
-            sponsorship = set(
-                st.multiselect("Sponsorship", ["offered", "silent", "denied"], key="f_sponsor")
-            )
-        r2 = st.columns(4)
-        with r2[0]:
-            seniority = set(
-                st.multiselect(
-                    "Seniority", ["junior", "mid", "senior", "staff", "principal"], key="f_sen"
-                )
-            )
-        with r2[1]:
-            employment = set(
-                st.multiselect(
-                    "Type", ["full_time", "contract", "internship", "part_time"], key="f_emp"
-                )
-            )
-        with r2[2]:
-            industry_options = sorted({r.industry for r in rows if r.industry})
-            industry = set(st.multiselect("Industry", industry_options, key="f_industry"))
-        with r2[3]:
             sort = st.selectbox(
                 "Sort by",
                 list(_SORT_LABELS),
@@ -129,11 +107,36 @@ def _control_desk(rows) -> FilterState:
                 key="f_sort",
             )
 
-        # Skills spans the row; the composite preset shares it (only shown then).
+        r2 = st.columns(3, gap="medium", vertical_alignment="top")
+        with r2[0]:
+            remote = set(st.multiselect("Remote", ["remote", "hybrid", "onsite"], key="f_remote"))
+        with r2[1]:
+            sponsorship = set(
+                st.multiselect("Sponsorship", ["offered", "silent", "denied"], key="f_sponsor")
+            )
+        with r2[2]:
+            seniority = set(
+                st.multiselect(
+                    "Seniority", ["junior", "mid", "senior", "staff", "principal"], key="f_sen"
+                )
+            )
+
+        r3 = st.columns(2, gap="medium", vertical_alignment="top")
+        with r3[0]:
+            employment = set(
+                st.multiselect(
+                    "Type", ["full_time", "contract", "internship", "part_time"], key="f_emp"
+                )
+            )
+        with r3[1]:
+            industry_options = sorted({r.industry for r in rows if r.industry})
+            industry = set(st.multiselect("Industry", industry_options, key="f_industry"))
+
+        # Skills spans the row; the composite preset shares it only when needed.
         skill_names = [t.name for t in available_skill_cloud(rows)]
         preset = "balanced"
         if sort == "composite":
-            sk_col, preset_col = st.columns([2, 2])
+            sk_col, preset_col = st.columns([2, 1], gap="medium", vertical_alignment="top")
             with sk_col:
                 chosen = st.multiselect("Skills (any match)", skill_names, key="f_skills")
             with preset_col:
@@ -208,18 +211,21 @@ def render_shortlist_page(session) -> None:
                         f'<div class="metaline">{meta_line(row)}</div>',
                         unsafe_allow_html=True,
                     )
-                    # Skills: one-row preview with an explicit "+N more" toggle that
-                    # reveals the rest inline (keeps cards a uniform height).
+                    # Skills: six-chip preview with an explicit "+N more" toggle
+                    # that reveals the rest inline.
                     if row.skills:
                         chips = [
                             skill_chip(tag, active=normalize_skill(tag.name) in state.skills)
                             for tag in row.skills
                         ]
-                        st.markdown(skill_strip(chips), unsafe_allow_html=True)
-                    # Rationale: a 2-line preview that expands in place — the reason a
-                    # job fits is worth a glance without forcing a click.
+                        st.markdown(skill_strip(chips, head=6), unsafe_allow_html=True)
+                    # Rationale: show a substantial preview before the in-place
+                    # expansion so the card is useful without an immediate click.
                     if row.fit_rationale:
-                        st.markdown(clamp_text(row.fit_rationale, lines=2), unsafe_allow_html=True)
+                        st.markdown(
+                            clamp_text(row.fit_rationale, preview_words=100),
+                            unsafe_allow_html=True,
+                        )
                 # Footer button lives OUTSIDE the columns so it spans the full card
                 # width and (via CSS margin-top:auto) sits flush at the bottom of
                 # every equal-height card — aligning across the row.
@@ -267,7 +273,12 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
 
         st.markdown('<div class="rail-head">Job description</div>', unsafe_allow_html=True)
         st.markdown(
-            clamp_text(row.jd_text or "—", lines=3, body_class="jd-text", pre=True, min_chars=160),
+            clamp_text(
+                row.jd_text or "—",
+                body_class="jd-text",
+                pre=True,
+                preview_words=160,
+            ),
             unsafe_allow_html=True,
         )
         with st.expander("Latest review critiques"):

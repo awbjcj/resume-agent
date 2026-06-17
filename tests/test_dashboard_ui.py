@@ -55,6 +55,8 @@ def test_skill_chip_encodes_coverage_requirement_and_active():
     assert "python" in covered_must
     assert "chip-have" in covered_must
     assert "chip-sel" in covered_must
+    assert "chip-text" in covered_must
+    assert 'title="python"' in covered_must
 
     gap_nice = skill_chip(SkillTag("graphql", covered=False, required=False), active=False)
     assert "chip-gap" in gap_nice
@@ -126,6 +128,12 @@ def test_theme_css_styles_keyed_controldesk_container():
     assert ".chip-gap" in THEME_CSS
     assert ".chip-nice" in THEME_CSS
     assert ".chip-sel" in THEME_CSS
+    assert ".skills-clip .chip" in THEME_CSS
+    assert "grid-template-columns: minmax(0, 1fr) auto" in THEME_CSS
+    assert 'div[data-testid="stElementContainer"]:has(.controldesk-head)' in THEME_CSS
+    assert "margin-bottom: 0.55rem" in THEME_CSS
+    assert '+ div[data-testid="stLayoutWrapper"]' in THEME_CSS
+    assert "padding-top: 0.55rem" in THEME_CSS
 
 
 def test_clamp_text_plain_when_short_and_details_when_long():
@@ -139,6 +147,20 @@ def test_clamp_text_plain_when_short_and_details_when_long():
     assert 'style="--xt-lines:2"' in long
 
 
+def test_clamp_text_word_preview_keeps_full_text_expandable():
+    text = " ".join(f"word{i}" for i in range(12))
+    out = clamp_text(text, preview_words=5)
+    assert "<details" in out
+    assert "xt-excerpt" in out
+    assert "xt-full" in out
+    assert "word4..." in out
+    assert "word11" in out
+
+    short = clamp_text("one two three", preview_words=5)
+    assert "<details" not in short
+    assert "one two three" in short
+
+
 def test_clamp_text_escapes_html():
     out = clamp_text("<script>alert(1)</script> " + "x" * 100)
     assert "<script>" not in out
@@ -146,12 +168,12 @@ def test_clamp_text_escapes_html():
 
 
 def test_skill_strip_plain_under_head_and_toggle_over_head():
-    plain = skill_strip(["<a>", "<b>", "<c>"], head=5)
+    plain = skill_strip(["<a>", "<b>", "<c>"])
     assert "<details" not in plain
     assert plain == '<div class="skills"><a><b><c></div>'
 
-    many = skill_strip([f"<c{i}>" for i in range(8)], head=5)
+    many = skill_strip([f"<c{i}>" for i in range(8)])
     assert "xt-skills" in many
-    # 8 chips, head=5 -> exactly 3 hidden, surfaced as the +N count.
-    assert 'data-n="3"' in many
+    # 8 chips, head=6 -> exactly 2 hidden, surfaced as the +N count.
+    assert 'data-n="2"' in many
     assert "skills-rest" in many
