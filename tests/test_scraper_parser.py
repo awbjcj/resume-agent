@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 from resume_agent.discovery.scraper.models import ScrapedCard
@@ -38,9 +39,44 @@ def test_parse_search_cards_extracts_each_posting():
     assert first.company == "Acme Corp"
     assert first.location == "Remote, United States"
     assert first.url == "https://www.linkedin.com/jobs/view/3700000001/"
+    assert first.posted_at is None
 
     second = cards[1]
     assert second.job_id == "3700000002"
+    assert second.posted_at is None
+
+
+def test_parse_search_cards_extracts_absolute_posted_at():
+    html = """
+    <html><body>
+      <div class="base-card" data-entity-urn="urn:li:jobPosting:3700000001">
+        <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000001/?trk=public_jobs_jserp-result_search-card"></a>
+        <h3 class="base-search-card__title">Senior Backend Engineer</h3>
+        <h4 class="base-search-card__subtitle">Acme Corp</h4>
+        <span class="job-search-card__location">Remote, United States</span>
+        <time class="job-search-card__listdate" datetime="2026-06-01">2 weeks ago</time>
+      </div>
+    </body></html>
+    """
+    cards = parse_search_cards(html)
+    assert cards[0].posted_at == datetime(2026, 6, 1, tzinfo=timezone.utc)
+
+
+def test_parse_search_cards_extracts_relative_posted_at():
+    now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
+    html = """
+    <html><body>
+      <div class="base-card" data-entity-urn="urn:li:jobPosting:3700000001">
+        <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000001/?trk=public_jobs_jserp-result_search-card"></a>
+        <h3 class="base-search-card__title">Senior Backend Engineer</h3>
+        <h4 class="base-search-card__subtitle">Acme Corp</h4>
+        <span class="job-search-card__location">Remote, United States</span>
+        <time class="job-search-card__listdate">2 days ago</time>
+      </div>
+    </body></html>
+    """
+    cards = parse_search_cards(html, now=now)
+    assert cards[0].posted_at == datetime(2026, 6, 14, 12, 0, tzinfo=timezone.utc)
 
 
 def test_parse_job_detail_returns_clean_text():

@@ -3,7 +3,11 @@ import pytest
 from resume_agent.llm_runner import AgentRunner
 
 from resume_agent.models.job import JobCriteria, SponsorshipSignal
-from resume_agent.discovery.extract import build_extract_agent, extract_job_criteria
+from resume_agent.discovery.extract import (
+    _INSTRUCTIONS,
+    build_extract_agent,
+    extract_job_criteria,
+)
 
 
 class _FakeResult:
@@ -37,3 +41,9 @@ def test_extract_rejects_wrong_type():
 def test_build_extract_agent_is_agent(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     assert isinstance(build_extract_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
+
+
+def test_instructions_mention_new_fields():
+    joined = " ".join(_INSTRUCTIONS).lower()
+    for needle in ["seniority", "employment type", "tech stack", "industry", "company size"]:
+        assert needle in joined

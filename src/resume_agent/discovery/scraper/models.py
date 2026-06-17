@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass
@@ -10,6 +11,7 @@ class ScrapedCard:
     company: str | None
     location: str | None
     url: str | None
+    posted_at: datetime | None = None
 
 
 @dataclass

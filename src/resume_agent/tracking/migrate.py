@@ -23,3 +23,13 @@ def ensure_dedup_key_column(engine: Engine) -> None:
                     text("UPDATE jobs SET dedup_key = :k WHERE id = :i"),
                     {"k": key, "i": row_id},
                 )
+
+
+def ensure_posted_at_column(engine: Engine) -> None:
+    """Idempotently add the ``jobs.posted_at`` column (source-derived posting date)."""
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+        if not cols:
+            return
+        if "posted_at" not in cols:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN posted_at DATETIME"))

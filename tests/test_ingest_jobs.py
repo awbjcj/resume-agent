@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.discovery.connectors.base import RawJob
@@ -31,6 +33,28 @@ def test_ingest_jobs_inserts_and_counts_per_source():
 def test_ingest_jobs_skips_empty_jd():
     with _session() as s:
         assert ingest_jobs(s, [_raw("adzuna", 1, "Acme", "Eng", "   ")]) == {}
+
+
+def test_ingest_threads_posted_at():
+    when = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    with _session() as s:
+        ingest_jobs(
+            s,
+            [
+                RawJob(
+                    source="greenhouse",
+                    url="u1",
+                    company="Acme",
+                    title="Eng",
+                    location="Remote",
+                    jd_text="hello",
+                    posted_at=when,
+                )
+            ],
+        )
+        jobs = jobs_by_status(s, JobStatus.raw.value)
+        assert len(jobs) == 1
+        assert jobs[0].posted_at == when.replace(tzinfo=None)
 
 
 def test_ingest_jobs_dedupes_same_posting_across_sources():

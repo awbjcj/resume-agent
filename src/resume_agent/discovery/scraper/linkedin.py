@@ -127,6 +127,7 @@ class LinkedInScraper:
                         title=card.title,
                         location=card.location,
                         jd_text=jd_text,
+                        posted_at=card.posted_at,
                     )
                 )
             return jobs

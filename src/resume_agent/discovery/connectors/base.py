@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 from resume_agent.discovery.search_config import SearchConfig
@@ -14,6 +15,7 @@ class RawJob:
     title: str | None
     location: str | None
     jd_text: str
+    posted_at: datetime | None = None
 
 
 class Connector(Protocol):

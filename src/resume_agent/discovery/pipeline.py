@@ -10,6 +10,17 @@ from resume_agent.tracking.repository import jobs_by_status, status_counts
 from resume_agent.tracking.tables import JobStatus
 
 
+_REEXTRACT_STATUSES = (
+    JobStatus.extracted.value,
+    JobStatus.filtered.value,
+    JobStatus.rejected.value,
+    JobStatus.shortlisted.value,
+    JobStatus.approved.value,
+    JobStatus.tailored.value,
+    JobStatus.rendered.value,
+)
+
+
 def run_extract(session: Session, agent: Runner) -> None:
     for job in jobs_by_status(session, JobStatus.raw.value):
         criteria = extract_job_criteria(job.jd_text, agent)
@@ -40,6 +51,24 @@ def run_score(session: Session, profile_facts: ProfileFacts, agent: Runner) -> N
         job.status = JobStatus.shortlisted.value
         session.add(job)
     session.commit()
+
+
+def reextract(session: Session, agent: Runner) -> int:
+    """Re-run extraction over already-processed jobs, rewriting criteria_json in place.
+
+    Does not change status or fit. Returns the number of jobs updated.
+    """
+    updated = 0
+    for status in _REEXTRACT_STATUSES:
+        for job in jobs_by_status(session, status):
+            if not job.jd_text.strip():
+                continue
+            criteria = extract_job_criteria(job.jd_text, agent)
+            job.criteria_json = criteria.model_dump(mode="json")
+            session.add(job)
+            updated += 1
+    session.commit()
+    return updated
 
 
 def discover(

@@ -30,6 +30,7 @@ tests/fixtures/linkedin/*_live.html
 .ruff_cache/
 .pytest_cache/
 .claude/
+.superpowers/
 
 
 # OS / editor
