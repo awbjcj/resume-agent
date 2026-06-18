@@ -9,6 +9,13 @@ from resume_agent.discovery.search_config import SearchConfig
 _BASE = "https://api.lever.co/v0/postings"
 
 
+def fetch_lever_board(token: str) -> list:
+    """GET a Lever board's postings array in JSON mode."""
+    resp = httpx.get(f"{_BASE}/{token}", params={"mode": "json"}, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def _assemble_jd(item: dict) -> str:
     """Stitch a Lever posting's opening, list sections, and closing into text.
 
@@ -78,6 +85,4 @@ class LeverConnector:
         return jobs[:limit] if limit is not None else jobs
 
     def _get_board(self, token: str) -> list:
-        resp = httpx.get(f"{_BASE}/{token}", params={"mode": "json"}, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
+        return fetch_lever_board(token)

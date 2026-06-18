@@ -9,6 +9,13 @@ from resume_agent.discovery.search_config import SearchConfig
 _BASE = "https://boards-api.greenhouse.io/v1/boards"
 
 
+def fetch_greenhouse_board(token: str) -> dict:
+    """GET a Greenhouse board's jobs payload with content."""
+    resp = httpx.get(f"{_BASE}/{token}/jobs", params={"content": "true"}, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def parse_greenhouse(payload: dict, company: str) -> list[RawJob]:
     """Map a Greenhouse board `jobs` payload to RawJobs."""
     jobs: list[RawJob] = []
@@ -60,6 +67,4 @@ class GreenhouseConnector:
         return jobs[:limit] if limit is not None else jobs
 
     def _get_board(self, token: str) -> dict:
-        resp = httpx.get(f"{_BASE}/{token}/jobs", params={"content": "true"}, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
+        return fetch_greenhouse_board(token)

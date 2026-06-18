@@ -74,3 +74,18 @@ def test_connector_isolates_failing_board_and_records_it():
     assert {j.company for j in jobs} == {"Acme"}
     assert "dead" in connector.failures
     assert "404" in connector.failures["dead"]
+
+
+def test_get_board_delegates_to_module_fetcher(monkeypatch):
+    import resume_agent.discovery.connectors.lever as lever
+
+    called = {}
+
+    def fake_fetch(token):
+        called["token"] = token
+        return []
+
+    monkeypatch.setattr(lever, "fetch_lever_board", fake_fetch)
+    conn = lever.LeverConnector([LeverBoard(token="acme")])
+    assert conn._get_board("acme") == []
+    assert called["token"] == "acme"
