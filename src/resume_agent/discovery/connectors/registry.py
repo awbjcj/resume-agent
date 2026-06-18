@@ -1,6 +1,7 @@
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.adzuna import AdzunaConnector
 from resume_agent.discovery.connectors.base import Connector
+from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import ConnectorsConfig
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
@@ -17,6 +18,9 @@ def build_connectors(config: ConnectorsConfig, settings: Settings) -> list[Conne
 
     if config.lever.enabled and config.lever.boards:
         connectors.append(LeverConnector(config.lever.boards))
+
+    if config.companies.enabled and config.companies.urls:
+        connectors.append(CompaniesConnector(config.companies.urls))
 
     if config.remoteok.enabled:
         connectors.append(RemoteOKConnector())

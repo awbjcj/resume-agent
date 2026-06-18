@@ -50,3 +50,33 @@ def test_adzuna_skipped_without_credentials():
     cfg = _cfg(adzuna=True)
     names = [c.name for c in build_connectors(cfg, _settings())]
     assert names == []
+
+
+def test_companies_connector_built_when_enabled_with_urls():
+    cfg = ConnectorsConfig.model_validate(
+        {"companies": {"enabled": True, "urls": ["https://jobs.ashbyhq.com/acme"]}}
+    )
+    names = [c.name for c in build_connectors(cfg, _settings())]
+    assert names == ["companies"]
+
+
+def test_companies_skipped_when_enabled_without_urls():
+    cfg = ConnectorsConfig.model_validate({"companies": {"enabled": True, "urls": []}})
+    names = [c.name for c in build_connectors(cfg, _settings())]
+    assert names == []
+
+
+def test_companies_ordered_with_ats_sources_before_aggregators():
+    cfg = ConnectorsConfig.model_validate(
+        {
+            "greenhouse": {"enabled": True, "boards": [{"token": "stripe"}]},
+            "lever": {"enabled": True, "boards": [{"token": "palantir"}]},
+            "remoteok": {"enabled": True},
+            "adzuna": {"enabled": True},
+            "linkedin": {"enabled": True},
+            "companies": {"enabled": True, "urls": ["https://jobs.ashbyhq.com/acme"]},
+        }
+    )
+    settings = _settings(adzuna_app_id="x", adzuna_app_key="y")
+    names = [c.name for c in build_connectors(cfg, settings)]
+    assert names == ["greenhouse", "lever", "companies", "remoteok", "adzuna", "linkedin"]
