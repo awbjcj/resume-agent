@@ -13,3 +13,35 @@ min_salary: 120000
 yoe_min: 0
 yoe_max: 5
 sponsorship_required: true   # silent postings are kept + flagged, not rejected
+
+# --- Relevance gate (optional; omit any field to disable that part) ---
+# Tier 1 (free, deterministic): the job TITLE must contain at least one
+# role_anchor (whole word) and none of the exclude_terms.
+role_anchors:
+  - engineer
+  - ai
+  - ml
+  - machine learning
+  - applied scientist
+  - llm
+exclude_terms:
+  - driver
+  - cdl
+  - nurse
+  - sales
+  - recruiter
+  - creative
+# Tier 2 (cheap LLM): a one-line description of the role you're hunting.
+# Falls back to `titles` if unset. Needs ANTHROPIC_API_KEY; skipped if absent.
+target_role: >
+  Applied AI / LLM engineering roles, including forward-deployed,
+  autonomy solutions, and ML platform engineering.
+# Shared source-narrowing (used by BOTH Adzuna and LinkedIn).
+distance: 40              # miles radius around locations[0]
+max_days_old: 30          # freshness window (Adzuna max_days_old; LinkedIn f_TPR)
+# LinkedIn native filters (named; mapped to f_E / f_JT codes by the scraper).
+experience_levels:        # internship | entry | associate | mid-senior | director | executive
+  - mid-senior
+  - director
+employment_types:         # full_time | contract | part_time | temporary | internship
+  - full_time

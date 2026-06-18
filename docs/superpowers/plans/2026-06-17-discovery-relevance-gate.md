@@ -177,9 +177,10 @@ git commit -m "feat(discovery): add relevance-gate config fields to SearchConfig
 
 The gate keeps a job iff its **title** contains ≥1 `role_anchor` (whole word) AND no
 `exclude_term` (whole word). Matching is word-boundary + case-insensitive, multi-word phrases
-allowed. Body is never a gate. Empty `role_anchors` ⇒ skip the anchor requirement; both lists
-empty ⇒ fall back to the legacy `filter_by_search`. A title-less job scans the whole document for
-anchors so a data hiccup doesn't drop a real role.
+allowed. Body is never a gate when explicit anchors are configured. Empty `role_anchors` ⇒ use the
+legacy `filter_by_search` result as the candidate set, then apply title-only excludes; this keeps
+existing keyword/title configs working. A title-less job scans the whole document for anchors so a
+data hiccup doesn't drop a real role.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -205,10 +206,16 @@ def test_anchor_required_in_title():
     assert [j.title for j in out] == ["AI Applications Engineer"]
 
 
-def test_exclude_term_rejects_even_with_anchor_absent():
-    cfg = _cfg(role_anchors=["engineer"], exclude_terms=["driver"])
+def test_exclude_term_rejects_when_anchor_requirement_is_skipped():
+    cfg = _cfg(exclude_terms=["driver"])
     out = relevance_gate([_job("Class A CDL Driver")], cfg)
     assert out == []
+
+
+def test_matching_is_case_insensitive():
+    cfg = _cfg(role_anchors=["ENGINEER"], exclude_terms=["CREATIVE"])
+    out = relevance_gate([_job("ai engineer"), _job("Creative Engineer")], cfg)
+    assert [j.title for j in out] == ["ai engineer"]
 
 
 def test_word_boundary_blocks_substring_false_positive():
@@ -224,10 +231,14 @@ def test_exclude_matches_title_only_not_body():
     assert [j.title for j in relevance_gate([keep], cfg)] == ["AI Engineer"]
 
 
-def test_empty_anchors_and_excludes_fall_back_to_legacy():
-    cfg = _cfg(keywords=["python"])
-    out = relevance_gate([_job("Anything", jd="we use python daily")], cfg)
-    assert len(out) == 1  # legacy filter_by_search keeps a body keyword hit
+def test_empty_anchors_falls_back_to_legacy_before_excludes():
+    cfg = _cfg(keywords=["python"], exclude_terms=["driver"])
+    out = relevance_gate([
+        _job("Backend Developer", jd="we use python daily"),
+        _job("Python Driver", jd="we use python daily"),
+        _job("Anything", jd="no matching keyword"),
+    ], cfg)
+    assert [j.title for j in out] == ["Backend Developer"]
 
 
 def test_missing_title_scans_document_for_anchor():
@@ -251,27 +262,26 @@ import re
 
 def _matches_any(haystack: str, terms: list[str]) -> bool:
     """True if any term appears in haystack as a whole word/phrase (case-insensitive)."""
-    return any(re.search(rf"\b{re.escape(t)}\b", haystack) for t in terms)
+    return any(re.search(rf"\b{re.escape(t)}\b", haystack, flags=re.IGNORECASE) for t in terms)
 
 
 def relevance_gate(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
     """Title-anchored relevance gate. Keep iff title has an anchor and no exclude term.
 
-    Body text is never a gate. Empty anchors => skip the anchor check; both lists
-    empty => fall back to the legacy keyword `filter_by_search`.
+    Body text is never a gate when explicit anchors are configured. Empty anchors
+    use the legacy keyword `filter_by_search` result as the candidate set.
     """
-    anchors = [t.strip().lower() for t in search.role_anchors if t.strip()]
-    excludes = [t.strip().lower() for t in search.exclude_terms if t.strip()]
-    if not anchors and not excludes:
-        return filter_by_search(jobs, search)
+    anchors = [t.strip() for t in search.role_anchors if t.strip()]
+    excludes = [t.strip() for t in search.exclude_terms if t.strip()]
+    candidates = jobs if anchors else filter_by_search(jobs, search)
 
     kept: list[RawJob] = []
-    for job in jobs:
-        title = (job.title or "").lower()
+    for job in candidates:
+        title = job.title or ""
         if excludes and title and _matches_any(title, excludes):
             continue
         if anchors:
-            haystack = title or f"{job.title or ''}\n{job.jd_text}".lower()
+            haystack = title or f"{job.title or ''}\n{job.jd_text}"
             if not _matches_any(haystack, anchors):
                 continue
         kept.append(job)
@@ -334,11 +344,13 @@ Expected: FAIL — `relevance_gate` not used / `conn.filtered` missing.
 - [ ] **Step 3: Update each connector**
 
 In `greenhouse.py` and `lever.py`: import `relevance_gate` (replace the `filter_by_search` import),
-initialise `self.filtered = 0` in `__init__`, and in `fetch` replace the filter line:
+initialise `self.filtered = 0` in `__init__`, reset it at the start of each `fetch`, and replace
+the filter line:
 
 ```python
 from resume_agent.discovery.connectors.text import relevance_gate, html_to_text
 # __init__: self.filtered = 0
+# fetch start, next to self.failures reset: self.filtered = 0
         before = len(jobs)
         jobs = relevance_gate(jobs, search)
         self.filtered = before - len(jobs)
@@ -382,15 +394,17 @@ In `src/resume_agent/discovery/connectors/runner.py`, fold the filtered count in
 ```python
 def _run_note(connector: Connector, count: int) -> str | None:
     """Non-fatal note: sub-sources skipped (dead boards) and off-target jobs filtered."""
-    parts: list[str] = []
     filtered = int(getattr(connector, "filtered", 0) or 0)
-    if filtered:
-        parts.append(f"+{count} added; filtered {filtered} off-target")
     failures: dict[str, str] | None = getattr(connector, "failures", None)
+    if not filtered and not failures:
+        return None
+    parts: list[str] = [f"+{count} added"]
+    if filtered:
+        parts.append(f"filtered {filtered} off-target")
     if failures:
         items = ", ".join(f"{name} ({reason})" for name, reason in failures.items())
         parts.append(f"skipped {len(failures)} source(s): {items}")
-    return "; ".join(parts) or None
+    return "; ".join(parts)
 ```
 
 Replace the `_partial_failure_note(...)` call in `run_pull` with `_run_note(connector, count)`
@@ -455,9 +469,11 @@ def test_adzuna_builds_targeted_params():
         mod.httpx.get = orig
 
     p = captured["params"]
+    assert captured["url"].endswith("/us/search/1")
     assert "ai engineer" in p["what_or"] and "machine learning" in p["what_or"]
     assert "driver" in p["what_exclude"] and "cdl" in p["what_exclude"]
     assert p["category"] == "it-jobs"
+    assert p["results_per_page"] == 50
     assert p["where"] == "Detroit, MI" and p["distance"] == 40
     assert p["salary_min"] == 130000
     assert p["max_days_old"] == 30
@@ -494,6 +510,7 @@ Expected: FAIL — params still use `what` blob.
             params["salary_min"] = search.min_salary
         if search.max_days_old is not None:
             params["max_days_old"] = search.max_days_old
+        # Page 1 preserves the current single-request fetch volume while narrowing the query.
         resp = httpx.get(f"{_BASE}/{self.country}/search/1", params=params, timeout=30)
         resp.raise_for_status()
         return resp.json()
@@ -558,6 +575,17 @@ def test_judge_relevance_type_guard():
     import pytest
     with pytest.raises(TypeError):
         judge_relevance("AI roles", "T", "jd", _Agent("not a verdict"))
+
+
+def test_build_relevance_agent_returns_none_without_api_key(monkeypatch):
+    from resume_agent.discovery import relevance as mod
+
+    class _Settings:
+        anthropic_api_key = ""
+        cheap_model = "cheap"
+
+    monkeypatch.setattr(mod, "get_settings", lambda: _Settings())
+    assert mod.build_relevance_agent() is None
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -595,12 +623,14 @@ class RelevanceVerdict(BaseModel):
     reason: str
 
 
-def build_relevance_agent(model_id: str | None = None) -> Runner:
+def build_relevance_agent(model_id: str | None = None) -> Runner | None:
     s = get_settings()
+    if not s.anthropic_api_key:
+        return None
     resolved = model_id or s.cheap_model
     return AgentRunner(
         Agent(
-            model=Claude(id=resolved, api_key=s.anthropic_api_key or None),
+            model=Claude(id=resolved, api_key=s.anthropic_api_key),
             description="You decide whether a job posting matches a target role.",
             instructions=_INSTRUCTIONS,
             output_schema=RelevanceVerdict,
@@ -694,6 +724,14 @@ def test_run_relevance_noop_when_no_target_and_no_titles(session_factory):
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
 
 
+def test_run_relevance_noop_when_titles_are_blank(session_factory):
+    cfg = SearchConfig(titles=["", "   "])
+    with session_factory() as s:
+        save_job(s, Job(source="x", jd_text="jd", title="Whatever", status=JobStatus.raw.value))
+        assert run_relevance(s, cfg, _Judge()) == 0
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
+
+
 def test_run_relevance_noop_when_agent_none(session_factory):
     cfg = SearchConfig(target_role="AI roles")
     with session_factory() as s:
@@ -728,8 +766,9 @@ from resume_agent.discovery.relevance import judge_relevance
 def _relevance_target(config: SearchConfig) -> str | None:
     if config.target_role and config.target_role.strip():
         return config.target_role.strip()
-    if config.titles:
-        return "Roles like: " + ", ".join(config.titles)
+    titles = [t.strip() for t in config.titles if t.strip()]
+    if titles:
+        return "Roles like: " + ", ".join(titles)
     return None
 
 
@@ -744,15 +783,17 @@ def run_relevance(session: Session, config: SearchConfig, agent: Runner | None) 
         return 0
     rejected = 0
     for job in jobs_by_status(session, JobStatus.raw.value):
-        if not job.jd_text.strip():
+        jd_text = job.jd_text or ""
+        if not jd_text.strip():
             continue
         try:
-            verdict = judge_relevance(target, job.title, job.jd_text, agent)
+            verdict = judge_relevance(target, job.title, jd_text, agent)
         except Exception:
             continue  # fail-open
         if not verdict.keep:
             job.status = JobStatus.rejected.value
-            job.reject_reason = f"off-target role: {verdict.reason}"
+            reason = (verdict.reason or "model rejected").strip()
+            job.reject_reason = f"off-target role: {reason}"
             session.add(job)
             rejected += 1
     session.commit()
@@ -834,6 +875,7 @@ from resume_agent.discovery.relevance import build_relevance_agent
 # ...
     extract_agent = build_extract_agent()
     fit_agent = build_fit_agent()
+    # Returns None when ANTHROPIC_API_KEY is missing, making run_relevance a no-op.
     relevance_agent = build_relevance_agent()
     engine = _engine(db_url)
     with get_session(engine) as session:
@@ -886,13 +928,16 @@ anchor/exclude lists in `search.yaml.example` — not the gate logic.)
 - [ ] **Step 6: Live before/after smoke (manual, recorded in PR)**
 
 ```bash
-# On main (baseline)
-git stash; git checkout main
-.venv/Scripts/python -m resume_agent.cli pull --db-url sqlite:///before.db
-.venv/Scripts/python -m resume_agent.cli discover --db-url sqlite:///before.db
+# Create a separate baseline worktree so this worktree's uncommitted changes are untouched.
+git worktree add ../resume-agent-main main
 
-# On this branch
-git checkout feat/relevance-gate; git stash pop 2>/dev/null || true
+# Baseline in the main worktree.
+cd ../resume-agent-main
+../resume-agent/.venv/Scripts/python -m resume_agent.cli pull --db-url sqlite:///before.db
+../resume-agent/.venv/Scripts/python -m resume_agent.cli discover --db-url sqlite:///before.db
+
+# Current branch in the original worktree.
+cd ../resume-agent
 .venv/Scripts/python -m resume_agent.cli pull --db-url sqlite:///after.db
 .venv/Scripts/python -m resume_agent.cli discover --db-url sqlite:///after.db
 ```
@@ -955,6 +1000,14 @@ def test_resolve_picks_first_geo_hit():
     assert resolve_geo_id("Detroit, MI", client=_client(payload)) == "103624908"
 
 
+def test_resolve_prefers_city_over_postal_variant():
+    payload = [
+        {"id": "103013972", "type": "GEO", "displayName": "48228, Detroit, Michigan, United States"},
+        {"id": "103624908", "type": "GEO", "displayName": "Detroit, Michigan, United States"},
+    ]
+    assert resolve_geo_id("Detroit, MI", client=_client(payload)) == "103624908"
+
+
 def test_resolve_returns_none_on_empty():
     assert resolve_geo_id("Greater Detroit Area", client=_client([])) is None
 
@@ -1001,6 +1054,11 @@ class _HttpLike(Protocol):
             timeout: float | None = ...) -> Any: ...
 
 
+def _looks_like_postal_variant(hit: dict[str, Any]) -> bool:
+    first_part = str(hit.get("displayName") or "").split(",", 1)[0].strip()
+    return bool(first_part) and first_part.replace(" ", "").isdigit()
+
+
 def resolve_geo_id(
     location: str,
     *,
@@ -1024,10 +1082,14 @@ def resolve_geo_id(
                         headers=_UA, timeout=20)
         resp.raise_for_status()
         hits = resp.json()
-        for hit in hits if isinstance(hits, list) else []:
-            if hit.get("type") == "GEO" and hit.get("id"):
-                geo_id = str(hit["id"])
-                break
+        geo_hits = [
+            hit for hit in (hits if isinstance(hits, list) else [])
+            if hit.get("type") == "GEO" and hit.get("id")
+        ]
+        preferred = next((hit for hit in geo_hits if not _looks_like_postal_variant(hit)), None)
+        chosen = preferred or (geo_hits[0] if geo_hits else None)
+        if chosen:
+            geo_id = str(chosen["id"])
     except Exception:
         geo_id = None  # fail-open
     if cache is not None:
@@ -1061,10 +1123,11 @@ without a browser; `_search_url` calls it with an injected geo-resolver (default
 `resolve_geo_id`). Unknown/blank values are omitted (fail-open); an unresolved location falls back
 to the existing text `location` param.
 
-Code tables (verified live):
+Code tables (verified live except salary buckets, which are approximate):
 `f_WT` {remote:2, hybrid:3, onsite:1}; `f_E` {internship:1, entry:2, associate:3, mid-senior:4,
 director:5, executive:6}; `f_JT` {full_time:F, contract:C, part_time:P, temporary:T, internship:I};
-`f_TPR = r{max_days_old*86400}`; `sortBy=DD` when `max_days_old` is set.
+`f_TPR = r{max_days_old*86400}`; `sortBy=DD` when `max_days_old` is set; `f_SB2` is emitted from
+`min_salary` using an approximate floor bucket.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1088,6 +1151,7 @@ def test_search_url_emits_native_filters():
         remote_policy="remote",
         experience_levels=["mid-senior", "director"],
         employment_types=["full_time"],
+        min_salary=130000,
         distance=40,
         max_days_old=30,
     )
@@ -1100,6 +1164,7 @@ def test_search_url_emits_native_filters():
     assert p["f_E"] == "4,5"
     assert p["f_JT"] == "F"
     assert p["f_TPR"] == "r2592000"   # 30 days * 86400
+    assert p["f_SB2"] == "5"          # approximate 120k+ bucket for 130k
     assert p["sortBy"] == "DD"
 
 
@@ -1114,7 +1179,7 @@ def test_search_url_falls_back_to_text_location_when_geo_unresolved():
 def test_search_url_omits_unset_filters():
     cfg = SearchConfig(titles=["AI Engineer"])  # remote_policy 'any'/None etc.
     p = _params(_search_url(cfg, geo_resolver=lambda loc: None))
-    for k in ("f_WT", "f_E", "f_JT", "f_TPR", "distance", "sortBy"):
+    for k in ("f_WT", "f_E", "f_JT", "f_TPR", "f_SB2", "distance", "sortBy"):
         assert k not in p
 ```
 
@@ -1137,6 +1202,17 @@ _EXP = {"internship": "1", "entry": "2", "associate": "3",
         "mid-senior": "4", "director": "5", "executive": "6"}
 _JT = {"full_time": "F", "contract": "C", "part_time": "P",
        "temporary": "T", "internship": "I"}
+_SALARY_BUCKETS = [
+    (40_000, "1"),
+    (60_000, "2"),
+    (80_000, "3"),
+    (100_000, "4"),
+    (120_000, "5"),
+    (140_000, "6"),
+    (160_000, "7"),
+    (180_000, "8"),
+    (200_000, "9"),
+]
 
 
 def _linkedin_filter_params(config: SearchConfig) -> dict[str, str]:
@@ -1151,7 +1227,14 @@ def _linkedin_filter_params(config: SearchConfig) -> dict[str, str]:
     jt = [_JT[e] for e in (s.strip().lower() for s in config.employment_types) if e in _JT]
     if jt:
         params["f_JT"] = ",".join(dict.fromkeys(jt))
-    if config.max_days_old is not None:
+    if config.min_salary is not None:
+        bucket = next(
+            (code for floor, code in reversed(_SALARY_BUCKETS) if config.min_salary >= floor),
+            None,
+        )
+        if bucket:
+            params["f_SB2"] = bucket
+    if config.max_days_old is not None and config.max_days_old > 0:
         params["f_TPR"] = f"r{int(config.max_days_old) * 86400}"
         params["sortBy"] = "DD"
     return params
@@ -1178,10 +1261,25 @@ def _search_url(config: SearchConfig,
     return _SEARCH_URL + "?" + urllib.parse.urlencode(params)
 ```
 
-The scraper instantiates one geo cache per `fetch` and passes a bound resolver
-(`lambda loc: resolve_geo_id(loc, cache=self._geo_cache)`) so repeated locations across the
-per-term `_source_searches` resolve once. Existing callers of `_search_url` keep working — the
-`geo_resolver` arg defaults to `resolve_geo_id`.
+In `LinkedInScraper.__init__`, add `self._geo_cache: dict[str, str | None] = {}`. Reset it at the
+start of `fetch`, and update `_search_html` to pass a bound resolver so repeated locations across
+the per-term `_source_searches` resolve once:
+
+```python
+def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
+    self._geo_cache = {}
+    try:
+        ...
+
+def _search_html(self, search: SearchConfig) -> str:
+    return self._content_for_url(
+        _search_url(search, geo_resolver=lambda loc: resolve_geo_id(loc, cache=self._geo_cache)),
+        wait_selector=_CARDS_SELECTOR,
+        scroll=True,
+    )
+```
+
+Existing callers of `_search_url` keep working — the `geo_resolver` arg defaults to `resolve_geo_id`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 

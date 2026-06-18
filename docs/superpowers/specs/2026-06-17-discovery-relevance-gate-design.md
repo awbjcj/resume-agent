@@ -50,7 +50,7 @@ query — so almost no narrowing happens at the source.
 | Term source | **New explicit config fields** `role_anchors` + `exclude_terms` (shipped with defaults in `.example`) |
 | Match scope | **Title only** for both anchors and excludes (word-boundary, case-insensitive); body never triggers reject |
 | LLM gate target | **New `target_role` description field** (falls back to `titles` if unset); gate sees target + title + truncated snippet |
-| Server-side search (Adzuna) | **Targeted Adzuna query**: `what_or` of role phrases, `what_exclude`, `category`, `where`+`distance`, `salary_min`, `max_days_old`, pagination |
+| Server-side search (Adzuna) | **Targeted Adzuna query**: `what_or` of role phrases, `what_exclude`, `category`, `where`+`distance`, `salary_min`, `max_days_old`, page `1` with `results_per_page` |
 | LinkedIn native filters | **URL-param filters** (`f_TPR`/`f_WT`/`f_E`/`f_JT`/`f_SB2`/`geoId`/`distance`/`sortBy`) built from config; **login-free typeahead** resolves `geoId`; no Playwright UI clicking |
 | Shared filter fields | `distance` + `max_days_old` are **shared** across Adzuna and LinkedIn (not connector-prefixed); `experience_levels` + `employment_types` added |
 | Placement | Lexical gate at the **connector edge** (junk never persisted; telemetry note); haiku gate as a new **`run_relevance` pipeline stage** with DB reject reasons |
@@ -94,10 +94,11 @@ Replaces `filter_by_search`. A job is **kept** iff:
   multi-word phrases allowed), **and**
 - its **title** contains **no** `exclude_term` (same matching).
 
-Body text is never a gate. If `role_anchors` is empty ⇒ the anchor requirement is skipped
-(fall back to today's keyword behavior so nothing breaks). If a job has no title, the anchor
-check falls back to scanning the whole document so a data hiccup doesn't drop a real job; excludes
-(title-only) simply don't fire.
+Body text is never a gate when explicit `role_anchors` are configured. If `role_anchors` is empty,
+the candidate set falls back to today's `filter_by_search` behavior so existing configs do not
+break; title-only `exclude_terms` still apply to that candidate set. If a job has no title, the
+anchor check falls back to scanning the whole document so a data hiccup doesn't drop a real job;
+excludes (title-only) simply don't fire.
 
 ```
 title='Class A CDL Driver'   anchors? none          → REJECT
@@ -137,7 +138,7 @@ Token budget: title + truncated snippet only (never the full JD), cheap model (`
 | `where` + `distance` | `locations[0]` + a configurable radius | geo-narrow |
 | `salary_min` | `min_salary` | server-side floor |
 | `max_days_old` | a configurable freshness window | recency |
-| `results_per_page` + pagination | — | fetch enough, deterministically |
+| `results_per_page` + page `1` | — | preserve the current single-request fetch volume deterministically |
 
 Deliberately **not** used: `title_only` and `what_and` (both over-filter and silently drop real
 roles). The local Tier-1 gate still runs on Adzuna results as a backstop.
