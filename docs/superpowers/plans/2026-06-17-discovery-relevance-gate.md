@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stop wildly off-target jobs ("Class A CDL Driver", "Creative Lead") from entering the raw list and burning two LLM calls each. Add a **tiered relevance gate** — a free deterministic title-anchored lexical gate at the connector edge, plus a cheap haiku relevance stage before extraction — and **tighten the Adzuna server-side query** so junk is narrowed at the source.
+**Goal:** Stop wildly off-target jobs ("Class A CDL Driver", "Creative Lead") from entering the raw list and burning two LLM calls each. Add a **tiered relevance gate** — a free deterministic title-anchored lexical gate at the connector edge, plus a cheap haiku relevance stage before extraction — and **narrow at the source**: a tightened Adzuna query and, for LinkedIn, its **native search filters** (`f_*`/`geoId`/`distance`/`sortBy`) applied from config before scraping.
 
-**Architecture:** Two new tiers slot in *before* the existing LLM stages. Tier 1 (lexical, title-anchored) replaces `filter_by_search` inside connectors so junk never reaches the DB. Tier 2 (`run_relevance`, haiku) is a new pipeline stage that marks off-target `raw` jobs `rejected` with a reason and lets survivors flow to `run_extract`. Everything fails open: empty config / no API key / LLM error ⇒ that gate is a no-op. No DB migration; config-only additions.
+**Architecture:** Two new tiers slot in *before* the existing LLM stages. Tier 1 (lexical, title-anchored) replaces `filter_by_search` inside connectors so junk never reaches the DB. Tier 2 (`run_relevance`, haiku) is a new pipeline stage that marks off-target `raw` jobs `rejected` with a reason and lets survivors flow to `run_extract`. Source-narrowing is per-connector: Adzuna gets a targeted query (Task 4); LinkedIn's `_search_url` emits native filter params with a **login-free** geoId lookup (Tasks 8–9). Everything fails open: empty config / no API key / LLM error / unresolved geo ⇒ that gate or param is a no-op. No DB migration; config-only additions.
 
 **Tech Stack:** Python 3.13, Pydantic v2 (`ExtensibleModel`, `extra="allow"`), SQLModel/SQLAlchemy (SQLite), Typer (CLI), Agno + Claude (LLM), httpx (connectors), pytest (offline; agents/HTTP faked).
 
@@ -19,7 +19,7 @@
 
 | File | Responsibility | Action |
 |---|---|---|
-| `src/resume_agent/discovery/search_config.py` | New `role_anchors`, `exclude_terms`, `target_role`, `adzuna_distance`, `adzuna_max_days_old` fields | Modify |
+| `src/resume_agent/discovery/search_config.py` | New `role_anchors`, `exclude_terms`, `target_role`, shared `distance`/`max_days_old`, `experience_levels`, `employment_types` fields | Modify |
 | `config/search.yaml.example` | Document the new fields with sensible defaults | Modify |
 | `src/resume_agent/discovery/connectors/text.py` | `relevance_gate` (title-anchored, word-boundary); keep `filter_by_search` as fallback | Modify |
 | `src/resume_agent/discovery/connectors/{greenhouse,lever,adzuna,remoteok}.py` | Call `relevance_gate`; record `self.filtered` | Modify |
@@ -28,6 +28,8 @@
 | `src/resume_agent/discovery/relevance.py` | `build_relevance_agent`, `judge_relevance` (haiku gate) | Create |
 | `src/resume_agent/discovery/pipeline.py` | `run_relevance` stage; call it inside `discover` | Modify |
 | `src/resume_agent/cli.py` | Build + thread the relevance agent into `discover` | Modify |
+| `src/resume_agent/discovery/scraper/geo.py` | `resolve_geo_id` (login-free LinkedIn typeahead) + cache | Create |
+| `src/resume_agent/discovery/scraper/linkedin.py` | `_search_url` emits `f_*`/`geoId`/`distance`/`sortBy` from config | Modify |
 | `tests/fixtures/relevance/*.json` | Labeled golden corpus | Create |
 | `tests/...` | One test file per module above | Create/Modify |
 
@@ -53,8 +55,10 @@ def test_relevance_fields_default_empty_and_optional():
     assert c.role_anchors == []
     assert c.exclude_terms == []
     assert c.target_role is None
-    assert c.adzuna_distance is None
-    assert c.adzuna_max_days_old is None
+    assert c.distance is None
+    assert c.max_days_old is None
+    assert c.experience_levels == []
+    assert c.employment_types == []
 
 
 def test_relevance_fields_roundtrip():
@@ -62,14 +66,18 @@ def test_relevance_fields_roundtrip():
         "role_anchors": ["engineer", "ai"],
         "exclude_terms": ["driver", "creative"],
         "target_role": "Applied AI / LLM engineering roles.",
-        "adzuna_distance": 40,
-        "adzuna_max_days_old": 30,
+        "distance": 40,
+        "max_days_old": 30,
+        "experience_levels": ["mid-senior", "director"],
+        "employment_types": ["full_time"],
     })
     assert c.role_anchors == ["engineer", "ai"]
     assert c.exclude_terms == ["driver", "creative"]
     assert "Applied AI" in (c.target_role or "")
-    assert c.adzuna_distance == 40
-    assert c.adzuna_max_days_old == 30
+    assert c.distance == 40
+    assert c.max_days_old == 30
+    assert c.experience_levels == ["mid-senior", "director"]
+    assert c.employment_types == ["full_time"]
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -97,8 +105,12 @@ class SearchConfig(ExtensibleModel):
     role_anchors: list[str] = Field(default_factory=list)
     exclude_terms: list[str] = Field(default_factory=list)
     target_role: str | None = None
-    adzuna_distance: int | None = None
-    adzuna_max_days_old: int | None = None
+    # Shared source-narrowing (used by both Adzuna and LinkedIn).
+    distance: int | None = None
+    max_days_old: int | None = None
+    # LinkedIn native filters (named values; scraper maps to f_E / f_JT codes).
+    experience_levels: list[str] = Field(default_factory=list)
+    employment_types: list[str] = Field(default_factory=list)
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -133,10 +145,20 @@ exclude_terms:
 target_role: >
   Applied AI / LLM engineering roles, including forward-deployed,
   autonomy solutions, and ML platform engineering.
-# Adzuna server-side narrowing (optional).
-adzuna_distance: 40       # miles radius around locations[0]
-adzuna_max_days_old: 30   # freshness window
+# Shared source-narrowing (used by BOTH Adzuna and LinkedIn).
+distance: 40              # miles radius around locations[0]
+max_days_old: 30         # freshness window (Adzuna max_days_old; LinkedIn f_TPR)
+# LinkedIn native filters (named; mapped to f_E / f_JT codes by the scraper).
+experience_levels:       # internship | entry | associate | mid-senior | director | executive
+  - mid-senior
+  - director
+employment_types:        # full_time | contract | part_time | temporary | internship
+  - full_time
 ```
+
+> Note: your current `config/search.yaml` lists `Greater Detroit Area` under `locations` —
+> LinkedIn's geo lookup returns nothing for that string. Replace it with a real place name
+> (e.g. `Detroit, MI`) so `geoId` resolves (Task 8).
 
 - [ ] **Step 6: Commit**
 
@@ -425,8 +447,8 @@ def test_adzuna_builds_targeted_params():
             exclude_terms=["driver", "cdl"],
             locations=["Detroit, MI"],
             min_salary=130000,
-            adzuna_distance=40,
-            adzuna_max_days_old=30,
+            distance=40,
+            max_days_old=30,
         )
         conn.fetch(cfg)
     finally:
@@ -466,12 +488,12 @@ Expected: FAIL — params still use `what` blob.
             params["what_exclude"] = " ".join(t.strip() for t in search.exclude_terms if t.strip())
         if search.locations:
             params["where"] = search.locations[0]
-            if search.adzuna_distance is not None:
-                params["distance"] = search.adzuna_distance
+            if search.distance is not None:
+                params["distance"] = search.distance
         if search.min_salary is not None:
             params["salary_min"] = search.min_salary
-        if search.adzuna_max_days_old is not None:
-            params["max_days_old"] = search.adzuna_max_days_old
+        if search.max_days_old is not None:
+            params["max_days_old"] = search.max_days_old
         resp = httpx.get(f"{_BASE}/{self.country}/search/1", params=params, timeout=30)
         resp.raise_for_status()
         return resp.json()
@@ -893,11 +915,300 @@ git commit -m "feat(discovery): wire relevance agent into CLI + golden-corpus re
 
 ---
 
+## Task 8: Login-free LinkedIn geoId resolver
+
+**Files:**
+- Create: `src/resume_agent/discovery/scraper/geo.py`
+- Test: `tests/test_scraper_geo.py` (create)
+
+A pure-ish helper that resolves a location string → LinkedIn `geoId` via the **login-free** guest
+typeahead, with an in-memory cache and fail-open `None` on no-match/error. The HTTP client is
+injected so tests never hit the network. Verified live: `"Detroit, MI"` → `103624908`,
+`"Ann Arbor, MI"` → `102965250`, `"Greater Detroit Area"` → `None`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `tests/test_scraper_geo.py`:
+
+```python
+from resume_agent.discovery.scraper.geo import resolve_geo_id
+
+
+class _Resp:
+    def __init__(self, payload): self._p = payload
+    def raise_for_status(self): ...
+    def json(self): return self._p
+
+
+def _client(payload):
+    class _C:
+        def get(self, url, params=None, headers=None, timeout=None):
+            return _Resp(payload)
+    return _C()
+
+
+def test_resolve_picks_first_geo_hit():
+    payload = [
+        {"id": "103624908", "type": "GEO", "displayName": "Detroit, Michigan, United States"},
+        {"id": "103013972", "type": "GEO", "displayName": "48228, Detroit, Michigan, United States"},
+    ]
+    assert resolve_geo_id("Detroit, MI", client=_client(payload)) == "103624908"
+
+
+def test_resolve_returns_none_on_empty():
+    assert resolve_geo_id("Greater Detroit Area", client=_client([])) is None
+
+
+def test_resolve_returns_none_on_error():
+    class _Boom:
+        def get(self, *a, **k): raise RuntimeError("network down")
+    assert resolve_geo_id("Detroit, MI", client=_Boom()) is None
+
+
+def test_resolve_caches_by_query():
+    calls = {"n": 0}
+    class _Counting:
+        def get(self, url, params=None, headers=None, timeout=None):
+            calls["n"] += 1
+            return _Resp([{"id": "1", "type": "GEO", "displayName": "X"}])
+    c = _Counting()
+    cache: dict[str, str | None] = {}
+    resolve_geo_id("Detroit, MI", client=c, cache=cache)
+    resolve_geo_id("Detroit, MI", client=c, cache=cache)
+    assert calls["n"] == 1  # second call served from cache
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `.venv/Scripts/python -m pytest tests/test_scraper_geo.py -q`
+Expected: FAIL — module does not exist.
+
+- [ ] **Step 3: Write the helper**
+
+Create `src/resume_agent/discovery/scraper/geo.py`:
+
+```python
+from typing import Any, Protocol
+
+import httpx
+
+_TYPEAHEAD = "https://www.linkedin.com/jobs-guest/api/typeaheadHits"
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+
+class _HttpLike(Protocol):
+    def get(self, url: str, params: dict | None = ..., headers: dict | None = ...,
+            timeout: float | None = ...) -> Any: ...
+
+
+def resolve_geo_id(
+    location: str,
+    *,
+    client: _HttpLike | None = None,
+    cache: dict[str, str | None] | None = None,
+) -> str | None:
+    """Resolve a location string to a LinkedIn geoId via the login-free typeahead.
+
+    Returns None (fail-open) on no match or any error. Results are memoised in
+    ``cache`` when provided (the scraper passes a per-run dict).
+    """
+    key = (location or "").strip()
+    if not key:
+        return None
+    if cache is not None and key in cache:
+        return cache[key]
+    http = client or httpx
+    geo_id: str | None = None
+    try:
+        resp = http.get(_TYPEAHEAD, params={"query": key, "typeaheadType": "GEO"},
+                        headers=_UA, timeout=20)
+        resp.raise_for_status()
+        hits = resp.json()
+        for hit in hits if isinstance(hits, list) else []:
+            if hit.get("type") == "GEO" and hit.get("id"):
+                geo_id = str(hit["id"])
+                break
+    except Exception:
+        geo_id = None  # fail-open
+    if cache is not None:
+        cache[key] = geo_id
+    return geo_id
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `.venv/Scripts/python -m pytest tests/test_scraper_geo.py -q`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/resume_agent/discovery/scraper/geo.py tests/test_scraper_geo.py
+git commit -m "feat(scraper): login-free LinkedIn geoId resolver with cache and fail-open"
+```
+
+---
+
+## Task 9: Emit LinkedIn native filters in `_search_url`
+
+**Files:**
+- Modify: `src/resume_agent/discovery/scraper/linkedin.py`
+- Test: `tests/test_scraper_linkedin.py`
+
+Extend `_search_url` to translate config into LinkedIn's `f_*`/`geoId`/`distance`/`sortBy` params
+**before** scraping. The mapping is a pure function (`_linkedin_filter_params`) so it is asserted
+without a browser; `_search_url` calls it with an injected geo-resolver (defaulting to
+`resolve_geo_id`). Unknown/blank values are omitted (fail-open); an unresolved location falls back
+to the existing text `location` param.
+
+Code tables (verified live):
+`f_WT` {remote:2, hybrid:3, onsite:1}; `f_E` {internship:1, entry:2, associate:3, mid-senior:4,
+director:5, executive:6}; `f_JT` {full_time:F, contract:C, part_time:P, temporary:T, internship:I};
+`f_TPR = r{max_days_old*86400}`; `sortBy=DD` when `max_days_old` is set.
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `tests/test_scraper_linkedin.py`:
+
+```python
+import urllib.parse
+
+from resume_agent.discovery.scraper.linkedin import _search_url
+from resume_agent.discovery.search_config import SearchConfig
+
+
+def _params(url):
+    return dict(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))
+
+
+def test_search_url_emits_native_filters():
+    cfg = SearchConfig(
+        titles=["AI Engineer"],
+        locations=["Detroit, MI"],
+        remote_policy="remote",
+        experience_levels=["mid-senior", "director"],
+        employment_types=["full_time"],
+        distance=40,
+        max_days_old=30,
+    )
+    url = _search_url(cfg, geo_resolver=lambda loc: "103624908")
+    p = _params(url)
+    assert p["keywords"] == "AI Engineer"
+    assert p["geoId"] == "103624908"
+    assert p["distance"] == "40"
+    assert p["f_WT"] == "2"
+    assert p["f_E"] == "4,5"
+    assert p["f_JT"] == "F"
+    assert p["f_TPR"] == "r2592000"   # 30 days * 86400
+    assert p["sortBy"] == "DD"
+
+
+def test_search_url_falls_back_to_text_location_when_geo_unresolved():
+    cfg = SearchConfig(titles=["AI Engineer"], locations=["Greater Detroit Area"])
+    url = _search_url(cfg, geo_resolver=lambda loc: None)
+    p = _params(url)
+    assert "geoId" not in p
+    assert p["location"] == "Greater Detroit Area"
+
+
+def test_search_url_omits_unset_filters():
+    cfg = SearchConfig(titles=["AI Engineer"])  # remote_policy 'any'/None etc.
+    p = _params(_search_url(cfg, geo_resolver=lambda loc: None))
+    for k in ("f_WT", "f_E", "f_JT", "f_TPR", "distance", "sortBy"):
+        assert k not in p
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `.venv/Scripts/python -m pytest tests/test_scraper_linkedin.py -k search_url -q`
+Expected: FAIL — `_search_url` takes no `geo_resolver` / emits no `f_*`.
+
+- [ ] **Step 3: Write the mapping + extend `_search_url`**
+
+In `src/resume_agent/discovery/scraper/linkedin.py` (add imports + a pure mapper, then call it):
+
+```python
+from typing import Callable
+
+from resume_agent.discovery.scraper.geo import resolve_geo_id
+
+_WT = {"remote": "2", "hybrid": "3", "onsite": "1", "on-site": "1"}
+_EXP = {"internship": "1", "entry": "2", "associate": "3",
+        "mid-senior": "4", "director": "5", "executive": "6"}
+_JT = {"full_time": "F", "contract": "C", "part_time": "P",
+       "temporary": "T", "internship": "I"}
+
+
+def _linkedin_filter_params(config: SearchConfig) -> dict[str, str]:
+    """Map config → LinkedIn f_* filter params (geo handled separately)."""
+    params: dict[str, str] = {}
+    wt = _WT.get((config.remote_policy or "").strip().lower())
+    if wt:
+        params["f_WT"] = wt
+    exp = [_EXP[e] for e in (s.strip().lower() for s in config.experience_levels) if e in _EXP]
+    if exp:
+        params["f_E"] = ",".join(dict.fromkeys(exp))
+    jt = [_JT[e] for e in (s.strip().lower() for s in config.employment_types) if e in _JT]
+    if jt:
+        params["f_JT"] = ",".join(dict.fromkeys(jt))
+    if config.max_days_old is not None:
+        params["f_TPR"] = f"r{int(config.max_days_old) * 86400}"
+        params["sortBy"] = "DD"
+    return params
+
+
+def _search_url(config: SearchConfig,
+                geo_resolver: Callable[[str], str | None] = resolve_geo_id) -> str:
+    params: dict[str, str] = {}
+    terms = _source_query_terms(config)
+    if terms:
+        params["keywords"] = terms[0][1]
+    if config.locations:
+        loc = config.locations[0]
+        geo_id = geo_resolver(loc)
+        if geo_id:
+            params["geoId"] = geo_id
+        else:
+            params["location"] = loc  # fail-open to text search
+        if config.distance is not None:
+            params["distance"] = str(config.distance)
+    params.update(_linkedin_filter_params(config))
+    if not params:
+        return _SEARCH_URL
+    return _SEARCH_URL + "?" + urllib.parse.urlencode(params)
+```
+
+The scraper instantiates one geo cache per `fetch` and passes a bound resolver
+(`lambda loc: resolve_geo_id(loc, cache=self._geo_cache)`) so repeated locations across the
+per-term `_source_searches` resolve once. Existing callers of `_search_url` keep working — the
+`geo_resolver` arg defaults to `resolve_geo_id`.
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `.venv/Scripts/python -m pytest tests/test_scraper_linkedin.py -q`
+Expected: PASS (new + existing scraper tests).
+
+- [ ] **Step 5: (Optional) live self-verify**
+
+With a logged-in profile, run `scrape --limit 5` and confirm in logs that the navigated
+`page.url` contains the `f_*`/`geoId` params (LinkedIn canonicalizes applied filters into the URL).
+Skip if no session is configured — it is not required for the suite.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/resume_agent/discovery/scraper/linkedin.py tests/test_scraper_linkedin.py
+git commit -m "feat(linkedin): apply native search filters (f_*/geoId/distance/sortBy) from config"
+```
+
+---
+
 ## Definition of Done
 
-- [ ] All 7 tasks committed; full suite green; ruff clean.
+- [ ] All 9 tasks committed; full suite green; ruff clean.
 - [ ] Default `role_anchors`/`exclude_terms` reject "Class A CDL Driver" and "Creative Lead" at Tier 1; the `rag`→`garage` substring bug cannot recur.
 - [ ] `run_relevance` rejects an off-target survivor with a reason and is a no-op when under-configured or the agent errors.
 - [ ] Adzuna issues one narrowed request (asserted params), not the all-terms blob.
+- [ ] LinkedIn `_search_url` emits native filters (`f_*`/`geoId`/`distance`/`sortBy`) from config; `resolve_geo_id` resolves real places and fails open to the text `location` for unrecognized strings.
 - [ ] Live before/after recorded in the PR shows lower junk-rate and fewer downstream LLM calls.
 - [ ] No existing config or test required changes (additive, fail-open).

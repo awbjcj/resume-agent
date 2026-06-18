@@ -50,7 +50,9 @@ query — so almost no narrowing happens at the source.
 | Term source | **New explicit config fields** `role_anchors` + `exclude_terms` (shipped with defaults in `.example`) |
 | Match scope | **Title only** for both anchors and excludes (word-boundary, case-insensitive); body never triggers reject |
 | LLM gate target | **New `target_role` description field** (falls back to `titles` if unset); gate sees target + title + truncated snippet |
-| Server-side search | **Targeted Adzuna query**: `what_or` of role phrases, `what_exclude`, `category`, `where`+`distance`, `salary_min`, `max_days_old`, pagination |
+| Server-side search (Adzuna) | **Targeted Adzuna query**: `what_or` of role phrases, `what_exclude`, `category`, `where`+`distance`, `salary_min`, `max_days_old`, pagination |
+| LinkedIn native filters | **URL-param filters** (`f_TPR`/`f_WT`/`f_E`/`f_JT`/`f_SB2`/`geoId`/`distance`/`sortBy`) built from config; **login-free typeahead** resolves `geoId`; no Playwright UI clicking |
+| Shared filter fields | `distance` + `max_days_old` are **shared** across Adzuna and LinkedIn (not connector-prefixed); `experience_levels` + `employment_types` added |
 | Placement | Lexical gate at the **connector edge** (junk never persisted; telemetry note); haiku gate as a new **`run_relevance` pipeline stage** with DB reject reasons |
 | Degradation | **Fail-open everywhere** — empty fields / no API key / LLM error ⇒ skip that gate; gates only *reject* on a confident signal; existing config + all tests keep working |
 | Verification | **Golden corpus** of labeled real JD samples + a **live before/after** `pull` reporting junk-rate and LLM-calls saved |
@@ -141,7 +143,39 @@ Deliberately **not** used: `title_only` and `what_and` (both over-filter and sil
 roles). The local Tier-1 gate still runs on Adzuna results as a backstop.
 
 Greenhouse / Lever are company ATS boards with **no full-text search** — fetch-all-then-gate is the
-only option; Tier 1 handles them. RemoteOK / LinkedIn are disabled today and unchanged.
+only option; Tier 1 handles them. RemoteOK is disabled today and unchanged.
+
+### 3.4 LinkedIn native filters (URL params)
+
+LinkedIn's UI filter panel is just query params on `/jobs/search/`. The scraper already emits
+`keywords` + `location` (`scraper/linkedin.py:92`); we extend `_search_url` to emit the native
+filter params **before** scraping, so LinkedIn does the narrowing server-side instead of pulling a
+broad list. Verified live against LinkedIn's login-free guest endpoints (2026-06-17):
+
+| Filter | Param | Codes (verified) | Driven by config |
+|---|---|---|---|
+| Date posted | `f_TPR` | `r<seconds>`: `r86400`/`r604800`/`r2592000` | `max_days_old` ⇒ `r{days*86400}` |
+| Workplace | `f_WT` | `1`=on-site, `2`=remote, `3`=hybrid (comma-join) | `remote_policy` (`any`/None ⇒ omit) |
+| Experience | `f_E` | `1`…`6` (internship→executive) | `experience_levels` (named) |
+| Job type | `f_JT` | `F`/`C`/`P`/`T`/`I` | `employment_types` (named) |
+| Salary | `f_SB2` | bucket index (non-linear) | `min_salary` (optional, approximate) |
+| Location | `geoId` + `distance` | numeric id + miles | `locations[0]` (resolved) + `distance` |
+| Sort | `sortBy` | `DD`=date, `R`=relevance | `DD` when `max_days_old` set, else omit |
+
+**geoId resolution — no Playwright needed.** A login-free GET to
+`https://www.linkedin.com/jobs-guest/api/typeaheadHits?query=<loc>&typeaheadType=GEO` returns
+`[{id, type:"GEO", displayName}]`. A small `resolve_geo_id(location)` helper picks the first bare
+GEO hit (preferring the city over postal-code variants) and is **cached** per run. This supersedes
+the "one-off Playwright geoId capture" idea from the brainstorm — the capture is unnecessary.
+
+**Fail-open.** If the typeahead returns `[]` (e.g. the config string `"Greater Detroit Area"`,
+which LinkedIn does not recognize) or errors, `geoId` is omitted and the scraper falls back to the
+existing text `location` param. Unknown/blank filter values are simply not emitted. The scraper may
+additionally self-verify by reading `page.url` back after navigation (LinkedIn canonicalizes
+applied filters into the URL).
+
+> Config fix flagged to the user: `locations` should use real LinkedIn place names
+> (`"Detroit, MI"`), not `"Greater Detroit Area"` (resolves to `[]`).
 
 ---
 
@@ -167,19 +201,30 @@ exclude_terms:         # Tier-1 + Adzuna what_exclude: title must contain none o
 target_role: >         # Tier-2: one-line description for the haiku gate
   Applied AI / LLM engineering roles, including forward-deployed,
   autonomy solutions, and ML platform engineering.
-adzuna_distance: 40        # optional; miles radius for `where`
-adzuna_max_days_old: 30    # optional; freshness window
+# Shared source-narrowing fields (used by BOTH Adzuna and LinkedIn).
+distance: 40           # miles radius around locations[0]
+max_days_old: 30       # freshness window (Adzuna max_days_old; LinkedIn f_TPR)
+# LinkedIn native filters (named values; scraper maps to f_E / f_JT codes).
+experience_levels:     # internship | entry | associate | mid-senior | director | executive
+  - mid-senior
+  - director
+employment_types:      # full_time | contract | part_time | temporary | internship
+  - full_time
 ```
 
-Existing `keywords` / `titles` keep their roles: `keywords` feed the Adzuna `what_or`; `titles`
-are the `target_role` fallback. No migration — these are config-only additions.
+Existing fields are reused for filtering: `remote_policy` → LinkedIn `f_WT`; `min_salary` →
+Adzuna `salary_min` + LinkedIn `f_SB2`; `locations[0]` → Adzuna `where` + LinkedIn `geoId`;
+`keywords` feed the Adzuna `what_or`; `titles` are the `target_role` fallback + LinkedIn query.
+No migration — all config-only additions, all optional (fail-open).
 
 ---
 
 ## 5. Out of scope
 
 - Semantic embeddings (deferred; revisit only if lexical + haiku prove insufficient).
-- RemoteOK tag-endpoint search and LinkedIn keyword tuning (those connectors are disabled).
+- RemoteOK tag-endpoint search (that connector is disabled).
+- `f_SB2` salary-bucket precision — mapping is non-linear; treat as approximate/optional.
+- Playwright UI-driven filter clicking — superseded by URL params + login-free geoId lookup.
 - Any change to extract / `apply_filters` / fit scoring — the gates sit entirely upstream.
 
 ---
@@ -192,6 +237,9 @@ are the `target_role` fallback. No migration — these are config-only additions
 3. `run_relevance` rejects a clearly off-target survivor (mocked agent) with a `reject_reason`, and
    is a **no-op** when under-configured or the agent errors (fail-open tests).
 4. Adzuna issues a single narrowed request (asserted params) instead of the blob.
-5. A live `pull` on the real config shows a materially lower junk-rate and fewer downstream
+5. `_search_url` emits the LinkedIn filter params from config (asserted query string), and
+   `resolve_geo_id("Detroit, MI")` returns `103624908` while `"Greater Detroit Area"` ⇒ `None`
+   (fail-open to the text `location` param).
+6. A live `pull` on the real config shows a materially lower junk-rate and fewer downstream
    `extract` calls than `main`.
-6. Full suite stays green; no existing config or test requires changes.
+7. Full suite stays green; no existing config or test requires changes.
