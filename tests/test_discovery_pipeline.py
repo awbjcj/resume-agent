@@ -1,7 +1,8 @@
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.pipeline import discover, reextract
+from resume_agent.discovery.pipeline import discover, reextract, run_relevance
+from resume_agent.discovery.relevance import RelevanceVerdict
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import (
     JobCriteriaExtract,
@@ -58,6 +59,15 @@ class _FitAgent:
         return _Result(FitScore(score=90, rationale="great fit"))
 
 
+class _Judge:
+    """Keeps titles containing 'engineer'; rejects others."""
+
+    def run(self, prompt):
+        keep = "JOB TITLE:\nAI Engineer" in prompt
+        reason = "ok" if keep else "off-target"
+        return _Result(RelevanceVerdict(keep=keep, reason=reason))
+
+
 class _ReextractAgent:
     def __init__(self, content):
         self._content = content
@@ -66,6 +76,63 @@ class _ReextractAgent:
     def run(self, prompt):
         self.prompts.append(prompt)
         return _Result(self._content)
+
+
+def test_run_relevance_rejects_offtarget_keeps_match():
+    cfg = SearchConfig(target_role="AI engineering roles")
+    with _session() as s:
+        save_job(
+            s,
+            Job(source="x", jd_text="build systems", title="AI Engineer", status=JobStatus.raw.value),
+        )
+        save_job(
+            s,
+            Job(source="x", jd_text="drive a truck", title="CDL Driver", status=JobStatus.raw.value),
+        )
+        rejected_count = run_relevance(s, cfg, _Judge())
+        assert rejected_count == 1
+        raw = jobs_by_status(s, JobStatus.raw.value)
+        rejected = jobs_by_status(s, JobStatus.rejected.value)
+        reject_reason = rejected[0].reject_reason
+        assert [j.title for j in raw] == ["AI Engineer"]
+        assert reject_reason is not None
+        assert reject_reason.startswith("off-target role")
+
+
+def test_run_relevance_noop_when_no_target_and_no_titles():
+    cfg = SearchConfig()
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd", title="Whatever", status=JobStatus.raw.value))
+        assert run_relevance(s, cfg, _Judge()) == 0
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
+
+
+def test_run_relevance_noop_when_titles_are_blank():
+    cfg = SearchConfig(titles=["", "   "])
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd", title="Whatever", status=JobStatus.raw.value))
+        assert run_relevance(s, cfg, _Judge()) == 0
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
+
+
+def test_run_relevance_noop_when_agent_none():
+    cfg = SearchConfig(target_role="AI roles")
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd", title="CDL Driver", status=JobStatus.raw.value))
+        assert run_relevance(s, cfg, None) == 0
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
+
+
+def test_run_relevance_keeps_job_on_agent_error():
+    class _Boom:
+        def run(self, prompt):
+            raise RuntimeError("api down")
+
+    cfg = SearchConfig(target_role="AI roles")
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd", title="CDL Driver", status=JobStatus.raw.value))
+        assert run_relevance(s, cfg, _Boom()) == 0
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
 
 
 def test_discover_extracts_filters_scores_and_shortlists():

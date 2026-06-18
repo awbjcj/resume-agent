@@ -19,6 +19,7 @@ from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
 from resume_agent.discovery.pipeline import discover, reextract
+from resume_agent.discovery.relevance import build_relevance_agent
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
@@ -185,9 +186,10 @@ def discover_cmd(
     profile_facts = load_facts(facts)
     extract_agent = build_extract_agent()
     fit_agent = build_fit_agent()
+    relevance_agent = build_relevance_agent()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        counts = discover(session, config, profile_facts, extract_agent, fit_agent)
+        counts = discover(session, config, profile_facts, extract_agent, fit_agent, relevance_agent)
     typer.echo(f"Discovery complete. Status counts: {counts}")
 
 

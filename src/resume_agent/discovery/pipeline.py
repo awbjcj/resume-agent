@@ -3,6 +3,7 @@ from sqlmodel import Session
 from resume_agent.discovery.extract import Runner, extract_job_criteria
 from resume_agent.discovery.filter import apply_filters
 from resume_agent.discovery.fit import compose_fit_input, score_fit
+from resume_agent.discovery.relevance import judge_relevance
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
@@ -53,6 +54,40 @@ def run_score(session: Session, profile_facts: ProfileFacts, agent: Runner) -> N
     session.commit()
 
 
+def _relevance_target(config: SearchConfig) -> str | None:
+    if config.target_role and config.target_role.strip():
+        return config.target_role.strip()
+    titles = [title.strip() for title in config.titles if title.strip()]
+    if titles:
+        return "Roles like: " + ", ".join(titles)
+    return None
+
+
+def run_relevance(session: Session, config: SearchConfig, agent: Runner | None) -> int:
+    """Reject off-target raw jobs via the cheap relevance gate."""
+    target = _relevance_target(config)
+    if target is None or agent is None:
+        return 0
+
+    rejected = 0
+    for job in jobs_by_status(session, JobStatus.raw.value):
+        jd_text = job.jd_text or ""
+        if not jd_text.strip():
+            continue
+        try:
+            verdict = judge_relevance(target, job.title, jd_text, agent)
+        except Exception:
+            continue
+        if not verdict.keep:
+            reason = (verdict.reason or "model rejected").strip()
+            job.status = JobStatus.rejected.value
+            job.reject_reason = f"off-target role: {reason}"
+            session.add(job)
+            rejected += 1
+    session.commit()
+    return rejected
+
+
 def reextract(session: Session, agent: Runner) -> int:
     """Re-run extraction over already-processed jobs, rewriting criteria_json in place.
 
@@ -77,8 +112,10 @@ def discover(
     profile_facts: ProfileFacts,
     extract_agent: Runner,
     fit_agent: Runner,
+    relevance_agent: Runner | None = None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows and return final status counts."""
+    run_relevance(session, config, relevance_agent)
     run_extract(session, extract_agent)
     run_filter(session, config)
     run_score(session, profile_facts, fit_agent)
