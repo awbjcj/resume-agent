@@ -25,3 +25,11 @@ remoteok:
 
 linkedin:
   enabled: false
+
+# Company careers pages by URL. The connector auto-detects the ATS
+# (Greenhouse / Lever / Ashby) and pulls all current openings. A direct
+# board URL works too; Workday is recognized but not yet fetched.
+companies:
+  enabled: false
+  urls:
+    - https://jobs.ashbyhq.com/someorg

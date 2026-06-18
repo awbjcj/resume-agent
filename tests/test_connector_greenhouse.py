@@ -95,3 +95,18 @@ def test_connector_isolates_failing_board_and_records_it():
     assert {j.company for j in jobs} == {"Stripe"}
     assert "dead" in connector.failures
     assert "404" in connector.failures["dead"]
+
+
+def test_get_board_delegates_to_module_fetcher(monkeypatch):
+    import resume_agent.discovery.connectors.greenhouse as gh
+
+    called = {}
+
+    def fake_fetch(token):
+        called["token"] = token
+        return {"jobs": []}
+
+    monkeypatch.setattr(gh, "fetch_greenhouse_board", fake_fetch)
+    conn = gh.GreenhouseConnector([GreenhouseBoard(token="acme")])
+    assert conn._get_board("acme") == {"jobs": []}
+    assert called["token"] == "acme"

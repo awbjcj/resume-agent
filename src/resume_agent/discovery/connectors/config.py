@@ -45,12 +45,18 @@ class LinkedInConfig(ExtensibleModel):
     enabled: bool = False
 
 
+class CompaniesConfig(ExtensibleModel):
+    enabled: bool = False
+    urls: list[str] = Field(default_factory=list)
+
+
 class ConnectorsConfig(ExtensibleModel):
     greenhouse: GreenhouseConfig = Field(default_factory=GreenhouseConfig)
     lever: LeverConfig = Field(default_factory=LeverConfig)
     adzuna: AdzunaConfig = Field(default_factory=AdzunaConfig)
     remoteok: RemoteOKConfig = Field(default_factory=RemoteOKConfig)
     linkedin: LinkedInConfig = Field(default_factory=LinkedInConfig)
+    companies: CompaniesConfig = Field(default_factory=CompaniesConfig)
 
 
 def load_connectors_config(path: str | Path) -> ConnectorsConfig:

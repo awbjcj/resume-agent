@@ -1,0 +1,21 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "title": "Senior ML Engineer",
+      "location": "Remote - US",
+      "descriptionPlain": "Build LLM systems. 5+ years of Python.",
+      "descriptionHtml": "<p>Build LLM systems. 5+ years of Python.</p>",
+      "jobUrl": "https://jobs.ashbyhq.com/acme/abc-123",
+      "publishedAt": "2026-06-01T00:00:00Z"
+    },
+    {
+      "title": "Class A CDL Driver",
+      "location": "Detroit, MI",
+      "descriptionPlain": "Drive a truck.",
+      "descriptionHtml": "<p>Drive a truck.</p>",
+      "jobUrl": "https://jobs.ashbyhq.com/acme/def-456",
+      "publishedAt": null
+    }
+  ]
+}

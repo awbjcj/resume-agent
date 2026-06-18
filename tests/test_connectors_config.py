@@ -10,6 +10,7 @@ def test_defaults_are_all_disabled():
     assert cfg.adzuna.enabled is False
     assert cfg.remoteok.enabled is False
     assert cfg.linkedin.enabled is False
+    assert cfg.companies.enabled is False
 
 
 def test_loads_example_file():
@@ -34,3 +35,22 @@ def test_board_company_defaults_to_token():
     board = cfg.greenhouse.boards[0]
     assert board.company is None
     assert board.display() == "acme"
+
+
+def test_companies_defaults_to_disabled_empty():
+    cfg = ConnectorsConfig()
+    assert cfg.companies.enabled is False
+    assert cfg.companies.urls == []
+
+
+def test_companies_loads_urls():
+    cfg = ConnectorsConfig.model_validate(
+        {"companies": {"enabled": True, "urls": ["https://careers.acme.com"]}}
+    )
+    assert cfg.companies.enabled is True
+    assert cfg.companies.urls == ["https://careers.acme.com"]
+
+
+def test_example_file_has_companies_section():
+    cfg = load_connectors_config(Path("config/connectors.yaml.example"))
+    assert cfg.companies.urls
