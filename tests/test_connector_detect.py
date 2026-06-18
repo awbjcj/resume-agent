@@ -25,6 +25,18 @@ def test_l1_workday_url():
     assert target is not None and target.ats == "workday"
 
 
+def test_l1_greenhouse_embed_url_reads_for_param():
+    # A directly-configured embed URL keeps the real slug in ?for=, not the path.
+    assert detect_ats(
+        "https://boards.greenhouse.io/embed/job_board?for=acme"
+    ) == AtsTarget("greenhouse", "acme")
+
+
+def test_l1_greenhouse_embed_url_without_for_falls_through(monkeypatch):
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
+    assert detect_ats("https://boards.greenhouse.io/embed/job_board") is None
+
+
 def test_l1_does_not_fetch_html(monkeypatch):
     def fail_get_html(url, client=None):
         raise AssertionError("L1 match should not fetch HTML")

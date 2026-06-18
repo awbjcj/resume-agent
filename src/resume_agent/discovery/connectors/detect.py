@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
@@ -61,6 +61,10 @@ def _l1(url: str) -> AtsTarget | None:
     for known_host, ats in _L1_HOSTS:
         if host == known_host:
             token = _first_path_segment(parts.path)
+            if ats == "greenhouse" and token == "embed":
+                # Embed URLs carry the real board slug in ?for=, not the path.
+                for_values = parse_qs(parts.query).get("for")
+                token = for_values[0] if for_values else None
             return AtsTarget(ats, token) if token else None
 
     workday = _WORKDAY_HOST.fullmatch(host)
