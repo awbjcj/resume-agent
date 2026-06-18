@@ -39,3 +39,18 @@ def test_run_pull_ingests_counts_and_isolates_failures(tmp_path):
         runs = read_runs(telemetry)
         assert runs["greenhouse"]["added"] == 1 and runs["greenhouse"]["error"] is None
         assert runs["adzuna"]["added"] == 0 and "429" in runs["adzuna"]["error"]
+
+
+def test_runner_note_includes_filtered_count(tmp_path):
+    class _Conn:
+        name = "fake"
+        filtered = 7
+
+        def fetch(self, search, limit=None):
+            return []
+
+    telemetry = tmp_path / "runs.json"
+    with _session() as s:
+        run_pull(s, [_Conn()], SearchConfig(), telemetry)
+    note = read_runs(telemetry)["fake"]["error"] or ""
+    assert "filtered 7" in note

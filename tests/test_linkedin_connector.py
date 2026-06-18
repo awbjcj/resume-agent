@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.scraper.linkedin import _FEED_URL, LinkedInScraper
+from resume_agent.discovery.scraper.linkedin import _FEED_URL, LinkedInScraper, _search_url
 from resume_agent.discovery.search_config import SearchConfig
 
 FIXTURES = Path(__file__).parent / "fixtures" / "linkedin"
@@ -54,6 +55,101 @@ def test_linkedin_fetch_threads_search_card_posted_at():
     assert _FakeDatedScraper().fetch(SearchConfig())[0].posted_at == datetime(
         2026, 6, 1, tzinfo=timezone.utc
     )
+
+
+def test_search_url_uses_one_source_query_not_every_title_and_keyword():
+    url = _search_url(
+        SearchConfig(
+            titles=["Software Engineer", "AI Engineer"],
+            keywords=["python", "rag"],
+            locations=["Ann Arbor, MI"],
+        ),
+        geo_resolver=lambda loc: None,
+    )
+    params = parse_qs(urlsplit(url).query)
+
+    assert params["keywords"] == ["Software Engineer"]
+    assert params["location"] == ["Ann Arbor, MI"]
+
+
+def test_search_url_emits_native_filters():
+    cfg = SearchConfig(
+        titles=["AI Engineer"],
+        locations=["Detroit, MI"],
+        remote_policy="remote",
+        experience_levels=["mid-senior", "director"],
+        employment_types=["full_time"],
+        min_salary=130000,
+        distance=40,
+        max_days_old=30,
+    )
+    url = _search_url(cfg, geo_resolver=lambda loc: "103624908")
+    params = parse_qs(urlsplit(url).query)
+
+    assert params["keywords"] == ["AI Engineer"]
+    assert params["geoId"] == ["103624908"]
+    assert params["distance"] == ["40"]
+    assert params["f_WT"] == ["2"]
+    assert params["f_E"] == ["4,5"]
+    assert params["f_JT"] == ["F"]
+    assert params["f_TPR"] == ["r2592000"]
+    assert params["f_SB2"] == ["5"]
+    assert params["sortBy"] == ["DD"]
+
+
+def test_search_url_falls_back_to_text_location_when_geo_unresolved():
+    cfg = SearchConfig(titles=["AI Engineer"], locations=["Greater Detroit Area"])
+    url = _search_url(cfg, geo_resolver=lambda loc: None)
+    params = parse_qs(urlsplit(url).query)
+    assert "geoId" not in params
+    assert params["location"] == ["Greater Detroit Area"]
+
+
+def test_search_url_omits_unset_filters():
+    cfg = SearchConfig(titles=["AI Engineer"])
+    params = parse_qs(urlsplit(_search_url(cfg, geo_resolver=lambda loc: None)).query)
+    for key in ("f_WT", "f_E", "f_JT", "f_TPR", "f_SB2", "distance", "sortBy"):
+        assert key not in params
+
+
+def test_linkedin_fetch_uses_next_source_query_until_limit():
+    class _MultiSearchScraper(LinkedInScraper):
+        def __init__(self):
+            super().__init__()
+            self.queries: list[str] = []
+
+        def _search_html(self, search):
+            term = (search.titles or search.keywords)[0]
+            self.queries.append(term)
+            job_id = {"Software Engineer": "3700000001", "AI Engineer": "3700000002"}[
+                term
+            ]
+            return f"""
+            <html><body>
+              <div class="base-card" data-entity-urn="urn:li:jobPosting:{job_id}">
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/{job_id}/"></a>
+                <h3 class="base-search-card__title">{term}</h3>
+                <h4 class="base-search-card__subtitle">Acme Corp</h4>
+                <span class="job-search-card__location">Remote, United States</span>
+              </div>
+            </body></html>
+            """
+
+        def _detail_html(self, card):
+            return """
+            <html><body>
+              <div class="show-more-less-html__markup">Build useful systems.</div>
+            </body></html>
+            """
+
+    scraper = _MultiSearchScraper()
+    jobs = scraper.fetch(
+        SearchConfig(titles=["Software Engineer", "AI Engineer"], keywords=["python"]),
+        limit=2,
+    )
+
+    assert scraper.queries == ["Software Engineer", "AI Engineer"]
+    assert [job.title for job in jobs] == ["Software Engineer", "AI Engineer"]
 
 
 class _ScriptedPage:

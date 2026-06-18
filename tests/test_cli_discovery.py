@@ -48,13 +48,38 @@ def test_discover_runs_and_reports_counts(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "load_facts", lambda path: object())
     monkeypatch.setattr(cli, "build_extract_agent", lambda: object())
     monkeypatch.setattr(cli, "build_fit_agent", lambda: object())
+    monkeypatch.setattr(cli, "build_relevance_agent", lambda: None, raising=False)
     monkeypatch.setattr(
-        cli, "discover", lambda session, config, facts, extract_agent, fit_agent: {"shortlisted": 1}
+        cli,
+        "discover",
+        lambda session, config, facts, extract_agent, fit_agent, relevance_agent=None: {
+            "shortlisted": 1
+        },
     )
 
     result = runner.invoke(cli.app, ["discover", "--db-url", db_url])
     assert result.exit_code == 0, result.output
     assert "shortlisted" in result.output
+
+
+def test_discover_builds_and_passes_relevance_agent(tmp_path, monkeypatch):
+    db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
+    seen = {}
+
+    def fake_discover(session, config, facts, extract_agent, fit_agent, relevance_agent=None):
+        seen["relevance_agent"] = relevance_agent
+        return {"shortlisted": 0}
+
+    monkeypatch.setattr(cli, "load_search_config", lambda path: object())
+    monkeypatch.setattr(cli, "load_facts", lambda path: object())
+    monkeypatch.setattr(cli, "build_extract_agent", lambda: object())
+    monkeypatch.setattr(cli, "build_fit_agent", lambda: object())
+    monkeypatch.setattr(cli, "build_relevance_agent", lambda: "RELV")
+    monkeypatch.setattr(cli, "discover", fake_discover)
+
+    result = runner.invoke(cli.app, ["discover", "--db-url", db_url])
+    assert result.exit_code == 0, result.output
+    assert seen["relevance_agent"] == "RELV"
 
 
 def test_discover_reextract_invokes_reextract(tmp_path, monkeypatch):

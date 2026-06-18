@@ -2,7 +2,7 @@ import httpx
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.text import filter_by_search, html_to_text
+from resume_agent.discovery.connectors.text import html_to_text, relevance_gate
 from resume_agent.discovery.search_config import SearchConfig
 
 _URL = "https://remoteok.com/api"
@@ -33,8 +33,15 @@ class RemoteOKConnector:
 
     name = "remoteok"
 
+    def __init__(self) -> None:
+        self.filtered = 0
+
     def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
-        jobs = filter_by_search(parse_remoteok(self._get_all()), search)
+        self.filtered = 0
+        jobs = parse_remoteok(self._get_all())
+        before = len(jobs)
+        jobs = relevance_gate(jobs, search)
+        self.filtered = before - len(jobs)
         return jobs[:limit] if limit is not None else jobs
 
     def _get_all(self) -> list:

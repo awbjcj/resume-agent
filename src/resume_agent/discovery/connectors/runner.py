@@ -8,13 +8,19 @@ from resume_agent.discovery.ingest import ingest_jobs
 from resume_agent.discovery.search_config import SearchConfig
 
 
-def _partial_failure_note(connector: Connector, count: int) -> str | None:
-    """A non-fatal note about sub-sources a connector skipped (e.g. dead boards)."""
+def _run_note(connector: Connector, count: int) -> str | None:
+    """Non-fatal note: skipped sub-sources and off-target jobs filtered."""
+    filtered = int(getattr(connector, "filtered", 0) or 0)
     failures: dict[str, str] | None = getattr(connector, "failures", None)
-    if not failures:
+    if not filtered and not failures:
         return None
-    items = ", ".join(f"{name} ({reason})" for name, reason in failures.items())
-    return f"+{count} added; skipped {len(failures)} source(s): {items}"
+    parts: list[str] = [f"+{count} added"]
+    if filtered:
+        parts.append(f"filtered {filtered} off-target")
+    if failures:
+        items = ", ".join(f"{name} ({reason})" for name, reason in failures.items())
+        parts.append(f"skipped {len(failures)} source(s): {items}")
+    return "; ".join(parts)
 
 
 def run_pull(
@@ -36,7 +42,7 @@ def run_pull(
                 telemetry_path,
                 connector.name,
                 added=count,
-                error=_partial_failure_note(connector, count),
+                error=_run_note(connector, count),
             )
         except Exception as exc:
             record_run(telemetry_path, connector.name, added=0, error=f"{type(exc).__name__}: {exc}")

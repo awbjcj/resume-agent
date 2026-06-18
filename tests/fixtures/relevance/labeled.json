@@ -1,0 +1,82 @@
+[
+  {
+    "title": "Class A CDL Driver",
+    "jd_text": "Operate a commercial truck and maintain delivery logs.",
+    "tier1_keep": false
+  },
+  {
+    "title": "Creative Lead",
+    "jd_text": "Lead brand campaigns and creative production.",
+    "tier1_keep": false
+  },
+  {
+    "title": "Warehouse Associate",
+    "jd_text": "Maintain the garage and storage areas for the facility.",
+    "tier1_keep": false
+  },
+  {
+    "title": "Registered Nurse",
+    "jd_text": "Provide patient care in a clinical environment.",
+    "tier1_keep": false
+  },
+  {
+    "title": "Technical Recruiter",
+    "jd_text": "Source candidates and coordinate interviews.",
+    "tier1_keep": false
+  },
+  {
+    "title": "Enterprise Sales Manager",
+    "jd_text": "Own quota and develop customer relationships.",
+    "tier1_keep": false
+  },
+  {
+    "title": "AI Applications Engineer",
+    "jd_text": "Build LLM-backed applications for enterprise users.",
+    "tier1_keep": true
+  },
+  {
+    "title": "Forward Deployed Engineer",
+    "jd_text": "Work with customers to ship applied AI systems.",
+    "tier1_keep": true
+  },
+  {
+    "title": "Autonomy Solutions Engineer",
+    "jd_text": "Develop perception and planning tools for autonomous platforms.",
+    "tier1_keep": true
+  },
+  {
+    "title": "Machine Learning Engineer",
+    "jd_text": "Train and deploy machine learning models in production.",
+    "tier1_keep": true
+  },
+  {
+    "title": "Applied Scientist",
+    "jd_text": "Design experiments and build ranking models.",
+    "tier1_keep": true
+  },
+  {
+    "title": "LLM Platform Engineer",
+    "jd_text": "Build retrieval, evaluation, and serving infrastructure.",
+    "tier1_keep": true
+  },
+  {
+    "title": "ML Infrastructure Engineer",
+    "jd_text": "Own feature stores, model deployment, and observability.",
+    "tier1_keep": true
+  },
+  {
+    "title": "AI Engineer",
+    "jd_text": "Prototype agentic workflows and production automation.",
+    "tier1_keep": true
+  },
+  {
+    "title": "Python Automation Specialist",
+    "jd_text": "Write scripts for office operations.",
+    "tier1_keep": false
+  },
+  {
+    "title": "Data Entry Clerk",
+    "jd_text": "Use Python-like spreadsheet formulas and maintain records.",
+    "tier1_keep": false
+  }
+]

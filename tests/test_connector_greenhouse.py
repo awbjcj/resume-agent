@@ -56,6 +56,21 @@ def test_connector_fetches_boards_and_filters_by_search():
     assert connector.name == "greenhouse"
 
 
+def test_greenhouse_gate_drops_offtarget_and_records_count(monkeypatch):
+    conn = GreenhouseConnector([GreenhouseBoard(token="acme", company="Acme")])
+    payload = {
+        "jobs": [
+            {"title": "AI Engineer", "absolute_url": "u1", "content": "build llm systems"},
+            {"title": "Class A CDL Driver", "absolute_url": "u2", "content": "drive a truck"},
+        ]
+    }
+    monkeypatch.setattr(conn, "_get_board", lambda token: payload)
+    cfg = SearchConfig(role_anchors=["engineer", "ai"], exclude_terms=["driver", "cdl"])
+    out = conn.fetch(cfg)
+    assert [j.title for j in out] == ["AI Engineer"]
+    assert conn.filtered == 1
+
+
 class _PartlyBrokenGreenhouse(GreenhouseConnector):
     """First board 404s; the rest return the fixture payload."""
 

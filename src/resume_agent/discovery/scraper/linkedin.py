@@ -9,6 +9,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from resume_agent.config import get_settings
 from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.scraper.geo import resolve_geo_id
 from resume_agent.discovery.scraper.models import ScrapedCard
 from resume_agent.discovery.scraper.parser import parse_job_detail, parse_search_cards
 from resume_agent.discovery.search_config import SearchConfig
@@ -19,12 +20,41 @@ _FEED_URL = "https://www.linkedin.com/feed/"
 
 # Containers that signal the meaningful content has rendered. Waiting on these
 # replaces a blind sleep: navigation returns as soon as the cards / JD exist.
-_CARDS_SELECTOR = "div.base-card"
-_DETAIL_SELECTOR = "div.show-more-less-html__markup, .description__text"
+_CARDS_SELECTOR = "div.base-card, div.job-card-container[data-job-id]"
+_DETAIL_SELECTOR = (
+    "div.show-more-less-html__markup, "
+    ".description__text, "
+    ".jobs-box__html-content, "
+    ".jobs-description__container, "
+    "[data-sdui-component*='aboutTheJob'], "
+    "[componentkey^='JobDetails_AboutTheJob']"
+)
 
 # How long to wait for a human to finish a manual login / 2FA / captcha before
 # giving up, when credentials are absent or LinkedIn throws a checkpoint.
 _MANUAL_LOGIN_TIMEOUT_MS = 180_000
+
+_WT = {"remote": "2", "hybrid": "3", "onsite": "1", "on-site": "1"}
+_EXP = {
+    "internship": "1",
+    "entry": "2",
+    "associate": "3",
+    "mid-senior": "4",
+    "director": "5",
+    "executive": "6",
+}
+_JT = {"full_time": "F", "contract": "C", "part_time": "P", "temporary": "T", "internship": "I"}
+_SALARY_BUCKETS = [
+    (40_000, "1"),
+    (60_000, "2"),
+    (80_000, "3"),
+    (100_000, "4"),
+    (120_000, "5"),
+    (140_000, "6"),
+    (160_000, "7"),
+    (180_000, "8"),
+    (200_000, "9"),
+]
 
 
 class _LoginPageLike(Protocol):
@@ -56,13 +86,88 @@ def _is_authenticated(url: str) -> bool:
     return "/feed" in url
 
 
-def _search_url(config: SearchConfig) -> str:
+def _source_query_terms(config: SearchConfig) -> list[tuple[str, str]]:
+    titles = [term.strip() for term in config.titles if term.strip()]
+    keywords = [term.strip() for term in config.keywords if term.strip()]
+    values = titles or keywords
+    kind = "titles" if titles else "keywords"
+    return [(kind, term) for term in dict.fromkeys(values)]
+
+
+def _source_searches(config: SearchConfig, limit: int | None) -> list[SearchConfig]:
+    terms = _source_query_terms(config)
+    if not terms:
+        return [config]
+    # Keep the no-limit command to one LinkedIn query, matching the old
+    # single-page scrape volume without building one giant keywords string.
+    max_terms = len(terms) if limit is not None else 1
+    searches: list[SearchConfig] = []
+    for kind, term in terms[:max_terms]:
+        update = (
+            {"titles": [term], "keywords": []}
+            if kind == "titles"
+            else {"titles": [], "keywords": [term]}
+        )
+        searches.append(config.model_copy(update=update))
+    return searches
+
+
+def _linkedin_filter_params(config: SearchConfig) -> dict[str, str]:
+    """Map config to LinkedIn's native filter params."""
     params: dict[str, str] = {}
-    terms = list(dict.fromkeys([*config.titles, *config.keywords]))
+    workplace = _WT.get((config.remote_policy or "").strip().lower())
+    if workplace:
+        params["f_WT"] = workplace
+
+    experience = [
+        _EXP[value]
+        for value in (level.strip().lower() for level in config.experience_levels)
+        if value in _EXP
+    ]
+    if experience:
+        params["f_E"] = ",".join(dict.fromkeys(experience))
+
+    job_types = [
+        _JT[value]
+        for value in (kind.strip().lower() for kind in config.employment_types)
+        if value in _JT
+    ]
+    if job_types:
+        params["f_JT"] = ",".join(dict.fromkeys(job_types))
+
+    if config.min_salary is not None:
+        bucket = next(
+            (code for floor, code in reversed(_SALARY_BUCKETS) if config.min_salary >= floor),
+            None,
+        )
+        if bucket:
+            params["f_SB2"] = bucket
+
+    if config.max_days_old is not None and config.max_days_old > 0:
+        params["f_TPR"] = f"r{int(config.max_days_old) * 86400}"
+        params["sortBy"] = "DD"
+
+    return params
+
+
+def _search_url(
+    config: SearchConfig,
+    geo_resolver: Callable[[str], str | None] = resolve_geo_id,
+) -> str:
+    params: dict[str, str] = {}
+    terms = _source_query_terms(config)
     if terms:
-        params["keywords"] = " ".join(terms)
+        params["keywords"] = terms[0][1]
     if config.locations:
-        params["location"] = config.locations[0]
+        location = config.locations[0]
+        geo_id = geo_resolver(location)
+        if geo_id:
+            params["geoId"] = geo_id
+        else:
+            params["location"] = location
+        if config.distance is not None:
+            params["distance"] = str(config.distance)
+    params.update(_linkedin_filter_params(config))
     if not params:
         return _SEARCH_URL
     return _SEARCH_URL + "?" + urllib.parse.urlencode(params)
@@ -99,6 +204,7 @@ class LinkedInScraper:
         self._playwright: Playwright | None = None
         self._context: BrowserContext | None = None
         self._page: Page | None = None
+        self._geo_cache: dict[str, str | None] = {}
 
     def _ensure_page(self) -> Page:
         """Lazily launch the persistent context once and reuse its page.
@@ -211,10 +317,24 @@ class LinkedInScraper:
             pass
 
     def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
+        self._geo_cache = {}
         try:
-            cards = parse_search_cards(self._search_html(search))
-            if limit is not None:
-                cards = cards[:limit]
+            if limit is not None and limit <= 0:
+                return []
+            cards: list[ScrapedCard] = []
+            seen_cards: set[str] = set()
+            for source_search in _source_searches(search, limit):
+                for card in parse_search_cards(self._search_html(source_search)):
+                    key = card.url or card.job_id
+                    if key and key in seen_cards:
+                        continue
+                    if key:
+                        seen_cards.add(key)
+                    cards.append(card)
+                    if limit is not None and len(cards) >= limit:
+                        break
+                if limit is not None and len(cards) >= limit:
+                    break
             jobs: list[RawJob] = []
             for card in cards:
                 jd_text = parse_job_detail(self._detail_html(card)).strip()
@@ -237,7 +357,9 @@ class LinkedInScraper:
 
     def _search_html(self, search: SearchConfig) -> str:
         return self._content_for_url(
-            _search_url(search), wait_selector=_CARDS_SELECTOR, scroll=True
+            _search_url(search, geo_resolver=lambda loc: resolve_geo_id(loc, cache=self._geo_cache)),
+            wait_selector=_CARDS_SELECTOR,
+            scroll=True,
         )
 
     def _detail_html(self, card: ScrapedCard) -> str:

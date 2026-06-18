@@ -2,7 +2,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from resume_agent.discovery.scraper.models import ScrapedCard
-from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail, parse_search_cards
+from resume_agent.discovery.scraper.parser import (
+    parse_detail_meta,
+    parse_job_detail,
+    parse_search_cards,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "linkedin"
 
@@ -79,6 +83,33 @@ def test_parse_search_cards_extracts_relative_posted_at():
     assert cards[0].posted_at == datetime(2026, 6, 14, 12, 0, tzinfo=timezone.utc)
 
 
+def test_parse_search_cards_extracts_logged_in_job_card():
+    html = """
+    <html><body>
+      <div class="job-card-container" data-job-id="4427219700">
+        <a class="job-card-list__title--link" href="/jobs/view/4427219700/?trk=flagship3_search_srp_jobs">
+          Controls Software Development Engineer
+        </a>
+        <div class="artdeco-entity-lockup__subtitle">FEV North America, Inc.</div>
+        <div class="artdeco-entity-lockup__caption">Madison Heights, MI (On-site)</div>
+        <time datetime="2026-06-12">5 days ago</time>
+      </div>
+    </body></html>
+    """
+    cards = parse_search_cards(html)
+
+    assert cards == [
+        ScrapedCard(
+            job_id="4427219700",
+            title="Controls Software Development Engineer",
+            company="FEV North America, Inc.",
+            location="Madison Heights, MI (On-site)",
+            url="https://www.linkedin.com/jobs/view/4427219700/",
+            posted_at=datetime(2026, 6, 12, tzinfo=timezone.utc),
+        )
+    ]
+
+
 def test_parse_job_detail_returns_clean_text():
     html = (FIXTURES / "job.html").read_text(encoding="utf-8")
     text = parse_job_detail(html)
@@ -92,6 +123,35 @@ def test_parse_job_detail_returns_empty_when_container_missing():
     # No recognized JD container: must not dump whole-page chrome as the JD.
     html = "<html><body><nav>People also viewed</nav><footer>About</footer></body></html>"
     assert parse_job_detail(html) == ""
+
+
+def test_parse_job_detail_reads_logged_in_search_panel_container():
+    html = """
+    <html><body>
+      <div class="jobs-box__html-content">
+        <h2>About the job</h2>
+        <p>Build APIs and automation for internal users.</p>
+      </div>
+    </body></html>
+    """
+    text = parse_job_detail(html)
+    assert "About the job" in text
+    assert "Build APIs and automation" in text
+
+
+def test_parse_job_detail_reads_logged_in_sdui_container():
+    html = """
+    <html><body>
+      <div componentkey="JobDetails_AboutTheJob_4402958807">
+        <div data-sdui-component="com.linkedin.sdui.generated.jobseeker.dsl.impl.aboutTheJob">
+          <h2>About the job</h2>
+          <p>Maintain high-traffic production services.</p>
+        </div>
+      </div>
+    </body></html>
+    """
+    text = parse_job_detail(html)
+    assert "Maintain high-traffic production services." in text
 
 
 def test_parse_detail_meta_reads_top_card():

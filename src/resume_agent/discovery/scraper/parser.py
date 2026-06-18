@@ -1,5 +1,5 @@
 from datetime import datetime
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
@@ -28,11 +28,16 @@ def _href(node: Tag | None) -> str | None:
 def _strip_query(href: str | None) -> str | None:
     if not href:
         return None
+    href = urljoin("https://www.linkedin.com", href)
     parsed = urlsplit(href)
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
 
 
 def _job_id(card: Tag, url: str | None) -> str | None:
+    for attr in ("data-job-id", "data-occludable-job-id"):
+        value = card.get(attr)
+        if isinstance(value, str) and value:
+            return value
     urn = card.get("data-entity-urn", "")
     if isinstance(urn, str) and urn:
         return urn.split(":")[-1]
@@ -47,12 +52,22 @@ def parse_search_cards(html: str, now: datetime | None = None) -> list[ScrapedCa
     """Parse a LinkedIn job-search results page into structured cards."""
     soup = BeautifulSoup(html, "html.parser")
     cards: list[ScrapedCard] = []
-    for card in soup.select("div.base-card"):
-        link = card.select_one("a.base-card__full-link")
+    card_nodes = [
+        *soup.select("div.base-card"),
+        *soup.select("div.job-card-container[data-job-id]"),
+    ]
+    for card in card_nodes:
+        link = card.select_one(
+            "a.base-card__full-link, "
+            "a.job-card-list__title--link, "
+            "a[href*='/jobs/view/']"
+        )
         url = _strip_query(_href(link))
         posted_at = None
         date_node = card.select_one(
-            "time.job-search-card__listdate, time.job-search-card__listdate--new"
+            "time.job-search-card__listdate, "
+            "time.job-search-card__listdate--new, "
+            "time"
         )
         if date_node is not None:
             date_value = date_node.get("datetime")
@@ -63,9 +78,25 @@ def parse_search_cards(html: str, now: datetime | None = None) -> list[ScrapedCa
         cards.append(
             ScrapedCard(
                 job_id=_job_id(card, url),
-                title=_text(card.select_one("h3.base-search-card__title")),
-                company=_text(card.select_one("h4.base-search-card__subtitle")),
-                location=_text(card.select_one("span.job-search-card__location")),
+                title=_text(
+                    card.select_one(
+                        "h3.base-search-card__title, a.job-card-list__title--link"
+                    )
+                ),
+                company=_text(
+                    card.select_one(
+                        "h4.base-search-card__subtitle, "
+                        ".artdeco-entity-lockup__subtitle, "
+                        ".job-card-container__primary-description"
+                    )
+                ),
+                location=_text(
+                    card.select_one(
+                        "span.job-search-card__location, "
+                        ".artdeco-entity-lockup__caption, "
+                        ".job-card-container__metadata-item"
+                    )
+                ),
                 url=url,
                 posted_at=posted_at,
             )
@@ -81,8 +112,13 @@ def parse_job_detail(html: str) -> str:
     page's navigation/chrome text being ingested as a bogus description.
     """
     soup = BeautifulSoup(html, "html.parser")
-    markup = soup.select_one("div.show-more-less-html__markup") or soup.select_one(
-        ".description__text"
+    markup = (
+        soup.select_one("div.show-more-less-html__markup")
+        or soup.select_one(".description__text")
+        or soup.select_one(".jobs-box__html-content")
+        or soup.select_one(".jobs-description__container")
+        or soup.select_one("[data-sdui-component*='aboutTheJob']")
+        or soup.select_one("[componentkey^='JobDetails_AboutTheJob']")
     )
     if markup is None:
         return ""
