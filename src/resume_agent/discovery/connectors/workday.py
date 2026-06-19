@@ -72,6 +72,8 @@ def apply_detail(row: WorkdayRow, detail: dict) -> None:
         row.url = info["externalUrl"]
     if info.get("location"):
         row.location = info["location"]
+    if info.get("companyName"):
+        row.company = info["companyName"]
     row.posted_at = parse_iso_datetime(info.get("startDate"))
 
 
@@ -103,7 +105,7 @@ def fetch_workday(target: AtsTarget, search: SearchConfig, limit: int | None = N
         if not row.external_path:
             continue  # no detail path -> cannot fetch a description; skip rather than POST a bad URL
         try:
-            resp = httpx.post(cxs_detail_url(target, row.external_path), json={}, timeout=30)
+            resp = httpx.get(cxs_detail_url(target, row.external_path), timeout=30)
             resp.raise_for_status()
         except httpx.HTTPError:
             continue  # one stale/failed detail endpoint must not discard the whole batch

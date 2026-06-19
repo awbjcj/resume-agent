@@ -90,12 +90,14 @@ def test_fetch_workday_list_gates_before_detail(monkeypatch):
     detail_calls = []
 
     def fake_post(url, json, timeout):
-        if url.endswith("/jobs"):
-            return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+
+    def fake_get(url, timeout):
         detail_calls.append(url)
         return _Resp(DETAIL)
 
     monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", fake_get)
     search = SearchConfig(role_anchors=["Software Engineer"])
     jobs = workday.fetch_workday(TARGET, search)
 
@@ -108,8 +110,9 @@ def test_fetch_workday_applies_keyword_filter_after_detail(monkeypatch):
     detail_calls = []
 
     def fake_post(url, json, timeout):
-        if url.endswith("/jobs"):
-            return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+
+    def fake_get(url, timeout):
         detail_calls.append(url)
         if "Software-Engineer" in url:
             return _Resp(DETAIL)
@@ -123,6 +126,7 @@ def test_fetch_workday_applies_keyword_filter_after_detail(monkeypatch):
         )
 
     monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", fake_get)
     jobs = workday.fetch_workday(TARGET, SearchConfig(keywords=["Python"]))
 
     assert [j.title for j in jobs] == ["Software Engineer"]
@@ -133,12 +137,11 @@ def test_fetch_workday_request_is_search_shaped(monkeypatch):
     sent = {}
 
     def fake_post(url, json, timeout):
-        if url.endswith("/jobs"):
-            sent.setdefault("searchText", json["searchText"])
-            return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
-        return _Resp(DETAIL)
+        sent.setdefault("searchText", json["searchText"])
+        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
 
     monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", lambda url, timeout: _Resp(DETAIL))
     workday.fetch_workday(TARGET, SearchConfig(titles=["Software Engineer"], role_anchors=["Engineer"]))
     assert sent["searchText"] == "Software Engineer"
 
@@ -146,12 +149,9 @@ def test_fetch_workday_request_is_search_shaped(monkeypatch):
 def test_fetch_workday_honors_limit(monkeypatch):
     page = {"total": 2, "jobPostings": LIST_PAGE["jobPostings"]}
 
-    def fake_post(url, json, timeout):
-        if url.endswith("/jobs"):
-            return _Resp(page if json["offset"] == 0 else {"total": 2, "jobPostings": []})
-        return _Resp(DETAIL)
-
-    monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "post",
+                        lambda url, json, timeout: _Resp(page if json["offset"] == 0 else {"total": 2, "jobPostings": []}))
+    monkeypatch.setattr(workday.httpx, "get", lambda url, timeout: _Resp(DETAIL))
     jobs = workday.fetch_workday(TARGET, SearchConfig(), limit=1)
     assert len(jobs) == 1
 
@@ -166,14 +166,23 @@ def test_fetch_workday_isolates_failed_detail_fetch(monkeypatch):
     }
 
     def fake_post(url, json, timeout):
-        if url.endswith("/jobs"):
-            return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+
+    def fake_get(url, timeout):
         if "Software-Engineer" in url:
             raise httpx.HTTPStatusError(
-                "500", request=httpx.Request("POST", url), response=httpx.Response(500)
+                "500", request=httpx.Request("GET", url), response=httpx.Response(500)
             )
         return _Resp(second_detail)
 
     monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", fake_get)
     jobs = workday.fetch_workday(TARGET, SearchConfig())
     assert [j.title for j in jobs] == ["Data Scientist"]
+
+
+def test_apply_detail_updates_company_name(monkeypatch):
+    row = parse_list_rows(TARGET, LIST_PAGE)[0]
+    assert row.company == "acme"
+    apply_detail(row, {**DETAIL, "jobPostingInfo": {**DETAIL["jobPostingInfo"], "companyName": "Acme Corp"}})
+    assert row.company == "Acme Corp"
