@@ -63,3 +63,19 @@ def relevance_gate(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
                 continue
         kept.append(job)
     return kept
+
+
+def title_relevance_gate(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
+    """Apply only title-safe relevance checks before a connector has JD text."""
+    anchors = [term.strip() for term in search.role_anchors if term.strip()]
+    excludes = [term.strip() for term in search.exclude_terms if term.strip()]
+
+    kept: list[RawJob] = []
+    for job in jobs:
+        title = job.title or ""
+        if excludes and title and _matches_any(title, excludes):
+            continue
+        if anchors and not _matches_any(title, anchors):
+            continue
+        kept.append(job)
+    return kept

@@ -9,6 +9,8 @@ STATE = {"listings": [
 ]}
 DETAIL = {"id": "1", "description": "<p>Build with Python.</p>",
           "url": "https://www.tesla.com/careers/search/job/1"}
+DETAIL_2 = {"id": "2", "description": "<p>Build fixtures.</p>",
+            "url": "https://www.tesla.com/careers/search/job/2"}
 
 
 def test_parse_tesla_listings_to_partial_rawjobs():
@@ -45,3 +47,28 @@ def test_fetch_tesla_gates_then_details(monkeypatch):
     assert [j.title for j in jobs] == ["Software Engineer"]
     assert len(detail_calls) == 1
     assert "Python" in jobs[0].jd_text
+
+
+def test_fetch_tesla_applies_keyword_filter_after_detail(monkeypatch):
+    detail_calls = []
+
+    class _Resp:
+        def __init__(self, p):
+            self._p = p
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._p
+
+    def fake_get(url, timeout):
+        if "state" in url:
+            return _Resp(STATE)
+        detail_calls.append(url)
+        return _Resp(DETAIL if url.endswith("/1") else DETAIL_2)
+
+    monkeypatch.setattr(tesla.httpx, "get", fake_get)
+    jobs = tesla.fetch_tesla(TARGET, SearchConfig(keywords=["Python"]))
+    assert [j.title for j in jobs] == ["Software Engineer"]
+    assert len(detail_calls) == 2

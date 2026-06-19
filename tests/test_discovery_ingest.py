@@ -1,8 +1,20 @@
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.discovery.ingest import IngestOutcome, add_job, save_or_upgrade
-from resume_agent.tracking.repository import application_for_job
-from resume_agent.tracking.tables import Application, ApplicationStatus, JobStatus
+from resume_agent.tracking.repository import (
+    application_for_job,
+    get_cover_letter,
+    resume_versions_for_job,
+    save_cover_letter,
+    save_resume_version,
+)
+from resume_agent.tracking.tables import (
+    Application,
+    ApplicationStatus,
+    CoverLetter,
+    JobStatus,
+    ResumeVersion,
+)
 
 
 def _session() -> Session:

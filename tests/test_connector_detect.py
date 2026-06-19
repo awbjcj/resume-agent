@@ -21,8 +21,9 @@ def test_l1_ashby_url():
 
 
 def test_l1_workday_url():
-    target = detect_ats("https://acme.wd1.myworkdayjobs.com/careers")
-    assert target is not None and target.ats == "workday"
+    assert detect_ats("https://acme.wd1.myworkdayjobs.com/careers") == AtsTarget(
+        "workday", tenant="acme", datacenter="wd1", site="careers"
+    )
 
 
 def test_l1_greenhouse_embed_url_reads_for_param():
@@ -111,6 +112,34 @@ def test_l1_workday_site_from_first_path_segment():
     t = detect_ats("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/jobs")
     assert t == AtsTarget(
         "workday", tenant="nvidia", datacenter="wd5", site="NVIDIAExternalCareerSite"
+    )
+
+
+def test_l1_workday_skips_locale_path_prefix():
+    assert detect_ats("https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/R-1") == AtsTarget(
+        "workday", tenant="acme", datacenter="wd5", site="Careers"
+    )
+
+
+def test_l2_workday_requires_full_fetchable_url(monkeypatch):
+    html = '<a href="https://acme.wd5.myworkdayjobs.com">Jobs</a>'
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: html)
+    assert detect_ats("https://careers.acme.com") is None
+
+
+def test_l2_workday_extracts_triple_from_embedded_url(monkeypatch):
+    html = '<a href="https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/R-1">Jobs</a>'
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: html)
+    assert detect_ats("https://careers.acme.com") == AtsTarget(
+        "workday", tenant="acme", datacenter="wd5", site="Careers"
+    )
+
+
+def test_l2_workday_extracts_site_from_cxs_url(monkeypatch):
+    html = '<script>fetch("https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/Careers/jobs")</script>'
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: html)
+    assert detect_ats("https://careers.acme.com") == AtsTarget(
+        "workday", tenant="acme", datacenter="wd5", site="Careers"
     )
 
 

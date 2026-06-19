@@ -4,14 +4,15 @@
 **Status:** Draft (design); pending user review
 **Branch:** `feat/discovery-structured-backends-and-priority`
 **Surface:** `discovery/connectors/detect.py` (descriptor + Workday/Tesla/Google detection),
-`discovery/connectors/companies.py` (dispatch seam), new backend modules
+`discovery/connectors/companies.py` (dispatch table), `discovery/connectors/text.py`
+(shared search/listing helpers), new backend modules
 `discovery/connectors/workday.py`, `tesla.py`, `google.py`. **No new config section.**
 
 > This is **Spec A** of a two-part upgrade brainstormed on 2026-06-19. The parts are independent
 > design→plan→build cycles split along a layer boundary:
 > - **A — structured-backend family + dispatch generalization** (this spec). *Touches `connectors/`.*
 > - **B — source-priority upgrade-merge** (`2026-06-19-source-priority-upgrade-merge-design.md`).
->   *Touches `ingest.py` / `repository.py`.* Newly urgent **because** of A.
+>   *Touches `ingest.py` / `connectors/runner.py`.* Newly urgent **because** of A.
 >
 > A deferred **Spec C** — generic Playwright + cached-pattern scraper for genuinely custom
 > (Notion/Webflow/bespoke-HTML) careers pages — is **out of scope** here; it gets its own brainstorm
@@ -41,10 +42,10 @@ OpenAI, Ford, GM, Google, Hyundai NA, KLA, Woven by Toyota), the population spli
 
 **None are Playwright/LLM HTML-scrape targets.** Every one exposes a *structured endpoint*. The goal
 is therefore to add **three structured backends** (Workday, Tesla, Google) reusing the existing
-detect→fetch→`RawJob` spine — and to **generalize the dispatch seam** so it can carry the richer
+detect→fetch→`RawJob` spine — and to **generalize the dispatch layer** so it can carry the richer
 identity and request-shaping these backends need.
 
-### Why the current seam can't absorb them (the forcing functions)
+### Why the current descriptor/dispatch path can't absorb them (the forcing functions)
 
 - **`token: str` is too thin.** Workday's identity is a **triple** — `generalmotors · wd5 ·
   Careers_GM` (tenant · data-center · site). `detect.py` today captures only the tenant
@@ -65,9 +66,9 @@ identity and request-shaping these backends need.
 | What to build | **Workday, Tesla, Google** as structured backends. (Ashby/Lever already cover OpenAI/Woven.) |
 | Generic long-tail scrape | **Deferred** to Spec C. Not in this spec. |
 | Dispatch model | **(1) Unified.** `detect_ats` returns a **structured descriptor**; Tesla/Google resolve by **host-match singletons** inside the same "paste any careers URL" flow. |
-| Identity type | `AtsTarget(ats, token)` → **`AtsTarget(ats, params)`** where `params` is an ats-specific mapping (`{"token": …}`, or `{"tenant","datacenter","site"}`, or `{}`). |
+| Identity type | Keep the backward-compatible `AtsTarget(ats, token="")` shape and add optional structured fields: `tenant`, `datacenter`, `site`. This avoids a repo-wide params mapping refactor while still carrying Workday's identity. |
 | Backend signature | Unify to `fetch(target, search, limit) -> list[RawJob]`. Existing backends ignore `search` (or use it only for the local list-gate). |
-| Workday volume | **(A) request-shaping** — push `search` keywords into the cxs `searchText`; **+ (C) list-gate** — relevance-gate on list-row title/location **before** spending the N+1 detail request. |
+| Workday volume | **(A) request-shaping** — push the strongest configured search text into the cxs `searchText`; **+ (C) list-gate** — relevance-gate on list-row title/location **before** spending the N+1 detail request. |
 | Config | **No new section.** Tesla/Google/Workday careers URLs go in the **existing** `companies.urls`; the unified detector routes them. Zero migration. |
 | Degradation | **Per-URL fail isolation**, unchanged. One dead/undetectable/unsupported URL is recorded in `.failures`; the rest ingest. |
 | Endpoint certainty | Workday cxs shape is **confirmed**. Tesla/Google exact endpoints are **reverse-engineered at build time** from the network tab (flagged risk §6). |
@@ -82,28 +83,35 @@ identity and request-shaping these backends need.
 @dataclass(frozen=True)
 class AtsTarget:
     ats: str                       # "greenhouse"|"lever"|"ashby"|"workday"|"tesla"|"google"
-    params: Mapping[str, str]      # ats-specific; backends read their own keys
+    token: str = ""                # board slug for greenhouse/lever/ashby
+    tenant: str = ""               # workday tenant, e.g. "generalmotors"
+    datacenter: str = ""           # workday data center, e.g. "wd5"
+    site: str = ""                 # workday site, e.g. "Careers_GM"
 ```
 
-- Greenhouse / Lever / Ashby → `params = {"token": <slug>}` (behavior identical to today).
-- Workday → `params = {"tenant": "generalmotors", "datacenter": "wd5", "site": "Careers_GM"}`.
-- Tesla / Google → `params = {}` (host *is* the identity).
+- Greenhouse / Lever / Ashby → `token = <slug>` (behavior identical to today, including existing
+  positional `AtsTarget("greenhouse", "acme")` call sites).
+- Workday → `tenant="generalmotors", datacenter="wd5", site="Careers_GM"`.
+- Tesla / Google → `AtsTarget("tesla")` / `AtsTarget("google")` (host *is* the identity).
 
 `detect_ats` gains, **before** the generic L1/L2 ATS logic:
 
 - **Host-match singletons (new, highest precedence).** `www.tesla.com`/`tesla.com` + path under
-  `/careers` → `AtsTarget("tesla", {})`. `careers.google.com` (and `google.com/about/careers`) →
-  `AtsTarget("google", {})`.
-- **Workday triple (fix existing).** `{tenant}.{dc}.myworkdayjobs.com/{site}/...` → capture **all
-  three** (`_WORKDAY_HOST` currently drops dc+site). `site` = first non-empty path segment.
+  `/careers` → `AtsTarget("tesla")`. `careers.google.com` (and `google.com/about/careers`) →
+  `AtsTarget("google")`.
+- **Workday triple (fix existing).** Direct Workday URLs of the form
+  `{tenant}.{dc}.myworkdayjobs.com/{site}/...` → capture **all three** (`_WORKDAY_HOST` currently
+  drops dc+site). `site` = first non-empty path segment. L2 HTML sniffing must only emit Workday
+  when it can extract a full Workday URL with a site path; a bare Workday host is not fetchable and
+  should return `None`.
 
-L1/L2 for Greenhouse/Lever/Ashby is unchanged except for wrapping the captured slug in
-`{"token": …}`. Detection stays deterministic and fixture-testable (host-match and Workday-triple
+L1/L2 for Greenhouse/Lever/Ashby is unchanged except that the captured slug lives in
+`target.token`. Detection stays deterministic and fixture-testable (host-match and Workday-triple
 need no network; Tesla/Google detection is pure URL parsing).
 
-### 3.2 Dispatch seam — `companies.py`
+### 3.2 Dispatch Table — `companies.py`
 
-`CompaniesConnector._fetch_target` dispatches on `target.ats` through a table:
+`CompaniesConnector.fetch` dispatches on `target.ats` through a table:
 
 ```python
 _BACKENDS = {
@@ -115,16 +123,15 @@ _BACKENDS = {
     "google":     fetch_google,
 }
 
-def _fetch_target(self, url, target):
-    backend = _BACKENDS.get(target.ats)
-    if backend is None:
-        self.failures[url] = f"{target.ats.title()} recognized, not yet supported"
-        return []
-    return backend(target, self.search, self.limit)
+backend = _BACKENDS.get(target.ats)
+if backend is None:
+    self.failures[url] = f"{target.ats.title()} recognized, not yet supported"
+else:
+    jobs.extend(backend(target, search, limit))
 ```
 
 Each backend has signature `(target: AtsTarget, search: SearchConfig, limit: int | None) ->
-list[RawJob]`. Greenhouse/Lever/Ashby adapters read `target.params["token"]` and call the existing
+list[RawJob]`. Greenhouse/Lever/Ashby adapters read `target.token` and call the existing
 shared `fetch_*_board` + `parse_*` (one code path preserved). The connector passes `search`/`limit`
 down so Workday can shape its request; the final `relevance_gate(jobs, search)` in `fetch()` stays as
 the backstop for backends that don't filter server-side.
@@ -136,7 +143,8 @@ https://{tenant}.{datacenter}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs   
 body: {"limit": 20, "offset": N, "searchText": <from search>, "appliedFacets": {}}
 ```
 
-1. **List, request-shaped (A).** POST with `searchText` derived from `search` keywords. Offset
+1. **List, request-shaped (A).** POST with `searchText` derived from the strongest configured search
+   text (`target_role`, titles, role anchors, then keywords). Offset
    pagination: page until `jobPostings` is empty **or** `offset+limit >= total` **or** the 10k cap /
    a configured page ceiling is hit. Each row → `{title, locationsText, postedOn, externalPath}`.
 2. **List-gate (C).** Run a title/location relevance pre-gate on the rows **before** any detail
@@ -155,7 +163,8 @@ are tenant-specific (discovered via a separate facets call) and are a **later re
 Tesla's careers search is JSON-backed (a `state` lookup payload of all listings + a per-id detail
 call). **Exact endpoints confirmed at build time** (§6). Shape: one list call returns all listings
 with lookup tables for departments/locations (no server-side search) → **client-side list-gate (C)**
-on title/location, then per-id detail for survivors → `jd_text`. `source="tesla"`.
+on title/location through the shared listing gate, then per-id detail for survivors → `jd_text`.
+`source="tesla"`.
 
 ### 3.5 Google backend — `google.py` (singleton)
 
@@ -206,18 +215,18 @@ companies:
   to `failures[url]` (never crash the run), fixture the parser against a captured payload.
 - **Workday rate-limiting / IP reputation.** N+1 over many survivors per run; pace requests and keep
   the list-gate aggressive so detail calls stay few. A per-run page ceiling caps worst case.
-- **Descriptor change is a refactor.** `AtsTarget(ats, token)` → `AtsTarget(ats, params)` touches the
-  three existing backends; covered by the existing connector tests (must stay green).
+- **Descriptor change is a refactor.** `AtsTarget(ats, token)` gains optional fields, so existing
+  positional call sites must stay valid; covered by the existing connector tests (must stay green).
 
 ---
 
 ## 7. Acceptance criteria
 
-1. `detect_ats` returns `AtsTarget("workday", {"tenant","datacenter","site"})` with **all three**
+1. `detect_ats` returns `AtsTarget("workday", tenant=..., datacenter=..., site=...)` with **all three**
    fields from a real Workday URL (e.g. `generalmotors.wd5.myworkdayjobs.com/Careers_GM`).
-2. `detect_ats` returns `AtsTarget("tesla", {})` / `AtsTarget("google", {})` by **host match**, with
+2. `detect_ats` returns `AtsTarget("tesla")` / `AtsTarget("google")` by **host match**, with
    precedence over generic L1/L2.
-3. Greenhouse/Lever/Ashby still resolve to `AtsTarget(ats, {"token": …})` and fetch through the
+3. Greenhouse/Lever/Ashby still resolve to `AtsTarget(ats, token)` and fetch through the
    **shared** `fetch_*_board` helpers (one code path, asserted) — no behavior change.
 4. Workday backend (fixtured cxs payloads): paginates the list, **list-gates before detail**, issues
    detail requests **only** for survivors, maps to `RawJob`s, honors `limit` and a page ceiling, and

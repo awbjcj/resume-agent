@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from html import unescape
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -42,6 +43,13 @@ _L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 _WORKDAY_HOST = re.compile(r"([a-z0-9-]+)\.([a-z0-9-]+)\.myworkdayjobs\.com", re.IGNORECASE)
+_WORKDAY_URL = re.compile(
+    r"(?:(?:https?:)?//)?"
+    r"(?P<host>[a-z0-9-]+\.[a-z0-9-]+\.myworkdayjobs\.com)"
+    r"(?P<path>/[^\"'<>\s]*)?",
+    re.IGNORECASE,
+)
+_LOCALE_SEGMENT = re.compile(r"^[a-z]{2}(?:[-_][a-z]{2})?$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -56,6 +64,32 @@ class AtsTarget:
 def _first_path_segment(path: str) -> str | None:
     segments = [segment for segment in path.split("/") if segment]
     return segments[0] if segments else None
+
+
+def _workday_site_segment(path: str) -> str | None:
+    segments = [segment for segment in path.split("/") if segment]
+    while segments and _LOCALE_SEGMENT.fullmatch(segments[0]):
+        segments.pop(0)
+    if len(segments) >= 4 and segments[0].lower() == "wday" and segments[1].lower() == "cxs":
+        return segments[3]
+    if segments and segments[0].lower() != "wday":
+        return segments[0]
+    return None
+
+
+def _workday_target(host: str, path: str) -> AtsTarget | None:
+    workday = _WORKDAY_HOST.fullmatch(host)
+    if not workday:
+        return None
+    site = _workday_site_segment(path)
+    if not site:
+        return None
+    return AtsTarget(
+        "workday",
+        tenant=workday.group(1),
+        datacenter=workday.group(2),
+        site=site,
+    )
 
 
 _SINGLETON_HOSTS: list[tuple[str, str]] = [
@@ -89,17 +123,9 @@ def _l1(url: str) -> AtsTarget | None:
                 token = for_values[0] if for_values else None
             return AtsTarget(ats, token) if token else None
 
-    workday = _WORKDAY_HOST.fullmatch(host)
-    if workday:
-        site = _first_path_segment(parts.path)
-        if site:
-            return AtsTarget(
-                "workday",
-                tenant=workday.group(1),
-                datacenter=workday.group(2),
-                site=site,
-            )
-        return None  # no site path -> not fetchable; fall through to L2/None
+    workday = _workday_target(host, parts.path)
+    if _WORKDAY_HOST.fullmatch(host):
+        return workday  # no site path -> not fetchable; fall through to L2/None
     return None
 
 
@@ -115,18 +141,20 @@ def _get_html(url: str, *, client: httpx.Client | None = None) -> str | None:
 
 
 def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
-    html = _get_html(url, client=client)
-    if not html:
+    raw_html = _get_html(url, client=client)
+    if not raw_html:
         return None
 
     for ats, pattern in _L2_MARKERS:
-        match = pattern.search(html)
+        match = pattern.search(raw_html)
         if match:
             return AtsTarget(ats, match.group(1))
 
-    workday = _WORKDAY_HOST.search(html)
-    if workday:
-        return AtsTarget("workday", workday.group(1))
+    html = unescape(raw_html).replace("\\/", "/")
+    for match in _WORKDAY_URL.finditer(html):
+        target = _workday_target(match.group("host").lower(), match.group("path") or "")
+        if target is not None:
+            return target
     return None
 
 

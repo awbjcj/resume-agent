@@ -66,13 +66,15 @@ def save_or_upgrade(
         # existing optional fields when the incoming source omitted them.
         existing.source = source
         existing.jd_text = jd_text
+        # All string fields are already _clean'd (empty -> None), so a truthy check means
+        # "the incoming source supplied this field"; posted_at is not a string, so test None.
         if url:
             existing.url = url
-        if company is not None:
+        if company:
             existing.company = company
-        if title is not None:
+        if title:
             existing.title = title
-        if incoming_location is not None:
+        if incoming_location:
             existing.location = incoming_location
         if posted_at is not None:
             existing.posted_at = posted_at

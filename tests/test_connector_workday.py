@@ -102,6 +102,31 @@ def test_fetch_workday_list_gates_before_detail(monkeypatch):
     assert "Python" in jobs[0].jd_text
 
 
+def test_fetch_workday_applies_keyword_filter_after_detail(monkeypatch):
+    detail_calls = []
+
+    def fake_post(url, json, timeout):
+        if url.endswith("/jobs"):
+            return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        detail_calls.append(url)
+        if "Software-Engineer" in url:
+            return _Resp(DETAIL)
+        return _Resp(
+            {
+                "jobPostingInfo": {
+                    "jobDescription": "<p>Analyze dashboards.</p>",
+                    "externalUrl": "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/R-2",
+                }
+            }
+        )
+
+    monkeypatch.setattr(workday.httpx, "post", fake_post)
+    jobs = workday.fetch_workday(TARGET, SearchConfig(keywords=["Python"]))
+
+    assert [j.title for j in jobs] == ["Software Engineer"]
+    assert len(detail_calls) == 2
+
+
 def test_fetch_workday_request_is_search_shaped(monkeypatch):
     sent = {}
 

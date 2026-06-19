@@ -3,8 +3,9 @@
 **Date:** 2026-06-19
 **Status:** Draft (design); pending user review
 **Branch:** `feat/discovery-structured-backends-and-priority`
-**Surface:** `discovery/ingest.py` (`add_job`), `tracking/repository.py` (`find_existing` / a new
-upgrade path), a small `source tier` map. **No config, no schema change.**
+**Surface:** `discovery/ingest.py` (`save_or_upgrade`, backward-compatible `add_job` /
+`ingest_jobs` wrappers), `discovery/source_tier.py`, and `discovery/connectors/runner.py` for pull
+telemetry. `tracking/repository.py` is reused unchanged. **No config, no schema change.**
 
 > This is **Spec B** of the 2026-06-19 two-part upgrade. It is a **downstream** dedup-policy change,
 > independent of **Spec A** (the structured-backend family) but made **urgent** by it: Workday is the
@@ -50,7 +51,7 @@ user's progress on that job.
 | Priority model | **(X) Upgrade-on-better-source.** Higher-tier re-see overwrites posting fields; it does not drop. |
 | Calibration | **Fixed 2-tier**, not per-source numeric knobs. **Tier 1 (canonical):** direct/ATS sources. **Tier 2 (fallback):** aggregators. |
 | State safety | **Preserve user progress.** Never reset `status`, and never touch related rows (`Application`, `ResumeVersion`, `CoverLetter`, notes). |
-| Post-application caution | If the job's `status` has **advanced past `raw`**, upgrade **only `url` + `source`** (gain the canonical apply link) and **freeze** `jd_text`/`title`/etc. so a resume already tailored to the old text isn't silently re-based. While `status == raw`, upgrade **all** posting fields. |
+| Post-application caution | If the job's `status` has **advanced past `raw`**, upgrade **only `url` + `source` when the incoming URL is present** (gain the canonical apply link) and **freeze** `jd_text`/`title`/etc. so a resume already tailored to the old text isn't silently re-based. While `status == raw`, upgrade posting fields but do not overwrite existing nullable fields with missing incoming values. |
 | Equal / lower tier | **No-op** (return `None`, current behavior) — no churn from same-tier re-pulls. |
 
 ### Tier assignment
@@ -68,24 +69,34 @@ sources (or among fallbacks) the tier is equal → first-seen stays.
 
 ## 3. Architecture
 
-`add_job` changes from "drop on duplicate" to "upgrade-or-skip on duplicate":
+`add_job` keeps its existing `Job | None` shape for CLI/test compatibility, but delegates to a new
+core function. The counted pull path uses the outcome-aware function so upgrades are visible without
+being counted as new inserts:
 
 ```python
-def add_job(session, *, source, jd_text, url, company, title, location, posted_at):
+def save_or_upgrade(session, *, source, jd_text, url, company, title, location, posted_at):
     ...
     existing = find_existing(session, url, jd_text, dedup_key)
     if existing is not None:
-        return maybe_upgrade(session, existing, incoming_fields, source)   # Job | None
+        return maybe_upgrade(session, existing, incoming_fields, source)   # (Job | None, outcome)
     # ... unchanged insert path ...
 ```
+
+`add_job(...)` remains a thin wrapper that returns the `Job` for inserts/upgrades and `None` for
+skips. `ingest_jobs(...)` remains backward compatible and returns insert counts only. A new
+`ingest_jobs_with_outcomes(...)` returns separate inserted/upgraded counts and is used by
+`run_pull(...)`.
 
 `maybe_upgrade(session, existing, fields, new_source)`:
 
 1. `if rank(new_source) >= rank(existing.source): return None` — equal/lower tier, keep existing.
 2. Higher tier → upgrade in place (same `Job.id`, related rows untouched):
-   - **`status == raw`** → overwrite `url, jd_text, company, title, location, posted_at, source`;
-     recompute `dedup_key`.
-   - **`status` advanced** → overwrite **only `url, source`**; leave the rest frozen.
+   - **`status == raw`** → overwrite `jd_text` and `source`; overwrite nullable posting fields
+     (`url`, `company`, `title`, `location`, `posted_at`) only when the incoming value is present;
+     recompute `dedup_key` from the merged `company/title`.
+   - **`status` advanced** → overwrite **only `url + source` when a canonical URL is present**;
+     leave the rest frozen. If the higher-tier copy has no URL, skip the advanced-status update
+     because it cannot improve the apply link and would misstate provenance.
 3. `save_job(session, existing)` (the existing `add`/`commit`/`refresh` path) and return it.
 
 Because `Application` / `ResumeVersion` / `CoverLetter` are separate tables keyed by `job_id`,
@@ -93,10 +104,11 @@ mutating the `Job` row's posting columns **does not cascade** to them — status
 inherently preserved. The post-application rule above is the extra guard against silently re-basing a
 tailored resume's source text.
 
-### Telemetry (optional, low-cost)
+### Telemetry
 
-`ingest_jobs` can distinguish *added* vs *upgraded* so `run_pull`'s note can read e.g.
-`+3 added, 2 upgraded` instead of hiding upgrades. Nice-to-have, not required for correctness.
+`ingest_jobs_with_outcomes` distinguishes *added* vs *upgraded* so `run_pull`'s note can read e.g.
+`+3 added, 2 upgraded` instead of hiding upgrades. The existing `added` telemetry field remains
+insert-only for compatibility.
 
 ---
 
@@ -130,8 +142,12 @@ check). Calling it out so it is not silently inherited.
    **no-op** — first-seen stays.
 4. Upgrade **preserves** `status`, `Application`, `ResumeVersion`, `CoverLetter`, and notes for that
    job (asserted via related-row queries before/after).
-5. When `status` has **advanced past `raw`**, a higher-tier re-see upgrades **only `url` + `source`**
-   and leaves `jd_text`/`title`/`location` unchanged.
-6. `ingest_jobs` return value / telemetry reflects upgrades without double-counting them as new adds.
-7. Full suite green; **no config or schema change**; existing dedup tests updated only where the
+5. When `status` has **advanced past `raw`**, a higher-tier re-see with an incoming URL upgrades
+   **only `url` + `source`** and leaves `jd_text`/`title`/`location` unchanged; without an incoming
+   URL, the advanced-status update is skipped.
+6. Raw-status upgrades do not overwrite existing non-empty optional fields with missing incoming
+   values.
+7. The outcome-aware ingest path and pull telemetry reflect upgrades without double-counting them as
+   new adds; the legacy `ingest_jobs` return value remains insert-only.
+8. Full suite green; **no config or schema change**; existing dedup tests updated only where the
    drop→upgrade behavior intentionally changed.

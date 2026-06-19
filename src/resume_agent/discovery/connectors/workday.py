@@ -5,7 +5,7 @@ import httpx
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_text, relevance_gate
+from resume_agent.discovery.connectors.text import html_to_text, relevance_gate, title_relevance_gate
 from resume_agent.discovery.search_config import SearchConfig
 
 _PAGE = 20  # cxs page size
@@ -89,21 +89,19 @@ def _list_pages(target: AtsTarget, search: SearchConfig):
 
 def fetch_workday(target: AtsTarget, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
     """List (request-shaped) -> gate on title/location -> detail-fetch survivors only."""
-    survivors: list[WorkdayRow] = []
-    for row in _list_pages(target, search):
-        # (C) gate BEFORE the N+1 detail fetch. With no anchors/keywords the gate is a
-        # pass-through, so the worst case is _MAX_OFFSET rows of detail calls — bounded.
-        if relevance_gate([row], search):
-            survivors.append(row)
-            if limit is not None and len(survivors) >= limit:
-                break
-
     jobs: list[RawJob] = []
-    for row in survivors:
+    for row in _list_pages(target, search):
+        # Gate only on title-safe constraints before the N+1 detail fetch. Keyword/title fallback
+        # needs jd_text, so the full relevance gate runs after detail is applied.
+        if not title_relevance_gate([row], search):
+            continue
         if not row.external_path:
             continue  # no detail path -> cannot fetch a description; skip rather than POST a bad URL
         resp = httpx.post(cxs_detail_url(target, row.external_path), json={}, timeout=30)
         resp.raise_for_status()
         apply_detail(row, resp.json())
-        jobs.append(row)
+        if relevance_gate([row], search):
+            jobs.append(row)
+            if limit is not None and len(jobs) >= limit:
+                break
     return jobs

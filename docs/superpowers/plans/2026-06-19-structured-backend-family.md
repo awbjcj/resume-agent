@@ -2,15 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add Workday, Tesla, and Google as structured (JSON-API) backends to the `companies` connector, behind a generalized detect→dispatch seam — no Playwright, no LLM, no new config.
+**Goal:** Add Workday, Tesla, and Google as structured (JSON-API) backends to the `companies` connector, behind a generalized detect→dispatch path — no Playwright, no LLM, no new config.
 
-**Architecture:** `detect_ats` gains host-match singletons (Tesla/Google) and a complete Workday triple (tenant·datacenter·site); `AtsTarget` grows three optional fields rather than changing its positional `(ats, token)` shape. `CompaniesConnector` dispatches `ats → adapter(target, search, limit)` through a small table; Workday shapes its cxs POST from `search` and **list-gates before** the N+1 detail fetch by reusing `relevance_gate`. Tesla/Google are singleton adapters parsed against captured fixtures.
+**Architecture:** `detect_ats` gains host-match singletons (Tesla/Google) and a complete Workday triple (tenant·datacenter·site); `AtsTarget` grows three optional fields rather than changing its positional `(ats, token)` shape. `CompaniesConnector` dispatches `ats → adapter(target, search, limit)` through a small table; Workday and Google shape API queries through one shared `primary_search_text(search)` helper; Workday/Tesla **list-gate before** N+1 detail fetches through one shared `listing_relevance_gate`. Tesla/Google are singleton adapters parsed against captured fixtures.
 
 **Tech Stack:** Python, `httpx` (sync), `pytest` + `monkeypatch`, existing `RawJob`/`relevance_gate`/`html_to_text`/`parse_iso_datetime` helpers.
 
 **Spec:** `docs/superpowers/specs/2026-06-19-structured-backend-family-design.md`
-
-> **Deviation from spec §3.1 (recorded):** the spec wrote `AtsTarget(ats, params: Mapping)`. The codebase has 15 detect tests that construct `AtsTarget("greenhouse", "acme")` positionally. Per the karpathy "surgical / don't break green tests" rule, this plan keeps `token` and **adds** `tenant`/`datacenter`/`site` optional fields — same structured-identity intent, near-zero blast radius.
 
 ---
 
@@ -23,6 +21,7 @@
 | `src/resume_agent/discovery/connectors/tesla.py` | Tesla careers JSON singleton backend | Create |
 | `src/resume_agent/discovery/connectors/google.py` | Google careers JSON singleton backend | Create |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table; thread `search`/`limit` to adapters | Modify |
+| `src/resume_agent/discovery/connectors/text.py` | Shared `primary_search_text` and list-row relevance gate | Modify |
 | `tests/test_connector_detect.py` | Extend with Workday triple + singletons | Modify |
 | `tests/test_connector_workday.py` | Workday parse/list-gate/fetch | Create |
 | `tests/test_connector_tesla.py` | Tesla parse/fetch | Create |
@@ -91,10 +90,10 @@ git commit -m "feat: extend AtsTarget with optional workday/singleton fields"
 
 ---
 
-## Task 2: Detect the full Workday triple in L1
+## Task 2: Detect the full Workday triple without emitting partial Workday targets
 
 **Files:**
-- Modify: `src/resume_agent/discovery/connectors/detect.py:44,70-73`
+- Modify: `src/resume_agent/discovery/connectors/detect.py:44,70-73,91-93`
 - Test: `tests/test_connector_detect.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -112,6 +111,20 @@ def test_l1_workday_site_from_first_path_segment():
     assert t == AtsTarget(
         "workday", tenant="nvidia", datacenter="wd5", site="NVIDIAExternalCareerSite"
     )
+
+
+def test_l2_workday_requires_full_url_with_site(monkeypatch):
+    html = '<a href="https://acme.wd1.myworkdayjobs.com/Careers/jobs">Jobs</a>'
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: html)
+    assert detect_ats("https://careers.acme.com") == AtsTarget(
+        "workday", tenant="acme", datacenter="wd1", site="Careers"
+    )
+
+
+def test_l2_workday_bare_host_is_not_fetchable(monkeypatch):
+    html = '<script src="https://acme.wd1.myworkdayjobs.com"></script>'
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: html)
+    assert detect_ats("https://careers.acme.com") is None
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -122,29 +135,40 @@ Expected: FAIL — current code returns `AtsTarget("workday", "nvidia")` (token-
 - [ ] **Step 3: Capture the data center and site**
 
 ```python
-# detect.py — widen the host regex to capture the data center
+# detect.py — widen the host regex to capture the data center; add a full URL regex for L2
 _WORKDAY_HOST = re.compile(r"([a-z0-9-]+)\.([a-z0-9-]+)\.myworkdayjobs\.com", re.IGNORECASE)
+_WORKDAY_URL = re.compile(
+    r"https?://([a-z0-9-]+)\.([a-z0-9-]+)\.myworkdayjobs\.com/([A-Za-z0-9_-]+)",
+    re.IGNORECASE,
+)
 ```
 
 ```python
+# detect.py — add one helper so L1 and L2 cannot drift
+def _workday_target(tenant: str, datacenter: str, site: str | None) -> AtsTarget | None:
+    if not site:
+        return None
+    return AtsTarget("workday", tenant=tenant, datacenter=datacenter, site=site)
+
+
 # detect.py — in _l1, replace the workday block
     workday = _WORKDAY_HOST.fullmatch(host)
     if workday:
-        site = _first_path_segment(parts.path)
-        if site:
-            return AtsTarget(
-                "workday",
-                tenant=workday.group(1),
-                datacenter=workday.group(2),
-                site=site,
-            )
-        return None  # no site path -> not fetchable; fall through to L2/None
+        return _workday_target(workday.group(1), workday.group(2), _first_path_segment(parts.path))
+```
+
+```python
+# detect.py — in _l2, replace the old host-only Workday sniff
+    workday = _WORKDAY_URL.search(html)
+    if workday:
+        return _workday_target(workday.group(1), workday.group(2), workday.group(3))
+    return None
 ```
 
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `pytest tests/test_connector_detect.py -v`
-Expected: PASS. Note `test_l1_workday_url` (`.../careers`) still passes — `ats == "workday"`, site `careers`.
+Expected: PASS. Note `test_l1_workday_url` (`.../careers`) still passes — `ats == "workday"`, site `careers`. The old L2 host-only Workday sniff is intentionally gone because it produced un-fetchable `workday` targets.
 
 - [ ] **Step 5: Commit**
 
@@ -173,6 +197,13 @@ def test_singleton_tesla_by_host(monkeypatch):
 def test_singleton_google_by_host(monkeypatch):
     monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
     assert detect_ats("https://careers.google.com/jobs/results/") == AtsTarget("google")
+
+
+def test_singleton_google_about_careers_by_host(monkeypatch):
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
+    assert detect_ats("https://www.google.com/about/careers/applications/jobs/results/") == AtsTarget(
+        "google"
+    )
 
 
 def test_singleton_precedes_l2(monkeypatch):
@@ -207,6 +238,8 @@ def _singleton(url: str) -> AtsTarget | None:
             if ats == "tesla" and not path.startswith("/careers"):
                 continue
             return AtsTarget(ats)
+    if host in {"google.com", "www.google.com"} and path.startswith("/about/careers"):
+        return AtsTarget("google")
     return None
 ```
 
@@ -231,10 +264,11 @@ git commit -m "feat: detect tesla/google careers by host-match singleton"
 
 ---
 
-## Task 4: Workday list parsing + request body
+## Task 4: Shared search/listing helpers + Workday list parsing
 
 **Files:**
 - Create: `src/resume_agent/discovery/connectors/workday.py`
+- Modify: `src/resume_agent/discovery/connectors/text.py`
 - Test: `tests/test_connector_workday.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -247,6 +281,7 @@ from resume_agent.discovery.connectors.workday import (
     list_request_body,
     parse_list_rows,
 )
+from resume_agent.discovery.connectors.text import primary_search_text, listing_relevance_gate
 from resume_agent.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers")
@@ -271,6 +306,16 @@ def test_list_request_body_shapes_search_text():
     assert body == {"appliedFacets": {}, "limit": 20, "offset": 20, "searchText": "Software Engineer"}
 
 
+def test_primary_search_text_uses_role_anchor_when_titles_absent():
+    assert primary_search_text(SearchConfig(role_anchors=["Software Engineer"])) == "Software Engineer"
+
+
+def test_listing_relevance_gate_can_match_location_before_detail_text():
+    rows = parse_list_rows(TARGET, LIST_PAGE)
+    kept = listing_relevance_gate(rows, SearchConfig(keywords=["Austin"]))
+    assert [r.title for r in kept] == ["Software Engineer"]
+
+
 def test_list_request_body_empty_search_text_when_no_terms():
     assert list_request_body(SearchConfig(), offset=0)["searchText"] == ""
 
@@ -285,6 +330,11 @@ def test_parse_list_rows_yields_partial_rawjobs():
     assert first.url == "https://acme.wd5.myworkdayjobs.com/job/Austin/Software-Engineer_R-1"
     assert first.jd_text == ""           # detail not fetched yet
     assert first.external_path == "/job/Austin/Software-Engineer_R-1"
+
+
+def test_parse_list_rows_skips_unfetchable_rows_without_external_path():
+    rows = parse_list_rows(TARGET, {"jobPostings": [{"title": "No path"}]})
+    assert rows == []
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -292,7 +342,37 @@ def test_parse_list_rows_yields_partial_rawjobs():
 Run: `pytest tests/test_connector_workday.py -v`
 Expected: FAIL — `ModuleNotFoundError: workday`
 
-- [ ] **Step 3: Implement parsing + body (no network yet)**
+- [ ] **Step 3: Implement shared helpers + parsing + body (no network yet)**
+
+```python
+# text.py — append below relevance_gate
+def primary_search_text(search: SearchConfig) -> str:
+    """Best single query string for APIs that accept one free-text search field."""
+    candidates = [search.target_role, *search.titles, *search.role_anchors, *search.keywords]
+    for term in candidates:
+        if term and term.strip():
+            return term.strip()
+    return ""
+
+
+def listing_relevance_gate(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
+    """Gate list rows before detail fetches, using title plus location as available text."""
+    kept: list[RawJob] = []
+    for job in jobs:
+        probe_text = "\n".join(part for part in (job.jd_text, job.location) if part)
+        probe = RawJob(
+            source=job.source,
+            url=job.url,
+            company=job.company,
+            title=job.title,
+            location=job.location,
+            jd_text=probe_text,
+            posted_at=job.posted_at,
+        )
+        if relevance_gate([probe], search):
+            kept.append(job)
+    return kept
+```
 
 ```python
 # src/resume_agent/discovery/connectors/workday.py
@@ -300,6 +380,7 @@ from dataclasses import dataclass
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import AtsTarget
+from resume_agent.discovery.connectors.text import primary_search_text
 from resume_agent.discovery.search_config import SearchConfig
 
 _PAGE = 20  # cxs page size
@@ -316,27 +397,28 @@ def _base(target: AtsTarget) -> str:
     return f"https://{target.tenant}.{target.datacenter}.myworkdayjobs.com"
 
 
+def _join_base_path(target: AtsTarget, path: str) -> str:
+    return f"{_base(target)}/{path.lstrip('/')}"
+
+
 def cxs_jobs_url(target: AtsTarget) -> str:
     return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}/jobs"
 
 
-def _search_text(search: SearchConfig) -> str:
-    terms = [t.strip() for t in (*search.titles, *search.keywords) if t.strip()]
-    return terms[0] if terms else ""
-
-
 def list_request_body(search: SearchConfig, offset: int) -> dict:
-    return {"appliedFacets": {}, "limit": _PAGE, "offset": offset, "searchText": _search_text(search)}
+    return {"appliedFacets": {}, "limit": _PAGE, "offset": offset, "searchText": primary_search_text(search)}
 
 
 def parse_list_rows(target: AtsTarget, page: dict) -> list[WorkdayRow]:
     rows: list[WorkdayRow] = []
     for item in page.get("jobPostings", []):
         path = item.get("externalPath") or ""
+        if not path:
+            continue
         rows.append(
             WorkdayRow(
                 source="workday",
-                url=f"{_base(target)}{path}" if path else None,
+                url=_join_base_path(target, path),
                 company=target.tenant,
                 title=item.get("title"),
                 location=item.get("locationsText"),
@@ -357,7 +439,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/resume_agent/discovery/connectors/workday.py tests/test_connector_workday.py
+git add src/resume_agent/discovery/connectors/text.py src/resume_agent/discovery/connectors/workday.py tests/test_connector_workday.py
 git commit -m "feat: workday list parsing and cxs request body"
 ```
 
@@ -392,6 +474,12 @@ def test_cxs_detail_url_joins_site_and_path():
     )
 
 
+def test_cxs_detail_url_accepts_path_without_leading_slash():
+    assert cxs_detail_url(TARGET, "job/Austin/Software-Engineer_R-1") == (
+        "https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/Careers/job/Austin/Software-Engineer_R-1"
+    )
+
+
 def test_apply_detail_fills_jd_url_posted_at():
     row = parse_list_rows(TARGET, LIST_PAGE)[0]
     apply_detail(row, DETAIL)
@@ -410,15 +498,17 @@ Expected: FAIL — `cxs_detail_url`/`apply_detail` undefined
 ```python
 # workday.py — add imports
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.connectors.text import html_to_text, primary_search_text
 ```
 
 ```python
 # workday.py — append
 def cxs_detail_url(target: AtsTarget, external_path: str) -> str:
-    # external_path begins with "/job/..."; the detail endpoint is "<site>/job/...".
-    suffix = external_path[len("/job") :] if external_path.startswith("/job") else external_path
-    return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}/job{suffix}"
+    # external_path is usually "/job/...", but normalize defensively.
+    path = external_path.strip().lstrip("/")
+    if path.startswith("job/"):
+        path = path[len("job/") :]
+    return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}/job/{path}"
 
 
 def apply_detail(row: WorkdayRow, detail: dict) -> None:
@@ -523,7 +613,7 @@ Expected: FAIL — `fetch_workday` / `workday.httpx` undefined
 ```python
 # workday.py — add imports at top
 import httpx
-from resume_agent.discovery.connectors.text import relevance_gate
+from resume_agent.discovery.connectors.text import listing_relevance_gate
 ```
 
 ```python
@@ -552,7 +642,7 @@ def fetch_workday(target: AtsTarget, search: SearchConfig, limit: int | None = N
     """List (request-shaped) -> gate on title/location -> detail-fetch survivors only."""
     survivors: list[WorkdayRow] = []
     for row in _list_pages(target, search):
-        if relevance_gate([row], search):          # (C) gate BEFORE spending a detail call
+        if listing_relevance_gate([row], search):  # (C) gate BEFORE spending a detail call
             survivors.append(row)
             if limit is not None and len(survivors) >= limit:
                 break
@@ -651,7 +741,7 @@ import httpx
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_text, relevance_gate
+from resume_agent.discovery.connectors.text import html_to_text, listing_relevance_gate
 from resume_agent.discovery.search_config import SearchConfig
 
 _STATE_URL = "https://www.tesla.com/cua-api/apps/careers/state"          # confirm at build time
@@ -685,7 +775,7 @@ def fetch_tesla(target: AtsTarget, search: SearchConfig, limit: int | None = Non
     resp.raise_for_status()
     survivors: list[TeslaRow] = []
     for row in parse_listings(resp.json()):
-        if relevance_gate([row], search):
+        if listing_relevance_gate([row], search):
             survivors.append(row)
             if limit is not None and len(survivors) >= limit:
                 break
@@ -784,16 +874,11 @@ import httpx
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.connectors.text import html_to_text, primary_search_text
 from resume_agent.discovery.search_config import SearchConfig
 
 _SEARCH_URL = "https://careers.google.com/api/v3/search/"   # confirm at build time
 _MAX_PAGES = 20
-
-
-def _query(search: SearchConfig) -> str:
-    terms = [t.strip() for t in (*search.titles, *search.keywords) if t.strip()]
-    return terms[0] if terms else ""
 
 
 def parse_jobs(page: dict) -> list[RawJob]:
@@ -818,7 +903,7 @@ def parse_jobs(page: dict) -> list[RawJob]:
 def fetch_google(target: AtsTarget, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
     jobs: list[RawJob] = []
     for page_num in range(1, _MAX_PAGES + 1):
-        resp = httpx.get(_SEARCH_URL, params={"q": _query(search), "page": page_num}, timeout=30)
+        resp = httpx.get(_SEARCH_URL, params={"q": primary_search_text(search), "page": page_num}, timeout=30)
         resp.raise_for_status()
         batch = parse_jobs(resp.json())
         if not batch:
@@ -843,7 +928,7 @@ git commit -m "feat: google careers singleton backend (search-shaped, fixture-te
 
 ---
 
-## Task 9: Wire the dispatch seam in `CompaniesConnector`
+## Task 9: Wire the dispatch table in `CompaniesConnector`
 
 **Files:**
 - Modify: `src/resume_agent/discovery/connectors/companies.py`
@@ -865,7 +950,7 @@ def test_companies_dispatches_workday(monkeypatch):
         from resume_agent.discovery.connectors.base import RawJob
         return [RawJob("workday", "u", "acme", "Software Engineer", "Austin", "jd")]
 
-    monkeypatch.setattr(companies, "fetch_workday", fake_workday)
+    monkeypatch.setitem(companies._BACKENDS, "workday", fake_workday)
     monkeypatch.setattr(
         companies, "detect_ats",
         lambda url: companies.AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers"),
@@ -1003,4 +1088,4 @@ git add -A && git commit -m "chore: lint structured-backend family"
 - **Spec coverage:** AC1 → Task 2; AC2 → Task 3; AC3 → Task 9 (`_greenhouse`/`_lever`/`_ashby` call shared `fetch_*_board`); AC4 → Tasks 4-6; AC5 → Tasks 7-8; AC6 → Task 9 (`failures` for undetected/unsupported); AC7 → Task 9 (`relevance_gate` + `.filtered` unchanged) and Task 10; AC8 → Task 10 + "no config change" (no Task touches `config.py`/`registry.py`).
 - **Placeholder scan:** none — every step carries runnable code; Tesla/Google URL constants are flagged build-time-confirm, not TBD, and their parsers are fully tested against fixtures.
 - **Type consistency:** `AtsTarget(ats, token="", tenant="", datacenter="", site="")` used consistently; adapter signature `(target, search, limit=None) -> list[RawJob]` matches `_BACKENDS` and `fetch_workday`/`fetch_tesla`/`fetch_google`; `WorkdayRow`/`TeslaRow` extend `RawJob` so `ingest` accepts them unchanged.
-- **Architecture (deletion test):** `_BACKENDS` is a real seam with 6 adapters; deleting it scatters ats-dispatch back into `if/elif` across the connector — it earns its keep. `workday.py` keeps list/detail/orchestration local to one file (locality).
+- **Architecture (deletion test):** `_BACKENDS` is a small dispatch table with 6 adapters; deleting it scatters ATS dispatch back into `if/elif` across the connector. `workday.py` keeps list/detail/orchestration local to one file (locality).
