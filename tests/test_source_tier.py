@@ -14,3 +14,7 @@ def test_equal_tier_sources_tie():
 
 def test_unknown_source_defaults_to_aggregator_tier():
     assert source_rank("mystery") == source_rank("adzuna")
+
+
+def test_manual_source_is_direct_tier():
+    assert source_rank("manual") < source_rank("adzuna")
