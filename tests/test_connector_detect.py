@@ -153,6 +153,17 @@ def test_singleton_google_by_host(monkeypatch):
     assert detect_ats("https://careers.google.com/jobs/results/") == AtsTarget("google")
 
 
+def test_singleton_google_modern_careers_url(monkeypatch):
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
+    url = "https://www.google.com/about/careers/applications/jobs/results"
+    assert detect_ats(url) == AtsTarget("google")
+
+
+def test_singleton_google_www_non_careers_path_not_matched(monkeypatch):
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
+    assert detect_ats("https://www.google.com/search?q=jobs") is None
+
+
 def test_singleton_precedes_l2(monkeypatch):
     def fail(url, client=None):
         raise AssertionError("singleton match must not fetch HTML")

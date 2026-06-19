@@ -96,6 +96,7 @@ _SINGLETON_HOSTS: list[tuple[str, str]] = [
     ("www.tesla.com", "tesla"),
     ("tesla.com", "tesla"),
     ("careers.google.com", "google"),
+    ("www.google.com", "google"),
 ]
 
 
@@ -106,6 +107,8 @@ def _singleton(url: str) -> AtsTarget | None:
     for known_host, ats in _SINGLETON_HOSTS:
         if host == known_host:
             if ats == "tesla" and not (path == "/careers" or path.startswith("/careers/")):
+                continue
+            if ats == "google" and host == "www.google.com" and not path.startswith("/about/careers/"):
                 continue
             return AtsTarget(ats)
     return None
