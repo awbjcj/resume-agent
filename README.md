@@ -189,10 +189,21 @@ uv run resume-agent scrape [--search config/search.yaml] [--limit 25]
 
 ### `pull` — pull jobs from job-board connectors
 
-Runs every connector enabled in `connectors.yaml` (Greenhouse, Adzuna, RemoteOK,
-…), dedupes the results into `raw` jobs, and prints a per-source count. Secrets
-(e.g. Adzuna keys) come from `.env`; which boards/sources to hit come from
-`connectors.yaml`.
+Runs every connector enabled in `connectors.yaml`, dedupes results into `raw`
+jobs, and prints a per-source count. When a higher-priority (canonical) source
+re-finds a job already in the DB from an aggregator, it **upgrades** the stored
+URL and JD text in place rather than dropping the duplicate — the pull summary
+shows `+N added, N upgraded`. Secrets (e.g. Adzuna keys) come from `.env`;
+which boards/sources to hit come from `connectors.yaml`.
+
+| Connector | What it needs |
+| --- | --- |
+| `greenhouse` | Board tokens in `connectors.yaml` |
+| `lever` | Board slugs in `connectors.yaml` |
+| `adzuna` | `ADZUNA_APP_ID` + `ADZUNA_APP_KEY` in `.env` |
+| `remoteok` | Nothing — open API |
+| `linkedin` | Burner credentials in `.env` (same as `scrape`) |
+| `companies` | Careers URLs in `connectors.yaml` — auto-detects Greenhouse, Lever, Ashby, Workday, Tesla, Google |
 
 ```bash
 uv run resume-agent pull [--connectors config/connectors.yaml] [--search config/search.yaml] [--limit 25]
@@ -339,7 +350,7 @@ Model tiers are also configurable via env (`CHEAP_MODEL`, `MID_MODEL`,
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `profile_sources.yaml` | Path to your resume and your GitHub username.                                                                                                                 |
 | `search.yaml`          | Keywords, titles, locations, and **hard filters** (salary, years of experience, remote policy, sponsorship).                                                  |
-| `connectors.yaml`      | Which job-board connectors `pull` runs and their parameters (Greenhouse board tokens, Adzuna country, RemoteOK, LinkedIn on/off). Secrets stay in `.env`.     |
+| `connectors.yaml`      | Which job-board connectors `pull` runs and their parameters (Greenhouse board tokens, Lever slugs, Adzuna country, RemoteOK, LinkedIn on/off, and `companies.urls` for direct ATS/portal URLs — Greenhouse, Lever, Ashby, Workday, Tesla, Google). Secrets stay in `.env`. |
 | `review.yaml`          | The reviewer roster, their weights/model tiers, `max_rounds`, `score_threshold`, optional `length_budget` one-page guidance, and optional `style_guide_path`. |
 | `render.yaml`          | Typst `template_path` and the PDF `output_dir`.                                                                                                               |
 | `style_guide.md`       | Optional house-style prose appended to the resume tailor loop. Governs how resumes are written, never what is claimed. Missing or empty means no change.      |
@@ -350,6 +361,27 @@ The cover-letter and resume templates live in `templates/` (`cover_letter.typ`,
 `resume.typ`) and can be edited directly. `config/gmail_credentials.json` (for
 `sync-status`) is the one config file with no example — it's the OAuth
 client-secret you download from Google Cloud (see [Gmail setup](#gmail-setup-for-sync-status)).
+
+### Source priority
+
+When the same job is seen by multiple connectors, a **canonical** source always
+wins over an **aggregator** copy:
+
+| Tier | Sources |
+| --- | --- |
+| **Canonical** (higher priority) | `greenhouse`, `lever`, `ashby`, `workday`, `tesla`, `google`, `companies`, `url` (hand-pasted) |
+| **Fallback** (lower priority) | `adzuna`, `remoteok`, `linkedin` |
+
+**First-seen-wins** among equal-tier sources — no churn from same-tier re-pulls.
+
+**Upgrade, not drop.** If a canonical source re-finds a job previously ingested
+from a fallback source, the stored posting fields (`url`, `jd_text`, `source`,
+`title`, `location`) are upgraded in place, keeping the same `Job` id. Your
+tailored resumes, cover letters, and application status are never touched.
+
+Once a job's status has advanced past `raw`, only the canonical apply `url` is
+updated (the JD text is frozen so a resume already tailored to it is not
+silently re-based).
 
 ---
 
@@ -378,37 +410,23 @@ it drives a real logged-in browser, paces its requests deliberately, and caps
 how much it pulls per run. Keep `--limit` modest and don't point it at an account
 you care about. Manual `addjob` is always available if you'd rather skip scraping.
 
----
-
-## Development
-
-```bash
-uv run pytest          # run the full test suite
-uv run pytest -k scraper   # run a subset
-```
-
-Tests are pure and offline — the agents and the browser are faked, so the suite
-needs no API key and no network.
-
-v1.5 keeps the tailor loop synchronous. Parallel reviewer panels and job-level
-concurrency are deferred while this pass reduces cost through leaner prompts.
-
-`scrape` is built for **personal, low-volume** use against a **burner** account:
-it drives a real logged-in browser, paces its requests deliberately, and caps
-how much it pulls per run. Keep `--limit` modest and don't point it at an account
-you care about. Manual `addjob` is always available if you'd rather skip scraping.
+The `companies` connector's Workday backend issues one detail request per
+surviving job listing — keep the relevance filters in `search.yaml` tight so the
+title-gate prunes the list before detail fetches begin.
 
 ---
 
 ## Development
 
 ```bash
-uv run pytest          # run the full test suite
+uv run pytest              # run the full test suite
 uv run pytest -k scraper   # run a subset
+ruff check                 # lint
 ```
 
-Tests are pure and offline — the agents and the browser are faked, so the suite
-needs no API key and no network.
+Tests are pure and offline — agents and the browser are faked, so the suite needs
+no API key and no network. Connector backends are tested against fixture JSON
+payloads captured from real responses.
 
 v1.5 keeps the tailor loop synchronous. Parallel reviewer panels and job-level
 concurrency are deferred while this pass reduces cost through leaner prompts.
