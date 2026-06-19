@@ -20,12 +20,15 @@ def _terms(search: SearchConfig) -> list[str]:
 
 
 def primary_search_term(search: SearchConfig) -> str:
-    """First non-empty title/keyword, used to shape a backend's server-side query.
+    """First non-empty title/keyword/anchor, used to shape a backend's server-side query.
 
-    Titles precede keywords (a title is the more specific query), and case is
-    preserved because some ATS search endpoints are case-sensitive.
+    Titles precede keywords (a title is the more specific query); role_anchors are a
+    last resort so configs that rely solely on anchors still send a shaped query.
+    Case is preserved because some ATS search endpoints are case-sensitive.
     """
     terms = [t.strip() for t in (*search.titles, *search.keywords) if t.strip()]
+    if not terms:
+        terms = [t.strip() for t in search.role_anchors if t.strip()]
     return terms[0] if terms else ""
 
 
