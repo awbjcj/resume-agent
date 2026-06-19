@@ -47,7 +47,10 @@ _WORKDAY_HOST = re.compile(r"([a-z0-9-]+)\.[a-z0-9-]+\.myworkdayjobs\.com", re.I
 @dataclass(frozen=True)
 class AtsTarget:
     ats: str
-    token: str
+    token: str = ""        # board slug for greenhouse/lever/ashby
+    tenant: str = ""       # workday tenant (e.g. "generalmotors")
+    datacenter: str = ""   # workday data center (e.g. "wd5")
+    site: str = ""         # workday site path segment (e.g. "Careers_GM")
 
 
 def _first_path_segment(path: str) -> str | None:

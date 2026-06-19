@@ -84,3 +84,18 @@ def test_l2_returns_none_for_unknown(monkeypatch):
 def test_l2_fails_open_on_fetch_error(monkeypatch):
     monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
     assert detect_ats("https://careers.acme.com") is None
+
+
+def test_atstarget_backward_compatible_positional():
+    assert AtsTarget("greenhouse", "acme") == AtsTarget("greenhouse", "acme")
+    assert AtsTarget("greenhouse", "acme").tenant == ""
+
+
+def test_atstarget_carries_workday_triple():
+    t = AtsTarget("workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM")
+    assert (t.tenant, t.datacenter, t.site) == ("generalmotors", "wd5", "Careers_GM")
+    assert t.token == ""
+
+
+def test_atstarget_singleton_needs_only_ats():
+    assert AtsTarget("tesla").token == ""
