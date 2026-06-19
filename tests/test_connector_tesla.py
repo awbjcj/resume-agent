@@ -25,6 +25,14 @@ def test_parse_tesla_listings_to_partial_rawjobs():
     assert rows[0].jd_text == ""
 
 
+def test_parse_tesla_listings_compact_keys():
+    """State endpoint may emit compact keys: t=title, l=location."""
+    compact_state = {"listings": [{"id": "3", "t": "ML Engineer", "l": "Palo Alto, CA"}]}
+    rows = tesla.parse_listings(compact_state)
+    assert rows[0].title == "ML Engineer"
+    assert rows[0].location == "Palo Alto, CA"
+
+
 def test_fetch_tesla_gates_then_details(monkeypatch):
     detail_calls = []
 

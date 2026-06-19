@@ -24,8 +24,8 @@ def parse_listings(state: dict) -> list[TeslaRow]:
                 source="tesla",
                 url=None,
                 company="Tesla",
-                title=item.get("title"),
-                location=item.get("region"),
+                title=item.get("title") or item.get("t"),
+                location=item.get("region") or item.get("l"),
                 jd_text="",
                 listing_id=str(item.get("id") or ""),
             )
