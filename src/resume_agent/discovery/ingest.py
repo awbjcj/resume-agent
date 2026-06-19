@@ -52,6 +52,10 @@ def save_or_upgrade(
     dedup_key = compute_dedup_key(company, title)
 
     existing = find_existing(session, url, jd_text, dedup_key)
+    # Same-source, different-URL dedup-key match means distinct postings (e.g. same role,
+    # different locations on a large board). URL check already passed — treat as new job.
+    if existing is not None and url and existing.url and url != existing.url and source == existing.source:
+        existing = None
     if existing is not None:
         if source_rank(source) >= source_rank(existing.source):
             return None, IngestOutcome.skipped

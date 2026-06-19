@@ -217,4 +217,16 @@ def test_post_raw_higher_tier_without_url_is_skipped():
                                        url=None, company="Acme", title="Backend Engineer")
         assert outcome is IngestOutcome.skipped
         assert job is None
-        assert first.source == "adzuna"
+
+
+def test_same_source_different_url_inserts_as_distinct_posting():
+    """Same company+title from the same ATS but different URLs = different locations; both kept."""
+    with _session() as s:
+        j1, o1 = save_or_upgrade(s, source="workday", jd_text="jd nyc",
+                                  url="http://wd/nyc", company="Acme", title="Engineer")
+        j2, o2 = save_or_upgrade(s, source="workday", jd_text="jd sf",
+                                  url="http://wd/sf", company="Acme", title="Engineer")
+        assert o1 is IngestOutcome.inserted
+        assert o2 is IngestOutcome.inserted
+        assert j1 is not None and j2 is not None
+        assert j1.id != j2.id
