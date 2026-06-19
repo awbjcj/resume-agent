@@ -157,4 +157,6 @@ def test_singleton_precedes_l2(monkeypatch):
     def fail(url, client=None):
         raise AssertionError("singleton match must not fetch HTML")
     monkeypatch.setattr(detect, "_get_html", fail)
-    assert detect_ats("https://www.tesla.com/careers").ats == "tesla"
+    target = detect_ats("https://www.tesla.com/careers")
+    assert target is not None
+    assert target.ats == "tesla"

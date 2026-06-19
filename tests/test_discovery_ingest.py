@@ -1,19 +1,11 @@
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.discovery.ingest import IngestOutcome, add_job, save_or_upgrade
-from resume_agent.tracking.repository import (
-    application_for_job,
-    get_cover_letter,
-    resume_versions_for_job,
-    save_cover_letter,
-    save_resume_version,
-)
+from resume_agent.tracking.repository import application_for_job
 from resume_agent.tracking.tables import (
     Application,
     ApplicationStatus,
-    CoverLetter,
     JobStatus,
-    ResumeVersion,
 )
 
 
@@ -92,6 +84,8 @@ def test_higher_tier_upgrades_lower_tier_in_place():
         upgraded, outcome = save_or_upgrade(s, source="workday", jd_text="full canonical jd",
                                             url="http://workday/1", company="Acme Corp",
                                             title="Senior Backend Engineer")
+        assert first is not None
+        assert upgraded is not None
         assert outcome is IngestOutcome.upgraded
         assert upgraded.id == first.id
         assert upgraded.source == "workday"
@@ -107,6 +101,8 @@ def test_raw_upgrade_does_not_clobber_existing_fields_with_missing_values():
         upgraded, outcome = save_or_upgrade(s, source="workday", jd_text="full canonical jd",
                                             url=None, company="Acme Corp",
                                             title="Backend Engineer", location=None)
+        assert first is not None
+        assert upgraded is not None
         assert outcome is IngestOutcome.upgraded
         assert upgraded.id == first.id
         assert upgraded.url == "http://adz/1"
@@ -119,6 +115,7 @@ def test_lower_tier_does_not_overwrite_higher_tier():
                                    company="Acme", title="Backend Engineer")
         job, outcome = save_or_upgrade(s, source="adzuna", jd_text="thin", url="http://adz/1",
                                        company="Acme", title="Backend Engineer")
+        assert first is not None
         assert outcome is IngestOutcome.skipped
         assert job is None
         assert first.source == "workday" and first.url == "http://wd/1"
@@ -138,6 +135,8 @@ def test_upgrade_preserves_application_and_status():
     with _session() as s:
         first, _ = save_or_upgrade(s, source="adzuna", jd_text="thin", url="http://adz/1",
                                    company="Acme", title="Backend Engineer")
+        assert first is not None
+        assert first.id is not None
         first.status = JobStatus.shortlisted.value
         s.add(first)
         s.commit()
@@ -148,6 +147,8 @@ def test_upgrade_preserves_application_and_status():
         upgraded, outcome = save_or_upgrade(s, source="workday", jd_text="full canonical jd",
                                             url="http://wd/1", company="Acme",
                                             title="Backend Engineer")
+        assert upgraded is not None
+        assert upgraded.id is not None
         assert outcome is IngestOutcome.upgraded
         assert upgraded.status == JobStatus.shortlisted.value
         app = application_for_job(s, upgraded.id)
@@ -158,12 +159,14 @@ def test_post_raw_upgrade_freezes_text_but_takes_url():
     with _session() as s:
         first, _ = save_or_upgrade(s, source="adzuna", jd_text="ORIGINAL jd", url="http://adz/1",
                                    company="Acme", title="Backend Engineer")
+        assert first is not None
         first.status = JobStatus.tailored.value
         s.add(first)
         s.commit()
 
         upgraded, _ = save_or_upgrade(s, source="workday", jd_text="REPLACEMENT jd",
                                       url="http://wd/1", company="Acme", title="Backend Engineer")
+        assert upgraded is not None
         assert upgraded.url == "http://wd/1"
         assert upgraded.source == "workday"
         assert upgraded.jd_text == "ORIGINAL jd"
@@ -173,6 +176,7 @@ def test_post_raw_higher_tier_without_url_is_skipped():
     with _session() as s:
         first, _ = save_or_upgrade(s, source="adzuna", jd_text="ORIGINAL jd", url="http://adz/1",
                                    company="Acme", title="Backend Engineer")
+        assert first is not None
         first.status = JobStatus.tailored.value
         s.add(first)
         s.commit()
