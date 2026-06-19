@@ -41,7 +41,7 @@ _L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
     ),
 ]
 
-_WORKDAY_HOST = re.compile(r"([a-z0-9-]+)\.[a-z0-9-]+\.myworkdayjobs\.com", re.IGNORECASE)
+_WORKDAY_HOST = re.compile(r"([a-z0-9-]+)\.([a-z0-9-]+)\.myworkdayjobs\.com", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -58,6 +58,25 @@ def _first_path_segment(path: str) -> str | None:
     return segments[0] if segments else None
 
 
+_SINGLETON_HOSTS: list[tuple[str, str]] = [
+    ("www.tesla.com", "tesla"),
+    ("tesla.com", "tesla"),
+    ("careers.google.com", "google"),
+]
+
+
+def _singleton(url: str) -> AtsTarget | None:
+    """Bespoke portals identified by host alone (no token)."""
+    host = (urlsplit(url).hostname or "").lower()
+    path = urlsplit(url).path.lower()
+    for known_host, ats in _SINGLETON_HOSTS:
+        if host == known_host:
+            if ats == "tesla" and not path.startswith("/careers"):
+                continue
+            return AtsTarget(ats)
+    return None
+
+
 def _l1(url: str) -> AtsTarget | None:
     parts = urlsplit(url)
     host = (parts.hostname or "").lower()
@@ -72,7 +91,15 @@ def _l1(url: str) -> AtsTarget | None:
 
     workday = _WORKDAY_HOST.fullmatch(host)
     if workday:
-        return AtsTarget("workday", workday.group(1))
+        site = _first_path_segment(parts.path)
+        if site:
+            return AtsTarget(
+                "workday",
+                tenant=workday.group(1),
+                datacenter=workday.group(2),
+                site=site,
+            )
+        return None  # no site path -> not fetchable; fall through to L2/None
     return None
 
 
@@ -104,5 +131,5 @@ def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
 
 
 def detect_ats(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
-    """Resolve a careers URL to an ATS target via URL pattern, then HTML sniff."""
-    return _l1(url) or _l2(url, client=client)
+    """Resolve a careers URL: bespoke singleton, then URL pattern, then HTML sniff."""
+    return _singleton(url) or _l1(url) or _l2(url, client=client)

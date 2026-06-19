@@ -99,3 +99,33 @@ def test_atstarget_carries_workday_triple():
 
 def test_atstarget_singleton_needs_only_ats():
     assert AtsTarget("tesla").token == ""
+
+
+def test_l1_workday_captures_tenant_datacenter_site():
+    assert detect_ats("https://generalmotors.wd5.myworkdayjobs.com/Careers_GM") == AtsTarget(
+        "workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM"
+    )
+
+
+def test_l1_workday_site_from_first_path_segment():
+    t = detect_ats("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/jobs")
+    assert t == AtsTarget(
+        "workday", tenant="nvidia", datacenter="wd5", site="NVIDIAExternalCareerSite"
+    )
+
+
+def test_singleton_tesla_by_host(monkeypatch):
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
+    assert detect_ats("https://www.tesla.com/careers/search/?query=engineer") == AtsTarget("tesla")
+
+
+def test_singleton_google_by_host(monkeypatch):
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
+    assert detect_ats("https://careers.google.com/jobs/results/") == AtsTarget("google")
+
+
+def test_singleton_precedes_l2(monkeypatch):
+    def fail(url, client=None):
+        raise AssertionError("singleton match must not fetch HTML")
+    monkeypatch.setattr(detect, "_get_html", fail)
+    assert detect_ats("https://www.tesla.com/careers").ats == "tesla"
