@@ -104,6 +104,17 @@ def test_companies_dispatches_workday(monkeypatch):
     assert [j.source for j in jobs] == ["workday"]
 
 
+def test_companies_isolates_parser_error(monkeypatch):
+    def boom(token):
+        raise KeyError("unexpected payload shape")
+
+    _patch(monkeypatch, detect=lambda url: AtsTarget("greenhouse", "acme"), gh=boom)
+    conn = CompaniesConnector(["https://careers.acme.com"])
+    jobs = conn.fetch(SearchConfig(keywords=["engineer"]))
+    assert jobs == []
+    assert "parse error: KeyError" in conn.failures["https://careers.acme.com"]
+
+
 def test_companies_unsupported_ats_recorded(monkeypatch):
     monkeypatch.setattr(
         companies, "detect_ats", lambda url: AtsTarget("smartrecruiters", "x")

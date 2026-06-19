@@ -71,7 +71,7 @@ def _singleton(url: str) -> AtsTarget | None:
     path = urlsplit(url).path.lower()
     for known_host, ats in _SINGLETON_HOSTS:
         if host == known_host:
-            if ats == "tesla" and not path.startswith("/careers"):
+            if ats == "tesla" and not (path == "/careers" or path.startswith("/careers/")):
                 continue
             return AtsTarget(ats)
     return None

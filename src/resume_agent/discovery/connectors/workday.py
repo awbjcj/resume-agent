@@ -9,7 +9,7 @@ from resume_agent.discovery.connectors.text import html_to_text, relevance_gate
 from resume_agent.discovery.search_config import SearchConfig
 
 _PAGE = 20  # cxs page size
-_MAX_OFFSET = 1000  # safety ceiling: <=50 pages even if a tenant ignores searchText
+_MAX_OFFSET = 1000  # safety ceiling: <=51 pages (~1020 rows) even if a tenant ignores searchText
 
 
 @dataclass
@@ -55,9 +55,9 @@ def parse_list_rows(target: AtsTarget, page: dict) -> list[WorkdayRow]:
 
 
 def cxs_detail_url(target: AtsTarget, external_path: str) -> str:
-    # external_path begins with "/job/..."; the detail endpoint is "<site>/job/...".
-    suffix = external_path[len("/job") :] if external_path.startswith("/job") else external_path
-    return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}/job{suffix}"
+    # external_path already begins with "/job/..."; the cxs detail endpoint is the
+    # site path with that suffix appended verbatim (no special-casing of the prefix).
+    return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}{external_path}"
 
 
 def apply_detail(row: WorkdayRow, detail: dict) -> None:
@@ -91,13 +91,17 @@ def fetch_workday(target: AtsTarget, search: SearchConfig, limit: int | None = N
     """List (request-shaped) -> gate on title/location -> detail-fetch survivors only."""
     survivors: list[WorkdayRow] = []
     for row in _list_pages(target, search):
-        if relevance_gate([row], search):  # (C) gate BEFORE spending a detail call
+        # (C) gate BEFORE the N+1 detail fetch. With no anchors/keywords the gate is a
+        # pass-through, so the worst case is _MAX_OFFSET rows of detail calls — bounded.
+        if relevance_gate([row], search):
             survivors.append(row)
             if limit is not None and len(survivors) >= limit:
                 break
 
     jobs: list[RawJob] = []
     for row in survivors:
+        if not row.external_path:
+            continue  # no detail path -> cannot fetch a description; skip rather than POST a bad URL
         resp = httpx.post(cxs_detail_url(target, row.external_path), json={}, timeout=30)
         resp.raise_for_status()
         apply_detail(row, resp.json())

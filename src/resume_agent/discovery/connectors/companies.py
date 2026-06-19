@@ -77,6 +77,10 @@ class CompaniesConnector:
                 jobs.extend(backend(target, search, limit))
             except httpx.HTTPError as exc:
                 self.failures[url] = board_error(exc)
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                # Reverse-engineered singleton payloads (Tesla/Google) may shift shape; isolate a
+                # parse failure to this URL instead of aborting the whole pull.
+                self.failures[url] = f"parse error: {type(exc).__name__}"
 
         before = len(jobs)
         jobs = relevance_gate(jobs, search)
