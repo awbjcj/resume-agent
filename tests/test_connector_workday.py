@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import httpx
+
 import resume_agent.discovery.connectors.workday as workday
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.workday import (
@@ -152,3 +154,26 @@ def test_fetch_workday_honors_limit(monkeypatch):
     monkeypatch.setattr(workday.httpx, "post", fake_post)
     jobs = workday.fetch_workday(TARGET, SearchConfig(), limit=1)
     assert len(jobs) == 1
+
+
+def test_fetch_workday_isolates_failed_detail_fetch(monkeypatch):
+    """A failing detail (N+1) fetch skips only that row, not the whole company."""
+    second_detail = {
+        "jobPostingInfo": {
+            "jobDescription": "<p>Analyze data.</p>",
+            "externalUrl": "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/R-2",
+        }
+    }
+
+    def fake_post(url, json, timeout):
+        if url.endswith("/jobs"):
+            return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+        if "Software-Engineer" in url:
+            raise httpx.HTTPStatusError(
+                "500", request=httpx.Request("POST", url), response=httpx.Response(500)
+            )
+        return _Resp(second_detail)
+
+    monkeypatch.setattr(workday.httpx, "post", fake_post)
+    jobs = workday.fetch_workday(TARGET, SearchConfig())
+    assert [j.title for j in jobs] == ["Data Scientist"]

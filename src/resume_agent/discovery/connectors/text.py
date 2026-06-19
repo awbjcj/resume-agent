@@ -19,6 +19,16 @@ def _terms(search: SearchConfig) -> list[str]:
     return [t.strip().lower() for t in (*search.keywords, *search.titles) if t.strip()]
 
 
+def primary_search_term(search: SearchConfig) -> str:
+    """First non-empty title/keyword, used to shape a backend's server-side query.
+
+    Titles precede keywords (a title is the more specific query), and case is
+    preserved because some ATS search endpoints are case-sensitive.
+    """
+    terms = [t.strip() for t in (*search.titles, *search.keywords) if t.strip()]
+    return terms[0] if terms else ""
+
+
 def filter_by_search(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
     """Keep jobs whose title or JD text contains any configured term."""
     terms = _terms(search)

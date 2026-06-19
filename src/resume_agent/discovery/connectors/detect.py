@@ -123,10 +123,9 @@ def _l1(url: str) -> AtsTarget | None:
                 token = for_values[0] if for_values else None
             return AtsTarget(ats, token) if token else None
 
-    workday = _workday_target(host, parts.path)
-    if _WORKDAY_HOST.fullmatch(host):
-        return workday  # no site path -> not fetchable; fall through to L2/None
-    return None
+    # Workday host with a usable site path -> a fetchable target; non-workday hosts and
+    # workday hosts lacking a site path both yield None, so detect_ats falls to the L2 sniff.
+    return _workday_target(host, parts.path)
 
 
 def _get_html(url: str, *, client: httpx.Client | None = None) -> str | None:

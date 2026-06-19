@@ -1,3 +1,5 @@
+import httpx
+
 import resume_agent.discovery.connectors.tesla as tesla
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.search_config import SearchConfig
@@ -72,3 +74,30 @@ def test_fetch_tesla_applies_keyword_filter_after_detail(monkeypatch):
     jobs = tesla.fetch_tesla(TARGET, SearchConfig(keywords=["Python"]))
     assert [j.title for j in jobs] == ["Software Engineer"]
     assert len(detail_calls) == 2
+
+
+def test_fetch_tesla_isolates_failed_detail_fetch(monkeypatch):
+    """A failing detail fetch skips only that listing, not the whole pull."""
+
+    class _Resp:
+        def __init__(self, p):
+            self._p = p
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._p
+
+    def fake_get(url, timeout):
+        if "state" in url:
+            return _Resp(STATE)
+        if url.endswith("/1"):
+            raise httpx.HTTPStatusError(
+                "500", request=httpx.Request("GET", url), response=httpx.Response(500)
+            )
+        return _Resp(DETAIL_2)
+
+    monkeypatch.setattr(tesla.httpx, "get", fake_get)
+    jobs = tesla.fetch_tesla(TARGET, SearchConfig())
+    assert [j.title for j in jobs] == ["Welder"]

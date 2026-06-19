@@ -5,7 +5,12 @@ import httpx
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_text, relevance_gate, title_relevance_gate
+from resume_agent.discovery.connectors.text import (
+    html_to_text,
+    primary_search_term,
+    relevance_gate,
+    title_relevance_gate,
+)
 from resume_agent.discovery.search_config import SearchConfig
 
 _PAGE = 20  # cxs page size
@@ -27,13 +32,13 @@ def cxs_jobs_url(target: AtsTarget) -> str:
     return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}/jobs"
 
 
-def _search_text(search: SearchConfig) -> str:
-    terms = [t.strip() for t in (*search.titles, *search.keywords) if t.strip()]
-    return terms[0] if terms else ""
-
-
 def list_request_body(search: SearchConfig, offset: int) -> dict:
-    return {"appliedFacets": {}, "limit": _PAGE, "offset": offset, "searchText": _search_text(search)}
+    return {
+        "appliedFacets": {},
+        "limit": _PAGE,
+        "offset": offset,
+        "searchText": primary_search_term(search),
+    }
 
 
 def parse_list_rows(target: AtsTarget, page: dict) -> list[WorkdayRow]:
@@ -97,8 +102,11 @@ def fetch_workday(target: AtsTarget, search: SearchConfig, limit: int | None = N
             continue
         if not row.external_path:
             continue  # no detail path -> cannot fetch a description; skip rather than POST a bad URL
-        resp = httpx.post(cxs_detail_url(target, row.external_path), json={}, timeout=30)
-        resp.raise_for_status()
+        try:
+            resp = httpx.post(cxs_detail_url(target, row.external_path), json={}, timeout=30)
+            resp.raise_for_status()
+        except httpx.HTTPError:
+            continue  # one stale/failed detail endpoint must not discard the whole batch
         apply_detail(row, resp.json())
         if relevance_gate([row], search):
             jobs.append(row)

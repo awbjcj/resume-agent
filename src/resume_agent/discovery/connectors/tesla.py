@@ -40,8 +40,11 @@ def fetch_tesla(target: AtsTarget, search: SearchConfig, limit: int | None = Non
     for row in parse_listings(resp.json()):
         if not title_relevance_gate([row], search):
             continue
-        d = httpx.get(_JOB_URL.format(id=row.listing_id), timeout=30)
-        d.raise_for_status()
+        try:
+            d = httpx.get(_JOB_URL.format(id=row.listing_id), timeout=30)
+            d.raise_for_status()
+        except httpx.HTTPError:
+            continue  # one stale/failed detail endpoint must not discard the whole batch
         info = d.json()
         row.jd_text = html_to_text(info.get("description", ""))
         row.url = info.get("url") or row.url
