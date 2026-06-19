@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from resume_agent.models.profile import Contact, Education
 from resume_agent.models.resume import (

@@ -1,7 +1,5 @@
 from resume_agent.llm_runner import AgentRunner
 
-from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.agents import (
     _TAILOR_INSTRUCTIONS,
     build_reviewer_agent,

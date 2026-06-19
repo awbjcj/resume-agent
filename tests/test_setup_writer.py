@@ -1,10 +1,9 @@
 import os
 
-import pytest
 
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.setup.state import WizardState
-from resume_agent.setup.writer import atomic_write_all
+from resume_agent.setup.writer import atomic_write_all, load_existing_state
 
 
 def _seed_examples(root):
@@ -49,9 +48,6 @@ def test_partial_failure_leaves_no_tmp_litter(tmp_path, monkeypatch):
 
     assert any(status.startswith("error") for status in report.values())
     assert not list(tmp_path.rglob("*.tmp"))     # tmp cleaned up even on failure
-
-
-from resume_agent.setup.writer import load_existing_state
 
 
 def test_load_existing_state_round_trips_what_was_written(tmp_path):

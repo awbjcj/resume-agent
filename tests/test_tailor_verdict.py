@@ -1,6 +1,6 @@
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.verdict import PanelVerdict, aggregate
+from resume_agent.tailor.verdict import aggregate
 
 
 def _config(threshold=85):
