@@ -1,6 +1,7 @@
 import httpx
 
 import resume_agent.discovery.connectors.companies as companies
+from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.search_config import SearchConfig
@@ -84,13 +85,33 @@ def test_undetectable_url_recorded_and_isolated(monkeypatch):
     assert "no known ATS" in conn.failures["https://mystery.example"]
 
 
-def test_workday_recognized_but_unsupported(monkeypatch):
-    _patch(monkeypatch, detect=lambda url: AtsTarget("workday", "acme"))
-    conn = CompaniesConnector(["https://acme.wd1.myworkdayjobs.com/careers"])
-    jobs = conn.fetch(SearchConfig(keywords=["engineer"]))
-    assert jobs == []
-    reason = conn.failures["https://acme.wd1.myworkdayjobs.com/careers"]
-    assert "not yet supported" in reason
+def test_companies_dispatches_workday(monkeypatch):
+    calls = {}
+
+    def fake_workday(target, search, limit=None):
+        calls["target"] = target
+        return [RawJob("workday", "u", "acme", "Software Engineer", "Austin", "jd")]
+
+    monkeypatch.setattr(companies, "fetch_workday", fake_workday)
+    monkeypatch.setattr(
+        companies,
+        "detect_ats",
+        lambda url: AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers"),
+    )
+    conn = CompaniesConnector(["https://acme.wd5.myworkdayjobs.com/Careers"])
+    jobs = conn.fetch(SearchConfig())
+    assert calls["target"].tenant == "acme"
+    assert [j.source for j in jobs] == ["workday"]
+
+
+def test_companies_unsupported_ats_recorded(monkeypatch):
+    monkeypatch.setattr(
+        companies, "detect_ats", lambda url: AtsTarget("smartrecruiters", "x")
+    )
+    conn = CompaniesConnector(["https://careers.x.com"])
+    conn.fetch(SearchConfig())
+    assert "https://careers.x.com" in conn.failures
+    assert "not yet supported" in conn.failures["https://careers.x.com"]
 
 
 def test_http_error_on_one_board_is_isolated(monkeypatch):
