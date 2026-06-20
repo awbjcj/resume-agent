@@ -58,11 +58,12 @@ resume already tailored to the old text is not silently re-based.
 
 ## Companies connector dispatch (`companies.py`)
 
-`CompaniesConnector.fetch` iterates `self.urls`, calls `detect_ats`, looks up
-the backend in `_BACKENDS`, and calls `backend(target, search, limit)`. Any URL
-that fails detection or whose backend raises `httpx.HTTPError` / a parse error is
-recorded in `self.failures` — it never aborts the run. The final
-`relevance_gate(jobs, search)` is the backstop for backends that don't filter
+`CompaniesConnector.fetch` delegates to the `harvest` seam: for each URL in
+`self.urls` it calls `detect_ats`, looks up the backend in `_BACKENDS`, and calls
+`backend(target, search, limit)`. Any URL that fails detection or whose backend
+raises `httpx.HTTPError` / a parse error is recorded on the returned
+`FetchResult.failures` (url → reason) — it never aborts the run. The relevance
+gate `harvest` runs over the union is the backstop for backends that don't filter
 server-side.
 
 To add a new backend: write `fetch_<name>(target, search, limit) -> list[RawJob]`

@@ -19,6 +19,7 @@ from resume_agent.discovery.search_config import SearchConfig
 __all__ = ["FetchResult", "gate_and_limit", "harvest", "harvest_detailed"]
 
 U = TypeVar("U")
+T = TypeVar("T", bound=RawJob)
 
 
 def gate_and_limit(
@@ -61,9 +62,9 @@ def harvest(
 
 
 def harvest_detailed(
-    rows: Iterable[RawJob],
-    fetch_detail: Callable[[RawJob], dict | None],
-    apply_detail: Callable[[RawJob, dict], None],
+    rows: Iterable[T],
+    fetch_detail: Callable[[T], dict | None],
+    apply_detail: Callable[[T, dict], None],
     *,
     search: SearchConfig,
     limit: int | None,

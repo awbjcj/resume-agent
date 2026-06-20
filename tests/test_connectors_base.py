@@ -1,4 +1,4 @@
-from resume_agent.discovery.connectors.base import Connector, RawJob
+from resume_agent.discovery.connectors.base import Connector, FetchResult, RawJob
 from resume_agent.discovery.search_config import SearchConfig
 
 
@@ -20,8 +20,8 @@ def test_connector_protocol_accepts_a_conforming_object():
         name = "fake"
 
         def fetch(self, search, limit=None):
-            return [RawJob("fake", None, "Acme", "Eng", None, "jd")]
+            return FetchResult(jobs=[RawJob("fake", None, "Acme", "Eng", None, "jd")])
 
     fake: Connector = _Fake()
-    jobs = fake.fetch(SearchConfig())
-    assert jobs[0].source == "fake"
+    result = fake.fetch(SearchConfig())
+    assert result.jobs[0].source == "fake"

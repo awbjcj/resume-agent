@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Any
 
 from resume_agent.discovery.merge import (
     IncomingJob,
@@ -12,7 +13,7 @@ from resume_agent.tracking.tables import Job, JobStatus
 
 
 def _incoming(**over) -> IncomingJob:
-    base = dict(
+    base: dict[str, Any] = dict(
         source="workday",
         jd_text="full jd",
         url="http://wd/1",
@@ -26,7 +27,7 @@ def _incoming(**over) -> IncomingJob:
 
 
 def _existing(**over) -> Job:
-    base = dict(
+    base: dict[str, Any] = dict(
         source="adzuna",
         jd_text="thin",
         url="http://adz/1",
