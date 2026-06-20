@@ -1,4 +1,4 @@
-from resume_agent.discovery.filter import FilterDecision, apply_filters
+from resume_agent.discovery.filter import apply_filters
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import JobCriteria, SalaryRange, SponsorshipSignal
 

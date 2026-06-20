@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.ingest import ingest_jobs
+from resume_agent.discovery.ingest import ingest_jobs, ingest_jobs_with_outcomes
 from resume_agent.tracking.repository import jobs_by_status
 from resume_agent.tracking.tables import JobStatus
 
@@ -91,3 +91,27 @@ def test_ingest_jobs_dedupes_same_posting_across_sources():
         assert len(rows) == 1
         assert rows[0].source == "greenhouse"
         assert rows[0].jd_text == "Full canonical JD"
+
+
+def test_cross_run_upgrade_not_counted_as_new_add():
+    # Run 1: aggregator claims the job.
+    with _session() as s:
+        summary1 = ingest_jobs_with_outcomes(s, [RawJob("adzuna", "http://adz/1", "Acme Corp",
+                                                        "Backend Engineer", "Remote", "thin jd")])
+        assert summary1.added == {"adzuna": 1}
+        assert summary1.upgraded == {}
+
+        # Run 2 (same session/db): the canonical Workday copy upgrades, is NOT a new add.
+        summary2 = ingest_jobs_with_outcomes(s, [RawJob("workday", "http://wd/1", "Acme Corp",
+                                                        "Senior Backend Engineer", "Remote",
+                                                        "full canonical jd")])
+        assert summary2.added == {}
+        assert summary2.upgraded == {"workday": 1}
+        assert ingest_jobs(s, [RawJob("workday", "http://wd/1", "Acme Corp",
+                                      "Senior Backend Engineer", "Remote", "full canonical jd")]) == {}
+
+        rows = jobs_by_status(s, JobStatus.raw.value)
+        assert len(rows) == 1
+        assert rows[0].source == "workday"
+        assert rows[0].url == "http://wd/1"
+        assert rows[0].jd_text == "full canonical jd"

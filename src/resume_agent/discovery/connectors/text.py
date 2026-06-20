@@ -19,6 +19,19 @@ def _terms(search: SearchConfig) -> list[str]:
     return [t.strip().lower() for t in (*search.keywords, *search.titles) if t.strip()]
 
 
+def primary_search_term(search: SearchConfig) -> str:
+    """First non-empty title/keyword/anchor, used to shape a backend's server-side query.
+
+    Titles precede keywords (a title is the more specific query); role_anchors are a
+    last resort so configs that rely solely on anchors still send a shaped query.
+    Case is preserved because some ATS search endpoints are case-sensitive.
+    """
+    terms = [t.strip() for t in (*search.titles, *search.keywords) if t.strip()]
+    if not terms:
+        terms = [t.strip() for t in search.role_anchors if t.strip()]
+    return terms[0] if terms else ""
+
+
 def filter_by_search(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
     """Keep jobs whose title or JD text contains any configured term."""
     terms = _terms(search)
@@ -61,5 +74,21 @@ def relevance_gate(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
             haystack = title or f"{job.title or ''}\n{job.jd_text}"
             if not _matches_any(haystack, anchors):
                 continue
+        kept.append(job)
+    return kept
+
+
+def title_relevance_gate(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
+    """Apply only title-safe relevance checks before a connector has JD text."""
+    anchors = [term.strip() for term in search.role_anchors if term.strip()]
+    excludes = [term.strip() for term in search.exclude_terms if term.strip()]
+
+    kept: list[RawJob] = []
+    for job in jobs:
+        title = job.title or ""
+        if excludes and title and _matches_any(title, excludes):
+            continue
+        if anchors and not _matches_any(title, anchors):
+            continue
         kept.append(job)
     return kept

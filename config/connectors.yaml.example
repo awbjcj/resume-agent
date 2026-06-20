@@ -26,10 +26,28 @@ remoteok:
 linkedin:
   enabled: false
 
-# Company careers pages by URL. The connector auto-detects the ATS
-# (Greenhouse / Lever / Ashby) and pulls all current openings. A direct
-# board URL works too; Workday is recognized but not yet fetched.
+# Company careers pages — paste any careers URL and the connector auto-detects
+# the ATS or bespoke portal and fetches matching openings.
+#
+# Supported backends:
+#   Greenhouse  — boards.greenhouse.io/<token> or pages that embed a Greenhouse board
+#   Lever       — jobs.lever.co/<token>
+#   Ashby       — jobs.ashbyhq.com/<token>
+#   Workday     — <tenant>.<dc>.myworkdayjobs.com/<site>  (uses CXS JSON API)
+#   Tesla       — www.tesla.com/careers  (bespoke JSON portal)
+#   Google      — careers.google.com/...  (bespoke JSON API)
+#
+# When a URL does not directly reveal the ATS, the connector fetches the page
+# and scans it for embedded Greenhouse / Lever / Ashby / Workday markers.
+#
+# Workday, Tesla, and Google are "canonical" sources — when they re-find a job
+# already ingested from an aggregator (Adzuna, RemoteOK, LinkedIn), the stored
+# URL and JD text are upgraded in place. User progress is never reset.
 companies:
   enabled: false
   urls:
-    - https://jobs.ashbyhq.com/someorg
+    - https://jobs.ashbyhq.com/openai                          # Ashby
+    - https://jobs.lever.co/woven-by-toyota                    # Lever
+    - https://generalmotors.wd5.myworkdayjobs.com/Careers_GM   # Workday
+    - https://www.tesla.com/careers                            # Tesla (singleton)
+    - https://careers.google.com/jobs/results/                 # Google (singleton)

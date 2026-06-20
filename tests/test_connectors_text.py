@@ -1,5 +1,10 @@
 from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.text import filter_by_search, html_to_text, relevance_gate
+from resume_agent.discovery.connectors.text import (
+    filter_by_search,
+    html_to_text,
+    primary_search_term,
+    relevance_gate,
+)
 from resume_agent.discovery.search_config import SearchConfig
 
 
@@ -77,3 +82,17 @@ def test_missing_title_scans_document_for_anchor():
     cfg = SearchConfig(role_anchors=["engineer"])
     out = relevance_gate([_job(None, jd="Senior Engineer wanted")], cfg)
     assert len(out) == 1
+
+
+def test_primary_search_term_prefers_titles_over_anchors():
+    cfg = SearchConfig(titles=["Software Engineer"], role_anchors=["Engineer"])
+    assert primary_search_term(cfg) == "Software Engineer"
+
+
+def test_primary_search_term_falls_back_to_role_anchors():
+    cfg = SearchConfig(role_anchors=["Software Engineer"])
+    assert primary_search_term(cfg) == "Software Engineer"
+
+
+def test_primary_search_term_empty_when_no_terms():
+    assert primary_search_term(SearchConfig()) == ""

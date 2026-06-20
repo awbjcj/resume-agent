@@ -1,6 +1,5 @@
 from typer.testing import CliRunner
 
-import resume_agent.cli as cli_mod
 from resume_agent.cli import app
 
 runner = CliRunner()
