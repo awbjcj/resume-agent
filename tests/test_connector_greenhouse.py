@@ -51,8 +51,8 @@ class _FakeGreenhouse(GreenhouseConnector):
 
 def test_connector_fetches_boards_and_filters_by_search():
     connector = _FakeGreenhouse([GreenhouseBoard(token="stripe", company="Stripe")])
-    jobs = connector.fetch(SearchConfig(keywords=["python"]))
-    assert {j.title for j in jobs} == {"Senior Backend Engineer"}
+    result = connector.fetch(SearchConfig(keywords=["python"]))
+    assert {j.title for j in result.jobs} == {"Senior Backend Engineer"}
     assert connector.name == "greenhouse"
 
 
@@ -66,9 +66,9 @@ def test_greenhouse_gate_drops_offtarget_and_records_count(monkeypatch):
     }
     monkeypatch.setattr(conn, "_get_board", lambda token: payload)
     cfg = SearchConfig(role_anchors=["engineer", "ai"], exclude_terms=["driver", "cdl"])
-    out = conn.fetch(cfg)
-    assert [j.title for j in out] == ["AI Engineer"]
-    assert conn.filtered == 1
+    result = conn.fetch(cfg)
+    assert [j.title for j in result.jobs] == ["AI Engineer"]
+    assert result.filtered == 1
 
 
 class _PartlyBrokenGreenhouse(GreenhouseConnector):
@@ -90,11 +90,11 @@ def test_connector_isolates_failing_board_and_records_it():
             GreenhouseBoard(token="stripe", company="Stripe"),
         ]
     )
-    jobs = connector.fetch(SearchConfig(keywords=["python"]))
+    result = connector.fetch(SearchConfig(keywords=["python"]))
     # A 404 on the first board must NOT abort the remaining boards.
-    assert {j.company for j in jobs} == {"Stripe"}
-    assert "dead" in connector.failures
-    assert "404" in connector.failures["dead"]
+    assert {j.company for j in result.jobs} == {"Stripe"}
+    assert "dead" in result.failures
+    assert "404" in result.failures["dead"]
 
 
 def test_get_board_delegates_to_module_fetcher(monkeypatch):

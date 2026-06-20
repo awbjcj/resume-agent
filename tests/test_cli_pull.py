@@ -1,7 +1,7 @@
 from typer.testing import CliRunner
 
 from resume_agent import cli
-from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob
 
 runner = CliRunner()
 
@@ -10,7 +10,9 @@ class _Conn:
     name = "greenhouse"
 
     def fetch(self, search, limit=None):
-        return [RawJob("greenhouse", "https://gh/1", "Acme", "Engineer", "Remote", "a real jd")]
+        return FetchResult(
+            jobs=[RawJob("greenhouse", "https://gh/1", "Acme", "Engineer", "Remote", "a real jd")]
+        )
 
 
 def test_pull_runs_enabled_connectors_and_reports(tmp_path, monkeypatch):

@@ -1,9 +1,10 @@
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob, board_error
+from resume_agent.discovery.connectors.base import FetchResult, RawJob, http_failure
 from resume_agent.discovery.connectors.config import GreenhouseBoard
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.text import html_to_text, relevance_gate
+from resume_agent.discovery.connectors.harvest import harvest
+from resume_agent.discovery.connectors.text import html_to_text
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://boards-api.greenhouse.io/v1/boards"
@@ -46,25 +47,16 @@ class GreenhouseConnector:
 
     def __init__(self, boards: list[GreenhouseBoard]):
         self.boards = boards
-        # token -> reason for boards that failed on the most recent fetch.
-        self.failures: dict[str, str] = {}
-        self.filtered = 0
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
-        jobs: list[RawJob] = []
-        self.failures = {}
-        self.filtered = 0
-        for board in self.boards:
-            try:
-                payload = self._get_board(board.token)
-            except httpx.HTTPError as exc:
-                self.failures[board.token] = board_error(exc)
-                continue
-            jobs.extend(parse_greenhouse(payload, board.display()))
-        before = len(jobs)
-        jobs = relevance_gate(jobs, search)
-        self.filtered = before - len(jobs)
-        return jobs[:limit] if limit is not None else jobs
+    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
+        return harvest(
+            self.boards,
+            lambda board: parse_greenhouse(self._get_board(board.token), board.display()),
+            search=search,
+            limit=limit,
+            key=lambda board: board.token,
+            on_error=http_failure,
+        )
 
     def _get_board(self, token: str) -> dict:
         return fetch_greenhouse_board(token)

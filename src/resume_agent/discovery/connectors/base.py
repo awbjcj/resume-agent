@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
 
@@ -17,6 +17,15 @@ def board_error(exc: httpx.HTTPError) -> str:
     return f"HTTP {status}" if status else type(exc).__name__
 
 
+def http_failure(exc: Exception) -> str | None:
+    """An ``on_error`` policy for connectors that isolate only HTTP failures.
+
+    Records a compact reason for an ``httpx.HTTPError`` and re-raises anything
+    else (returning ``None`` tells :func:`harvest` to propagate).
+    """
+    return board_error(exc) if isinstance(exc, httpx.HTTPError) else None
+
+
 @dataclass
 class RawJob:
     """A single job as a connector emits it, ready for ingest."""
@@ -30,9 +39,23 @@ class RawJob:
     posted_at: datetime | None = None
 
 
+@dataclass
+class FetchResult:
+    """What a connector's ``fetch`` returns: the kept jobs, the units that failed
+    (key -> reason), and how many jobs the relevance gate dropped.
+
+    Replaces the duck-typed ``.failures`` / ``.filtered`` attributes the runner and
+    CLI used to read off the connector instance.
+    """
+
+    jobs: list[RawJob]
+    failures: dict[str, str] = field(default_factory=dict)
+    filtered: int = 0
+
+
 class Connector(Protocol):
     """A job source behind the shared fetch seam."""
 
     name: str
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]: ...
+    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult: ...

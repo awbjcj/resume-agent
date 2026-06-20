@@ -46,6 +46,6 @@ class _FakeRemoteOK(RemoteOKConnector):
 
 def test_connector_filters_by_search():
     connector = _FakeRemoteOK()
-    jobs = connector.fetch(SearchConfig(keywords=["react"]))
-    assert {j.title for j in jobs} == {"Frontend Engineer"}
+    result = connector.fetch(SearchConfig(keywords=["react"]))
+    assert {j.title for j in result.jobs} == {"Frontend Engineer"}
     assert connector.name == "remoteok"

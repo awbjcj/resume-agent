@@ -44,11 +44,11 @@ def test_fetches_detected_greenhouse_and_gates(monkeypatch):
     )
     conn = CompaniesConnector(["https://careers.acme.com"])
     cfg = SearchConfig(role_anchors=["engineer", "ai"], exclude_terms=["driver", "cdl"])
-    jobs = conn.fetch(cfg)
-    assert [j.title for j in jobs] == ["AI Engineer"]
+    result = conn.fetch(cfg)
+    assert [j.title for j in result.jobs] == ["AI Engineer"]
     assert conn.name == "companies"
-    assert conn.filtered == 1
-    assert conn.failures == {}
+    assert result.filtered == 1
+    assert result.failures == {}
 
 
 def test_fetches_detected_lever(monkeypatch):
@@ -58,8 +58,8 @@ def test_fetches_detected_lever(monkeypatch):
         lever=lambda token: _LEVER,
     )
     conn = CompaniesConnector(["https://jobs.lever.co/acme"])
-    jobs = conn.fetch(SearchConfig(keywords=["python"]))
-    assert [(j.source, j.title, j.url) for j in jobs] == [("lever", "AI Engineer", "u3")]
+    result = conn.fetch(SearchConfig(keywords=["python"]))
+    assert [(j.source, j.title, j.url) for j in result.jobs] == [("lever", "AI Engineer", "u3")]
 
 
 def test_fetches_detected_ashby(monkeypatch):
@@ -69,8 +69,8 @@ def test_fetches_detected_ashby(monkeypatch):
         ashby=lambda token: _ASHBY,
     )
     conn = CompaniesConnector(["https://jobs.ashbyhq.com/acme"])
-    jobs = conn.fetch(SearchConfig(keywords=["retrieval"]))
-    assert [(j.source, j.title, j.url) for j in jobs] == [("ashby", "AI Engineer", "u4")]
+    result = conn.fetch(SearchConfig(keywords=["retrieval"]))
+    assert [(j.source, j.title, j.url) for j in result.jobs] == [("ashby", "AI Engineer", "u4")]
 
 
 def test_undetectable_url_recorded_and_isolated(monkeypatch):
@@ -79,10 +79,10 @@ def test_undetectable_url_recorded_and_isolated(monkeypatch):
 
     _patch(monkeypatch, detect=detect, gh=lambda token: _GH)
     conn = CompaniesConnector(["https://mystery.example", "https://careers.acme.com"])
-    jobs = conn.fetch(SearchConfig(keywords=["engineer"]))
-    assert {j.title for j in jobs} == {"AI Engineer"}
-    assert "https://mystery.example" in conn.failures
-    assert "no known ATS" in conn.failures["https://mystery.example"]
+    result = conn.fetch(SearchConfig(keywords=["engineer"]))
+    assert {j.title for j in result.jobs} == {"AI Engineer"}
+    assert "https://mystery.example" in result.failures
+    assert "no known ATS" in result.failures["https://mystery.example"]
 
 
 def test_companies_dispatches_workday(monkeypatch):
@@ -99,9 +99,9 @@ def test_companies_dispatches_workday(monkeypatch):
         lambda url: AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers"),
     )
     conn = CompaniesConnector(["https://acme.wd5.myworkdayjobs.com/Careers"])
-    jobs = conn.fetch(SearchConfig())
+    result = conn.fetch(SearchConfig())
     assert calls["target"].tenant == "acme"
-    assert [j.source for j in jobs] == ["workday"]
+    assert [j.source for j in result.jobs] == ["workday"]
 
 
 def test_companies_isolates_parser_error(monkeypatch):
@@ -110,9 +110,9 @@ def test_companies_isolates_parser_error(monkeypatch):
 
     _patch(monkeypatch, detect=lambda url: AtsTarget("greenhouse", "acme"), gh=boom)
     conn = CompaniesConnector(["https://careers.acme.com"])
-    jobs = conn.fetch(SearchConfig(keywords=["engineer"]))
-    assert jobs == []
-    assert "parse error: KeyError" in conn.failures["https://careers.acme.com"]
+    result = conn.fetch(SearchConfig(keywords=["engineer"]))
+    assert result.jobs == []
+    assert "parse error: KeyError" in result.failures["https://careers.acme.com"]
 
 
 def test_companies_unsupported_ats_recorded(monkeypatch):
@@ -120,9 +120,9 @@ def test_companies_unsupported_ats_recorded(monkeypatch):
         companies, "detect_ats", lambda url: AtsTarget("smartrecruiters", "x")
     )
     conn = CompaniesConnector(["https://careers.x.com"])
-    conn.fetch(SearchConfig())
-    assert "https://careers.x.com" in conn.failures
-    assert "not yet supported" in conn.failures["https://careers.x.com"]
+    result = conn.fetch(SearchConfig())
+    assert "https://careers.x.com" in result.failures
+    assert "not yet supported" in result.failures["https://careers.x.com"]
 
 
 def test_http_error_on_one_board_is_isolated(monkeypatch):
@@ -133,9 +133,9 @@ def test_http_error_on_one_board_is_isolated(monkeypatch):
 
     _patch(monkeypatch, detect=lambda url: AtsTarget("greenhouse", "dead"), gh=gh)
     conn = CompaniesConnector(["https://careers.dead.com"])
-    jobs = conn.fetch(SearchConfig(keywords=["engineer"]))
-    assert jobs == []
-    assert "404" in conn.failures["https://careers.dead.com"]
+    result = conn.fetch(SearchConfig(keywords=["engineer"]))
+    assert result.jobs == []
+    assert "404" in result.failures["https://careers.dead.com"]
 
 
 def test_limit_caps_results(monkeypatch):
@@ -145,5 +145,5 @@ def test_limit_caps_results(monkeypatch):
         gh=lambda token: _GH,
     )
     conn = CompaniesConnector(["https://careers.acme.com"])
-    jobs = conn.fetch(SearchConfig(keywords=["a"]), limit=1)
-    assert len(jobs) == 1
+    result = conn.fetch(SearchConfig(keywords=["a"]), limit=1)
+    assert len(result.jobs) == 1

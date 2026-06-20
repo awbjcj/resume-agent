@@ -8,7 +8,7 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from resume_agent.config import get_settings
-from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob
 from resume_agent.discovery.scraper.geo import resolve_geo_id
 from resume_agent.discovery.scraper.models import ScrapedCard
 from resume_agent.discovery.scraper.parser import parse_job_detail, parse_search_cards
@@ -316,11 +316,11 @@ class LinkedInScraper:
         except PlaywrightTimeoutError:
             pass
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
+    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
         self._geo_cache = {}
         try:
             if limit is not None and limit <= 0:
-                return []
+                return FetchResult(jobs=[])
             cards: list[ScrapedCard] = []
             seen_cards: set[str] = set()
             for source_search in _source_searches(search, limit):
@@ -351,7 +351,7 @@ class LinkedInScraper:
                         posted_at=card.posted_at,
                     )
                 )
-            return jobs
+            return FetchResult(jobs=jobs)
         finally:
             self._close_browser()
 

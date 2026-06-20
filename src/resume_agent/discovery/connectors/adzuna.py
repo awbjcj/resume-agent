@@ -1,8 +1,8 @@
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.text import relevance_gate
+from resume_agent.discovery.connectors.harvest import gate_and_limit
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://api.adzuna.com/v1/api/jobs"
@@ -35,15 +35,10 @@ class AdzunaConnector:
         self.app_id = app_id
         self.app_key = app_key
         self.country = country
-        self.filtered = 0
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
-        self.filtered = 0
-        jobs = parse_adzuna(self._get_results(search))
-        before = len(jobs)
-        jobs = relevance_gate(jobs, search)
-        self.filtered = before - len(jobs)
-        return jobs[:limit] if limit is not None else jobs
+    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
+        jobs, filtered = gate_and_limit(parse_adzuna(self._get_results(search)), search, limit)
+        return FetchResult(jobs=jobs, filtered=filtered)
 
     def _get_results(self, search: SearchConfig) -> dict:
         role_terms = [

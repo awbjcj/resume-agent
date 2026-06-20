@@ -204,7 +204,7 @@ def scrape_cmd(
     connector = build_linkedin_scraper()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        added = ingest_jobs(session, connector.fetch(config, limit=limit))
+        added = ingest_jobs(session, connector.fetch(config, limit=limit).jobs)
     typer.echo(f"Scrape complete. Added {sum(added.values())} new job(s).")
 
 
@@ -232,15 +232,13 @@ def pull_cmd(
         raise typer.Exit(code=0)
     engine = _engine(db_url)
     with get_session(engine) as session:
-        totals = run_pull(session, connectors, search_config, CONNECTOR_RUNS_PATH, limit=limit)
+        report = run_pull(session, connectors, search_config, CONNECTOR_RUNS_PATH, limit=limit)
     for name in (c.name for c in connectors):
-        typer.echo(f"  {name:<12} +{totals.get(name, 0)}")
-    for connector in connectors:
-        failures = getattr(connector, "failures", None)
-        if failures:
-            joined = ", ".join(f"{tok} ({reason})" for tok, reason in failures.items())
-            typer.echo(f"  {connector.name}: skipped {len(failures)} dead source(s): {joined}")
-    typer.echo(f"Pull complete. Added {sum(totals.values())} new job(s).")
+        typer.echo(f"  {name:<12} +{report.totals.get(name, 0)}")
+    for name, failures in report.failures.items():
+        joined = ", ".join(f"{tok} ({reason})" for tok, reason in failures.items())
+        typer.echo(f"  {name}: skipped {len(failures)} dead source(s): {joined}")
+    typer.echo(f"Pull complete. Added {sum(report.totals.values())} new job(s).")
 
 
 @app.command("sources")

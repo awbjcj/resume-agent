@@ -44,8 +44,8 @@ class _FakeAdzuna(AdzunaConnector):
 
 def test_connector_filters_by_search():
     connector = _FakeAdzuna(app_id="x", app_key="y", country="us")
-    jobs = connector.fetch(SearchConfig(keywords=["kubernetes"]))
-    assert {j.title for j in jobs} == {"Platform Engineer"}
+    result = connector.fetch(SearchConfig(keywords=["kubernetes"]))
+    assert {j.title for j in result.jobs} == {"Platform Engineer"}
     assert connector.name == "adzuna"
 
 

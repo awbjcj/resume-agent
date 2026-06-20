@@ -45,8 +45,8 @@ class _FakeLever(LeverConnector):
 
 def test_connector_fetches_boards_and_filters_by_search():
     connector = _FakeLever([LeverBoard(token="acme", company="Acme")])
-    jobs = connector.fetch(SearchConfig(keywords=["python"]))
-    assert {j.title for j in jobs} == {"Senior Backend Engineer"}
+    result = connector.fetch(SearchConfig(keywords=["python"]))
+    assert {j.title for j in result.jobs} == {"Senior Backend Engineer"}
     assert connector.name == "lever"
 
 
@@ -69,11 +69,11 @@ def test_connector_isolates_failing_board_and_records_it():
             LeverBoard(token="acme", company="Acme"),
         ]
     )
-    jobs = connector.fetch(SearchConfig(keywords=["python"]))
+    result = connector.fetch(SearchConfig(keywords=["python"]))
     # A 404 on the first board must NOT abort the remaining boards.
-    assert {j.company for j in jobs} == {"Acme"}
-    assert "dead" in connector.failures
-    assert "404" in connector.failures["dead"]
+    assert {j.company for j in result.jobs} == {"Acme"}
+    assert "dead" in result.failures
+    assert "404" in result.failures["dead"]
 
 
 def test_get_board_delegates_to_module_fetcher(monkeypatch):

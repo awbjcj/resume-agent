@@ -1,7 +1,7 @@
 from typer.testing import CliRunner
 
 from resume_agent import cli
-from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob
 
 runner = CliRunner()
 
@@ -10,7 +10,9 @@ class _FakeConnector:
     name = "linkedin"
 
     def fetch(self, search, limit=None):
-        return [RawJob("linkedin", "https://li/1", "Acme", "Engineer", "Remote", "a real jd")]
+        return FetchResult(
+            jobs=[RawJob("linkedin", "https://li/1", "Acme", "Engineer", "Remote", "a real jd")]
+        )
 
 
 def test_scrape_command_ingests_via_connector(tmp_path, monkeypatch):

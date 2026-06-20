@@ -18,7 +18,7 @@ class _FakeBrowserScraper(LinkedInScraper):
 
 
 def test_linkedin_fetch_returns_rawjobs_attributed_to_linkedin():
-    jobs = _FakeBrowserScraper().fetch(SearchConfig())
+    jobs = _FakeBrowserScraper().fetch(SearchConfig()).jobs
     assert len(jobs) == 2
     assert all(isinstance(j, RawJob) for j in jobs)
     assert all(j.source == "linkedin" for j in jobs)
@@ -27,7 +27,7 @@ def test_linkedin_fetch_returns_rawjobs_attributed_to_linkedin():
 
 
 def test_linkedin_fetch_respects_limit():
-    assert len(_FakeBrowserScraper().fetch(SearchConfig(), limit=1)) == 1
+    assert len(_FakeBrowserScraper().fetch(SearchConfig(), limit=1).jobs) == 1
 
 
 def test_linkedin_fetch_threads_search_card_posted_at():
@@ -52,7 +52,7 @@ def test_linkedin_fetch_threads_search_card_posted_at():
             </body></html>
             """
 
-    assert _FakeDatedScraper().fetch(SearchConfig())[0].posted_at == datetime(
+    assert _FakeDatedScraper().fetch(SearchConfig()).jobs[0].posted_at == datetime(
         2026, 6, 1, tzinfo=timezone.utc
     )
 
@@ -146,7 +146,7 @@ def test_linkedin_fetch_uses_next_source_query_until_limit():
     jobs = scraper.fetch(
         SearchConfig(titles=["Software Engineer", "AI Engineer"], keywords=["python"]),
         limit=2,
-    )
+    ).jobs
 
     assert scraper.queries == ["Software Engineer", "AI Engineer"]
     assert [job.title for job in jobs] == ["Software Engineer", "AI Engineer"]
