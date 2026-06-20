@@ -7,17 +7,17 @@ from typing import Iterable
 from sqlmodel import Session
 
 from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.source_tier import source_rank
-from resume_agent.tracking.dedup import compute_dedup_key
+from resume_agent.discovery.merge import (
+    IncomingJob,
+    Insert,
+    MergeAction,
+    Rebase,
+    Skip,
+    UpgradeUrlOnly,
+    decide,
+)
 from resume_agent.tracking.repository import find_existing, save_job
 from resume_agent.tracking.tables import Job, JobStatus
-
-
-def _clean(value: str | None) -> str | None:
-    if value is None:
-        return None
-    cleaned = value.strip()
-    return cleaned or None
 
 
 class IngestOutcome(str, Enum):
@@ -44,59 +44,50 @@ def save_or_upgrade(
     posted_at: datetime | None = None,
 ) -> tuple[Job | None, IngestOutcome]:
     """Insert a new job, upgrade an existing one from a higher-tier source, or skip."""
-    jd_text = jd_text.strip()
-    url = _clean(url)
-    company = _clean(company)
-    title = _clean(title)
-    incoming_location = _clean(location)
-    dedup_key = compute_dedup_key(company, title)
-
-    existing = find_existing(session, url, jd_text, dedup_key)
-    # Same-source, different-URL dedup-key match means distinct postings (e.g. same role,
-    # different locations on a large board). URL check already passed — treat as new job.
-    if existing is not None and url and existing.url and url != existing.url and source == existing.source:
-        existing = None
-    if existing is not None:
-        if source_rank(source) >= source_rank(existing.source):
-            return None, IngestOutcome.skipped
-        if existing.status != JobStatus.raw.value:
-            if not url:
-                return None, IngestOutcome.skipped
-            existing.url = url
-            existing.source = source
-            return save_job(session, existing), IngestOutcome.upgraded
-
-        # Higher-tier re-see while raw: re-base the posting text, but do not erase
-        # existing optional fields when the incoming source omitted them.
-        existing.source = source
-        existing.jd_text = jd_text
-        # All string fields are already _clean'd (empty -> None), so a truthy check means
-        # "the incoming source supplied this field"; posted_at is not a string, so test None.
-        if url:
-            existing.url = url
-        if company:
-            existing.company = company
-        if title:
-            existing.title = title
-        if incoming_location:
-            existing.location = incoming_location
-        if posted_at is not None:
-            existing.posted_at = posted_at
-        existing.dedup_key = compute_dedup_key(existing.company, existing.title)
-        return save_job(session, existing), IngestOutcome.upgraded
-
-    job = Job(
+    incoming = IncomingJob.clean(
         source=source,
         jd_text=jd_text,
         url=url,
         company=company,
         title=title,
-        location=incoming_location,
+        location=location,
         posted_at=posted_at,
-        dedup_key=dedup_key,
-        status=JobStatus.raw.value,
     )
-    return save_job(session, job), IngestOutcome.inserted
+    existing = find_existing(session, incoming.url, incoming.jd_text, incoming.dedup_key)
+    return _apply(session, existing, incoming, decide(existing, incoming))
+
+
+def _apply(
+    session: Session,
+    existing: Job | None,
+    incoming: IncomingJob,
+    action: MergeAction,
+) -> tuple[Job | None, IngestOutcome]:
+    """Carry out the pure merge decision against the database."""
+    if isinstance(action, Skip):
+        return None, IngestOutcome.skipped
+    if isinstance(action, Insert):
+        job = Job(
+            source=incoming.source,
+            jd_text=incoming.jd_text,
+            url=incoming.url,
+            company=incoming.company,
+            title=incoming.title,
+            location=incoming.location,
+            posted_at=incoming.posted_at,
+            dedup_key=incoming.dedup_key,
+            status=JobStatus.raw.value,
+        )
+        return save_job(session, job), IngestOutcome.inserted
+    # The remaining actions mutate the matched row in place.
+    assert existing is not None
+    if isinstance(action, UpgradeUrlOnly):
+        existing.url = action.url
+        existing.source = action.source
+    elif isinstance(action, Rebase):
+        for field, value in action.updates.items():
+            setattr(existing, field, value)
+    return save_job(session, existing), IngestOutcome.upgraded
 
 
 def add_job(

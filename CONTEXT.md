@@ -72,3 +72,22 @@ _Avoid_: parser, scraper, extractor
 The title-and-JD filter applied to the harvested union; `title_relevance_gate`
 is its title-only form used before JD text is available (Workday/Tesla list rows).
 _Avoid_: filter (filtering is a later pipeline stage on persisted jobs)
+
+## Ingest & source priority
+
+**IncomingJob**:
+A job offered to ingest, normalized — strings trimmed, blanks collapsed to None.
+Built once from a connector's RawJob or the manual/URL kwargs.
+_Avoid_: candidate, payload
+
+**Merge decision**:
+The pure rule, given the matched row and an IncomingJob, for what wins —
+canonical beats aggregator, a tailored posting's text is frozen, raw rows
+re-base and merge optionals without erasing. `decide`, returning a MergeAction.
+Distinct from matching (`find_existing`), which is DB-bound.
+_Avoid_: dedupe (dedupe is the key + the match; this is the post-match policy)
+
+**MergeAction**:
+The typed result of the Merge decision, carrying the writes the applier performs:
+`Insert`, `Skip`, `UpgradeUrlOnly`, `Rebase`. The applier holds no policy.
+_Avoid_: outcome (reserve IngestOutcome for the inserted/upgraded/skipped tag)
