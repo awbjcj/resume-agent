@@ -282,7 +282,12 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
             unsafe_allow_html=True,
         )
         with st.expander("Latest review critiques"):
-            st.json(row.critique_json or [])
+            if row.critique_json is None:
+                st.caption("Not tailored yet — run `resume-agent tailor` to generate a review.")
+            elif not row.critique_json:
+                st.caption("Reviewed — no critiques raised.")
+            else:
+                st.json(row.critique_json)
 
         statuses = [s.value for s in ApplicationStatus]
         current = row.application_status or ApplicationStatus.ready.value
