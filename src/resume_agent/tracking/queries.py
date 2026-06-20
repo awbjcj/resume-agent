@@ -144,7 +144,9 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 status=job.status,
                 fit_score=job.fit_score,
                 jd_text=job.jd_text,
-                critique_json=version.critique_json if version else None,
+                # None means "never tailored" (no version); [] means a version
+                # exists but reviewers raised nothing. The board reads them apart.
+                critique_json=(version.critique_json or []) if version else None,
                 pdf_path=rendered.pdf_path if rendered else None,
                 application_status=application.status if application else None,
                 salary_min=salary.get("minimum"),

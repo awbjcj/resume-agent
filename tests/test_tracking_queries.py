@@ -160,6 +160,24 @@ def test_pipeline_rows_include_pdf_and_application_status():
         assert row.fit_score == 90
 
 
+def test_pipeline_rows_distinguish_no_version_from_empty_critiques():
+    # The board must tell "never tailored" (no ResumeVersion) apart from
+    # "tailored, reviewers raised nothing": None vs []. Collapsing both to []
+    # made every untailored card read as an empty critique list.
+    with _session() as s:
+        untailored = save_job(s, Job(source="manual", jd_text="a", company="A", title="E",
+                                     status=JobStatus.shortlisted.value))
+        reviewed_clean = save_job(s, Job(source="manual", jd_text="b", company="B", title="E",
+                                         status=JobStatus.tailored.value))
+        save_resume_version(
+            s, ResumeVersion(job_id=_require_id(reviewed_clean.id), round=1, content_json={"x": 1})
+        )
+
+        by_id = {row.job_id: row for row in pipeline_rows(s)}
+        assert by_id[_require_id(untailored.id)].critique_json is None
+        assert by_id[_require_id(reviewed_clean.id)].critique_json == []
+
+
 def test_pipeline_rows_include_lean_metadata_fields():
     with _session() as s:
         save_job(
