@@ -57,3 +57,28 @@ def test_ensure_posted_at_column_is_idempotent():
     with engine.begin() as conn:
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
     assert cols.count("posted_at") == 1
+
+
+def test_ensure_archived_at_column_adds_missing_column():
+    engine = create_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
+    from resume_agent.tracking.migrate import ensure_archived_at_column
+    ensure_archived_at_column(engine)
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+        indexes = [row[1] for row in conn.execute(text("PRAGMA index_list(jobs)"))]
+    assert "archived_at" in cols
+    assert "ix_jobs_archived_at" in indexes
+
+
+def test_ensure_archived_at_column_is_idempotent():
+    engine = create_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE jobs (id INTEGER PRIMARY KEY, source VARCHAR)"))
+    from resume_agent.tracking.migrate import ensure_archived_at_column
+    ensure_archived_at_column(engine)
+    ensure_archived_at_column(engine)
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+    assert cols.count("archived_at") == 1

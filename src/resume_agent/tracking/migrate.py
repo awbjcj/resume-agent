@@ -33,3 +33,16 @@ def ensure_posted_at_column(engine: Engine) -> None:
             return
         if "posted_at" not in cols:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN posted_at DATETIME"))
+
+
+def ensure_archived_at_column(engine: Engine) -> None:
+    """Idempotently add the ``jobs.archived_at`` column (soft-archive timestamp)."""
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+        if not cols:
+            return
+        if "archived_at" not in cols:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN archived_at DATETIME"))
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_jobs_archived_at ON jobs (archived_at)")
+        )

@@ -51,6 +51,7 @@ class Job(SQLModel, table=True):
     status: str = Field(default=JobStatus.raw.value, index=True)
     reject_reason: str | None = None
     posted_at: datetime | None = None
+    archived_at: datetime | None = Field(default=None, index=True)
     schema_version: int = 1
     created_at: datetime = Field(default_factory=utcnow)
 
