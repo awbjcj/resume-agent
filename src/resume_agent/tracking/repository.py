@@ -8,6 +8,7 @@ from resume_agent.tracking.tables import (
     ApplicationStatus,
     CoverLetter,
     Job,
+    JobStatus,
     ResumeVersion,
     utcnow,
 )
@@ -137,3 +138,23 @@ def save_cover_letter(session: Session, cover_letter: CoverLetter) -> CoverLette
 
 def get_cover_letter(session: Session, cover_letter_id: int) -> CoverLetter | None:
     return session.get(CoverLetter, cover_letter_id)
+
+
+_PROGRESS_STATUSES = {
+    JobStatus.approved.value,
+    JobStatus.tailored.value,
+    JobStatus.rendered.value,
+}
+
+
+def has_progress(session: Session, job_id: int) -> bool:
+    """True if a job has user investment that must never be destroyed."""
+    job = session.get(Job, job_id)
+    if job is None:
+        return False
+    if job.status in _PROGRESS_STATUSES:
+        return True
+    for model in (Application, ResumeVersion, CoverLetter):
+        if session.exec(select(model).where(model.job_id == job_id)).first() is not None:
+            return True
+    return False

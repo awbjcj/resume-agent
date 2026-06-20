@@ -58,3 +58,24 @@ def test_get_resume_version_roundtrip():
         assert fetched.content_json is not None
         assert fetched.content_json["contact"]["name"] == "Ada"
         assert get_resume_version(s, 9999) is None
+
+
+def test_has_progress_true_for_advanced_status_and_children():
+    from resume_agent.tracking.repository import (
+        has_progress, save_application, save_resume_version,
+    )
+    from resume_agent.tracking.tables import Application, ResumeVersion
+
+    with _session() as s:
+        raw = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
+        approved = save_job(s, Job(source="m", jd_text="b", status=JobStatus.approved.value))
+        with_version = save_job(s, Job(source="m", jd_text="c", status=JobStatus.raw.value))
+        save_resume_version(s, ResumeVersion(job_id=_require_id(with_version.id), round=1))
+        with_app = save_job(s, Job(source="m", jd_text="d", status=JobStatus.raw.value))
+        save_application(s, Application(job_id=_require_id(with_app.id)))
+
+        assert has_progress(s, _require_id(raw.id)) is False
+        assert has_progress(s, _require_id(approved.id)) is True
+        assert has_progress(s, _require_id(with_version.id)) is True
+        assert has_progress(s, _require_id(with_app.id)) is True
+        assert has_progress(s, 9999) is False
