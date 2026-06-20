@@ -362,7 +362,8 @@ def delete_job(session: Session, job_id: int) -> bool:
     job = session.get(Job, job_id)
     if job is None:
         return False
-    for model in (CoverLetter, ResumeVersion, Application):
+    # Dependency order: CoverLetter/Application can reference ResumeVersion.
+    for model in (CoverLetter, Application, ResumeVersion):
         for child in session.exec(select(model).where(model.job_id == job_id)).all():
             session.delete(child)
     session.delete(job)
@@ -388,8 +389,14 @@ git commit -m "Add delete_job with cascade and progress guard"
 
 **Files:**
 - Modify: `src/resume_agent/tracking/repository.py` (`jobs_by_status`, `status_counts`)
-- Modify: `src/resume_agent/tracking/queries.py` (`shortlist_rows`, `pipeline_rows`)
-- Test: `tests/test_repository.py`, `tests/test_tracking_queries.py`
+- Modify: `src/resume_agent/tracking/queries.py` (`shortlist_rows`, `pipeline_rows`, `application_job_pairs`)
+- Modify: `src/resume_agent/tracking/match_gap.py` (`_target_jobs`)
+- Modify: `src/resume_agent/tracking/analytics.py` (`_rows`)
+- Test: `tests/test_repository.py`, `tests/test_tracking_queries.py`, `tests/test_tracking_match_gap.py`, `tests/test_tracking_analytics.py`
+
+> Note: `jobs_by_status` is also how the discovery pipeline (`discovery/pipeline.py`)
+> reads jobs to process, so this one filter additionally stops archived jobs from
+> being re-extracted/re-surfaced — a deliberate, beneficial side effect.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -424,11 +431,66 @@ def test_archived_jobs_excluded_from_shortlist_and_pipeline():
         assert [r.company for r in shortlist_rows(s)] == ["Keep"]
         assert [r.company for r in pipeline_rows(s)] == ["Keep"]
         _ = keep
+
+
+def test_archived_jobs_excluded_from_application_job_pairs():
+    from resume_agent.tracking.queries import application_job_pairs
+    from resume_agent.tracking.repository import archive_job, save_application
+    from resume_agent.tracking.tables import Application, ApplicationStatus
+
+    with _session() as s:
+        keep = save_job(s, Job(source="m", jd_text="a", company="Keep", title="E",
+                               status=JobStatus.rendered.value))
+        hide = save_job(s, Job(source="m", jd_text="b", company="Hide", title="E",
+                               status=JobStatus.rendered.value))
+        save_application(s, Application(job_id=_require_id(keep.id),
+                                        status=ApplicationStatus.submitted.value))
+        save_application(s, Application(job_id=_require_id(hide.id),
+                                        status=ApplicationStatus.submitted.value))
+        archive_job(s, _require_id(hide.id))
+
+        assert [job.company for _, job in application_job_pairs(s)] == ["Keep"]
+```
+
+Add to `tests/test_tracking_match_gap.py`:
+
+```python
+def test_match_gap_excludes_archived_targets():
+    from resume_agent.tracking.repository import archive_job
+
+    facts = _facts({"lang": [Skill(name="Python")]})
+    with _session() as s:
+        _job(s, JobStatus.shortlisted.value, ["Python", "Go"])
+        hidden = _job(s, JobStatus.shortlisted.value, ["Rust"])
+        assert hidden.id is not None
+        archive_job(s, hidden.id)
+        report = match_gap(s, facts)
+        assert report.target_total == 1
+```
+
+Add to `tests/test_tracking_analytics.py`:
+
+```python
+def test_analytics_excludes_archived_jobs():
+    from resume_agent.tracking.repository import archive_job
+
+    with _session() as session:
+        _seed(session, "greenhouse", 85, ApplicationStatus.submitted.value)
+        hidden = save_job(session, Job(source="adzuna", company="C", title="T",
+                                       fit_score=90, status="rendered"))
+        assert hidden.id is not None
+        save_application(session, Application(job_id=hidden.id,
+                                             status=ApplicationStatus.interview.value))
+        archive_job(session, hidden.id)
+
+        assert [stat.label for stat in source_stats(session)] == ["greenhouse"]
+        bands = {stat.label: stat for stat in fit_band_stats(session)}
+        assert bands["80-100"].applications == 1
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_repository.py::test_archived_jobs_excluded_from_status_views tests/test_tracking_queries.py::test_archived_jobs_excluded_from_shortlist_and_pipeline -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_repository.py::test_archived_jobs_excluded_from_status_views tests/test_tracking_queries.py::test_archived_jobs_excluded_from_shortlist_and_pipeline tests/test_tracking_queries.py::test_archived_jobs_excluded_from_application_job_pairs tests/test_tracking_match_gap.py::test_match_gap_excludes_archived_targets tests/test_tracking_analytics.py::test_analytics_excludes_archived_jobs -v`
 Expected: FAIL (archived rows still returned)
 
 - [ ] **Step 3: Add the filter to `repository.py`**
@@ -485,16 +547,71 @@ In `pipeline_rows`, change the select:
     ).all()
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [ ] **Step 5: Add the filter to `application_job_pairs`**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_repository.py tests/test_tracking_queries.py -v`
+In `src/resume_agent/tracking/queries.py`, change `application_job_pairs` so Gmail
+status sync also ignores archived jobs:
+
+```python
+def application_job_pairs(session: Session) -> list[tuple[Application, Job]]:
+    """Every active application paired with its unarchived job."""
+    archived_col = cast(Any, Job.archived_at)
+    statement = (
+        select(Application, Job)
+        .join(Job, Application.job_id == Job.id)  # type: ignore[arg-type]
+        .where(archived_col.is_(None))
+    )
+    return [(app, job) for app, job in session.exec(statement).all()]
+```
+
+- [ ] **Step 6: Add the filter to `match_gap.py`**
+
+In `src/resume_agent/tracking/match_gap.py`, replace `_target_jobs` so the Match-gap report ignores archived jobs (`cast` and `Any` are already imported there):
+
+```python
+def _target_jobs(session: Session) -> list[Job]:
+    status_col = cast(Any, Job.status)
+    id_col = cast(Any, Job.id)
+    archived_col = cast(Any, Job.archived_at)
+    return list(
+        session.exec(
+            select(Job)
+            .where(status_col.in_(TARGET_STATUSES), archived_col.is_(None))
+            .order_by(id_col)
+        ).all()
+    )
+```
+
+- [ ] **Step 7: Add the filter to `analytics.py`**
+
+In `src/resume_agent/tracking/analytics.py`, add `Any` and `cast` to the typing
+imports, then update `_rows`:
+
+```python
+from typing import Any, Callable, cast
+```
+
+```python
+def _rows(session: Session) -> list[tuple[str, int | None, str]]:
+    archived_col = cast(Any, Job.archived_at)
+    statement = (
+        select(Application.status, Job.fit_score, Job.source)
+        .join(Job, Application.job_id == Job.id)  # type: ignore[arg-type]
+        .where(Application.status != ApplicationStatus.ready.value, archived_col.is_(None))
+    )
+    return list(session.exec(statement).all())
+```
+
+- [ ] **Step 8: Run tests to verify they pass**
+
+Run: `.venv/Scripts/python.exe -m pytest tests/test_repository.py tests/test_tracking_queries.py tests/test_tracking_match_gap.py tests/test_tracking_analytics.py -v`
 Expected: PASS (all, including existing tests)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/resume_agent/tracking/repository.py src/resume_agent/tracking/queries.py tests/test_repository.py tests/test_tracking_queries.py
-git commit -m "Exclude archived jobs from shortlist, pipeline, and status views"
+git add src/resume_agent/tracking/repository.py src/resume_agent/tracking/queries.py src/resume_agent/tracking/match_gap.py src/resume_agent/tracking/analytics.py tests/test_repository.py tests/test_tracking_queries.py tests/test_tracking_match_gap.py tests/test_tracking_analytics.py
+git commit -m "Exclude archived jobs from normal dashboard and sync views"
 ```
 
 ---
@@ -621,7 +738,9 @@ from datetime import datetime, timedelta, timezone
 from resume_agent.tracking.prune import (
     PruneRow,
     expire_candidates,
+    is_zero_progress,
     prune_candidates,
+    prune_reason_counts,
     prune_skipped,
 )
 from resume_agent.tracking.prune_config import PruneConfig
@@ -647,6 +766,23 @@ def test_prune_candidates_match_each_enabled_rule():
 
     ids = {r.job_id for r in prune_candidates([rejected, low_fit, stale, fresh_good], cfg, NOW)}
     assert ids == {1, 2, 3}
+
+
+def test_is_zero_progress_is_inverse_of_progress_flag():
+    assert is_zero_progress(_row(progress=False)) is True
+    assert is_zero_progress(_row(progress=True)) is False
+
+
+def test_prune_reason_counts_uses_primary_reason_without_double_counting():
+    cfg = PruneConfig()
+    rejected_low_fit = _row(job_id=1, status=JobStatus.rejected.value, fit=1)
+    stale = _row(job_id=2, posted=NOW - timedelta(days=90))
+
+    assert prune_reason_counts([rejected_low_fit, stale], cfg, NOW) == {
+        "rejected": 1,
+        "low_fit": 0,
+        "stale": 1,
+    }
 
 
 def test_prune_skips_jobs_with_progress():
@@ -713,6 +849,14 @@ class PruneReport:
     archived: int
     expired: int
     skipped: int
+    rejected: int = 0
+    low_fit: int = 0
+    stale: int = 0
+
+
+def is_zero_progress(row: PruneRow) -> bool:
+    """Data-level mirror of repository.has_progress for pure prune predicates."""
+    return not row.has_progress
 
 
 def _age_days(dt: datetime, now: datetime) -> float:
@@ -723,23 +867,28 @@ def _age_days(dt: datetime, now: datetime) -> float:
     return (now - dt).total_seconds() / 86400.0
 
 
-def _matches(row: PruneRow, config: PruneConfig, now: datetime) -> bool:
+def prune_reason(row: PruneRow, config: PruneConfig, now: datetime) -> str | None:
+    """Primary archive reason, ordered so preview counts never double-count."""
     if config.enable_rejected and row.status == JobStatus.rejected.value:
-        return True
+        return "rejected"
     if config.enable_low_fit and row.fit_score is not None and row.fit_score < config.fit_threshold:
-        return True
+        return "low_fit"
     if config.enable_stale:
         ref = row.posted_at or row.created_at
         if _age_days(ref, now) > config.stale_days:
-            return True
-    return False
+            return "stale"
+    return None
+
+
+def _matches(row: PruneRow, config: PruneConfig, now: datetime) -> bool:
+    return prune_reason(row, config, now) is not None
 
 
 def prune_candidates(rows: list[PruneRow], config: PruneConfig, now: datetime) -> list[PruneRow]:
     """Zero-progress, not-yet-archived rows matching any enabled rule."""
     return [
         r for r in rows
-        if r.archived_at is None and not r.has_progress and _matches(r, config, now)
+        if r.archived_at is None and is_zero_progress(r) and _matches(r, config, now)
     ]
 
 
@@ -756,9 +905,21 @@ def expire_candidates(rows: list[PruneRow], config: PruneConfig, now: datetime) 
     return [
         r for r in rows
         if r.archived_at is not None
-        and not r.has_progress
+        and is_zero_progress(r)
         and _age_days(r.archived_at, now) > config.retention_days
     ]
+
+
+def prune_reason_counts(
+    rows: list[PruneRow], config: PruneConfig, now: datetime
+) -> dict[str, int]:
+    """Primary archive-reason counts for zero-progress prune candidates."""
+    counts = {"rejected": 0, "low_fit": 0, "stale": 0}
+    for row in prune_candidates(rows, config, now):
+        reason = prune_reason(row, config, now)
+        if reason is not None:
+            counts[reason] += 1
+    return counts
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -821,11 +982,13 @@ def test_prune_run_archives_junk_expires_old_and_skips_progress():
 
         preview = prune_preview(s, cfg, now=NOW)
         assert preview.archived == 1 and preview.expired == 1 and preview.skipped == 1
+        assert preview.rejected == 1 and preview.low_fit == 0 and preview.stale == 0
         # Preview must not mutate.
         assert get_job(s, _require_id(rejected.id)).archived_at is None
 
         report = prune_run(s, cfg, now=NOW)
         assert report.archived == 1 and report.expired == 1 and report.skipped == 1
+        assert report.rejected == 1 and report.low_fit == 0 and report.stale == 0
         assert get_job(s, _require_id(rejected.id)).archived_at is not None
         assert get_job(s, _require_id(old_archived.id)) is None       # expired
         assert get_job(s, _require_id(protected.id)) is not None      # progress kept
@@ -847,6 +1010,7 @@ from resume_agent.tracking.prune import (
     PruneRow,
     expire_candidates,
     prune_candidates,
+    prune_reason_counts,
     prune_skipped,
 )
 from resume_agent.tracking.prune_config import PruneConfig
@@ -883,13 +1047,31 @@ def _prune_plan(session: Session, config: PruneConfig, now: datetime):
     )
 
 
+def _prune_report(
+    to_archive: list[PruneRow],
+    to_expire: list[PruneRow],
+    skipped: list[PruneRow],
+    config: PruneConfig,
+    now: datetime,
+) -> PruneReport:
+    reasons = prune_reason_counts(to_archive, config, now)
+    return PruneReport(
+        archived=len(to_archive),
+        expired=len(to_expire),
+        skipped=len(skipped),
+        rejected=reasons["rejected"],
+        low_fit=reasons["low_fit"],
+        stale=reasons["stale"],
+    )
+
+
 def prune_preview(
     session: Session, config: PruneConfig, now: datetime | None = None
 ) -> PruneReport:
     """Count what a prune would do, without writing anything."""
     now = now or utcnow()
     to_archive, to_expire, skipped = _prune_plan(session, config, now)
-    return PruneReport(archived=len(to_archive), expired=len(to_expire), skipped=len(skipped))
+    return _prune_report(to_archive, to_expire, skipped, config, now)
 
 
 def prune_run(
@@ -902,7 +1084,7 @@ def prune_run(
         archive_job(session, row.job_id)
     for row in to_expire:
         delete_job(session, row.job_id)
-    return PruneReport(archived=len(to_archive), expired=len(to_expire), skipped=len(skipped))
+    return _prune_report(to_archive, to_expire, skipped, config, now)
 ```
 
 Also add `from datetime import datetime` at the top of `repository.py` if not already imported (it currently is not — add it).
@@ -986,24 +1168,28 @@ Expected: FAIL (no `prune` command → non-zero exit / usage error)
 
 - [ ] **Step 3: Implement the command**
 
-In `src/resume_agent/cli.py`, add to the imports:
+In `src/resume_agent/cli.py`, extend the existing repository import (line ~41) to add `prune_preview, prune_run`, and add the config import:
 
 ```python
+from resume_agent.tracking.repository import (
+    get_job, jobs_by_status, prune_preview, prune_run, save_job, update_application_status,
+)
 from resume_agent.tracking.prune_config import load_prune_config
-from resume_agent.tracking.repository import prune_preview, prune_run
 ```
+
+`_engine` (which does `make_engine` + `init_db`), `get_session`, and `get_settings` are already imported in `cli.py` — reuse `_engine`, don't duplicate engine setup.
 
 Add the command (place it near the other top-level `@app.command()` functions):
 
 ```python
 @app.command()
 def prune(
-    db_url: str = typer.Option(None, "--db-url", help="Override the configured DB URL."),
+    db_url: str | None = typer.Option(None, "--db-url", help="Override the configured DB URL."),
     config: str = typer.Option("config/prune.yaml", "--config", help="Path to prune.yaml."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show counts without writing."),
-    fit: int = typer.Option(None, "--fit", help="Override fit_threshold."),
-    stale_days: int = typer.Option(None, "--stale-days", help="Override stale_days."),
-    retention_days: int = typer.Option(None, "--retention-days", help="Override retention_days."),
+    fit: int | None = typer.Option(None, "--fit", help="Override fit_threshold."),
+    stale_days: int | None = typer.Option(None, "--stale-days", help="Override stale_days."),
+    retention_days: int | None = typer.Option(None, "--retention-days", help="Override retention_days."),
 ) -> None:
     """Archive junk jobs (rejected / low-fit / stale) and expire old archived ones."""
     cfg = load_prune_config(config)
@@ -1019,19 +1205,21 @@ def prune(
     if overrides:
         cfg = cfg.model_copy(update=overrides)
 
-    engine = make_engine(db_url or get_settings().db_url)
-    init_db(engine)
-    with get_session(engine) as session:
+    with get_session(_engine(db_url)) as session:
         if dry_run:
             report = prune_preview(session, cfg)
             typer.echo(
-                f"[dry-run] {report.archived} to archive, {report.expired} to expire, "
+                f"[dry-run] {report.rejected} rejected, {report.low_fit} low-fit, "
+                f"{report.stale} stale -> {report.archived} to archive; "
+                f"{report.expired} to expire, "
                 f"{report.skipped} skipped (have progress)"
             )
         else:
             report = prune_run(session, cfg)
             typer.echo(
-                f"+{report.archived} archived, {report.expired} expired, "
+                f"+{report.archived} archived "
+                f"({report.rejected} rejected, {report.low_fit} low-fit, {report.stale} stale), "
+                f"{report.expired} expired, "
                 f"{report.skipped} skipped"
             )
 ```
@@ -1192,7 +1380,7 @@ git commit -m "Add triage_rows and archived_rows builders"
 
 ---
 
-## Task 11: Pure selection-state helpers
+## Task 11: Pure selection-state helper
 
 **Files:**
 - Create: `src/resume_agent/dashboard/selection.py`
@@ -1203,12 +1391,7 @@ git commit -m "Add triage_rows and archived_rows builders"
 Create `tests/test_dashboard_selection.py`:
 
 ```python
-from resume_agent.dashboard.selection import all_deletable, reconcile_selection
-
-
-def test_reconcile_drops_ids_no_longer_visible():
-    assert reconcile_selection({1, 2, 3}, {2, 3, 4}) == {2, 3}
-    assert reconcile_selection(set(), {1, 2}) == set()
+from resume_agent.dashboard.selection import all_deletable
 
 
 def test_all_deletable_requires_nonempty_subset():
@@ -1227,16 +1410,11 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.dashboar
 Create `src/resume_agent/dashboard/selection.py`:
 
 ```python
-"""Pure helpers for the Triage page's checkbox selection state.
+"""Pure helper for the Triage page's bulk-delete gate.
 
-Kept Streamlit-free so the fragile selection logic is unit-testable; the render
-layer only stores/reads a set of job ids in st.session_state.
+Kept Streamlit-free so the rule is unit-testable; the render layer derives the
+selected ids directly from the per-card checkbox widget state.
 """
-
-
-def reconcile_selection(selected: set[int], visible_ids: set[int]) -> set[int]:
-    """Drop selected ids that are no longer on screen (archived/deleted/filtered)."""
-    return selected & visible_ids
 
 
 def all_deletable(selected_ids: set[int], deletable_ids: set[int]) -> bool:
@@ -1302,6 +1480,8 @@ def test_triage_page_renders_with_a_raw_job(tmp_path, monkeypatch):
         at = AppTest.from_file(appmod.__file__, default_timeout=30).run()
         at.radio[0].set_value("Triage").run()
         assert not at.exception, at.exception
+        assert any(widget.label == "Status" for widget in at.multiselect)
+        assert any(widget.label == "Sort by" for widget in at.selectbox)
     finally:
         get_settings.cache_clear()  # don't leak the temp DB into other tests
 ```
@@ -1321,14 +1501,16 @@ Expected: FAIL with `AttributeError: module 'resume_agent.dashboard.app' has no 
 Add to `src/resume_agent/dashboard/pages.py`. Update imports at the top:
 
 ```python
-from resume_agent.dashboard.selection import all_deletable, reconcile_selection
+from datetime import datetime, timezone
+
+from resume_agent.dashboard.selection import all_deletable
 from resume_agent.tracking.prune_config import load_prune_config
 from resume_agent.tracking.queries import (
     PipelineRow, TriageRow, archived_rows, pipeline_rows, shortlist_rows, triage_rows,
 )
 from resume_agent.tracking.repository import (
     application_for_job, archive_job, delete_job, get_job, prune_preview, prune_run,
-    save_application, save_job, update_application_status,
+    restore_job, save_application, save_job, update_application_status,
 )
 ```
 
@@ -1336,10 +1518,15 @@ Add the constant and helpers:
 
 ```python
 _PRUNE_CONFIG_PATH = "config/prune.yaml"
-_SEL_KEY = "triage_selected"
+_UNDO_KEY = "triage_last_archived"
 
 
-def _triage_card(session, row: TriageRow, selected: set[int]) -> None:
+def _triage_card(row: TriageRow) -> bool:
+    """Render one triage card; return whether its checkbox is ticked.
+
+    The checkbox's own keyed widget state (``sel-{id}``) is the single source of
+    truth — there is no parallel selection set to drift out of sync.
+    """
     with st.container(border=True):
         head, box = st.columns([5, 1], vertical_alignment="center")
         with head:
@@ -1352,12 +1539,73 @@ def _triage_card(session, row: TriageRow, selected: set[int]) -> None:
                 unsafe_allow_html=True,
             )
         with box:
-            checked = st.checkbox("Select", value=row.job_id in selected,
-                                  key=f"sel-{row.job_id}", label_visibility="collapsed")
-        if checked:
-            selected.add(row.job_id)
-        else:
-            selected.discard(row.job_id)
+            checked = st.checkbox("Select", key=f"sel-{row.job_id}",
+                                  label_visibility="collapsed")
+    return checked
+
+
+def _clear_checkboxes(job_ids) -> None:
+    # Acted-on rows leave the view; drop their stale checkbox state so a later
+    # "Show archived" toggle can't resurrect a ticked box for the same id.
+    for jid in job_ids:
+        st.session_state.pop(f"sel-{jid}", None)
+
+
+def _row_age_days(row: TriageRow) -> int | None:
+    if row.posted_at is None:
+        return None
+    posted = row.posted_at
+    if posted.tzinfo is None:
+        posted = posted.replace(tzinfo=timezone.utc)
+    else:
+        posted = posted.astimezone(timezone.utc)
+    return max(0, (datetime.now(timezone.utc) - posted).days)
+
+
+def _filter_sort_triage_rows(rows: list[TriageRow]) -> list[TriageRow]:
+    with st.container(key="controldesk_triage"):
+        st.markdown('<div class="controldesk-head">Filter &amp; sort</div>',
+                    unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4, gap="medium", vertical_alignment="top")
+        statuses = sorted({row.status for row in rows})
+        chosen = set(c1.multiselect("Status", statuses, default=statuses, key="triage_status"))
+        min_fit = c2.slider("Min fit", 0, 100, 0, key="triage_min_fit")
+        max_age = c3.number_input("Max age days (0 = any)", 0, 3650, 0, key="triage_max_age")
+        sort = c4.selectbox("Sort by", ["fit", "recency", "company"], key="triage_sort")
+
+    visible = []
+    for row in rows:
+        age = _row_age_days(row)
+        if row.status not in chosen:
+            continue
+        if row.fit_score is not None and row.fit_score < min_fit:
+            continue
+        if max_age and age is not None and age > max_age:
+            continue
+        visible.append(row)
+
+    if sort == "fit":
+        visible.sort(key=lambda row: (row.fit_score is not None, row.fit_score or -1),
+                     reverse=True)
+    elif sort == "recency":
+        visible.sort(key=lambda row: _row_age_days(row) if _row_age_days(row) is not None else 10**9)
+    else:
+        visible.sort(key=lambda row: ((row.company or "").lower(), (row.title or "").lower()))
+    return visible
+
+
+def _render_archive_undo(session) -> None:
+    last_archived = list(st.session_state.get(_UNDO_KEY, []))
+    if not last_archived:
+        return
+    msg, action = st.columns([3, 1], vertical_alignment="center")
+    msg.success(f"Archived {len(last_archived)} job(s).")
+    if action.button("Undo archive", key="triage_undo_archive"):
+        for jid in last_archived:
+            restore_job(session, jid)
+        st.session_state[_UNDO_KEY] = []
+        _clear_checkboxes(last_archived)
+        st.rerun()
 
 
 def render_triage_page(session) -> None:
@@ -1369,49 +1617,54 @@ def render_triage_page(session) -> None:
 
     show_archived = st.toggle("Show archived", value=False, key="triage_show_archived")
     rows = archived_rows(session) if show_archived else triage_rows(session)
-
-    metric_row([("In view", str(len(rows))),
-                ("Deletable", str(sum(1 for r in rows if not r.has_progress)))])
-
-    _render_prune_panel(session)
+    _render_archive_undo(session)
 
     if not rows:
         empty_state("◇", "Nothing to triage",
                     "Run <code>resume-agent pull</code> to bring in jobs, or toggle archived.")
         return
 
-    selected: set[int] = st.session_state.setdefault(_SEL_KEY, set())
-    visible_ids = {r.job_id for r in rows}
-    selected = reconcile_selection(selected, visible_ids)
-    st.session_state[_SEL_KEY] = selected
+    visible = _filter_sort_triage_rows(rows)
+    metric_row([("In view", str(len(visible))),
+                ("Deletable", str(sum(1 for r in visible if not r.has_progress)))])
 
+    _render_prune_panel(session)
+
+    if not visible:
+        empty_state("◇", "No jobs match these filters", "Loosen a filter or clear the age limit.")
+        return
+
+    # Derive the selection straight from the per-card checkboxes as we render them.
+    selected: set[int] = set()
     with st.container(key="cardgrid_triage"):
-        for row in rows:
-            _triage_card(session, row, selected)
+        for row in visible:
+            if _triage_card(row):
+                selected.add(row.job_id)
 
-    deletable_ids = {r.job_id for r in rows if not r.has_progress}
+    deletable_ids = {r.job_id for r in visible if not r.has_progress}
     _render_action_bar(session, selected, deletable_ids, show_archived)
 
 
 def _render_action_bar(session, selected, deletable_ids, show_archived) -> None:
-    cols = st.columns(3)
-    if show_archived:
-        if cols[0].button("Restore selected", key="triage_restore",
-                          disabled=not selected):
-            from resume_agent.tracking.repository import restore_job
-            for jid in list(selected):
-                restore_job(session, jid)
-            st.session_state[_SEL_KEY] = set()
+    with st.container(key="triage_actionbar"):
+        cols = st.columns(2)
+        if show_archived:
+            if cols[0].button("Restore selected", key="triage_restore", disabled=not selected):
+                for jid in selected:
+                    restore_job(session, jid)
+                _clear_checkboxes(selected)
+                st.rerun()
+            return
+        if cols[0].button("Archive selected", key="triage_archive", disabled=not selected):
+            archived = sorted(selected)
+            for jid in archived:
+                archive_job(session, jid)
+            st.session_state[_UNDO_KEY] = archived
+            _clear_checkboxes(archived)
             st.rerun()
-        return
-    if cols[0].button("Archive selected", key="triage_archive", disabled=not selected):
-        for jid in list(selected):
-            archive_job(session, jid)
-        st.session_state[_SEL_KEY] = set()
-        st.rerun()
-    can_delete = all_deletable(selected, deletable_ids)
-    if cols[1].button("Delete selected", key="triage_delete", disabled=not can_delete):
-        _confirm_delete(session, sorted(selected))
+        if cols[1].button("Delete selected", key="triage_delete",
+                          disabled=not all_deletable(selected, deletable_ids)):
+            _confirm_delete(session, sorted(selected))
 
 
 @st.dialog("Permanently delete jobs")
@@ -1420,7 +1673,7 @@ def _confirm_delete(session, job_ids: list[int]) -> None:
     if st.button("Confirm delete", key="confirm_delete"):
         for jid in job_ids:
             delete_job(session, jid)
-        st.session_state[_SEL_KEY] = set()
+        _clear_checkboxes(job_ids)
         st.rerun()
 
 
@@ -1436,7 +1689,8 @@ def _render_prune_panel(session) -> None:
         )
         preview = prune_preview(session, run_config)
         st.caption(
-            f"{preview.archived} would be archived · {preview.expired} expired · "
+            f"{preview.rejected} rejected · {preview.low_fit} low-fit · {preview.stale} stale "
+            f"→ {preview.archived} archive · {preview.expired} expire · "
             f"{preview.skipped} skipped (have progress)"
         )
         if st.button("Prune now", key="prune_now"):
@@ -1452,7 +1706,6 @@ def _confirm_prune(session, run_config) -> None:
     )
     if st.button("Confirm prune", key="confirm_prune"):
         prune_run(session, run_config)
-        st.session_state[_SEL_KEY] = set()
         st.rerun()
 ```
 
@@ -1466,6 +1719,17 @@ div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_triage"] {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr));
   gap: clamp(1rem, 1.4vw, 1.6rem);
   align-items: stretch;
+}
+
+div[data-testid="stVerticalBlock"][class*="st-key-triage_actionbar"] {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 5;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.7rem;
+  box-shadow: 0 4px 18px rgba(22,19,15,0.12);
 }
 ```
 
@@ -1515,7 +1779,7 @@ Expected: PASS
 
 ```bash
 git add src/resume_agent/dashboard/pages.py src/resume_agent/dashboard/app.py src/resume_agent/dashboard/ui.py tests/test_dashboard_app.py
-git commit -m "Add Triage page with bulk archive/delete, restore, and prune panel"
+git commit -m "Add Triage filtering, bulk actions, undo, restore, and prune panel"
 ```
 
 ---
@@ -1526,9 +1790,10 @@ git commit -m "Add Triage page with bulk archive/delete, restore, and prune pane
 - Modify: `src/resume_agent/dashboard/pages.py`
 - Test: `tests/test_dashboard_app.py`
 
-> Adds, per card: archive button, delete button (only when `not row.has_progress`),
-> and a manual JobStatus stage selector. Adds collapsible stage groups. `PipelineRow`
-> gains a `has_progress` flag so the delete button can be gated without a second query.
+> Adds a filter/sort control desk, collapsible stage groups, and per-card archive,
+> delete (only when `not row.has_progress`), and manual JobStatus stage controls.
+> `PipelineRow` gains a `has_progress` flag so the delete button can be gated
+> without a second query.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1552,6 +1817,14 @@ def test_pipeline_row_carries_has_progress_flag():
         flags = {r.job_id: r.has_progress for r in pipeline_rows(s)}
         assert flags[raw.id] is False
         assert flags[adv.id] is True
+```
+
+Also extend the existing `test_dashboard_pages_render_without_error` after the
+Pipeline navigation to prove the new control desk is wired:
+
+```python
+        assert any(widget.label == "Stages" for widget in at.multiselect)
+        assert any(widget.label == "Sort by" for widget in at.selectbox)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1601,17 +1874,73 @@ In `src/resume_agent/dashboard/pages.py`, inside `_render_pipeline_card`, after 
         with arch_col:
             if st.button("Archive", key=f"arch-{row.job_id}"):
                 archive_job(session, row.job_id)
+                st.session_state[_UNDO_KEY] = [row.job_id]
                 st.rerun()
         with del_col:
             if not row.has_progress and st.button("Delete", key=f"del-{row.job_id}"):
                 _confirm_delete(session, [row.job_id])
 ```
 
-- [ ] **Step 6: Add collapsible stage groups in `render_pipeline_page`**
+- [ ] **Step 6: Add the Pipeline filter/sort desk**
 
-In `render_pipeline_page`, wrap each status section's card grid in an `st.expander`. Replace the `for status in present:` loop body:
+Add a small page-local helper in `src/resume_agent/dashboard/pages.py`:
 
 ```python
+def _filter_sort_pipeline_rows(rows: list[PipelineRow]) -> list[PipelineRow]:
+    with st.container(key="controldesk_pipeline"):
+        st.markdown('<div class="controldesk-head">Filter &amp; sort</div>',
+                    unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4, gap="medium", vertical_alignment="top")
+        statuses = sorted({row.status for row in rows})
+        chosen = set(c1.multiselect("Stages", statuses, default=statuses, key="pipe_stages"))
+        min_fit = c2.slider("Min fit", 0, 100, 0, key="pipe_min_fit")
+        query = c3.text_input("Company/title", key="pipe_query")
+        sort = c4.selectbox("Sort by", ["stage", "fit", "company"], key="pipe_sort")
+
+    needle = query.strip().lower()
+    visible = []
+    for row in rows:
+        haystack = f"{row.company or ''} {row.title or ''}".lower()
+        if row.status not in chosen:
+            continue
+        if row.fit_score is not None and row.fit_score < min_fit:
+            continue
+        if needle and needle not in haystack:
+            continue
+        visible.append(row)
+
+    if sort == "fit":
+        visible.sort(key=lambda row: (row.fit_score is not None, row.fit_score or -1),
+                     reverse=True)
+    elif sort == "company":
+        visible.sort(key=lambda row: ((row.company or "").lower(), (row.title or "").lower()))
+    else:
+        order = {status: idx for idx, status in enumerate(_STATUS_ORDER)}
+        visible.sort(key=lambda row: (order.get(row.status, 999),
+                                      (row.company or "").lower(), (row.title or "").lower()))
+    return visible
+```
+
+- [ ] **Step 7: Add collapsible stage groups in `render_pipeline_page`**
+
+In `render_pipeline_page`, call `_render_archive_undo(session)`, filter the rows
+before counting, and wrap each status section's card grid in an `st.expander`:
+
+```python
+    _render_archive_undo(session)
+    rows = _filter_sort_pipeline_rows(rows)
+    if not rows:
+        empty_state("◇", "No jobs match these filters", "Loosen a Pipeline filter.")
+        return
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row.status] = counts.get(row.status, 0) + 1
+    rendered = counts.get(JobStatus.rendered.value, 0)
+    metric_row([("In view", str(len(rows))), ("Rendered", str(rendered)),
+                ("Stages active", str(len(counts)))])
+    present = [s for s in _STATUS_ORDER if s in counts]
+    present += [s for s in counts if s not in _STATUS_ORDER]
+
     for status in present:
         with st.expander(f"{status} · {counts[status]}", expanded=status != JobStatus.rejected.value):
             with st.container(key=f"cardgrid_pipeline_{status}"):
@@ -1619,16 +1948,16 @@ In `render_pipeline_page`, wrap each status section's card grid in an `st.expand
                     _render_pipeline_card(session, row)
 ```
 
-- [ ] **Step 7: Run the dashboard + queries suites**
+- [ ] **Step 8: Run the dashboard + queries suites**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_dashboard_app.py tests/test_tracking_queries.py -v`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add src/resume_agent/dashboard/pages.py src/resume_agent/tracking/queries.py tests/test_dashboard_app.py
-git commit -m "Add pipeline board archive/delete, stage change, and collapsible groups"
+git commit -m "Add pipeline board filtering, archive/delete, stage change, and collapsible groups"
 ```
 
 ---
@@ -1656,12 +1985,14 @@ Add a short subsection under "Core invariants" documenting the archive/delete/pr
 ```markdown
 ### Archive, delete, prune
 `Job.archived_at` (orthogonal to `status`) soft-hides a job; every view filters
-`archived_at IS NULL`. `has_progress(session, job_id)` — status in
-{approved, tailored, rendered} OR any Application/ResumeVersion/CoverLetter — is the
-single gate for irreversible paths. `delete_job` refuses jobs with progress and
-cascades children otherwise. `prune_run` (config: `config/prune.yaml`) archives
-rejected/low-fit/stale zero-progress jobs, then hard-deletes archived zero-progress
-jobs older than `retention_days`. Surfaced via the dashboard Triage page and
+`archived_at IS NULL` except dedupe lookup, which intentionally still sees trash-bin
+jobs to avoid duplicate re-ingest. `has_progress(session, job_id)` — status in
+{approved, tailored, rendered} OR any Application/ResumeVersion/CoverLetter — is
+the single gate for irreversible paths. `delete_job` refuses jobs with progress and
+cascades incidental children in FK-safe order otherwise. `prune_run` (config:
+`config/prune.yaml`) archives rejected/low-fit/stale zero-progress jobs, reports
+primary reason counts, then hard-deletes archived zero-progress jobs older than
+`retention_days`. Surfaced via the dashboard Triage page and
 `resume-agent prune [--dry-run]`.
 ```
 
@@ -1676,8 +2007,8 @@ git commit -m "Document archive/delete/prune model in CLAUDE.md"
 
 ## Self-Review
 
-- **Spec coverage:** D1 tiered (Tasks 2/4) · D2 `archived_at` (Task 1) · D3 trash-bin (Tasks 7/8) · D4 criteria (Task 7) · D5 trigger button+CLI (Tasks 9/12) · D6 YAML+override (Tasks 6/9/12) · D7 Triage page (Task 12) · D8 checkbox cards + restore (Tasks 11/12) · D9 pipeline controls all four (Task 13) · D10 asymmetric confirm (Task 12 `st.dialog`, instant archive). All covered.
-- **Blast radius (spec §3):** archived filter on shortlist/pipeline/status_counts/jobs_by_status — Task 5. Tested.
+- **Spec coverage:** D1 tiered (Tasks 2/4) · D2 `archived_at` (Task 1) · D3 trash-bin (Tasks 7/8) · D4 criteria + reason counts (Tasks 7/8) · D5 trigger button+CLI (Tasks 9/12) · D6 YAML+override (Tasks 6/9/12) · D7 Triage page (Task 12) · D8 checkbox cards + sticky action bar + restore (Tasks 11/12) · D9 pipeline filter/sort + controls + collapsible groups (Task 13) · D10 asymmetric confirm + archive undo (Tasks 12/13). All covered.
+- **Blast radius (spec §3):** archived filter on shortlist/pipeline/status_counts/jobs_by_status/application_job_pairs/match-gap/analytics — Task 5. Tested. Dedupe lookup remains intentionally unfiltered.
 - **Type consistency:** `PruneRow`/`PruneReport`/`PruneConfig`, `triage_rows`/`archived_rows`/`TriageRow`, `has_progress`, `archive_job`/`restore_job`/`delete_job`, `prune_preview`/`prune_run` used with identical signatures across tasks.
 - **AppTest seeding:** Task 12's render test uses the repo's verified pattern (`DB_URL` env var + `get_settings.cache_clear()` in a `try/finally`), copied from `test_dashboard_pages_render_without_error`.
 ```

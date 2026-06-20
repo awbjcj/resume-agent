@@ -77,11 +77,14 @@ these two primitives.
   (status untouched, so restore is lossless).
 - `delete_job(session, job_id) -> bool` — re-check `has_progress`; if progress,
   refuse and return `False`. Otherwise delete children
-  (`CoverLetter` → `ResumeVersion` → `Application`) then the `Job` in **one
+  (`CoverLetter` → `Application` → `ResumeVersion`) then the `Job` in **one
   transaction** — a defensive cascade that does not depend on SQLite's FK pragma.
 - **Blast-radius update:** `shortlist_rows`, `pipeline_rows`, `status_counts`, and
-  the discovery selects gain `WHERE archived_at IS NULL` so archived jobs vanish
-  from every normal view.
+  the discovery selects gain `WHERE archived_at IS NULL`. Other normal dashboard /
+  CLI read paths that join or select jobs — match-gap targets, analytics rows, and
+  `application_job_pairs` for Gmail status sync — get the same guard so archived
+  jobs vanish from normal workflows. Dedupe lookup intentionally still sees
+  archived jobs, so a trash-bin job does not get re-ingested as a duplicate.
 
 ### 4. Prune engine — pure predicates + thin orchestrator
 
@@ -98,14 +101,18 @@ New module `tracking/prune.py`, **pure** over plain rows/dataclasses:
   `archived_at` is older than `retention_days` **AND** zero-progress.
 
 Orchestrator: `prune_run(session, config) -> PruneReport(archived, expired,
-skipped)` lives in `tracking/repository.py` (the session-based layer), keeping
-`prune.py` purely functional like `filtering.py`. `PruneReport` is a frozen
-dataclass defined alongside the pure predicates in `prune.py`.
+skipped, rejected, low_fit, stale)` lives in `tracking/repository.py` (the
+session-based layer), keeping `prune.py` purely functional like `filtering.py`.
+`PruneReport` is a frozen dataclass defined alongside the pure predicates in
+`prune.py`.
 
 - `archived` — count newly archived this run.
 - `expired` — count hard-deleted by the retention sweep.
 - `skipped` — count that matched a prune predicate but were kept because they had
   progress (telemetry, so the user sees why something survived).
+- `rejected`, `low_fit`, `stale` — primary-reason counts for rows that will be
+  archived. Primary reason priority is rejected → low-fit → stale so the preview
+  totals are stable and do not double-count rows matching multiple rules.
 
 Archived jobs **with** progress are never auto-expired; they stay archived forever.
 
@@ -123,17 +130,19 @@ enable_low_fit: true
 enable_stale: true
 ```
 
-`PruneConfig` dataclass + `load_prune_config(path)` with these defaults when the
-file is absent. The dashboard pre-fills its prune panel from this; the CLI reads
-the same. Dashboard edits are per-run overrides, not persisted.
+`PruneConfig` uses the repo's existing `ExtensibleModel` / Pydantic config pattern
+(matching `search_config.py`) plus `load_prune_config(path)` with these defaults
+when the file is absent. The dashboard pre-fills its prune panel from this; the CLI
+reads the same. Dashboard edits are per-run overrides, not persisted.
 
 ### 6. CLI (`cli.py`)
 
 `resume-agent prune [--dry-run] [--fit N] [--stale-days N] [--retention-days N]`:
 
-- `--dry-run` computes and prints the preview counts without writing.
+- `--dry-run` computes and prints the preview counts without writing, including
+  rejected / low-fit / stale primary archive reasons.
 - Otherwise applies `prune_run` and reports `+N archived, M expired, K skipped`
-  in the `run_pull` telemetry style.
+  plus the reason breakdown, in the `run_pull` telemetry style.
 - Flags override `prune.yaml` for that invocation.
 
 ### 7. Dashboard surfaces
@@ -143,10 +152,12 @@ Sidebar order becomes: **Shortlist · Triage · Pipeline board · Analytics · M
 **New Triage page** (`render_triage_page`) — for raw/extracted/filtered/rejected:
 
 - Control desk: filter by status / min-fit / age, sort by fit / recency / company.
-- **Checkbox cards + sticky action bar.** Selection lives in
-  `st.session_state["triage_selected"]` (a set of `job_id`); each card checkbox is
-  keyed `sel-{job_id}` and survives reruns. Action bar: *Archive selected* /
-  *Delete selected* (delete only enabled when every selected job `is_deletable`).
+- **Checkbox cards + sticky action bar.** Each card checkbox is keyed
+  `sel-{job_id}` (its own widget state, surviving reruns); the selected set is
+  derived directly from those keys each render — there is no parallel session-state
+  set to drift (avoiding the `value=`-vs-keyed-state footgun). Acted-on rows leave
+  the view and their stale checkbox keys are popped. Action bar: *Archive selected*
+  / *Delete selected* (delete enabled only when every selected job `is_deletable`).
 - **"Show archived" toggle** reuses the same cards to list archived jobs with a
   per-card / bulk **Restore**.
 - **Prune panel:** config-driven preview ("N rejected · M low-fit · K stale →
@@ -168,9 +179,11 @@ Sidebar order becomes: **Shortlist · Triage · Pipeline board · Analytics · M
 
 ### 8. Testing (offline, fakes — per the project test philosophy)
 
-- **Pure:** `prune_candidates`, `expire_candidates`, `is_zero_progress`, selection
-  helpers, `triage_rows` / `archived_rows` builders, and that
-  `shortlist_rows` / `pipeline_rows` / `status_counts` exclude archived rows.
+- **Pure:** `prune_candidates`, `expire_candidates`, `is_zero_progress`, primary
+  prune-reason counts, the `all_deletable` rule, `triage_rows` / `archived_rows` builders,
+  and that normal read paths (`shortlist_rows`, `pipeline_rows`,
+  `application_job_pairs`, `status_counts`, match-gap targets, analytics rows)
+  exclude archived rows.
 - **Repository:** `archive_job` / `restore_job` round-trip (status preserved),
   `delete_job` cascade + refusal when progress exists, `prune_run` report counts
   (archived / expired / skipped, including the progress-skip path).
@@ -179,12 +192,14 @@ Sidebar order becomes: **Shortlist · Triage · Pipeline board · Analytics · M
 
 ## Risks & mitigations
 
-- **Selection-state fragility** (D8 is the most custom Streamlit work): keep the
-  selection set keyed strictly by `job_id`, prune stale ids on each render, and
-  cover the helper logic with pure unit tests so the DOM wiring is the only
-  untested part.
-- **Blast radius of the archived filter:** every status query must add the
-  `archived_at IS NULL` guard or archived jobs leak back into views — enumerated
-  in §3 and covered by tests in §8.
+- **Selection-state fragility** (D8 is the most custom Streamlit work): the
+  selected set is derived directly from per-card checkbox widget state (no parallel
+  set to desync, avoiding the `value=`-vs-keyed-state footgun); the only extracted,
+  unit-tested rule is `all_deletable`. Acted-on rows leave the view and their
+  checkbox keys are popped so a later "Show archived" toggle can't resurrect a tick.
+- **Blast radius of the archived filter:** every normal dashboard / CLI read path
+  must add the `archived_at IS NULL` guard or archived jobs leak back into views —
+  enumerated in §3 and covered by tests in §8. Dedupe lookup is the explicit
+  exception.
 - **`st.dialog` availability:** requires a recent Streamlit (already in use per the
   1.58 DOM notes); if unavailable, fall back to a two-step inline confirm.
