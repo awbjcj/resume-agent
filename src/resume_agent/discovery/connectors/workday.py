@@ -5,12 +5,8 @@ import httpx
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import (
-    html_to_text,
-    primary_search_term,
-    relevance_gate,
-    title_relevance_gate,
-)
+from resume_agent.discovery.connectors.harvest import harvest_detailed
+from resume_agent.discovery.connectors.text import html_to_text, primary_search_term
 from resume_agent.discovery.search_config import SearchConfig
 
 _PAGE = 20  # cxs page size
@@ -94,24 +90,21 @@ def _list_pages(target: AtsTarget, search: SearchConfig):
             return
 
 
+def _fetch_detail(target: AtsTarget, row: WorkdayRow) -> dict | None:
+    # No detail path -> cannot fetch a description; skip rather than GET a bad URL.
+    if not row.external_path:
+        return None
+    resp = httpx.get(cxs_detail_url(target, row.external_path), timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def fetch_workday(target: AtsTarget, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
     """List (request-shaped) -> gate on title/location -> detail-fetch survivors only."""
-    jobs: list[RawJob] = []
-    for row in _list_pages(target, search):
-        # Gate only on title-safe constraints before the N+1 detail fetch. Keyword/title fallback
-        # needs jd_text, so the full relevance gate runs after detail is applied.
-        if not title_relevance_gate([row], search):
-            continue
-        if not row.external_path:
-            continue  # no detail path -> cannot fetch a description; skip rather than POST a bad URL
-        try:
-            resp = httpx.get(cxs_detail_url(target, row.external_path), timeout=30)
-            resp.raise_for_status()
-        except httpx.HTTPError:
-            continue  # one stale/failed detail endpoint must not discard the whole batch
-        apply_detail(row, resp.json())
-        if relevance_gate([row], search):
-            jobs.append(row)
-            if limit is not None and len(jobs) >= limit:
-                break
-    return jobs
+    return harvest_detailed(
+        _list_pages(target, search),
+        lambda row: _fetch_detail(target, row),
+        apply_detail,
+        search=search,
+        limit=limit,
+    )

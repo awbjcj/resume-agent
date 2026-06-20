@@ -2,7 +2,12 @@ import httpx
 import pytest
 
 from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.harvest import FetchResult, gate_and_limit, harvest
+from resume_agent.discovery.connectors.harvest import (
+    FetchResult,
+    gate_and_limit,
+    harvest,
+    harvest_detailed,
+)
 from resume_agent.discovery.search_config import SearchConfig
 
 _ANCHORED = SearchConfig(role_anchors=["engineer"])
@@ -100,3 +105,87 @@ def test_gate_and_limit_applies_limit_after_gating():
     assert [j.title for j in kept] == ["AI Engineer"]
     # filtered counts the gate drop, independent of the limit truncation.
     assert filtered == 1
+
+
+def _detailed(row: RawJob, jd: str) -> None:
+    row.jd_text = jd
+
+
+def test_harvest_detailed_title_gates_before_fetching_detail():
+    fetched: list[str] = []
+
+    def fetch_detail(row):
+        fetched.append(row.title)
+        return {"jd": "jd"}
+
+    jobs = harvest_detailed(
+        [_job("AI Engineer"), _job("CDL Driver")],
+        fetch_detail,
+        lambda row, detail: _detailed(row, detail["jd"]),
+        search=_ANCHORED,
+        limit=None,
+    )
+    # Only the title-matching row triggers the N+1 detail fetch.
+    assert fetched == ["AI Engineer"]
+    assert [j.title for j in jobs] == ["AI Engineer"]
+
+
+def test_harvest_detailed_isolates_a_failed_detail_fetch():
+    def fetch_detail(row):
+        if row.title == "Dead Engineer":
+            raise httpx.HTTPStatusError(
+                "500", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            )
+        return {"jd": "jd"}
+
+    jobs = harvest_detailed(
+        [_job("Dead Engineer"), _job("Live Engineer")],
+        fetch_detail,
+        lambda row, detail: _detailed(row, detail["jd"]),
+        search=_ANCHORED,
+        limit=None,
+    )
+    assert [j.title for j in jobs] == ["Live Engineer"]
+
+
+def test_harvest_detailed_skips_rows_with_no_detail():
+    jobs = harvest_detailed(
+        [_job("First Engineer"), _job("Second Engineer")],
+        lambda row: None if row.title == "First Engineer" else {"jd": "jd"},
+        lambda row, detail: _detailed(row, detail["jd"]),
+        search=_ANCHORED,
+        limit=None,
+    )
+    assert [j.title for j in jobs] == ["Second Engineer"]
+
+
+def test_harvest_detailed_applies_full_gate_after_detail():
+    # No anchors: the title gate passes everything, and the post-detail gate falls
+    # back to a keyword search over title + jd.
+    jobs = harvest_detailed(
+        [_job("Engineer One"), _job("Engineer Two")],
+        lambda row: {"jd": "python" if row.title == "Engineer One" else "java"},
+        lambda row, detail: _detailed(row, detail["jd"]),
+        search=SearchConfig(keywords=["python"]),
+        limit=None,
+    )
+    assert [j.title for j in jobs] == ["Engineer One"]
+
+
+def test_harvest_detailed_stops_at_limit():
+    fetched: list[str] = []
+
+    def fetch_detail(row):
+        fetched.append(row.title)
+        return {"jd": "jd"}
+
+    jobs = harvest_detailed(
+        [_job("First Engineer"), _job("Second Engineer"), _job("Third Engineer")],
+        fetch_detail,
+        lambda row, detail: _detailed(row, detail["jd"]),
+        search=_ANCHORED,
+        limit=1,
+    )
+    assert [j.title for j in jobs] == ["First Engineer"]
+    # Stops fetching details once the limit is met.
+    assert fetched == ["First Engineer"]

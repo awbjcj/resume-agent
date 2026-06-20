@@ -30,6 +30,13 @@ used to copy. Single-call connectors reuse only its tail via `gate_and_limit`.
 _Avoid_: fetch loop, pull loop, runner (the runner orchestrates connectors;
 a harvest is internal to one connector)
 
+**Detailed harvest**:
+The N+1 variant of Harvest for boards that list titles then serve each JD on a
+separate detail endpoint (Workday, Tesla): title-gate each row, fetch its detail,
+apply it, then run the full relevance gate. One stale detail endpoint skips its
+row, not the batch. `harvest_detailed`.
+_Avoid_: N+1 loop, detail loop
+
 **FetchResult**:
 What a connector's `fetch` returns: `jobs`, `failures` (Unit key → reason), and
 `filtered` (count dropped by the relevance gate). Replaces the duck-typed
