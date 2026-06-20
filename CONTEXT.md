@@ -73,6 +73,28 @@ The title-and-JD filter applied to the harvested union; `title_relevance_gate`
 is its title-only form used before JD text is available (Workday/Tesla list rows).
 _Avoid_: filter (filtering is a later pipeline stage on persisted jobs)
 
+## Tailoring & verdict
+
+**Verdict**:
+What one tailoring round earns — `PanelVerdict`: `gate_passed`, `aggregate_score`,
+`passed`, and the `critiques` behind them. Built by exactly one constructor,
+`aggregate`, so "what makes a round pass" has a single shape.
+_Avoid_: result, outcome, score (the score is one field of the verdict)
+
+**Gate critique**:
+A `ReviewCritique` whose `passed` blocks the round regardless of score — the
+configured gate reviewers (LLM fact-check) plus the deterministic gates. The
+fact-lock invariant rides here, not in a separate bool.
+_Avoid_: hard gate (the gate is the policy; this is one critique that carries it)
+
+**Deterministic gate**:
+A gate decided in-process without an LLM — provenance: every cited id must
+resolve to a real fact. Emitted as a gate critique by `provenance_critique`, it
+guards the expensive panel: when it fails the round, the workflow skips the LLM
+reviewers. `DETERMINISTIC_GATES` in `verdict.py` names the set; `aggregate`
+gates on it alongside the configured reviewer gates.
+_Avoid_: pre-check, structural check (it is a first-class gate, not a precondition)
+
 ## Ingest & source priority
 
 **IncomingJob**:

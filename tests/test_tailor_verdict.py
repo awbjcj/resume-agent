@@ -50,11 +50,27 @@ def test_gate_pass_and_meets_threshold_passes():
 
 
 def test_provenance_failure_blocks_gate_even_if_reviewers_pass():
+    # Provenance now rides in the critiques list as a deterministic gate, not a bool.
     critiques = [
+        ReviewCritique(reviewer="provenance", score=0, passed=False),
         ReviewCritique(reviewer="fact-check", score=100, passed=True),
         ReviewCritique(reviewer="ats-keyword", score=100, passed=True),
         ReviewCritique(reviewer="recruiter", score=100, passed=True),
     ]
-    verdict = aggregate(critiques, _config(), provenance_passed=False)
+    verdict = aggregate(critiques, _config())
     assert verdict.gate_passed is False
     assert verdict.passed is False
+
+
+def test_passing_provenance_critique_is_a_gate_not_scored():
+    # A passing provenance critique gates (it's checked) but never moves the score.
+    critiques = [
+        ReviewCritique(reviewer="provenance", score=100, passed=True),
+        ReviewCritique(reviewer="fact-check", score=100, passed=True),
+        ReviewCritique(reviewer="ats-keyword", score=90, passed=True),
+        ReviewCritique(reviewer="recruiter", score=80, passed=True),
+    ]
+    verdict = aggregate(critiques, _config(threshold=85))
+    assert verdict.gate_passed is True
+    assert verdict.aggregate_score == 85  # provenance's score=100 is excluded
+    assert verdict.passed is True

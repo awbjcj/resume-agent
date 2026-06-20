@@ -2,7 +2,12 @@ from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.review import ReviewCritique
+from resume_agent.tailor.provenance import PROVENANCE_REVIEWER
 from resume_agent.tailor.review_config import ReviewConfig
+
+# Gates decided in-process, not by a configured reviewer agent. They ride in the
+# critiques list like any gate, so aggregate stays the only verdict constructor.
+DETERMINISTIC_GATES = frozenset({PROVENANCE_REVIEWER})
 
 
 class PanelVerdict(ExtensibleModel):
@@ -12,14 +17,21 @@ class PanelVerdict(ExtensibleModel):
     critiques: list[ReviewCritique] = Field(default_factory=list)
 
 
-def aggregate(
-    critiques: list[ReviewCritique], config: ReviewConfig, provenance_passed: bool = True
-) -> PanelVerdict:
-    """Combine critiques: deterministic and reviewer gates block the round."""
+def aggregate(critiques: list[ReviewCritique], config: ReviewConfig) -> PanelVerdict:
+    """Combine critiques into one verdict: any failed gate blocks the round.
+
+    Gates are the configured reviewer gates plus the deterministic gates
+    (provenance). Each rides in `critiques`, so there is a single verdict shape
+    whether or not the panel ran.
+    """
     by_name = {c.reviewer: c for c in critiques}
 
-    gate_names = [r.name for r in config.reviewers if r.gate and r.name in by_name]
-    gate_passed = provenance_passed and all(by_name[name].passed for name in gate_names)
+    config_gates = {r.name for r in config.reviewers if r.gate}
+    gate_passed = all(
+        c.passed
+        for c in critiques
+        if c.reviewer in config_gates or c.reviewer in DETERMINISTIC_GATES
+    )
 
     weighted = [
         (r.weight, by_name[r.name].score)

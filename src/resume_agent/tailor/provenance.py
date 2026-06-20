@@ -5,6 +5,9 @@ from pydantic import Field
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
+from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
+
+PROVENANCE_REVIEWER = "provenance"
 
 
 class ProvenanceReport(ExtensibleModel):
@@ -63,6 +66,27 @@ def check_provenance(content: ResumeContent, facts: ProfileFacts) -> ProvenanceR
     valid = set(index_facts(facts))
     missing = sorted(i for i in referenced_ids(content) if i not in valid)
     return ProvenanceReport(ok=not missing, missing=missing)
+
+
+def provenance_critique(content: ResumeContent, facts: ProfileFacts) -> ReviewCritique:
+    """The fact-lock gate as a critique: every cited id must resolve to a real fact.
+
+    A deterministic gate — no LLM. Failing ids become blocking issues, so the
+    verdict's gate logic sees provenance through the same shape as a reviewer gate.
+    """
+    report = check_provenance(content, facts)
+    return ReviewCritique(
+        reviewer=PROVENANCE_REVIEWER,
+        score=100 if report.ok else 0,
+        passed=report.ok,
+        issues=[
+            ReviewIssue(
+                severity=Severity.blocking,
+                message=f"provenance id not found in profile facts: {missing_id}",
+            )
+            for missing_id in report.missing
+        ],
+    )
 
 
 def resolve_evidence(content: ResumeContent, facts: ProfileFacts) -> dict[str, Any]:

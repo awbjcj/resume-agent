@@ -13,10 +13,12 @@ from resume_agent.models.resume import (
     TailoredProject,
     TailoredSkill,
 )
+from resume_agent.models.review import Severity
 from resume_agent.tailor.provenance import (
     ProvenanceReport,
     check_provenance,
     index_facts,
+    provenance_critique,
     referenced_ids,
     resolve_evidence,
 )
@@ -74,6 +76,22 @@ def test_check_provenance_flags_fabricated_id():
     report = check_provenance(_content(bullet_prov="ghost999"), _facts())
     assert report.ok is False
     assert report.missing == ["ghost999"]
+
+
+def test_provenance_critique_passes_for_clean_content():
+    crit = provenance_critique(_content(), _facts())
+    assert crit.reviewer == "provenance"
+    assert crit.passed is True
+    assert crit.score == 100
+    assert crit.issues == []
+
+
+def test_provenance_critique_blocks_fabricated_id():
+    crit = provenance_critique(_content(bullet_prov="ghost999"), _facts())
+    assert crit.passed is False
+    assert crit.score == 0
+    assert crit.issues[0].severity == Severity.blocking
+    assert "ghost999" in crit.issues[0].message
 
 
 def test_resolve_evidence_returns_only_referenced_facts():
