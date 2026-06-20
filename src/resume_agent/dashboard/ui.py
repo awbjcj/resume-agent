@@ -415,11 +415,16 @@ def clamp_text(
         if len(words) <= preview_words:
             return f'<div class="{body_class}{pre_cls}">{safe}</div>'
         preview = escape(" ".join(words[:preview_words]) + "...")
+        # The full copy lives in the <details> BODY (after </summary>), not the
+        # summary, so a closed <details> hides it natively — no flash of the whole
+        # rationale before THEME_CSS loads (it was visible until .xt-full's
+        # stylesheet display:none kicked in). The [open] rules still reveal it.
         return (
             '<details class="xt"><summary>'
             f'<div class="{body_class} xt-excerpt{pre_cls}">{preview}</div>'
+            '<span class="xt-cue"></span></summary>'
             f'<div class="{body_class} xt-full{pre_cls}">{safe}</div>'
-            '<span class="xt-cue"></span></summary></details>'
+            '</details>'
         )
     if len(text) <= min_chars:
         return f'<div class="{body_class}{pre_cls}">{safe}</div>'
