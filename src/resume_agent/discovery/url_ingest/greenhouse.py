@@ -12,8 +12,12 @@ def _text(soup: BeautifulSoup, selector: str) -> str | None:
     return value or None
 
 
-def parse_greenhouse(html: str) -> ExtractedJob:
-    """Parse a boards.greenhouse.io posting into structured fields."""
+def read_greenhouse_posting(html: str) -> ExtractedJob:
+    """Read a single boards.greenhouse.io posting page into structured fields.
+
+    Distinct from connectors.greenhouse.parse_greenhouse, which maps the board
+    *API* JSON; this scrapes one rendered posting's HTML.
+    """
     soup = BeautifulSoup(html, "html.parser")
     company = _text(soup, "span.company-name")
     if company and company.lower().startswith("at "):

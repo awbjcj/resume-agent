@@ -54,6 +54,20 @@ A single opening as a connector emits it, ready for ingest — source, url,
 company, title, location, jd_text, posted_at.
 _Avoid_: posting, listing, record
 
+**Host identity**:
+A URL's ATS resolved by host and path alone, with no network — `identify_host`.
+`detect_ats` is host identity first, then an L2 HTML sniff for embedded ATSes.
+url_ingest uses host identity on a page it already holds, so the sniff never
+re-fetches it.
+_Avoid_: detection (reserve for the full `detect_ats`, sniff included)
+
+**Posting reader**:
+A `reader(html) -> ExtractedJob` for one ATS's single posting page, registered in
+url_ingest's `_READERS` by host identity. The single-posting counterpart to a
+Producer (which maps a board's whole list). LinkedIn has one but stays off the
+registry — it is a scraper target, not an ATS.
+_Avoid_: parser, scraper, extractor
+
 **RelevanceGate**:
 The title-and-JD filter applied to the harvested union; `title_relevance_gate`
 is its title-only form used before JD text is available (Workday/Tesla list rows).

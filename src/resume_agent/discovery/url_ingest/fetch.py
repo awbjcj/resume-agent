@@ -11,7 +11,8 @@ _LINKEDIN_DETAIL_SELECTOR = "div.show-more-less-html__markup, .description__text
 _SHELL_TEXT_THRESHOLD = 200
 
 
-def _is_linkedin(host: str) -> bool:
+def is_linkedin(host: str) -> bool:
+    """The single LinkedIn host rule, shared by fetch (render) and service (route)."""
     return host == "linkedin.com" or host.endswith(".linkedin.com")
 
 
@@ -26,7 +27,7 @@ def _looks_like_js_shell(html: str) -> bool:
 def fetch_page(url: str, *, allow_browser: bool = True) -> PageContent:
     """Fetch a posting page. HTTP-first; render in-browser for LinkedIn or JS shells."""
     host = urlsplit(url).netloc.lower()
-    if allow_browser and _is_linkedin(host):
+    if allow_browser and is_linkedin(host):
         html = fetch_rendered(url, wait_selector=_LINKEDIN_DETAIL_SELECTOR)
         return PageContent(html=html, final_url=url, rendered=True)
     resp = httpx.get(url, headers=_HEADERS, follow_redirects=True, timeout=20.0)

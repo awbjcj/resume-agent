@@ -1,5 +1,5 @@
 import resume_agent.discovery.connectors.detect as detect
-from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats
+from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, identify_host
 
 
 def test_l1_greenhouse_url():
@@ -171,3 +171,28 @@ def test_singleton_precedes_l2(monkeypatch):
     target = detect_ats("https://www.tesla.com/careers")
     assert target is not None
     assert target.ats == "tesla"
+
+
+def _no_network(monkeypatch):
+    def fail(url, client=None):
+        raise AssertionError("identify_host must never fetch HTML")
+    monkeypatch.setattr(detect, "_get_html", fail)
+
+
+def test_identify_host_resolves_direct_ats_without_network(monkeypatch):
+    _no_network(monkeypatch)
+    assert identify_host("https://boards.greenhouse.io/acme/jobs/1") == AtsTarget("greenhouse", "acme")
+    assert identify_host("https://acme.wd5.myworkdayjobs.com/Careers") == AtsTarget(
+        "workday", tenant="acme", datacenter="wd5", site="Careers"
+    )
+
+
+def test_identify_host_resolves_singleton_without_network(monkeypatch):
+    _no_network(monkeypatch)
+    assert identify_host("https://www.tesla.com/careers/search") == AtsTarget("tesla")
+
+
+def test_identify_host_returns_none_for_embedded_careers_page(monkeypatch):
+    # No host/path signal -> None, without falling through to the L2 sniff.
+    _no_network(monkeypatch)
+    assert identify_host("https://careers.acme.com/openings") is None

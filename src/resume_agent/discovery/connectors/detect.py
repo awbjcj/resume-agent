@@ -160,6 +160,15 @@ def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
     return None
 
 
+def identify_host(url: str) -> AtsTarget | None:
+    """Resolve a URL to its ATS by host/path alone — bespoke singleton, then URL pattern.
+
+    Pure: no network. Callers that already hold the page (url_ingest) use this to
+    avoid the L2 sniff re-fetching a page they have — and rendered — already.
+    """
+    return _singleton(url) or _l1(url)
+
+
 def detect_ats(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
-    """Resolve a careers URL: bespoke singleton, then URL pattern, then HTML sniff."""
-    return _singleton(url) or _l1(url) or _l2(url, client=client)
+    """Resolve a careers URL: host/path identity, then an HTML sniff for embeds."""
+    return identify_host(url) or _l2(url, client=client)

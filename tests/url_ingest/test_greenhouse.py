@@ -1,4 +1,4 @@
-from resume_agent.discovery.url_ingest.greenhouse import parse_greenhouse
+from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
 
 _HTML = """
 <html><body>
@@ -13,8 +13,8 @@ _HTML = """
 """
 
 
-def test_parse_greenhouse_extracts_all_fields():
-    job = parse_greenhouse(_HTML)
+def test_read_greenhouse_posting_extracts_all_fields():
+    job = read_greenhouse_posting(_HTML)
     assert job.title == "Senior Platform Engineer"
     assert job.company == "Globex"
     assert job.location == "Remote - US"
@@ -22,7 +22,7 @@ def test_parse_greenhouse_extracts_all_fields():
     assert "5 years of Go" in job.jd_text
 
 
-def test_parse_greenhouse_missing_content_yields_empty_jd():
-    job = parse_greenhouse("<html><body></body></html>")
+def test_read_greenhouse_posting_missing_content_yields_empty_jd():
+    job = read_greenhouse_posting("<html><body></body></html>")
     assert job.jd_text == ""
     assert job.company is None
