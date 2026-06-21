@@ -171,6 +171,26 @@ def restore_job(session: Session, job_id: int) -> Job | None:
     return job
 
 
+def delete_job(session: Session, job_id: int) -> bool:
+    """Hard-delete a zero-progress job and its children in one transaction.
+
+    Returns False (and changes nothing) if the job has user progress or is
+    already gone. The progress check is the single irreversible-path guard.
+    """
+    if has_progress(session, job_id):
+        return False
+    job = session.get(Job, job_id)
+    if job is None:
+        return False
+    # Dependency order: CoverLetter/Application can reference ResumeVersion.
+    for model in (CoverLetter, Application, ResumeVersion):
+        for child in session.exec(select(model).where(model.job_id == job_id)).all():
+            session.delete(child)
+    session.delete(job)
+    session.commit()
+    return True
+
+
 def has_progress(session: Session, job_id: int) -> bool:
     """True if a job has user investment that must never be destroyed."""
     job = session.get(Job, job_id)

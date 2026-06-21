@@ -100,3 +100,27 @@ def test_has_progress_true_for_advanced_status_and_children():
         assert has_progress(s, _require_id(with_version.id)) is True
         assert has_progress(s, _require_id(with_app.id)) is True
         assert has_progress(s, 9999) is False
+
+
+def test_delete_job_cascades_children_and_refuses_progress():
+    from resume_agent.tracking.repository import (
+        delete_job, get_job, save_application, save_cover_letter, save_resume_version,
+    )
+    from resume_agent.tracking.tables import Application, CoverLetter, ResumeVersion
+    from sqlmodel import select
+
+    with _session() as s:
+        junk = save_job(s, Job(source="m", jd_text="a", status=JobStatus.rejected.value))
+        jid = _require_id(junk.id)
+        assert delete_job(s, jid) is True
+        assert get_job(s, jid) is None
+
+        # A job with children/progress is refused and left intact.
+        kept = save_job(s, Job(source="m", jd_text="b", status=JobStatus.raw.value))
+        kid = _require_id(kept.id)
+        save_resume_version(s, ResumeVersion(job_id=kid, round=1))
+        save_application(s, Application(job_id=kid))
+        save_cover_letter(s, CoverLetter(job_id=kid))
+        assert delete_job(s, kid) is False
+        assert get_job(s, kid) is not None
+        assert s.exec(select(ResumeVersion).where(ResumeVersion.job_id == kid)).first() is not None
