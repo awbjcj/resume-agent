@@ -1,9 +1,8 @@
 from agno.agent import Agent
-from agno.models.anthropic import Claude
 from pydantic import BaseModel, ConfigDict
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner
+from resume_agent.llm_runner import AgentRunner, Runner, build_model, resolve_api_key
 
 _SNIPPET_CHARS = 500
 
@@ -24,12 +23,12 @@ class RelevanceVerdict(BaseModel):
 
 def build_relevance_agent(model_id: str | None = None) -> Runner | None:
     settings = get_settings()
-    if not settings.anthropic_api_key:
-        return None
     resolved = model_id or settings.cheap_model
+    if not resolve_api_key(resolved):
+        return None
     return AgentRunner(
         Agent(
-            model=Claude(id=resolved, api_key=settings.anthropic_api_key),
+            model=build_model(resolved),
             description="You decide whether a job posting matches a target role.",
             instructions=_INSTRUCTIONS,
             output_schema=RelevanceVerdict,

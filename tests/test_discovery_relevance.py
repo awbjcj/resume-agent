@@ -41,8 +41,9 @@ def test_build_relevance_agent_returns_none_without_api_key(monkeypatch):
     from resume_agent.discovery import relevance as mod
 
     class _Settings:
-        anthropic_api_key = ""
         cheap_model = "cheap"
 
+    # No key configured for the resolved model's provider -> no agent.
     monkeypatch.setattr(mod, "get_settings", lambda: _Settings())
+    monkeypatch.setattr(mod, "resolve_api_key", lambda model_id: "")
     assert mod.build_relevance_agent() is None
