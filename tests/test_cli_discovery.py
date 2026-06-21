@@ -49,10 +49,11 @@ def test_discover_runs_and_reports_counts(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "build_extract_agent", lambda: object())
     monkeypatch.setattr(cli, "build_fit_agent", lambda: object())
     monkeypatch.setattr(cli, "build_relevance_agent", lambda: None, raising=False)
+    monkeypatch.setattr(cli, "build_skill_canonicalizer", lambda: object())
     monkeypatch.setattr(
         cli,
         "discover",
-        lambda session, config, facts, extract_agent, fit_agent, relevance_agent=None: {
+        lambda session, config, facts, extract_agent, fit_agent, relevance_agent=None, canonicalizer=None: {  # noqa: E501
             "shortlisted": 1
         },
     )
@@ -66,7 +67,9 @@ def test_discover_builds_and_passes_relevance_agent(tmp_path, monkeypatch):
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
     seen = {}
 
-    def fake_discover(session, config, facts, extract_agent, fit_agent, relevance_agent=None):
+    def fake_discover(
+        session, config, facts, extract_agent, fit_agent, relevance_agent=None, canonicalizer=None
+    ):
         seen["relevance_agent"] = relevance_agent
         return {"shortlisted": 0}
 
@@ -75,6 +78,7 @@ def test_discover_builds_and_passes_relevance_agent(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "build_extract_agent", lambda: object())
     monkeypatch.setattr(cli, "build_fit_agent", lambda: object())
     monkeypatch.setattr(cli, "build_relevance_agent", lambda: "RELV")
+    monkeypatch.setattr(cli, "build_skill_canonicalizer", lambda: object())
     monkeypatch.setattr(cli, "discover", fake_discover)
 
     result = runner.invoke(cli.app, ["discover", "--db-url", db_url])

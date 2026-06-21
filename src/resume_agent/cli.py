@@ -18,7 +18,7 @@ from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
-from resume_agent.discovery.pipeline import discover, reextract
+from resume_agent.discovery.pipeline import backfill_rescore, discover, reextract
 from resume_agent.discovery.relevance import build_relevance_agent
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
@@ -173,14 +173,33 @@ def discover_cmd(
         "--reextract",
         help="Re-extract metadata for already-processed jobs (backfill new fields). Does not change status or fit.",
     ),
+    rescore_existing: bool = typer.Option(
+        False,
+        "--rescore",
+        help="Backfill SIC + location for already-shortlisted jobs (does not change fit or status).",
+    ),
 ) -> None:
     """Run the discovery funnel over current jobs and report status counts."""
+    if reextract_existing and rescore_existing:
+        typer.echo("Choose only one backfill mode: --reextract or --rescore.")
+        raise typer.Exit(code=2)
+
     if reextract_existing:
         extract_agent = build_extract_agent()
         engine = _engine(db_url)
         with get_session(engine) as session:
             updated = reextract(session, extract_agent)
         typer.echo(f"Re-extracted metadata for {updated} job(s).")
+        return
+
+    if rescore_existing:
+        profile_facts = load_facts(facts)
+        fit_agent = build_fit_agent()
+        canonicalizer = build_skill_canonicalizer()
+        engine = _engine(db_url)
+        with get_session(engine) as session:
+            updated = backfill_rescore(session, profile_facts, fit_agent, canonicalizer=canonicalizer)
+        typer.echo(f"Backfilled SIC + location for {updated} shortlisted job(s).")
         return
 
     config = load_search_config(search)
@@ -190,7 +209,10 @@ def discover_cmd(
     relevance_agent = build_relevance_agent()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        counts = discover(session, config, profile_facts, extract_agent, fit_agent, relevance_agent)
+        counts = discover(
+            session, config, profile_facts, extract_agent, fit_agent, relevance_agent,
+            canonicalizer=build_skill_canonicalizer(),
+        )
     typer.echo(f"Discovery complete. Status counts: {counts}")
 
 
