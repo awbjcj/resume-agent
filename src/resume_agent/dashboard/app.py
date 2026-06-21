@@ -32,7 +32,9 @@ def _engine():
 
 
 def main() -> None:
-    st.set_page_config(page_title="Resume Agent — Broadsheet", page_icon="▤", layout="wide")
+    st.set_page_config(
+        page_title="Resume Agent — Broadsheet", page_icon="▤", layout="wide"
+    )
     st.markdown(THEME_CSS, unsafe_allow_html=True)
 
     with st.sidebar:
