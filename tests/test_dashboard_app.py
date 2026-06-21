@@ -59,8 +59,29 @@ def test_dashboard_pages_render_without_error(tmp_path, monkeypatch):
 
         at.radio[0].set_value("Pipeline board").run()
         assert not at.exception, at.exception
+        assert any(widget.label == "Stages" for widget in at.multiselect)
+        assert any(widget.label == "Sort by" for widget in at.selectbox)
     finally:
         get_settings.cache_clear()  # don't leak the temp DB into other tests
+
+
+def test_pipeline_row_carries_has_progress_flag():
+    from sqlmodel import Session, SQLModel, create_engine
+    from resume_agent.tracking.queries import pipeline_rows
+    from resume_agent.tracking.repository import save_application, save_job
+    from resume_agent.tracking.tables import Application, Job, JobStatus
+
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as s:
+        raw = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
+        adv = save_job(s, Job(source="m", jd_text="b", status=JobStatus.raw.value))
+        assert adv.id is not None
+        save_application(s, Application(job_id=adv.id))
+
+        flags = {r.job_id: r.has_progress for r in pipeline_rows(s)}
+        assert flags[raw.id] is False
+        assert flags[adv.id] is True
 
 
 def test_dashboard_exposes_triage_page():

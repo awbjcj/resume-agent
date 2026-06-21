@@ -78,6 +78,7 @@ class PipelineRow:
     salary_max: int | None
     remote_policy: str | None
     seniority: str | None
+    has_progress: bool = False
 
 
 def _skill_tags(criteria: dict, tokens: set[str]) -> list[SkillTag]:
@@ -174,6 +175,7 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 salary_max=salary.get("maximum"),
                 remote_policy=criteria.get("remote_policy"),
                 seniority=criteria.get("seniority"),
+                has_progress=has_progress(session, job_id),
             )
         )
     return rows

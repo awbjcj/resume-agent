@@ -256,6 +256,41 @@ def render_shortlist_page(session) -> None:
                     st.rerun()
 
 
+def _filter_sort_pipeline_rows(rows: list[PipelineRow]) -> list[PipelineRow]:
+    with st.container(key="controldesk_pipeline"):
+        st.markdown('<div class="controldesk-head">Filter &amp; sort</div>',
+                    unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4, gap="medium", vertical_alignment="top")
+        statuses = sorted({row.status for row in rows})
+        chosen = set(c1.multiselect("Stages", statuses, default=statuses, key="pipe_stages"))
+        min_fit = c2.slider("Min fit", 0, 100, 0, key="pipe_min_fit")
+        query = c3.text_input("Company/title", key="pipe_query")
+        sort = c4.selectbox("Sort by", ["stage", "fit", "company"], key="pipe_sort")
+
+    needle = query.strip().lower()
+    visible = []
+    for row in rows:
+        haystack = f"{row.company or ''} {row.title or ''}".lower()
+        if row.status not in chosen:
+            continue
+        if row.fit_score is not None and row.fit_score < min_fit:
+            continue
+        if needle and needle not in haystack:
+            continue
+        visible.append(row)
+
+    if sort == "fit":
+        visible.sort(key=lambda row: (row.fit_score is not None, row.fit_score or -1),
+                     reverse=True)
+    elif sort == "company":
+        visible.sort(key=lambda row: ((row.company or "").lower(), (row.title or "").lower()))
+    else:
+        order = {status: idx for idx, status in enumerate(_STATUS_ORDER)}
+        visible.sort(key=lambda row: (order.get(row.status, 999),
+                                      (row.company or "").lower(), (row.title or "").lower()))
+    return visible
+
+
 def _render_pipeline_card(session, row: PipelineRow) -> None:
     with st.container(border=True):
         head, badges = st.columns([3, 2], vertical_alignment="center")
@@ -328,6 +363,28 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
             saved = f"Saved — status set to “{new_status}”"
             st.success(saved + (f" · note: {notes}" if notes else ""))
 
+        st.markdown('<div class="rail-head">Manage</div>', unsafe_allow_html=True)
+        stage_col, arch_col, del_col = st.columns([2, 1, 1])
+        with stage_col:
+            stages = [s.value for s in JobStatus]
+            new_stage = st.selectbox(
+                "Stage", stages, index=stages.index(row.status), key=f"stage-{row.job_id}"
+            )
+            if st.button("Set stage", key=f"setstage-{row.job_id}"):
+                job = get_job(session, row.job_id)
+                if job is not None:
+                    job.status = new_stage
+                    save_job(session, job)
+                    st.rerun()
+        with arch_col:
+            if st.button("Archive", key=f"arch-{row.job_id}"):
+                archive_job(session, row.job_id)
+                st.session_state[_UNDO_KEY] = [row.job_id]
+                st.rerun()
+        with del_col:
+            if not row.has_progress and st.button("Delete", key=f"del-{row.job_id}"):
+                _confirm_delete(session, [row.job_id])
+
 
 def render_pipeline_page(session) -> None:
     rows = pipeline_rows(session)
@@ -345,20 +402,25 @@ def render_pipeline_page(session) -> None:
         )
         return
 
+    _render_archive_undo(session)
+    rows = _filter_sort_pipeline_rows(rows)
+    if not rows:
+        empty_state("◇", "No jobs match these filters", "Loosen a Pipeline filter.")
+        return
     counts: dict[str, int] = {}
     for row in rows:
         counts[row.status] = counts.get(row.status, 0) + 1
     rendered = counts.get(JobStatus.rendered.value, 0)
-    metric_row([("Total jobs", str(len(rows))), ("Rendered", str(rendered)),
+    metric_row([("In view", str(len(rows))), ("Rendered", str(rendered)),
                 ("Stages active", str(len(counts)))])
-
     present = [s for s in _STATUS_ORDER if s in counts]
     present += [s for s in counts if s not in _STATUS_ORDER]
+
     for status in present:
-        st.markdown(f'<div class="rail-head">{status} · {counts[status]}</div>', unsafe_allow_html=True)
-        with st.container(key=f"cardgrid_pipeline_{status}"):
-            for row in [r for r in rows if r.status == status]:
-                _render_pipeline_card(session, row)
+        with st.expander(f"{status} · {counts[status]}", expanded=status != JobStatus.rejected.value):
+            with st.container(key=f"cardgrid_pipeline_{status}"):
+                for row in [r for r in rows if r.status == status]:
+                    _render_pipeline_card(session, row)
 
 
 def render_analytics_page(session) -> None:
