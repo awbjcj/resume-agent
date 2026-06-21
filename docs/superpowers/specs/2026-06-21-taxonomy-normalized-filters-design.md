@@ -1,7 +1,7 @@
 # Taxonomy-Normalized Filters (Industry / Skills / Location / Company-size) — Design
 
 **Date:** 2026-06-21
-**Status:** Approved (design); pending implementation plan
+**Status:** Approved (design); implementation plan aligned
 **Surface:** `discovery/` (extract + fit + pipeline), `tracking/` (queries, canonicalize), new `taxonomy/` package, `dashboard/` (control desk + filtering), `cli.py`, `data/`
 
 ---
@@ -55,7 +55,7 @@ Consequences:
 |---|---|
 | Canonicalization seam | **Hybrid (C):** deterministic `taxonomy` layer is canonical; LLM rides existing passes; LLM canonicalizer is a build-time/refresh tool, not a runtime read dependency |
 | Industry granularity | **2-digit SIC Major Group** (~83); **Division derived** from the code |
-| Industry classification | Fit agent emits `sic_major` at **`run_score`** (filter survivors only); unmappable → **`Unclassified`** |
+| Industry classification | Fit agent emits `sic_major` at **`run_score`** (filter survivors only); unmappable → `None` internally and displays as **`Unclassified`** |
 | Industry filter UI | **Division → Major Group cascade** (replaces the flat multiselect) |
 | Skill splitting | Extract agent emits **atomic** skills + deterministic splitter **safety net** (protected-token allowlist); per-job |
 | Skill synonyms | **Machine-grown persisted alias map**: `canonicalize.py` runs once over the union after `run_score`; map merged into a file; read path applies it deterministically |
@@ -79,9 +79,10 @@ All modules are pure (no Streamlit, no live network/LLM) and unit-tested in isol
   - Loads bundled `data/sic_codes.json` → `{major_group_code: {label, division}}`
     and `{division_code: division_label}`.
   - `major_group_label(code) -> str | None`, `division_for(code) -> (code, label) | None`.
-  - `UNCLASSIFIED = "Unclassified"` sentinel for jobs with no `sic_major`.
+  - `UNCLASSIFIED = "Unclassified"` display label for jobs with no valid `sic_major`;
+    `sic_major` itself remains `None` so unknown-pass filtering stays consistent.
   - Validation helper: a code is valid only if present in the table; unknown/garbage
-    agent output coerces to `Unclassified`.
+    agent output coerces to `None`.
 - **`skills.py`**
   - `split_skills(items: list[str]) -> list[str]` — deterministic splitter: splits on
     `,`, ` / `, ` or `, ` and ` **only when** the surrounding text is not in the
@@ -94,15 +95,15 @@ All modules are pure (no Streamlit, no live network/LLM) and unit-tested in isol
     canonical choices win** (stability across refreshes).
   - `refresh_aliases(tokens, canonicalizer, path)` — run the canonicalizer over the
     token union, merge into the file, write atomically.
-  - Canonical **display name**: keep the first-seen original surface form for each
-    canonical token (stored alongside, or derived deterministically) so the cloud shows
-    `Kubernetes`, not `kubernetes`.
+  - Canonical **display name** is intentionally simple in the first implementation:
+    the stable canonical token is the filter/display value. Polished display aliases
+    can be added later without changing matching semantics.
 - **`location.py`**
   - `normalize_country(raw) -> str | None` (→ ISO-2 via bundled map: `United States`/`USA`/`US`→`US`, `UK`/`United Kingdom`/`GB`→`GB`, …).
   - `normalize_region(raw, country) -> str | None` (US → USPS 2-letter via bundled map;
     non-US → leave region `None`, per "foreign = city + country").
   - `is_us(country) -> bool`.
-  - `build_location(agent_out) -> StructuredLocation` assembling
+  - `build_location(city, region, country, raw=None) -> StructuredLocation` assembling
     `{city, region, country, is_us, raw}` from the agent's `{city, region, country}` plus
     normalization. Pure transform over agent output (agent faked in tests).
 - **`company_size.py`**
@@ -159,7 +160,7 @@ the package** instead, loaded via `importlib.resources`.
   1. call fit agent → `score`, `rationale`, `sic_major`, `location`.
   2. write `fit_score` / `fit_rationale` columns (unchanged).
   3. read `criteria_json`, set `sic_major` (coerced via `sic.py` to a valid code or
-     `Unclassified`) and structured `location` (via `location.build_location`), write back.
+     `None`) and structured `location` (via `location.build_location`), write back.
   4. after the loop, collect the union of (split, normalized) skill tokens across
      shortlisted jobs and call `refresh_aliases(...)` once.
 - Fit-agent instruction additions: classify the **domain the JD serves** to the nearest
@@ -172,7 +173,8 @@ the package** instead, loaded via `importlib.resources`.
   `reextract`): for each **shortlisted** job, re-run the upgraded fit agent, write
   `sic_major` + `location` into `criteria_json` (does **not** change `fit_score`/`status`),
   then `refresh_aliases`. Returns count.
-- CLI surface: `resume-agent backfill` (or `discover --rescore`).
+- CLI surface: `resume-agent discover --rescore`, mirroring the existing
+  `resume-agent discover --reextract` backfill style.
 
 ### 4.6 Data access (`tracking/queries.py`)
 
@@ -194,7 +196,7 @@ class ShortlistRow:
 - `_skill_tags` composes `normalize_skill` → `apply_aliases` (loaded once per build) and
   runs `split_skills` first; dedup by canonical token, must-have > nice > tech_stack.
 - SIC/location/company-size flattened from `criteria_json` via the `taxonomy` layer;
-  missing `sic_major` → `Unclassified`.
+  missing `sic_major` → `sic_major=None`, `sic_label="Unclassified"`.
 
 ### 4.7 Filtering (`dashboard/filtering.py`)
 
@@ -222,13 +224,14 @@ class ShortlistRow:
 - Skill cloud (`available_skill_cloud`) now reads alias-canonicalized tokens → fewer,
   deduped chips; coverage/required encoding unchanged.
 - Cascade selections narrow downstream options live; "Unclassified" / "Unknown"
-  surface as explicit selectable buckets.
+  surface as display labels while the underlying `None` values keep unknown-pass
+  filtering behavior.
 
 ---
 
 ## 5. Error handling & edge cases
 
-- **Fit agent returns an invalid/garbage SIC code** → coerced to `Unclassified`
+- **Fit agent returns an invalid/garbage SIC code** → coerced to `None` and displayed as `Unclassified`
   (validated against `data/sic_codes.json`).
 - **Location unparseable** (`"2 Locations"` the agent can't split) → structured fields
   `None`; row still passes location filters (unknown passes).
@@ -247,7 +250,8 @@ class ShortlistRow:
 ## 6. Testing strategy (offline; agents faked, data fixtured)
 
 Pure modules carry the weight:
-- `taxonomy/sic.py` — derive label/division; unknown code → `Unclassified`.
+- `taxonomy/sic.py` — derive label/division; unknown code → `None` plus `Unclassified`
+  display fallback.
 - `taxonomy/skills.py` — splitter (commas/or/slash, protected tokens, idempotence);
   `apply_aliases` composition with `normalize_skill`; `merge_aliases` monotonicity &
   idempotence; `refresh_aliases` with a faked canonicalizer.
@@ -257,7 +261,7 @@ Pure modules carry the weight:
 - `filtering.py` — each new filter in isolation, AND combination, cascade option
   builders, "unknown passes" for every new field, skill OR unchanged.
 - `queries.py` — `criteria_json` + taxonomy → widened `ShortlistRow`; canonical skill
-  tags; `Unclassified` fallback.
+  tags; `Unclassified` display fallback.
 - `extract.py` / `fit.py` — faked agents return atomic skills / `sic_major` / location;
   `run_score` writes them into `criteria_json` and triggers one alias refresh; backfill
   populates without touching `fit_score`/`status`.

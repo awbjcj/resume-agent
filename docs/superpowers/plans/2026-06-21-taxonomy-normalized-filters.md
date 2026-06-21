@@ -31,10 +31,10 @@
 - `src/resume_agent/discovery/pipeline.py` — `run_score` writes SIC + location into `criteria_json` + alias refresh; `discover` threads canonicalizer; new `backfill_rescore`.
 - `src/resume_agent/cli.py` — `--rescore` flag on `discover`.
 - `src/resume_agent/tracking/queries.py` — widened `ShortlistRow`; canonical skill tags; SIC/location/size flatten.
-- `src/resume_agent/dashboard/filtering.py` — `FilterState` (rename `industry`→`sic`, add location/size); `_passes`; cascade option builders.
+- `src/resume_agent/dashboard/filtering.py` — `FilterState` keeps the existing `industry` interface but stores SIC major-group codes; add location/size; `_passes`; cascade option builders.
 - `src/resume_agent/dashboard/pages.py` — control-desk cascades (industry + location + company-size).
 
-**Convention note (decided in this plan):** backfill is a `--rescore` flag on `discover`, mirroring the existing `--reextract` flag (`cli.py:171`), not a new top-level command. The spec left this open; the flag is the surgical, consistent choice.
+**Convention note:** backfill is a `--rescore` flag on `discover`, mirroring the existing `--reextract` flag (`cli.py:171`), not a new top-level command.
 
 ---
 
@@ -189,6 +189,12 @@ def test_coerce_code_keeps_valid_drops_invalid():
     assert sic.coerce_code("9999", table) is None
     assert sic.coerce_code(None, table) is None
     assert sic.coerce_code("  60 ", table) == "60"
+
+
+def test_display_label_falls_back_to_unclassified():
+    table = sic.load_sic_table()
+    assert sic.display_label("73", table) == "Business Services"
+    assert sic.display_label(None, table) == sic.UNCLASSIFIED
 ```
 
 - [ ] **Step 4: Run test to verify it fails**
@@ -237,16 +243,28 @@ def coerce_code(raw: str | None, table: dict) -> str | None:
         return None
     code = str(raw).strip()
     return code if code in table["major_groups"] else None
+
+
+def display_label(code: str | None, table: dict) -> str:
+    """Return the major-group label, or the display fallback for unknown industry."""
+    return major_group_label(code, table) or UNCLASSIFIED
 ```
 
 - [ ] **Step 6: Run test to verify it passes**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_sic.py -v`
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 
 - [ ] **Step 7: Ensure the data file ships with the package**
 
-Open `pyproject.toml`. If it does not already include non-Python package data, add under the build/tool config so `*.json` under the package is packaged (e.g. for setuptools: `[tool.setuptools.package-data]` with `"resume_agent.taxonomy" = ["data/*.json"]`). If the project uses a build backend that includes data by default, skip. Run `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_sic.py -v` again to confirm still green.
+Open `pyproject.toml`. This project uses Hatchling, so verify the built wheel includes `src/resume_agent/taxonomy/data/sic_codes.json`. If it does not, add:
+
+```toml
+[tool.hatch.build.targets.wheel.force-include]
+"src/resume_agent/taxonomy/data/sic_codes.json" = "resume_agent/taxonomy/data/sic_codes.json"
+```
+
+Then run `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_sic.py -v` again to confirm still green.
 
 - [ ] **Step 8: Commit**
 
@@ -430,17 +448,13 @@ Add these imports at the top of `src/resume_agent/taxonomy/skills.py` (below the
 ```python
 import json
 from pathlib import Path
-from typing import Callable
 
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
 ```
 
 Append to `src/resume_agent/taxonomy/skills.py`:
 
 ```python
-Canonicalizer = Callable[[set[str]], dict[str, str]]
-
-
 def load_aliases(path: str | Path) -> dict[str, str]:
     """Load the token->canonical map; missing file -> empty (identity)."""
     p = Path(path)
@@ -470,7 +484,9 @@ def refresh_aliases(
     merged = merge_aliases(load_aliases(path), mapping)
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(merged, sort_keys=True), "utf-8")
+    tmp = p.with_name(f"{p.name}.tmp")
+    tmp.write_text(json.dumps(merged, sort_keys=True), "utf-8")
+    tmp.replace(p)
     return merged
 ```
 
@@ -515,7 +531,7 @@ def test_normalize_country_variants_to_iso2():
 def test_normalize_region_us_only():
     assert location.normalize_region("California", "US") == "CA"
     assert location.normalize_region("CA", "US") == "CA"
-    assert location.normalize_region("Ontario", "CA-country") is None  # non-US -> None
+    assert location.normalize_region("Ontario", "CA") is None  # non-US -> None
     assert location.normalize_region(None, "US") is None
 
 
@@ -686,6 +702,12 @@ def test_snap_variants():
     assert company_size.snap("publicly traded") == "enterprise"
 
 
+def test_snap_employee_counts():
+    assert company_size.snap("1-50 employees") == "startup"
+    assert company_size.snap("250 employees") == "scaleup"
+    assert company_size.snap("10,000+ employees") == "enterprise"
+
+
 def test_snap_unmappable_is_none():
     assert company_size.snap("we are a vibe") is None
     assert company_size.snap(None) is None
@@ -704,14 +726,16 @@ Create `src/resume_agent/taxonomy/company_size.py`:
 ```python
 """Company-size taxonomy: snap free-text stage/size to three buckets."""
 
+import re
+
 BUCKETS = ("startup", "scaleup", "enterprise")
 
 # Ordered substring rules; first match wins (most specific first).
 _RULES: tuple[tuple[str, str], ...] = (
+    ("pre-seed", "startup"),
     ("seed", "startup"),
     ("series a", "startup"),
     ("series b", "startup"),
-    ("pre-seed", "startup"),
     ("early stage", "startup"),
     ("startup", "startup"),
     ("series c", "scaleup"),
@@ -723,11 +747,26 @@ _RULES: tuple[tuple[str, str], ...] = (
     ("mid-size", "scaleup"),
     ("fortune 500", "enterprise"),
     ("fortune 100", "enterprise"),
-    ("public", "enterprise"),
+    ("publicly traded", "enterprise"),
     ("enterprise", "enterprise"),
     ("multinational", "enterprise"),
-    ("large", "enterprise"),
 )
+_COUNT = re.compile(r"(\d[\d,]*)\s*(?:-|to)\s*(\d[\d,]*)|(\d[\d,]*)\s*\+?")
+
+
+def _employee_count_bucket(text: str) -> str | None:
+    if "employee" not in text and "people" not in text:
+        return None
+    match = _COUNT.search(text)
+    if match is None:
+        return None
+    high = match.group(2) or match.group(1) or match.group(3)
+    count = int(high.replace(",", ""))
+    if count <= 50:
+        return "startup"
+    if count <= 1000:
+        return "scaleup"
+    return "enterprise"
 
 
 def snap(raw: str | None) -> str | None:
@@ -740,13 +779,13 @@ def snap(raw: str | None) -> str | None:
     for needle, bucket in _RULES:
         if needle in text:
             return bucket
-    return None
+    return _employee_count_bucket(text)
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_taxonomy_company_size.py -v`
-Expected: PASS (3 tests).
+Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -979,8 +1018,7 @@ def test_run_score_writes_sic_and_location_into_criteria(tmp_path):
             Job(
                 source="x", jd_text="jd", title="Eng",
                 status=JobStatus.filtered.value,
-                criteria_json={"industry": "fintech"},
-                location="Austin, TX, USA",
+                criteria_json={"industry": "fintech", "location": "Austin, TX, USA"},
             ),
         )
         run_score(s, facts, _SicLocFitAgent(), aliases_path=tmp_path / "a.json")
@@ -990,6 +1028,7 @@ def test_run_score_writes_sic_and_location_into_criteria(tmp_path):
         assert job.criteria_json["industry"] == "fintech"  # preserved
         assert job.criteria_json["location_parts"]["region"] == "TX"
         assert job.criteria_json["location_parts"]["is_us"] is True
+        assert job.criteria_json["location_parts"]["raw"] == "Austin, TX, USA"
 
 
 def test_run_score_refreshes_aliases_when_canonicalizer_given(tmp_path):
@@ -1025,10 +1064,12 @@ In `src/resume_agent/discovery/pipeline.py`, add imports at the top:
 ```python
 from pathlib import Path
 
+from resume_agent.discovery.fit import FitScore
 from resume_agent.taxonomy import sic
 from resume_agent.taxonomy.location import build_location
-from resume_agent.taxonomy.skills import Canonicalizer, refresh_aliases, split_skills
-from resume_agent.tracking.match_gap import normalize_skill
+from resume_agent.taxonomy.skills import refresh_aliases, split_skills
+from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
+from resume_agent.tracking.tables import Job, JobStatus
 ```
 
 Add a module constant near the top (after imports):
@@ -1048,25 +1089,36 @@ def run_score(
     canonicalizer: Canonicalizer | None = None,
     aliases_path: Path | str = SKILL_ALIASES_PATH,
 ) -> None:
-    scored: list[Job] = []
     for job in jobs_by_status(session, JobStatus.filtered.value):
-        fit = score_fit(compose_fit_input(job.jd_text, profile_facts, job.location), agent)
+        location_text = _job_location_text(job)
+        fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
         job.fit_score = fit.score
         job.fit_rationale = fit.rationale
-        criteria = dict(job.criteria_json or {})
-        criteria["sic_major"] = sic.coerce_code(fit.sic_major, _SIC_TABLE)
-        if fit.location is not None:
-            loc = build_location(
-                fit.location.city, fit.location.region, fit.location.country, raw=job.location
-            )
-            criteria["location_parts"] = loc.as_dict()
-        job.criteria_json = criteria
+        _write_taxonomy_fields(job, fit, location_text)
         job.status = JobStatus.shortlisted.value
         session.add(job)
-        scored.append(job)
     session.commit()
     if canonicalizer is not None:
-        _refresh_skill_aliases(scored, canonicalizer, aliases_path)
+        _refresh_skill_aliases(
+            jobs_by_status(session, JobStatus.shortlisted.value), canonicalizer, aliases_path
+        )
+
+
+def _job_location_text(job: Job) -> str | None:
+    criteria = job.criteria_json or {}
+    value = job.location or criteria.get("location")
+    return str(value).strip() if value and str(value).strip() else None
+
+
+def _write_taxonomy_fields(job: Job, fit: FitScore, raw_location: str | None) -> None:
+    criteria = dict(job.criteria_json or {})
+    criteria["sic_major"] = sic.coerce_code(fit.sic_major, _SIC_TABLE)
+    if fit.location is not None:
+        loc = build_location(
+            fit.location.city, fit.location.region, fit.location.country, raw=raw_location
+        )
+        criteria["location_parts"] = loc.as_dict()
+    job.criteria_json = criteria
 
 
 def _refresh_skill_aliases(
@@ -1182,25 +1234,21 @@ def backfill_rescore(
     Re-runs the fit agent only to harvest the new fields; does NOT change
     fit_score or status. Returns the number of jobs updated.
     """
-    scored: list[Job] = []
+    updated = 0
     for job in jobs_by_status(session, JobStatus.shortlisted.value):
         if not job.jd_text.strip():
             continue
-        fit = score_fit(compose_fit_input(job.jd_text, profile_facts, job.location), agent)
-        criteria = dict(job.criteria_json or {})
-        criteria["sic_major"] = sic.coerce_code(fit.sic_major, _SIC_TABLE)
-        if fit.location is not None:
-            loc = build_location(
-                fit.location.city, fit.location.region, fit.location.country, raw=job.location
-            )
-            criteria["location_parts"] = loc.as_dict()
-        job.criteria_json = criteria
+        location_text = _job_location_text(job)
+        fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
+        _write_taxonomy_fields(job, fit, location_text)
         session.add(job)
-        scored.append(job)
+        updated += 1
     session.commit()
     if canonicalizer is not None:
-        _refresh_skill_aliases(scored, canonicalizer, aliases_path)
-    return len(scored)
+        _refresh_skill_aliases(
+            jobs_by_status(session, JobStatus.shortlisted.value), canonicalizer, aliases_path
+        )
+    return updated
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
@@ -1230,9 +1278,13 @@ In `discover_cmd` (`cli.py:166`), add a new option to the signature (after `reex
     ),
 ```
 
-And add a branch at the start of the body, right after the `if reextract_existing:` block:
+And add the guard/branch at the start of the body, before the existing `if reextract_existing:` block:
 
 ```python
+    if reextract_existing and rescore_existing:
+        typer.echo("Choose only one backfill mode: --reextract or --rescore.")
+        raise typer.Exit(code=2)
+
     if rescore_existing:
         profile_facts = load_facts(facts)
         fit_agent = build_fit_agent()
@@ -1277,27 +1329,15 @@ git commit -m "Add discover --rescore backfill for SIC + location"
 
 - [ ] **Step 1: Write the failing test (append)**
 
-Append to `tests/test_tracking_queries.py` (use the file's existing session/save helpers; if it builds jobs inline, mirror that style):
+Append to `tests/test_tracking_queries.py`, using the file's existing `_session`, `save_job`,
+`Job`, `JobStatus`, `Contact`, and `ProfileFacts` imports/helpers:
 
 ```python
-from resume_agent.tracking.queries import shortlist_rows
-from resume_agent.tracking.tables import Job, JobStatus
-from resume_agent.tracking.repository import save_job
-from resume_agent.models.profile import Contact, ProfileFacts
-from sqlmodel import Session, SQLModel, create_engine
-
-
-def _qsession() -> Session:
-    engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
-    return Session(engine)
-
-
 def test_shortlist_row_exposes_sic_location_and_canonical_skills(tmp_path):
     aliases = tmp_path / "aliases.json"
     aliases.write_text('{"k8s": "kubernetes"}', "utf-8")
     facts = ProfileFacts(contact=Contact(name="Ada"))
-    with _qsession() as s:
+    with _session() as s:
         save_job(
             s,
             Job(
@@ -1357,7 +1397,7 @@ Add the new `ShortlistRow` fields (append to the dataclass, after `skills`, all 
     is_us: bool = False
 ```
 
-> Note: `company_size` is already a `ShortlistRow` field; this task fills it with the snapped bucket instead of raw text.
+> Note: `company_size` is already a `ShortlistRow` field; this task fills it with the snapped bucket instead of raw text. `sic_major` remains `None` for unknown/invalid codes; `sic_label` carries the `Unclassified` display fallback.
 
 Replace `_skill_tags` so it splits then canonicalizes (dedup by canonical token; the canonical token becomes the display `name`, which keeps `filtering.py` unchanged):
 
@@ -1429,7 +1469,7 @@ def shortlist_rows(
                 posted_at=job.posted_at,
                 skills=_skill_tags(criteria, tokens, aliases),
                 sic_major=code,
-                sic_label=sic_tax.major_group_label(code, sic_table),
+                sic_label=sic_tax.display_label(code, sic_table),
                 sic_division=division[1] if division else None,
                 location_country=loc.get("country"),
                 location_region=loc.get("region"),
@@ -1528,7 +1568,7 @@ from resume_agent.dashboard.filtering import (
 
 def test_sic_filter_unknown_passes():
     rows = [_row(job_id=1, sic_major="73"), _row(job_id=2, sic_major="60"), _row(job_id=3)]
-    out = apply_filters(rows, FilterState(sic={"73"}))
+    out = apply_filters(rows, FilterState(industry={"73"}))
     assert {r.job_id for r in out} == {1, 3}  # unclassified (None) passes
 
 
@@ -1574,11 +1614,11 @@ def test_location_cascade_builders_narrow():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_dashboard_filtering.py -v`
-Expected: FAIL (`TypeError` on `FilterState(sic=...)` / `ImportError` for `available_industries`).
+Expected: FAIL (SIC filter still reads `row.industry` and `available_industries` is missing).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/resume_agent/dashboard/filtering.py`, update `FilterState` — rename `industry` to `sic` and add the location/size sets:
+In `src/resume_agent/dashboard/filtering.py`, update `FilterState` — keep the existing `industry` field, but treat its values as SIC major-group codes; add the location/size sets:
 
 ```python
 @dataclass
@@ -1588,7 +1628,7 @@ class FilterState:
     sponsorship: set[str] = field(default_factory=set)
     seniority: set[str] = field(default_factory=set)
     employment_type: set[str] = field(default_factory=set)
-    sic: set[str] = field(default_factory=set)
+    industry: set[str] = field(default_factory=set)
     country: set[str] = field(default_factory=set)
     region: set[str] = field(default_factory=set)
     city: set[str] = field(default_factory=set)
@@ -1599,7 +1639,7 @@ class FilterState:
     preset: str = "balanced"
 ```
 
-In `_passes`, replace the categorical tuple with the new set (note `sic` maps to `row.sic_major`, plus the location/size fields):
+In `_passes`, replace the categorical tuple with the new set (note `state.industry` now maps to `row.sic_major`, plus the location/size fields):
 
 ```python
     for selected, value in (
@@ -1607,7 +1647,7 @@ In `_passes`, replace the categorical tuple with the new set (note `sic` maps to
         (state.sponsorship, row.sponsorship_signal),
         (state.seniority, row.seniority),
         (state.employment_type, row.employment_type),
-        (state.sic, row.sic_major),
+        (state.industry, row.sic_major),
         (state.country, row.location_country),
         (state.region, row.location_region),
         (state.city, row.location_city),
@@ -1703,7 +1743,7 @@ Replace it with a Division→Major Group cascade driven by `available_industries
                 if not chosen_divisions or division in chosen_divisions:
                     code_options.extend(codes)
             code_labels = {code: label for code, label in code_options}
-            sic = set(
+            industry = set(
                 st.multiselect(
                     "Industry — group",
                     sorted(code_labels),
@@ -1747,10 +1787,10 @@ After the industry block (still inside the control desk), add:
 
 - [ ] **Step 3: Update the `FilterState(...)` construction**
 
-In the `return FilterState(...)` (`pages.py:169-180`), replace `industry=industry,` with the new fields:
+In the `return FilterState(...)` (`pages.py:169-180`), keep `industry=industry,` and add the new location/size fields:
 
 ```python
-        sic=sic,
+        industry=industry,
         country=country,
         region=region,
         city=city,
@@ -1782,7 +1822,7 @@ git commit -m "Shortlist control desk: SIC + location cascades + company-size fi
 ## Self-Review
 
 **Spec coverage:**
-- SIC 2-digit + Division derived → Task 1; classify at `run_score` → Task 7/8; Unclassified (None code) → Tasks 1/10; cascade UI → Tasks 11/12. ✓
+- SIC 2-digit + Division derived → Task 1; classify at `run_score` → Task 7/8; invalid/unknown codes stored as `None` with `Unclassified` display fallback → Tasks 1/10; cascade UI → Tasks 11/12. ✓
 - Skill split (atomic + safety net) → Tasks 2, 6, 10. ✓
 - Skill synonyms (machine-grown persisted alias map, merge, refresh after score) → Tasks 3, 8; applied on read → Task 10. ✓
 - Alias map at `data/skill_aliases.json` grown by merge → Tasks 3, 8. ✓
@@ -1790,7 +1830,7 @@ git commit -m "Shortlist control desk: SIC + location cascades + company-size fi
 - Company-size buckets + optional filter → Tasks 5, 10, 11, 12. ✓
 - Backfill (re-score existing shortlisted, no fit/status change) + alias refresh → Task 9. ✓
 - Storage in `criteria_json`, no migration → Tasks 8, 10. ✓
-- Bundled reference inside package (data/ gitignored) → Task 1 (+ pyproject package-data). ✓
+- Bundled reference inside package (data/ gitignored) → Task 1 (+ Hatchling wheel-data check). ✓
 - Offline tests, agents faked, data fixtured → every task. ✓
 
 **Placeholder scan:** No TBD/TODO; every code step shows complete code; SIC data file is fully enumerated.
@@ -1800,7 +1840,7 @@ git commit -m "Shortlist control desk: SIC + location cascades + company-size fi
 - `criteria_json` keys `sic_major` (str|None) + `location_parts` (dict from `StructuredLocation.as_dict()`) — written Tasks 8/9, read Task 10. ✓
 - `StructuredLocation.as_dict()` keys `{city, region, country, is_us, raw}` — defined Task 4, consumed Task 10 (reads `country/region/city/is_us`). ✓
 - `ShortlistRow` new fields (`sic_major/sic_label/sic_division/location_country/location_region/location_city/is_us`) — defined Task 10, used Tasks 11/12. ✓
-- `FilterState.sic` (renamed from `industry`) + `country/region/city/company_size` — defined Task 11, constructed Task 12; old `industry` references removed in Task 12. ✓
+- `FilterState.industry` keeps the existing interface but now carries SIC major-group codes; `country/region/city/company_size` are defined Task 11 and constructed Task 12. ✓
 - `_skill_tags(criteria, tokens, aliases)` signature — changed Task 10 (all call sites updated within `shortlist_rows`). ✓
 - `run_score(..., canonicalizer=None, aliases_path=...)` and `discover(..., canonicalizer=None)` — defined Task 8, called Task 9 CLI. ✓
 - `available_industries/countries/states/cities` — defined Task 11, called Task 12. ✓
