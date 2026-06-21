@@ -2,8 +2,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from playwright.sync_api import Error as PlaywrightError
+
 from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.scraper.linkedin import _FEED_URL, LinkedInScraper, _search_url
+from resume_agent.discovery.scraper.linkedin import (
+    _FEED_URL,
+    LinkedInScraper,
+    _playwright_failure_reason,
+    _search_url,
+)
 from resume_agent.discovery.search_config import SearchConfig
 
 FIXTURES = Path(__file__).parent / "fixtures" / "linkedin"
@@ -28,6 +35,57 @@ def test_linkedin_fetch_returns_rawjobs_attributed_to_linkedin():
 
 def test_linkedin_fetch_respects_limit():
     assert len(_FakeBrowserScraper().fetch(SearchConfig(), limit=1).jobs) == 1
+
+
+def test_linkedin_fetch_isolates_failed_detail_navigation():
+    class _PartiallyDeadScraper(LinkedInScraper):
+        def _search_html(self, search):
+            return """
+            <html><body>
+              <div class="base-card" data-entity-urn="urn:li:jobPosting:3700000001">
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000001/"></a>
+                <h3 class="base-search-card__title">Dead Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme Corp</h4>
+                <span class="job-search-card__location">Remote, United States</span>
+              </div>
+              <div class="base-card" data-entity-urn="urn:li:jobPosting:3700000002">
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000002/"></a>
+                <h3 class="base-search-card__title">Live Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme Corp</h4>
+                <span class="job-search-card__location">Remote, United States</span>
+              </div>
+            </body></html>
+            """
+
+        def _detail_html(self, card):
+            if card.title == "Dead Engineer":
+                raise PlaywrightError("Page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE")
+            return """
+            <html><body>
+              <div class="show-more-less-html__markup">Build useful systems.</div>
+            </body></html>
+            """
+
+    result = _PartiallyDeadScraper().fetch(SearchConfig())
+
+    assert [job.title for job in result.jobs] == ["Live Engineer"]
+    assert result.failures == {
+        "https://www.linkedin.com/jobs/view/3700000001/": (
+            "Page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE"
+        )
+    }
+
+
+def test_playwright_failure_reason_handles_empty_message():
+    # An exception with no message must not IndexError on splitlines()[0].
+    assert _playwright_failure_reason(PlaywrightError("")) == "Error"
+
+
+def test_playwright_failure_reason_strips_url_tail():
+    reason = _playwright_failure_reason(
+        PlaywrightError("Page.goto: net::ERR_ABORTED at https://example.com/x")
+    )
+    assert reason == "Page.goto: net::ERR_ABORTED"
 
 
 def test_linkedin_fetch_threads_search_card_posted_at():
