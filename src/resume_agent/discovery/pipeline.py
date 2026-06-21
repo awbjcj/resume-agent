@@ -9,6 +9,7 @@ from resume_agent.discovery.relevance import judge_relevance
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
+from resume_agent.progress import ProgressReporter
 from resume_agent.taxonomy import sic
 from resume_agent.taxonomy.location import build_location
 from resume_agent.taxonomy.skills import refresh_aliases, split_skills
@@ -31,12 +32,25 @@ _REEXTRACT_STATUSES = (
 )
 
 
-def run_extract(session: Session, agent: Runner) -> None:
-    for job in jobs_by_status(session, JobStatus.raw.value):
+# The LLM-bound discover phases the dashboard shows a per-phase bar for; the
+# cheap, instant run_filter step is not surfaced. relevance may be skipped (no
+# agent), in which case the strip simply opens at phase 2.
+_DISCOVER_PHASES = 3
+
+
+def run_extract(session: Session, agent: Runner, reporter: ProgressReporter | None = None) -> None:
+    jobs = jobs_by_status(session, JobStatus.raw.value)
+    if reporter:
+        reporter.begin(
+            len(jobs), "Extracting criteria", phase_index=2, phase_count=_DISCOVER_PHASES
+        )
+    for index, job in enumerate(jobs, 1):
         criteria = extract_job_criteria(job.jd_text, agent)
         job.criteria_json = criteria.model_dump(mode="json")
         job.status = JobStatus.extracted.value
         session.add(job)
+        if reporter:
+            reporter.step(index)
     session.commit()
 
 
@@ -59,8 +73,12 @@ def run_score(
     agent: Runner,
     canonicalizer: Canonicalizer | None = None,
     aliases_path: Path | str = SKILL_ALIASES_PATH,
+    reporter: ProgressReporter | None = None,
 ) -> None:
-    for job in jobs_by_status(session, JobStatus.filtered.value):
+    jobs = jobs_by_status(session, JobStatus.filtered.value)
+    if reporter:
+        reporter.begin(len(jobs), "Scoring fit", phase_index=3, phase_count=_DISCOVER_PHASES)
+    for index, job in enumerate(jobs, 1):
         location_text = _job_location_text(job)
         fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
         job.fit_score = fit.score
@@ -68,6 +86,8 @@ def run_score(
         _write_taxonomy_fields(job, fit, location_text)
         job.status = JobStatus.shortlisted.value
         session.add(job)
+        if reporter:
+            reporter.step(index)
     session.commit()
     if canonicalizer is not None:
         _refresh_skill_aliases(
@@ -116,20 +136,34 @@ def _relevance_target(config: SearchConfig) -> str | None:
     return None
 
 
-def run_relevance(session: Session, config: SearchConfig, agent: Runner | None) -> int:
+def run_relevance(
+    session: Session,
+    config: SearchConfig,
+    agent: Runner | None,
+    reporter: ProgressReporter | None = None,
+) -> int:
     """Reject off-target raw jobs via the cheap relevance gate."""
     target = _relevance_target(config)
     if target is None or agent is None:
         return 0
 
+    jobs = jobs_by_status(session, JobStatus.raw.value)
+    if reporter:
+        reporter.begin(
+            len(jobs), "Checking relevance", phase_index=1, phase_count=_DISCOVER_PHASES
+        )
     rejected = 0
-    for job in jobs_by_status(session, JobStatus.raw.value):
+    for index, job in enumerate(jobs, 1):
         jd_text = job.jd_text or ""
         if not jd_text.strip():
+            if reporter:
+                reporter.step(index)
             continue
         try:
             verdict = judge_relevance(target, job.title, jd_text, agent)
         except Exception:
+            if reporter:
+                reporter.step(index)
             continue
         if not verdict.keep:
             reason = (verdict.reason or "model rejected").strip()
@@ -137,6 +171,8 @@ def run_relevance(session: Session, config: SearchConfig, agent: Runner | None) 
             job.reject_reason = f"off-target role: {reason}"
             session.add(job)
             rejected += 1
+        if reporter:
+            reporter.step(index)
     session.commit()
     return rejected
 
@@ -167,12 +203,15 @@ def discover(
     fit_agent: Runner,
     relevance_agent: Runner | None = None,
     canonicalizer: Canonicalizer | None = None,
+    reporter: ProgressReporter | None = None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows and return final status counts."""
-    run_relevance(session, config, relevance_agent)
-    run_extract(session, extract_agent)
+    run_relevance(session, config, relevance_agent, reporter=reporter)
+    run_extract(session, extract_agent, reporter=reporter)
     run_filter(session, config)
-    run_score(session, profile_facts, fit_agent, canonicalizer=canonicalizer)
+    run_score(session, profile_facts, fit_agent, canonicalizer=canonicalizer, reporter=reporter)
+    if reporter:
+        reporter.done()
     return status_counts(session)
 
 

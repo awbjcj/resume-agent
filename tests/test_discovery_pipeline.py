@@ -162,6 +162,41 @@ def test_discover_extracts_filters_scores_and_shortlists():
         assert counts[JobStatus.rejected.value] == 1
 
 
+def test_discover_reports_progress_done(tmp_path):
+    from resume_agent.progress import ProgressReporter, read_progress
+
+    cfg = SearchConfig(sponsorship_required=True)
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        add_job(s, source="manual", jd_text="good role, will sponsor")
+        discover(
+            s, cfg, facts, _ExtractAgent(), _FitAgent(),
+            reporter=ProgressReporter("discover", tmp_path),
+        )
+    rec = read_progress("discover", tmp_path)
+    assert rec is not None and rec["state"] == "done"
+
+
+def test_run_score_reports_phase_three(tmp_path):
+    from resume_agent.progress import ProgressReporter, read_progress
+
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(
+            s,
+            Job(source="x", jd_text="jd", title="Eng", status=JobStatus.filtered.value,
+                criteria_json={}),
+        )
+        run_score(
+            s, facts, _SicLocFitAgent(), aliases_path=tmp_path / "a.json",
+            reporter=ProgressReporter("discover", tmp_path),
+        )
+    rec = read_progress("discover", tmp_path)
+    assert rec is not None
+    assert rec["phase_index"] == 3 and rec["phase_count"] == 3
+    assert rec["current"] == 1 and rec["total"] == 1
+
+
 def test_discover_commits_once_per_stage(monkeypatch):
     cfg = SearchConfig(sponsorship_required=True)
     facts = ProfileFacts(contact=Contact(name="Ada"))
