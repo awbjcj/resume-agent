@@ -12,6 +12,7 @@ from resume_agent.discovery.merge import (
     Insert,
     MergeAction,
     Rebase,
+    RefreshText,
     Skip,
     UpgradeUrlOnly,
     decide,
@@ -84,7 +85,7 @@ def _apply(
     if isinstance(action, UpgradeUrlOnly):
         existing.url = action.url
         existing.source = action.source
-    elif isinstance(action, Rebase):
+    elif isinstance(action, (Rebase, RefreshText)):
         for field, value in action.updates.items():
             setattr(existing, field, value)
     return save_job(session, existing), IngestOutcome.upgraded

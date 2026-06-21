@@ -85,6 +85,34 @@ def test_save_or_upgrade_inserts_new():
         assert job is not None and job.source == "adzuna"
 
 
+def test_same_source_richer_text_refreshes_existing_row():
+    with _session() as s:
+        first, _ = save_or_upgrade(
+            s,
+            source="adzuna",
+            jd_text="thin preview",
+            url="http://adz/1",
+            company="Acme",
+            title="Backend Engineer",
+        )
+        richer, outcome = save_or_upgrade(
+            s,
+            source="adzuna",
+            jd_text=" ".join(f"full{i}" for i in range(70)),
+            url="http://adz/1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            location="Remote",
+        )
+        assert first is not None
+        assert richer is not None
+        assert outcome is IngestOutcome.upgraded
+        assert richer.id == first.id
+        assert "full69" in richer.jd_text
+        assert richer.title == "Senior Backend Engineer"
+        assert richer.location == "Remote"
+
+
 def test_higher_tier_upgrades_lower_tier_in_place():
     with _session() as s:
         first, _ = save_or_upgrade(s, source="adzuna", jd_text="thin jd", url="http://adz/1",

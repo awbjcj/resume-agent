@@ -87,7 +87,23 @@ class Rebase:
     updates: dict[str, Any]
 
 
-MergeAction = Insert | Skip | UpgradeUrlOnly | Rebase
+@dataclass(frozen=True)
+class RefreshText:
+    """Same-source detail refresh: replace a thin JD with a materially richer copy."""
+
+    updates: dict[str, Any]
+
+
+MergeAction = Insert | Skip | UpgradeUrlOnly | Rebase | RefreshText
+
+
+_TEXT_REFRESH_FROZEN = {JobStatus.tailored.value, JobStatus.rendered.value}
+
+
+def _materially_richer(new_text: str, old_text: str) -> bool:
+    new_words = new_text.split()
+    old_words = old_text.split()
+    return len(new_words) >= 45 and len(new_words) >= len(old_words) + 15
 
 
 def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
@@ -104,6 +120,25 @@ def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
         and incoming.source == existing.source
     ):
         return Insert()
+
+    if (
+        incoming.source == existing.source
+        and incoming.url
+        and existing.url
+        and incoming.url == existing.url
+        and existing.status not in _TEXT_REFRESH_FROZEN
+        and _materially_richer(incoming.jd_text, existing.jd_text)
+    ):
+        updates: dict[str, Any] = {"jd_text": incoming.jd_text}
+        if incoming.company:
+            updates["company"] = incoming.company
+        if incoming.title:
+            updates["title"] = incoming.title
+        if incoming.location:
+            updates["location"] = incoming.location
+        if incoming.posted_at is not None:
+            updates["posted_at"] = incoming.posted_at
+        return RefreshText(updates=updates)
 
     if source_rank(incoming.source) >= source_rank(existing.source):
         return Skip()

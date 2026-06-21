@@ -5,6 +5,7 @@ from resume_agent.discovery.merge import (
     IncomingJob,
     Insert,
     Rebase,
+    RefreshText,
     Skip,
     UpgradeUrlOnly,
     decide,
@@ -111,6 +112,37 @@ def test_decide_rebase_threads_posted_at():
     action = decide(existing, _incoming(source="workday", posted_at=when))
     assert isinstance(action, Rebase)
     assert action.updates["posted_at"] == when
+
+
+def test_decide_refreshes_same_source_url_when_text_is_richer():
+    existing = _existing(source="adzuna", jd_text="thin preview", url="http://adz/1")
+    incoming = _incoming(
+        source="adzuna",
+        url="http://adz/1",
+        jd_text=" ".join(f"full{i}" for i in range(70)),
+        title="Senior Backend Engineer",
+        location="Remote",
+    )
+    action = decide(existing, incoming)
+    assert isinstance(action, RefreshText)
+    assert "full69" in action.updates["jd_text"]
+    assert action.updates["title"] == "Senior Backend Engineer"
+    assert action.updates["location"] == "Remote"
+
+
+def test_decide_does_not_refresh_text_after_rendering():
+    existing = _existing(
+        source="adzuna",
+        status=JobStatus.rendered.value,
+        jd_text="thin preview",
+        url="http://adz/1",
+    )
+    incoming = _incoming(
+        source="adzuna",
+        url="http://adz/1",
+        jd_text=" ".join(f"full{i}" for i in range(70)),
+    )
+    assert decide(existing, incoming) == Skip()
 
 
 def test_incoming_clean_strips_and_blanks_to_none():
