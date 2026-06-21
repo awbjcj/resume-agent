@@ -1,9 +1,8 @@
 from agno.agent import Agent
-from agno.models.anthropic import Claude
 from pydantic import BaseModel, ConfigDict, Field
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner
+from resume_agent.llm_runner import AgentRunner, Runner, build_model
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.profile import ProfileFacts
 
@@ -43,7 +42,7 @@ def build_fit_agent(model_id: str | None = None) -> Runner:
     resolved = model_id or s.cheap_model
     return AgentRunner(
         Agent(
-            model=Claude(id=resolved, api_key=s.anthropic_api_key or None),
+            model=build_model(resolved),
             description="You rate how well a candidate fits a job.",
             instructions=_INSTRUCTIONS,
             output_schema=FitScore,

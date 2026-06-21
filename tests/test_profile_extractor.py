@@ -47,15 +47,15 @@ def test_extractor_defaults_to_mid_tier(monkeypatch):
 
     import resume_agent.profile.extractor as extractor_mod
 
-    class _FakeClaude:
-        def __init__(self, id, **kwargs):
-            captured["id"] = id
+    def _fake_build_model(model_id, api_key=None):
+        captured["id"] = model_id
+        return object()
 
     class _FakeAgent:
         def __init__(self, **kwargs):
             pass
 
-    monkeypatch.setattr(extractor_mod, "Claude", _FakeClaude)
+    monkeypatch.setattr(extractor_mod, "build_model", _fake_build_model)
     monkeypatch.setattr(extractor_mod, "Agent", _FakeAgent)
 
     extractor_mod.build_extractor_agent()

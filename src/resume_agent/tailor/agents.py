@@ -1,8 +1,7 @@
 from agno.agent import Agent
-from agno.models.anthropic import Claude
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner
+from resume_agent.llm_runner import AgentRunner, Runner, build_model
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.style_guide import compose_instructions
@@ -56,10 +55,9 @@ _DEFAULT_REVIEWER_INSTRUCTIONS = [
 
 
 def build_tailor_agent(model_id: str | None = None, style_guide: str | None = None) -> Runner:
-    s = get_settings()
     return AgentRunner(
         Agent(
-            model=Claude(id=model_id or model_for_tier("premium"), api_key=s.anthropic_api_key or None),
+            model=build_model(model_id or model_for_tier("premium")),
             description="You are an expert resume writer who never fabricates.",
             instructions=compose_instructions(_TAILOR_INSTRUCTIONS, style_guide),
             output_schema=ResumeContent,
@@ -69,10 +67,9 @@ def build_tailor_agent(model_id: str | None = None, style_guide: str | None = No
 
 
 def build_reviser_agent(model_id: str | None = None, style_guide: str | None = None) -> Runner:
-    s = get_settings()
     return AgentRunner(
         Agent(
-            model=Claude(id=model_id or model_for_tier("premium"), api_key=s.anthropic_api_key or None),
+            model=build_model(model_id or model_for_tier("premium")),
             description="You revise resume content while keeping it strictly fact-locked.",
             instructions=compose_instructions(_REVISER_INSTRUCTIONS, style_guide),
             output_schema=ResumeContent,
@@ -84,10 +81,9 @@ def build_reviser_agent(model_id: str | None = None, style_guide: str | None = N
 def build_reviewer_agent(
     name: str, model_id: str | None = None, style_guide: str | None = None
 ) -> Runner:
-    s = get_settings()
     return AgentRunner(
         Agent(
-            model=Claude(id=model_id or model_for_tier("mid"), api_key=s.anthropic_api_key or None),
+            model=build_model(model_id or model_for_tier("mid")),
             description=f"You are the '{name}' resume reviewer.",
             instructions=compose_instructions(
                 REVIEWER_INSTRUCTIONS.get(name, _DEFAULT_REVIEWER_INSTRUCTIONS), style_guide

@@ -2,11 +2,10 @@ import json
 from typing import Callable
 
 from agno.agent import Agent
-from agno.models.anthropic import Claude
 from pydantic import Field
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner
+from resume_agent.llm_runner import AgentRunner, Runner, build_model
 from resume_agent.models.base import ExtensibleModel
 
 _INSTRUCTIONS = [
@@ -38,7 +37,7 @@ def _default_agent() -> Runner:
     settings = get_settings()
     return AgentRunner(
         Agent(
-            model=Claude(id=settings.cheap_model, api_key=settings.anthropic_api_key or None),
+            model=build_model(settings.cheap_model),
             description="You canonicalize skill names into synonym clusters.",
             instructions=_INSTRUCTIONS,
             output_schema=SkillClusters,
