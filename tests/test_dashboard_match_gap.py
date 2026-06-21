@@ -1,4 +1,5 @@
-from resume_agent.dashboard.app import match_gap_table_rows, render_match_gap_page
+from resume_agent.dashboard.app import render_match_gap_page
+from resume_agent.dashboard.pages import match_gap_table_rows
 from resume_agent.tracking.match_gap import GapRow, MatchGapReport
 
 

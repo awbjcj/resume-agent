@@ -1,6 +1,7 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.dashboard.app import analytics_table_rows, render_analytics_page
+from resume_agent.dashboard.app import render_analytics_page
+from resume_agent.dashboard.pages import analytics_table_rows
 from resume_agent.tracking.repository import save_application, save_job
 from resume_agent.tracking.tables import Application, ApplicationStatus, Job
 

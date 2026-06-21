@@ -16,8 +16,6 @@ from resume_agent.dashboard.ui import (  # noqa: F401  (re-exported)
     status_badge,
 )
 from resume_agent.dashboard.pages import (  # noqa: F401  (re-exported)
-    analytics_table_rows,
-    match_gap_table_rows,
     render_analytics_page,
     render_match_gap_page,
     render_pipeline_page,
