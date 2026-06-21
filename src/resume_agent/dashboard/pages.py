@@ -111,9 +111,11 @@ def _control_desk(rows) -> FilterState:
     # styles div[...][class*="st-key-controldesk"] as the bordered panel.
     with st.container(key="controldesk"):
         st.markdown('<div class="controldesk-head">Filter &amp; sort</div>', unsafe_allow_html=True)
-        # Balanced rows: three controls per row keeps the panel aligned without
-        # forcing selectboxes into narrow 4-column cells on laptop/tablet widths.
-        r1 = st.columns(3, gap="medium", vertical_alignment="top")
+        # Dense 4-up grid: every control is a narrow cell, so the whole panel
+        # collapses to four short rows instead of six. Dependent filters
+        # (country->state->city, division->group) execute in code order
+        # regardless of which grid cell they occupy.
+        r1 = st.columns(4, gap="small", vertical_alignment="top")
         with r1[0]:
             salary_min = st.number_input(
                 "Min salary", min_value=0, step=10000, value=0, key="f_salary"
@@ -127,8 +129,11 @@ def _control_desk(rows) -> FilterState:
                 format_func=lambda key: _SORT_LABELS[key],
                 key="f_sort",
             )
+        with r1[3]:
+            size_options = sorted({r.company_size for r in rows if r.company_size})
+            company_size = set(st.multiselect("Company size", size_options, key="f_size"))
 
-        r2 = st.columns(3, gap="medium", vertical_alignment="top")
+        r2 = st.columns(4, gap="small", vertical_alignment="top")
         with r2[0]:
             remote = set(st.multiselect("Remote", ["remote", "hybrid", "onsite"], key="f_remote"))
         with r2[1]:
@@ -141,25 +146,48 @@ def _control_desk(rows) -> FilterState:
                     "Seniority", ["junior", "mid", "senior", "staff", "principal"], key="f_sen"
                 )
             )
-
-        r3 = st.columns(2, gap="medium", vertical_alignment="top")
-        with r3[0]:
+        with r2[3]:
             employment = set(
                 st.multiselect(
                     "Type", ["full_time", "contract", "internship", "part_time"], key="f_emp"
                 )
             )
+
+        r3 = st.columns(4, gap="small", vertical_alignment="top")
+        with r3[0]:
+            country = set(st.multiselect("Country", available_countries(rows), key="f_country"))
         with r3[1]:
+            region = set(
+                st.multiselect("State (US)", available_states(rows, country), key="f_region")
+            )
+        with r3[2]:
+            city = set(
+                st.multiselect("City", available_cities(rows, country, region), key="f_city")
+            )
+        with r3[3]:
             grouped = available_industries(rows)
             division_labels = [d for d, _ in grouped]
             chosen_divisions = set(
                 st.multiselect("Industry — division", division_labels, key="f_division")
             )
-            code_options: list[tuple[str, str]] = []
-            for division, codes in grouped:
-                if not chosen_divisions or division in chosen_divisions:
-                    code_options.extend(codes)
-            code_labels = {code: label for code, label in code_options}
+
+        # Final row: industry group, skills, and the composite-only preset.
+        # Industry group depends on the division choice made just above.
+        code_options: list[tuple[str, str]] = []
+        for division, codes in grouped:
+            if not chosen_divisions or division in chosen_divisions:
+                code_options.extend(codes)
+        code_labels = {code: label for code, label in code_options}
+        skill_names = [t.name for t in available_skill_cloud(rows)]
+        preset = "balanced"
+        if sort == "composite":
+            g_col, sk_col, preset_col = st.columns(
+                [1, 2, 1], gap="small", vertical_alignment="top"
+            )
+        else:
+            g_col, sk_col = st.columns([1, 3], gap="small", vertical_alignment="top")
+            preset_col = None
+        with g_col:
             industry = set(
                 st.multiselect(
                     "Industry — group",
@@ -168,28 +196,9 @@ def _control_desk(rows) -> FilterState:
                     key="f_sic",
                 )
             )
-
-        rloc = st.columns(3, gap="medium", vertical_alignment="top")
-        with rloc[0]:
-            country = set(st.multiselect("Country", available_countries(rows), key="f_country"))
-        with rloc[1]:
-            region = set(
-                st.multiselect("State (US)", available_states(rows, country), key="f_region")
-            )
-        with rloc[2]:
-            city = set(
-                st.multiselect("City", available_cities(rows, country, region), key="f_city")
-            )
-        size_options = sorted({r.company_size for r in rows if r.company_size})
-        company_size = set(st.multiselect("Company size", size_options, key="f_size"))
-
-        # Skills spans the row; the composite preset shares it only when needed.
-        skill_names = [t.name for t in available_skill_cloud(rows)]
-        preset = "balanced"
-        if sort == "composite":
-            sk_col, preset_col = st.columns([2, 1], gap="medium", vertical_alignment="top")
-            with sk_col:
-                chosen = st.multiselect("Skills (any match)", skill_names, key="f_skills")
+        with sk_col:
+            chosen = st.multiselect("Skills (any match)", skill_names, key="f_skills")
+        if preset_col is not None:
             with preset_col:
                 preset = st.radio(
                     "Preset",
@@ -198,8 +207,6 @@ def _control_desk(rows) -> FilterState:
                     horizontal=True,
                     key="f_preset",
                 )
-        else:
-            chosen = st.multiselect("Skills (any match)", skill_names, key="f_skills")
         skills = {normalize_skill(skill) for skill in chosen}
 
     return FilterState(
