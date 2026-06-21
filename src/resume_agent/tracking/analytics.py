@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable, cast
 
 from sqlmodel import Session, select
 
@@ -51,10 +51,11 @@ def _band(score: int | None) -> str:
 
 
 def _rows(session: Session) -> list[tuple[str, int | None, str]]:
+    archived_col = cast(Any, Job.archived_at)
     statement = (
         select(Application.status, Job.fit_score, Job.source)
         .join(Job, Application.job_id == Job.id)  # type: ignore[arg-type]
-        .where(Application.status != ApplicationStatus.ready.value)
+        .where(Application.status != ApplicationStatus.ready.value, archived_col.is_(None))
     )
     return list(session.exec(statement).all())
 

@@ -62,9 +62,12 @@ class MatchGapReport:
 def _target_jobs(session: Session) -> list[Job]:
     status_col = cast(Any, Job.status)
     id_col = cast(Any, Job.id)
+    archived_col = cast(Any, Job.archived_at)
     return list(
         session.exec(
-            select(Job).where(status_col.in_(TARGET_STATUSES)).order_by(id_col)
+            select(Job)
+            .where(status_col.in_(TARGET_STATUSES), archived_col.is_(None))
+            .order_by(id_col)
         ).all()
     )
 

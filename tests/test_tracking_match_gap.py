@@ -136,5 +136,18 @@ def test_match_gap_empty_db():
         assert report == MatchGapReport(target_total=0, gaps=[], per_job={})
 
 
+def test_match_gap_excludes_archived_targets():
+    from resume_agent.tracking.repository import archive_job
+
+    facts = _facts({"lang": [Skill(name="Python")]})
+    with _session() as s:
+        _job(s, JobStatus.shortlisted.value, ["Python", "Go"])
+        hidden = _job(s, JobStatus.shortlisted.value, ["Rust"])
+        assert hidden.id is not None
+        archive_job(s, hidden.id)
+        report = match_gap(s, facts)
+        assert report.target_total == 1
+
+
 def test_gap_row_demand_share():
     assert GapRow(skill="X", demand_count=2, target_total=3).demand_share == 67

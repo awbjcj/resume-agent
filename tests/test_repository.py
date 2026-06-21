@@ -102,6 +102,18 @@ def test_has_progress_true_for_advanced_status_and_children():
         assert has_progress(s, 9999) is False
 
 
+def test_archived_jobs_excluded_from_status_views():
+    from resume_agent.tracking.repository import archive_job, jobs_by_status, status_counts
+
+    with _session() as s:
+        a = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
+        save_job(s, Job(source="m", jd_text="b", status=JobStatus.raw.value))
+        archive_job(s, _require_id(a.id))
+
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
+        assert status_counts(s).get(JobStatus.raw.value) == 1
+
+
 def test_delete_job_cascades_children_and_refuses_progress():
     from resume_agent.tracking.repository import (
         delete_job, get_job, save_application, save_cover_letter, save_resume_version,

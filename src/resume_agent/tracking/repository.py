@@ -28,7 +28,12 @@ def save_job(session: Session, job: Job) -> Job:
 
 
 def jobs_by_status(session: Session, status: str) -> list[Job]:
-    return list(session.exec(select(Job).where(Job.status == status)).all())
+    archived_col = cast(Any, Job.archived_at)
+    return list(
+        session.exec(
+            select(Job).where(Job.status == status, archived_col.is_(None))
+        ).all()
+    )
 
 
 def find_existing(
@@ -49,7 +54,12 @@ def find_existing(
 
 
 def status_counts(session: Session) -> dict[str, int]:
-    rows = session.exec(select(Job.status, func.count()).group_by(Job.status)).all()
+    archived_col = cast(Any, Job.archived_at)
+    rows = session.exec(
+        select(Job.status, func.count())
+        .where(archived_col.is_(None))
+        .group_by(Job.status)
+    ).all()
     return {status: count for status, count in rows}
 
 

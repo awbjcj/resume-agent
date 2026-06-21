@@ -178,6 +178,40 @@ def test_pipeline_rows_distinguish_no_version_from_empty_critiques():
         assert by_id[_require_id(reviewed_clean.id)].critique_json == []
 
 
+def test_archived_jobs_excluded_from_shortlist_and_pipeline():
+    from resume_agent.tracking.repository import archive_job
+
+    with _session() as s:
+        keep = save_job(s, Job(source="m", jd_text="a", company="Keep", title="E",
+                               status=JobStatus.shortlisted.value, fit_score=70))
+        hide = save_job(s, Job(source="m", jd_text="b", company="Hide", title="E",
+                               status=JobStatus.shortlisted.value, fit_score=90))
+        archive_job(s, _require_id(hide.id))
+
+        assert [r.company for r in shortlist_rows(s)] == ["Keep"]
+        assert [r.company for r in pipeline_rows(s)] == ["Keep"]
+        _ = keep
+
+
+def test_archived_jobs_excluded_from_application_job_pairs():
+    from resume_agent.tracking.queries import application_job_pairs
+    from resume_agent.tracking.repository import archive_job, save_application
+    from resume_agent.tracking.tables import Application, ApplicationStatus
+
+    with _session() as s:
+        keep = save_job(s, Job(source="m", jd_text="a", company="Keep", title="E",
+                               status=JobStatus.rendered.value))
+        hide = save_job(s, Job(source="m", jd_text="b", company="Hide", title="E",
+                               status=JobStatus.rendered.value))
+        save_application(s, Application(job_id=_require_id(keep.id),
+                                        status=ApplicationStatus.submitted.value))
+        save_application(s, Application(job_id=_require_id(hide.id),
+                                        status=ApplicationStatus.submitted.value))
+        archive_job(s, _require_id(hide.id))
+
+        assert [job.company for _, job in application_job_pairs(s)] == ["Keep"]
+
+
 def test_pipeline_rows_include_lean_metadata_fields():
     with _session() as s:
         save_job(

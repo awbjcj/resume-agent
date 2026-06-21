@@ -46,6 +46,23 @@ def test_fit_band_stats_groups_by_band():
         assert bands["60-79"].applications == 1
 
 
+def test_analytics_excludes_archived_jobs():
+    from resume_agent.tracking.repository import archive_job
+
+    with _session() as session:
+        _seed(session, "greenhouse", 85, ApplicationStatus.submitted.value)
+        hidden = save_job(session, Job(source="adzuna", company="C", title="T",
+                                       fit_score=90, status="rendered"))
+        assert hidden.id is not None
+        save_application(session, Application(job_id=hidden.id,
+                                             status=ApplicationStatus.interview.value))
+        archive_job(session, hidden.id)
+
+        assert [stat.label for stat in source_stats(session)] == ["greenhouse"]
+        bands = {stat.label: stat for stat in fit_band_stats(session)}
+        assert bands["80-100"].applications == 1
+
+
 def test_empty_history_returns_empty():
     with _session() as session:
         assert source_stats(session) == []
