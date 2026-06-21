@@ -5,6 +5,7 @@ from resume_agent.dashboard.ui import (
     clamp_text,
     fit_block,
     meta_line,
+    progress_bar,
     skill_chip,
     skill_strip,
     status_badge,
@@ -175,6 +176,46 @@ def test_clamp_text_escapes_html():
     out = clamp_text("<script>alert(1)</script> " + "x" * 100)
     assert "<script>" not in out
     assert "&lt;script&gt;" in out
+
+
+def test_progress_bar_none_is_empty():
+    assert progress_bar(None) == ""
+    assert progress_bar({}) == ""
+
+
+def test_progress_bar_running_shows_percent_counts_and_phase():
+    html = progress_bar(
+        {
+            "process": "discover", "state": "running", "label": "Scoring fit",
+            "phase_index": 3, "phase_count": 3, "current": 12, "total": 30,
+        }
+    )
+    assert "DISCOVER" in html
+    assert "40%" in html  # 12/30
+    assert "12 / 30" in html
+    assert "Phase 3 of 3 · Scoring fit" in html
+    assert "width:40%" in html
+
+
+def test_progress_bar_done_and_error_states():
+    done = progress_bar({"process": "tailor", "state": "done", "current": 5, "total": 5})
+    assert "100%" in done
+    assert "5 done" in done
+
+    err = progress_bar({"process": "pull", "state": "error", "error": "HTTP 429"})
+    assert "HTTP 429" in err
+    assert "progress-err" in err
+
+
+def test_progress_bar_escapes_error_text():
+    html = progress_bar({"process": "pull", "state": "error", "error": "<script>x</script>"})
+    assert "<script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_theme_css_styles_progress_strip():
+    assert ".progress-strip" in THEME_CSS
+    assert ".progress-fill" in THEME_CSS
 
 
 def test_skill_strip_plain_under_head_and_toggle_over_head():

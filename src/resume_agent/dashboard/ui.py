@@ -7,6 +7,8 @@ module imports cleanly and the helpers are unit-testable without a server.
 from datetime import datetime, timezone
 from html import escape
 
+from resume_agent.progress import ProgressStats, progress_stats
+
 THEME_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
@@ -62,6 +64,34 @@ h1, h2, h3, h4, .card-title, .nameplate, .empty-title {
 .metric { flex:1; min-width: 150px; background: var(--paper-2); border:1px solid var(--rule); border-radius: var(--radius); padding: 1.0rem 1.2rem; }
 .metric-value { font-family:'Newsreader', serif; font-size: clamp(1.8rem, 1.8vw, 2.4rem); font-weight: 700; color: var(--ink); line-height:1; }
 .metric-label { font-family:'IBM Plex Mono', monospace; font-size: 0.74rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-top: 0.45rem; }
+
+/* ── Live progress strip ──────────────────────────────────────── */
+/* Rendered above the page body (app.py) from a polling fragment, so a
+   terminal-launched pull/discover/tailor surfaces here within ~2s. One row per
+   active process; finished rows linger briefly then collapse. */
+.progress-strip { display:flex; flex-direction:column; gap:0.7rem; margin: 0 0 1.4rem; }
+.progress-row {
+  background: var(--paper-2); border:1px solid var(--rule); border-left: 3px solid var(--badge, var(--muted));
+  border-radius: var(--radius); padding: 0.7rem 0.95rem;
+}
+.progress-head, .progress-foot {
+  display:flex; align-items:baseline; gap:0.7rem; font-family:'IBM Plex Mono', monospace;
+}
+.progress-name {
+  font-size: 0.74rem; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 700;
+  color: var(--badge, var(--ink));
+}
+.progress-phase { font-size: 0.72rem; color: var(--muted); flex:1; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.progress-pct { font-family:'Newsreader', serif; font-size: 1.15rem; font-weight: 700; color: var(--ink); }
+.progress-track { height: 7px; border-radius: 999px; background: rgba(22,19,15,0.12);
+  margin: 0.5rem 0 0.45rem; overflow:hidden; }
+.progress-fill { height:100%; border-radius:999px; background: var(--badge, var(--muted));
+  transition: width .3s ease; }
+.progress-foot { font-size: 0.72rem; color: var(--muted); margin:0; }
+.progress-count { color: var(--ink); }
+.progress-eta { margin-left:auto; }
+.progress-err { color: var(--danger); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* ── Responsive card grids ────────────────────────────────────── */
 /* st.container(key="cardgrid_…") puts a stable st-key-cardgrid… class on the
@@ -510,6 +540,52 @@ def fit_mini(score: int | None) -> str:
         f'<div class="fit-mini" {aria}>'
         f'<div class="fit-mini-num" style="color:{color}">{shown}</div>'
         '<div class="fit-mini-cap">Fit</div>'
+        "</div>"
+    )
+
+
+_PROGRESS_COLORS = {"running": AMBER, "done": EMERALD, "error": ROSE}
+
+
+def progress_bar(record: dict | None) -> str:
+    """Render one process's live progress as an HTML bar (pure).
+
+    ``None`` (process never ran) → empty string. Colour tracks state:
+    running=amber, done=emerald, error=rose. The percentage/ETA math lives in
+    :func:`resume_agent.progress.progress_stats` so it is testable on its own.
+    """
+    if not record:
+        return ""
+    stats: ProgressStats = progress_stats(record)
+    color = _PROGRESS_COLORS.get(stats.state, MUTED)
+    name = escape(stats.process.upper() or "PROCESS")
+
+    if stats.state == "error":
+        detail = escape(stats.error or "failed")
+        foot = f'<span class="progress-err">✕ {detail}</span>'
+        head_mid = '<span class="progress-phase">error</span>'
+    elif stats.state == "done":
+        done_n = stats.total or stats.current
+        foot = (
+            f'<span class="progress-count">✓ {done_n} done</span>'
+            f'<span class="progress-eta">{escape(stats.elapsed_text)}</span>'
+        )
+        head_mid = '<span class="progress-phase">complete</span>'
+    else:
+        phase = f"{stats.phase} · " if stats.phase else ""
+        head_mid = f'<span class="progress-phase">{escape(phase + stats.label)}</span>'
+        eta = f"~{escape(stats.eta_text)} left" if stats.eta_text else "estimating…"
+        foot = (
+            f'<span class="progress-count">{stats.current} / {stats.total}</span>'
+            f'<span class="progress-eta">{eta}</span>'
+        )
+
+    return (
+        f'<div class="progress-row" style="--badge:{color}">'
+        f'<div class="progress-head"><span class="progress-name">{name}</span>'
+        f'{head_mid}<span class="progress-pct">{stats.pct}%</span></div>'
+        f'<div class="progress-track"><div class="progress-fill" style="width:{stats.pct}%"></div></div>'
+        f'<div class="progress-foot">{foot}</div>'
         "</div>"
     )
 

@@ -27,11 +27,13 @@ from resume_agent.dashboard.ui import (
     masthead,
     meta_line,
     metric_row,
+    progress_bar,
     salary_label,
     skill_chip,
     skill_strip,
     status_badge,
 )
+from resume_agent.progress import PROGRESS_ROOT, is_displayable, read_all
 from resume_agent.profile.store import load_facts
 from resume_agent.tracking.analytics import fit_band_stats, source_stats
 from resume_agent.tracking.match_gap import MatchGapReport, match_gap, normalize_skill
@@ -71,6 +73,22 @@ _PRESET_LABELS = {
     "pay_first": "Pay-first",
     "freshest": "Freshest",
 }
+
+
+@st.fragment(run_every=2)
+def _progress_fragment(root) -> None:
+    # Polls every 2s so a pull/discover/tailor launched in a terminal surfaces
+    # here on its own; only this fragment reruns, not the whole page.
+    visible = [r for r in read_all(root).values() if is_displayable(r)]
+    if not visible:
+        return
+    bars = "".join(progress_bar(record) for record in visible)
+    st.markdown(f'<div class="progress-strip">{bars}</div>', unsafe_allow_html=True)
+
+
+def render_progress_strip(root=PROGRESS_ROOT) -> None:
+    """Draw the live progress strip (one bar per active process) above the page."""
+    _progress_fragment(root)
 
 
 def _new_application(job_id: int, status: str, notes: str) -> Application:

@@ -21,6 +21,7 @@ from resume_agent.dashboard.pages import (  # noqa: F401  (re-exported)
     render_analytics_page,
     render_match_gap_page,
     render_pipeline_page,
+    render_progress_strip,
     render_shortlist_page,
     render_triage_page,
 )
@@ -47,6 +48,8 @@ def main() -> None:
             ["Shortlist", "Triage", "Pipeline board", "Analytics", "Match-gap"],
             label_visibility="collapsed",
         )
+
+    render_progress_strip()
 
     engine = _engine()
     with get_session(engine) as session:
