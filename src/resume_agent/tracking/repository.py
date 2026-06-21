@@ -202,7 +202,11 @@ def delete_job(session: Session, job_id: int) -> bool:
     job = session.get(Job, job_id)
     if job is None:
         return False
-    # Dependency order: CoverLetter/Application can reference ResumeVersion.
+    # Defensive cascade: the has_progress() guard above already refuses any job
+    # that owns a child row, so normally nothing remains to delete here. Kept as
+    # a belt-and-suspenders sweep — in FK-safe order (CoverLetter/Application
+    # before the ResumeVersion they may reference) — in case that guard ever
+    # narrows and a childed job reaches this path.
     for model in (CoverLetter, Application, ResumeVersion):
         for child in session.exec(select(model).where(model.job_id == job_id)).all():
             session.delete(child)
@@ -224,23 +228,33 @@ def has_progress(session: Session, job_id: int) -> bool:
     return False
 
 
+def _progressed_job_ids(session: Session) -> set[int]:
+    """Job ids owning any child row, resolved in one query per child table.
+
+    Mirrors has_progress()'s child-existence check, but batched so a whole-table
+    prune scan costs three queries instead of ~4 per job (an N+1 over every job).
+    """
+    progressed: set[int] = set()
+    for model in (Application, ResumeVersion, CoverLetter):
+        progressed.update(session.exec(select(cast(Any, model.job_id))).all())
+    return progressed
+
+
 def _prune_rows(session: Session) -> list[PruneRow]:
-    rows: list[PruneRow] = []
-    for job in session.exec(select(Job)).all():
-        if job.id is None:
-            continue
-        rows.append(
-            PruneRow(
-                job_id=job.id,
-                status=job.status,
-                fit_score=job.fit_score,
-                posted_at=job.posted_at,
-                created_at=job.created_at,
-                archived_at=job.archived_at,
-                has_progress=has_progress(session, job.id),
-            )
+    progressed = _progressed_job_ids(session)
+    return [
+        PruneRow(
+            job_id=job.id,
+            status=job.status,
+            fit_score=job.fit_score,
+            posted_at=job.posted_at,
+            created_at=job.created_at,
+            archived_at=job.archived_at,
+            has_progress=job.status in _PROGRESS_STATUSES or job.id in progressed,
         )
-    return rows
+        for job in session.exec(select(Job)).all()
+        if job.id is not None
+    ]
 
 
 def _prune_plan(session: Session, config: PruneConfig, now: datetime):

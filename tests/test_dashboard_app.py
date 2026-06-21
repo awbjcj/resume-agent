@@ -84,6 +84,20 @@ def test_pipeline_row_carries_has_progress_flag():
         assert flags[adv.id] is True
 
 
+def test_pipeline_empty_state_still_renders_archive_undo(monkeypatch):
+    from resume_agent.dashboard import pages
+
+    calls = []
+    monkeypatch.setattr(pages, "pipeline_rows", lambda session: [])
+    monkeypatch.setattr(pages, "masthead", lambda *args, **kwargs: calls.append("masthead"))
+    monkeypatch.setattr(pages, "_render_archive_undo", lambda session: calls.append("undo"))
+    monkeypatch.setattr(pages, "empty_state", lambda *args, **kwargs: calls.append("empty"))
+
+    pages.render_pipeline_page(object())
+
+    assert calls == ["masthead", "undo", "empty"]
+
+
 def test_dashboard_exposes_triage_page():
     from resume_agent.dashboard import app
     assert callable(app.render_triage_page)

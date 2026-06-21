@@ -394,6 +394,7 @@ def render_pipeline_page(session) -> None:
         "Every job by pipeline stage, with its tailored PDF, review critiques, and your application status.",
     )
 
+    _render_archive_undo(session)
     if not rows:
         empty_state(
             "◇",
@@ -402,7 +403,6 @@ def render_pipeline_page(session) -> None:
         )
         return
 
-    _render_archive_undo(session)
     rows = _filter_sort_pipeline_rows(rows)
     if not rows:
         empty_state("◇", "No jobs match these filters", "Loosen a Pipeline filter.")
@@ -556,7 +556,9 @@ def _filter_sort_triage_rows(rows: list[TriageRow]) -> list[TriageRow]:
         visible.sort(key=lambda row: (row.fit_score is not None, row.fit_score or -1),
                      reverse=True)
     elif sort == "recency":
-        visible.sort(key=lambda row: _row_age_days(row) if _row_age_days(row) is not None else 10**9)
+        # Compute age once per row (the key is otherwise evaluated with two
+        # _row_age_days calls — each re-reading the clock — per element).
+        visible.sort(key=lambda row: (age if (age := _row_age_days(row)) is not None else 10**9))
     else:
         visible.sort(key=lambda row: ((row.company or "").lower(), (row.title or "").lower()))
     return visible
