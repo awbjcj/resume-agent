@@ -118,3 +118,9 @@ def test_instructions_mention_new_fields():
     joined = " ".join(_INSTRUCTIONS).lower()
     for needle in ["seniority", "employment type", "tech stack", "industry", "company size"]:
         assert needle in joined
+
+
+def test_instructions_require_atomic_skills_and_size_buckets():
+    joined = " ".join(_INSTRUCTIONS).lower()
+    assert "one skill" in joined or "single" in joined  # atomic-skills guidance
+    assert "startup" in joined and "scaleup" in joined and "enterprise" in joined

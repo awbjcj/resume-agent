@@ -12,8 +12,10 @@ _INSTRUCTIONS = [
     "Infer seniority as one of: junior, mid, senior, staff, principal -- leave null if unclear.",
     "Infer employment type as one of: full_time, contract, internship, part_time -- leave null if unclear.",
     "List the concrete tech stack (languages, frameworks, tools) named in the post.",
+    "Emit each skill as a single atomic skill -- never combine several into one item;",
+    "e.g. 'Python, C++ or C' becomes three separate skill entries.",
     "Capture the industry or domain (e.g. fintech, healthcare) when stated.",
-    "Capture company size or stage (startup, scaleup, enterprise) when stated.",
+    "Capture company size as exactly one of: startup, scaleup, enterprise -- leave null if unclear.",
     "Use only what the text supports; leave unknown fields null.",
 ]
 
