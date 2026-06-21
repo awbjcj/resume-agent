@@ -53,7 +53,7 @@ def test_discover_runs_and_reports_counts(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli,
         "discover",
-        lambda session, config, facts, extract_agent, fit_agent, relevance_agent=None, canonicalizer=None: {  # noqa: E501
+        lambda session, config, facts, extract_agent, fit_agent, relevance_agent=None, canonicalizer=None, reporter=None: {  # noqa: E501
             "shortlisted": 1
         },
     )
@@ -68,7 +68,8 @@ def test_discover_builds_and_passes_relevance_agent(tmp_path, monkeypatch):
     seen = {}
 
     def fake_discover(
-        session, config, facts, extract_agent, fit_agent, relevance_agent=None, canonicalizer=None
+        session, config, facts, extract_agent, fit_agent,
+        relevance_agent=None, canonicalizer=None, reporter=None,
     ):
         seen["relevance_agent"] = relevance_agent
         return {"shortlisted": 0}

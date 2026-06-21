@@ -29,11 +29,12 @@ from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
 from resume_agent.gmail.propose import propose_transitions
 from resume_agent.profile.build import build_profile
+from resume_agent.progress import ProgressReporter
 from resume_agent.profile.store import load_facts, save_facts
 from resume_agent.profile.validate import validate_profile
 from resume_agent.tailor.agents import build_reviewer_agent, build_reviser_agent, build_tailor_agent, model_for_tier
 from resume_agent.tailor.review_config import load_review_config
-from resume_agent.tailor.service import tailor_job
+from resume_agent.tailor.service import tailor_jobs
 from resume_agent.tailor.style_guide import load_style_guide
 from resume_agent.render.render_config import RenderConfig, load_render_config
 from resume_agent.render.service import render_version
@@ -211,7 +212,7 @@ def discover_cmd(
     with get_session(engine) as session:
         counts = discover(
             session, config, profile_facts, extract_agent, fit_agent, relevance_agent,
-            canonicalizer=build_skill_canonicalizer(),
+            canonicalizer=build_skill_canonicalizer(), reporter=ProgressReporter("discover"),
         )
     typer.echo(f"Discovery complete. Status counts: {counts}")
 
@@ -259,7 +260,10 @@ def pull_cmd(
         raise typer.Exit(code=0)
     engine = _engine(db_url)
     with get_session(engine) as session:
-        report = run_pull(session, connectors, search_config, CONNECTOR_RUNS_PATH, limit=limit)
+        report = run_pull(
+            session, connectors, search_config, CONNECTOR_RUNS_PATH,
+            limit=limit, reporter=ProgressReporter("pull"),
+        )
     for name in (c.name for c in connectors):
         typer.echo(f"  {name:<12} +{report.totals.get(name, 0)}")
     for name, failures in report.failures.items():
@@ -381,12 +385,14 @@ def tailor_cmd(
         reviser_agent = build_reviser_agent(style_guide=style_guide)
         reviewer_agents = build_reviewer_agents(config, style_guide=style_guide)
 
-        for job in targets:
-            versions = tailor_job(
-                session, job, profile_facts, config, tailor_agent, reviewer_agents, reviser_agent
-            )
+        results = tailor_jobs(
+            session, targets, profile_facts, config,
+            tailor_agent, reviewer_agents, reviser_agent,
+            reporter=ProgressReporter("tailor"),
+        )
+        for job_id, versions in results.items():
             typer.echo(
-                f"Job #{job.id}: {len(versions)} version(s); final fact_check_passed={versions[-1].fact_check_passed}"
+                f"Job #{job_id}: {len(versions)} version(s); final fact_check_passed={versions[-1].fact_check_passed}"
             )
 
 

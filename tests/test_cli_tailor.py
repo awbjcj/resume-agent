@@ -55,8 +55,10 @@ def test_tailor_processes_a_job(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         cli,
-        "tailor_job",
-        lambda session, job, facts, config, tailor_agent, reviewer_agents, reviser_agent: [_Version()],
+        "tailor_jobs",
+        lambda session, targets, facts, config, tailor_agent, reviewer_agents, reviser_agent, reporter=None: {  # noqa: E501
+            _require_id(job.id): [_Version()] for job in targets
+        },
     )
 
     result = runner.invoke(cli.app, ["tailor", "--job-id", str(job_id), "--db-url", db_url])
@@ -93,7 +95,7 @@ def test_tailor_threads_style_guide_into_all_loop_agents(tmp_path, monkeypatch):
     class _Version:
         fact_check_passed = True
 
-    monkeypatch.setattr(cli, "tailor_job", lambda *args, **kwargs: [_Version()])
+    monkeypatch.setattr(cli, "tailor_jobs", lambda *args, **kwargs: {1: [_Version()]})
 
     result = runner.invoke(cli.app, ["tailor", "--job-id", str(job_id), "--db-url", db_url])
 
