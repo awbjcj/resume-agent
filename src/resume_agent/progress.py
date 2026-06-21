@@ -1,0 +1,241 @@
+"""Cross-process progress channel for long-running CLI commands.
+
+The CLI commands (``pull`` / ``discover`` / ``tailor``) run in their own OS
+process; the Streamlit dashboard runs in another. To show a *live* progress bar
+there is no shared memory to lean on — the running command writes its progress to
+a small JSON file and the dashboard polls it. One file per process
+(``data/progress/{name}.json``) so a ``pull`` and a ``discover`` running at once
+never clobber each other's record.
+
+Mirrors ``discovery/connectors/telemetry.py`` — pure file IO, no third-party deps,
+so the writer side is testable without a server and the reader side without a
+running command.
+"""
+
+import json
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+PROGRESS_ROOT = Path("data/progress")
+
+#: The processes that emit progress. The dashboard polls these in order.
+PROCESSES = ("pull", "discover", "tailor")
+
+#: Throttle ``step`` writes to at most one per this many seconds (begin/done and
+#: the final step always write regardless, so the bar never stalls short of 100%).
+_MIN_WRITE_INTERVAL = 0.25
+
+#: How long a finished (done/error) record keeps showing before the bar collapses.
+TERMINAL_TTL_SECONDS = 60
+
+
+def _path(process: str, root: Path | str = PROGRESS_ROOT) -> Path:
+    return Path(root) / f"{process}.json"
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def read_progress(process: str, root: Path | str = PROGRESS_ROOT) -> dict | None:
+    """Return the latest record for one process, or None if it has never run.
+
+    A truncated/half-written file (the writer is mid-flush) reads as None rather
+    than raising — the next poll picks up the complete record.
+    """
+    p = _path(process, root)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def read_all(root: Path | str = PROGRESS_ROOT) -> dict[str, dict]:
+    """Return ``{process: record}`` for every process that has a record."""
+    out: dict[str, dict] = {}
+    for name in PROCESSES:
+        record = read_progress(name, root)
+        if record is not None:
+            out[name] = record
+    return out
+
+
+def clear_progress(process: str, root: Path | str = PROGRESS_ROOT) -> None:
+    """Remove a process's record (used to reset a stale bar)."""
+    _path(process, root).unlink(missing_ok=True)
+
+
+class ProgressReporter:
+    """Writes one process's live progress to its JSON file.
+
+    Library and test callers pass ``None`` instead of a reporter, so the
+    instrumented loops stay silent (and touch no disk) outside the CLI. A
+    multi-phase process (discover) calls :meth:`begin` once per phase; ETA is
+    therefore measured per phase, which is honest when each phase's total only
+    becomes known as it starts.
+    """
+
+    def __init__(self, process: str, root: Path | str = PROGRESS_ROOT) -> None:
+        self.process = process
+        self.root = Path(root)
+        self._record: dict = {}
+        self._last_write = 0.0
+
+    def begin(
+        self,
+        total: int,
+        label: str,
+        *,
+        phase_index: int | None = None,
+        phase_count: int | None = None,
+        **extra: object,
+    ) -> None:
+        """Start (or restart, for a new phase) the active progress segment."""
+        self._record = {
+            "process": self.process,
+            "state": "running",
+            "label": label,
+            "phase_index": phase_index,
+            "phase_count": phase_count,
+            "current": 0,
+            "total": total,
+            "started_at": _now_iso(),
+            **extra,
+        }
+        self._flush(force=True)
+
+    def step(self, current: int, *, label: str | None = None, **extra: object) -> None:
+        """Advance the active segment. No-op if :meth:`begin` was never called."""
+        if not self._record:
+            return
+        self._record["current"] = current
+        if label is not None:
+            self._record["label"] = label
+        self._record.update(extra)
+        self._flush(force=current >= int(self._record.get("total") or 0))
+
+    def done(self, *, error: str | None = None, **extra: object) -> None:
+        """Mark the process finished (``done``) or failed (``error``)."""
+        if not self._record:
+            # done() without begin() (e.g. nothing to process) — still emit a
+            # terminal record so the dashboard can show a completed bar.
+            self._record = {
+                "process": self.process,
+                "label": self.process,
+                "current": 0,
+                "total": 0,
+                "started_at": _now_iso(),
+            }
+        self._record["state"] = "error" if error else "done"
+        self._record["error"] = error
+        self._record.update(extra)
+        self._flush(force=True)
+
+    def _flush(self, *, force: bool) -> None:
+        now = time.monotonic()
+        if not force and now - self._last_write < _MIN_WRITE_INTERVAL:
+            return
+        self._last_write = now
+        self._record["updated_at"] = _now_iso()
+        path = _path(self.process, self.root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self._record, indent=2), encoding="utf-8")
+
+
+@dataclass
+class ProgressStats:
+    """The display-ready view of a raw record: percentage, ETA, phase label."""
+
+    process: str
+    state: str  # running | done | error
+    label: str
+    pct: int  # 0..100
+    current: int
+    total: int
+    phase: str | None  # "Phase 3 of 3", or None for single-phase processes
+    eta_text: str | None  # "~2m left", or None when not estimable
+    elapsed_text: str
+    error: str | None
+
+
+def _parse(ts: object) -> datetime | None:
+    if not isinstance(ts, str):
+        return None
+    try:
+        return datetime.fromisoformat(ts)
+    except ValueError:
+        return None
+
+
+def _fmt_duration(seconds: float) -> str:
+    total = int(max(0, seconds))
+    if total < 60:
+        return f"{total}s"
+    minutes, secs = divmod(total, 60)
+    if minutes < 60:
+        return f"{minutes}m {secs}s" if secs else f"{minutes}m"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+
+
+def progress_stats(record: dict, *, now: datetime | None = None) -> ProgressStats:
+    """Derive percentage, elapsed, and ETA from a raw progress record (pure).
+
+    ETA assumes a steady per-item rate over the *current phase only* — measured
+    from ``started_at`` to ``updated_at`` (which is when ``current`` was true),
+    not to wall-clock now, so the rate is not skewed by dashboard poll lag.
+    """
+    now = now or datetime.now(timezone.utc)
+    total = int(record.get("total") or 0)
+    current = int(record.get("current") or 0)
+    state = str(record.get("state") or "running")
+
+    pct = 100 if state == "done" else (round(100 * current / total) if total > 0 else 0)
+    pct = max(0, min(100, pct))
+
+    phase_index = record.get("phase_index")
+    phase_count = record.get("phase_count")
+    phase = f"Phase {phase_index} of {phase_count}" if phase_index and phase_count else None
+
+    started = _parse(record.get("started_at"))
+    updated = _parse(record.get("updated_at")) or now
+    elapsed = (updated - started).total_seconds() if started else 0.0
+
+    eta_text: str | None = None
+    if state == "running" and started and 0 < current < total:
+        eta_text = _fmt_duration((elapsed / current) * (total - current))
+
+    return ProgressStats(
+        process=str(record.get("process") or ""),
+        state=state,
+        label=str(record.get("label") or record.get("process") or ""),
+        pct=pct,
+        current=current,
+        total=total,
+        phase=phase,
+        eta_text=eta_text,
+        elapsed_text=_fmt_duration(elapsed),
+        error=record.get("error") if isinstance(record.get("error"), str) else None,
+    )
+
+
+def is_displayable(record: dict, *, now: datetime | None = None) -> bool:
+    """Whether the dashboard should show this record.
+
+    Running records always show; finished ones linger for ``TERMINAL_TTL_SECONDS``
+    so a completed run gives a brief ✓/✕ confirmation before the bar collapses.
+    """
+    state = record.get("state")
+    if state == "running":
+        return True
+    if state not in ("done", "error"):
+        return False
+    now = now or datetime.now(timezone.utc)
+    updated = _parse(record.get("updated_at"))
+    if updated is None:
+        return False
+    return (now - updated).total_seconds() <= TERMINAL_TTL_SECONDS
