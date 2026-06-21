@@ -37,6 +37,18 @@ Equal-tier re-pulls are no-ops (first-seen-wins). Once a job's status has
 advanced past `raw`, only the apply `url` is upgraded; `jd_text` is frozen so a
 resume already tailored to the old text is not silently re-based.
 
+### Archive, delete, prune
+`Job.archived_at` (orthogonal to `status`) soft-hides a job; every view filters
+`archived_at IS NULL` except dedupe lookup, which intentionally still sees trash-bin
+jobs to avoid duplicate re-ingest. `has_progress(session, job_id)` — status in
+{approved, tailored, rendered} OR any Application/ResumeVersion/CoverLetter — is
+the single gate for irreversible paths. `delete_job` refuses jobs with progress and
+cascades incidental children in FK-safe order otherwise. `prune_run` (config:
+`config/prune.yaml`) archives rejected/low-fit/stale zero-progress jobs, reports
+primary reason counts, then hard-deletes archived zero-progress jobs older than
+`retention_days`. Surfaced via the dashboard Triage page and
+`resume-agent prune [--dry-run]`.
+
 ---
 
 ## ATS detection flow (`detect.py`)
