@@ -49,6 +49,20 @@ def resolve_api_key(model_id: str) -> str:
     }.get(provider, "")
 
 
+def use_json_mode_for(model: Any) -> bool:
+    """Whether an ``output_schema`` agent over ``model`` must use JSON mode.
+
+    Providers without native/json_schema structured outputs (e.g. DeepSeek)
+    honour an ``output_schema`` only via ``response_format`` JSON mode; without
+    it they intermittently return prose that agno cannot parse, falling back to
+    the raw ``str``. Providers that *do* support it — OpenAI, Anthropic — keep
+    their stricter native structured outputs (``use_json_mode=False``). The flag
+    is read off the agno model itself, so this stays correct as providers gain
+    or lose native support.
+    """
+    return not getattr(model, "supports_native_structured_outputs", False)
+
+
 def build_model(model_id: str, api_key: str | None = None) -> Any:
     """Construct the agno model for a (possibly provider-prefixed) ``model_id``.
 
