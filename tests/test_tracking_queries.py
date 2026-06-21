@@ -84,12 +84,13 @@ def test_shortlist_row_flattens_metadata_and_tags_coverage():
         assert row.industry == "fintech"
         assert row.company_size == "scaleup"
         assert row.posted_at == datetime(2026, 6, 1)
+        # Skill tags are keyed by canonical (normalized, lowercased) token.
         names = {t.name: t for t in row.skills}
-        assert names["Python"].covered is True
-        assert names["Python"].required is True
-        assert names["Go"].covered is False
-        assert names["Go"].required is True
-        assert names["Docker"].required is False
+        assert names["python"].covered is True
+        assert names["python"].required is True
+        assert names["go"].covered is False
+        assert names["go"].required is True
+        assert names["docker"].required is False
 
 
 def test_shortlist_row_surfaces_tech_stack_as_nonrequired_deduped():
@@ -107,14 +108,15 @@ def test_shortlist_row_surfaces_tech_stack_as_nonrequired_deduped():
             ),
         )
         rows = shortlist_rows(s, facts=_facts_with_python())
+        # Skill tags are keyed by canonical (normalized, lowercased) token.
         names = {t.name: t for t in rows[0].skills}
         # Python appears once, keeping its must-have (required) slot.
-        assert [t.name for t in rows[0].skills].count("Python") == 1
-        assert names["Python"].required is True
-        assert names["Python"].covered is True
+        assert [t.name for t in rows[0].skills].count("python") == 1
+        assert names["python"].required is True
+        assert names["python"].covered is True
         # Kafka surfaces from tech_stack as a non-required, filterable tag.
-        assert names["Kafka"].required is False
-        assert names["Kafka"].covered is False
+        assert names["kafka"].required is False
+        assert names["kafka"].covered is False
 
 
 def test_shortlist_row_without_facts_marks_all_uncovered():
@@ -271,3 +273,38 @@ def test_archived_rows_lists_all_archived_any_status():
         archive_job(s, _require_id(b.id))
 
         assert {r.company for r in archived_rows(s)} == {"A", "B"}
+
+
+def test_shortlist_row_exposes_sic_location_and_canonical_skills(tmp_path):
+    aliases = tmp_path / "aliases.json"
+    aliases.write_text('{"k8s": "kubernetes"}', "utf-8")
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="x", jd_text="jd", title="Eng", company="C",
+                status=JobStatus.shortlisted.value, location="Austin, TX, USA",
+                criteria_json={
+                    "sic_major": "73",
+                    "company_size": "Series A",
+                    "must_have_skills": ["Python, C++ or C", "k8s"],
+                    "location_parts": {
+                        "city": "Austin", "region": "TX", "country": "US",
+                        "is_us": True, "raw": "Austin, TX, USA",
+                    },
+                },
+            ),
+        )
+        rows = shortlist_rows(s, facts=facts, aliases_path=aliases)
+        row = rows[0]
+        assert row.sic_major == "73"
+        assert row.sic_label == "Business Services"
+        assert row.sic_division == "Services"
+        assert row.location_country == "US"
+        assert row.location_region == "TX"
+        assert row.location_city == "Austin"
+        assert row.is_us is True
+        assert row.company_size == "startup"
+        names = {t.name for t in row.skills}
+        assert {"python", "c++", "c", "kubernetes"} <= names  # split + canonicalized

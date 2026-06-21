@@ -3,7 +3,11 @@ from datetime import datetime, timedelta, timezone
 from resume_agent.dashboard.filtering import (
     FilterState,
     apply_filters,
+    available_cities,
+    available_countries,
+    available_industries,
     available_skill_cloud,
+    available_states,
     composite_score,
     sort_rows,
 )
@@ -25,6 +29,14 @@ def _row(
     posted: datetime | None = None,
     skills: list[SkillTag] | None = None,
     currency: str | None = "USD",
+    sic_major: str | None = None,
+    sic_label: str | None = None,
+    sic_division: str | None = None,
+    country: str | None = None,
+    region: str | None = None,
+    city: str | None = None,
+    is_us: bool = False,
+    company_size: str | None = None,
 ) -> ShortlistRow:
     return ShortlistRow(
         job_id=job_id,
@@ -41,9 +53,16 @@ def _row(
         seniority=seniority,
         employment_type=emp,
         industry=industry,
-        company_size=None,
+        company_size=company_size,
         posted_at=posted,
         skills=skills or [],
+        sic_major=sic_major,
+        sic_label=sic_label,
+        sic_division=sic_division,
+        location_country=country,
+        location_region=region,
+        location_city=city,
+        is_us=is_us,
     )
 
 
@@ -165,3 +184,48 @@ def test_available_skill_cloud_is_deduped_union():
 
 def test_empty_result_returns_empty_list():
     assert apply_filters([], FilterState(fit_min=90)) == []
+
+
+def test_sic_filter_unknown_passes():
+    rows = [_row(job_id=1, sic_major="73"), _row(job_id=2, sic_major="60"), _row(job_id=3)]
+    out = apply_filters(rows, FilterState(industry={"73"}))
+    assert {r.job_id for r in out} == {1, 3}  # unclassified (None) passes
+
+
+def test_location_filters_and_together_unknown_passes():
+    rows = [
+        _row(job_id=1, country="US", region="TX", city="Austin"),
+        _row(job_id=2, country="US", region="CA", city="San Jose"),
+        _row(job_id=3, country="GB", region=None, city="London"),
+        _row(job_id=4),  # all unknown -> passes
+    ]
+    out = apply_filters(rows, FilterState(country={"US"}, region={"TX"}))
+    assert {r.job_id for r in out} == {1, 4}
+
+
+def test_company_size_filter():
+    rows = [_row(job_id=1, company_size="startup"), _row(job_id=2, company_size="enterprise")]
+    out = apply_filters(rows, FilterState(company_size={"startup"}))
+    assert {r.job_id for r in out} == {1}
+
+
+def test_available_industries_grouped_by_division_sorted():
+    rows = [_row(sic_major="73", sic_label="Business Services", sic_division="Services"),
+            _row(sic_major="60", sic_label="Depository Institutions",
+                 sic_division="Finance, Insurance & Real Estate")]
+    grouped = available_industries(rows)
+    divisions = [d for d, _ in grouped]
+    assert "Services" in divisions and "Finance, Insurance & Real Estate" in divisions
+    services = dict(grouped)["Services"]
+    assert ("73", "Business Services") in services
+
+
+def test_location_cascade_builders_narrow():
+    rows = [
+        _row(country="US", region="TX", city="Austin"),
+        _row(country="US", region="CA", city="San Jose"),
+        _row(country="GB", region=None, city="London"),
+    ]
+    assert available_countries(rows) == ["GB", "US"]
+    assert available_states(rows, {"US"}) == ["CA", "TX"]
+    assert available_cities(rows, {"US"}, {"TX"}) == ["Austin"]

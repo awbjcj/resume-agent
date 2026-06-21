@@ -25,6 +25,10 @@ class FilterState:
     seniority: set[str] = field(default_factory=set)
     employment_type: set[str] = field(default_factory=set)
     industry: set[str] = field(default_factory=set)
+    country: set[str] = field(default_factory=set)
+    region: set[str] = field(default_factory=set)
+    city: set[str] = field(default_factory=set)
+    company_size: set[str] = field(default_factory=set)
     fit_min: int | None = None
     skills: set[str] = field(default_factory=set)
     sort: str = "fit"
@@ -47,7 +51,11 @@ def _passes(row: ShortlistRow, state: FilterState) -> bool:
         (state.sponsorship, row.sponsorship_signal),
         (state.seniority, row.seniority),
         (state.employment_type, row.employment_type),
-        (state.industry, row.industry),
+        (state.industry, row.sic_major),
+        (state.country, row.location_country),
+        (state.region, row.location_region),
+        (state.city, row.location_city),
+        (state.company_size, row.company_size),
     ):
         if selected and value is not None and value not in selected:
             return False
@@ -150,3 +158,43 @@ def available_skill_cloud(rows: list[ShortlistRow]) -> list[SkillTag]:
                 existing.covered = existing.covered or tag.covered
                 existing.required = existing.required or tag.required
     return sorted(merged.values(), key=lambda tag: (not tag.covered, tag.name.lower()))
+
+
+def available_industries(rows: list[ShortlistRow]) -> list[tuple[str, list[tuple[str, str]]]]:
+    """Present SIC codes grouped by division: [(division_label, [(code, label), ...]), ...]."""
+    by_division: dict[str, set[tuple[str, str]]] = {}
+    for row in rows:
+        if row.sic_major and row.sic_division and row.sic_label:
+            by_division.setdefault(row.sic_division, set()).add((row.sic_major, row.sic_label))
+    return [
+        (division, sorted(codes))
+        for division, codes in sorted(by_division.items())
+    ]
+
+
+def available_countries(rows: list[ShortlistRow]) -> list[str]:
+    return sorted({r.location_country for r in rows if r.location_country})
+
+
+def available_states(rows: list[ShortlistRow], countries: set[str]) -> list[str]:
+    return sorted(
+        {
+            r.location_region
+            for r in rows
+            if r.location_region and (not countries or r.location_country in countries)
+        }
+    )
+
+
+def available_cities(
+    rows: list[ShortlistRow], countries: set[str], states: set[str]
+) -> list[str]:
+    return sorted(
+        {
+            r.location_city
+            for r in rows
+            if r.location_city
+            and (not countries or r.location_country in countries)
+            and (not states or r.location_region in states)
+        }
+    )

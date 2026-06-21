@@ -1,14 +1,23 @@
+from pathlib import Path
+
 from sqlmodel import Session
 
 from resume_agent.discovery.extract import Runner, extract_job_criteria
 from resume_agent.discovery.filter import apply_filters
-from resume_agent.discovery.fit import compose_fit_input, score_fit
+from resume_agent.discovery.fit import FitScore, compose_fit_input, score_fit
 from resume_agent.discovery.relevance import judge_relevance
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
+from resume_agent.taxonomy import sic
+from resume_agent.taxonomy.location import build_location
+from resume_agent.taxonomy.skills import refresh_aliases, split_skills
+from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
 from resume_agent.tracking.repository import jobs_by_status, status_counts
-from resume_agent.tracking.tables import JobStatus
+from resume_agent.tracking.tables import Job, JobStatus
+
+SKILL_ALIASES_PATH = Path("data/skill_aliases.json")
+_SIC_TABLE = sic.load_sic_table()
 
 
 _REEXTRACT_STATUSES = (
@@ -44,14 +53,58 @@ def run_filter(session: Session, config: SearchConfig) -> None:
     session.commit()
 
 
-def run_score(session: Session, profile_facts: ProfileFacts, agent: Runner) -> None:
+def run_score(
+    session: Session,
+    profile_facts: ProfileFacts,
+    agent: Runner,
+    canonicalizer: Canonicalizer | None = None,
+    aliases_path: Path | str = SKILL_ALIASES_PATH,
+) -> None:
     for job in jobs_by_status(session, JobStatus.filtered.value):
-        fit = score_fit(compose_fit_input(job.jd_text, profile_facts), agent)
+        location_text = _job_location_text(job)
+        fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
         job.fit_score = fit.score
         job.fit_rationale = fit.rationale
+        _write_taxonomy_fields(job, fit, location_text)
         job.status = JobStatus.shortlisted.value
         session.add(job)
     session.commit()
+    if canonicalizer is not None:
+        _refresh_skill_aliases(
+            jobs_by_status(session, JobStatus.shortlisted.value), canonicalizer, aliases_path
+        )
+
+
+def _job_location_text(job: Job) -> str | None:
+    criteria = job.criteria_json or {}
+    value = job.location or criteria.get("location")
+    return str(value).strip() if value and str(value).strip() else None
+
+
+def _write_taxonomy_fields(job: Job, fit: FitScore, raw_location: str | None) -> None:
+    criteria = dict(job.criteria_json or {})
+    criteria["sic_major"] = sic.coerce_code(fit.sic_major, _SIC_TABLE)
+    if fit.location is not None:
+        loc = build_location(
+            fit.location.city, fit.location.region, fit.location.country, raw=raw_location
+        )
+        criteria["location_parts"] = loc.as_dict()
+    job.criteria_json = criteria
+
+
+def _refresh_skill_aliases(
+    jobs: list[Job], canonicalizer: Canonicalizer, aliases_path: Path | str
+) -> None:
+    tokens: set[str] = set()
+    for job in jobs:
+        criteria = job.criteria_json or {}
+        for key in ("must_have_skills", "nice_to_have_skills", "tech_stack"):
+            for atomic in split_skills([str(s) for s in (criteria.get(key) or [])]):
+                token = normalize_skill(atomic)
+                if token:
+                    tokens.add(token)
+    if tokens:
+        refresh_aliases(tokens, canonicalizer, aliases_path)
 
 
 def _relevance_target(config: SearchConfig) -> str | None:
@@ -113,10 +166,40 @@ def discover(
     extract_agent: Runner,
     fit_agent: Runner,
     relevance_agent: Runner | None = None,
+    canonicalizer: Canonicalizer | None = None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows and return final status counts."""
     run_relevance(session, config, relevance_agent)
     run_extract(session, extract_agent)
     run_filter(session, config)
-    run_score(session, profile_facts, fit_agent)
+    run_score(session, profile_facts, fit_agent, canonicalizer=canonicalizer)
     return status_counts(session)
+
+
+def backfill_rescore(
+    session: Session,
+    profile_facts: ProfileFacts,
+    agent: Runner,
+    canonicalizer: Canonicalizer | None = None,
+    aliases_path: Path | str = SKILL_ALIASES_PATH,
+) -> int:
+    """Populate sic_major + location for already-shortlisted jobs.
+
+    Re-runs the fit agent only to harvest the new fields; does NOT change
+    fit_score or status. Returns the number of jobs updated.
+    """
+    updated = 0
+    for job in jobs_by_status(session, JobStatus.shortlisted.value):
+        if not job.jd_text.strip():
+            continue
+        location_text = _job_location_text(job)
+        fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
+        _write_taxonomy_fields(job, fit, location_text)
+        session.add(job)
+        updated += 1
+    session.commit()
+    if canonicalizer is not None:
+        _refresh_skill_aliases(
+            jobs_by_status(session, JobStatus.shortlisted.value), canonicalizer, aliases_path
+        )
+    return updated

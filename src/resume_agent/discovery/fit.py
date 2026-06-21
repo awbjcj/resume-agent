@@ -1,6 +1,6 @@
 from agno.agent import Agent
 from agno.models.anthropic import Claude
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import AgentRunner, Runner
@@ -8,15 +8,33 @@ from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.profile import ProfileFacts
 
 
+class FitLocation(BaseModel):
+    """LLM-facing parsed location (every field required, nullable for unknown)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    city: str | None
+    region: str | None
+    country: str | None
+
+
 class FitScore(ExtensibleModel):
     score: int = Field(ge=0, le=100)
     rationale: str
+    # New fields default to None so existing callers/faked agents keep working.
+    sic_major: str | None = None
+    location: FitLocation | None = None
 
 
 _INSTRUCTIONS = [
     "Score how well the candidate fits the job, from 0 to 100.",
     "Base the score only on the candidate facts and job description provided.",
     "Give a one or two sentence rationale.",
+    "Classify the industry the job's domain serves into the single best 2-digit SIC "
+    "major-group code (e.g. fintech -> '60', healthcare -> '80', software/business "
+    "services -> '73'); set sic_major to that 2-digit string, or null if unclear.",
+    "Parse the work location into city, region (US state), and country; leave any "
+    "part null if the text does not support it.",
 ]
 
 
@@ -33,10 +51,13 @@ def build_fit_agent(model_id: str | None = None) -> Runner:
     )
 
 
-def compose_fit_input(jd_text: str, profile_facts: ProfileFacts) -> str:
+def compose_fit_input(
+    jd_text: str, profile_facts: ProfileFacts, location: str | None = None
+) -> str:
     return (
         "CANDIDATE PROFILE (JSON):\n"
         f"{profile_facts.model_dump_json()}\n\n"
+        f"JOB LOCATION: {location or 'unknown'}\n\n"
         "JOB DESCRIPTION:\n"
         f"{jd_text}"
     )

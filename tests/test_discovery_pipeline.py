@@ -1,7 +1,13 @@
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.pipeline import discover, reextract, run_relevance
+from resume_agent.discovery.pipeline import (
+    backfill_rescore,
+    discover,
+    reextract,
+    run_relevance,
+    run_score,
+)
 from resume_agent.discovery.relevance import RelevanceVerdict
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import (
@@ -10,7 +16,7 @@ from resume_agent.models.job import (
     SponsorshipSignal,
 )
 from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.discovery.fit import FitScore
+from resume_agent.discovery.fit import FitLocation, FitScore
 from resume_agent.tracking.repository import jobs_by_status, save_job
 from resume_agent.tracking.tables import Job, JobStatus
 
@@ -228,3 +234,82 @@ def test_reextract_rewrites_criteria_without_changing_status():
         assert filtered[0].criteria_json == {"seniority": None}
         assert raw and raw[0].criteria_json is None
         assert agent.prompts == ["rejected-jd", "jd"]
+
+
+class _SicLocFitAgent:
+    def run(self, prompt):
+        return _Result(
+            FitScore(
+                score=88, rationale="ok", sic_major="73",
+                location=FitLocation(city="Austin", region="TX", country="USA"),
+            )
+        )
+
+
+def test_run_score_writes_sic_and_location_into_criteria(tmp_path):
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="x", jd_text="jd", title="Eng",
+                status=JobStatus.filtered.value,
+                criteria_json={"industry": "fintech", "location": "Austin, TX, USA"},
+            ),
+        )
+        run_score(s, facts, _SicLocFitAgent(), aliases_path=tmp_path / "a.json")
+        job = jobs_by_status(s, JobStatus.shortlisted.value)[0]
+        assert job.fit_score == 88
+        assert job.criteria_json is not None
+        assert job.criteria_json["sic_major"] == "73"
+        assert job.criteria_json["industry"] == "fintech"  # preserved
+        assert job.criteria_json["location_parts"]["region"] == "TX"
+        assert job.criteria_json["location_parts"]["is_us"] is True
+        assert job.criteria_json["location_parts"]["raw"] == "Austin, TX, USA"
+
+
+def test_run_score_refreshes_aliases_when_canonicalizer_given(tmp_path):
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    path = tmp_path / "aliases.json"
+
+    def canon(tokens):
+        return {"k8s": "kubernetes"} if "k8s" in tokens else {t: t for t in tokens}
+
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="x", jd_text="jd", title="Eng",
+                status=JobStatus.filtered.value,
+                criteria_json={"must_have_skills": ["k8s"]},
+            ),
+        )
+        run_score(s, facts, _SicLocFitAgent(), canonicalizer=canon, aliases_path=path)
+        import json
+        assert json.loads(path.read_text("utf-8"))["k8s"] == "kubernetes"
+
+
+def test_backfill_rescore_populates_without_changing_fit_or_status(tmp_path):
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="x", jd_text="jd", title="Eng",
+                status=JobStatus.shortlisted.value,
+                criteria_json={"industry": "fintech"},
+                fit_score=55, location="Austin, TX, USA",
+            ),
+        )
+        save_job(
+            s,
+            Job(source="x", jd_text="other", status=JobStatus.filtered.value, criteria_json={}),
+        )
+        updated = backfill_rescore(s, facts, _SicLocFitAgent(), aliases_path=tmp_path / "a.json")
+        job = jobs_by_status(s, JobStatus.shortlisted.value)[0]
+        assert updated == 1  # only the shortlisted job
+        assert job.fit_score == 55  # unchanged
+        assert job.status == JobStatus.shortlisted.value
+        assert job.criteria_json is not None
+        assert job.criteria_json["sic_major"] == "73"
+        assert job.criteria_json["location_parts"]["region"] == "TX"
