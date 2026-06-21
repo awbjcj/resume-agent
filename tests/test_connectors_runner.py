@@ -43,6 +43,21 @@ def test_run_pull_ingests_counts_and_isolates_failures(tmp_path):
         assert runs["adzuna"]["added"] == 0 and "429" in runs["adzuna"]["error"]
 
 
+def test_run_pull_reports_progress_with_added_total(tmp_path):
+    from resume_agent.progress import ProgressReporter, read_progress
+
+    with _session() as s:
+        run_pull(
+            s, [_Good(), _Boom()], SearchConfig(), tmp_path / "runs.json",
+            reporter=ProgressReporter("pull", tmp_path),
+        )
+    rec = read_progress("pull", tmp_path)
+    assert rec is not None
+    assert rec["state"] == "done"
+    assert rec["total"] == 2  # two connectors
+    assert rec["added"] == 1  # only _Good ingested a job
+
+
 def test_runner_note_includes_filtered_count(tmp_path):
     class _Conn:
         name = "fake"

@@ -7,6 +7,7 @@ from resume_agent.discovery.connectors.base import Connector, FetchResult
 from resume_agent.discovery.connectors.telemetry import record_run
 from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.progress import ProgressReporter
 
 
 @dataclass
@@ -42,16 +43,28 @@ def run_pull(
     search: SearchConfig,
     telemetry_path: str | Path,
     limit: int | None = None,
+    reporter: ProgressReporter | None = None,
 ) -> PullReport:
-    """Fetch + ingest each connector in order, isolating failures."""
+    """Fetch + ingest each connector in order, isolating failures.
+
+    Progress is connector-granular: the total job count is unknown until each
+    connector returns, so the bar advances per connector and carries a running
+    ``added`` count rather than a (fabricated) per-job percentage.
+    """
     report = PullReport()
-    for connector in connectors:
+    if reporter:
+        reporter.begin(total=len(connectors), label="Starting", added=0)
+    added_total = 0
+    for index, connector in enumerate(connectors, 1):
+        if reporter:
+            reporter.step(index - 1, label=f"Pulling {connector.name}")
         try:
             result = connector.fetch(search, limit=limit)
             summary = ingest_jobs_with_outcomes(session, result.jobs)
             added_count = summary.added.get(connector.name, sum(summary.added.values()))
             upgraded_count = summary.upgraded.get(connector.name, sum(summary.upgraded.values()))
             report.totals[connector.name] = added_count
+            added_total += added_count
             if result.failures:
                 report.failures[connector.name] = result.failures
             record_run(
@@ -62,4 +75,8 @@ def run_pull(
             )
         except Exception as exc:
             record_run(telemetry_path, connector.name, added=0, error=f"{type(exc).__name__}: {exc}")
+        if reporter:
+            reporter.step(index, added=added_total)
+    if reporter:
+        reporter.done(added=added_total)
     return report
