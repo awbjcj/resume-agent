@@ -17,7 +17,7 @@ def _session() -> Session:
     return Session(engine)
 
 
-def _require_id(value):
+def _require_id(value: int | None) -> int:
     assert value is not None
     return value
 
@@ -35,12 +35,17 @@ def test_prune_run_archives_junk_expires_old_and_skips_progress():
         assert preview.archived == 1 and preview.expired == 1 and preview.skipped == 1
         assert preview.rejected == 1 and preview.low_fit == 0 and preview.stale == 0
         # Preview must not mutate.
-        assert get_job(s, _require_id(rejected.id)).archived_at is None
+        rejected_before = get_job(s, _require_id(rejected.id))
+        assert rejected_before is not None
+        assert rejected_before.archived_at is None
 
         report = prune_run(s, cfg, now=NOW)
         assert report.archived == 1 and report.expired == 1 and report.skipped == 1
         assert report.rejected == 1 and report.low_fit == 0 and report.stale == 0
-        assert get_job(s, _require_id(rejected.id)).archived_at is not None
+        rejected_after = get_job(s, _require_id(rejected.id))
+        assert rejected_after is not None
+        assert rejected_after.archived_at is not None
         assert get_job(s, _require_id(old_archived.id)) is None       # expired
-        assert get_job(s, _require_id(protected.id)) is not None      # progress kept
-        assert get_job(s, _require_id(protected.id)).archived_at is None
+        protected_after = get_job(s, _require_id(protected.id))
+        assert protected_after is not None      # progress kept
+        assert protected_after.archived_at is None

@@ -75,13 +75,14 @@ def test_pipeline_row_carries_has_progress_flag():
     SQLModel.metadata.create_all(engine)
     with Session(engine) as s:
         raw = save_job(s, Job(source="m", jd_text="a", status=JobStatus.raw.value))
+        raw_id = _require_id(raw.id)
         adv = save_job(s, Job(source="m", jd_text="b", status=JobStatus.raw.value))
-        assert adv.id is not None
-        save_application(s, Application(job_id=adv.id))
+        adv_id = _require_id(adv.id)
+        save_application(s, Application(job_id=adv_id))
 
         flags = {r.job_id: r.has_progress for r in pipeline_rows(s)}
-        assert flags[raw.id] is False
-        assert flags[adv.id] is True
+        assert flags[raw_id] is False
+        assert flags[adv_id] is True
 
 
 def test_pipeline_empty_state_still_renders_archive_undo(monkeypatch):
