@@ -38,7 +38,8 @@ from resume_agent.tailor.style_guide import load_style_guide
 from resume_agent.render.render_config import RenderConfig, load_render_config
 from resume_agent.render.service import render_version
 from resume_agent.tracking.queries import application_job_pairs
-from resume_agent.tracking.repository import get_job, jobs_by_status, save_job, update_application_status
+from resume_agent.tracking.prune_config import load_prune_config
+from resume_agent.tracking.repository import get_job, jobs_by_status, prune_preview, prune_run, save_job, update_application_status
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
 from resume_agent.tracking.match_gap import match_gap
 from resume_agent.tracking.tables import JobStatus
@@ -438,6 +439,48 @@ def setup_cmd() -> None:
     from resume_agent.setup.app import SetupApp
 
     SetupApp().run()
+
+
+@app.command("prune")
+def prune(
+    db_url: str | None = typer.Option(None, "--db-url", help="Override the configured DB URL."),
+    config: str = typer.Option("config/prune.yaml", "--config", help="Path to prune.yaml."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show counts without writing."),
+    fit: int | None = typer.Option(None, "--fit", help="Override fit_threshold."),
+    stale_days: int | None = typer.Option(None, "--stale-days", help="Override stale_days."),
+    retention_days: int | None = typer.Option(None, "--retention-days", help="Override retention_days."),
+) -> None:
+    """Archive junk jobs (rejected / low-fit / stale) and expire old archived ones."""
+    cfg = load_prune_config(config)
+    overrides = {
+        k: v
+        for k, v in (
+            ("fit_threshold", fit),
+            ("stale_days", stale_days),
+            ("retention_days", retention_days),
+        )
+        if v is not None
+    }
+    if overrides:
+        cfg = cfg.model_copy(update=overrides)
+
+    with get_session(_engine(db_url)) as session:
+        if dry_run:
+            report = prune_preview(session, cfg)
+            typer.echo(
+                f"[dry-run] {report.rejected} rejected, {report.low_fit} low-fit, "
+                f"{report.stale} stale -> {report.archived} to archive; "
+                f"{report.expired} to expire, "
+                f"{report.skipped} skipped (have progress)"
+            )
+        else:
+            report = prune_run(session, cfg)
+            typer.echo(
+                f"+{report.archived} archived "
+                f"({report.rejected} rejected, {report.low_fit} low-fit, {report.stale} stale), "
+                f"{report.expired} expired, "
+                f"{report.skipped} skipped"
+            )
 
 
 @app.command("sync-status")
