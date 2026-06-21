@@ -61,3 +61,36 @@ def test_dashboard_pages_render_without_error(tmp_path, monkeypatch):
         assert not at.exception, at.exception
     finally:
         get_settings.cache_clear()  # don't leak the temp DB into other tests
+
+
+def test_dashboard_exposes_triage_page():
+    from resume_agent.dashboard import app
+    assert callable(app.render_triage_page)
+
+
+def test_triage_page_renders_with_a_raw_job(tmp_path, monkeypatch):
+    from streamlit.testing.v1 import AppTest
+
+    import resume_agent.dashboard.app as appmod
+    from resume_agent.config import get_settings
+    from resume_agent.db import get_session, init_db, make_engine
+    from resume_agent.tracking.repository import save_job
+    from resume_agent.tracking.tables import Job, JobStatus
+
+    db_url = f"sqlite:///{(tmp_path / 'jobs.db').as_posix()}"
+    monkeypatch.setenv("DB_URL", db_url)
+    get_settings.cache_clear()
+
+    engine = make_engine(db_url)
+    init_db(engine)
+    with get_session(engine) as s:
+        save_job(s, Job(source="manual", jd_text="a", company="Acme", title="Eng",
+                        status=JobStatus.raw.value, fit_score=20))
+    try:
+        at = AppTest.from_file(appmod.__file__, default_timeout=30).run()
+        at.radio[0].set_value("Triage").run()
+        assert not at.exception, at.exception
+        assert any(widget.label == "Status" for widget in at.multiselect)
+        assert any(widget.label == "Sort by" for widget in at.selectbox)
+    finally:
+        get_settings.cache_clear()  # don't leak the temp DB into other tests

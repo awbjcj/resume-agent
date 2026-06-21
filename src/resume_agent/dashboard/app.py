@@ -22,6 +22,7 @@ from resume_agent.dashboard.pages import (  # noqa: F401  (re-exported)
     render_match_gap_page,
     render_pipeline_page,
     render_shortlist_page,
+    render_triage_page,
 )
 
 
@@ -43,7 +44,7 @@ def main() -> None:
         )
         page = st.radio(
             "View",
-            ["Shortlist", "Pipeline board", "Analytics", "Match-gap"],
+            ["Shortlist", "Triage", "Pipeline board", "Analytics", "Match-gap"],
             label_visibility="collapsed",
         )
 
@@ -51,6 +52,8 @@ def main() -> None:
     with get_session(engine) as session:
         if page == "Shortlist":
             render_shortlist_page(session)
+        elif page == "Triage":
+            render_triage_page(session)
         elif page == "Pipeline board":
             render_pipeline_page(session)
         elif page == "Analytics":

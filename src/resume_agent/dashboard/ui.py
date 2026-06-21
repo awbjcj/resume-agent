@@ -79,6 +79,26 @@ div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_shortlist"] {
   align-items: stretch;
 }
 
+/* Triage — compact intake cards: same regulated 2–3 columns as the shortlist
+   so the desk reads as one family, with a sticky action bar pinned below. */
+div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_triage"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr));
+  gap: clamp(1rem, 1.4vw, 1.6rem);
+  align-items: stretch;
+}
+
+div[data-testid="stVerticalBlock"][class*="st-key-triage_actionbar"] {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 5;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.7rem;
+  box-shadow: 0 4px 18px rgba(22,19,15,0.12);
+}
+
 /* Pipeline — detail cards. One per row: they carry an expandable job
    description, status selector and notes field that need the full width and
    look broken (and absurdly tall) when squeezed into a narrow grid column. */

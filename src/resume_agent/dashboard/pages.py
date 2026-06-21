@@ -1,6 +1,7 @@
 # src/resume_agent/dashboard/pages.py
 """The four dashboard pages — thin compositions over ui.py primitives."""
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import streamlit as st
@@ -11,6 +12,7 @@ from resume_agent.dashboard.filtering import (
     available_skill_cloud,
     sort_rows,
 )
+from resume_agent.dashboard.selection import all_deletable
 from resume_agent.dashboard.ui import (
     AMBER,
     clamp_text,
@@ -27,10 +29,23 @@ from resume_agent.dashboard.ui import (
 from resume_agent.profile.store import load_facts
 from resume_agent.tracking.analytics import fit_band_stats, source_stats
 from resume_agent.tracking.match_gap import MatchGapReport, match_gap, normalize_skill
-from resume_agent.tracking.queries import PipelineRow, pipeline_rows, shortlist_rows
+from resume_agent.tracking.prune_config import load_prune_config
+from resume_agent.tracking.queries import (
+    PipelineRow,
+    TriageRow,
+    archived_rows,
+    pipeline_rows,
+    shortlist_rows,
+    triage_rows,
+)
 from resume_agent.tracking.repository import (
     application_for_job,
+    archive_job,
+    delete_job,
     get_job,
+    prune_preview,
+    prune_run,
+    restore_job,
     save_application,
     save_job,
     update_application_status,
@@ -406,3 +421,195 @@ def render_match_gap_page(session) -> None:
 
     st.markdown('<div class="rail-head">Most-demanded missing skills</div>', unsafe_allow_html=True)
     st.table(match_gap_table_rows(report))
+
+
+_PRUNE_CONFIG_PATH = "config/prune.yaml"
+_UNDO_KEY = "triage_last_archived"
+
+
+def _triage_card(row: TriageRow) -> bool:
+    """Render one triage card; return whether its checkbox is ticked.
+
+    The checkbox's own keyed widget state (``sel-{id}``) is the single source of
+    truth — there is no parallel selection set to drift out of sync.
+    """
+    with st.container(border=True):
+        head, box = st.columns([5, 1], vertical_alignment="center")
+        with head:
+            st.markdown(
+                f'<div class="card-title">{row.title or "—"}</div>'
+                f'<div class="card-meta">{row.company or "—"} · '
+                f'{row.location or "location n/a"} &nbsp; {status_badge(row.status)}</div>'
+                f'<div class="metaline">fit {row.fit_score if row.fit_score is not None else "—"} '
+                f'· {row.source}</div>',
+                unsafe_allow_html=True,
+            )
+        with box:
+            checked = st.checkbox("Select", key=f"sel-{row.job_id}",
+                                  label_visibility="collapsed")
+    return checked
+
+
+def _clear_checkboxes(job_ids) -> None:
+    # Acted-on rows leave the view; drop their stale checkbox state so a later
+    # "Show archived" toggle can't resurrect a ticked box for the same id.
+    for jid in job_ids:
+        st.session_state.pop(f"sel-{jid}", None)
+
+
+def _row_age_days(row: TriageRow) -> int | None:
+    if row.posted_at is None:
+        return None
+    posted = row.posted_at
+    if posted.tzinfo is None:
+        posted = posted.replace(tzinfo=timezone.utc)
+    else:
+        posted = posted.astimezone(timezone.utc)
+    return max(0, (datetime.now(timezone.utc) - posted).days)
+
+
+def _filter_sort_triage_rows(rows: list[TriageRow]) -> list[TriageRow]:
+    with st.container(key="controldesk_triage"):
+        st.markdown('<div class="controldesk-head">Filter &amp; sort</div>',
+                    unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4, gap="medium", vertical_alignment="top")
+        statuses = sorted({row.status for row in rows})
+        chosen = set(c1.multiselect("Status", statuses, default=statuses, key="triage_status"))
+        min_fit = c2.slider("Min fit", 0, 100, 0, key="triage_min_fit")
+        max_age = c3.number_input("Max age days (0 = any)", 0, 3650, 0, key="triage_max_age")
+        sort = c4.selectbox("Sort by", ["fit", "recency", "company"], key="triage_sort")
+
+    visible = []
+    for row in rows:
+        age = _row_age_days(row)
+        if row.status not in chosen:
+            continue
+        if row.fit_score is not None and row.fit_score < min_fit:
+            continue
+        if max_age and age is not None and age > max_age:
+            continue
+        visible.append(row)
+
+    if sort == "fit":
+        visible.sort(key=lambda row: (row.fit_score is not None, row.fit_score or -1),
+                     reverse=True)
+    elif sort == "recency":
+        visible.sort(key=lambda row: _row_age_days(row) if _row_age_days(row) is not None else 10**9)
+    else:
+        visible.sort(key=lambda row: ((row.company or "").lower(), (row.title or "").lower()))
+    return visible
+
+
+def _render_archive_undo(session) -> None:
+    last_archived = list(st.session_state.get(_UNDO_KEY, []))
+    if not last_archived:
+        return
+    msg, action = st.columns([3, 1], vertical_alignment="center")
+    msg.success(f"Archived {len(last_archived)} job(s).")
+    if action.button("Undo archive", key="triage_undo_archive"):
+        for jid in last_archived:
+            restore_job(session, jid)
+        st.session_state[_UNDO_KEY] = []
+        _clear_checkboxes(last_archived)
+        st.rerun()
+
+
+def render_triage_page(session) -> None:
+    masthead(
+        "Intake",
+        'Triage <span class="dot">·</span> Desk',
+        "Raw and rejected jobs before the shortlist. Archive noise, delete dead-ends, prune in bulk.",
+    )
+
+    show_archived = st.toggle("Show archived", value=False, key="triage_show_archived")
+    rows = archived_rows(session) if show_archived else triage_rows(session)
+    _render_archive_undo(session)
+
+    if not rows:
+        empty_state("◇", "Nothing to triage",
+                    "Run <code>resume-agent pull</code> to bring in jobs, or toggle archived.")
+        return
+
+    visible = _filter_sort_triage_rows(rows)
+    metric_row([("In view", str(len(visible))),
+                ("Deletable", str(sum(1 for r in visible if not r.has_progress)))])
+
+    _render_prune_panel(session)
+
+    if not visible:
+        empty_state("◇", "No jobs match these filters", "Loosen a filter or clear the age limit.")
+        return
+
+    # Derive the selection straight from the per-card checkboxes as we render them.
+    selected: set[int] = set()
+    with st.container(key="cardgrid_triage"):
+        for row in visible:
+            if _triage_card(row):
+                selected.add(row.job_id)
+
+    deletable_ids = {r.job_id for r in visible if not r.has_progress}
+    _render_action_bar(session, selected, deletable_ids, show_archived)
+
+
+def _render_action_bar(session, selected, deletable_ids, show_archived) -> None:
+    with st.container(key="triage_actionbar"):
+        cols = st.columns(2)
+        if show_archived:
+            if cols[0].button("Restore selected", key="triage_restore", disabled=not selected):
+                for jid in selected:
+                    restore_job(session, jid)
+                _clear_checkboxes(selected)
+                st.rerun()
+            return
+        if cols[0].button("Archive selected", key="triage_archive", disabled=not selected):
+            archived = sorted(selected)
+            for jid in archived:
+                archive_job(session, jid)
+            st.session_state[_UNDO_KEY] = archived
+            _clear_checkboxes(archived)
+            st.rerun()
+        if cols[1].button("Delete selected", key="triage_delete",
+                          disabled=not all_deletable(selected, deletable_ids)):
+            _confirm_delete(session, sorted(selected))
+
+
+@st.dialog("Permanently delete jobs")
+def _confirm_delete(session, job_ids: list[int]) -> None:
+    st.write(f"Delete {len(job_ids)} job(s)? This cannot be undone.")
+    if st.button("Confirm delete", key="confirm_delete"):
+        for jid in job_ids:
+            delete_job(session, jid)
+        _clear_checkboxes(job_ids)
+        st.rerun()
+
+
+def _render_prune_panel(session) -> None:
+    config = load_prune_config(_PRUNE_CONFIG_PATH)
+    with st.expander("Prune (archive junk, expire old)"):
+        c1, c2, c3 = st.columns(3)
+        fit = c1.number_input("Fit below", 0, 100, config.fit_threshold, key="prune_fit")
+        stale = c2.number_input("Stale days", 0, 3650, config.stale_days, key="prune_stale")
+        retain = c3.number_input("Retention days", 0, 3650, config.retention_days, key="prune_retain")
+        run_config = config.model_copy(
+            update={"fit_threshold": fit, "stale_days": stale, "retention_days": retain}
+        )
+        preview = prune_preview(session, run_config)
+        st.caption(
+            f"{preview.rejected} rejected · {preview.low_fit} low-fit · {preview.stale} stale "
+            f"→ {preview.archived} archive · {preview.expired} expire · "
+            f"{preview.skipped} skipped (have progress)"
+        )
+        if st.button("Prune now", key="prune_now"):
+            _confirm_prune(session, run_config)
+
+
+@st.dialog("Run prune")
+def _confirm_prune(session, run_config) -> None:
+    report = prune_preview(session, run_config)
+    st.write(
+        f"Archive {report.archived} job(s) and permanently delete {report.expired} "
+        "expired archived job(s)? Expiry cannot be undone."
+    )
+    if st.button("Confirm prune", key="confirm_prune"):
+        prune_run(session, run_config)
+        st.rerun()
