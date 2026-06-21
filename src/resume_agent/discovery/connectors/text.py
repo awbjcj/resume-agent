@@ -15,6 +15,24 @@ def html_to_text(raw: str) -> str:
     return soup.get_text(separator="\n", strip=True)
 
 
+# Word-count floor + gain a replacement JD must clear to count as "materially
+# richer" than the text it would replace. Shared so the Adzuna detail-page
+# enrichment and the same-source merge refresh stay in lockstep (text one side
+# considers richer is the same text the other side will store).
+_MIN_RICHER_WORDS = 45
+_MIN_GAIN_WORDS = 15
+
+
+def is_materially_richer(candidate: str, fallback: str) -> bool:
+    """True if `candidate` has enough words, and enough more than `fallback`, to replace it."""
+    candidate_words = len(candidate.split())
+    fallback_words = len(fallback.split())
+    return (
+        candidate_words >= _MIN_RICHER_WORDS
+        and candidate_words >= fallback_words + _MIN_GAIN_WORDS
+    )
+
+
 def _terms(search: SearchConfig) -> list[str]:
     return [t.strip().lower() for t in (*search.keywords, *search.titles) if t.strip()]
 

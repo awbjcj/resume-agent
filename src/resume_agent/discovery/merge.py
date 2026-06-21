@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from resume_agent.discovery.connectors.text import is_materially_richer
 from resume_agent.discovery.source_tier import source_rank
 from resume_agent.tracking.dedup import compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
@@ -100,12 +101,6 @@ MergeAction = Insert | Skip | UpgradeUrlOnly | Rebase | RefreshText
 _TEXT_REFRESH_FROZEN = {JobStatus.tailored.value, JobStatus.rendered.value}
 
 
-def _materially_richer(new_text: str, old_text: str) -> bool:
-    new_words = new_text.split()
-    old_words = old_text.split()
-    return len(new_words) >= 45 and len(new_words) >= len(old_words) + 15
-
-
 def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
     """Decide what to do with `incoming` given the row `find_existing` matched (or None)."""
     if existing is None:
@@ -127,7 +122,7 @@ def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
         and existing.url
         and incoming.url == existing.url
         and existing.status not in _TEXT_REFRESH_FROZEN
-        and _materially_richer(incoming.jd_text, existing.jd_text)
+        and is_materially_richer(incoming.jd_text, existing.jd_text)
     ):
         updates: dict[str, Any] = {"jd_text": incoming.jd_text}
         if incoming.company:

@@ -8,15 +8,13 @@ from resume_agent.discovery.connectors.base import FetchResult, RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import identify_host
 from resume_agent.discovery.connectors.harvest import gate_and_limit
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.connectors.text import html_to_text, is_materially_richer
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.discovery.url_ingest.fetch import fetch_page, is_linkedin
 from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
 
 _BASE = "https://api.adzuna.com/v1/api/jobs"
-_MIN_RICHER_WORDS = 45
-_MIN_GAIN_WORDS = 15
 _DETAIL_SELECTORS = (
     '[class*="job-description"]',
     '[id*="job-description"]',
@@ -56,15 +54,6 @@ def _clean_lines(text: str) -> str:
 
 def _words(text: str) -> list[str]:
     return [word for word in text.split() if word.strip()]
-
-
-def _is_richer(candidate: str, fallback: str) -> bool:
-    candidate_words = len(_words(candidate))
-    fallback_words = len(_words(fallback))
-    return (
-        candidate_words >= _MIN_RICHER_WORDS
-        and candidate_words >= fallback_words + _MIN_GAIN_WORDS
-    )
 
 
 def _json_ld_descriptions(soup: BeautifulSoup) -> list[str]:
@@ -118,7 +107,7 @@ def _best_detail_text(html: str, fallback: str) -> str | None:
     if not candidates:
         return None
     best = max(candidates, key=lambda text: len(_words(text)))
-    return best if _is_richer(best, fallback) else None
+    return best if is_materially_richer(best, fallback) else None
 
 
 def enrich_adzuna_job(job: RawJob) -> RawJob:
@@ -150,7 +139,7 @@ def enrich_adzuna_job(job: RawJob) -> RawJob:
             company = extracted.company or company
             location = extracted.location or location
             jd_text = extracted.jd_text
-    jd_text = jd_text if jd_text and _is_richer(jd_text, job.jd_text) else None
+    jd_text = jd_text if jd_text and is_materially_richer(jd_text, job.jd_text) else None
     jd_text = jd_text or _best_detail_text(page.html, job.jd_text)
     if not jd_text:
         return job
