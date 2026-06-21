@@ -2,8 +2,14 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from resume_agent.discovery.connectors.adzuna import AdzunaConnector, parse_adzuna
+from resume_agent.discovery.connectors.adzuna import (
+    AdzunaConnector,
+    enrich_adzuna_job,
+    parse_adzuna,
+)
+from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.discovery.url_ingest.models import PageContent
 
 FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "adzuna" / "search.json").read_text())
 
@@ -38,12 +44,15 @@ def test_parse_adzuna_sets_posted_at_from_created():
 
 
 class _FakeAdzuna(AdzunaConnector):
+    def __init__(self):
+        super().__init__(app_id="x", app_key="y", country="us", enrich_details=False)
+
     def _get_results(self, search):
         return FIXTURE
 
 
 def test_connector_filters_by_search():
-    connector = _FakeAdzuna(app_id="x", app_key="y", country="us")
+    connector = _FakeAdzuna()
     result = connector.fetch(SearchConfig(keywords=["kubernetes"]))
     assert {j.title for j in result.jobs} == {"Platform Engineer"}
     assert connector.name == "adzuna"
@@ -94,3 +103,37 @@ def test_adzuna_builds_targeted_params():
     assert p["salary_min"] == 130000
     assert p["max_days_old"] == 30
     assert "what" not in p
+
+
+def test_enrich_adzuna_job_replaces_snippet_from_jobposting_json_ld(monkeypatch):
+    words = " ".join(f"detail{i}" for i in range(70))
+    html = f"""
+    <html><head>
+      <script type="application/ld+json">
+      {{"@type":"JobPosting","description":"<p>Build Python services.</p><p>{words}</p>"}}
+      </script>
+    </head><body>shell</body></html>
+    """
+
+    def fake_fetch_page(url):
+        assert url == "https://www.adzuna.com/jobs/1"
+        return PageContent(html=html, final_url="https://company.example/jobs/1", rendered=False)
+
+    import resume_agent.discovery.connectors.adzuna as mod
+
+    monkeypatch.setattr(mod, "fetch_page", fake_fetch_page)
+    raw = RawJob(
+        source="adzuna",
+        url="https://www.adzuna.com/jobs/1",
+        company="Acme",
+        title="Platform Engineer",
+        location="Remote",
+        jd_text="Short Python preview.",
+    )
+
+    enriched = enrich_adzuna_job(raw)
+
+    assert enriched.url == raw.url
+    assert enriched.company == "Acme"
+    assert "Build Python services." in enriched.jd_text
+    assert "detail69" in enriched.jd_text

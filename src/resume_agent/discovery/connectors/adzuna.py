@@ -1,11 +1,34 @@
+from urllib.parse import urlsplit
+
 import httpx
+from bs4 import BeautifulSoup
+from bs4.element import Tag
 
 from resume_agent.discovery.connectors.base import FetchResult, RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
+from resume_agent.discovery.connectors.detect import identify_host
 from resume_agent.discovery.connectors.harvest import gate_and_limit
+from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.discovery.url_ingest.fetch import fetch_page, is_linkedin
+from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
 
 _BASE = "https://api.adzuna.com/v1/api/jobs"
+_MIN_RICHER_WORDS = 45
+_MIN_GAIN_WORDS = 15
+_DETAIL_SELECTORS = (
+    '[class*="job-description"]',
+    '[id*="job-description"]',
+    '[data-testid*="job-description"]',
+    '[data-qa*="job-description"]',
+    '[class*="jobDescription"]',
+    '[id*="jobDescription"]',
+    '[class*="description"]',
+    '[id*="description"]',
+    "article",
+    "main",
+)
 
 
 def parse_adzuna(payload: dict) -> list[RawJob]:
@@ -26,19 +49,153 @@ def parse_adzuna(payload: dict) -> list[RawJob]:
     return jobs
 
 
+def _clean_lines(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines()]
+    return "\n".join(line for line in lines if line)
+
+
+def _words(text: str) -> list[str]:
+    return [word for word in text.split() if word.strip()]
+
+
+def _is_richer(candidate: str, fallback: str) -> bool:
+    candidate_words = len(_words(candidate))
+    fallback_words = len(_words(fallback))
+    return (
+        candidate_words >= _MIN_RICHER_WORDS
+        and candidate_words >= fallback_words + _MIN_GAIN_WORDS
+    )
+
+
+def _json_ld_descriptions(soup: BeautifulSoup) -> list[str]:
+    descriptions: list[str] = []
+
+    def visit(node) -> None:
+        if isinstance(node, list):
+            for item in node:
+                visit(item)
+            return
+        if not isinstance(node, dict):
+            return
+        node_type = node.get("@type")
+        types = node_type if isinstance(node_type, list) else [node_type]
+        if any(str(item).lower() == "jobposting" for item in types):
+            raw = node.get("description")
+            if isinstance(raw, str):
+                descriptions.append(html_to_text(raw))
+        graph = node.get("@graph")
+        if graph is not None:
+            visit(graph)
+
+    import json
+
+    for script in soup.select('script[type="application/ld+json"]'):
+        raw = script.string or script.get_text("", strip=True)
+        if not raw:
+            continue
+        try:
+            visit(json.loads(raw))
+        except json.JSONDecodeError:
+            continue
+    return descriptions
+
+
+def _candidate_texts(html: str) -> list[str]:
+    soup = BeautifulSoup(html, "html.parser")
+    candidates = [_clean_lines(text) for text in _json_ld_descriptions(soup)]
+    for selector in _DETAIL_SELECTORS:
+        for node in soup.select(selector):
+            if isinstance(node, Tag):
+                text = _clean_lines(node.get_text("\n", strip=True))
+                if text:
+                    candidates.append(text)
+    candidates.append(_clean_lines(html_to_text(html)))
+    return [candidate for candidate in candidates if candidate]
+
+
+def _best_detail_text(html: str, fallback: str) -> str | None:
+    candidates = _candidate_texts(html)
+    if not candidates:
+        return None
+    best = max(candidates, key=lambda text: len(_words(text)))
+    return best if _is_richer(best, fallback) else None
+
+
+def enrich_adzuna_job(job: RawJob) -> RawJob:
+    """Try to replace Adzuna's snippet with a full description from redirect_url.
+
+    Adzuna search results expose only a description snippet. The redirect target is
+    the best available source for complete JD text, so enrichment is best-effort:
+    failures leave the original RawJob intact and are recorded by the connector.
+    """
+    if not job.url:
+        return job
+    page = fetch_page(job.url)
+    host = (urlsplit(page.final_url).hostname or "").lower()
+    title = job.title
+    company = job.company
+    location = job.location
+    jd_text: str | None = None
+    if is_linkedin(host):
+        meta = parse_detail_meta(page.html)
+        title = meta.title or title
+        company = meta.company or company
+        location = meta.location or location
+        jd_text = parse_job_detail(page.html)
+    else:
+        target = identify_host(page.final_url)
+        if target and target.ats == "greenhouse":
+            extracted = read_greenhouse_posting(page.html)
+            title = extracted.title or title
+            company = extracted.company or company
+            location = extracted.location or location
+            jd_text = extracted.jd_text
+    jd_text = jd_text if jd_text and _is_richer(jd_text, job.jd_text) else None
+    jd_text = jd_text or _best_detail_text(page.html, job.jd_text)
+    if not jd_text:
+        return job
+    return RawJob(
+        source=job.source,
+        url=job.url,
+        company=company,
+        title=title,
+        location=location,
+        jd_text=jd_text,
+        posted_at=job.posted_at,
+    )
+
+
 class AdzunaConnector:
     """Keyword aggregator. One search call; results filtered client-side too."""
 
     name = "adzuna"
 
-    def __init__(self, app_id: str, app_key: str, country: str = "us"):
+    def __init__(
+        self,
+        app_id: str,
+        app_key: str,
+        country: str = "us",
+        *,
+        enrich_details: bool = True,
+    ):
         self.app_id = app_id
         self.app_key = app_key
         self.country = country
+        self.enrich_details = enrich_details
 
     def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
         jobs, filtered = gate_and_limit(parse_adzuna(self._get_results(search)), search, limit)
-        return FetchResult(jobs=jobs, filtered=filtered)
+        if not self.enrich_details:
+            return FetchResult(jobs=jobs, filtered=filtered)
+        enriched: list[RawJob] = []
+        failures: dict[str, str] = {}
+        for job in jobs:
+            try:
+                enriched.append(enrich_adzuna_job(job))
+            except Exception as exc:  # noqa: BLE001 - optional detail fetch must not kill pull.
+                failures[job.url or job.title or "unknown"] = type(exc).__name__
+                enriched.append(job)
+        return FetchResult(jobs=enriched, failures=failures, filtered=filtered)
 
     def _get_results(self, search: SearchConfig) -> dict:
         role_terms = [
