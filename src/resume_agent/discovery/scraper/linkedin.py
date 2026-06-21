@@ -173,6 +173,15 @@ def _search_url(
     return _SEARCH_URL + "?" + urllib.parse.urlencode(params)
 
 
+def _playwright_failure_reason(exc: PlaywrightError) -> str:
+    """Compact a Playwright navigation failure for CLI/telemetry output."""
+    lines = str(exc).splitlines()
+    first_line = lines[0].strip() if lines else ""
+    if first_line.startswith("Page.goto:") and " at " in first_line:
+        return first_line.split(" at ", maxsplit=1)[0]
+    return first_line or type(exc).__name__
+
+
 class LinkedInScraper:
     """Connector over a persistent, logged-in burner LinkedIn profile.
 
@@ -336,8 +345,14 @@ class LinkedInScraper:
                 if limit is not None and len(cards) >= limit:
                     break
             jobs: list[RawJob] = []
+            failures: dict[str, str] = {}
             for card in cards:
-                jd_text = parse_job_detail(self._detail_html(card)).strip()
+                try:
+                    detail_html = self._detail_html(card)
+                except PlaywrightError as exc:
+                    failures[card.url or card.job_id or "unknown"] = _playwright_failure_reason(exc)
+                    continue
+                jd_text = parse_job_detail(detail_html).strip()
                 if not jd_text:
                     continue
                 jobs.append(
@@ -351,7 +366,7 @@ class LinkedInScraper:
                         posted_at=card.posted_at,
                     )
                 )
-            return FetchResult(jobs=jobs)
+            return FetchResult(jobs=jobs, failures=failures)
         finally:
             self._close_browser()
 

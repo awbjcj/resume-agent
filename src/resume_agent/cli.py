@@ -227,7 +227,11 @@ def scrape_cmd(
     connector = build_linkedin_scraper()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        added = ingest_jobs(session, connector.fetch(config, limit=limit).jobs)
+        result = connector.fetch(config, limit=limit)
+        added = ingest_jobs(session, result.jobs)
+    if result.failures:
+        joined = ", ".join(f"{url} ({reason})" for url, reason in result.failures.items())
+        typer.echo(f"Skipped {len(result.failures)} failed posting(s): {joined}")
     typer.echo(f"Scrape complete. Added {sum(added.values())} new job(s).")
 
 
