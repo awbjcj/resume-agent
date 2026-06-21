@@ -2,6 +2,7 @@
 """The four dashboard pages — thin compositions over ui.py primitives."""
 
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 
 import streamlit as st
@@ -9,7 +10,11 @@ import streamlit as st
 from resume_agent.dashboard.filtering import (
     FilterState,
     apply_filters,
+    available_cities,
+    available_countries,
+    available_industries,
     available_skill_cloud,
+    available_states,
     sort_rows,
 )
 from resume_agent.dashboard.selection import all_deletable
@@ -18,6 +23,7 @@ from resume_agent.dashboard.ui import (
     clamp_text,
     empty_state,
     fit_block,
+    fit_mini,
     masthead,
     meta_line,
     metric_row,
@@ -144,8 +150,38 @@ def _control_desk(rows) -> FilterState:
                 )
             )
         with r3[1]:
-            industry_options = sorted({r.industry for r in rows if r.industry})
-            industry = set(st.multiselect("Industry", industry_options, key="f_industry"))
+            grouped = available_industries(rows)
+            division_labels = [d for d, _ in grouped]
+            chosen_divisions = set(
+                st.multiselect("Industry — division", division_labels, key="f_division")
+            )
+            code_options: list[tuple[str, str]] = []
+            for division, codes in grouped:
+                if not chosen_divisions or division in chosen_divisions:
+                    code_options.extend(codes)
+            code_labels = {code: label for code, label in code_options}
+            industry = set(
+                st.multiselect(
+                    "Industry — group",
+                    sorted(code_labels),
+                    format_func=lambda c: code_labels.get(c) or str(c),
+                    key="f_sic",
+                )
+            )
+
+        rloc = st.columns(3, gap="medium", vertical_alignment="top")
+        with rloc[0]:
+            country = set(st.multiselect("Country", available_countries(rows), key="f_country"))
+        with rloc[1]:
+            region = set(
+                st.multiselect("State (US)", available_states(rows, country), key="f_region")
+            )
+        with rloc[2]:
+            city = set(
+                st.multiselect("City", available_cities(rows, country, region), key="f_city")
+            )
+        size_options = sorted({r.company_size for r in rows if r.company_size})
+        company_size = set(st.multiselect("Company size", size_options, key="f_size"))
 
         # Skills spans the row; the composite preset shares it only when needed.
         skill_names = [t.name for t in available_skill_cloud(rows)]
@@ -173,6 +209,10 @@ def _control_desk(rows) -> FilterState:
         seniority=seniority,
         employment_type=employment,
         industry=industry,
+        country=country,
+        region=region,
+        city=city,
+        company_size=company_size,
         fit_min=fit_min or None,
         skills=skills,
         sort=sort,
@@ -510,18 +550,28 @@ def _triage_card(row: TriageRow) -> bool:
     truth — there is no parallel selection set to drift out of sync.
     """
     with st.container(border=True):
-        box, head = st.columns([0.9, 5], vertical_alignment="top")
+        # checkbox · identity · fit — top-aligned so the square and the fit meter
+        # both sit on the title's first line regardless of how the body grows.
+        box, body, meter = st.columns([0.5, 5, 1], vertical_alignment="top")
         with box:
-            checked = st.checkbox("Select", key=f"sel-{row.job_id}")
-        with head:
+            # Caption collapsed (kept as the input's accessible name) so the
+            # control reads as a clean square, not a labelled white rail.
+            checked = st.checkbox(
+                "Select", key=f"sel-{row.job_id}", label_visibility="collapsed"
+            )
+        with body:
+            age = _row_age_days(row)
+            age_str = "" if age is None else (" · today" if age == 0 else f" · {age}d ago")
             st.markdown(
-                f'<div class="card-title">{row.title or "—"}</div>'
-                f'<div class="card-meta">{row.company or "—"} · '
-                f'{row.location or "location n/a"} &nbsp; {status_badge(row.status)}</div>'
-                f'<div class="metaline">fit {row.fit_score if row.fit_score is not None else "—"} '
-                f'· {row.source}</div>',
+                f'<div class="card-title">{escape(row.title or "—")}</div>'
+                f'<div class="card-meta">{escape(row.company or "—")} · '
+                f'{escape(row.location or "location n/a")}</div>'
+                f'<div class="triage-tags">{status_badge(row.status)}'
+                f'<span class="metaline">{escape(row.source)}{age_str}</span></div>',
                 unsafe_allow_html=True,
             )
+        with meter:
+            st.markdown(fit_mini(row.fit_score), unsafe_allow_html=True)
     return checked
 
 

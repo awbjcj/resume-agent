@@ -79,12 +79,14 @@ div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_shortlist"] {
   align-items: stretch;
 }
 
-/* Triage — compact intake cards: same regulated 2–3 columns as the shortlist
-   so the desk reads as one family, with a sticky action bar pinned below. */
+/* Triage — compact intake cards. A wider 600px min-track deliberately keeps
+   this to FEWER columns than the shortlist (2 on a laptop, 3 on 4K): each card
+   gets the room a job title needs, so titles rarely wrap and never break the
+   row. Density is recovered by packing each card (checkbox · identity · fit). */
 div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_triage"] {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr));
-  gap: clamp(1rem, 1.4vw, 1.6rem);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 600px), 1fr));
+  gap: clamp(0.8rem, 1.2vw, 1.3rem);
   align-items: stretch;
 }
 
@@ -171,24 +173,46 @@ div[class*="st-key-cardgrid_shortlist"]
 div[class*="st-key-cardgrid_shortlist"]
   div[data-testid="stElementContainer"][class*="st-key-approve"] .stButton > button { width: 100%; }
 
-/* Triage cards share the same bottom-aligned behavior as shortlist cards, with
-   the visible checkbox column reading as a selection rail instead of a stray
-   control floating in the corner. */
+/* Triage intake cards: a clean selection square at the left, the job identity
+   in the middle, a fit meter pinned right. Cards share the shortlist's flex
+   stretch so a row stays level. */
 div[class*="st-key-cardgrid_triage"] > div[data-testid="stLayoutWrapper"] { display: flex; }
+/* Card padding (overrides the tighter shared base). The extra bottom value gives
+   the status/age footer room to clear the card's bottom edge. */
 div[class*="st-key-cardgrid_triage"] > div[data-testid="stLayoutWrapper"]
-  > div[data-testid="stVerticalBlock"] { flex: 1; display: flex; flex-direction: column; }
-div[class*="st-key-cardgrid_triage"] .stCheckbox {
-  background: #fff; border: 1px solid var(--rule); border-radius: var(--radius-sm);
-  padding: 0.42rem 0.48rem; min-height: 100%;
+  > div[data-testid="stVerticalBlock"] {
+  flex: 1; display: flex; flex-direction: column; padding: 1rem 1.15rem 1.4rem;
 }
-div[class*="st-key-cardgrid_triage"] .stCheckbox label {
-  display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;
+
+/* Two-line clamp caps a long title so it can't add card height and desync its
+   row neighbours (grid stretch keeps the cards level). The title is left at its
+   NATURAL height — no min-height — so a one-line title hugs the location line
+   instead of leaving a reserved-second-line gap above it. Sized down from the
+   shortlist's 1.5rem — this is a denser intake context. */
+div[class*="st-key-cardgrid_triage"] .card-title {
+  font-size: 1.16rem; font-weight: 600; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-div[class*="st-key-cardgrid_triage"] .stCheckbox [data-testid="stWidgetLabel"] p,
-div[class*="st-key-cardgrid_triage"] .stCheckbox label p {
-  font-family:'IBM Plex Mono', monospace; font-size: 0.62rem; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow-wrap: normal;
-}
+/* Keep the title→location gap small and compact (it briefly grew when the title
+   reserved two lines; the title is back to natural height, so 0.15rem is enough). */
+div[class*="st-key-cardgrid_triage"] .card-title { margin-bottom: 0; }
+div[class*="st-key-cardgrid_triage"] .card-meta { font-size: 0.92rem; margin-top: 0.15rem; }
+
+/* The selection control is now a plain checkbox (its "Select" caption is
+   collapsed in pages.py but kept as the input's accessible name) instead of a
+   full-height white rail. Nudge it onto the title's first baseline and let it
+   inherit the oxblood primaryColor for its checked state. */
+div[class*="st-key-cardgrid_triage"] .stCheckbox { padding-top: 0.18rem; }
+
+/* Status badge + source/age meta riding one tidy baseline below the identity. */
+.triage-tags { display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:0.6rem; }
+.triage-tags .metaline { margin-top: 0; }
+
+/* Compact fit meter for the dense triage card: a colored numeral + tiny cap,
+   right-aligned. A scaled-down sibling of .fit so the desk reads as one family. */
+.fit-mini { text-align:right; line-height:1; }
+.fit-mini-num { font-family:'Newsreader', serif; font-size: clamp(1.5rem, 1.6vw, 1.9rem); font-weight: 700; }
+.fit-mini-cap { font-family:'IBM Plex Mono', monospace; font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-top: 0.25rem; }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
 div[data-testid="stElementContainer"]:has(.stButton),
@@ -458,6 +482,34 @@ def fit_block(score: int | None) -> str:
         f'<div class="fit-num" style="color:{color}">{shown}<span class="fit-max">/100</span></div>'
         f'<div class="fit-bar"><div class="fit-fill" style="width:{pct}%;background:{color}"></div></div>'
         '<div class="fit-cap">FIT SCORE</div>'
+        "</div>"
+    )
+
+
+def fit_mini(score: int | None) -> str:
+    """Return a compact fit indicator (colored numeral + cap) for dense cards.
+
+    A scaled-down sibling of :func:`fit_block` — no bar — for the triage card
+    where the full meter would dominate a row built for fast scanning.
+    """
+    if score is None:
+        color, shown = MUTED, "—"
+    elif score >= 80:
+        color, shown = EMERALD, str(score)
+    elif score >= 60:
+        color, shown = AMBER, str(score)
+    else:
+        color, shown = ROSE, str(score)
+    aria = (
+        f'role="meter" aria-valuenow="{score}" aria-valuemin="0" aria-valuemax="100" '
+        f'aria-label="Fit score {score} out of 100"'
+        if score is not None
+        else 'role="meter" aria-label="Fit score not yet computed"'
+    )
+    return (
+        f'<div class="fit-mini" {aria}>'
+        f'<div class="fit-mini-num" style="color:{color}">{shown}</div>'
+        '<div class="fit-mini-cap">Fit</div>'
         "</div>"
     )
 
