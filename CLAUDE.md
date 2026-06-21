@@ -15,6 +15,34 @@ are tested against fixture JSON payloads, not live endpoints.
 
 ---
 
+## LLM providers (`llm_runner.py`)
+
+Every LLM agent is built through one seam — `build_model(model_id)` in
+`llm_runner.py` — which is the **only** place that knows about provider SDKs. No
+builder imports a concrete agno model class directly.
+
+- **Provider-prefixed model ids.** `split_provider` reads a `provider:model`
+  prefix: `openai:` / `gemini:` / `deepseek:` route to that provider; a bare id
+  (or an unknown prefix, e.g. a Workday `tenant:site`) defaults to **Anthropic**,
+  so legacy Claude ids pass through unchanged.
+- **Per-provider keys.** `resolve_api_key(model_id)` maps the resolved provider to
+  its `Settings` field (`anthropic_api_key` / `openai_api_key` / `gemini_api_key`
+  / `deepseek_api_key`). `relevance.py`'s "no key → return `None`" guard uses it,
+  so it is provider-aware.
+- **Lazy SDK imports.** `build_model` imports the agno provider class *inside* its
+  branch, so a Claude-only run never imports `openai` or `google-genai`, and a
+  missing optional SDK fails only when that provider is actually selected.
+- **Tiers unchanged.** `model_for_tier` still maps `cheap`/`mid`/`premium` →
+  `Settings.{cheap,mid,premium}_model`; the prefix lives inside those ids.
+- **Dependency note.** agno 2.6.x's Gemini import needs `google-genai`'s
+  `step_delta` submodule, renamed to `stepdelta` in 2.9.0 — `pyproject.toml`
+  caps it at `<2.9.0`. DeepSeek and OpenAI both ride the `openai` SDK.
+
+To add a provider: extend `PROVIDERS`, add its key to `Settings`, and add a branch
+to `build_model` with a lazy import. Nothing else changes.
+
+---
+
 ## Core invariants (never break these)
 
 ### Fact-lock
@@ -112,6 +140,7 @@ aggressiveness determines how many detail fetches are issued.
 
 | Path | Role |
 | --- | --- |
+| `src/resume_agent/llm_runner.py` | `build_model` provider seam + `AgentRunner` adapter |
 | `src/resume_agent/discovery/connectors/detect.py` | ATS detection (singleton → L1 → L2) |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation |
 | `src/resume_agent/discovery/connectors/workday.py` | Workday CXS list → gate → detail |

@@ -5,6 +5,21 @@ discussion name the same concepts the same way. Architecture terms
 (module, interface, seam, deep/shallow) follow their usual meaning; this file
 records the **domain** nouns specific to this project.
 
+## LLM providers
+
+**Model seam** (`build_model`):
+The single constructor every agent builder calls to turn a model id into an agno
+model. The only code that knows about provider SDKs; builders never import a
+concrete model class. Lazy per-branch imports keep unused provider SDKs unloaded.
+_Avoid_: model factory loop, client builder (it builds one model, not a client)
+
+**Provider-prefixed model id**:
+A model id of the form `provider:model` (`openai:`, `gemini:`, `deepseek:`); a
+bare id, or an unknown prefix, is Anthropic. `split_provider` parses it,
+`resolve_api_key` maps the provider to its configured key. Lets tiers mix
+providers without a separate provider setting.
+_Avoid_: namespaced model, qualified id (reserve "provider" for the prefix value)
+
 ## Discovery & connectors
 
 **Connector**:

@@ -1,4 +1,7 @@
 # Reviewer roster, weights, and loop controls (see design spec §5.3).
+# Each reviewer's `model_tier` (cheap | mid | premium) resolves to the matching
+# CHEAP_MODEL / MID_MODEL / PREMIUM_MODEL in .env, so a tier inherits whatever
+# LLM provider that model id names (bare = Anthropic; openai:/gemini:/deepseek:).
 max_rounds: 3
 score_threshold: 85
 style_guide_path: config/style_guide.md

@@ -51,7 +51,7 @@ points where _you_ (not the agent) make the call.
 
 - **Python 3.13+**
 - **[uv](https://docs.astral.sh/uv/)** for dependency and environment management
-- An **Anthropic API key** (the discover, tailor, and cover-letter steps call Claude)
+- An **LLM provider key** — the discover, tailor, and cover-letter steps default to **Claude**, so an **Anthropic API key** works out of the box. You can instead (or additionally) use **OpenAI**, **Google Gemini**, or **DeepSeek** — see [LLM providers](#env--secrets-and-models)
 - _Optional:_ a **GitHub token** (enriches your profile from your repos)
 - _Optional:_ a **burner LinkedIn account** (only needed for `scrape`)
 - _Optional:_ **job-board connector keys** for `pull` — e.g. [Adzuna API](https://developer.adzuna.com/) credentials (Greenhouse and RemoteOK need no key)
@@ -331,15 +331,32 @@ Copied from `.env.example`. Loaded automatically.
 
 | Key                                    | Purpose                                                                      |
 | -------------------------------------- | ---------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                    | **Required** for `discover`, `tailor`, and `cover-letter`.                   |
+| `ANTHROPIC_API_KEY`                    | Powers `discover`, `tailor`, and `cover-letter` with Claude (the default).   |
+| `OPENAI_API_KEY`                       | Optional; needed only if a model tier is prefixed `openai:`.                 |
+| `GEMINI_API_KEY`                       | Optional; needed only if a model tier is prefixed `gemini:`.                 |
+| `DEEPSEEK_API_KEY`                     | Optional; needed only if a model tier is prefixed `deepseek:`.               |
 | `GITHUB_TOKEN`                         | Optional; enriches `profile build`.                                          |
 | `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`     | Optional; enable the Adzuna connector for `pull`.                            |
 | `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | Burner credentials for `scrape`.                                             |
 | `LINKEDIN_USER_DATA_DIR`               | Where the logged-in browser session is cached (default `.linkedin_profile`). |
 | `DB_URL`                               | Database location (default `sqlite:///data/resume_agent.db`).                |
 
-Model tiers are also configurable via env (`CHEAP_MODEL`, `MID_MODEL`,
-`PREMIUM_MODEL`) and default to Claude Haiku / Sonnet / Opus.
+#### Choosing an LLM provider
+
+Every LLM call resolves through one of three model tiers — `CHEAP_MODEL`,
+`MID_MODEL`, `PREMIUM_MODEL` — which default to Claude Haiku / Sonnet / Opus. A
+model id is **provider-prefixed**: a bare id stays on Anthropic, while an
+`openai:`, `gemini:`, or `deepseek:` prefix routes that tier to another provider.
+Each tier uses its own provider's key, so you can mix providers freely:
+
+```bash
+CHEAP_MODEL=gemini:gemini-2.0-flash     # cheap extract/fit/relevance on Gemini
+MID_MODEL=deepseek:deepseek-chat        # reviewers / cover-letter reviser on DeepSeek
+PREMIUM_MODEL=claude-opus-4-8           # bare id → Anthropic for the tailor writer
+```
+
+Set only the keys for the providers you actually use; a provider's SDK is loaded
+lazily, so a Claude-only run never touches the OpenAI or Gemini libraries.
 
 > **Gmail** uses an OAuth client file (`config/gmail_credentials.json`), not an
 > `.env` key — see [Gmail setup](#gmail-setup-for-sync-status).
