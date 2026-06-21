@@ -235,3 +235,39 @@ def test_pipeline_rows_include_lean_metadata_fields():
         assert row.salary_max == 180000
         assert row.remote_policy == "hybrid"
         assert row.seniority == "staff"
+
+
+def test_triage_rows_are_pre_shortlist_and_unarchived():
+    from resume_agent.tracking.queries import triage_rows
+    from resume_agent.tracking.repository import archive_job
+
+    with _session() as s:
+        save_job(s, Job(source="m", jd_text="a", company="Raw", title="E",
+                        status=JobStatus.raw.value, fit_score=30))
+        save_job(s, Job(source="m", jd_text="b", company="Rej", title="E",
+                        status=JobStatus.rejected.value))
+        save_job(s, Job(source="m", jd_text="c", company="Short", title="E",
+                        status=JobStatus.shortlisted.value))  # excluded: has own page
+        hidden = save_job(s, Job(source="m", jd_text="d", company="Hidden", title="E",
+                                 status=JobStatus.raw.value))
+        archive_job(s, _require_id(hidden.id))
+
+        companies = {r.company for r in triage_rows(s)}
+        assert companies == {"Raw", "Rej"}
+
+
+def test_archived_rows_lists_all_archived_any_status():
+    from resume_agent.tracking.queries import archived_rows
+    from resume_agent.tracking.repository import archive_job
+
+    with _session() as s:
+        a = save_job(s, Job(source="m", jd_text="a", company="A", title="E",
+                            status=JobStatus.shortlisted.value))
+        b = save_job(s, Job(source="m", jd_text="b", company="B", title="E",
+                            status=JobStatus.raw.value))
+        save_job(s, Job(source="m", jd_text="c", company="C", title="E",
+                        status=JobStatus.raw.value))  # not archived
+        archive_job(s, _require_id(a.id))
+        archive_job(s, _require_id(b.id))
+
+        assert {r.company for r in archived_rows(s)} == {"A", "B"}

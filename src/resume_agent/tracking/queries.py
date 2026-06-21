@@ -8,6 +8,7 @@ from resume_agent.models.profile import ProfileFacts
 from resume_agent.tracking.match_gap import normalize_skill, profile_skill_tokens
 from resume_agent.tracking.repository import (
     application_for_job,
+    has_progress,
     latest_rendered_resume_version,
     latest_resume_version,
 )
@@ -46,6 +47,20 @@ class ShortlistRow:
     company_size: str | None
     posted_at: datetime | None
     skills: list[SkillTag]
+
+
+@dataclass
+class TriageRow:
+    job_id: int
+    company: str | None
+    title: str | None
+    location: str | None
+    source: str
+    status: str
+    fit_score: int | None
+    posted_at: datetime | None
+    archived_at: datetime | None
+    has_progress: bool
 
 
 @dataclass
@@ -173,3 +188,46 @@ def application_job_pairs(session: Session) -> list[tuple[Application, Job]]:
         .where(archived_col.is_(None))
     )
     return [(app, job) for app, job in session.exec(statement).all()]
+
+
+_TRIAGE_STATUSES = (
+    JobStatus.raw.value,
+    JobStatus.extracted.value,
+    JobStatus.filtered.value,
+    JobStatus.rejected.value,
+)
+
+
+def _triage_row(session: Session, job: Job) -> TriageRow:
+    job_id = _require_job_id(job)
+    return TriageRow(
+        job_id=job_id,
+        company=job.company,
+        title=job.title,
+        location=job.location,
+        source=job.source,
+        status=job.status,
+        fit_score=job.fit_score,
+        posted_at=job.posted_at,
+        archived_at=job.archived_at,
+        has_progress=has_progress(session, job_id),
+    )
+
+
+def triage_rows(session: Session) -> list[TriageRow]:
+    archived_col = cast(Any, Job.archived_at)
+    status_col = cast(Any, Job.status)
+    jobs = session.exec(
+        select(Job)
+        .where(status_col.in_(_TRIAGE_STATUSES), archived_col.is_(None))
+        .order_by(cast(Any, Job.fit_score).asc().nullsfirst())
+    ).all()
+    return [_triage_row(session, job) for job in jobs]
+
+
+def archived_rows(session: Session) -> list[TriageRow]:
+    archived_col = cast(Any, Job.archived_at)
+    jobs = session.exec(
+        select(Job).where(archived_col.is_not(None)).order_by(archived_col.desc())
+    ).all()
+    return [_triage_row(session, job) for job in jobs]
