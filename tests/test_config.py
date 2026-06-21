@@ -24,6 +24,17 @@ def test_settings_have_safe_defaults():
     assert settings.db_url.startswith("sqlite:///")
 
 
+def test_settings_have_provider_key_defaults(monkeypatch):
+    # Provider keys may be present in the ambient OS env; clear them so we test
+    # the Settings class defaults, not the developer's shell.
+    for var in ("OPENAI_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    settings = _settings(env_file=None)
+    assert settings.openai_api_key == ""
+    assert settings.gemini_api_key == ""
+    assert settings.deepseek_api_key == ""
+
+
 def test_load_yaml_parses_mapping(tmp_path):
     f = tmp_path / "search.yaml"
     f.write_text("keywords:\n  - python\n  - backend\nsponsorship_required: true\n", encoding="utf-8")
