@@ -1,11 +1,15 @@
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, cast
 
 from sqlmodel import Session, select
 
 from resume_agent.models.profile import ProfileFacts
-from resume_agent.tracking.match_gap import normalize_skill, profile_skill_tokens
+from resume_agent.taxonomy import sic as sic_tax
+from resume_agent.taxonomy.company_size import snap as snap_size
+from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_skills
+from resume_agent.tracking.match_gap import profile_skill_tokens
 from resume_agent.tracking.repository import (
     application_for_job,
     has_progress,
@@ -47,6 +51,13 @@ class ShortlistRow:
     company_size: str | None
     posted_at: datetime | None
     skills: list[SkillTag]
+    sic_major: str | None = None
+    sic_label: str | None = None
+    sic_division: str | None = None
+    location_country: str | None = None
+    location_region: str | None = None
+    location_city: str | None = None
+    is_us: bool = False
 
 
 @dataclass
@@ -81,10 +92,12 @@ class PipelineRow:
     has_progress: bool = False
 
 
-def _skill_tags(criteria: dict, tokens: set[str]) -> list[SkillTag]:
+def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> list[SkillTag]:
     # tech_stack (techs the post names) is also surfaced as non-required tags so
-    # the skill cloud and "Skills (any match)" filter can match on it; deduped by
-    # normalized token, with must_have > nice_to_have > tech_stack taking the slot.
+    # the skill cloud and "Skills (any match)" filter can match on it. Compound
+    # entries are split into atomic skills, then deduped by canonical token (the
+    # canonical token becomes the display name); must_have > nice_to_have > tech_stack.
+    profile_canonical = {canonical_skill(t, aliases) for t in tokens}
     tags: list[SkillTag] = []
     seen: set[str] = set()
     for key, required in (
@@ -92,17 +105,23 @@ def _skill_tags(criteria: dict, tokens: set[str]) -> list[SkillTag]:
         ("nice_to_have_skills", False),
         ("tech_stack", False),
     ):
-        for raw_name in criteria.get(key) or []:
-            name = str(raw_name).strip()
-            token = normalize_skill(name)
-            if not token or token in seen:
+        raw_items = [str(s) for s in (criteria.get(key) or [])]
+        for atomic in split_skills(raw_items):
+            canonical = canonical_skill(atomic, aliases)
+            if not canonical or canonical in seen:
                 continue
-            seen.add(token)
-            tags.append(SkillTag(name=name, covered=token in tokens, required=required))
+            seen.add(canonical)
+            tags.append(
+                SkillTag(name=canonical, covered=canonical in profile_canonical, required=required)
+            )
     return tags
 
 
-def shortlist_rows(session: Session, facts: ProfileFacts | None = None) -> list[ShortlistRow]:
+def shortlist_rows(
+    session: Session,
+    facts: ProfileFacts | None = None,
+    aliases_path: str | Path = "data/skill_aliases.json",
+) -> list[ShortlistRow]:
     fit_score_col = cast(Any, Job.fit_score)
     archived_col = cast(Any, Job.archived_at)
     jobs = session.exec(
@@ -111,11 +130,16 @@ def shortlist_rows(session: Session, facts: ProfileFacts | None = None) -> list[
         .order_by(fit_score_col.desc().nullslast())
     ).all()
     tokens = profile_skill_tokens(facts) if facts is not None else set()
+    aliases = load_aliases(aliases_path)
+    sic_table = sic_tax.load_sic_table()
     rows = []
     for job in jobs:
         job_id = _require_job_id(job)
         criteria = job.criteria_json or {}
         salary = criteria.get("salary_range") or {}
+        loc = criteria.get("location_parts") or {}
+        code = sic_tax.coerce_code(criteria.get("sic_major"), sic_table)
+        division = sic_tax.division_for(code, sic_table)
         rows.append(
             ShortlistRow(
                 job_id=job_id,
@@ -132,9 +156,16 @@ def shortlist_rows(session: Session, facts: ProfileFacts | None = None) -> list[
                 seniority=criteria.get("seniority"),
                 employment_type=criteria.get("employment_type"),
                 industry=criteria.get("industry"),
-                company_size=criteria.get("company_size"),
+                company_size=snap_size(criteria.get("company_size")),
                 posted_at=job.posted_at,
-                skills=_skill_tags(criteria, tokens),
+                skills=_skill_tags(criteria, tokens, aliases),
+                sic_major=code,
+                sic_label=sic_tax.display_label(code, sic_table),
+                sic_division=division[1] if division else None,
+                location_country=loc.get("country"),
+                location_region=loc.get("region"),
+                location_city=loc.get("city"),
+                is_us=bool(loc.get("is_us")),
             )
         )
     return rows
