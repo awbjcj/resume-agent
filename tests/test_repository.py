@@ -9,6 +9,27 @@ from resume_agent.tracking.repository import (
 from resume_agent.tracking.tables import Job, JobStatus
 
 
+def test_archive_and_restore_preserve_status():
+    from resume_agent.tracking.repository import archive_job, restore_job
+
+    with _session() as s:
+        job = save_job(s, Job(source="m", jd_text="a", status=JobStatus.shortlisted.value))
+        jid = _require_id(job.id)
+
+        archived = archive_job(s, jid)
+        assert archived is not None
+        assert archived.archived_at is not None
+        assert archived.status == JobStatus.shortlisted.value
+
+        restored = restore_job(s, jid)
+        assert restored is not None
+        assert restored.archived_at is None
+        assert restored.status == JobStatus.shortlisted.value
+
+        assert archive_job(s, 9999) is None
+        assert restore_job(s, 9999) is None
+
+
 def _session() -> Session:
     engine = create_engine("sqlite://")
     SQLModel.metadata.create_all(engine)

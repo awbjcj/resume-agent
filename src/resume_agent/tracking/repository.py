@@ -147,6 +147,30 @@ _PROGRESS_STATUSES = {
 }
 
 
+def archive_job(session: Session, job_id: int) -> Job | None:
+    """Soft-archive a job (reversible). Status is left untouched."""
+    job = session.get(Job, job_id)
+    if job is None:
+        return None
+    job.archived_at = utcnow()
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    return job
+
+
+def restore_job(session: Session, job_id: int) -> Job | None:
+    """Un-archive a job, restoring it to its exact prior stage."""
+    job = session.get(Job, job_id)
+    if job is None:
+        return None
+    job.archived_at = None
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    return job
+
+
 def has_progress(session: Session, job_id: int) -> bool:
     """True if a job has user investment that must never be destroyed."""
     job = session.get(Job, job_id)
