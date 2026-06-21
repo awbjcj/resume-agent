@@ -13,7 +13,7 @@ THEME_CSS = """
 
 :root {
   --paper:#f4f1ea; --paper-2:#efeae0; --ink:#16130f; --muted:#6c6253;
-  --oxblood:#8c2f1f; --rule:rgba(22,19,15,0.16);
+  --oxblood:#8c2f1f; --danger:#9f2f35; --rule:rgba(22,19,15,0.16);
   /* One radius scale used everywhere (was an ad-hoc mix of 3/4/6px). */
   --radius:8px; --radius-sm:4px;
 }
@@ -92,12 +92,21 @@ div[data-testid="stVerticalBlock"][class*="st-key-triage_actionbar"] {
   position: sticky;
   bottom: 1rem;
   z-index: 5;
-  background: var(--paper-2);
+  background: color-mix(in srgb, var(--paper-2) 94%, #fff);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  padding: 0.7rem;
-  box-shadow: 0 4px 18px rgba(22,19,15,0.12);
+  padding: 0.8rem;
+  box-shadow: 0 10px 28px rgba(22,19,15,0.14);
+  gap: 0.55rem !important;
 }
+.actionbar-status {
+  font-family:'IBM Plex Mono', monospace; font-size: 0.74rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 0 0 0.55rem; border-bottom: 1px solid var(--rule);
+}
+.actionbar-status strong { color: var(--ink); font-weight: 700; }
+div[class*="st-key-triage_actionbar"] .stButton,
+div[class*="st-key-triage_actionbar"] .stButton > button { width: 100%; }
 
 /* Pipeline — detail cards. One per row: they carry an expandable job
    description, status selector and notes field that need the full width and
@@ -124,6 +133,9 @@ div[data-testid="stVerticalBlock"][class*="st-key-cardgrid_pipeline"] {
 .rationale { color: #3f382e; font-size: 1.02rem; line-height: 1.6; margin-top: 0.7rem; border-left: 2px solid var(--oxblood); padding-left: 0.9rem; }
 .rail-head { font-family:'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: 0.24em; font-size: 0.74rem; color: var(--muted); margin: 1.5rem 0 0.4rem; display:flex; align-items:center; gap: 0.7rem; }
 .rail-head::after { content:""; flex:1; height:1px; background: var(--rule); }
+.card-title, .card-meta, .metaline, .rationale, .jd-text {
+  max-width: 100%; overflow-wrap: anywhere; word-break: normal;
+}
 
 /* ── Cards (bordered st.container inside a cardgrid) ───────────── */
 /* Streamlit 1.58 wraps each grid item in an stLayoutWrapper; the bordered card
@@ -132,7 +144,8 @@ div[class*="st-key-cardgrid"] > div[data-testid="stLayoutWrapper"]
   > div[data-testid="stVerticalBlock"] {
   background: var(--paper-2); border: 1px solid var(--rule) !important; border-radius: var(--radius);
   box-shadow: 0 1px 0 rgba(22,19,15,0.04); transition: border-color .18s ease;
-  padding: 0.6rem 0.7rem 0.3rem;
+  padding: 0.75rem 0.85rem 0.55rem;
+  overflow: hidden;
 }
 div[class*="st-key-cardgrid"] > div[data-testid="stLayoutWrapper"]
   > div[data-testid="stVerticalBlock"]:hover { border-color: var(--oxblood) !important; }
@@ -158,11 +171,65 @@ div[class*="st-key-cardgrid_shortlist"]
 div[class*="st-key-cardgrid_shortlist"]
   div[data-testid="stElementContainer"][class*="st-key-approve"] .stButton > button { width: 100%; }
 
+/* Triage cards share the same bottom-aligned behavior as shortlist cards, with
+   the visible checkbox column reading as a selection rail instead of a stray
+   control floating in the corner. */
+div[class*="st-key-cardgrid_triage"] > div[data-testid="stLayoutWrapper"] { display: flex; }
+div[class*="st-key-cardgrid_triage"] > div[data-testid="stLayoutWrapper"]
+  > div[data-testid="stVerticalBlock"] { flex: 1; display: flex; flex-direction: column; }
+div[class*="st-key-cardgrid_triage"] .stCheckbox {
+  background: #fff; border: 1px solid var(--rule); border-radius: var(--radius-sm);
+  padding: 0.42rem 0.48rem; min-height: 100%;
+}
+div[class*="st-key-cardgrid_triage"] .stCheckbox label {
+  display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;
+}
+div[class*="st-key-cardgrid_triage"] .stCheckbox [data-testid="stWidgetLabel"] p,
+div[class*="st-key-cardgrid_triage"] .stCheckbox label p {
+  font-family:'IBM Plex Mono', monospace; font-size: 0.62rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow-wrap: normal;
+}
+
 /* ── Buttons ──────────────────────────────────────────────────── */
-.stButton > button { font-family:'IBM Plex Mono', monospace; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; border-radius: var(--radius-sm); border: 1px solid var(--oxblood); background: var(--oxblood); color: var(--paper); font-weight: 600; padding: 0.45rem 1.1rem; transition: all .15s ease; }
+div[data-testid="stElementContainer"]:has(.stButton),
+.stButton, .stButton > button { width: 100% !important; }
+.stButton > button { font-family:'IBM Plex Mono', monospace; font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; border-radius: var(--radius-sm); border: 1px solid var(--oxblood); background: var(--oxblood); color: var(--paper); font-weight: 700; padding: 0.52rem 0.9rem; min-height: 2.25rem; transition: all .15s ease; white-space: nowrap; }
 .stButton > button:hover { background: #75271a; border-color:#75271a; }
+.stButton > button:disabled,
+.stButton > button:disabled:hover {
+  color: color-mix(in srgb, var(--muted) 70%, #fff) !important;
+  background: color-mix(in srgb, var(--paper-2) 82%, #fff) !important;
+  border-color: var(--rule) !important;
+  opacity: 1;
+}
 .stDownloadButton > button { font-family:'IBM Plex Mono', monospace; font-size: 0.74rem; letter-spacing: 0.06em; border-radius: 3px; background: transparent; color: var(--ink); border: 1px solid var(--rule); }
 .stDownloadButton > button:hover { border-color: var(--oxblood); color: var(--oxblood); }
+
+/* Secondary and destructive actions are keyed in pages.py. Keeping these as
+   scoped variants avoids making every Streamlit button look dangerous. */
+div[data-testid="stElementContainer"][class*="st-key-setstage-"] .stButton > button,
+div[data-testid="stElementContainer"][class*="st-key-arch-"] .stButton > button,
+div[data-testid="stElementContainer"][class*="st-key-triage_archive"] .stButton > button,
+div[data-testid="stElementContainer"][class*="st-key-triage_restore"] .stButton > button {
+  background: transparent; color: var(--ink); border-color: var(--rule);
+}
+div[data-testid="stElementContainer"][class*="st-key-setstage-"] .stButton > button:hover,
+div[data-testid="stElementContainer"][class*="st-key-arch-"] .stButton > button:hover,
+div[data-testid="stElementContainer"][class*="st-key-triage_archive"] .stButton > button:hover,
+div[data-testid="stElementContainer"][class*="st-key-triage_restore"] .stButton > button:hover {
+  color: var(--oxblood); border-color: var(--oxblood); background: #fff;
+}
+div[data-testid="stElementContainer"][class*="st-key-del-"] .stButton > button,
+div[data-testid="stElementContainer"][class*="st-key-triage_delete"] .stButton > button {
+  background: transparent; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+}
+div[data-testid="stElementContainer"][class*="st-key-del-"] .stButton > button:hover,
+div[data-testid="stElementContainer"][class*="st-key-triage_delete"] .stButton > button:hover {
+  background: color-mix(in srgb, var(--danger) 10%, #fff);
+  border-color: var(--danger); color: var(--danger);
+}
+div[class*="st-key-cardgrid_pipeline"] .stButton,
+div[class*="st-key-cardgrid_pipeline"] .stButton > button { width: 100%; }
 
 /* ── Sidebar ──────────────────────────────────────────────────── */
 [data-testid="stSidebar"] { background: var(--paper-2); border-right: 2px solid var(--ink); }
@@ -281,6 +348,9 @@ details.xt-skills > summary::-webkit-details-marker { display: none; }
 .xt-clamp {
   display: -webkit-box; -webkit-line-clamp: var(--xt-lines, 2);
   -webkit-box-orient: vertical; overflow: hidden;
+}
+.rationale.xt-clamp, .jd-text.xt-clamp {
+  min-height: calc(var(--xt-lines, 2) * 1.55em);
 }
 details.xt[open] .xt-clamp { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .xt-full { display: none; }

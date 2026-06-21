@@ -235,10 +235,11 @@ def render_shortlist_page(session) -> None:
                         ]
                         st.markdown(skill_strip(chips, head=6), unsafe_allow_html=True)
                     # Rationale: show a substantial preview before the in-place
-                    # expansion so the card is useful without an immediate click.
+                    # expansion, using the same line-clamped disclosure pattern
+                    # as the Pipeline JD cards so text blocks align across rows.
                     if row.fit_rationale:
                         st.markdown(
-                            clamp_text(row.fit_rationale, preview_words=100),
+                            clamp_text(row.fit_rationale, lines=4, min_chars=180),
                             unsafe_allow_html=True,
                         )
                 # Footer button lives OUTSIDE the columns so it spans the full card
@@ -327,7 +328,8 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
                 row.jd_text or "—",
                 body_class="jd-text",
                 pre=True,
-                preview_words=160,
+                lines=4,
+                min_chars=260,
             ),
             unsafe_allow_html=True,
         )
@@ -341,35 +343,47 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
 
         statuses = [s.value for s in ApplicationStatus]
         current = row.application_status or ApplicationStatus.ready.value
-        set_col, note_col = st.columns([1, 2])
-        with set_col:
+        st.markdown('<div class="rail-head">Application</div>', unsafe_allow_html=True)
+        app_status_col, note_col, save_col = st.columns([1.1, 2.4, 0.9], vertical_alignment="bottom")
+        with app_status_col:
             new_status = st.selectbox(
-                "Application status", statuses, index=statuses.index(current), key=f"status-{row.job_id}"
+                "Application status",
+                statuses,
+                index=statuses.index(current),
+                key=f"status-{row.job_id}",
             )
         with note_col:
-            notes = st.text_input("Notes", key=f"notes-{row.job_id}", placeholder="e.g. applied via referral")
-        if st.button("Save status", key=f"save-{row.job_id}"):
-            application = application_for_job(session, row.job_id)
-            if application is None:
-                save_application(session, _new_application(row.job_id, new_status, notes))
-            elif application.id is None:
-                st.error("Cannot update an application that has not been persisted.")
-                return
-            else:
-                update_application_status(session, application.id, new_status, notes or None)
-            # No st.rerun() here: an immediate rerun restarts the script and
-            # discards this message, so the click appears to do nothing. The
-            # selectbox keeps its value via widget state, so a rerun is needless.
-            saved = f"Saved — status set to “{new_status}”"
-            st.success(saved + (f" · note: {notes}" if notes else ""))
+            notes = st.text_input(
+                "Notes",
+                key=f"notes-{row.job_id}",
+                placeholder="e.g. applied via referral",
+            )
+        with save_col:
+            if st.button("Save", key=f"save-{row.job_id}"):
+                application = application_for_job(session, row.job_id)
+                if application is None:
+                    save_application(session, _new_application(row.job_id, new_status, notes))
+                elif application.id is None:
+                    st.error("Cannot update an application that has not been persisted.")
+                    return
+                else:
+                    update_application_status(session, application.id, new_status, notes or None)
+                # No st.rerun() here: an immediate rerun restarts the script and
+                # discards this message, so the click appears to do nothing. The
+                # selectbox keeps its value via widget state, so a rerun is needless.
+                saved = f"Saved — status set to “{new_status}”"
+                st.success(saved + (f" · note: {notes}" if notes else ""))
 
         st.markdown('<div class="rail-head">Manage</div>', unsafe_allow_html=True)
-        stage_col, arch_col, del_col = st.columns([2, 1, 1])
+        stage_col, set_col, arch_col, del_col = st.columns(
+            [1.9, 0.9, 0.9, 0.9], vertical_alignment="bottom"
+        )
+        stages = [s.value for s in JobStatus]
         with stage_col:
-            stages = [s.value for s in JobStatus]
             new_stage = st.selectbox(
                 "Stage", stages, index=stages.index(row.status), key=f"stage-{row.job_id}"
             )
+        with set_col:
             if st.button("Set stage", key=f"setstage-{row.job_id}"):
                 job = get_job(session, row.job_id)
                 if job is not None:
@@ -382,7 +396,7 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
                 st.session_state[_UNDO_KEY] = [row.job_id]
                 st.rerun()
         with del_col:
-            if not row.has_progress and st.button("Delete", key=f"del-{row.job_id}"):
+            if st.button("Delete", key=f"del-{row.job_id}", disabled=row.has_progress):
                 _confirm_delete(session, [row.job_id])
 
 
@@ -496,7 +510,9 @@ def _triage_card(row: TriageRow) -> bool:
     truth — there is no parallel selection set to drift out of sync.
     """
     with st.container(border=True):
-        head, box = st.columns([5, 1], vertical_alignment="center")
+        box, head = st.columns([0.9, 5], vertical_alignment="top")
+        with box:
+            checked = st.checkbox("Select", key=f"sel-{row.job_id}")
         with head:
             st.markdown(
                 f'<div class="card-title">{row.title or "—"}</div>'
@@ -506,9 +522,6 @@ def _triage_card(row: TriageRow) -> bool:
                 f'· {row.source}</div>',
                 unsafe_allow_html=True,
             )
-        with box:
-            checked = st.checkbox("Select", key=f"sel-{row.job_id}",
-                                  label_visibility="collapsed")
     return checked
 
 
@@ -617,7 +630,13 @@ def render_triage_page(session) -> None:
 
 def _render_action_bar(session, selected, deletable_ids, show_archived) -> None:
     with st.container(key="triage_actionbar"):
-        cols = st.columns(2)
+        count = len(selected)
+        noun = "job" if count == 1 else "jobs"
+        st.markdown(
+            f'<div class="actionbar-status"><strong>{count}</strong> {noun} selected</div>',
+            unsafe_allow_html=True,
+        )
+        cols = st.columns([1, 1], gap="small", vertical_alignment="center")
         if show_archived:
             if cols[0].button("Restore selected", key="triage_restore", disabled=not selected):
                 for jid in selected:

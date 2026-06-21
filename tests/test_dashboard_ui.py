@@ -136,6 +136,16 @@ def test_theme_css_styles_keyed_controldesk_container():
     assert "padding-top: 0.55rem" in THEME_CSS
 
 
+def test_theme_css_styles_board_actions_and_text_bounds():
+    assert "actionbar-status" in THEME_CSS
+    assert "st-key-triage_actionbar" in THEME_CSS
+    assert "st-key-triage_delete" in THEME_CSS
+    assert "st-key-del-" in THEME_CSS
+    assert "st-key-arch-" in THEME_CSS
+    assert "overflow-wrap: anywhere" in THEME_CSS
+    assert "min-height: calc(var(--xt-lines, 2) * 1.55em)" in THEME_CSS
+
+
 def test_clamp_text_plain_when_short_and_details_when_long():
     short = clamp_text("brief reason")
     assert "<details" not in short
