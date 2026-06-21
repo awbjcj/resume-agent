@@ -1,8 +1,18 @@
+from datetime import datetime
 from typing import Any, cast
 
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from resume_agent.tracking.prune import (
+    PruneReport,
+    PruneRow,
+    expire_candidates,
+    prune_candidates,
+    prune_reason_counts,
+    prune_skipped,
+)
+from resume_agent.tracking.prune_config import PruneConfig
 from resume_agent.tracking.tables import (
     Application,
     ApplicationStatus,
@@ -212,3 +222,71 @@ def has_progress(session: Session, job_id: int) -> bool:
         if session.exec(select(model).where(model.job_id == job_id)).first() is not None:
             return True
     return False
+
+
+def _prune_rows(session: Session) -> list[PruneRow]:
+    rows: list[PruneRow] = []
+    for job in session.exec(select(Job)).all():
+        if job.id is None:
+            continue
+        rows.append(
+            PruneRow(
+                job_id=job.id,
+                status=job.status,
+                fit_score=job.fit_score,
+                posted_at=job.posted_at,
+                created_at=job.created_at,
+                archived_at=job.archived_at,
+                has_progress=has_progress(session, job.id),
+            )
+        )
+    return rows
+
+
+def _prune_plan(session: Session, config: PruneConfig, now: datetime):
+    rows = _prune_rows(session)
+    return (
+        prune_candidates(rows, config, now),
+        expire_candidates(rows, config, now),
+        prune_skipped(rows, config, now),
+    )
+
+
+def _prune_report(
+    to_archive: list[PruneRow],
+    to_expire: list[PruneRow],
+    skipped: list[PruneRow],
+    config: PruneConfig,
+    now: datetime,
+) -> PruneReport:
+    reasons = prune_reason_counts(to_archive, config, now)
+    return PruneReport(
+        archived=len(to_archive),
+        expired=len(to_expire),
+        skipped=len(skipped),
+        rejected=reasons["rejected"],
+        low_fit=reasons["low_fit"],
+        stale=reasons["stale"],
+    )
+
+
+def prune_preview(
+    session: Session, config: PruneConfig, now: datetime | None = None
+) -> PruneReport:
+    """Count what a prune would do, without writing anything."""
+    now = now or utcnow()
+    to_archive, to_expire, skipped = _prune_plan(session, config, now)
+    return _prune_report(to_archive, to_expire, skipped, config, now)
+
+
+def prune_run(
+    session: Session, config: PruneConfig, now: datetime | None = None
+) -> PruneReport:
+    """Archive matching junk and expire old archived rows. Returns the tally."""
+    now = now or utcnow()
+    to_archive, to_expire, skipped = _prune_plan(session, config, now)
+    for row in to_archive:
+        archive_job(session, row.job_id)
+    for row in to_expire:
+        delete_job(session, row.job_id)
+    return _prune_report(to_archive, to_expire, skipped, config, now)
