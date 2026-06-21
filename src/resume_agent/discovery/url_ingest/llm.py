@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 
 from resume_agent.config import get_settings
 from resume_agent.discovery.url_ingest.models import ExtractedJob
-from resume_agent.llm_runner import AgentRunner, Runner, build_model
+from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
 
 _INSTRUCTIONS = [
     "Extract the company, job title, location, and full job-description text.",
@@ -14,13 +14,14 @@ _INSTRUCTIONS = [
 
 def build_url_extract_agent(model_id: str | None = None) -> Runner:
     s = get_settings()
-    resolved = model_id or s.cheap_model
+    model = build_model(model_id or s.cheap_model)
     return AgentRunner(
         Agent(
-            model=build_model(resolved),
+            model=model,
             description="You extract a job posting's fields from page text.",
             instructions=_INSTRUCTIONS,
             output_schema=ExtractedJob,
+            use_json_mode=use_json_mode_for(model),
         )
     )
 

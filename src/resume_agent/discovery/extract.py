@@ -1,7 +1,7 @@
 from agno.agent import Agent
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model
+from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
 from resume_agent.models.job import JobCriteria, JobCriteriaExtract
 
 
@@ -21,13 +21,14 @@ _INSTRUCTIONS = [
 
 def build_extract_agent(model_id: str | None = None) -> Runner:
     s = get_settings()
-    resolved = model_id or s.cheap_model
+    model = build_model(model_id or s.cheap_model)
     return AgentRunner(
         Agent(
-            model=build_model(resolved),
+            model=model,
             description="You extract structured hiring criteria from job descriptions.",
             instructions=_INSTRUCTIONS,
             output_schema=JobCriteriaExtract,
+            use_json_mode=use_json_mode_for(model),
         )
     )
 

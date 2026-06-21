@@ -2,7 +2,13 @@ from agno.agent import Agent
 from pydantic import BaseModel, ConfigDict
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, resolve_api_key
+from resume_agent.llm_runner import (
+    AgentRunner,
+    Runner,
+    build_model,
+    resolve_api_key,
+    use_json_mode_for,
+)
 
 _SNIPPET_CHARS = 500
 
@@ -26,12 +32,14 @@ def build_relevance_agent(model_id: str | None = None) -> Runner | None:
     resolved = model_id or settings.cheap_model
     if not resolve_api_key(resolved):
         return None
+    model = build_model(resolved)
     return AgentRunner(
         Agent(
-            model=build_model(resolved),
+            model=model,
             description="You decide whether a job posting matches a target role.",
             instructions=_INSTRUCTIONS,
             output_schema=RelevanceVerdict,
+            use_json_mode=use_json_mode_for(model),
         )
     )
 

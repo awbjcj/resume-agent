@@ -5,7 +5,7 @@ from agno.agent import Agent
 from pydantic import Field
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model
+from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
 from resume_agent.models.base import ExtensibleModel
 
 _INSTRUCTIONS = [
@@ -35,12 +35,14 @@ def clusters_to_mapping(clusters: list[list[str]], tokens: set[str]) -> dict[str
 
 def _default_agent() -> Runner:
     settings = get_settings()
+    model = build_model(settings.cheap_model)
     return AgentRunner(
         Agent(
-            model=build_model(settings.cheap_model),
+            model=model,
             description="You canonicalize skill names into synonym clusters.",
             instructions=_INSTRUCTIONS,
             output_schema=SkillClusters,
+            use_json_mode=use_json_mode_for(model),
         )
     )
 

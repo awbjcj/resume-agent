@@ -1,7 +1,7 @@
 from agno.agent import Agent
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model
+from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
 from resume_agent.models.profile import ProfileFacts
 
 
@@ -16,14 +16,14 @@ _INSTRUCTIONS = [
 def build_extractor_agent(model_id: str | None = None) -> Runner:
     """Create the Agno agent that structures resume text into ProfileFacts."""
     s = get_settings()
-    resolved = model_id or s.mid_model
+    model = build_model(model_id or s.mid_model)
     return AgentRunner(
         Agent(
-            model=build_model(resolved),
+            model=model,
             description="You extract structured, truthful resume facts from raw resume text.",
             instructions=_INSTRUCTIONS,
             output_schema=ProfileFacts,
-            use_json_mode=True,
+            use_json_mode=use_json_mode_for(model),
         )
     )
 

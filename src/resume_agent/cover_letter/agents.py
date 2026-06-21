@@ -1,6 +1,6 @@
 from agno.agent import Agent
 
-from resume_agent.llm_runner import AgentRunner, Runner, build_model
+from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
 from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.tailor.agents import model_for_tier
 
@@ -19,24 +19,26 @@ _REVISE_INSTRUCTIONS = [
 
 
 def build_cover_letter_agent(model_id: str | None = None) -> Runner:
+    model = build_model(model_id or model_for_tier("premium"))
     return AgentRunner(
         Agent(
-            model=build_model(model_id or model_for_tier("premium")),
+            model=model,
             description="You are an expert cover-letter writer who never fabricates.",
             instructions=_DRAFT_INSTRUCTIONS,
             output_schema=CoverLetterContent,
-            use_json_mode=True,
+            use_json_mode=use_json_mode_for(model),
         )
     )
 
 
 def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
+    model = build_model(model_id or model_for_tier("mid"))
     return AgentRunner(
         Agent(
-            model=build_model(model_id or model_for_tier("mid")),
+            model=model,
             description="You revise cover letters to keep every claim fact-locked.",
             instructions=_REVISE_INSTRUCTIONS,
             output_schema=CoverLetterContent,
-            use_json_mode=True,
+            use_json_mode=use_json_mode_for(model),
         )
     )
