@@ -499,5 +499,19 @@ def sync_status_cmd(
             typer.echo("Re-run with --apply to apply these transitions.")
 
 
+@app.command("serve")
+def serve_cmd(
+    host: str = typer.Option("127.0.0.1", help="Bind host (use 0.0.0.0 to expose on LAN)."),
+    port: int = typer.Option(8000, help="Bind port."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Run the FastAPI backend (for the React frontend / API clients)."""
+    import uvicorn
+
+    from resume_agent.api.app import create_app
+
+    uvicorn.run(create_app(db_url=db_url), host=host, port=port)
+
+
 if __name__ == "__main__":
     app()

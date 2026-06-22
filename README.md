@@ -323,6 +323,32 @@ uv run resume-agent sync-status --max-results 100
 
 ---
 
+## API server
+
+The same pipeline is exposed over HTTP for the future React/shadcn frontend (and
+any API client):
+
+```bash
+uv run resume-agent serve                       # http://127.0.0.1:8000
+uv run resume-agent serve --host 0.0.0.0 --port 8080
+```
+
+- Interactive docs at `/docs`; the OpenAPI schema at `/openapi.json`.
+- The committed contract the frontend consumes lives in `contracts/`
+  (`openapi.json` + generated `ts/api.ts`); regenerate with
+  `bash scripts/gen_ts_client.sh` after any schema change.
+- Long operations (`POST /api/discover|pull|tailor|cover-letters|jobs/from-url`)
+  return a **run** you watch via `GET /api/runs/{id}/events` (Server-Sent Events)
+  or poll at `GET /api/runs/{id}`.
+- Set `API_TOKEN` in `.env` to require an `Authorization: Bearer <token>` on every
+  route except `/api/health`; set `CORS_ORIGINS` (comma-separated) for your
+  frontend dev server. Both are off-by-default-friendly for local single-user use.
+
+Deferred (not yet exposed over HTTP): Gmail `sync-status`, analytics, match-gap,
+`profile build`, LinkedIn `scrape`.
+
+---
+
 ## Configuration
 
 ### `.env` — secrets and models

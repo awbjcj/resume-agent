@@ -15,6 +15,41 @@ are tested against fixture JSON payloads, not live endpoints.
 
 ---
 
+## API layer (`api/`)
+
+The FastAPI app is the **third thin adapter** over the domain code, alongside the
+CLI and Streamlit — all three call the same `services/` use-case layer
+(`discovery`, `tailoring`, `cover_letters`, `rendering`, `board`). No business
+logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
+`api/app.py` is the factory (lifespan runs `init_db`, stores the engine on
+`app.state`).
+
+- **Pydantic schemas are the contract source of truth.** `CamelModel`
+  (`api/schemas/base.py`) sets `alias_generator=to_camel` + `from_attributes`, so
+  the wire format is **camelCase** while Python stays snake_case, and DTO→schema is
+  a `model_validate(row)` projection (the schema whitelists fields off the richer
+  query DTO). FastAPI emits OpenAPI → `scripts/export_openapi.py` writes
+  `contracts/openapi.json` → `openapi-typescript` writes `contracts/ts/api.ts`.
+  Regenerate with `bash scripts/gen_ts_client.sh`; `tests/api/test_openapi_contract.py`
+  is a drift gate.
+- **Long ops = a Run + SSE.** `pull`/`discover`/`tailor`/`cover-letters`/add-from-URL
+  return `202` with a run record; work runs in a threadpool via `RunManager`
+  (`api/runs/manager.py`), keyed by `run_id`, reusing `ProgressReporter` under
+  `data/runs/`. **Each worker opens its OWN DB session** bound to the app engine —
+  never the request session (not thread-safe). Clients watch `GET /api/runs/{id}/events`
+  (sse-starlette) or poll `GET /api/runs/{id}`.
+- **Errors** use one envelope `{ "error": { code, message, details? } }` via
+  `ApiException` + handlers in `api/errors.py`.
+- **Auth/CORS:** optional static bearer via `Settings.api_token` (guards every
+  route except `/api/health`; off when unset); `Settings.cors_origins` allowlist.
+- **In-memory sqlite tests** need a shared connection: `make_engine` gives
+  `sqlite://` a `StaticPool` + `check_same_thread=False` so the request threadpool
+  sees the schema the lifespan thread created.
+- **Deferred (not exposed over HTTP):** Gmail sync, analytics, match-gap, profile
+  build, LinkedIn scrape.
+
+---
+
 ## LLM providers (`llm_runner.py`)
 
 Every LLM agent is built through one seam — `build_model(model_id)` in
