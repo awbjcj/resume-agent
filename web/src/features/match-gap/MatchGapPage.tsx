@@ -1,3 +1,5 @@
+import { MatchGapContainer } from "./MatchGapContainer";
+
 export function MatchGapPage() {
-  return <div>Match-gap</div>;
+  return <MatchGapContainer />;
 }
