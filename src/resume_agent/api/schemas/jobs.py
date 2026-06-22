@@ -32,6 +32,12 @@ class ShortlistItem(CamelModel):
     company_size: str | None
     posted_at: datetime | None
     skills: list[SkillTagOut]
+    sic_major: str | None = None
+    sic_label: str | None = None
+    sic_division: str | None = None
+    location_country: str | None = None
+    location_region: str | None = None
+    location_city: str | None = None
 
 
 class PipelineItem(CamelModel):

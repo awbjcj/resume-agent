@@ -52,3 +52,27 @@ def test_bearer_enforced_on_guarded_route():
         assert client.get("/api/pipeline").status_code == 401
         ok = client.get("/api/pipeline", headers={"Authorization": "Bearer secret"})
         assert ok.status_code == 200
+
+
+def test_shortlist_item_exposes_facet_fields():
+    client = _client()
+    with client:
+        _seed(
+            client.app,
+            status=JobStatus.shortlisted.value,
+            fit_score=70,
+            company="Acme",
+            location="New York, NY, US",
+        )
+        body = client.get("/api/shortlist").json()
+    assert body["data"], "expected one shortlisted row"
+    item = body["data"][0]
+    for key in (
+        "locationCountry",
+        "locationRegion",
+        "locationCity",
+        "sicMajor",
+        "sicDivision",
+        "sicLabel",
+    ):
+        assert key in item
