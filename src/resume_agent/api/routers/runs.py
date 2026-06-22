@@ -12,8 +12,10 @@ from fastapi import APIRouter, Depends, Request
 
 from resume_agent.api.deps import get_run_manager
 from resume_agent.api.errors import ApiException
+from sse_starlette.sse import EventSourceResponse
+
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
+from resume_agent.api.runs.sse import record_to_run, run_events
 from resume_agent.api.schemas.runs import (
     AddJobUrlParams,
     CoverLetterParams,
@@ -139,3 +141,10 @@ def get_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
     if record is None:
         raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
     return record_to_run(run_id, record)
+
+
+@router.get("/runs/{run_id}/events")
+async def stream_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
+    if mgr.get(run_id) is None:
+        raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
+    return EventSourceResponse(run_events(mgr, run_id))
