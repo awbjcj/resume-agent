@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Analytics */
+        get: operations["get_analytics_api_analytics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cover-letters": {
         parameters: {
             query?: never;
@@ -118,6 +135,23 @@ export interface paths {
         get?: never;
         /** Upsert Application */
         put: operations["upsert_application_api_jobs__job_id__application_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/match-gap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Match Gap */
+        get: operations["get_match_gap_api_match_gap_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -328,6 +362,13 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** AnalyticsOut */
+        AnalyticsOut: {
+            /** Byband */
+            byBand: components["schemas"]["CohortOut"][];
+            /** Bysource */
+            bySource: components["schemas"]["CohortOut"][];
+        };
         /** ApplicationOut */
         ApplicationOut: {
             /** Id */
@@ -353,6 +394,25 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** CohortOut */
+        CohortOut: {
+            /** Applications */
+            applications: number;
+            /** Interviewrate */
+            interviewRate: number;
+            /** Interviews */
+            interviews: number;
+            /** Label */
+            label: string;
+            /** Offerrate */
+            offerRate: number;
+            /** Offers */
+            offers: number;
+            /** Responserate */
+            responseRate: number;
+            /** Responses */
+            responses: number;
+        };
         /** CoverLetterParams */
         CoverLetterParams: {
             /**
@@ -362,6 +422,17 @@ export interface components {
             approved: boolean;
             /** Jobids */
             jobIds?: number[] | null;
+        };
+        /** GapOut */
+        GapOut: {
+            /** Demandcount */
+            demandCount: number;
+            /** Demandshare */
+            demandShare: number;
+            /** Skill */
+            skill: string;
+            /** Targettotal */
+            targetTotal: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -415,6 +486,13 @@ export interface components {
             archived?: boolean | null;
             /** Status */
             status?: string | null;
+        };
+        /** MatchGapOut */
+        MatchGapOut: {
+            /** Gaps */
+            gaps: components["schemas"]["GapOut"][];
+            /** Targettotal */
+            targetTotal: number;
         };
         /** Page[PipelineItem] */
         Page_PipelineItem_: {
@@ -577,6 +655,12 @@ export interface components {
             jobId: number;
             /** Location */
             location: string | null;
+            /** Locationcity */
+            locationCity?: string | null;
+            /** Locationcountry */
+            locationCountry?: string | null;
+            /** Locationregion */
+            locationRegion?: string | null;
             /** Postedat */
             postedAt: string | null;
             /** Remotepolicy */
@@ -589,6 +673,12 @@ export interface components {
             salaryMin: number | null;
             /** Seniority */
             seniority: string | null;
+            /** Sicdivision */
+            sicDivision?: string | null;
+            /** Siclabel */
+            sicLabel?: string | null;
+            /** Sicmajor */
+            sicMajor?: string | null;
             /** Skills */
             skills: components["schemas"]["SkillTagOut"][];
             /** Sponsorshipsignal */
@@ -660,6 +750,37 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_analytics_api_analytics_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     launch_cover_letters_api_cover_letters_post: {
         parameters: {
             query?: never;
@@ -943,6 +1064,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_match_gap_api_match_gap_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchGapOut"];
                 };
             };
             /** @description Validation Error */

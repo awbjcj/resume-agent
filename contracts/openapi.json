@@ -109,6 +109,30 @@
         "title": "AddJobUrlParams",
         "type": "object"
       },
+      "AnalyticsOut": {
+        "properties": {
+          "byBand": {
+            "items": {
+              "$ref": "#/components/schemas/CohortOut"
+            },
+            "title": "Byband",
+            "type": "array"
+          },
+          "bySource": {
+            "items": {
+              "$ref": "#/components/schemas/CohortOut"
+            },
+            "title": "Bysource",
+            "type": "array"
+          }
+        },
+        "required": [
+          "bySource",
+          "byBand"
+        ],
+        "title": "AnalyticsOut",
+        "type": "object"
+      },
       "ApplicationOut": {
         "properties": {
           "id": {
@@ -187,6 +211,54 @@
         "title": "ApplicationUpsert",
         "type": "object"
       },
+      "CohortOut": {
+        "properties": {
+          "applications": {
+            "title": "Applications",
+            "type": "integer"
+          },
+          "interviewRate": {
+            "title": "Interviewrate",
+            "type": "integer"
+          },
+          "interviews": {
+            "title": "Interviews",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "offerRate": {
+            "title": "Offerrate",
+            "type": "integer"
+          },
+          "offers": {
+            "title": "Offers",
+            "type": "integer"
+          },
+          "responseRate": {
+            "title": "Responserate",
+            "type": "integer"
+          },
+          "responses": {
+            "title": "Responses",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "applications",
+          "responses",
+          "interviews",
+          "offers",
+          "responseRate",
+          "interviewRate",
+          "offerRate"
+        ],
+        "title": "CohortOut",
+        "type": "object"
+      },
       "CoverLetterParams": {
         "properties": {
           "approved": {
@@ -210,6 +282,34 @@
           }
         },
         "title": "CoverLetterParams",
+        "type": "object"
+      },
+      "GapOut": {
+        "properties": {
+          "demandCount": {
+            "title": "Demandcount",
+            "type": "integer"
+          },
+          "demandShare": {
+            "title": "Demandshare",
+            "type": "integer"
+          },
+          "skill": {
+            "title": "Skill",
+            "type": "string"
+          },
+          "targetTotal": {
+            "title": "Targettotal",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "skill",
+          "demandCount",
+          "targetTotal",
+          "demandShare"
+        ],
+        "title": "GapOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -420,6 +520,27 @@
           }
         },
         "title": "JobPatch",
+        "type": "object"
+      },
+      "MatchGapOut": {
+        "properties": {
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/GapOut"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "targetTotal": {
+            "title": "Targettotal",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "targetTotal",
+          "gaps"
+        ],
+        "title": "MatchGapOut",
         "type": "object"
       },
       "Page_PipelineItem_": {
@@ -992,6 +1113,39 @@
             ],
             "title": "Location"
           },
+          "locationCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationcity"
+          },
+          "locationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationcountry"
+          },
+          "locationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationregion"
+          },
           "postedAt": {
             "anyOf": [
               {
@@ -1058,6 +1212,39 @@
               }
             ],
             "title": "Seniority"
+          },
+          "sicDivision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sicdivision"
+          },
+          "sicLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siclabel"
+          },
+          "sicMajor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sicmajor"
           },
           "skills": {
             "items": {
@@ -1309,6 +1496,52 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/analytics": {
+      "get": {
+        "operationId": "get_analytics_api_analytics_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Analytics"
+      }
+    },
     "/api/cover-letters": {
       "post": {
         "operationId": "launch_cover_letters_api_cover_letters_post",
@@ -1772,6 +2005,52 @@
           }
         },
         "summary": "Upsert Application"
+      }
+    },
+    "/api/match-gap": {
+      "get": {
+        "operationId": "get_match_gap_api_match_gap_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchGapOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Match Gap"
       }
     },
     "/api/pipeline": {
