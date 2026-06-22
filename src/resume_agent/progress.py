@@ -20,6 +20,9 @@ from pathlib import Path
 
 PROGRESS_ROOT = Path("data/progress")
 
+#: Where the API persists one JSON record per background run (run_id-keyed).
+RUNS_ROOT = Path("data/runs")
+
 #: The processes that emit progress. The dashboard polls these in order.
 PROCESSES = ("pull", "discover", "tailor")
 
