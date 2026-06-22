@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from resume_agent.api.deps import get_settings_dep, require_token
 from resume_agent.api.errors import install_error_handlers
-from resume_agent.api.routers import health
+from resume_agent.api.routers import boards, health
 from resume_agent.config import get_settings
 from resume_agent.db import init_db, make_engine
 
@@ -51,8 +51,8 @@ def create_app(
     install_error_handlers(app)
 
     # Guard everything except /api/health behind the optional bearer token.
-    guarded = [Depends(require_token)]  # noqa: F841  (used by routers added in later tasks)
+    guarded = [Depends(require_token)]
     app.include_router(health.router, prefix="/api")
-    # (subsequent routers are included with dependencies=guarded in later tasks)
+    app.include_router(boards.router, prefix="/api", dependencies=guarded)
 
     return app

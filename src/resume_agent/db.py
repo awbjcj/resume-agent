@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.config import get_settings
@@ -23,9 +24,25 @@ def _ensure_sqlite_dir(url: str) -> None:
             Path(db_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
 
 
+def _is_memory_sqlite(url: str) -> bool:
+    """True for an in-memory sqlite URL (`sqlite://` or `sqlite:///:memory:`)."""
+    return url in ("sqlite://", "sqlite://:memory:", "sqlite:///:memory:")
+
+
 def make_engine(url: str | None = None) -> Engine:
     resolved = url or get_settings().db_url
     _ensure_sqlite_dir(resolved)
+    if _is_memory_sqlite(resolved):
+        # A single shared connection so every thread (e.g. FastAPI's request
+        # threadpool vs. the lifespan that ran init_db) sees the same in-memory
+        # database. The default SingletonThreadPool would give each thread its
+        # own empty DB. Only in-memory URLs hit this; file/prod is unaffected.
+        return create_engine(
+            resolved,
+            echo=False,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
     return create_engine(resolved, echo=False)
 
 
