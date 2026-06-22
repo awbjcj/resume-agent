@@ -134,3 +134,10 @@
     @apply font-sans;
     }
 }
+
+/* NavLink active state inside the sidebar (NavLink sets aria-current="page"). */
+[data-sidebar="menu-button"][aria-current="page"] {
+  background: var(--sidebar-accent);
+  font-weight: 600;
+}
+
