@@ -1,3 +1,5 @@
+import { AnalyticsContainer } from "./AnalyticsContainer";
+
 export function AnalyticsPage() {
-  return <div>Analytics</div>;
+  return <AnalyticsContainer />;
 }
