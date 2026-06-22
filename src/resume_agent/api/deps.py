@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from collections.abc import Iterator
 
 from fastapi import Depends, Header, Request
@@ -30,7 +31,7 @@ def require_token(
     if not settings.api_token:
         return
     expected = f"Bearer {settings.api_token}"
-    if authorization != expected:
+    if not hmac.compare_digest(authorization or "", expected):
         raise ApiException(401, "UNAUTHORIZED", "Missing or invalid bearer token")
 
 

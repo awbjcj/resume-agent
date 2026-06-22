@@ -40,6 +40,7 @@ def create_app(
         engine = make_engine(resolved_db)
         init_db(engine)
         app.state.engine = engine
+        app.state.run_manager.sweep()  # drop stale run records (unbounded otherwise)
         yield
         app.state.run_manager.shutdown()
 
@@ -54,8 +55,11 @@ def create_app(
     app.dependency_overrides[get_settings_dep] = lambda: resolved_settings
 
     origins = [o.strip() for o in resolved_settings.cors_origins.split(",") if o.strip()]
+    # Auth is a static bearer token in the Authorization header (not cookies), so
+    # allow_credentials stays False — that keeps a wildcard/`*` origin valid instead
+    # of silently breaking credentialed requests (the classic CORS footgun).
     app.add_middleware(
-        CORSMiddleware, allow_origins=origins, allow_credentials=True,
+        CORSMiddleware, allow_origins=origins, allow_credentials=False,
         allow_methods=["*"], allow_headers=["*"],
     )
 

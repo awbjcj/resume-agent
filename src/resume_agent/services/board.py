@@ -60,6 +60,8 @@ def list_pipeline(
     session: Session, *, status: str | None = None, min_fit: int | None = None,
     q: str | None = None, sort: str = "stage", page: int = 1, page_size: int = 50,
 ) -> Page[PipelineRow]:
+    # sort defaults to "stage" = the native pipeline_rows order (status, company,
+    # title); only "fit"/"company" re-sort. An unknown sort falls through to native.
     rows = pipeline_rows(session)
     if status is not None:
         rows = [r for r in rows if r.status == status]

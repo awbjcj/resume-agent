@@ -48,3 +48,42 @@ def test_submit_records_error(tmp_path):
     rec = mgr.get(run_id)
     assert rec["state"] == "error"
     assert "nope" in rec["error"]
+
+
+def test_submit_stamps_terminal_on_base_exception(tmp_path):
+    import pytest
+
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+
+    def interrupt(reporter):
+        raise KeyboardInterrupt("stop")
+
+    # BaseException propagates (re-raised) but a terminal record is still written.
+    with pytest.raises(KeyboardInterrupt):
+        mgr.submit("pull", interrupt)
+    files = list(tmp_path.glob("*.json"))
+    assert len(files) == 1
+    import json
+    rec = json.loads(files[0].read_text(encoding="utf-8"))
+    assert rec["state"] == "error"
+    assert "KeyboardInterrupt" in rec["error"]
+
+
+def test_sweep_removes_stale_run_files(tmp_path):
+    import os
+    import time
+
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.create("discover")
+    path = tmp_path / f"{run_id}.json"
+    old = time.time() - 100_000  # older than the 1-day default
+    os.utime(path, (old, old))
+    assert mgr.sweep() == 1
+    assert not path.exists()
+
+
+def test_sweep_keeps_fresh_run_files(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.create("discover")
+    assert mgr.sweep() == 0
+    assert (tmp_path / f"{run_id}.json").exists()
