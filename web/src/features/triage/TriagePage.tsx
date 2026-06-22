@@ -1,3 +1,5 @@
+import { TriageContainer } from "./TriageContainer";
+
 export function TriagePage() {
-  return <div>Triage</div>;
+  return <TriageContainer />;
 }
