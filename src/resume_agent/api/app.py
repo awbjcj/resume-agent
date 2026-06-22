@@ -8,6 +8,8 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from resume_agent.api.deps import get_settings_dep, require_token
 from resume_agent.api.errors import install_error_handlers
@@ -21,6 +23,14 @@ from resume_agent.api.routers import runs as runs_router
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.config import get_settings
 from resume_agent.db import init_db, make_engine
+
+
+def spa_dist_dir() -> Path:
+    """Location of the built React SPA (repo_root/web/dist).
+
+    app.py lives at src/resume_agent/api/app.py, so the repo root is parents[3].
+    """
+    return Path(__file__).resolve().parents[3] / "web" / "dist"
 
 
 def create_app(
@@ -77,5 +87,21 @@ def create_app(
     app.include_router(runs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(analytics_router.router, prefix="/api", dependencies=guarded)
     app.include_router(match_gap_router.router, prefix="/api", dependencies=guarded)
+
+    # Serve the built SPA when present. Registered AFTER the API + docs routes so
+    # they take precedence; the catch-all is excluded from the OpenAPI schema so
+    # it never appears in the generated contract.
+    dist = spa_dist_dir()
+    if dist.is_dir():
+        assets = dist / "assets"
+        if assets.is_dir():
+            app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(full_path: str):
+            candidate = dist / full_path
+            if full_path and candidate.is_file():
+                return FileResponse(candidate)
+            return FileResponse(dist / "index.html")
 
     return app
