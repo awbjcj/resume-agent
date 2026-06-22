@@ -30,6 +30,9 @@ describe("a11y", () => {
     );
     const { container, findByText } = wrap(<ShortlistContainer />);
     await findByText(/nothing shortlisted yet/i);
-    expect(await axe(container)).toHaveNoViolations();
+    // Assert on results directly (vitest-axe's toHaveNoViolations matcher type
+    // augmentation targets the old Vi namespace, incompatible with vitest 4).
+    const results = await axe(container);
+    expect(results.violations).toEqual([]);
   });
 });
