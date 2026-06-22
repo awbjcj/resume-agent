@@ -13,6 +13,7 @@ from resume_agent.api.deps import get_settings_dep, require_token
 from resume_agent.api.errors import install_error_handlers
 from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import jobs as jobs_router
+from resume_agent.api.routers import prune as prune_router
 from resume_agent.api.routers import resumes
 from resume_agent.config import get_settings
 from resume_agent.db import init_db, make_engine
@@ -58,5 +59,6 @@ def create_app(
     app.include_router(boards.router, prefix="/api", dependencies=guarded)
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(resumes.router, prefix="/api", dependencies=guarded)
+    app.include_router(prune_router.router, prefix="/api", dependencies=guarded)
 
     return app
