@@ -1,3 +1,5 @@
+import { PipelineContainer } from "./PipelineContainer";
+
 export function PipelinePage() {
-  return <div>Pipeline</div>;
+  return <PipelineContainer />;
 }
