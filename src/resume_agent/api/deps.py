@@ -32,3 +32,7 @@ def require_token(
     expected = f"Bearer {settings.api_token}"
     if authorization != expected:
         raise ApiException(401, "UNAUTHORIZED", "Missing or invalid bearer token")
+
+
+def get_run_manager(request: Request):
+    return request.app.state.run_manager

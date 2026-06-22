@@ -15,6 +15,8 @@ from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import prune as prune_router
 from resume_agent.api.routers import resumes
+from resume_agent.api.routers import runs as runs_router
+from resume_agent.api.runs.manager import RunManager
 from resume_agent.config import get_settings
 from resume_agent.db import init_db, make_engine
 
@@ -39,10 +41,16 @@ def create_app(
         init_db(engine)
         app.state.engine = engine
         yield
+        app.state.run_manager.shutdown()
 
     app = FastAPI(title="Resume Agent API", version="0.1.0", lifespan=lifespan)
     app.state.settings = resolved_settings
     app.state.db_url = resolved_db
+    app.state.run_manager = (
+        RunManager(root=runs_root, executor=run_executor)
+        if runs_root is not None
+        else RunManager(executor=run_executor)
+    )
     app.dependency_overrides[get_settings_dep] = lambda: resolved_settings
 
     origins = [o.strip() for o in resolved_settings.cors_origins.split(",") if o.strip()]
@@ -60,5 +68,6 @@ def create_app(
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(resumes.router, prefix="/api", dependencies=guarded)
     app.include_router(prune_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(runs_router.router, prefix="/api", dependencies=guarded)
 
     return app
