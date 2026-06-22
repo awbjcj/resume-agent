@@ -42,7 +42,7 @@
 - `src/resume_agent/api/schemas/runs.py` — `RunOut`, `PullParams`, `TailorParams`, `CoverLetterParams`, `AddJobUrlParams`, `AddJobTextRequest`.
 - `src/resume_agent/api/mappers.py` — DTO/table → schema converters (mostly `Schema.model_validate(dto)`).
 - `src/resume_agent/api/runs/__init__.py`
-- `src/resume_agent/api/runs/manager.py` — `RunManager` (create/get/list runs; submit work to an executor; `run_id`-keyed `ProgressReporter`).
+- `src/resume_agent/api/runs/manager.py` — `RunManager` (create/get runs; submit work to an executor; `run_id`-keyed `ProgressReporter`).
 - `src/resume_agent/api/runs/sse.py` — SSE event generator tailing a run record.
 - `src/resume_agent/api/routers/health.py`
 - `src/resume_agent/api/routers/boards.py` — `GET /api/shortlist`, `/api/pipeline`, `/api/triage`.
@@ -68,7 +68,7 @@
 
 # Phase 0 — Extract the application-service layer
 
-> The CLI's existing tests (`tests/test_cli_*.py`) are the regression net for this phase. After each task, the relevant `test_cli_*` must still pass unchanged.
+> The CLI's existing tests (`tests/test_cli_*.py`) are the regression net for this phase. After each task, the relevant `test_cli_*` behavior assertions must still pass; Task 5 may retarget monkeypatches from `cli.py` to the new service modules when implementation details move.
 
 ## Task 1: Centralize agent-bundle builders
 
@@ -89,10 +89,12 @@ def test_discovery_bundle_has_three_agents(monkeypatch):
     monkeypatch.setattr(agents, "build_extract_agent", lambda: "extract")
     monkeypatch.setattr(agents, "build_fit_agent", lambda: "fit")
     monkeypatch.setattr(agents, "build_relevance_agent", lambda: "relevance")
+    monkeypatch.setattr(agents, "build_skill_canonicalizer", lambda: "canonicalizer")
     bundle = agents.build_discovery_bundle()
     assert bundle.extract == "extract"
     assert bundle.fit == "fit"
     assert bundle.relevance == "relevance"
+    assert bundle.canonicalizer == "canonicalizer"
 
 
 def test_tailor_bundle_builds_one_reviewer_per_spec(monkeypatch):
@@ -502,10 +504,23 @@ DEFAULT_REVIEW = "config/review.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
 
 
+class TargetNotFound(RuntimeError):
+    """Raised when a requested job id does not exist."""
+
+    def __init__(self, job_id: int) -> None:
+        self.job_id = job_id
+        super().__init__(f"Job #{job_id} not found")
+
+
 def resolve_targets(session: Session, *, job_ids: list[int] | None, approved: bool) -> list[Job]:
     if job_ids:
-        found = [get_job(session, jid) for jid in job_ids]
-        return [j for j in found if j is not None]
+        targets: list[Job] = []
+        for jid in job_ids:
+            job = get_job(session, jid)
+            if job is None:
+                raise TargetNotFound(jid)
+            targets.append(job)
+        return targets
     if approved:
         return jobs_by_status(session, JobStatus.approved.value)
     return []
@@ -578,6 +593,8 @@ def write_cover_letters(
     if reporter:
         reporter.begin(len(targets), "Starting")
     for index, job in enumerate(targets, 1):
+        if job.id is None:
+            raise ValueError("Cannot write a cover letter for a job that has not been persisted")
         if reporter:
             reporter.step(index - 1, label=f"Cover letter for job #{job.id}")
         cover = generate_cover_letter(session, job, facts, bundle.draft, bundle.reviser)
@@ -787,7 +804,11 @@ DEFAULT_FACTS = "data/profile/facts.json"
 
 
 def _by_fit_desc(rows):
-    return sorted(rows, key=lambda r: (r.fit_score is not None, r.fit_score or -1), reverse=True)
+    return sorted(
+        rows,
+        key=lambda r: (r.fit_score is not None, r.fit_score if r.fit_score is not None else -1),
+        reverse=True,
+    )
 
 
 def list_shortlist(
@@ -887,12 +908,14 @@ git commit -m "feat(services): board read-models + mutations"
 
 **Files:**
 - Modify: `src/resume_agent/cli.py` (commands: `addjob`, `discover_cmd`, `pull_cmd`, `tailor_cmd`, `cover_letter_cmd`, `render_cmd`; remove the inline `build_reviewer_agents` helper)
-- Test: existing `tests/test_cli_*.py` (no change — they are the regression net)
+- Test: existing `tests/test_cli_*.py` remain the regression net. Some current tests monkeypatch `cli.py` implementation details that move into `services/*`; update those monkeypatch targets to the service module or service entrypoint while keeping the command invocations and behavioral assertions unchanged.
 
 - [ ] **Step 1: Run the CLI tests to capture the green baseline**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_discovery.py tests/test_cli_tailor.py tests/test_cli_cover_letter.py tests/test_cli_render.py tests/test_cli_pull.py tests/test_cli_addjob_url.py -v`
 Expected: PASS (baseline before refactor).
+
+Before editing code, note the tests that patch moved symbols (`load_search_config`, `build_*_agent`, `tailor_jobs`, `job_from_url`, `generate_cover_letter`, etc.). After the refactor, retarget those patches to `resume_agent.services.discovery`, `resume_agent.services.tailoring`, `resume_agent.services.cover_letters`, or `resume_agent.services.rendering` as appropriate; do not weaken the output/status assertions.
 
 - [ ] **Step 2: Rewrite `discover_cmd`'s funnel branch to call the service**
 
@@ -943,14 +966,19 @@ In `tailor_cmd`, replace the target-resolution + config-loading + agent-building
 
 ```python
     from resume_agent.services.tailoring import tailor as tailor_service
+    from resume_agent.services.tailoring import TargetNotFound
 
     engine = _engine(db_url)
     with get_session(engine) as session:
-        results = tailor_service(
-            session, job_ids=[job_id] if job_id is not None else None,
-            approved=approved, review_path=review, facts_path=facts,
-            reporter=ProgressReporter("tailor"),
-        )
+        try:
+            results = tailor_service(
+                session, job_ids=[job_id] if job_id is not None else None,
+                approved=approved, review_path=review, facts_path=facts,
+                reporter=ProgressReporter("tailor"),
+            )
+        except TargetNotFound as exc:
+            typer.echo(str(exc))
+            raise typer.Exit(code=1) from exc
         if not results:
             typer.echo("Specify --job-id <id> or --approved (and ensure the job exists).")
             raise typer.Exit(code=1)
@@ -961,14 +989,14 @@ In `tailor_cmd`, replace the target-resolution + config-loading + agent-building
             )
 ```
 
-In `cover_letter_cmd`, replace its body with a call to `services.cover_letters.write_cover_letters(...)` and echo each `CoverLetterResult`. In `render_cmd`, replace the `render_version` call with `services.rendering.render_resume_version(session, version_id, render_path=config)`. In `addjob`, route the manual/stdin path through `services.discovery.add_job_from_text(...)` and the URL path through `services.discovery.add_job_from_url(...)` (catching `UrlFetchError` → `typer.Exit(1)`).
+In `cover_letter_cmd`, replace its body with a call to `services.cover_letters.write_cover_letters(...)` and echo each `CoverLetterResult`; catch `TargetNotFound` the same way as `tailor_cmd`. In `render_cmd`, replace the `render_version` call with `services.rendering.render_resume_version(session, version_id, render_path=config)`. In `addjob`, route the manual/stdin path through `services.discovery.add_job_from_text(...)` and the URL path through `services.discovery.add_job_from_url(...)` (catching `UrlFetchError` → `typer.Exit(1)`). Preserve the existing URL-path CLI output by echoing `Extracted: {job.title or '?'} @ {job.company or '?'} ({job.location or '?'})` when a URL job is inserted or upgraded.
 
 Delete the now-unused module-level `build_reviewer_agents` helper (`cli.py:331-338`) and prune imports that moved into the services (`build_*_agent`, `load_review_config`, `load_style_guide`, `load_search_config` where no longer referenced, `tailor_jobs`, `discover`, `run_pull`, `generate_cover_letter`, `render_version`, etc.). Keep imports still used by out-of-scope commands.
 
 - [ ] **Step 5: Run the CLI tests + lint to verify behavior is preserved**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_discovery.py tests/test_cli_tailor.py tests/test_cli_cover_letter.py tests/test_cli_render.py tests/test_cli_pull.py tests/test_cli_addjob_url.py -v && .venv/Scripts/python.exe -m ruff check`
-Expected: PASS, ruff clean. If a CLI test fails, the refactor changed behavior — reconcile the service to match the prior output exactly (do not edit the test).
+Expected: PASS, ruff clean. If a CLI test fails on command output/status/data, the refactor changed behavior — reconcile the service to match the prior output exactly. If it fails only because a monkeypatch target moved, update the monkeypatch target without changing the behavioral assertion.
 
 - [ ] **Step 6: Commit**
 
@@ -1299,11 +1327,12 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from concurrent.futures import Executor
+from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from resume_agent.api.deps import require_token
+from resume_agent.api.deps import get_settings_dep, require_token
 from resume_agent.api.errors import install_error_handlers
 from resume_agent.api.routers import health
 from resume_agent.config import get_settings
@@ -1315,10 +1344,14 @@ def create_app(
     db_url: str | None = None,
     api_token: str | None = None,
     run_executor: Executor | None = None,
+    runs_root: Path | str | None = None,
 ) -> FastAPI:
     settings = get_settings()
     resolved_db = db_url or settings.db_url
     resolved_token = settings.api_token if api_token is None else api_token
+    resolved_settings = settings.model_copy(
+        update={"db_url": resolved_db, "api_token": resolved_token}
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -1328,9 +1361,11 @@ def create_app(
         yield
 
     app = FastAPI(title="Resume Agent API", version="0.1.0", lifespan=lifespan)
-    app.state.api_token = resolved_token
+    app.state.settings = resolved_settings
+    app.state.db_url = resolved_db
+    app.dependency_overrides[get_settings_dep] = lambda: resolved_settings
 
-    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    origins = [o.strip() for o in resolved_settings.cors_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware, allow_origins=origins, allow_credentials=True,
         allow_methods=["*"], allow_headers=["*"],
@@ -1346,7 +1381,7 @@ def create_app(
     return app
 ```
 
-Note: `TestClient` with `lifespan` requires entering the context manager — `TestClient(app)` does this automatically on `with`/first request. The override for `api_token` in tests is handled by `create_app(api_token=...)`; `require_token` reads `get_settings().api_token`, so for the bearer test we pass settings directly (as the test does) rather than through the app — full route-level enforcement is covered in Task 8.
+Note: routes that depend on lifespan-initialized state (`app.state.engine`) should use `with TestClient(...)` in tests; the health route does not need that state. The `api_token` and `db_url` overrides are copied into a per-app `Settings` object and installed via FastAPI's dependency override mechanism, so guarded routes see the app-specific token instead of the cached process-global settings.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1600,7 +1635,7 @@ def to_page(service_page: ServicePage, item_model) -> Page:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
 from resume_agent.api.deps import get_session
@@ -1614,8 +1649,11 @@ router = APIRouter()
 
 @router.get("/shortlist", response_model=Page[ShortlistItem])
 def get_shortlist(
-    min_fit: int | None = None, sort: str = "fit",
-    page: int = 1, page_size: int = 50, session: Session = Depends(get_session),
+    min_fit: int | None = Query(None, alias="minFit"),
+    sort: str = Query("fit", alias="sortBy"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, alias="pageSize", ge=1, le=200),
+    session: Session = Depends(get_session),
 ):
     result = board.list_shortlist(session, min_fit=min_fit, sort=sort, page=page, page_size=page_size)
     return to_page(result, ShortlistItem)
@@ -1623,8 +1661,12 @@ def get_shortlist(
 
 @router.get("/pipeline", response_model=Page[PipelineItem])
 def get_pipeline(
-    status: str | None = None, min_fit: int | None = None, q: str | None = None,
-    sort: str = "stage", page: int = 1, page_size: int = 50,
+    status: str | None = None,
+    min_fit: int | None = Query(None, alias="minFit"),
+    q: str | None = None,
+    sort: str = Query("stage", alias="sortBy"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, alias="pageSize", ge=1, le=200),
     session: Session = Depends(get_session),
 ):
     result = board.list_pipeline(
@@ -1635,8 +1677,12 @@ def get_pipeline(
 
 @router.get("/triage", response_model=Page[TriageItem])
 def get_triage(
-    archived: bool = False, status: str | None = None, min_fit: int | None = None,
-    sort: str = "fit", page: int = 1, page_size: int = 50,
+    archived: bool = False,
+    status: str | None = None,
+    min_fit: int | None = Query(None, alias="minFit"),
+    sort: str = Query("fit", alias="sortBy"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, alias="pageSize", ge=1, le=200),
     session: Session = Depends(get_session),
 ):
     result = board.list_triage(
@@ -1963,7 +2009,7 @@ from resume_agent.api.schemas.jobs import ApplicationUpsert, JobPatch
 from resume_agent.api.schemas.runs import AddJobTextRequest  # defined in Task 12
 from resume_agent.services import board
 from resume_agent.services.discovery import add_job_from_text
-from resume_agent.tracking.tables import JobStatus
+from resume_agent.tracking.tables import ApplicationStatus, JobStatus
 
 
 @router.patch("/jobs/{job_id}", response_model=JobDetail)
@@ -1993,6 +2039,9 @@ def delete_job_endpoint(job_id: int, session: Session = Depends(get_session)) ->
 def upsert_application(job_id: int, body: ApplicationUpsert, session: Session = Depends(get_session)):
     if get_job(session, job_id) is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
+    valid = {s.value for s in ApplicationStatus}
+    if body.status not in valid:
+        raise ApiException(422, "VALIDATION_ERROR", f"Unknown application status '{body.status}'")
     app_row = board.upsert_application(session, job_id, status=body.status, notes=body.notes)
     return ApplicationOut.model_validate(app_row)
 
@@ -2005,6 +2054,7 @@ def create_manual_job(body: AddJobTextRequest, session: Session = Depends(get_se
     )
     if job is None:
         raise ApiException(409, "CONFLICT", "Duplicate job (same URL or JD already present)")
+    assert job.id is not None
     return _job_detail(session, job.id)
 ```
 
@@ -2147,6 +2197,8 @@ def render_endpoint(version_id: int, session: Session = Depends(get_session)):
     if path is None:
         raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
     version = get_resume_version(session, version_id)
+    if version is None:
+        raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
     return ResumeVersionOut.model_validate(version)
 ```
 
@@ -2273,6 +2325,7 @@ so callables here are closures created by the run router with their own engine.
 
 from __future__ import annotations
 
+import json
 import uuid
 from concurrent.futures import Executor, ThreadPoolExecutor
 from pathlib import Path
@@ -2288,25 +2341,54 @@ from resume_agent.progress import (
 RunFn = Callable[[ProgressReporter], object]
 
 
+class RunProgressReporter(ProgressReporter):
+    """ProgressReporter variant that preserves the run kind on every write."""
+
+    def __init__(self, run_id: str, kind: str, root: Path | str) -> None:
+        super().__init__(run_id, root=root)
+        self.kind = kind
+
+    def begin(
+        self,
+        total: int,
+        label: str,
+        *,
+        phase_index: int | None = None,
+        phase_count: int | None = None,
+        **extra: object,
+    ) -> None:
+        super().begin(
+            total,
+            label,
+            phase_index=phase_index,
+            phase_count=phase_count,
+            kind=self.kind,
+            **extra,
+        )
+
+    def done(self, *, error: str | None = None, **extra: object) -> None:
+        super().done(error=error, kind=self.kind, **extra)
+
+
 class RunManager:
     def __init__(self, *, root: Path | str = RUNS_ROOT, executor: Executor | None = None) -> None:
         self.root = Path(root)
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
+        self._owns_executor = executor is None
 
     def create(self, kind: str) -> str:
         run_id = uuid.uuid4().hex
-        reporter = ProgressReporter(run_id, root=self.root)
         # Seed a terminal-less "pending" record so GET works before work begins.
-        reporter._record = {  # noqa: SLF001 — intentional: seed the initial record
+        self._write(run_id, {
             "process": run_id, "kind": kind, "state": "pending",
             "label": "Queued", "current": 0, "total": 0,
             "started_at": _now(), "result": None, "error": None,
-        }
-        reporter._flush(force=True)  # noqa: SLF001
+            "updated_at": _now(),
+        })
         return run_id
 
-    def reporter(self, run_id: str, kind: str) -> ProgressReporter:
-        return ProgressReporter(run_id, root=self.root)
+    def reporter(self, run_id: str, kind: str) -> RunProgressReporter:
+        return RunProgressReporter(run_id, kind, self.root)
 
     def submit(self, kind: str, fn: RunFn) -> str:
         run_id = self.create(kind)
@@ -2315,9 +2397,9 @@ class RunManager:
         def _runner() -> None:
             try:
                 result = fn(reporter)
-                reporter.done(kind=kind, result=result)
+                reporter.done(result=result)
             except Exception as exc:  # noqa: BLE001 — surface any failure as run error
-                reporter.done(kind=kind, error=f"{type(exc).__name__}: {exc}", result=None)
+                reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
 
         self.executor.submit(_runner)
         return run_id
@@ -2328,13 +2410,22 @@ class RunManager:
     def clear(self, run_id: str) -> None:
         clear_progress(run_id, root=self.root)
 
+    def shutdown(self) -> None:
+        if self._owns_executor:
+            self.executor.shutdown(wait=False)
+
+    def _write(self, run_id: str, record: dict) -> None:
+        path = self.root / f"{run_id}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
 
 def _now() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 ```
 
-Note: `reporter.done(result=...)` passes `result`/`kind` through `**extra` (already supported by `ProgressReporter.done`), so the terminal record carries them. The `create()` seeding writes `kind`/`result`/`error` keys so the record shape is stable from the first read.
+Note: `RunProgressReporter` injects `kind` into every `begin()`/`done()` write, so a running record never loses its run type after the worker starts. The `create()` seed writes `kind`/`result`/`error` keys directly so the record shape is stable from the first read without touching `ProgressReporter` private fields.
 
 Add to `src/resume_agent/api/schemas/runs.py` (append to the file started in Task 10):
 
@@ -2422,18 +2513,20 @@ class InlineExecutor(Executor):
         return fut
 
 
-def _client():
-    return TestClient(create_app(db_url="sqlite://", run_executor=InlineExecutor()))
+def _client(tmp_path):
+    return TestClient(
+        create_app(db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path)
+    )
 
 
-def test_discover_launch_returns_run(monkeypatch):
+def test_discover_launch_returns_run(monkeypatch, tmp_path):
     # Fake the service so no LLM/network runs; assert the run wiring works.
     def fake_discover_jobs(session, *, reporter=None, **kw):
         reporter.begin(1, "x"); reporter.step(1)
         return {"shortlisted": 2}
 
     monkeypatch.setattr(runs_router, "discover_jobs", fake_discover_jobs)
-    client = _client()
+    client = _client(tmp_path)
     with client:
         resp = client.post("/api/discover", json={})
         assert resp.status_code == 202
@@ -2441,17 +2534,17 @@ def test_discover_launch_returns_run(monkeypatch):
         got = client.get(f"/api/runs/{run_id}").json()
     assert got["kind"] == "discover"
     assert got["state"] == "done"
-    assert got["result"] == {"shortlisted": 2}
+    assert got["result"] == {"statusCounts": {"shortlisted": 2}}
     assert got["percent"] == 100
 
 
-def test_get_unknown_run_404():
-    client = _client()
+def test_get_unknown_run_404(tmp_path):
+    client = _client(tmp_path)
     with client:
         assert client.get("/api/runs/deadbeef").status_code == 404
 
 
-def test_tailor_launch_passes_params(monkeypatch):
+def test_tailor_launch_passes_params(monkeypatch, tmp_path):
     captured = {}
 
     def fake_tailor(session, *, job_ids=None, approved=False, reporter=None, **kw):
@@ -2460,7 +2553,7 @@ def test_tailor_launch_passes_params(monkeypatch):
         return {}
 
     monkeypatch.setattr(runs_router, "tailor", fake_tailor)
-    client = _client()
+    client = _client(tmp_path)
     with client:
         client.post("/api/tailor", json={"jobIds": [1, 2], "approved": False})
     assert captured["job_ids"] == [1, 2]
@@ -2503,8 +2596,10 @@ def record_to_run(run_id: str, record: dict) -> RunOut:
 # src/resume_agent/api/routers/runs.py
 """Run launch endpoints + GET run. Each launch returns 202 with the run record.
 
-The work callables open their OWN engine/session inside the worker thread — never
-the request session, which is not safe to share across threads.
+The work callables open their OWN session inside the worker thread — never the
+request session, which is not safe to share across threads. The session is bound
+to the app engine so `create_app(db_url=...)` and in-memory test databases are
+honored.
 """
 
 from __future__ import annotations
@@ -2522,8 +2617,7 @@ from resume_agent.api.schemas.runs import (
     RunOut,
     TailorParams,
 )
-from resume_agent.config import get_settings
-from resume_agent.db import get_session, make_engine
+from resume_agent.db import get_session
 from resume_agent.services.cover_letters import write_cover_letters
 from resume_agent.services.discovery import add_job_from_url, discover_jobs, pull_jobs
 from resume_agent.services.tailoring import tailor
@@ -2531,35 +2625,45 @@ from resume_agent.services.tailoring import tailor
 router = APIRouter()
 
 
-def _engine():
-    return make_engine(get_settings().db_url)
+def _engine(request: Request):
+    return request.app.state.engine
 
 
 @router.post("/discover", response_model=RunOut, status_code=202)
 def launch_discover(request: Request, mgr: RunManager = Depends(get_run_manager)):
+    engine = _engine(request)
+
     def work(reporter):
-        with get_session(_engine()) as session:
+        with get_session(engine) as session:
             return {"statusCounts": discover_jobs(session, reporter=reporter)}
 
     run_id = mgr.submit("discover", work)
-    return record_to_run(run_id, mgr.get(run_id))
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
 
 
 @router.post("/pull", response_model=RunOut, status_code=202)
-def launch_pull(params: PullParams, mgr: RunManager = Depends(get_run_manager)):
+def launch_pull(params: PullParams, request: Request, mgr: RunManager = Depends(get_run_manager)):
+    engine = _engine(request)
+
     def work(reporter):
-        with get_session(_engine()) as session:
+        with get_session(engine) as session:
             report = pull_jobs(session, limit=params.limit, reporter=reporter)
             return {"totals": report.totals, "failures": report.failures}
 
     run_id = mgr.submit("pull", work)
-    return record_to_run(run_id, mgr.get(run_id))
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
 
 
 @router.post("/tailor", response_model=RunOut, status_code=202)
-def launch_tailor(params: TailorParams, mgr: RunManager = Depends(get_run_manager)):
+def launch_tailor(params: TailorParams, request: Request, mgr: RunManager = Depends(get_run_manager)):
+    engine = _engine(request)
+
     def work(reporter):
-        with get_session(_engine()) as session:
+        with get_session(engine) as session:
             results = tailor(
                 session, job_ids=params.job_ids, approved=params.approved, reporter=reporter
             )
@@ -2570,13 +2674,21 @@ def launch_tailor(params: TailorParams, mgr: RunManager = Depends(get_run_manage
             ]}
 
     run_id = mgr.submit("tailor", work)
-    return record_to_run(run_id, mgr.get(run_id))
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
 
 
 @router.post("/cover-letters", response_model=RunOut, status_code=202)
-def launch_cover_letters(params: CoverLetterParams, mgr: RunManager = Depends(get_run_manager)):
+def launch_cover_letters(
+    params: CoverLetterParams,
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    engine = _engine(request)
+
     def work(reporter):
-        with get_session(_engine()) as session:
+        with get_session(engine) as session:
             results = write_cover_letters(
                 session, job_ids=params.job_ids, approved=params.approved, reporter=reporter
             )
@@ -2586,23 +2698,35 @@ def launch_cover_letters(params: CoverLetterParams, mgr: RunManager = Depends(ge
             ]}
 
     run_id = mgr.submit("coverLetter", work)
-    return record_to_run(run_id, mgr.get(run_id))
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
 
 
 @router.post("/jobs/from-url", response_model=RunOut, status_code=202)
-def launch_add_from_url(params: AddJobUrlParams, mgr: RunManager = Depends(get_run_manager)):
+def launch_add_from_url(
+    params: AddJobUrlParams,
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    engine = _engine(request)
+
     def work(reporter):
         reporter.begin(1, f"Fetching {params.url}")
-        with get_session(_engine()) as session:
+        with get_session(engine) as session:
             job = add_job_from_url(
                 session, url=params.url, company=params.company, title=params.title,
                 location=params.location, allow_browser=params.allow_browser,
             )
+            job_id = job.id if job else None
+            duplicate = job is None
         reporter.step(1)
-        return {"jobId": job.id if job else None, "duplicate": job is None}
+        return {"jobId": job_id, "duplicate": duplicate}
 
     run_id = mgr.submit("addJobUrl", work)
-    return record_to_run(run_id, mgr.get(run_id))
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)
@@ -2626,12 +2750,28 @@ In `src/resume_agent/api/app.py`: import `RunManager`; in `create_app`, after CO
     from resume_agent.api.runs.manager import RunManager
     from resume_agent.api.routers import runs as runs_router
 
-    app.state.run_manager = RunManager(executor=run_executor)
+    app.state.run_manager = (
+        RunManager(root=runs_root, executor=run_executor)
+        if runs_root is not None
+        else RunManager(executor=run_executor)
+    )
     ...
     app.include_router(runs_router.router, prefix="/api", dependencies=guarded)
 ```
 
-(`create_app` already accepts `run_executor: Executor | None = None` from Task 7's signature.)
+(`create_app` already accepts `run_executor: Executor | None = None` and `runs_root: Path | str | None = None` from Task 7's signature.)
+
+Also update the lifespan cleanup to stop the owned threadpool:
+
+```python
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        engine = make_engine(resolved_db)
+        init_db(engine)
+        app.state.engine = engine
+        yield
+        app.state.run_manager.shutdown()
+```
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -2674,13 +2814,15 @@ class InlineExecutor(Executor):
         return fut
 
 
-def test_sse_stream_emits_terminal_event(monkeypatch):
+def test_sse_stream_emits_terminal_event(monkeypatch, tmp_path):
     def fake_discover_jobs(session, *, reporter=None, **kw):
         reporter.begin(1, "scoring"); reporter.step(1)
         return {"shortlisted": 1}
 
     monkeypatch.setattr(runs_router, "discover_jobs", fake_discover_jobs)
-    client = TestClient(create_app(db_url="sqlite://", run_executor=InlineExecutor()))
+    client = TestClient(
+        create_app(db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path)
+    )
     with client:
         run_id = client.post("/api/discover", json={}).json()["runId"]
         # InlineExecutor means the run is already terminal; the stream should
@@ -2727,7 +2869,7 @@ async def run_events(mgr, run_id: str, *, poll_interval: float = 0.5) -> AsyncIt
             yield {"data": json.dumps({"state": "error", "error": "run not found", "percent": 0})}
             return
         run = record_to_run(run_id, record)
-        payload = run.model_dump(by_alias=True)
+        payload = run.model_dump(mode="json", by_alias=True)
         serialized = json.dumps(payload)
         if serialized != last:
             yield {"data": serialized}
@@ -2867,6 +3009,7 @@ git commit -m "feat(contracts): export + commit OpenAPI schema with drift test"
 # Requires Node (npx). Run after scripts/export_openapi.py.
 set -euo pipefail
 .venv/Scripts/python.exe scripts/export_openapi.py
+mkdir -p contracts/ts
 npx --yes openapi-typescript contracts/openapi.json -o contracts/ts/api.ts
 echo "Wrote contracts/ts/api.ts"
 ```
