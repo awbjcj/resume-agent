@@ -14,6 +14,7 @@ from resume_agent.api.errors import install_error_handlers
 from resume_agent.api.routers import analytics as analytics_router
 from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import jobs as jobs_router
+from resume_agent.api.routers import match_gap as match_gap_router
 from resume_agent.api.routers import prune as prune_router
 from resume_agent.api.routers import resumes
 from resume_agent.api.routers import runs as runs_router
@@ -75,5 +76,6 @@ def create_app(
     app.include_router(prune_router.router, prefix="/api", dependencies=guarded)
     app.include_router(runs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(analytics_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(match_gap_router.router, prefix="/api", dependencies=guarded)
 
     return app
