@@ -14,7 +14,17 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-export const api = createClient<paths>({ baseUrl: "/" });
+// Absolute same-origin base. The schema paths already start with "/api", so we
+// only need the origin. Using window.location.origin (rather than "" or "/")
+// keeps requests same-origin in the browser and yields an absolute URL under
+// jsdom/Node fetch, which rejects relative URLs as "Invalid URL".
+const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+// Defer to globalThis.fetch at call time (not capture-at-construct): lets MSW —
+// which patches the global in test setup after this module loads — intercept.
+export const api = createClient<paths>({
+  baseUrl,
+  fetch: (request: Request) => globalThis.fetch(request),
+});
 
 api.use({
   onRequest({ request }) {
