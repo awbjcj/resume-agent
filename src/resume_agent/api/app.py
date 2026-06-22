@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from resume_agent.api.deps import get_settings_dep, require_token
 from resume_agent.api.errors import install_error_handlers
+from resume_agent.api.routers import analytics as analytics_router
 from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import prune as prune_router
@@ -73,5 +74,6 @@ def create_app(
     app.include_router(resumes.router, prefix="/api", dependencies=guarded)
     app.include_router(prune_router.router, prefix="/api", dependencies=guarded)
     app.include_router(runs_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(analytics_router.router, prefix="/api", dependencies=guarded)
 
     return app
