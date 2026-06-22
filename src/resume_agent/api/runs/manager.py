@@ -24,6 +24,7 @@ from pathlib import Path
 from resume_agent.progress import (
     RUNS_ROOT,
     ProgressReporter,
+    atomic_write_text,
     clear_progress,
     read_progress,
 )
@@ -128,9 +129,7 @@ class RunManager:
             self.executor.shutdown(wait=False)
 
     def _write(self, run_id: str, record: dict) -> None:
-        path = self.root / f"{run_id}.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+        atomic_write_text(self.root / f"{run_id}.json", json.dumps(record, indent=2))
 
 
 def _now() -> str:

@@ -15,7 +15,7 @@ def record_to_run(run_id: str, record: dict) -> RunOut:
     return RunOut(
         run_id=run_id,
         kind=str(record.get("kind") or ""),
-        state=stats.state if record.get("state") != "pending" else "pending",
+        state=stats.state,  # progress_stats passes "pending"/"running"/"done"/"error" through
         label=stats.label,
         percent=stats.pct,
         current=stats.current,

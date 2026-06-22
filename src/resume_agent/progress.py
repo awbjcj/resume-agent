@@ -13,6 +13,8 @@ running command.
 """
 
 import json
+import os
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -36,6 +38,27 @@ TERMINAL_TTL_SECONDS = 60
 
 def _path(process: str, root: Path | str = PROGRESS_ROOT) -> Path:
     return Path(root) / f"{process}.json"
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` so a concurrent reader never sees a torn file.
+
+    ``Path.write_text`` truncates-then-writes, so a reader polling mid-write can
+    observe an empty/partial file — which :func:`read_progress` (and the SSE
+    ``run_events`` consumer) then has to treat as a missing record. Writing to a
+    sibling temp file and :func:`os.replace`-ing it in is atomic on POSIX and
+    Windows, so readers always see either the previous or the next *complete*
+    record.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
 
 
 def _now_iso() -> str:
@@ -144,9 +167,7 @@ class ProgressReporter:
             return
         self._last_write = now
         self._record["updated_at"] = _now_iso()
-        path = _path(self.process, self.root)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self._record, indent=2), encoding="utf-8")
+        atomic_write_text(_path(self.process, self.root), json.dumps(self._record, indent=2))
 
 
 @dataclass
