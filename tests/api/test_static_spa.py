@@ -16,6 +16,10 @@ def test_spa_served_when_dist_exists(tmp_path, monkeypatch):
         deep = client.get("/pipeline")
         assert deep.status_code == 200
         assert "<title>app</title>" in deep.text
+        # Unknown API paths 404 with the JSON envelope, not the SPA shell.
+        unknown = client.get("/api/does-not-exist")
+        assert unknown.status_code == 404
+        assert unknown.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_no_spa_mount_without_dist(tmp_path, monkeypatch):

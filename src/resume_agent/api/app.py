@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from resume_agent.api.deps import get_settings_dep, require_token
-from resume_agent.api.errors import install_error_handlers
+from resume_agent.api.errors import ApiException, install_error_handlers
 from resume_agent.api.routers import analytics as analytics_router
 from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import jobs as jobs_router
@@ -99,6 +99,10 @@ def create_app(
 
         @app.get("/{full_path:path}", include_in_schema=False)
         async def spa_fallback(full_path: str):
+            # Unknown API paths must 404 with the JSON envelope, not the SPA shell,
+            # so API clients don't mis-parse an HTML 200.
+            if full_path == "api" or full_path.startswith("api/"):
+                raise ApiException(404, "NOT_FOUND", f"No route for /{full_path}")
             candidate = dist / full_path
             if full_path and candidate.is_file():
                 return FileResponse(candidate)

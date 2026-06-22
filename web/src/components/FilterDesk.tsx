@@ -177,7 +177,10 @@ export function FilterDesk({
         <MultiSelect
           label="Skills (any match)"
           options={skills.map((t) => t.name)}
-          selected={new Set([...state.skills])}
+          // Operate in display-name space; state.skills holds normalized tokens,
+          // so map back through normalizeSkill for the checked state and forward
+          // on change. (Comparing raw names to tokens left every box unchecked.)
+          selected={new Set(skills.filter((t) => state.skills.has(normalizeSkill(t.name))).map((t) => t.name))}
           onChange={(picked) => set({ skills: new Set([...picked].map(normalizeSkill)) })}
         />
         {state.sort === "composite" && (

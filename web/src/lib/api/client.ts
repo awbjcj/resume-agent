@@ -47,3 +47,25 @@ export async function unwrap<T>(
   }
   return data as T;
 }
+
+interface PageEnvelope<T> {
+  data: T[];
+  pagination: { totalPages: number };
+}
+
+/**
+ * Fetch every page of a paginated board endpoint (the API caps pageSize at 200),
+ * so client-side filtering sees all rows. Page 1 reveals totalPages; only then
+ * are the remaining pages requested, so single-page boards cost one request.
+ */
+export async function fetchAllPages<T>(
+  getPage: (page: number) => Promise<{ data?: unknown; error?: ErrorEnvelope | unknown }>,
+): Promise<T[]> {
+  const first = (await unwrap(getPage(1))) as PageEnvelope<T>;
+  const all = [...first.data];
+  for (let page = 2; page <= first.pagination.totalPages; page++) {
+    const next = (await unwrap(getPage(page))) as PageEnvelope<T>;
+    all.push(...next.data);
+  }
+  return all;
+}

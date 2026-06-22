@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { FilterDesk } from "./FilterDesk";
@@ -34,5 +35,19 @@ describe("FilterDesk", () => {
       />,
     );
     expect(screen.getByText("Preset")).toBeInTheDocument();
+  });
+
+  it("reflects an active normalized skill as checked in the menu", async () => {
+    // state.skills holds the normalized token 'go'; the option label is 'Go'.
+    render(
+      <FilterDesk
+        rows={rows}
+        state={{ ...emptyFilterState(), skills: new Set(["go"]) }}
+        onChange={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /skills/i }));
+    const item = await screen.findByRole("menuitemcheckbox", { name: "Go" });
+    expect(item).toHaveAttribute("aria-checked", "true");
   });
 });
