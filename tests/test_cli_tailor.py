@@ -2,7 +2,6 @@ from typer.testing import CliRunner
 
 from resume_agent import cli
 from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tracking.repository import get_job
 from resume_agent.tracking.tables import Job, JobStatus
 
@@ -40,71 +39,22 @@ def test_approve_sets_status_approved(tmp_path):
 
 
 def test_tailor_processes_a_job(tmp_path, monkeypatch):
+    # The tailor command now delegates to the tailoring service; the CLI keeps
+    # the not-found guard and formats the per-job summary line.
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
     job_id = _seed(db_url, JobStatus.approved.value)
-
-    monkeypatch.setattr(cli, "load_review_config", lambda path: ReviewConfig())
-    monkeypatch.setattr(cli, "load_facts", lambda path: object())
-    monkeypatch.setattr(cli, "load_style_guide", lambda path: None)
-    monkeypatch.setattr(cli, "build_tailor_agent", lambda style_guide=None: object())
-    monkeypatch.setattr(cli, "build_reviser_agent", lambda style_guide=None: object())
-    monkeypatch.setattr(cli, "build_reviewer_agents", lambda config, style_guide=None: {})
 
     class _Version:
         fact_check_passed = True
 
-    monkeypatch.setattr(
-        cli,
-        "tailor_jobs",
-        lambda session, targets, facts, config, tailor_agent, reviewer_agents, reviser_agent, reporter=None: {  # noqa: E501
-            _require_id(job.id): [_Version()] for job in targets
-        },
-    )
+    def fake_tailor(session, *, job_ids=None, approved=False, review_path=None, facts_path=None, reporter=None):
+        return {jid: [_Version()] for jid in (job_ids or [])}
+
+    monkeypatch.setattr(cli, "tailor", fake_tailor)
 
     result = runner.invoke(cli.app, ["tailor", "--job-id", str(job_id), "--db-url", db_url])
     assert result.exit_code == 0, result.output
     assert "1 version" in result.output
-
-
-def test_tailor_threads_style_guide_into_all_loop_agents(tmp_path, monkeypatch):
-    db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
-    job_id = _seed(db_url, JobStatus.approved.value)
-
-    monkeypatch.setattr(cli, "load_review_config", lambda path: ReviewConfig())
-    monkeypatch.setattr(cli, "load_facts", lambda path: object())
-    monkeypatch.setattr(cli, "load_style_guide", lambda path: "HOUSE STYLE TEXT")
-
-    seen: dict[str, object] = {}
-
-    def fake_tailor(style_guide=None):
-        seen["tailor"] = style_guide
-        return object()
-
-    def fake_reviser(style_guide=None):
-        seen["reviser"] = style_guide
-        return object()
-
-    def fake_reviewers(config, style_guide=None):
-        seen["reviewers"] = style_guide
-        return {}
-
-    monkeypatch.setattr(cli, "build_tailor_agent", fake_tailor)
-    monkeypatch.setattr(cli, "build_reviser_agent", fake_reviser)
-    monkeypatch.setattr(cli, "build_reviewer_agents", fake_reviewers)
-
-    class _Version:
-        fact_check_passed = True
-
-    monkeypatch.setattr(cli, "tailor_jobs", lambda *args, **kwargs: {1: [_Version()]})
-
-    result = runner.invoke(cli.app, ["tailor", "--job-id", str(job_id), "--db-url", db_url])
-
-    assert result.exit_code == 0, result.output
-    assert seen == {
-        "tailor": "HOUSE STYLE TEXT",
-        "reviser": "HOUSE STYLE TEXT",
-        "reviewers": "HOUSE STYLE TEXT",
-    }
 
 
 def test_tailor_reports_missing_job(tmp_path):

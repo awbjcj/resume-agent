@@ -1,13 +1,11 @@
-from pathlib import Path
-
 from typer.testing import CliRunner
 
 from resume_agent import cli
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.ingest import add_job
-from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.services.cover_letters import CoverLetterResult
 from resume_agent.tracking.repository import save_job
-from resume_agent.tracking.tables import CoverLetter, JobStatus
+from resume_agent.tracking.tables import JobStatus
 
 runner = CliRunner()
 
@@ -22,17 +20,13 @@ def test_cover_letter_command_generates_and_renders(tmp_path, monkeypatch):
         job.status = JobStatus.approved.value
         save_job(s, job)
 
-    monkeypatch.setattr(cli, "load_facts", lambda path: ProfileFacts(contact=Contact(name="Ada")))
-    monkeypatch.setattr(cli, "build_cover_letter_agent", lambda: object())
-    monkeypatch.setattr(cli, "build_cover_letter_reviser_agent", lambda: object())
     monkeypatch.setattr(
         cli,
-        "generate_cover_letter",
-        lambda session, job, facts, draft_agent, reviser_agent: CoverLetter(
-            id=1, job_id=job.id, fact_check_passed=True
-        ),
+        "write_cover_letters",
+        lambda session, job_ids=None, approved=False, facts_path=None: [
+            CoverLetterResult(job_id=1, cover_letter_id=1, fact_check_passed=True, pdf_path="output/x.pdf")
+        ],
     )
-    monkeypatch.setattr(cli, "render_cover_letter", lambda session, cl_id: Path("output/x.pdf"))
 
     result = runner.invoke(cli.app, ["cover-letter", "--approved", "--db-url", db_url])
 

@@ -34,13 +34,11 @@ def test_render_command(tmp_path, monkeypatch):
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
     version_id = _seed(db_url)
 
-    monkeypatch.setattr(cli, "load_render_config", lambda path: object())
-
-    def fake_render_version(session, vid, config, render_fn=None):
+    def fake_render(session, vid, render_path=None):
         assert vid == version_id
         return Path("output/fake.pdf")
 
-    monkeypatch.setattr(cli, "render_version", fake_render_version)
+    monkeypatch.setattr(cli, "render_resume_version", fake_render)
 
     result = runner.invoke(cli.app, ["render", str(version_id), "--db-url", db_url])
     assert result.exit_code == 0, result.output

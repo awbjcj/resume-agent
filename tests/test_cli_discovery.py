@@ -37,25 +37,13 @@ def test_addjob_reports_duplicate(tmp_path):
 
 
 def test_discover_runs_and_reports_counts(tmp_path, monkeypatch):
+    # The funnel now routes through the discover_jobs service; the CLI just
+    # opens a session, calls it, and echoes the counts.
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
-    engine = make_engine(db_url)
-    init_db(engine)
-    with get_session(engine) as s:
-        s.add(Job(source="manual", jd_text="jd", status=JobStatus.raw.value))
-        s.commit()
-
-    monkeypatch.setattr(cli, "load_search_config", lambda path: object())
-    monkeypatch.setattr(cli, "load_facts", lambda path: object())
-    monkeypatch.setattr(cli, "build_extract_agent", lambda: object())
-    monkeypatch.setattr(cli, "build_fit_agent", lambda: object())
-    monkeypatch.setattr(cli, "build_relevance_agent", lambda: None, raising=False)
-    monkeypatch.setattr(cli, "build_skill_canonicalizer", lambda: object())
     monkeypatch.setattr(
         cli,
-        "discover",
-        lambda session, config, facts, extract_agent, fit_agent, relevance_agent=None, canonicalizer=None, reporter=None: {  # noqa: E501
-            "shortlisted": 1
-        },
+        "discover_jobs",
+        lambda session, search_path, facts_path, reporter=None: {"shortlisted": 1},
     )
 
     result = runner.invoke(cli.app, ["discover", "--db-url", db_url])
@@ -63,28 +51,22 @@ def test_discover_runs_and_reports_counts(tmp_path, monkeypatch):
     assert "shortlisted" in result.output
 
 
-def test_discover_builds_and_passes_relevance_agent(tmp_path, monkeypatch):
+def test_discover_passes_search_and_facts_paths(tmp_path, monkeypatch):
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
     seen = {}
 
-    def fake_discover(
-        session, config, facts, extract_agent, fit_agent,
-        relevance_agent=None, canonicalizer=None, reporter=None,
-    ):
-        seen["relevance_agent"] = relevance_agent
+    def fake_discover_jobs(session, search_path, facts_path, reporter=None):
+        seen["search"] = search_path
+        seen["facts"] = facts_path
         return {"shortlisted": 0}
 
-    monkeypatch.setattr(cli, "load_search_config", lambda path: object())
-    monkeypatch.setattr(cli, "load_facts", lambda path: object())
-    monkeypatch.setattr(cli, "build_extract_agent", lambda: object())
-    monkeypatch.setattr(cli, "build_fit_agent", lambda: object())
-    monkeypatch.setattr(cli, "build_relevance_agent", lambda: "RELV")
-    monkeypatch.setattr(cli, "build_skill_canonicalizer", lambda: object())
-    monkeypatch.setattr(cli, "discover", fake_discover)
+    monkeypatch.setattr(cli, "discover_jobs", fake_discover_jobs)
 
-    result = runner.invoke(cli.app, ["discover", "--db-url", db_url])
+    result = runner.invoke(
+        cli.app, ["discover", "--db-url", db_url, "--search", "S.yaml", "--facts", "F.json"]
+    )
     assert result.exit_code == 0, result.output
-    assert seen["relevance_agent"] == "RELV"
+    assert seen == {"search": "S.yaml", "facts": "F.json"}
 
 
 def test_discover_reextract_invokes_reextract(tmp_path, monkeypatch):
@@ -98,19 +80,6 @@ def test_discover_reextract_invokes_reextract(tmp_path, monkeypatch):
     extract_agent = object()
     monkeypatch.setattr(cli, "build_extract_agent", lambda: extract_agent)
     monkeypatch.setattr(cli, "reextract", fake_reextract)
-
-    # These should not be needed for --reextract.
-    monkeypatch.setattr(
-        cli,
-        "load_search_config",
-        lambda path: (_ for _ in ()).throw(AssertionError("search loaded")),
-    )
-    monkeypatch.setattr(
-        cli, "load_facts", lambda path: (_ for _ in ()).throw(AssertionError("facts loaded"))
-    )
-    monkeypatch.setattr(
-        cli, "build_fit_agent", lambda: (_ for _ in ()).throw(AssertionError("fit built"))
-    )
 
     result = runner.invoke(cli.app, ["discover", "--reextract", "--db-url", db_url])
     assert result.exit_code == 0, result.output

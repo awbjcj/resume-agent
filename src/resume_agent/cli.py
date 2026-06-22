@@ -3,28 +3,17 @@ import subprocess
 from pathlib import Path
 from typing import cast
 
-import httpx
 import typer
-from playwright.sync_api import Error as PlaywrightError
 
 from resume_agent.config import load_yaml, get_settings
 from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.discovery.connectors.config import load_connectors_config
-from resume_agent.discovery.connectors.registry import build_connectors
-from resume_agent.discovery.connectors.runner import run_pull
 from resume_agent.discovery.connectors.telemetry import read_runs
-from resume_agent.discovery.ingest import add_job, ingest_jobs
-from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
-from resume_agent.discovery.url_ingest.service import job_from_url
+from resume_agent.discovery.ingest import ingest_jobs
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
-from resume_agent.discovery.pipeline import backfill_rescore, discover, reextract
-from resume_agent.discovery.relevance import build_relevance_agent
+from resume_agent.discovery.pipeline import backfill_rescore, reextract
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
-from resume_agent.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
-from resume_agent.cover_letter.render import render_cover_letter
-from resume_agent.cover_letter.service import generate_cover_letter
 from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
 from resume_agent.gmail.propose import propose_transitions
@@ -32,15 +21,19 @@ from resume_agent.profile.build import build_profile
 from resume_agent.progress import ProgressReporter
 from resume_agent.profile.store import load_facts, save_facts
 from resume_agent.profile.validate import validate_profile
-from resume_agent.tailor.agents import build_reviewer_agent, build_reviser_agent, build_tailor_agent, model_for_tier
-from resume_agent.tailor.review_config import load_review_config
-from resume_agent.tailor.service import tailor_jobs
-from resume_agent.tailor.style_guide import load_style_guide
-from resume_agent.render.render_config import RenderConfig, load_render_config
-from resume_agent.render.service import render_version
+from resume_agent.services.cover_letters import write_cover_letters
+from resume_agent.services.discovery import (
+    UrlFetchError,
+    add_job_from_text,
+    add_job_from_url,
+    discover_jobs,
+    pull_jobs,
+)
+from resume_agent.services.rendering import render_resume_version
+from resume_agent.services.tailoring import tailor
 from resume_agent.tracking.queries import application_job_pairs
 from resume_agent.tracking.prune_config import load_prune_config
-from resume_agent.tracking.repository import get_job, jobs_by_status, prune_preview, prune_run, save_job, update_application_status
+from resume_agent.tracking.repository import get_job, prune_preview, prune_run, save_job, update_application_status
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
 from resume_agent.tracking.match_gap import match_gap
 from resume_agent.tracking.tables import JobStatus
@@ -129,35 +122,34 @@ def addjob(
     Precedence: --jd-file, non-empty piped stdin, then URL extraction.
     """
     stdin_text = None if jd_file else _read_piped_stdin()
+    engine = _engine(db_url)
+    is_url_extract = bool(url) and not (jd_file or stdin_text is not None)
     if jd_file or stdin_text is not None:
         jd_text = Path(jd_file).read_text(encoding="utf-8") if jd_file else stdin_text or ""
-        source = "manual"
+        with get_session(engine) as session:
+            job = add_job_from_text(
+                session, jd_text=jd_text, url=url,
+                company=company, title=title, location=location,
+            )
     elif url:
         try:
-            raw = job_from_url(
-                url, agent=build_url_extract_agent(), allow_browser=not no_browser
-            )
-        except (httpx.HTTPError, PlaywrightError) as exc:
-            typer.echo(f"Couldn't fetch {url}: {exc}")
+            with get_session(engine) as session:
+                job = add_job_from_url(
+                    session, url=url, company=company, title=title,
+                    location=location, allow_browser=not no_browser,
+                )
+        except UrlFetchError as exc:
+            typer.echo(str(exc))
             raise typer.Exit(code=1) from exc
-        if raw is None:
-            typer.echo("Couldn't extract a job description from that URL.")
-            raise typer.Exit(code=1)
-        jd_text = raw.jd_text
-        company = company or raw.company
-        title = title or raw.title
-        location = location or raw.location
-        source = "url"
-        typer.echo(f"Extracted: {title or '?'} @ {company or '?'} ({location or '?'})")
     else:
         jd_text = typer.get_text_stream("stdin").read()
-        source = "manual"
-    engine = _engine(db_url)
-    with get_session(engine) as session:
-        job = add_job(
-            session, source=source, jd_text=jd_text, url=url,
-            company=company, title=title, location=location,
-        )
+        with get_session(engine) as session:
+            job = add_job_from_text(
+                session, jd_text=jd_text, url=url,
+                company=company, title=title, location=location,
+            )
+    if is_url_extract and job is not None:
+        typer.echo(f"Extracted: {job.title or '?'} @ {job.company or '?'} ({job.location or '?'})")
     if job is None:
         typer.echo("Duplicate job (same URL or JD already present); not added.")
         raise typer.Exit(code=0)
@@ -203,16 +195,11 @@ def discover_cmd(
         typer.echo(f"Backfilled SIC + location for {updated} shortlisted job(s).")
         return
 
-    config = load_search_config(search)
-    profile_facts = load_facts(facts)
-    extract_agent = build_extract_agent()
-    fit_agent = build_fit_agent()
-    relevance_agent = build_relevance_agent()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        counts = discover(
-            session, config, profile_facts, extract_agent, fit_agent, relevance_agent,
-            canonicalizer=build_skill_canonicalizer(), reporter=ProgressReporter("discover"),
+        counts = discover_jobs(
+            session, search_path=search, facts_path=facts,
+            reporter=ProgressReporter("discover"),
         )
     typer.echo(f"Discovery complete. Status counts: {counts}")
 
@@ -252,19 +239,17 @@ def pull_cmd(
             "Copy config/connectors.yaml.example to config/connectors.yaml and edit it."
         )
         raise typer.Exit(code=1)
-    search_config = load_search_config(search)
-    connectors_config = load_connectors_config(connectors_path)
-    connectors = build_connectors(connectors_config, get_settings())
-    if not connectors:
-        typer.echo("No connectors enabled. Edit connectors.yaml (and .env) to enable some.")
-        raise typer.Exit(code=0)
     engine = _engine(db_url)
     with get_session(engine) as session:
-        report = run_pull(
-            session, connectors, search_config, CONNECTOR_RUNS_PATH,
-            limit=limit, reporter=ProgressReporter("pull"),
+        report = pull_jobs(
+            session, search_path=search, connectors_path=connectors_path,
+            telemetry_path=CONNECTOR_RUNS_PATH, limit=limit,
+            reporter=ProgressReporter("pull"),
         )
-    for name in (c.name for c in connectors):
+    if not report.totals and not report.failures:
+        typer.echo("No connectors enabled. Edit connectors.yaml (and .env) to enable some.")
+        raise typer.Exit(code=0)
+    for name in sorted(report.totals):
         typer.echo(f"  {name:<12} +{report.totals.get(name, 0)}")
     for name, failures in report.failures.items():
         joined = ", ".join(f"{tok} ({reason})" for tok, reason in failures.items())
@@ -328,16 +313,6 @@ def match_gap_cmd(
 DEFAULT_REVIEW = "config/review.yaml"
 
 
-def build_reviewer_agents(config, style_guide: str | None = None) -> dict:
-    """Build one Agno reviewer agent per configured reviewer, at its model tier."""
-    return {
-        spec.name: build_reviewer_agent(
-            spec.name, model_for_tier(spec.model_tier), style_guide=style_guide
-        )
-        for spec in config.reviewers
-    }
-
-
 @app.command("approve")
 def approve(
     job_id: int = typer.Argument(..., help="Job id to approve for tailoring."),
@@ -366,33 +341,21 @@ def tailor_cmd(
     """Run the tailor + review loop over approved job(s)."""
     engine = _engine(db_url)
     with get_session(engine) as session:
-        if job_id is not None:
-            job = get_job(session, job_id)
-            if job is None:
-                typer.echo(f"Job #{job_id} not found.")
-                raise typer.Exit(code=1)
-            targets = [job]
-        elif approved:
-            targets = jobs_by_status(session, JobStatus.approved.value)
-        else:
+        if job_id is None and not approved:
             typer.echo("Specify --job-id <id> or --approved.")
             raise typer.Exit(code=1)
+        if job_id is not None and get_job(session, job_id) is None:
+            typer.echo(f"Job #{job_id} not found.")
+            raise typer.Exit(code=1)
 
-        config = load_review_config(review)
-        profile_facts = load_facts(facts)
-        style_guide = load_style_guide(config.style_guide_path)
-        tailor_agent = build_tailor_agent(style_guide=style_guide)
-        reviser_agent = build_reviser_agent(style_guide=style_guide)
-        reviewer_agents = build_reviewer_agents(config, style_guide=style_guide)
-
-        results = tailor_jobs(
-            session, targets, profile_facts, config,
-            tailor_agent, reviewer_agents, reviser_agent,
+        results = tailor(
+            session, job_ids=[job_id] if job_id is not None else None,
+            approved=approved, review_path=review, facts_path=facts,
             reporter=ProgressReporter("tailor"),
         )
-        for job_id, versions in results.items():
+        for jid, versions in results.items():
             typer.echo(
-                f"Job #{job_id}: {len(versions)} version(s); final fact_check_passed={versions[-1].fact_check_passed}"
+                f"Job #{jid}: {len(versions)} version(s); final fact_check_passed={versions[-1].fact_check_passed}"
             )
 
 
@@ -406,30 +369,21 @@ def cover_letter_cmd(
     """Draft a fact-locked cover letter per job and render it to PDF."""
     engine = _engine(db_url)
     with get_session(engine) as session:
-        if job_id is not None:
-            job = get_job(session, job_id)
-            if job is None:
-                typer.echo(f"Job #{job_id} not found.")
-                raise typer.Exit(code=1)
-            targets = [job]
-        elif approved:
-            targets = jobs_by_status(session, JobStatus.approved.value)
-        else:
+        if job_id is None and not approved:
             typer.echo("Specify --job-id <id> or --approved.")
             raise typer.Exit(code=1)
+        if job_id is not None and get_job(session, job_id) is None:
+            typer.echo(f"Job #{job_id} not found.")
+            raise typer.Exit(code=1)
 
-        profile_facts = load_facts(facts)
-        draft_agent = build_cover_letter_agent()
-        reviser_agent = build_cover_letter_reviser_agent()
-
-        for job in targets:
-            cover = generate_cover_letter(session, job, profile_facts, draft_agent, reviser_agent)
-            if cover.id is None:
-                raise RuntimeError("Cover letter was not persisted")
-            path = render_cover_letter(session, cover.id)
+        results = write_cover_letters(
+            session, job_ids=[job_id] if job_id is not None else None,
+            approved=approved, facts_path=facts,
+        )
+        for r in results:
             typer.echo(
-                f"Job #{job.id}: cover letter #{cover.id} "
-                f"(fact_check_passed={cover.fact_check_passed}) -> {path}"
+                f"Job #{r.job_id}: cover letter #{r.cover_letter_id} "
+                f"(fact_check_passed={r.fact_check_passed}) -> {r.pdf_path}"
             )
 
 
@@ -443,10 +397,9 @@ def render_cmd(
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Render a stored resume version to a PDF."""
-    render_config = load_render_config(config) if Path(config).exists() else RenderConfig()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        path = render_version(session, version_id, render_config)
+        path = render_resume_version(session, version_id, render_path=config)
     if path is None:
         typer.echo(f"Resume version #{version_id} not found.")
         raise typer.Exit(code=1)
