@@ -7,6 +7,9 @@ requires-python = ">=3.13"
 dependencies = [
     "agno>=2.6.12",
     "anthropic>=0.107.1",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "sse-starlette>=2.1.0",
     "openai>=1.0.0",
     # agno 2.6.x's Gemini Interactions import expects the `step_delta` submodule,
     # which google-genai renamed to `stepdelta` in 2.9.0 — cap below it.

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     cheap_model: str = "claude-haiku-4-5-20251001"
     mid_model: str = "claude-sonnet-4-6"
     premium_model: str = "claude-opus-4-8"
+    api_token: str = ""  # when non-empty, the API requires Authorization: Bearer <token>
+    cors_origins: str = "http://localhost:3000,http://localhost:5173"
 
 
 @lru_cache
