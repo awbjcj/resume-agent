@@ -24,14 +24,15 @@ from resume_agent.tailor.agents import (
     model_for_tier,
 )
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
+from resume_agent.tracking.match_gap import Canonicalizer
 
 
 @dataclass
 class DiscoveryBundle:
     extract: Runner
     fit: Runner
-    relevance: Runner
-    canonicalizer: object
+    relevance: Runner | None
+    canonicalizer: Canonicalizer | None
 
 
 @dataclass

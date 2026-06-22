@@ -27,13 +27,14 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
     monkeypatch.setattr(tailoring, "load_style_guide", lambda p: None)
     monkeypatch.setattr(
         tailoring, "build_tailor_bundle",
-        lambda config, style_guide=None: tailoring.TailorBundle(tailor="t", reviser="r", reviewers={}),
+        lambda config, style_guide=None: tailoring.TailorBundle(tailor="t", reviser="r", reviewers={}),  # type: ignore[arg-type]
     )
     with _session() as session:
         job = Job(source="manual", jd_text="x", status=JobStatus.approved.value)
         session.add(job)
         session.commit()
         session.refresh(job)
+        assert job.id is not None
         result = tailoring.tailor(session, job_ids=[job.id])
     assert captured["targets"] == [job.id]
     assert result
@@ -50,9 +51,12 @@ def test_render_resume_version_returns_path(monkeypatch, tmp_path):
         session.add(job)
         session.commit()
         session.refresh(job)
+        assert job.id is not None
         v = ResumeVersion(job_id=job.id, round=0)
         session.add(v)
         session.commit()
         session.refresh(v)
+        assert v.id is not None
         path = rendering.render_resume_version(session, v.id)
+    assert path is not None
     assert Path(path).name == "out.pdf"

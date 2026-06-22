@@ -26,5 +26,5 @@ def test_bearer_required_when_token_set():
     from resume_agent.api.deps import require_token
     from resume_agent.api.errors import ApiException
     with pytest.raises(ApiException) as ei:
-        require_token(authorization=None, settings=type("S", (), {"api_token": "secret"})())
+        require_token(authorization=None, settings=type("S", (), {"api_token": "secret"})())  # type: ignore[arg-type]
     assert ei.value.status_code == 401

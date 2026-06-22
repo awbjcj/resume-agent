@@ -16,8 +16,8 @@ class InlineExecutor(Executor):
 
 def test_sse_stream_emits_terminal_event(monkeypatch, tmp_path):
     def fake_discover_jobs(session, *, reporter=None, **kw):
-        reporter.begin(1, "scoring")
-        reporter.step(1)
+        reporter.begin(1, "scoring")  # type: ignore[attr-defined]
+        reporter.step(1)  # type: ignore[attr-defined]
         return {"shortlisted": 1}
 
     monkeypatch.setattr(runs_router, "discover_jobs", fake_discover_jobs)

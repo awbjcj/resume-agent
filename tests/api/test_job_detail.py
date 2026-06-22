@@ -12,11 +12,12 @@ def _client():
 def test_job_detail_includes_versions_and_application():
     client = _client()
     with client:
-        with get_session(client.app.state.engine) as s:
+        with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
             job = Job(source="manual", jd_text="hello", status=JobStatus.tailored.value)
             s.add(job)
             s.commit()
             s.refresh(job)
+            assert job.id is not None
             s.add(ResumeVersion(job_id=job.id, round=0, review_score=88))
             s.commit()
             jid = job.id
@@ -37,11 +38,12 @@ def test_job_detail_404():
 def test_pdf_download_404_when_no_file(tmp_path):
     client = _client()
     with client:
-        with get_session(client.app.state.engine) as s:
+        with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
             job = Job(source="manual", jd_text="x")
             s.add(job)
             s.commit()
             s.refresh(job)
+            assert job.id is not None
             v = ResumeVersion(job_id=job.id, round=0, pdf_path=str(tmp_path / "missing.pdf"))
             s.add(v)
             s.commit()
@@ -56,11 +58,12 @@ def test_pdf_download_streams_file(tmp_path):
     pdf = tmp_path / "ok.pdf"
     pdf.write_bytes(b"%PDF-1.4 test")
     with client:
-        with get_session(client.app.state.engine) as s:
+        with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
             job = Job(source="manual", jd_text="x")
             s.add(job)
             s.commit()
             s.refresh(job)
+            assert job.id is not None
             v = ResumeVersion(job_id=job.id, round=0, pdf_path=str(pdf))
             s.add(v)
             s.commit()

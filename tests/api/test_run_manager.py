@@ -20,6 +20,7 @@ def test_create_run_starts_pending(tmp_path):
     mgr = RunManager(root=tmp_path, executor=InlineExecutor())
     run_id = mgr.create("discover")
     rec = mgr.get(run_id)
+    assert rec is not None
     assert rec["kind"] == "discover"
     assert rec["state"] in ("pending", "running", "done")
 
@@ -34,6 +35,7 @@ def test_submit_runs_fn_and_records_result(tmp_path):
 
     run_id = mgr.submit("discover", work)
     rec = mgr.get(run_id)
+    assert rec is not None
     assert rec["state"] == "done"
     assert rec["result"] == {"statusCounts": {"shortlisted": 3}}
 
@@ -46,6 +48,7 @@ def test_submit_records_error(tmp_path):
 
     run_id = mgr.submit("pull", boom)
     rec = mgr.get(run_id)
+    assert rec is not None
     assert rec["state"] == "error"
     assert "nope" in rec["error"]
 

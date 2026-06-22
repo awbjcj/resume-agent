@@ -25,8 +25,8 @@ def _client(tmp_path):
 def test_discover_launch_returns_run(monkeypatch, tmp_path):
     # Fake the service so no LLM/network runs; assert the run wiring works.
     def fake_discover_jobs(session, *, reporter=None, **kw):
-        reporter.begin(1, "x")
-        reporter.step(1)
+        reporter.begin(1, "x")  # type: ignore[attr-defined]
+        reporter.step(1)  # type: ignore[attr-defined]
         return {"shortlisted": 2}
 
     monkeypatch.setattr(runs_router, "discover_jobs", fake_discover_jobs)
@@ -54,8 +54,8 @@ def test_tailor_launch_passes_params(monkeypatch, tmp_path):
     def fake_tailor(session, *, job_ids=None, approved=False, reporter=None, **kw):
         captured["job_ids"] = job_ids
         captured["approved"] = approved
-        reporter.begin(1, "x")
-        reporter.step(1)
+        reporter.begin(1, "x")  # type: ignore[attr-defined]
+        reporter.step(1)  # type: ignore[attr-defined]
         return {}
 
     monkeypatch.setattr(runs_router, "tailor", fake_tailor)

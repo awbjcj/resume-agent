@@ -32,6 +32,7 @@ def _job_detail(session: Session, job_id: int) -> JobDetail:
     job = get_job(session, job_id)
     if job is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
+    assert job.id is not None
     application = application_for_job(session, job_id)
     versions = resume_versions_for_job(session, job_id)
     return JobDetail(

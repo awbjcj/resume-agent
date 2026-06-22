@@ -46,6 +46,7 @@ def write_cover_letters(
         cover = generate_cover_letter(session, job, facts, bundle.draft, bundle.reviser)
         if cover.id is None:
             raise RuntimeError("Cover letter was not persisted")
+        assert job.id is not None
         path = render_cover_letter(session, cover.id)
         results.append(
             CoverLetterResult(

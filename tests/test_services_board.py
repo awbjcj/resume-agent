@@ -44,6 +44,7 @@ def test_list_pipeline_filters_by_status_and_min_fit():
 def test_set_stage_changes_status():
     with _session() as session:
         job = _job(session, status=JobStatus.shortlisted.value)
+        assert job.id is not None
         updated = board.set_stage(session, job.id, JobStatus.approved.value)
     assert updated is not None
     assert updated.status == JobStatus.approved.value
@@ -52,4 +53,5 @@ def test_set_stage_changes_status():
 def test_delete_refuses_job_with_progress():
     with _session() as session:
         job = _job(session, status=JobStatus.rendered.value)  # rendered == has_progress
+        assert job.id is not None
         assert board.delete(session, job.id) is False

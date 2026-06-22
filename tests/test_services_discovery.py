@@ -36,7 +36,7 @@ def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
     monkeypatch.setattr(discovery, "load_facts", lambda p: object())
     monkeypatch.setattr(
         discovery, "build_discovery_bundle",
-        lambda: discovery.DiscoveryBundle(extract="e", fit="f", relevance="r", canonicalizer="c"),
+        lambda: discovery.DiscoveryBundle(extract="e", fit="f", relevance="r", canonicalizer="c"),  # type: ignore[arg-type]
     )
     with _session() as session:
         counts = discovery.discover_jobs(session, search_path="x", facts_path="y")
