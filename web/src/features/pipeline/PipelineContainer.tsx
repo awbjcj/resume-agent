@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { useBulkRun } from "@/features/runs/use-bulk-run";
 import { BoardSkeleton } from "@/components/skeletons";
 import { EmptyState } from "@/components/EmptyState";
 import { MetricRow } from "@/components/MetricRow";
@@ -19,6 +21,7 @@ export function PipelineContainer() {
   const [q, setQ] = useState("");
   const [minFit, setMinFit] = useState(0);
   const [params, setParams] = useSearchParams();
+  const bulk = useBulkRun();
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -47,6 +50,14 @@ export function PipelineContainer() {
         title="Pipeline / Board"
         sub="Every job by pipeline stage, with its tailored PDF, review critiques, and your application status."
       />
+      <div className="mb-4 flex gap-2">
+        <Button variant="outline" size="sm" onClick={bulk.tailorApproved}>
+          Tailor approved
+        </Button>
+        <Button variant="outline" size="sm" onClick={bulk.coverLettersApproved}>
+          Cover letters (approved)
+        </Button>
+      </div>
       <MetricRow
         items={[
           ["In view", String(visible.length)],
