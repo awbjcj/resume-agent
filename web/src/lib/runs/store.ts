@@ -20,7 +20,8 @@ export const useRunStore = create<RunState>((set) => ({
   upsert: (r) => set((s) => ({ runs: { ...s.runs, [r.runId]: r } })),
   remove: (id) =>
     set((s) => {
-      const { [id]: _removed, ...rest } = s.runs;
-      return { runs: rest };
+      const runs = { ...s.runs };
+      delete runs[id];
+      return { runs };
     }),
 }));

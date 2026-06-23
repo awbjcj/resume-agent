@@ -1,15 +1,15 @@
-import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
+import type { ReactNode } from "react";
 
 import { server } from "@/test/server";
 import { useShortlist } from "./use-shortlist";
 
 function wrapper({ children }: { children: ReactNode }) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
 describe("useShortlist", () => {
@@ -22,8 +22,10 @@ describe("useShortlist", () => {
         }),
       ),
     );
+
     const { result } = renderHook(() => useShortlist(), { wrapper });
+
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.data?.[0].jobId).toBe(1);
+    expect(result.current.data?.[0]?.jobId).toBe(1);
   });
 });
