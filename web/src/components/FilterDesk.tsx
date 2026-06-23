@@ -72,25 +72,38 @@ export function FilterDesk({
   return (
     <section
       aria-label="Filter and sort"
-      className="mb-6 rounded-lg border bg-card p-4"
+      className="mb-7 rounded-lg border bg-card p-5 shadow-[0_1px_2px_rgba(24,32,38,0.04)]"
     >
-      <div className="mb-3 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-        Filter &amp; sort
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">Filter &amp; sort</div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Narrow the board before approving jobs for tailoring.
+          </p>
+        </div>
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {rows.length} candidates
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="f-salary">Min salary (USD)</Label>
+          <Label htmlFor="f-salary" className="text-xs font-semibold uppercase tracking-[0.14em]">
+            Min salary (USD)
+          </Label>
           <Input
             id="f-salary"
             type="number"
             min={0}
             step={10000}
+            className="h-10 bg-card"
             value={state.salaryMin ?? 0}
             onChange={(e) => set({ salaryMin: Number(e.target.value) || null })}
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="f-fit">Min fit</Label>
+          <Label htmlFor="f-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
+            Min fit
+          </Label>
           <Slider
             id="f-fit"
             aria-label="Min fit"
@@ -102,9 +115,11 @@ export function FilterDesk({
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="f-sort">Sort by</Label>
+          <Label htmlFor="f-sort" className="text-xs font-semibold uppercase tracking-[0.14em]">
+            Sort by
+          </Label>
           <Select value={state.sort} onValueChange={(v) => set({ sort: v as SortKey })}>
-            <SelectTrigger id="f-sort" className="w-full">
+            <SelectTrigger id="f-sort" className="h-10 w-full bg-card">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -185,9 +200,11 @@ export function FilterDesk({
         />
         {state.sort === "composite" && (
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="f-preset">Preset</Label>
+            <Label htmlFor="f-preset" className="text-xs font-semibold uppercase tracking-[0.14em]">
+              Preset
+            </Label>
             <Select value={state.preset} onValueChange={(v) => set({ preset: v as Preset })}>
-              <SelectTrigger id="f-preset" className="w-full">
+              <SelectTrigger id="f-preset" className="h-10 w-full bg-card">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
