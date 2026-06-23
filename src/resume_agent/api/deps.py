@@ -24,11 +24,23 @@ def get_session(request: Request) -> Iterator[Session]:
 
 
 def require_token(
+    request: Request,
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings_dep),
 ) -> None:
-    """No-op when no api_token is configured; else enforce a bearer match."""
+    """No-op when no api_token is configured; else enforce a bearer match.
+
+    Accepts the token either in the ``Authorization: Bearer`` header or, as a
+    fallback for clients that cannot set headers (``EventSource`` SSE, ``<a>``
+    downloads), in a ``?token=`` query param. The query param is read off the raw
+    request (not declared as a FastAPI ``Query``) so it stays out of the OpenAPI
+    schema for every guarded route. Note: query-param tokens can appear in access
+    logs — acceptable for a localhost single-user tool.
+    """
     if not settings.api_token:
+        return
+    query_token = request.query_params.get("token")
+    if query_token is not None and hmac.compare_digest(query_token, settings.api_token):
         return
     expected = f"Bearer {settings.api_token}"
     if not hmac.compare_digest(authorization or "", expected):

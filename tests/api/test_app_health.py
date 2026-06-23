@@ -19,12 +19,7 @@ def test_no_auth_by_default():
 
 def test_bearer_required_when_token_set():
     client = _client(api_token="secret")
-    assert client.get("/api/health").status_code == 200  # health is unguarded
-    # a guarded route (added later) would 401; here we assert the dep itself:
-    import pytest
-
-    from resume_agent.api.deps import require_token
-    from resume_agent.api.errors import ApiException
-    with pytest.raises(ApiException) as ei:
-        require_token(authorization=None, settings=type("S", (), {"api_token": "secret"})())  # type: ignore[arg-type]
-    assert ei.value.status_code == 401
+    with client:
+        assert client.get("/api/health").status_code == 200  # health is unguarded
+        assert client.get("/api/pipeline").status_code == 401
+        assert client.get("/api/pipeline?token=secret").status_code == 200
