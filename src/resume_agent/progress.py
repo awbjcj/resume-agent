@@ -161,6 +161,25 @@ class ProgressReporter:
         self._record.update(extra)
         self._flush(force=True)
 
+    def cancelled(self, **extra: object) -> None:
+        """Mark the process cancelled — a terminal state distinct from done/error.
+
+        Partial work already committed is kept; the bar shows how far it got
+        (``current``/``total`` are left untouched) with a cancelled badge.
+        """
+        if not self._record:
+            self._record = {
+                "process": self.process,
+                "label": self.process,
+                "current": 0,
+                "total": 0,
+                "started_at": _now_iso(),
+            }
+        self._record["state"] = "cancelled"
+        self._record["error"] = None
+        self._record.update(extra)
+        self._flush(force=True)
+
     def _flush(self, *, force: bool) -> None:
         now = time.monotonic()
         if not force and now - self._last_write < _MIN_WRITE_INTERVAL:
@@ -256,7 +275,7 @@ def is_displayable(record: dict, *, now: datetime | None = None) -> bool:
     state = record.get("state")
     if state == "running":
         return True
-    if state not in ("done", "error"):
+    if state not in ("done", "error", "cancelled"):
         return False
     now = now or datetime.now(timezone.utc)
     updated = _parse(record.get("updated_at"))

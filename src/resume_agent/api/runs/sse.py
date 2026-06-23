@@ -45,6 +45,6 @@ async def run_events(mgr, run_id: str, *, poll_interval: float = 0.5) -> AsyncIt
         if serialized != last:
             yield {"data": serialized}
             last = serialized
-        if run.state in ("done", "error"):
+        if run.state in ("done", "error", "cancelled"):
             return
         await asyncio.sleep(poll_interval)

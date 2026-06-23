@@ -143,6 +143,19 @@ def get_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
     return record_to_run(run_id, record)
 
 
+@router.post("/runs/{run_id}/cancel", response_model=RunOut)
+def cancel_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
+    """Request cooperative cancellation. The worker stops at its next progress
+    checkpoint; the run then settles into the ``cancelled`` terminal state."""
+    record = mgr.get(run_id)
+    if record is None:
+        raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
+    mgr.request_cancel(run_id)
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
+
+
 @router.get("/runs/{run_id}/events")
 async def stream_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
     if mgr.get(run_id) is None:

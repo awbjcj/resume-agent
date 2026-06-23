@@ -32,12 +32,35 @@ from resume_agent.progress import (
 RunFn = Callable[[ProgressReporter], object]
 
 
-class RunProgressReporter(ProgressReporter):
-    """ProgressReporter variant that preserves the run kind on every write."""
+class RunCancelled(Exception):
+    """Raised inside a worker when its run has been cancel-requested.
 
-    def __init__(self, run_id: str, kind: str, root: Path | str) -> None:
+    Cooperative: only surfaces at a progress checkpoint (begin/step), so the
+    worker stops cleanly between units of work rather than being killed
+    mid-network-call. Caught by the runner, which stamps a ``cancelled`` record.
+    """
+
+
+class RunProgressReporter(ProgressReporter):
+    """ProgressReporter variant that preserves the run kind on every write and
+    is the cooperative-cancellation checkpoint: ``begin``/``step`` raise
+    :class:`RunCancelled` once the run has been flagged for cancellation."""
+
+    def __init__(
+        self,
+        run_id: str,
+        kind: str,
+        root: Path | str,
+        *,
+        cancel_check: Callable[[], bool] | None = None,
+    ) -> None:
         super().__init__(run_id, root=root)
         self.kind = kind
+        self._cancel_check = cancel_check
+
+    def _raise_if_cancelled(self) -> None:
+        if self._cancel_check is not None and self._cancel_check():
+            raise RunCancelled
 
     def begin(
         self,
@@ -48,6 +71,7 @@ class RunProgressReporter(ProgressReporter):
         phase_count: int | None = None,
         **extra: object,
     ) -> None:
+        self._raise_if_cancelled()
         super().begin(
             total,
             label,
@@ -57,8 +81,15 @@ class RunProgressReporter(ProgressReporter):
             **extra,
         )
 
+    def step(self, current: int, *, label: str | None = None, **extra: object) -> None:
+        self._raise_if_cancelled()
+        super().step(current, label=label, **extra)
+
     def done(self, *, error: str | None = None, **extra: object) -> None:
         super().done(error=error, kind=self.kind, **extra)
+
+    def cancelled(self, **extra: object) -> None:
+        super().cancelled(kind=self.kind, **extra)
 
 
 class RunManager:
@@ -66,6 +97,25 @@ class RunManager:
         self.root = Path(root)
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
         self._owns_executor = executor is None
+        # Run ids flagged for cooperative cancellation. A plain set is enough:
+        # under the GIL add/discard/contains are atomic, and a missed read just
+        # defers the stop to the next checkpoint.
+        self._cancel_requested: set[str] = set()
+
+    def request_cancel(self, run_id: str) -> bool:
+        """Flag a run for cooperative cancellation.
+
+        Returns False if the run is unknown or already terminal (nothing to
+        cancel); True once flagged. The worker stops at its next checkpoint.
+        """
+        record = self.get(run_id)
+        if record is None or record.get("state") in ("done", "error", "cancelled"):
+            return False
+        self._cancel_requested.add(run_id)
+        return True
+
+    def is_cancel_requested(self, run_id: str) -> bool:
+        return run_id in self._cancel_requested
 
     def create(self, kind: str) -> str:
         run_id = uuid.uuid4().hex
@@ -79,7 +129,9 @@ class RunManager:
         return run_id
 
     def reporter(self, run_id: str, kind: str) -> RunProgressReporter:
-        return RunProgressReporter(run_id, kind, self.root)
+        return RunProgressReporter(
+            run_id, kind, self.root, cancel_check=lambda: self.is_cancel_requested(run_id)
+        )
 
     def submit(self, kind: str, fn: RunFn) -> str:
         run_id = self.create(kind)
@@ -89,11 +141,15 @@ class RunManager:
             try:
                 result = fn(reporter)
                 reporter.done(result=result)
+            except RunCancelled:  # cooperative stop — terminal but not a failure
+                reporter.cancelled()
             except Exception as exc:  # noqa: BLE001 — surface any failure as run error
                 reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
             except BaseException as exc:  # interpreter exit/interrupt: still stamp, then re-raise
                 reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
                 raise
+            finally:
+                self._cancel_requested.discard(run_id)
 
         self.executor.submit(_runner)
         return run_id
