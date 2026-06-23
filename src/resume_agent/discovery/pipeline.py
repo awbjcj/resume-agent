@@ -63,6 +63,7 @@ def run_filter(session: Session, config: SearchConfig) -> None:
         else:
             job.status = JobStatus.rejected.value
             job.reject_reason = decision.reject_reason
+            job.reject_category = "filtered"
         session.add(job)
     session.commit()
 
@@ -169,6 +170,7 @@ def run_relevance(
             reason = (verdict.reason or "model rejected").strip()
             job.status = JobStatus.rejected.value
             job.reject_reason = f"off-target role: {reason}"
+            job.reject_category = "relevance"
             session.add(job)
             rejected += 1
         if reporter:

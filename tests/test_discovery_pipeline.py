@@ -348,3 +348,15 @@ def test_backfill_rescore_populates_without_changing_fit_or_status(tmp_path):
         assert job.criteria_json is not None
         assert job.criteria_json["sic_major"] == "73"
         assert job.criteria_json["location_parts"]["region"] == "TX"
+
+
+def test_filter_and_relevance_set_reject_category():
+    cfg = SearchConfig(sponsorship_required=True, target_role="AI engineering roles")
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        add_job(s, source="manual", jd_text="bad role, nosponsor here", title="AI Engineer")
+        add_job(s, source="manual", jd_text="drive a truck", title="CDL Driver")
+        discover(s, cfg, facts, _ExtractAgent(), _FitAgent(), _Judge())
+        rejected = jobs_by_status(s, JobStatus.rejected.value)
+        categories = {j.reject_category for j in rejected}
+        assert categories == {"filtered", "relevance"}
