@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { launchers, useLaunchRun, type DiscoverMode } from "./use-launch-run";
+import { launchers, useLaunchRun, type ReprocessScope } from "./use-launch-run";
 
 export function PullDialog() {
   const [open, setOpen] = useState(false);
@@ -65,63 +65,71 @@ export function PullDialog() {
   );
 }
 
-const DISCOVER_MODES: { value: DiscoverMode; label: string; hint: string }[] = [
-  {
-    value: "discover",
-    label: "Discover",
-    hint: "Run the full funnel: extract → relevance → fit-score new jobs.",
-  },
-  {
-    value: "reextract",
-    label: "Re-extract metadata",
-    hint: "Backfill criteria_json on already-processed jobs. Doesn't change status or fit.",
-  },
-  {
-    value: "rescore",
-    label: "Re-score (SIC + location)",
-    hint: "Backfill SIC + location on shortlisted jobs. Doesn't change fit or status.",
-  },
+export function DiscoverDialog() {
+  const { launch } = useLaunchRun();
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => launch("discover", () => launchers.discover())}
+    >
+      Discover
+    </Button>
+  );
+}
+
+export function RefreshButton() {
+  const { launch } = useLaunchRun();
+  return (
+    <Button size="sm" onClick={() => launch("refresh", () => launchers.refresh())}>
+      Refresh
+    </Button>
+  );
+}
+
+const REPROCESS_SCOPES: { value: ReprocessScope; label: string }[] = [
+  { value: "shortlisted", label: "Re-score shortlist" },
+  { value: "rejected:relevance", label: "Reconsider off-target" },
+  { value: "rejected:filtered", label: "Reconsider hard-filtered" },
+  { value: "all", label: "Everything (non-submitted)" },
 ];
 
-export function DiscoverDialog() {
+export function ReprocessDialog() {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<DiscoverMode>("discover");
+  const [scope, setScope] = useState<ReprocessScope>("shortlisted");
   const { launch } = useLaunchRun();
-  const active = DISCOVER_MODES.find((m) => m.value === mode)!;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm">Discover</Button>} />
+      <DialogTrigger render={<Button size="sm" variant="outline">Reprocess</Button>} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Discover</DialogTitle>
+          <DialogTitle>Reprocess</DialogTitle>
           <DialogDescription>
-            Run the discovery funnel, or a one-off backfill over existing jobs.
+            Re-run the full funnel over a scope. Can change fit + status. Submitted jobs
+            are never touched.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="discover-mode">Mode</Label>
-          <Select value={mode} onValueChange={(v) => setMode((v as DiscoverMode) ?? "discover")}>
-            <SelectTrigger id="discover-mode" className="w-full">
+          <Label htmlFor="reprocess-scope">Scope</Label>
+          <Select value={scope} onValueChange={(v) => setScope(v as ReprocessScope)}>
+            <SelectTrigger id="reprocess-scope" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {DISCOVER_MODES.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
+              {REPROCESS_SCOPES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">{active.hint}</p>
         </div>
         <Button
           onClick={async () => {
-            const ok = await launch("discover", () => launchers.discover(mode));
+            const ok = await launch("reprocess", () => launchers.reprocess([scope]));
             if (ok) setOpen(false);
           }}
         >
-          Start {active.label.toLowerCase()}
+          Start reprocess
         </Button>
       </DialogContent>
     </Dialog>

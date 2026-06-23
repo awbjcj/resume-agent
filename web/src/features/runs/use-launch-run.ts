@@ -54,11 +54,19 @@ export async function cancelRun(runId: string): Promise<void> {
 export interface PullOptions {
   limit?: number | null;
 }
-export type DiscoverMode = "discover" | "reextract" | "rescore";
+
+export type ReprocessScope =
+  | "shortlisted"
+  | "rejected:relevance"
+  | "rejected:filtered"
+  | "all";
 
 export const launchers = {
   pull: (opts: PullOptions = {}) =>
     unwrap(api.POST("/api/pull", { body: { limit: opts.limit ?? null } })),
-  discover: (mode: DiscoverMode = "discover") =>
-    unwrap(api.POST("/api/discover", { body: { mode } })),
+  discover: () => unwrap(api.POST("/api/discover", { body: {} })),
+  reprocess: (scopes: ReprocessScope[]) =>
+    unwrap(api.POST("/api/reprocess", { body: { scopes } })),
+  refresh: (opts: PullOptions = {}) =>
+    unwrap(api.POST("/api/refresh", { body: { limit: opts.limit ?? null } })),
 };
