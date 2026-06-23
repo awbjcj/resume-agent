@@ -603,6 +603,51 @@ def test_reprocess_unknown_scope_raises():
         with pytest.raises(ValueError):
             reprocess(s, SearchConfig(), ProfileFacts(contact=Contact(name="Ada")),
                       _ExtractAgent(), _FitAgent(), ["bogus"])
+
+
+def test_reprocess_only_touches_scoped_jobs():
+    # An unrelated raw job (not in scope) must stay raw and untouched.
+    cfg = SearchConfig()
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd s", title="Eng",
+                        status=JobStatus.shortlisted.value, fit_score=10, criteria_json={}))
+        save_job(s, Job(source="x", jd_text="jd raw", title="Eng", status=JobStatus.raw.value))
+
+        reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
+
+        raw = jobs_by_status(s, JobStatus.raw.value)
+        assert [j.jd_text for j in raw] == ["jd raw"]  # unrelated raw left alone
+        assert raw[0].criteria_json is None             # never extracted
+
+
+def test_reprocess_empty_scope_processes_nothing():
+    cfg = SearchConfig()
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd raw", title="Eng", status=JobStatus.raw.value))
+        # No shortlisted jobs exist, so scope selects nothing.
+        reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1  # untouched
+        assert not jobs_by_status(s, JobStatus.shortlisted.value)
+
+
+def test_reprocess_clears_stale_fit_when_now_rejected():
+    # A previously-scored job that now fails filtering must not keep stale fit data.
+    cfg = SearchConfig(sponsorship_required=True)
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="bad role, nosponsor here", title="Eng",
+                        status=JobStatus.shortlisted.value, fit_score=88,
+                        fit_rationale="old rationale", criteria_json={"stale": 1}))
+
+        reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
+
+        rejected = jobs_by_status(s, JobStatus.rejected.value)
+        assert len(rejected) == 1
+        assert rejected[0].fit_score is None
+        assert rejected[0].fit_rationale is None
+        assert rejected[0].reject_category == "filtered"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -622,7 +667,55 @@ from resume_agent.tracking.repository import has_progress, jobs_by_status, statu
 
 2. **Delete** the `reextract` function (lines ~180-195) and the `backfill_rescore` function (lines ~218-244), and the now-unused `_REEXTRACT_STATUSES` constant (lines ~24-32).
 
-3. Add scope selection + `reprocess`:
+3. **Thread an optional `job_ids` filter through every funnel stage** so reprocess
+   only touches the jobs it selected (resetting jobs to `raw` and calling the
+   unfiltered `discover` would also sweep up unrelated `raw` jobs — see P1 in review).
+
+   Add a `job_ids: set[int] | None = None` parameter to `run_relevance`,
+   `run_extract`, `run_filter`, `run_score`, and `discover`. In each of the four
+   stage functions, immediately after the `jobs = jobs_by_status(...)` line, insert:
+
+```python
+    if job_ids is not None:
+        jobs = [job for job in jobs if job.id in job_ids]
+```
+
+   (For `run_filter`, which currently iterates `jobs_by_status(...)` inline, first
+   bind it to a `jobs` local, apply the same filter, then iterate `jobs`.)
+
+   Then update `discover` to accept and forward the filter:
+
+```python
+def discover(
+    session: Session,
+    config: SearchConfig,
+    profile_facts: ProfileFacts,
+    extract_agent: Runner,
+    fit_agent: Runner,
+    relevance_agent: Runner | None = None,
+    canonicalizer: Canonicalizer | None = None,
+    reporter: ProgressReporter | None = None,
+    job_ids: set[int] | None = None,
+) -> dict[str, int]:
+    """Run the full funnel over current rows (optionally only `job_ids`)."""
+    run_relevance(session, config, relevance_agent, reporter=reporter, job_ids=job_ids)
+    run_extract(session, extract_agent, reporter=reporter, job_ids=job_ids)
+    run_filter(session, config, job_ids=job_ids)
+    run_score(
+        session, profile_facts, fit_agent, canonicalizer=canonicalizer,
+        reporter=reporter, job_ids=job_ids,
+    )
+    if reporter:
+        reporter.done()
+    return status_counts(session)
+```
+
+   `job_ids` defaults to `None` (process all), so existing `discover_jobs` / CLI /
+   API callers are unaffected.
+
+4. Add scope selection + `reprocess`. The reset clears **all derived/scored fields**
+   (not just status) so a job that re-fails relevance/filtering cannot keep stale
+   `fit_score` / `fit_rationale` / `criteria_json` (P1 in review):
 
 ```python
 _REPROCESS_ALL_STATUSES = (
@@ -666,7 +759,7 @@ def reprocess(
     canonicalizer: Canonicalizer | None = None,
     reporter: ProgressReporter | None = None,
 ) -> dict[str, int]:
-    """Reset in-scope, non-progressed jobs to raw and re-run the full funnel over them."""
+    """Reset in-scope, non-progressed jobs to a clean raw state and re-run the funnel."""
     selected: dict[int, Job] = {}
     for scope in scopes:
         for job in _scope_jobs(session, scope):
@@ -679,11 +772,14 @@ def reprocess(
         job.status = JobStatus.raw.value
         job.reject_reason = None
         job.reject_category = None
+        job.fit_score = None
+        job.fit_rationale = None
+        job.criteria_json = None
         session.add(job)
     session.commit()
     return discover(
         session, config, profile_facts, extract_agent, fit_agent, relevance_agent,
-        canonicalizer=canonicalizer, reporter=reporter,
+        canonicalizer=canonicalizer, reporter=reporter, job_ids=set(selected),
     )
 ```
 
@@ -709,7 +805,8 @@ git commit -m "feat(pipeline): add scoped reprocess; remove dead reextract/backf
 ## Task 7: Service wrappers — reprocess_jobs + refresh_jobs
 
 **Files:**
-- Modify: `src/resume_agent/services/discovery.py` (delete `reextract_metadata`/`rescore_existing`; add `reprocess_jobs`, `refresh_jobs`, `RefreshReport`)
+- Modify: `src/resume_agent/discovery/connectors/runner.py` (`run_pull` gains a `finish` flag)
+- Modify: `src/resume_agent/services/discovery.py` (`pull_jobs` forwards `finish`; delete `reextract_metadata`/`rescore_existing`; add `reprocess_jobs`, `refresh_jobs`, `RefreshReport`)
 - Test: `tests/test_services_discovery.py` (create if absent)
 
 - [ ] **Step 1: Write the failing test**
@@ -760,6 +857,21 @@ def test_reprocess_jobs_rescores_shortlisted(tmp_path):
         )
         assert jobs_by_status(s, JobStatus.shortlisted.value)[0].fit_score == 77
         assert counts[JobStatus.shortlisted.value] == 1
+
+
+def test_run_pull_finish_false_does_not_emit_done(tmp_path):
+    # The refresh sub-step must NOT mark the run done, or the web SSE closes early.
+    from resume_agent.discovery.connectors.runner import run_pull
+    from resume_agent.discovery.search_config import SearchConfig
+    from resume_agent.progress import ProgressReporter, read_progress
+
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as s:
+        reporter = ProgressReporter("refresh", tmp_path)
+        run_pull(s, [], SearchConfig(), tmp_path / "runs.json", reporter=reporter, finish=False)
+    rec = read_progress("refresh", tmp_path)
+    assert rec is not None and rec["state"] == "running"  # not "done"
 ```
 
 > Confirm the minimal `facts.json` / `search.yaml` shapes load via `load_facts` /
@@ -783,12 +895,11 @@ from resume_agent.discovery.pipeline import discover, reprocess
 
 2. **Delete** `reextract_metadata` and `rescore_existing` (lines ~112-152).
 
-3. Add a `RefreshReport` dataclass at the top (after the constants):
+3. Add `from dataclasses import dataclass` to the **top-of-file import block**
+   (with the other stdlib/`from __future__` imports — NOT mid-file, which trips
+   Ruff E402), then define `RefreshReport` after the module constants:
 
 ```python
-from dataclasses import dataclass
-
-
 @dataclass(frozen=True)
 class RefreshReport:
     pulled: int
@@ -797,7 +908,30 @@ class RefreshReport:
     failures: dict[str, dict[str, str]]
 ```
 
-4. Add the two use-cases:
+4. **Let pull run as a non-finishing sub-step of refresh.** `run_pull`
+   (`src/resume_agent/discovery/connectors/runner.py`) ends with
+   `if reporter: reporter.done(added=added_total)`. That terminal `done` frame
+   makes the web SSE watcher (`web/src/lib/runs/sse.ts`) close the run — so a
+   shared reporter would mark `refresh` complete after pull, before discover.
+   Add a `finish: bool = True` parameter to `run_pull` and gate the final call:
+
+```python
+    if reporter and finish:
+        reporter.done(added=added_total)
+```
+
+   Add the same `finish: bool = True` parameter to `pull_jobs` and forward it:
+
+```python
+    return run_pull(
+        session, connectors, search_config, telemetry_path,
+        limit=limit, reporter=reporter, finish=finish,
+    )
+```
+
+   (Default `True` keeps the standalone `pull` CLI/API behavior unchanged.)
+
+5. Add the two use-cases:
 
 ```python
 def reprocess_jobs(
@@ -834,8 +968,9 @@ def refresh_jobs(
     """Pull from every connector, then discover the newly-added raw jobs, in one pass."""
     pull_report = pull_jobs(
         session, search_path=search_path, connectors_path=connectors_path,
-        telemetry_path=telemetry_path, limit=limit, reporter=reporter,
+        telemetry_path=telemetry_path, limit=limit, reporter=reporter, finish=False,
     )
+    # discover_jobs -> discover() emits the single terminal `done` that closes the run.
     counts = discover_jobs(
         session, search_path=search_path, facts_path=facts_path,
         bundle=bundle, reporter=reporter,
@@ -1164,12 +1299,15 @@ Expected: PASS
 
 Run: `bash scripts/gen_ts_client.sh`
 Then: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -v`
-Expected: PASS (regenerated `contracts/openapi.json` + `contracts/ts/api.ts` match the live app).
+Expected: PASS. The script writes THREE artifacts that must all be committed:
+`contracts/openapi.json`, `contracts/ts/api.ts`, AND `web/src/lib/api/schema.ts` (the
+script copies the contract into the SPA's local schema, which `web/src/lib/api/client.ts`
+imports — if it's stale, Task 12's typecheck uses old paths and fails).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/runs.py src/resume_agent/api/routers/runs.py contracts/ tests/api/
+git add src/resume_agent/api/schemas/runs.py src/resume_agent/api/routers/runs.py contracts/ web/src/lib/api/schema.ts tests/api/
 git commit -m "feat(api): modeless discover; add reprocess + refresh run endpoints"
 ```
 
@@ -1183,15 +1321,17 @@ git commit -m "feat(api): modeless discover; add reprocess + refresh run endpoin
 - Modify: connectors `greenhouse.py`, `lever.py`, `ashby.py`, `google.py`, `remoteok.py`, `tesla.py`, `workday.py`, `adzuna.py`
 - Test: `tests/test_connectors_text.py`
 
-- [ ] **Step 1: Add the dependency**
+- [ ] **Step 1: Add the dependency (update the lockfile)**
 
-In `pyproject.toml`, in the dependencies array after `"beautifulsoup4>=4.15.0",`:
+The repo is uv-managed (there is a `uv.lock`). Add the dep so BOTH `pyproject.toml`
+and `uv.lock` update and the venv installs it:
 
-```toml
-    "markdownify>=0.13.0",
+```bash
+uv add "markdownify>=0.13.0"
 ```
 
-Then install: `.venv/Scripts/python.exe -m pip install "markdownify>=0.13.0"`
+If `uv` is unavailable, fall back to editing `pyproject.toml` (add `"markdownify>=0.13.0",`
+after `"beautifulsoup4>=4.15.0",`), then `uv lock` and `.venv/Scripts/python.exe -m pip install "markdownify>=0.13.0"`. Either way, `uv.lock` MUST be updated and committed (Step 7) so lockfile users get the dep.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -1227,12 +1367,17 @@ Expected: FAIL — `html_to_markdown` undefined.
 
 - [ ] **Step 4: Implement html_to_markdown**
 
-In `src/resume_agent/discovery/connectors/text.py`, below `html_to_text`:
+In `src/resume_agent/discovery/connectors/text.py`, add the import to the
+**top-of-file import block** (next to the existing `import html` / BeautifulSoup
+imports — NOT mid-file, which trips Ruff E402):
 
 ```python
 from markdownify import markdownify as _markdownify
+```
 
+Then add the function below `html_to_text`:
 
+```python
 def html_to_markdown(raw: str) -> str:
     """Convert posting HTML to readable markdown (headings, bullets, bold preserved).
 
@@ -1274,7 +1419,7 @@ Expected: PASS (fix any connector test that asserted old plain-text output).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml src/resume_agent/discovery/connectors/ tests/test_connectors_text.py
+git add pyproject.toml uv.lock src/resume_agent/discovery/connectors/ tests/test_connectors_text.py
 git commit -m "feat(connectors): store JD as markdown via html_to_markdown at ingest"
 ```
 
@@ -1283,17 +1428,30 @@ git commit -m "feat(connectors): store JD as markdown via html_to_markdown at in
 ## Task 11: Web — markdown JD renderer
 
 **Files:**
-- Modify: `web/package.json` (add `react-markdown`)
+- Modify: `web/package.json` (+ lockfile) — add `react-markdown`, `remark-gfm`, `remark-breaks`
 - Create: `web/src/lib/format/prettify.ts`, `web/src/lib/format/prettify.test.ts`
-- Modify: `web/src/components/JobModal.tsx:96-98`
+- Create: `web/src/components/JdBody.tsx`, `web/src/components/JdBody.test.tsx`
+- Modify: `web/src/components/JobModal.tsx:96-98` (use `<JdBody>`)
+- Modify: `web/src/index.css` (add `.jd-markdown` styles — no Tailwind typography plugin is installed)
 
-- [ ] **Step 1: Add the dependency**
+**Why these plugins:** `react-markdown` collapses single newlines (CommonMark soft
+breaks), but legacy JDs are newline-separated flat text — rendering them raw would run
+lines together (a regression vs the old `<pre>`). `remark-breaks` turns each soft
+newline into a `<br>` so legacy layout survives; `remark-gfm` renders real
+lists/headings from newly-ingested markdown rows.
+
+- [ ] **Step 1: Add the dependencies**
+
+Use the web project's package manager (npm — there is a `web/package-lock.json`; if the
+repo instead has `web/pnpm-lock.yaml`, use pnpm and commit that lockfile):
 
 ```bash
-cd web && npm install react-markdown@^9
+cd web && npm install react-markdown@^9 remark-gfm@^4 remark-breaks@^4
 ```
 
-- [ ] **Step 2: Write the failing test for prettifyPlainText**
+(Commit the updated `web/package.json` + lockfile in the final step.)
+
+- [ ] **Step 2: Write the failing prettify test**
 
 Create `web/src/lib/format/prettify.test.ts`:
 
@@ -1302,25 +1460,30 @@ import { describe, expect, it } from "vitest";
 import { prettifyPlainText } from "./prettify";
 
 describe("prettifyPlainText", () => {
-  it("turns dash-prefixed lines into markdown bullets", () => {
-    const out = prettifyPlainText("Responsibilities\n- Build APIs\n- Ship features");
-    expect(out).toContain("- Build APIs");
+  it("preserves every line of newline-heavy legacy text", () => {
+    const out = prettifyPlainText("Line one\nLine two\nLine three");
+    expect(out.split("\n")).toHaveLength(3);
+    expect(out).toContain("Line one");
+    expect(out).toContain("Line three");
   });
 
-  it("joins blank-line-separated blocks as paragraphs", () => {
-    const out = prettifyPlainText("Intro line\n\nSecond block");
-    expect(out).toContain("Intro line");
-    expect(out).toContain("Second block");
+  it("normalizes bullet glyphs to dashes", () => {
+    expect(prettifyPlainText("• Build APIs")).toBe("- Build APIs");
+    expect(prettifyPlainText("* Ship features")).toBe("- Ship features");
   });
 
-  it("leaves existing markdown bullets alone", () => {
-    const out = prettifyPlainText("- already a bullet");
-    expect(out.trim()).toBe("- already a bullet");
+  it("leaves markdown headings and existing dashes intact", () => {
+    expect(prettifyPlainText("## Responsibilities")).toBe("## Responsibilities");
+    expect(prettifyPlainText("- already a bullet")).toBe("- already a bullet");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(prettifyPlainText("")).toBe("");
   });
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [ ] **Step 3: Run to verify it fails**
 
 Run: `cd web && npx vitest run src/lib/format/prettify.test.ts`
 Expected: FAIL — module not found.
@@ -1330,66 +1493,137 @@ Expected: FAIL — module not found.
 Create `web/src/lib/format/prettify.ts`:
 
 ```ts
-// Legacy JD rows are flat text (structure was stripped at ingest before the
-// markdown change). This applies light, conservative heuristics so they render
-// with some structure under react-markdown. New (markdown) rows pass through
-// untouched because they already contain markdown markers.
-const BULLET_LINE = /^\s*[-*•]\s+/;
+// Legacy JD rows are flat text (HTML structure was stripped at ingest before the
+// markdown change); newer rows are already markdown. Both render via react-markdown
+// with remark-breaks (single newlines -> <br>, preserving legacy line layout). This
+// pass only normalizes leading bullet glyphs to "- " for consistency; it is
+// idempotent and leaves headings, numbered lists, bold, and existing "- " untouched.
+const BULLET_GLYPH = /^(\s*)[•·▪◦●○*–-]\s+/;
 
 export function prettifyPlainText(text: string): string {
   if (!text) return "";
-  // Already markdown-ish? Leave it alone.
-  if (/(^|\n)\s*(#{1,6}\s|[-*]\s|\d+\.\s)/.test(text)) return text;
-
   return text
+    .replace(/\r\n/g, "\n")
     .split("\n")
-    .map((line) => {
-      const trimmed = line.trimEnd();
-      if (BULLET_LINE.test(trimmed)) return trimmed.replace(BULLET_LINE, "- ");
-      return trimmed;
-    })
+    .map((line) => line.replace(BULLET_GLYPH, "$1- "))
     .join("\n");
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [ ] **Step 5: Run to verify it passes**
 
 Run: `cd web && npx vitest run src/lib/format/prettify.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Render markdown in the modal**
+- [ ] **Step 6: Write the failing JdBody render test**
 
-In `web/src/components/JobModal.tsx`:
-- Add imports at top:
+Create `web/src/components/JdBody.test.tsx`:
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { JdBody } from "./JdBody";
+
+describe("JdBody", () => {
+  it("keeps newline-heavy legacy text on separate lines (no run-on)", () => {
+    const { container } = render(<JdBody text={"Line one\nLine two\nLine three"} />);
+    // remark-breaks renders soft newlines as <br>, so the lines stay distinct.
+    expect(container.querySelectorAll("br").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/Line one/)).toBeInTheDocument();
+    expect(screen.getByText(/Line three/)).toBeInTheDocument();
+  });
+
+  it("renders a real markdown list as <li> items", () => {
+    const { container } = render(<JdBody text={"## Skills\n\n- Python\n- Go"} />);
+    expect(container.querySelectorAll("li").length).toBe(2);
+    expect(screen.getByRole("heading", { name: "Skills" })).toBeInTheDocument();
+  });
+});
+```
+
+- [ ] **Step 7: Run to verify it fails**
+
+Run: `cd web && npx vitest run src/components/JdBody.test.tsx`
+Expected: FAIL — module not found.
+
+- [ ] **Step 8: Implement JdBody**
+
+Create `web/src/components/JdBody.tsx`:
 
 ```tsx
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
+
 import { prettifyPlainText } from "@/lib/format/prettify";
+
+// Renders a job description. New rows are markdown; legacy rows are flat text.
+// remark-gfm renders real lists/headings; remark-breaks preserves legacy newlines.
+export function JdBody({ text }: { text: string }) {
+  return (
+    <div className="jd-markdown mt-3 rounded-xl border bg-background/60 p-5 text-[15px] leading-7">
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+        {prettifyPlainText(text)}
+      </ReactMarkdown>
+    </div>
+  );
+}
 ```
 
-- Replace the `<pre>` block (lines 96-98) with:
+- [ ] **Step 9: Run to verify it passes**
+
+Run: `cd web && npx vitest run src/components/JdBody.test.tsx`
+Expected: PASS
+
+- [ ] **Step 10: Add the `.jd-markdown` styles**
+
+No `@tailwindcss/typography` plugin is installed, so style the container explicitly.
+Append to `web/src/index.css` (plain CSS, after the existing Tailwind import/directives):
+
+```css
+.jd-markdown > :first-child { margin-top: 0; }
+.jd-markdown h1, .jd-markdown h2, .jd-markdown h3, .jd-markdown h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.1em 0 0.4em;
+}
+.jd-markdown h1 { font-size: 1.25rem; }
+.jd-markdown h2 { font-size: 1.1rem; }
+.jd-markdown h3, .jd-markdown h4 { font-size: 1rem; }
+.jd-markdown p { margin: 0.6em 0; }
+.jd-markdown ul, .jd-markdown ol { margin: 0.6em 0; padding-left: 1.4em; }
+.jd-markdown ul { list-style: disc; }
+.jd-markdown ol { list-style: decimal; }
+.jd-markdown li { margin: 0.2em 0; }
+.jd-markdown a { text-decoration: underline; }
+.jd-markdown strong { font-weight: 600; }
+.jd-markdown code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.9em; }
+```
+
+- [ ] **Step 11: Use JdBody in the modal**
+
+In `web/src/components/JobModal.tsx`, add the import:
 
 ```tsx
-                      <div className="prose prose-sm mt-3 max-w-none rounded-xl border bg-background/60 p-5 leading-7 dark:prose-invert">
-                        <ReactMarkdown>{prettifyPlainText(job.jdText)}</ReactMarkdown>
-                      </div>
+import { JdBody } from "./JdBody";
 ```
 
-> If the Tailwind typography (`prose`) plugin is not installed, either add
-> `@tailwindcss/typography` to `web` and the Tailwind config, or drop the `prose`
-> classes and style the container directly (headings/lists inherit sane defaults).
-> Verify which by checking `web/tailwind.config.*` for the typography plugin.
+Replace the `<pre>` block (lines 96-98) with:
 
-- [ ] **Step 7: Run web tests + typecheck**
+```tsx
+                      <JdBody text={job.jdText} />
+```
+
+- [ ] **Step 12: Run web tests + typecheck**
 
 Run: `cd web && npx vitest run && npx tsc --noEmit`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
-git add web/package.json web/package-lock.json web/src/lib/format/ web/src/components/JobModal.tsx
-git commit -m "feat(web): render JD as markdown with legacy plain-text prettifier"
+git add web/package.json web/package-lock.json web/src/lib/format/ web/src/components/JdBody.tsx web/src/components/JdBody.test.tsx web/src/components/JobModal.tsx web/src/index.css
+git commit -m "feat(web): render JD as markdown (gfm+breaks) with legacy prettifier"
 ```
 
 ---
