@@ -11,7 +11,15 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
   const source = new EventSource(withTokenParam(`/api/runs/${runId}/events`));
 
   source.onmessage = (e) => {
-    let data: { state?: string; percent?: number; label?: string; error?: string };
+    let data: {
+      state?: string;
+      percent?: number;
+      label?: string;
+      current?: number;
+      total?: number;
+      etaText?: string | null;
+      error?: string;
+    };
     try {
       data = JSON.parse(e.data);
     } catch {
@@ -19,16 +27,25 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
     }
     const state = data.state ?? "running";
     const status: RunRecord["status"] =
-      state === "done" ? "succeeded" : state === "error" ? "failed" : "running";
+      state === "done"
+        ? "succeeded"
+        : state === "error"
+          ? "failed"
+          : state === "cancelled"
+            ? "cancelled"
+            : "running";
     useRunStore.getState().upsert({
       runId,
       kind,
       status,
       percent: typeof data.percent === "number" ? data.percent : 0,
       phase: data.label ?? "",
+      current: typeof data.current === "number" ? data.current : 0,
+      total: typeof data.total === "number" ? data.total : 0,
+      etaText: data.etaText ?? null,
       error: data.error ?? undefined,
     });
-    if (state === "done" || state === "error") {
+    if (state === "done" || state === "error" || state === "cancelled") {
       source.close();
       onDone?.();
       // Let the finished bar linger briefly, then clear it.
@@ -37,9 +54,17 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
   };
 
   source.onerror = () => {
-    useRunStore
-      .getState()
-      .upsert({ runId, kind, status: "failed", percent: 0, phase: "", error: "stream error" });
+    useRunStore.getState().upsert({
+      runId,
+      kind,
+      status: "failed",
+      percent: 0,
+      phase: "",
+      current: 0,
+      total: 0,
+      etaText: null,
+      error: "stream error",
+    });
     source.close();
     onDone?.();
   };

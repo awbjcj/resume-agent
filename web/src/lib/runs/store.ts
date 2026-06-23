@@ -3,9 +3,12 @@ import { create } from "zustand";
 export interface RunRecord {
   runId: string;
   kind: string;
-  status: "running" | "succeeded" | "failed";
+  status: "running" | "succeeded" | "failed" | "cancelled";
   percent: number;
   phase: string;
+  current: number;
+  total: number;
+  etaText: string | null;
   error?: string;
 }
 
