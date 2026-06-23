@@ -2,6 +2,7 @@
 
 UV ?= uv
 NPM ?= npm
+NPX ?= npx
 HOST ?= 127.0.0.1
 PORT ?= 8000
 WEB_HOST ?= localhost
@@ -44,7 +45,7 @@ kill-port:
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill_port.ps1 -Port $(PORT)
 
 web:
-	$(NPM) --prefix web run dev -- --host $(WEB_HOST) --port $(WEB_PORT)
+	cd web && $(NPX) vite --host $(WEB_HOST) --port $(WEB_PORT)
 
 dev:
 	$(MAKE) -j2 api web
@@ -77,7 +78,7 @@ build-web:
 	$(NPM) --prefix web run build
 
 preview:
-	$(NPM) --prefix web run preview -- --host $(WEB_HOST) --port $(WEB_PORT)
+	cd web && $(NPX) vite preview --host $(WEB_HOST) --port $(WEB_PORT)
 
 verify: lint test build
 

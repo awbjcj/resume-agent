@@ -32,6 +32,7 @@ tests/fixtures/linkedin/*_live.html
 .omc/
 .remember/
 .worktrees/
+.playwright-cli/
 .ruff_cache/
 .pytest_cache/
 .claude/
