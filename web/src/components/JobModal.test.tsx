@@ -62,7 +62,7 @@ describe("JobModal", () => {
     );
     wrap(<JobModal jobId={42} onClose={() => {}} />);
     await waitFor(() => expect(screen.getByText("Must-have")).toBeInTheDocument());
-    expect(screen.getByText("Best-have")).toBeInTheDocument();
+    expect(screen.getByText("Nice-to-have")).toBeInTheDocument();
     expect(screen.getByText("Python")).toBeInTheDocument();
     expect(screen.getByText("Rust")).toBeInTheDocument();
     expect(screen.getByText("1/3 covered")).toBeInTheDocument();
