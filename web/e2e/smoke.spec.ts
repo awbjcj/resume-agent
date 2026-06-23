@@ -42,6 +42,7 @@ test("loads shortlist and opens a job drawer", async ({ page }) => {
         hasProgress: false,
         application: null,
         resumeVersions: [],
+        skills: [],
       },
     }),
   );
