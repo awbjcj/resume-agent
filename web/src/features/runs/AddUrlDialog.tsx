@@ -41,9 +41,10 @@ export function AddUrlDialog() {
         <Button
           disabled={!url.trim()}
           onClick={async () => {
-            await launch("addJobUrl", () =>
+            const launched = await launch("addJobUrl", () =>
               unwrap(api.POST("/api/jobs/from-url", { body: { url, allowBrowser: true } })),
             );
+            if (!launched) return;
             setOpen(false);
             setUrl("");
           }}
