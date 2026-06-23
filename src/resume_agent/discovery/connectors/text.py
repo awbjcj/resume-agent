@@ -2,6 +2,7 @@ import html
 import re
 
 from bs4 import BeautifulSoup
+from markdownify import markdownify as _markdownify
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.search_config import SearchConfig
@@ -13,6 +14,17 @@ def html_to_text(raw: str) -> str:
         return ""
     soup = BeautifulSoup(html.unescape(raw), "html.parser")
     return soup.get_text(separator="\n", strip=True)
+
+
+def html_to_markdown(raw: str) -> str:
+    """Convert posting HTML to readable markdown (headings, bullets, bold preserved).
+
+    Plain-text input passes through essentially unchanged. Used at ingest so the JD
+    keeps structure for display while staying readable to the extract/fit agents.
+    """
+    if not raw:
+        return ""
+    return _markdownify(html.unescape(raw), heading_style="ATX", bullets="-").strip()
 
 
 # Word-count floor + gain a replacement JD must clear to count as "materially

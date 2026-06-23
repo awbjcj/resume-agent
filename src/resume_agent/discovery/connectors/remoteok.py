@@ -3,7 +3,7 @@ import httpx
 from resume_agent.discovery.connectors.base import FetchResult, RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.harvest import gate_and_limit
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.connectors.text import html_to_markdown
 from resume_agent.discovery.search_config import SearchConfig
 
 _URL = "https://remoteok.com/api"
@@ -22,7 +22,7 @@ def parse_remoteok(payload: list) -> list[RawJob]:
                 company=item.get("company"),
                 title=item.get("position"),
                 location=item.get("location") or "Remote",
-                jd_text=html_to_text(item.get("description", "")),
+                jd_text=html_to_markdown(item.get("description", "")),
                 posted_at=parse_iso_datetime(item.get("date")),
             )
         )

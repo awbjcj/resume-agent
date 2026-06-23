@@ -4,7 +4,7 @@ from resume_agent.discovery.connectors.base import FetchResult, RawJob, http_fai
 from resume_agent.discovery.connectors.config import GreenhouseBoard
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.harvest import harvest
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.connectors.text import html_to_markdown
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://boards-api.greenhouse.io/v1/boards"
@@ -29,7 +29,7 @@ def parse_greenhouse(payload: dict, company: str) -> list[RawJob]:
                 company=company,
                 title=item.get("title"),
                 location=location,
-                jd_text=html_to_text(item.get("content", "")),
+                jd_text=html_to_markdown(item.get("content", "")),
                 posted_at=parse_iso_datetime(item.get("updated_at")),
             )
         )

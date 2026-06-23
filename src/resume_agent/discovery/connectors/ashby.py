@@ -2,7 +2,7 @@ import httpx
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.connectors.text import html_to_markdown
 
 _BASE = "https://api.ashbyhq.com/posting-api/job-board"
 
@@ -11,7 +11,7 @@ def parse_ashby(payload: dict, company: str) -> list[RawJob]:
     """Map an Ashby posting-api jobs payload to RawJobs."""
     jobs: list[RawJob] = []
     for item in payload.get("jobs", []):
-        jd_text = item.get("descriptionPlain") or html_to_text(item.get("descriptionHtml", ""))
+        jd_text = item.get("descriptionPlain") or html_to_markdown(item.get("descriptionHtml", ""))
         jobs.append(
             RawJob(
                 source="ashby",

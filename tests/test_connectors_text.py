@@ -96,3 +96,25 @@ def test_primary_search_term_falls_back_to_role_anchors():
 
 def test_primary_search_term_empty_when_no_terms():
     assert primary_search_term(SearchConfig()) == ""
+
+
+def test_html_to_markdown_preserves_lists_and_headings():
+    from resume_agent.discovery.connectors.text import html_to_markdown
+
+    html = "<h2>Responsibilities</h2><ul><li>Build APIs</li><li>Ship features</li></ul>"
+    md = html_to_markdown(html)
+    assert "Responsibilities" in md
+    assert "- Build APIs" in md or "* Build APIs" in md
+    assert "Ship features" in md
+
+
+def test_html_to_markdown_passes_plain_text_through():
+    from resume_agent.discovery.connectors.text import html_to_markdown
+
+    assert html_to_markdown("Just plain text").strip() == "Just plain text"
+
+
+def test_html_to_markdown_empty():
+    from resume_agent.discovery.connectors.text import html_to_markdown
+
+    assert html_to_markdown("") == ""

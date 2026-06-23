@@ -6,7 +6,7 @@ from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
-from resume_agent.discovery.connectors.text import html_to_text, primary_search_term
+from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
 from resume_agent.discovery.search_config import SearchConfig
 
 _PAGE = 20  # cxs page size
@@ -63,7 +63,7 @@ def cxs_detail_url(target: AtsTarget, external_path: str) -> str:
 
 def apply_detail(row: WorkdayRow, detail: dict) -> None:
     info = detail.get("jobPostingInfo") or {}
-    row.jd_text = html_to_text(info.get("jobDescription", ""))
+    row.jd_text = html_to_markdown(info.get("jobDescription", ""))
     if info.get("externalUrl"):
         row.url = info["externalUrl"]
     if info.get("location"):

@@ -5,7 +5,7 @@ import httpx
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.connectors.text import html_to_markdown
 from resume_agent.discovery.search_config import SearchConfig
 
 _STATE_URL = "https://www.tesla.com/cua-api/apps/careers/state"  # confirm at build time
@@ -41,7 +41,7 @@ def _fetch_detail(row: TeslaRow) -> dict:
 
 
 def apply_tesla_detail(row: TeslaRow, info: dict) -> None:
-    row.jd_text = html_to_text(info.get("description", ""))
+    row.jd_text = html_to_markdown(info.get("description", ""))
     row.url = info.get("url") or row.url
 
 

@@ -8,7 +8,7 @@ from resume_agent.discovery.connectors.base import FetchResult, RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import identify_host
 from resume_agent.discovery.connectors.harvest import gate_and_limit
-from resume_agent.discovery.connectors.text import html_to_text, is_materially_richer
+from resume_agent.discovery.connectors.text import html_to_markdown, is_materially_richer
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.discovery.url_ingest.fetch import fetch_page, is_linkedin
@@ -71,7 +71,7 @@ def _json_ld_descriptions(soup: BeautifulSoup) -> list[str]:
         if any(str(item).lower() == "jobposting" for item in types):
             raw = node.get("description")
             if isinstance(raw, str):
-                descriptions.append(html_to_text(raw))
+                descriptions.append(html_to_markdown(raw))
         graph = node.get("@graph")
         if graph is not None:
             visit(graph)
@@ -98,7 +98,7 @@ def _candidate_texts(html: str) -> list[str]:
                 text = _clean_lines(node.get_text("\n", strip=True))
                 if text:
                     candidates.append(text)
-    candidates.append(_clean_lines(html_to_text(html)))
+    candidates.append(_clean_lines(html_to_markdown(html)))
     return [candidate for candidate in candidates if candidate]
 
 

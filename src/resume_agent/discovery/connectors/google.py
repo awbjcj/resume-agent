@@ -3,7 +3,7 @@ import httpx
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
-from resume_agent.discovery.connectors.text import html_to_text, primary_search_term
+from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
 from resume_agent.discovery.search_config import SearchConfig
 
 _SEARCH_URL = "https://careers.google.com/api/v3/search/"  # confirm at build time
@@ -22,7 +22,7 @@ def parse_jobs(page: dict) -> list[RawJob]:
                 company="Google",
                 title=item.get("title"),
                 location=location,
-                jd_text=html_to_text(item.get("description", "")),
+                jd_text=html_to_markdown(item.get("description", "")),
                 posted_at=parse_iso_datetime(item.get("publish_date")),
             )
         )

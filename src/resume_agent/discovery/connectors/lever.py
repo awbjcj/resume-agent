@@ -4,7 +4,7 @@ from resume_agent.discovery.connectors.base import FetchResult, RawJob, http_fai
 from resume_agent.discovery.connectors.config import LeverBoard
 from resume_agent.discovery.connectors.dates import parse_epoch_millis
 from resume_agent.discovery.connectors.harvest import harvest
-from resume_agent.discovery.connectors.text import html_to_text
+from resume_agent.discovery.connectors.text import html_to_markdown
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://api.lever.co/v0/postings"
@@ -32,7 +32,7 @@ def _assemble_jd(item: dict) -> str:
             parts.append(f"<h3>{heading}</h3>")
         parts.append(section.get("content") or "")
     parts.append(item.get("additional") or "")
-    return html_to_text("\n".join(part for part in parts if part))
+    return html_to_markdown("\n".join(part for part in parts if part))
 
 
 def parse_lever(payload: list, company: str) -> list[RawJob]:
