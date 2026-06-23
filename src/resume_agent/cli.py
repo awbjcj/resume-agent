@@ -9,9 +9,6 @@ from resume_agent.config import load_yaml, get_settings
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.connectors.telemetry import read_runs
 from resume_agent.discovery.ingest import ingest_jobs
-from resume_agent.discovery.extract import build_extract_agent
-from resume_agent.discovery.fit import build_fit_agent
-from resume_agent.discovery.pipeline import backfill_rescore, reextract
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.gmail.classify import classify_email
@@ -28,6 +25,8 @@ from resume_agent.services.discovery import (
     add_job_from_url,
     discover_jobs,
     pull_jobs,
+    refresh_jobs,
+    reprocess_jobs,
 )
 from resume_agent.services.rendering import render_resume_version
 from resume_agent.services.tailoring import tailor
@@ -161,40 +160,8 @@ def discover_cmd(
     search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
-    reextract_existing: bool = typer.Option(
-        False,
-        "--reextract",
-        help="Re-extract metadata for already-processed jobs (backfill new fields). Does not change status or fit.",
-    ),
-    rescore_existing: bool = typer.Option(
-        False,
-        "--rescore",
-        help="Backfill SIC + location for already-shortlisted jobs (does not change fit or status).",
-    ),
 ) -> None:
-    """Run the discovery funnel over current jobs and report status counts."""
-    if reextract_existing and rescore_existing:
-        typer.echo("Choose only one backfill mode: --reextract or --rescore.")
-        raise typer.Exit(code=2)
-
-    if reextract_existing:
-        extract_agent = build_extract_agent()
-        engine = _engine(db_url)
-        with get_session(engine) as session:
-            updated = reextract(session, extract_agent)
-        typer.echo(f"Re-extracted metadata for {updated} job(s).")
-        return
-
-    if rescore_existing:
-        profile_facts = load_facts(facts)
-        fit_agent = build_fit_agent()
-        canonicalizer = build_skill_canonicalizer()
-        engine = _engine(db_url)
-        with get_session(engine) as session:
-            updated = backfill_rescore(session, profile_facts, fit_agent, canonicalizer=canonicalizer)
-        typer.echo(f"Backfilled SIC + location for {updated} shortlisted job(s).")
-        return
-
+    """Run the discovery funnel over new (raw) jobs and report status counts."""
     engine = _engine(db_url)
     with get_session(engine) as session:
         counts = discover_jobs(
@@ -202,6 +169,53 @@ def discover_cmd(
             reporter=ProgressReporter("discover"),
         )
     typer.echo(f"Discovery complete. Status counts: {counts}")
+
+
+@app.command("reprocess")
+def reprocess_cmd(
+    scope: list[str] = typer.Option(
+        ["shortlisted"], "--scope",
+        help="Repeatable: shortlisted | rejected:relevance | rejected:filtered | all.",
+    ),
+    search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
+    facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Re-run the full funnel over chosen scopes (can flip fit + status)."""
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        counts = reprocess_jobs(
+            session, scopes=scope, search_path=search, facts_path=facts,
+            reporter=ProgressReporter("discover"),
+        )
+    typer.echo(f"Reprocess complete. Status counts: {counts}")
+
+
+@app.command("refresh")
+def refresh_cmd(
+    search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
+    connectors_path: str = typer.Option(DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."),
+    facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Pull from connectors then discover the new jobs, in one pass."""
+    if not Path(connectors_path).exists():
+        typer.echo(
+            f"No connectors config found at {connectors_path}. "
+            "Copy config/connectors.yaml.example to config/connectors.yaml and edit it."
+        )
+        raise typer.Exit(code=1)
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        report = refresh_jobs(
+            session, search_path=search, connectors_path=connectors_path,
+            telemetry_path=CONNECTOR_RUNS_PATH, facts_path=facts, limit=limit,
+            reporter=ProgressReporter("refresh"),
+        )
+    typer.echo(
+        f"Refresh complete. +{report.pulled} pulled. Status counts: {report.status_counts}"
+    )
 
 
 @app.command("scrape")

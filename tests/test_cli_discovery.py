@@ -69,19 +69,38 @@ def test_discover_passes_search_and_facts_paths(tmp_path, monkeypatch):
     assert seen == {"search": "S.yaml", "facts": "F.json"}
 
 
-def test_discover_reextract_invokes_reextract(tmp_path, monkeypatch):
-    db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
-    called = {}
+def test_reprocess_invokes_service(tmp_path, monkeypatch):
+    import resume_agent.cli as cli
 
-    def fake_reextract(session, agent):
-        called["agent"] = agent
-        return 3
+    captured = {}
 
-    extract_agent = object()
-    monkeypatch.setattr(cli, "build_extract_agent", lambda: extract_agent)
-    monkeypatch.setattr(cli, "reextract", fake_reextract)
+    def fake_reprocess_jobs(session, *, scopes, search_path, facts_path, reporter=None):
+        captured["scopes"] = scopes
+        return {"shortlisted": 3}
 
-    result = runner.invoke(cli.app, ["discover", "--reextract", "--db-url", db_url])
-    assert result.exit_code == 0, result.output
-    assert called["agent"] is extract_agent
-    assert "Re-extracted metadata for 3 job(s)." in result.output
+    monkeypatch.setattr(cli, "reprocess_jobs", fake_reprocess_jobs)
+    db_url = f"sqlite:///{tmp_path/'t.db'}"
+    result = runner.invoke(
+        cli.app, ["reprocess", "--scope", "shortlisted", "--scope", "rejected:relevance",
+                  "--db-url", db_url],
+    )
+    assert result.exit_code == 0
+    assert captured["scopes"] == ["shortlisted", "rejected:relevance"]
+
+
+def test_refresh_invokes_service(tmp_path, monkeypatch):
+    import resume_agent.cli as cli
+    from pathlib import Path
+    from resume_agent.services.discovery import RefreshReport
+
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+
+    def fake_refresh_jobs(session, **kwargs):
+        return RefreshReport(pulled=5, totals={"greenhouse": 5},
+                             status_counts={"shortlisted": 2}, failures={})
+
+    monkeypatch.setattr(cli, "refresh_jobs", fake_refresh_jobs)
+    db_url = f"sqlite:///{tmp_path/'t.db'}"
+    result = runner.invoke(cli.app, ["refresh", "--db-url", db_url])
+    assert result.exit_code == 0
+    assert "5 pulled" in result.output
