@@ -10,7 +10,7 @@ import { BoardSkeleton } from "@/components/skeletons";
 import { EmptyState } from "@/components/EmptyState";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
-import { JobDrawer } from "@/components/JobDrawer";
+import { JobModal } from "@/components/JobModal";
 import { PipelineCard } from "./PipelineCard";
 import { usePipeline, type PipelineItem } from "./use-pipeline";
 
@@ -50,7 +50,7 @@ export function PipelineContainer() {
         title="Pipeline / Board"
         sub="Every job by pipeline stage, with its tailored PDF, review critiques, and your application status."
       />
-      <div className="mb-4 flex gap-2">
+      <div className="mb-5 flex flex-wrap gap-2 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
         <Button variant="outline" size="sm" onClick={bulk.tailorApproved}>
           Tailor approved
         </Button>
@@ -65,13 +65,22 @@ export function PipelineContainer() {
           ["Stages active", String(byStage.size)],
         ]}
       />
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mb-7 grid grid-cols-1 gap-4 rounded-lg border bg-card p-5 shadow-[0_1px_2px_rgba(24,32,38,0.04)] sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="pipe-q">Company/title</Label>
-          <Input id="pipe-q" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Label htmlFor="pipe-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
+            Company/title
+          </Label>
+          <Input
+            id="pipe-q"
+            className="h-10 bg-card"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="pipe-fit">Min fit</Label>
+          <Label htmlFor="pipe-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
+            Min fit
+          </Label>
           <Slider
             id="pipe-fit"
             aria-label="Min fit"
@@ -89,11 +98,16 @@ export function PipelineContainer() {
         />
       ) : (
         stages.map((stage) => (
-          <section key={stage} className="mb-6">
-            <h2 className="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              {stage} · {byStage.get(stage)!.length}
-            </h2>
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <section key={stage} className="mb-8">
+            <div className="mb-3 flex items-center justify-between border-b pb-2">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {stage}
+              </h2>
+              <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">
+                {byStage.get(stage)!.length}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
               {byStage.get(stage)!.map((row) => (
                 <PipelineCard
                   key={row.jobId}
@@ -114,7 +128,7 @@ export function PipelineContainer() {
         ))
       )}
       {openId && (
-        <JobDrawer
+        <JobModal
           jobId={Number(openId)}
           onClose={() =>
             setParams(

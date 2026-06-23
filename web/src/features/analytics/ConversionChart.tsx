@@ -19,8 +19,15 @@ const config: ChartConfig = {
 export function ConversionChart({ rows }: { rows: Cohort[] }) {
   // Visual enhancement only; the cohort table is the canonical accessible form.
   return (
-    <div aria-hidden="true">
-      <ChartContainer config={config} className="h-56 w-full">
+    <div
+      aria-hidden="true"
+      className="rounded-lg border bg-card p-5 shadow-[0_1px_2px_rgba(24,32,38,0.04)]"
+    >
+      <div className="mb-4">
+        <div className="text-sm font-semibold">Conversion shape</div>
+        <div className="text-xs text-muted-foreground">Applications, interviews, and offers.</div>
+      </div>
+      <ChartContainer config={config} className="h-72 w-full">
         <BarChart data={rows} accessibilityLayer>
           <XAxis dataKey="label" tickLine={false} axisLine={false} />
           <YAxis allowDecimals={false} width={28} />

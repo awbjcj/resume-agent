@@ -8,7 +8,7 @@ import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
 import { FilterDesk } from "@/components/FilterDesk";
 import { JobCard } from "@/components/JobCard";
-import { JobDrawer } from "@/components/JobDrawer";
+import { JobModal } from "@/components/JobModal";
 import { applyFilters } from "@/lib/filters/apply";
 import { sortRows } from "@/lib/filters/sort";
 import { useShortlist } from "./use-shortlist";
@@ -80,7 +80,7 @@ export function ShortlistContainer() {
               body="Loosen a filter or clear the skill tags."
             />
           ) : (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
               {visible.map((row) => (
                 <JobCard
                   key={row.jobId}
@@ -89,7 +89,7 @@ export function ShortlistContainer() {
                   onOpen={() => openJob(row.jobId)}
                   footer={
                     <Button className="w-full" onClick={() => approve.mutate(row.jobId)}>
-                      Approve for tailoring →
+                      Approve for tailoring
                     </Button>
                   }
                 />
@@ -98,7 +98,7 @@ export function ShortlistContainer() {
           )}
         </>
       )}
-      {openId && <JobDrawer jobId={Number(openId)} onClose={closeJob} />}
+      {openId && <JobModal jobId={Number(openId)} onClose={closeJob} />}
     </>
   );
 }

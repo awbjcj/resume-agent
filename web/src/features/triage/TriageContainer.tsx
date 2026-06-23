@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { JobDrawer } from "@/components/JobDrawer";
+import { JobModal } from "@/components/JobModal";
 import { TriageCard } from "./TriageCard";
 import { PrunePanel } from "./PrunePanel";
 import { useTriage } from "./use-triage";
@@ -46,9 +46,11 @@ export function TriageContainer() {
         title="Triage Desk"
         sub="Raw and rejected jobs before the shortlist. Archive noise, delete dead-ends, prune in bulk."
       />
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-5 inline-flex items-center gap-3 rounded-lg border bg-card px-4 py-3 shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
         <Switch id="show-archived" checked={archived} onCheckedChange={setArchived} />
-        <Label htmlFor="show-archived">Show archived</Label>
+        <Label htmlFor="show-archived" className="text-sm font-medium">
+          Show archived
+        </Label>
       </div>
       <MetricRow
         items={[
@@ -64,8 +66,8 @@ export function TriageContainer() {
         />
       ) : (
         <>
-          <div className="mb-4 flex items-center gap-3">
-            <span className="text-sm">
+          <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
+            <span className="rounded-full bg-secondary px-3 py-1.5 text-sm">
               <strong>{selected.size}</strong> selected
             </span>
             {archived ? (
@@ -104,7 +106,7 @@ export function TriageContainer() {
               }}
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
             {rows.map((row) => (
               <TriageCard
                 key={row.jobId}
@@ -126,7 +128,7 @@ export function TriageContainer() {
         </>
       )}
       {openId && (
-        <JobDrawer
+        <JobModal
           jobId={Number(openId)}
           onClose={() =>
             setParams(

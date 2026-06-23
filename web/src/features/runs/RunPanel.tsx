@@ -9,10 +9,11 @@ export function RunPanel() {
   if (runs.length === 0) return null;
   return (
     // aria-live announces run start/progress/completion to screen readers.
-    <div aria-live="polite" className="space-y-2 border-b px-6 py-3">
+    <div aria-live="polite" className="border-b bg-card/55 px-5 py-3 md:px-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[1680px] space-y-2">
       {runs.map((r) => (
-        <div key={r.runId} className="rounded-lg border bg-card p-2">
-          <div className="flex items-baseline justify-between font-mono text-xs uppercase tracking-widest">
+        <div key={r.runId} className="rounded-lg border bg-card p-3 shadow-sm">
+          <div className="flex items-baseline justify-between text-xs font-semibold uppercase tracking-[0.16em]">
             <span>
               {r.kind}
               {r.phase ? ` · ${r.phase}` : ""}
@@ -27,6 +28,7 @@ export function RunPanel() {
           {r.error && <p className="mt-1 text-xs text-destructive">{r.error}</p>}
         </div>
       ))}
+      </div>
     </div>
   );
 }

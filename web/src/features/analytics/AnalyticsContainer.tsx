@@ -26,35 +26,37 @@ function CohortTable({
   rows: Cohort[];
 }) {
   return (
-    <Table>
-      <caption className="mb-2 text-left font-mono text-xs uppercase tracking-widest text-muted-foreground">
-        {caption}
-      </caption>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{header}</TableHead>
-          <TableHead>Apps</TableHead>
-          <TableHead>Responses</TableHead>
-          <TableHead>Interviews</TableHead>
-          <TableHead>Offers</TableHead>
-          <TableHead>Interview %</TableHead>
-          <TableHead>Offer %</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((c) => (
-          <TableRow key={c.label}>
-            <TableCell>{c.label}</TableCell>
-            <TableCell>{c.applications}</TableCell>
-            <TableCell>{c.responses}</TableCell>
-            <TableCell>{c.interviews}</TableCell>
-            <TableCell>{c.offers}</TableCell>
-            <TableCell>{c.interviewRate}</TableCell>
-            <TableCell>{c.offerRate}</TableCell>
+    <div className="overflow-x-auto rounded-lg border bg-card shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
+      <Table>
+        <caption className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {caption}
+        </caption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{header}</TableHead>
+            <TableHead>Apps</TableHead>
+            <TableHead>Responses</TableHead>
+            <TableHead>Interviews</TableHead>
+            <TableHead>Offers</TableHead>
+            <TableHead>Interview %</TableHead>
+            <TableHead>Offer %</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {rows.map((c) => (
+            <TableRow key={c.label}>
+              <TableCell>{c.label}</TableCell>
+              <TableCell>{c.applications}</TableCell>
+              <TableCell>{c.responses}</TableCell>
+              <TableCell>{c.interviews}</TableCell>
+              <TableCell>{c.offers}</TableCell>
+              <TableCell>{c.interviewRate}</TableCell>
+              <TableCell>{c.offerRate}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 

@@ -40,29 +40,31 @@ export function MatchGapContainer() {
           body="Your profile covers every required skill across your target jobs."
         />
       ) : (
-        <Table>
-          <caption className="mb-2 text-left font-mono text-xs uppercase tracking-widest text-muted-foreground">
-            Most-demanded missing skills
-          </caption>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Skill</TableHead>
-              <TableHead>Demanded by</TableHead>
-              <TableHead>Share %</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.gaps.map((g) => (
-              <TableRow key={g.skill}>
-                <TableCell>{g.skill}</TableCell>
-                <TableCell>
-                  {g.demandCount}/{g.targetTotal}
-                </TableCell>
-                <TableCell>{g.demandShare}</TableCell>
+        <div className="overflow-x-auto rounded-lg border bg-card shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
+          <Table>
+            <caption className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Most-demanded missing skills
+            </caption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Skill</TableHead>
+                <TableHead>Demanded by</TableHead>
+                <TableHead>Share %</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {data.gaps.map((g) => (
+                <TableRow key={g.skill}>
+                  <TableCell>{g.skill}</TableCell>
+                  <TableCell>
+                    {g.demandCount}/{g.targetTotal}
+                  </TableCell>
+                  <TableCell>{g.demandShare}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </>
   );
