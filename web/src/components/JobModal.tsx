@@ -18,20 +18,20 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="block max-h-[90vh] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:max-w-5xl">
+      <DialogContent className="block max-h-[92vh] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:max-w-6xl">
         {isLoading || !job ? (
           <div className="p-6">
             <DrawerSkeleton />
           </div>
         ) : (
-          <div className="flex max-h-[90vh] flex-col">
+          <div className="flex max-h-[92vh] flex-col">
             {/* ── Gradient-mesh masthead ─────────────────────────────── */}
-            <header className="jobmodal-mesh relative shrink-0 overflow-hidden border-b px-6 py-6 pr-14">
+            <header className="jobmodal-mesh relative shrink-0 overflow-hidden border-b px-8 py-7 pr-16">
               <div className="relative">
-                <DialogTitle className="font-heading text-2xl leading-tight font-semibold text-foreground sm:text-3xl">
+                <DialogTitle className="font-heading text-3xl leading-tight font-semibold text-foreground sm:text-4xl">
                   {job.title ?? "—"}
                 </DialogTitle>
-                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-foreground/70">
+                <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-base text-foreground/70">
                   <span className="font-medium text-foreground/90">
                     {job.company ?? "—"}
                   </span>
@@ -43,7 +43,7 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
                       href={job.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="ml-auto inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-background/60 px-3 py-1 text-xs font-semibold backdrop-blur-sm transition-colors hover:bg-background"
+                      className="ml-auto inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-background/60 px-3.5 py-1.5 text-sm font-semibold backdrop-blur-sm transition-colors hover:bg-background"
                     >
                       Open posting ↗
                     </a>
@@ -54,13 +54,13 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
 
             {/* ── Two-pane body: rail (fit + meta + skills) | main (JD) ─ */}
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-              <aside className="shrink-0 space-y-5 overflow-y-auto border-b bg-muted/30 px-5 py-5 lg:w-[340px] lg:border-b-0 lg:border-r">
+              <aside className="shrink-0 space-y-6 overflow-y-auto border-b bg-muted/30 px-6 py-6 lg:w-[400px] lg:border-b-0 lg:border-r">
                 <div className="flex justify-center">
                   <FitDial score={job.fitScore} />
                 </div>
                 <JobMeta job={job} />
                 <div className="rise-in" style={{ "--rise-i": 4 } as React.CSSProperties}>
-                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Skills
                   </h3>
                   <SkillMatrix skills={job.skills} />
@@ -69,9 +69,9 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
 
               <section className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <Tabs defaultValue="jd" className="flex min-h-0 flex-1 flex-col">
-                  <TabsList className="h-auto shrink-0 flex-wrap justify-start rounded-none border-b bg-transparent px-5 pt-4">
-                    <TabsTrigger value="jd">Job description</TabsTrigger>
-                    <TabsTrigger value="versions">
+                  <TabsList className="h-auto shrink-0 flex-wrap justify-start gap-1 rounded-none border-b bg-transparent px-6 pt-5 text-base">
+                    <TabsTrigger value="jd" className="text-sm">Job description</TabsTrigger>
+                    <TabsTrigger value="versions" className="text-sm">
                       Versions
                       {job.resumeVersions.length > 0 && (
                         <span className="ml-1.5 tabular-nums opacity-60">
@@ -79,21 +79,21 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
                         </span>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="application">Application</TabsTrigger>
-                    <TabsTrigger value="manage">Manage</TabsTrigger>
+                    <TabsTrigger value="application" className="text-sm">Application</TabsTrigger>
+                    <TabsTrigger value="manage" className="text-sm">Manage</TabsTrigger>
                   </TabsList>
 
-                  <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+                  <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
                     <TabsContent value="jd" className="mt-0">
                       {job.fitRationale && (
-                        <p className="mb-4 rounded-xl border bg-accent/40 p-4 text-sm leading-6">
+                        <p className="mb-5 rounded-xl border bg-accent/40 p-5 text-[15px] leading-7">
                           {job.fitRationale}
                         </p>
                       )}
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                         Job description
                       </h3>
-                      <pre className="mt-3 rounded-xl border bg-background/60 p-4 font-sans text-sm leading-6 whitespace-pre-wrap">
+                      <pre className="mt-3 rounded-xl border bg-background/60 p-5 font-sans text-[15px] leading-7 whitespace-pre-wrap">
                         {job.jdText}
                       </pre>
                     </TabsContent>

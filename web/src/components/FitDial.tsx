@@ -8,7 +8,7 @@ const BANDS = [
   { min: 0, stroke: "var(--chart-4)" }, // weak — muted blue
 ];
 
-export function FitDial({ score, size = 132 }: { score: number | null; size?: number }) {
+export function FitDial({ score, size = 160 }: { score: number | null; size?: number }) {
   const r = size / 2 - 10;
   const circ = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(100, score ?? 0)) / 100;
@@ -51,10 +51,10 @@ export function FitDial({ score, size = 132 }: { score: number | null; size?: nu
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-heading text-4xl font-semibold leading-none tabular-nums">
+        <span className="font-heading text-5xl font-semibold leading-none tabular-nums">
           {score ?? "—"}
         </span>
-        <span className="mt-1.5 text-[0.6rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+        <span className="mt-2 text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
           fit
         </span>
       </div>

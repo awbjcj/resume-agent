@@ -5,6 +5,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Base UI components expose orientation via `data-orientation="horizontal|vertical"`.
+   The shadcn/base-ui Slider, ScrollArea, Separator, and Tabs primitives size
+   themselves with `data-horizontal:*` / `data-vertical:*` utilities, which only
+   resolve once these custom variants map them onto that attribute. Without them
+   the Slider track collapses to zero height and becomes uninteractable. */
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;
@@ -202,10 +210,10 @@
 .skill-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.32rem;
+  gap: 0.36rem;
   border-radius: 9999px;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.74rem;
+  padding: 0.3rem 0.72rem;
+  font-size: 0.84rem;
   font-weight: 550;
   line-height: 1.2;
   border: 1px solid transparent;

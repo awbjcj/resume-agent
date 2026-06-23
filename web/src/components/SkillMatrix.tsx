@@ -46,11 +46,11 @@ function Group({
   if (tags.length === 0) return null;
   return (
     <div>
-      <div className="mb-2 flex items-baseline gap-2">
-        <h4 className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+      <div className="mb-2.5 flex items-baseline gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {label}
         </h4>
-        <span className="text-[0.68rem] font-medium tabular-nums text-muted-foreground/70">
+        <span className="text-xs font-medium tabular-nums text-muted-foreground/70">
           {tags.length}
         </span>
       </div>
@@ -94,7 +94,7 @@ export function SkillMatrix({
         activeSkills={activeSkills}
         baseIndex={must.length}
       />
-      <div className="flex items-center gap-4 border-t pt-3 text-[0.68rem] text-muted-foreground">
+      <div className="flex items-center gap-4 border-t pt-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span aria-hidden className="text-primary">●</span> you have
         </span>

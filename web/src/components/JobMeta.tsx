@@ -13,11 +13,11 @@ const SPONSORSHIP_TONE: Record<string, string> = {
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <dt className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+    <div className="flex items-baseline justify-between gap-3 py-2">
+      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </dt>
-      <dd className="text-right text-sm font-medium">{children}</dd>
+      <dd className="text-right text-base font-medium">{children}</dd>
     </div>
   );
 }
