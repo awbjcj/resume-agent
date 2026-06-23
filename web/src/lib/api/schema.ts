@@ -444,6 +444,14 @@ export interface components {
             /** Jobids */
             jobIds?: number[] | null;
         };
+        /** DiscoverParams */
+        DiscoverParams: {
+            /**
+             * Mode
+             * @default discover
+             */
+            mode: string;
+        };
         /** GapOut */
         GapOut: {
             /** Demandcount */
@@ -878,7 +886,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DiscoverParams"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {

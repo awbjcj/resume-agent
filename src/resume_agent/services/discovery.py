@@ -16,7 +16,7 @@ from resume_agent.discovery.connectors.config import load_connectors_config
 from resume_agent.discovery.connectors.registry import build_connectors
 from resume_agent.discovery.connectors.runner import PullReport, run_pull
 from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.pipeline import discover
+from resume_agent.discovery.pipeline import backfill_rescore, discover, reextract
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.profile.store import load_facts
@@ -107,3 +107,45 @@ def pull_jobs(
     return run_pull(
         session, connectors, search_config, telemetry_path, limit=limit, reporter=reporter
     )
+
+
+def reextract_metadata(
+    session: Session,
+    *,
+    bundle: DiscoveryBundle | None = None,
+    reporter: ProgressReporter | None = None,
+) -> int:
+    """Re-extract criteria_json for already-processed jobs (backfill new fields).
+
+    The dashboard's "Re-extract" discover mode. Does not change status or fit.
+    Returns the number of jobs updated.
+    """
+    bundle = bundle or build_discovery_bundle()
+    if reporter is not None:
+        reporter.begin(1, "Re-extracting job metadata")
+    updated = reextract(session, bundle.extract)
+    if reporter is not None:
+        reporter.step(1, label=f"Re-extracted {updated} job(s)")
+    return updated
+
+
+def rescore_existing(
+    session: Session,
+    *,
+    facts_path: str = DEFAULT_FACTS,
+    bundle: DiscoveryBundle | None = None,
+    reporter: ProgressReporter | None = None,
+) -> int:
+    """Backfill SIC + location for already-shortlisted jobs.
+
+    The dashboard's "Re-score" discover mode. Does not change fit or status.
+    Returns the number of jobs updated.
+    """
+    facts = load_facts(facts_path)
+    bundle = bundle or build_discovery_bundle()
+    if reporter is not None:
+        reporter.begin(1, "Backfilling SIC + location")
+    updated = backfill_rescore(session, facts, bundle.fit, canonicalizer=bundle.canonicalizer)
+    if reporter is not None:
+        reporter.step(1, label=f"Rescored {updated} job(s)")
+    return updated

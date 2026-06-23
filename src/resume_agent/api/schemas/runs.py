@@ -32,6 +32,12 @@ class PullParams(CamelModel):
     limit: int | None = None
 
 
+class DiscoverParams(CamelModel):
+    # discover (run the funnel) | reextract (backfill metadata) | rescore
+    # (backfill SIC + location). Mirrors the CLI's three discover behaviors.
+    mode: str = "discover"
+
+
 class TailorParams(CamelModel):
     job_ids: list[int] | None = None
     approved: bool = False

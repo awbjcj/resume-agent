@@ -284,6 +284,17 @@
         "title": "CoverLetterParams",
         "type": "object"
       },
+      "DiscoverParams": {
+        "properties": {
+          "mode": {
+            "default": "discover",
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "title": "DiscoverParams",
+        "type": "object"
+      },
       "GapOut": {
         "properties": {
           "demandCount": {
@@ -1792,6 +1803,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DiscoverParams"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Params"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "content": {

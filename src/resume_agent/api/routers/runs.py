@@ -19,13 +19,20 @@ from resume_agent.api.runs.sse import record_to_run, run_events
 from resume_agent.api.schemas.runs import (
     AddJobUrlParams,
     CoverLetterParams,
+    DiscoverParams,
     PullParams,
     RunOut,
     TailorParams,
 )
 from resume_agent.db import get_session
 from resume_agent.services.cover_letters import write_cover_letters
-from resume_agent.services.discovery import add_job_from_url, discover_jobs, pull_jobs
+from resume_agent.services.discovery import (
+    add_job_from_url,
+    discover_jobs,
+    pull_jobs,
+    reextract_metadata,
+    rescore_existing,
+)
 from resume_agent.services.tailoring import tailor
 
 router = APIRouter()
@@ -36,11 +43,22 @@ def _engine(request: Request):
 
 
 @router.post("/discover", response_model=RunOut, status_code=202)
-def launch_discover(request: Request, mgr: RunManager = Depends(get_run_manager)):
+def launch_discover(
+    request: Request,
+    params: DiscoverParams | None = None,
+    mgr: RunManager = Depends(get_run_manager),
+):
     engine = _engine(request)
+    mode = (params or DiscoverParams()).mode
+    if mode not in ("discover", "reextract", "rescore"):
+        raise ApiException(422, "VALIDATION_ERROR", f"Unknown discover mode '{mode}'")
 
     def work(reporter):
         with get_session(engine) as session:
+            if mode == "reextract":
+                return {"reextracted": reextract_metadata(session, reporter=reporter)}
+            if mode == "rescore":
+                return {"rescored": rescore_existing(session, reporter=reporter)}
             return {"statusCounts": discover_jobs(session, reporter=reporter)}
 
     run_id = mgr.submit("discover", work)
