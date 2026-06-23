@@ -21,6 +21,8 @@ from resume_agent.api.schemas.runs import (
     CoverLetterParams,
     DiscoverParams,
     PullParams,
+    RefreshParams,
+    ReprocessParams,
     RunOut,
     TailorParams,
 )
@@ -30,8 +32,8 @@ from resume_agent.services.discovery import (
     add_job_from_url,
     discover_jobs,
     pull_jobs,
-    reextract_metadata,
-    rescore_existing,
+    refresh_jobs,
+    reprocess_jobs,
 )
 from resume_agent.services.tailoring import tailor
 
@@ -49,16 +51,9 @@ def launch_discover(
     mgr: RunManager = Depends(get_run_manager),
 ):
     engine = _engine(request)
-    mode = (params or DiscoverParams()).mode
-    if mode not in ("discover", "reextract", "rescore"):
-        raise ApiException(422, "VALIDATION_ERROR", f"Unknown discover mode '{mode}'")
 
     def work(reporter):
         with get_session(engine) as session:
-            if mode == "reextract":
-                return {"reextracted": reextract_metadata(session, reporter=reporter)}
-            if mode == "rescore":
-                return {"rescored": rescore_existing(session, reporter=reporter)}
             return {"statusCounts": discover_jobs(session, reporter=reporter)}
 
     run_id = mgr.submit("discover", work)
@@ -67,8 +62,48 @@ def launch_discover(
     return record_to_run(run_id, record)
 
 
+@router.post("/reprocess", response_model=RunOut, status_code=202)
+def launch_reprocess(
+    params: ReprocessParams, request: Request, mgr: RunManager = Depends(get_run_manager)
+):
+    engine = _engine(request)
+
+    def work(reporter):
+        with get_session(engine) as session:
+            return {"statusCounts": reprocess_jobs(session, scopes=params.scopes, reporter=reporter)}
+
+    run_id = mgr.submit("reprocess", work)
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
+
+
+@router.post("/refresh", response_model=RunOut, status_code=202)
+def launch_refresh(
+    params: RefreshParams, request: Request, mgr: RunManager = Depends(get_run_manager)
+):
+    engine = _engine(request)
+
+    def work(reporter):
+        with get_session(engine) as session:
+            report = refresh_jobs(session, limit=params.limit, reporter=reporter)
+            return {
+                "pulled": report.pulled,
+                "totals": report.totals,
+                "statusCounts": report.status_counts,
+                "failures": report.failures,
+            }
+
+    run_id = mgr.submit("refresh", work)
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
+
+
 @router.post("/pull", response_model=RunOut, status_code=202)
-def launch_pull(params: PullParams, request: Request, mgr: RunManager = Depends(get_run_manager)):
+def launch_pull(
+    params: PullParams, request: Request, mgr: RunManager = Depends(get_run_manager)
+):
     engine = _engine(request)
 
     def work(reporter):
@@ -83,19 +118,29 @@ def launch_pull(params: PullParams, request: Request, mgr: RunManager = Depends(
 
 
 @router.post("/tailor", response_model=RunOut, status_code=202)
-def launch_tailor(params: TailorParams, request: Request, mgr: RunManager = Depends(get_run_manager)):
+def launch_tailor(
+    params: TailorParams, request: Request, mgr: RunManager = Depends(get_run_manager)
+):
     engine = _engine(request)
 
     def work(reporter):
         with get_session(engine) as session:
             results = tailor(
-                session, job_ids=params.job_ids, approved=params.approved, reporter=reporter
+                session,
+                job_ids=params.job_ids,
+                approved=params.approved,
+                reporter=reporter,
             )
-            return {"jobs": [
-                {"jobId": jid, "versionCount": len(v),
-                 "factCheckPassed": v[-1].fact_check_passed if v else False}
-                for jid, v in results.items()
-            ]}
+            return {
+                "jobs": [
+                    {
+                        "jobId": jid,
+                        "versionCount": len(v),
+                        "factCheckPassed": v[-1].fact_check_passed if v else False,
+                    }
+                    for jid, v in results.items()
+                ]
+            }
 
     run_id = mgr.submit("tailor", work)
     record = mgr.get(run_id)
@@ -114,12 +159,21 @@ def launch_cover_letters(
     def work(reporter):
         with get_session(engine) as session:
             results = write_cover_letters(
-                session, job_ids=params.job_ids, approved=params.approved, reporter=reporter
+                session,
+                job_ids=params.job_ids,
+                approved=params.approved,
+                reporter=reporter,
             )
-            return {"coverLetters": [
-                {"jobId": r.job_id, "coverLetterId": r.cover_letter_id,
-                 "factCheckPassed": r.fact_check_passed} for r in results
-            ]}
+            return {
+                "coverLetters": [
+                    {
+                        "jobId": r.job_id,
+                        "coverLetterId": r.cover_letter_id,
+                        "factCheckPassed": r.fact_check_passed,
+                    }
+                    for r in results
+                ]
+            }
 
     run_id = mgr.submit("coverLetter", work)
     record = mgr.get(run_id)
@@ -139,8 +193,12 @@ def launch_add_from_url(
         reporter.begin(1, f"Fetching {params.url}")
         with get_session(engine) as session:
             job = add_job_from_url(
-                session, url=params.url, company=params.company, title=params.title,
-                location=params.location, allow_browser=params.allow_browser,
+                session,
+                url=params.url,
+                company=params.company,
+                title=params.title,
+                location=params.location,
+                allow_browser=params.allow_browser,
             )
             job_id = job.id if job else None
             duplicate = job is None

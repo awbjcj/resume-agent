@@ -33,9 +33,16 @@ class PullParams(CamelModel):
 
 
 class DiscoverParams(CamelModel):
-    # discover (run the funnel) | reextract (backfill metadata) | rescore
-    # (backfill SIC + location). Mirrors the CLI's three discover behaviors.
-    mode: str = "discover"
+    # Discover now only runs the funnel over new (raw) jobs. No modes.
+    pass
+
+
+class ReprocessParams(CamelModel):
+    scopes: list[str] = ["shortlisted"]
+
+
+class RefreshParams(CamelModel):
+    limit: int | None = None
 
 
 class TailorParams(CamelModel):

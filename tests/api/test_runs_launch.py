@@ -63,3 +63,29 @@ def test_tailor_launch_passes_params(monkeypatch, tmp_path):
     with client:
         client.post("/api/tailor", json={"jobIds": [1, 2], "approved": False})
     assert captured["job_ids"] == [1, 2]
+
+
+def test_reprocess_endpoint_launches_run(monkeypatch, tmp_path):
+    def fake_reprocess_jobs(session, *, scopes, reporter=None, **kw):
+        return {"shortlisted": 1}
+
+    monkeypatch.setattr(runs_router, "reprocess_jobs", fake_reprocess_jobs)
+    client = _client(tmp_path)
+    with client:
+        resp = client.post("/api/reprocess", json={"scopes": ["shortlisted"]})
+    assert resp.status_code == 202
+    assert resp.json()["kind"] == "reprocess"
+
+
+def test_refresh_endpoint_launches_run(monkeypatch, tmp_path):
+    from resume_agent.services.discovery import RefreshReport
+
+    def fake_refresh_jobs(session, *, limit=None, reporter=None, **kw):
+        return RefreshReport(pulled=0, totals={}, status_counts={}, failures={})
+
+    monkeypatch.setattr(runs_router, "refresh_jobs", fake_refresh_jobs)
+    client = _client(tmp_path)
+    with client:
+        resp = client.post("/api/refresh", json={"limit": None})
+    assert resp.status_code == 202
+    assert resp.json()["kind"] == "refresh"

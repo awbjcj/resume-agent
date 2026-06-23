@@ -210,6 +210,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Refresh */
+        post: operations["launch_refresh_api_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reprocess": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Reprocess */
+        post: operations["launch_reprocess_api_reprocess_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/resume-versions/{version_id}/pdf": {
         parameters: {
             query?: never;
@@ -445,13 +479,7 @@ export interface components {
             jobIds?: number[] | null;
         };
         /** DiscoverParams */
-        DiscoverParams: {
-            /**
-             * Mode
-             * @default discover
-             */
-            mode: string;
-        };
+        DiscoverParams: Record<string, never>;
         /** GapOut */
         GapOut: {
             /** Demandcount */
@@ -650,6 +678,21 @@ export interface components {
         PullParams: {
             /** Limit */
             limit?: number | null;
+        };
+        /** RefreshParams */
+        RefreshParams: {
+            /** Limit */
+            limit?: number | null;
+        };
+        /** ReprocessParams */
+        ReprocessParams: {
+            /**
+             * Scopes
+             * @default [
+             *       "shortlisted"
+             *     ]
+             */
+            scopes: string[];
         };
         /** ResumeVersionOut */
         ResumeVersionOut: {
@@ -1258,6 +1301,76 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PullParams"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_refresh_api_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshParams"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_reprocess_api_reprocess_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReprocessParams"];
             };
         };
         responses: {
