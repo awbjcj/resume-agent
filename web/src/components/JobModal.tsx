@@ -11,6 +11,7 @@ import { StageManager } from "@/features/job/StageManager";
 import { useJobDetail } from "@/features/job/use-job-detail";
 import { useRenderVersion } from "@/features/job/use-job-mutations";
 import { withTokenParam } from "@/lib/api/client";
+import { JdBody } from "./JdBody";
 
 export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => void }) {
   const { data: job, isLoading } = useJobDetail(jobId);
@@ -93,9 +94,7 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
                       <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                         Job description
                       </h3>
-                      <pre className="mt-3 rounded-xl border bg-background/60 p-5 font-sans text-[15px] leading-7 whitespace-pre-wrap">
-                        {job.jdText}
-                      </pre>
+                      <JdBody text={job.jdText} />
                     </TabsContent>
 
                     <TabsContent value="versions" className="mt-0">
