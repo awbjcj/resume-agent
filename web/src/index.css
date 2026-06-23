@@ -6,10 +6,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-serif);
+    --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;
-    --font-serif: 'Newsreader', Georgia, serif;
-    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --font-serif: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'Geist Variable', ui-monospace, monospace;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,77 +50,73 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Palette ported from src/resume_agent/dashboard/ui.py THEME_CSS.
-   paper/paper-2/ink/muted/oxblood/danger/rule -> shadcn semantic tokens. */
 :root {
-    --radius: 0.5rem; /* ui.py --radius: 8px */
-    --background: #f4f1ea;   /* paper */
-    --foreground: #16130f;   /* ink */
-    --card: #efeae0;         /* paper-2 */
-    --card-foreground: #16130f;
-    --popover: #efeae0;
-    --popover-foreground: #16130f;
-    --primary: #8c2f1f;      /* oxblood */
-    --primary-foreground: #f4f1ea;
-    --secondary: #efeae0;
-    --secondary-foreground: #16130f;
-    --muted: #efeae0;
-    --muted-foreground: #6c6253;
-    --accent: #efeae0;
-    --accent-foreground: #8c2f1f;
-    --destructive: #9f2f35;  /* danger */
-    --border: rgba(22, 19, 15, 0.16);  /* rule */
-    --input: rgba(22, 19, 15, 0.16);
-    --ring: #8c2f1f;
-    --chart-1: #8c2f1f;
-    --chart-2: #6c6253;
-    --chart-3: #16130f;
-    --chart-4: #b5654d;
-    --chart-5: #a89a85;
-    --sidebar: #f4f1ea;
-    --sidebar-foreground: #16130f;
-    --sidebar-primary: #8c2f1f;
-    --sidebar-primary-foreground: #f4f1ea;
-    --sidebar-accent: #efeae0;
-    --sidebar-accent-foreground: #16130f;
-    --sidebar-border: rgba(22, 19, 15, 0.16);
-    --sidebar-ring: #8c2f1f;
+    --radius: 0.5rem;
+    --background: #f6f8fb;
+    --foreground: #182026;
+    --card: #ffffff;
+    --card-foreground: #182026;
+    --popover: #ffffff;
+    --popover-foreground: #182026;
+    --primary: #08708a;
+    --primary-foreground: #ffffff;
+    --secondary: #eef4f7;
+    --secondary-foreground: #182026;
+    --muted: #eef4f7;
+    --muted-foreground: #65717c;
+    --accent: #e6f7fa;
+    --accent-foreground: #075f76;
+    --destructive: #bd2d46;
+    --border: rgba(24, 32, 38, 0.12);
+    --input: rgba(24, 32, 38, 0.14);
+    --ring: #0a94a8;
+    --chart-1: #08708a;
+    --chart-2: #16a085;
+    --chart-3: #3867d6;
+    --chart-4: #78b7d0;
+    --chart-5: #8b95a1;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #1d252d;
+    --sidebar-primary: #08708a;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e6f7fa;
+    --sidebar-accent-foreground: #075f76;
+    --sidebar-border: rgba(24, 32, 38, 0.12);
+    --sidebar-ring: #0a94a8;
 }
 
-/* Dark mode is net-new (ui.py is light-only): darkened paper/ink with a
-   lightened oxblood for contrast. */
 .dark {
-    --background: #16130f;
-    --foreground: #f4f1ea;
-    --card: #1f1b16;
-    --card-foreground: #f4f1ea;
-    --popover: #1f1b16;
-    --popover-foreground: #f4f1ea;
-    --primary: #c8553d;
-    --primary-foreground: #16130f;
-    --secondary: #1f1b16;
-    --secondary-foreground: #f4f1ea;
-    --muted: #1f1b16;
-    --muted-foreground: #a89a85;
-    --accent: #1f1b16;
-    --accent-foreground: #c8553d;
-    --destructive: #d4565b;
-    --border: rgba(244, 241, 234, 0.16);
-    --input: rgba(244, 241, 234, 0.16);
-    --ring: #c8553d;
-    --chart-1: #c8553d;
-    --chart-2: #a89a85;
-    --chart-3: #f4f1ea;
-    --chart-4: #8c2f1f;
-    --chart-5: #6c6253;
-    --sidebar: #1f1b16;
-    --sidebar-foreground: #f4f1ea;
-    --sidebar-primary: #c8553d;
-    --sidebar-primary-foreground: #16130f;
-    --sidebar-accent: #16130f;
-    --sidebar-accent-foreground: #f4f1ea;
-    --sidebar-border: rgba(244, 241, 234, 0.16);
-    --sidebar-ring: #c8553d;
+    --background: #121416;
+    --foreground: #eef4f7;
+    --card: #181b1f;
+    --card-foreground: #eef4f7;
+    --popover: #181b1f;
+    --popover-foreground: #eef4f7;
+    --primary: #5bd8e7;
+    --primary-foreground: #102023;
+    --secondary: #20262b;
+    --secondary-foreground: #eef4f7;
+    --muted: #20262b;
+    --muted-foreground: #a7b1bb;
+    --accent: #17373c;
+    --accent-foreground: #8eeaf2;
+    --destructive: #ff6b82;
+    --border: rgba(238, 244, 247, 0.12);
+    --input: rgba(238, 244, 247, 0.16);
+    --ring: #5bd8e7;
+    --chart-1: #5bd8e7;
+    --chart-2: #43d19e;
+    --chart-3: #86a9ff;
+    --chart-4: #76c4d9;
+    --chart-5: #a7b1bb;
+    --sidebar: #181b1f;
+    --sidebar-foreground: #eef4f7;
+    --sidebar-primary: #5bd8e7;
+    --sidebar-primary-foreground: #102023;
+    --sidebar-accent: #17373c;
+    --sidebar-accent-foreground: #8eeaf2;
+    --sidebar-border: rgba(238, 244, 247, 0.12);
+    --sidebar-ring: #5bd8e7;
 }
 
 @layer base {
@@ -128,7 +124,11 @@
     @apply border-border outline-ring/50;
     }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-[15px] text-foreground antialiased;
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--border), transparent 55%) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--border), transparent 60%) 1px, transparent 1px);
+    background-size: 72px 72px;
     }
   html {
     @apply font-sans;
@@ -138,6 +138,89 @@
 /* NavLink active state inside the sidebar (NavLink sets aria-current="page"). */
 [data-sidebar="menu-button"][aria-current="page"] {
   background: var(--sidebar-accent);
-  font-weight: 600;
+  color: var(--sidebar-accent-foreground);
+  font-weight: 650;
+  box-shadow: inset 3px 0 0 var(--sidebar-primary);
 }
 
+/* ── Job detail modal: gradient-mesh header + animated focal elements ──────── */
+
+/* Layered radial wash in the brand palette — atmosphere behind the masthead.
+   Sits under the title; kept low-contrast so foreground text stays legible. */
+.jobmodal-mesh {
+  background-color: var(--accent);
+  background-image:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--primary), transparent 55%), transparent 55%),
+    radial-gradient(100% 120% at 100% 0%, color-mix(in oklab, var(--chart-3), transparent 60%), transparent 50%),
+    radial-gradient(90% 160% at 60% 120%, color-mix(in oklab, var(--chart-2), transparent 62%), transparent 55%);
+}
+/* Faint diagonal grain so the wash reads as a surface, not a flat fill. */
+.jobmodal-mesh::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--foreground), transparent 94%) 0 1px,
+    transparent 1px 7px
+  );
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+}
+
+/* Radial fit dial: the ring sweeps from empty to its value once on open. */
+@keyframes dial-sweep {
+  from { stroke-dashoffset: var(--dial-circ); }
+  to { stroke-dashoffset: var(--dial-offset); }
+}
+.dial-ring {
+  stroke-dasharray: var(--dial-circ);
+  stroke-dashoffset: var(--dial-offset);
+  animation: dial-sweep 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+/* Staggered fade-up for the rail's skill groups + meta rows on open. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise-in {
+  animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--rise-i, 0) * 70ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dial-ring,
+  .rise-in {
+    animation: none;
+  }
+}
+
+/* Skill chip channels: filled = covered (you have it), outlined = gap. */
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  border-radius: 9999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 550;
+  line-height: 1.2;
+  border: 1px solid transparent;
+}
+.skill-chip[data-covered="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: color-mix(in oklab, var(--primary), black 8%);
+}
+.skill-chip[data-covered="false"] {
+  background: transparent;
+  color: var(--muted-foreground);
+  border-color: var(--input);
+  border-style: dashed;
+}
+.skill-chip[data-active="true"] {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring), transparent 45%);
+}
