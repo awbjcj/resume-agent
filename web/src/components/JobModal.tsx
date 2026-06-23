@@ -1,0 +1,159 @@
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "./StatusBadge";
+import { FitDial } from "./FitDial";
+import { JobMeta } from "./JobMeta";
+import { SkillMatrix } from "./SkillMatrix";
+import { DrawerSkeleton } from "./skeletons";
+import { ApplicationEditor } from "@/features/job/ApplicationEditor";
+import { StageManager } from "@/features/job/StageManager";
+import { useJobDetail } from "@/features/job/use-job-detail";
+import { useRenderVersion } from "@/features/job/use-job-mutations";
+import { withTokenParam } from "@/lib/api/client";
+
+export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => void }) {
+  const { data: job, isLoading } = useJobDetail(jobId);
+  const render = useRenderVersion(jobId);
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="block max-h-[90vh] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:max-w-5xl">
+        {isLoading || !job ? (
+          <div className="p-6">
+            <DrawerSkeleton />
+          </div>
+        ) : (
+          <div className="flex max-h-[90vh] flex-col">
+            {/* ── Gradient-mesh masthead ─────────────────────────────── */}
+            <header className="jobmodal-mesh relative shrink-0 overflow-hidden border-b px-6 py-6 pr-14">
+              <div className="relative">
+                <DialogTitle className="font-heading text-2xl leading-tight font-semibold text-foreground sm:text-3xl">
+                  {job.title ?? "—"}
+                </DialogTitle>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-foreground/70">
+                  <span className="font-medium text-foreground/90">
+                    {job.company ?? "—"}
+                  </span>
+                  <span aria-hidden>·</span>
+                  <span>{job.location ?? "location n/a"}</span>
+                  <StatusBadge status={job.status} />
+                  {job.url && (
+                    <a
+                      href={job.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ml-auto inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-background/60 px-3 py-1 text-xs font-semibold backdrop-blur-sm transition-colors hover:bg-background"
+                    >
+                      Open posting ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            </header>
+
+            {/* ── Two-pane body: rail (fit + meta + skills) | main (JD) ─ */}
+            <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+              <aside className="shrink-0 space-y-5 overflow-y-auto border-b bg-muted/30 px-5 py-5 lg:w-[340px] lg:border-b-0 lg:border-r">
+                <div className="flex justify-center">
+                  <FitDial score={job.fitScore} />
+                </div>
+                <JobMeta job={job} />
+                <div className="rise-in" style={{ "--rise-i": 4 } as React.CSSProperties}>
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Skills
+                  </h3>
+                  <SkillMatrix skills={job.skills} />
+                </div>
+              </aside>
+
+              <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <Tabs defaultValue="jd" className="flex min-h-0 flex-1 flex-col">
+                  <TabsList className="h-auto shrink-0 flex-wrap justify-start rounded-none border-b bg-transparent px-5 pt-4">
+                    <TabsTrigger value="jd">Job description</TabsTrigger>
+                    <TabsTrigger value="versions">
+                      Versions
+                      {job.resumeVersions.length > 0 && (
+                        <span className="ml-1.5 tabular-nums opacity-60">
+                          {job.resumeVersions.length}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="application">Application</TabsTrigger>
+                    <TabsTrigger value="manage">Manage</TabsTrigger>
+                  </TabsList>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+                    <TabsContent value="jd" className="mt-0">
+                      {job.fitRationale && (
+                        <p className="mb-4 rounded-xl border bg-accent/40 p-4 text-sm leading-6">
+                          {job.fitRationale}
+                        </p>
+                      )}
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Job description
+                      </h3>
+                      <pre className="mt-3 rounded-xl border bg-background/60 p-4 font-sans text-sm leading-6 whitespace-pre-wrap">
+                        {job.jdText}
+                      </pre>
+                    </TabsContent>
+
+                    <TabsContent value="versions" className="mt-0">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Resume versions
+                      </h3>
+                      {job.resumeVersions.length === 0 && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Not tailored yet.
+                        </p>
+                      )}
+                      <ul className="mt-2 space-y-2">
+                        {job.resumeVersions.map((v) => (
+                          <li
+                            key={v.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/60 p-3"
+                          >
+                            <span className="text-sm">
+                              Round {v.round} · score {v.reviewScore ?? "—"} ·{" "}
+                              {v.factCheckPassed ? "fact-check ✓" : "fact-check ✗"}
+                            </span>
+                            {v.pdfPath ? (
+                              <a
+                                className="text-sm underline"
+                                href={withTokenParam(`/api/resume-versions/${v.id}/pdf`)}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Download PDF
+                              </a>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => render.mutate(v.id)}
+                              >
+                                Render
+                              </Button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </TabsContent>
+
+                    <TabsContent value="application" className="mt-0">
+                      <ApplicationEditor jobId={jobId} application={job.application} />
+                    </TabsContent>
+
+                    <TabsContent value="manage" className="mt-0">
+                      <StageManager job={job} onDeleted={onClose} />
+                    </TabsContent>
+                  </div>
+                </Tabs>
+              </section>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
