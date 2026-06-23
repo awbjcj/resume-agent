@@ -54,7 +54,13 @@ def save_or_upgrade(
         location=location,
         posted_at=posted_at,
     )
-    existing = find_existing(session, incoming.url, incoming.jd_text, incoming.dedup_key)
+    existing = find_existing(
+        session,
+        incoming.url,
+        incoming.jd_text,
+        incoming.dedup_key,
+        incoming.content_fingerprint,
+    )
     return _apply(session, existing, incoming, decide(existing, incoming))
 
 
@@ -77,6 +83,7 @@ def _apply(
             location=incoming.location,
             posted_at=incoming.posted_at,
             dedup_key=incoming.dedup_key,
+            content_fingerprint=incoming.content_fingerprint,
             status=JobStatus.raw.value,
         )
         return save_job(session, job), IngestOutcome.inserted

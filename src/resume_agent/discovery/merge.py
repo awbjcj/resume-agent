@@ -13,7 +13,7 @@ from typing import Any
 
 from resume_agent.discovery.connectors.text import is_materially_richer
 from resume_agent.discovery.source_tier import source_rank
-from resume_agent.tracking.dedup import compute_dedup_key
+from resume_agent.tracking.dedup import compute_content_fingerprint, compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
 
 
@@ -61,6 +61,10 @@ class IncomingJob:
     @property
     def dedup_key(self) -> str | None:
         return compute_dedup_key(self.company, self.title)
+
+    @property
+    def content_fingerprint(self) -> str | None:
+        return compute_content_fingerprint(self.jd_text)
 
 
 @dataclass(frozen=True)
@@ -125,6 +129,7 @@ def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
         and is_materially_richer(incoming.jd_text, existing.jd_text)
     ):
         updates: dict[str, Any] = {"jd_text": incoming.jd_text}
+        updates["content_fingerprint"] = incoming.content_fingerprint
         if incoming.company:
             updates["company"] = incoming.company
         if incoming.title:
@@ -148,6 +153,7 @@ def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
 
     # Raw + higher tier: re-base the text, merging optionals without erasing what we know.
     updates: dict[str, Any] = {"source": incoming.source, "jd_text": incoming.jd_text}
+    updates["content_fingerprint"] = incoming.content_fingerprint
     if incoming.url:
         updates["url"] = incoming.url
     if incoming.company:

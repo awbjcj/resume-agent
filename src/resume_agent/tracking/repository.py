@@ -47,9 +47,13 @@ def jobs_by_status(session: Session, status: str) -> list[Job]:
 
 
 def find_existing(
-    session: Session, url: str | None, jd_text: str, dedup_key: str | None = None
+    session: Session,
+    url: str | None,
+    jd_text: str,
+    dedup_key: str | None = None,
+    content_fingerprint: str | None = None,
 ) -> Job | None:
-    """Return a matching job for dedupe: by URL, else identical JD text, else dedup_key."""
+    """Match for dedupe: URL, then identical JD, then dedup_key, then (keyless) fingerprint."""
     if url:
         by_url = session.exec(select(Job).where(Job.url == url)).first()
         if by_url is not None:
@@ -59,7 +63,13 @@ def find_existing(
         if by_jd is not None:
             return by_jd
     if dedup_key:
-        return session.exec(select(Job).where(Job.dedup_key == dedup_key)).first()
+        by_key = session.exec(select(Job).where(Job.dedup_key == dedup_key)).first()
+        if by_key is not None:
+            return by_key
+    if dedup_key is None and content_fingerprint:
+        return session.exec(
+            select(Job).where(Job.content_fingerprint == content_fingerprint)
+        ).first()
     return None
 
 

@@ -258,3 +258,16 @@ def test_same_source_different_url_inserts_as_distinct_posting():
         assert o2 is IngestOutcome.inserted
         assert j1 is not None and j2 is not None
         assert j1.id != j2.id
+
+
+def test_keyless_near_duplicate_collapses_via_fingerprint():
+    from resume_agent.discovery.ingest import add_job
+    from resume_agent.tracking.repository import jobs_by_status
+    from resume_agent.tracking.tables import JobStatus
+
+    with _session() as s:
+        first = add_job(s, source="remoteok", jd_text="Build great systems for us")
+        second = add_job(s, source="remoteok", jd_text="Build  great   systems for us")
+        assert first is not None
+        assert second is None  # deduped by fingerprint, not inserted
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
