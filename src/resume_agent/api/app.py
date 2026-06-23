@@ -103,9 +103,13 @@ def create_app(
             # so API clients don't mis-parse an HTML 200.
             if full_path == "api" or full_path.startswith("api/"):
                 raise ApiException(404, "NOT_FOUND", f"No route for /{full_path}")
-            candidate = dist / full_path
-            if full_path and candidate.is_file():
-                return FileResponse(candidate)
+            dist_root = dist.resolve()
+            candidate = (dist_root / full_path).resolve()
+            if full_path:
+                if not candidate.is_relative_to(dist_root):
+                    raise ApiException(404, "NOT_FOUND", f"No route for /{full_path}")
+                if candidate.is_file():
+                    return FileResponse(candidate)
             return FileResponse(dist / "index.html")
 
     return app
