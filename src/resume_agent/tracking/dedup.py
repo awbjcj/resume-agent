@@ -12,8 +12,25 @@ def _normalize(value: str) -> str:
     return _NON_ALNUM.sub(" ", value.lower()).strip()
 
 
+# Conservative role-noun abbreviations expanded so cross-source title variants
+# collapse to one key. Seniority words are already stripped by _SENIORITY, so
+# only role nouns belong here. Keep this small to avoid over-collapsing.
+_ABBREVIATIONS = {
+    "swe": "software engineer",
+    "sde": "software engineer",
+    "eng": "engineer",
+    "engr": "engineer",
+    "dev": "developer",
+    "mgr": "manager",
+}
+
+
+def _expand_abbreviations(normalized: str) -> str:
+    return " ".join(_ABBREVIATIONS.get(token, token) for token in normalized.split())
+
+
 def _normalize_title(title: str) -> str:
-    return _normalize(_SENIORITY.sub("", title.strip()))
+    return _expand_abbreviations(_normalize(_SENIORITY.sub("", title.strip())))
 
 
 def compute_dedup_key(company: str | None, title: str | None) -> str | None:
