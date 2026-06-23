@@ -446,6 +446,8 @@ export interface components {
             archivedAt: string | null;
             /** Company */
             company: string | null;
+            /** Companysize */
+            companySize?: string | null;
             /**
              * Createdat
              * Format: date-time
@@ -455,6 +457,8 @@ export interface components {
             criteriaJson: {
                 [key: string]: unknown;
             } | null;
+            /** Employmenttype */
+            employmentType?: string | null;
             /** Fitrationale */
             fitRationale: string | null;
             /** Fitscore */
@@ -463,16 +467,44 @@ export interface components {
             hasProgress: boolean;
             /** Id */
             id: number;
+            /** Industry */
+            industry?: string | null;
             /** Jdtext */
             jdText: string;
             /** Location */
             location: string | null;
+            /** Locationcity */
+            locationCity?: string | null;
+            /** Locationcountry */
+            locationCountry?: string | null;
+            /** Locationregion */
+            locationRegion?: string | null;
             /** Postedat */
             postedAt: string | null;
+            /** Remotepolicy */
+            remotePolicy?: string | null;
             /** Resumeversions */
             resumeVersions: components["schemas"]["ResumeVersionOut"][];
+            /** Salarycurrency */
+            salaryCurrency?: string | null;
+            /** Salarymax */
+            salaryMax?: number | null;
+            /** Salarymin */
+            salaryMin?: number | null;
+            /** Seniority */
+            seniority?: string | null;
+            /** Sicdivision */
+            sicDivision?: string | null;
+            /** Siclabel */
+            sicLabel?: string | null;
+            /** Sicmajor */
+            sicMajor?: string | null;
+            /** Skills */
+            skills: components["schemas"]["SkillTagOut"][];
             /** Source */
             source: string;
+            /** Sponsorshipsignal */
+            sponsorshipSignal?: string | null;
             /** Status */
             status: string;
             /** Title */

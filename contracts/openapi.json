@@ -360,6 +360,17 @@
             ],
             "title": "Company"
           },
+          "companySize": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Companysize"
+          },
           "createdAt": {
             "format": "date-time",
             "title": "Createdat",
@@ -376,6 +387,17 @@
               }
             ],
             "title": "Criteriajson"
+          },
+          "employmentType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employmenttype"
           },
           "fitRationale": {
             "anyOf": [
@@ -407,6 +429,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
           "jdText": {
             "title": "Jdtext",
             "type": "string"
@@ -422,6 +455,39 @@
             ],
             "title": "Location"
           },
+          "locationCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationcity"
+          },
+          "locationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationcountry"
+          },
+          "locationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationregion"
+          },
           "postedAt": {
             "anyOf": [
               {
@@ -434,6 +500,17 @@
             ],
             "title": "Postedat"
           },
+          "remotePolicy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remotepolicy"
+          },
           "resumeVersions": {
             "items": {
               "$ref": "#/components/schemas/ResumeVersionOut"
@@ -441,9 +518,104 @@
             "title": "Resumeversions",
             "type": "array"
           },
+          "salaryCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salarycurrency"
+          },
+          "salaryMax": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salarymax"
+          },
+          "salaryMin": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salarymin"
+          },
+          "seniority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seniority"
+          },
+          "sicDivision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sicdivision"
+          },
+          "sicLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siclabel"
+          },
+          "sicMajor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sicmajor"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillTagOut"
+            },
+            "title": "Skills",
+            "type": "array"
+          },
           "source": {
             "title": "Source",
             "type": "string"
+          },
+          "sponsorshipSignal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sponsorshipsignal"
           },
           "status": {
             "title": "Status",
@@ -489,7 +661,8 @@
           "createdAt",
           "hasProgress",
           "application",
-          "resumeVersions"
+          "resumeVersions",
+          "skills"
         ],
         "title": "JobDetail",
         "type": "object"
