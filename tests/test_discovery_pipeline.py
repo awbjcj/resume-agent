@@ -2,9 +2,8 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.discovery.ingest import add_job
 from resume_agent.discovery.pipeline import (
-    backfill_rescore,
     discover,
-    reextract,
+    reprocess,
     run_relevance,
     run_score,
 )
@@ -12,7 +11,6 @@ from resume_agent.discovery.relevance import RelevanceVerdict
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import (
     JobCriteriaExtract,
-    Seniority,
     SponsorshipSignal,
 )
 from resume_agent.models.profile import Contact, ProfileFacts
@@ -217,59 +215,6 @@ def test_discover_commits_once_per_stage(monkeypatch):
     assert commits["n"] == 3
 
 
-def test_reextract_rewrites_criteria_without_changing_status():
-    agent = _ReextractAgent(_extract(seniority=Seniority.staff))
-    with _session() as s:
-        save_job(
-            s,
-            Job(
-                source="manual",
-                jd_text="jd",
-                status=JobStatus.shortlisted.value,
-                criteria_json={"seniority": None},
-                fit_score=70,
-            ),
-        )
-        save_job(
-            s,
-            Job(
-                source="manual",
-                jd_text="rejected-jd",
-                status=JobStatus.rejected.value,
-                criteria_json={"seniority": None},
-            ),
-        )
-        save_job(
-            s,
-            Job(
-                source="manual",
-                jd_text="   ",
-                status=JobStatus.filtered.value,
-                criteria_json={"seniority": None},
-            ),
-        )
-        save_job(s, Job(source="manual", jd_text="raw-jd", status=JobStatus.raw.value))
-
-        updated = reextract(s, agent)
-
-        shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
-        rejected = jobs_by_status(s, JobStatus.rejected.value)
-        filtered = jobs_by_status(s, JobStatus.filtered.value)
-        raw = jobs_by_status(s, JobStatus.raw.value)
-        shortlisted_criteria = shortlisted[0].criteria_json
-        rejected_criteria = rejected[0].criteria_json
-        assert updated == 2
-        assert shortlisted_criteria is not None
-        assert shortlisted_criteria["seniority"] == "staff"
-        assert shortlisted[0].status == JobStatus.shortlisted.value
-        assert shortlisted[0].fit_score == 70
-        assert rejected_criteria is not None
-        assert rejected_criteria["seniority"] == "staff"
-        assert rejected[0].status == JobStatus.rejected.value
-        assert filtered[0].criteria_json == {"seniority": None}
-        assert raw and raw[0].criteria_json is None
-        assert agent.prompts == ["rejected-jd", "jd"]
-
 
 class _SicLocFitAgent:
     def run(self, prompt):
@@ -324,31 +269,6 @@ def test_run_score_refreshes_aliases_when_canonicalizer_given(tmp_path):
         assert json.loads(path.read_text("utf-8"))["k8s"] == "kubernetes"
 
 
-def test_backfill_rescore_populates_without_changing_fit_or_status(tmp_path):
-    facts = ProfileFacts(contact=Contact(name="Ada"))
-    with _session() as s:
-        save_job(
-            s,
-            Job(
-                source="x", jd_text="jd", title="Eng",
-                status=JobStatus.shortlisted.value,
-                criteria_json={"industry": "fintech"},
-                fit_score=55, location="Austin, TX, USA",
-            ),
-        )
-        save_job(
-            s,
-            Job(source="x", jd_text="other", status=JobStatus.filtered.value, criteria_json={}),
-        )
-        updated = backfill_rescore(s, facts, _SicLocFitAgent(), aliases_path=tmp_path / "a.json")
-        job = jobs_by_status(s, JobStatus.shortlisted.value)[0]
-        assert updated == 1  # only the shortlisted job
-        assert job.fit_score == 55  # unchanged
-        assert job.status == JobStatus.shortlisted.value
-        assert job.criteria_json is not None
-        assert job.criteria_json["sic_major"] == "73"
-        assert job.criteria_json["location_parts"]["region"] == "TX"
-
 
 def test_filter_and_relevance_set_reject_category():
     cfg = SearchConfig(sponsorship_required=True, target_role="AI engineering roles")
@@ -360,3 +280,88 @@ def test_filter_and_relevance_set_reject_category():
         rejected = jobs_by_status(s, JobStatus.rejected.value)
         categories = {j.reject_category for j in rejected}
         assert categories == {"filtered", "relevance"}
+
+
+def test_reprocess_shortlisted_rescores_and_skips_progress():
+    cfg = SearchConfig()  # no relevance target -> relevance gate is a no-op
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd a", title="Eng",
+                        status=JobStatus.shortlisted.value, fit_score=10, criteria_json={}))
+        save_job(s, Job(source="x", jd_text="jd b", title="Eng",
+                        status=JobStatus.tailored.value, fit_score=10, criteria_json={}))
+
+        counts = reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
+
+        shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
+        tailored = jobs_by_status(s, JobStatus.tailored.value)
+        assert shortlisted[0].fit_score == 90       # re-scored
+        assert tailored[0].fit_score == 10           # progress-guarded, untouched
+        assert counts[JobStatus.shortlisted.value] == 1
+
+
+def test_reprocess_rejected_relevance_only():
+    cfg = SearchConfig()
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd r", title="Eng",
+                        status=JobStatus.rejected.value, reject_category="relevance"))
+        save_job(s, Job(source="x", jd_text="jd f", title="Eng",
+                        status=JobStatus.rejected.value, reject_category="filtered"))
+
+        reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["rejected:relevance"])
+
+        shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
+        rejected = jobs_by_status(s, JobStatus.rejected.value)
+        assert len(shortlisted) == 1
+        assert {j.reject_category for j in rejected} == {"filtered"}
+
+
+def test_reprocess_unknown_scope_raises():
+    import pytest
+    with _session() as s:
+        with pytest.raises(ValueError):
+            reprocess(s, SearchConfig(), ProfileFacts(contact=Contact(name="Ada")),
+                      _ExtractAgent(), _FitAgent(), ["bogus"])
+
+
+def test_reprocess_only_touches_scoped_jobs():
+    cfg = SearchConfig()
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd s", title="Eng",
+                        status=JobStatus.shortlisted.value, fit_score=10, criteria_json={}))
+        save_job(s, Job(source="x", jd_text="jd raw", title="Eng", status=JobStatus.raw.value))
+
+        reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
+
+        raw = jobs_by_status(s, JobStatus.raw.value)
+        assert [j.jd_text for j in raw] == ["jd raw"]
+        assert raw[0].criteria_json is None
+
+
+def test_reprocess_empty_scope_processes_nothing():
+    cfg = SearchConfig()
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="jd raw", title="Eng", status=JobStatus.raw.value))
+        reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
+        assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
+        assert not jobs_by_status(s, JobStatus.shortlisted.value)
+
+
+def test_reprocess_clears_stale_fit_when_now_rejected():
+    cfg = SearchConfig(sponsorship_required=True)
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="bad role, nosponsor here", title="Eng",
+                        status=JobStatus.shortlisted.value, fit_score=88,
+                        fit_rationale="old rationale", criteria_json={"stale": 1}))
+
+        reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
+
+        rejected = jobs_by_status(s, JobStatus.rejected.value)
+        assert len(rejected) == 1
+        assert rejected[0].fit_score is None
+        assert rejected[0].fit_rationale is None
+        assert rejected[0].reject_category == "filtered"

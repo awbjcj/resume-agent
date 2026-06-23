@@ -14,22 +14,11 @@ from resume_agent.taxonomy import sic
 from resume_agent.taxonomy.location import build_location
 from resume_agent.taxonomy.skills import refresh_aliases, split_skills
 from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
-from resume_agent.tracking.repository import jobs_by_status, status_counts
+from resume_agent.tracking.repository import has_progress, jobs_by_status, status_counts
 from resume_agent.tracking.tables import Job, JobStatus
 
 SKILL_ALIASES_PATH = Path("data/skill_aliases.json")
 _SIC_TABLE = sic.load_sic_table()
-
-
-_REEXTRACT_STATUSES = (
-    JobStatus.extracted.value,
-    JobStatus.filtered.value,
-    JobStatus.rejected.value,
-    JobStatus.shortlisted.value,
-    JobStatus.approved.value,
-    JobStatus.tailored.value,
-    JobStatus.rendered.value,
-)
 
 
 # The LLM-bound discover phases the dashboard shows a per-phase bar for; the
@@ -38,8 +27,15 @@ _REEXTRACT_STATUSES = (
 _DISCOVER_PHASES = 3
 
 
-def run_extract(session: Session, agent: Runner, reporter: ProgressReporter | None = None) -> None:
+def run_extract(
+    session: Session,
+    agent: Runner,
+    reporter: ProgressReporter | None = None,
+    job_ids: set[int] | None = None,
+) -> None:
     jobs = jobs_by_status(session, JobStatus.raw.value)
+    if job_ids is not None:
+        jobs = [job for job in jobs if job.id in job_ids]
     if reporter:
         reporter.begin(
             len(jobs), "Extracting criteria", phase_index=2, phase_count=_DISCOVER_PHASES
@@ -54,8 +50,15 @@ def run_extract(session: Session, agent: Runner, reporter: ProgressReporter | No
     session.commit()
 
 
-def run_filter(session: Session, config: SearchConfig) -> None:
-    for job in jobs_by_status(session, JobStatus.extracted.value):
+def run_filter(
+    session: Session,
+    config: SearchConfig,
+    job_ids: set[int] | None = None,
+) -> None:
+    jobs = jobs_by_status(session, JobStatus.extracted.value)
+    if job_ids is not None:
+        jobs = [job for job in jobs if job.id in job_ids]
+    for job in jobs:
         criteria = JobCriteria.model_validate(job.criteria_json or {})
         decision = apply_filters(criteria, config)
         if decision.keep:
@@ -75,8 +78,11 @@ def run_score(
     canonicalizer: Canonicalizer | None = None,
     aliases_path: Path | str = SKILL_ALIASES_PATH,
     reporter: ProgressReporter | None = None,
+    job_ids: set[int] | None = None,
 ) -> None:
     jobs = jobs_by_status(session, JobStatus.filtered.value)
+    if job_ids is not None:
+        jobs = [job for job in jobs if job.id in job_ids]
     if reporter:
         reporter.begin(len(jobs), "Scoring fit", phase_index=3, phase_count=_DISCOVER_PHASES)
     for index, job in enumerate(jobs, 1):
@@ -142,6 +148,7 @@ def run_relevance(
     config: SearchConfig,
     agent: Runner | None,
     reporter: ProgressReporter | None = None,
+    job_ids: set[int] | None = None,
 ) -> int:
     """Reject off-target raw jobs via the cheap relevance gate."""
     target = _relevance_target(config)
@@ -149,6 +156,8 @@ def run_relevance(
         return 0
 
     jobs = jobs_by_status(session, JobStatus.raw.value)
+    if job_ids is not None:
+        jobs = [job for job in jobs if job.id in job_ids]
     if reporter:
         reporter.begin(
             len(jobs), "Checking relevance", phase_index=1, phase_count=_DISCOVER_PHASES
@@ -179,24 +188,6 @@ def run_relevance(
     return rejected
 
 
-def reextract(session: Session, agent: Runner) -> int:
-    """Re-run extraction over already-processed jobs, rewriting criteria_json in place.
-
-    Does not change status or fit. Returns the number of jobs updated.
-    """
-    updated = 0
-    for status in _REEXTRACT_STATUSES:
-        for job in jobs_by_status(session, status):
-            if not job.jd_text.strip():
-                continue
-            criteria = extract_job_criteria(job.jd_text, agent)
-            job.criteria_json = criteria.model_dump(mode="json")
-            session.add(job)
-            updated += 1
-    session.commit()
-    return updated
-
-
 def discover(
     session: Session,
     config: SearchConfig,
@@ -206,41 +197,81 @@ def discover(
     relevance_agent: Runner | None = None,
     canonicalizer: Canonicalizer | None = None,
     reporter: ProgressReporter | None = None,
+    job_ids: set[int] | None = None,
 ) -> dict[str, int]:
-    """Run the full funnel over current rows and return final status counts."""
-    run_relevance(session, config, relevance_agent, reporter=reporter)
-    run_extract(session, extract_agent, reporter=reporter)
-    run_filter(session, config)
-    run_score(session, profile_facts, fit_agent, canonicalizer=canonicalizer, reporter=reporter)
+    """Run the full funnel over current rows (optionally only `job_ids`)."""
+    run_relevance(session, config, relevance_agent, reporter=reporter, job_ids=job_ids)
+    run_extract(session, extract_agent, reporter=reporter, job_ids=job_ids)
+    run_filter(session, config, job_ids=job_ids)
+    run_score(
+        session, profile_facts, fit_agent, canonicalizer=canonicalizer,
+        reporter=reporter, job_ids=job_ids,
+    )
     if reporter:
         reporter.done()
     return status_counts(session)
 
 
-def backfill_rescore(
-    session: Session,
-    profile_facts: ProfileFacts,
-    agent: Runner,
-    canonicalizer: Canonicalizer | None = None,
-    aliases_path: Path | str = SKILL_ALIASES_PATH,
-) -> int:
-    """Populate sic_major + location for already-shortlisted jobs.
+_REPROCESS_ALL_STATUSES = (
+    JobStatus.raw.value,
+    JobStatus.extracted.value,
+    JobStatus.filtered.value,
+    JobStatus.rejected.value,
+    JobStatus.shortlisted.value,
+)
 
-    Re-runs the fit agent only to harvest the new fields; does NOT change
-    fit_score or status. Returns the number of jobs updated.
-    """
-    updated = 0
-    for job in jobs_by_status(session, JobStatus.shortlisted.value):
-        if not job.jd_text.strip():
-            continue
-        location_text = _job_location_text(job)
-        fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
-        _write_taxonomy_fields(job, fit, location_text)
+
+def _scope_jobs(session: Session, scope: str) -> list[Job]:
+    if scope == "shortlisted":
+        return jobs_by_status(session, JobStatus.shortlisted.value)
+    if scope == "rejected:relevance":
+        return [
+            j for j in jobs_by_status(session, JobStatus.rejected.value)
+            if j.reject_category == "relevance"
+        ]
+    if scope == "rejected:filtered":
+        return [
+            j for j in jobs_by_status(session, JobStatus.rejected.value)
+            if j.reject_category == "filtered"
+        ]
+    if scope == "all":
+        jobs: list[Job] = []
+        for status in _REPROCESS_ALL_STATUSES:
+            jobs.extend(jobs_by_status(session, status))
+        return jobs
+    raise ValueError(f"unknown reprocess scope: {scope}")
+
+
+def reprocess(
+    session: Session,
+    config: SearchConfig,
+    profile_facts: ProfileFacts,
+    extract_agent: Runner,
+    fit_agent: Runner,
+    scopes: list[str],
+    relevance_agent: Runner | None = None,
+    canonicalizer: Canonicalizer | None = None,
+    reporter: ProgressReporter | None = None,
+) -> dict[str, int]:
+    """Reset in-scope, non-progressed jobs to a clean raw state and re-run the funnel."""
+    selected: dict[int, Job] = {}
+    for scope in scopes:
+        for job in _scope_jobs(session, scope):
+            if job.id is None or job.id in selected:
+                continue
+            if has_progress(session, job.id):
+                continue
+            selected[job.id] = job
+    for job in selected.values():
+        job.status = JobStatus.raw.value
+        job.reject_reason = None
+        job.reject_category = None
+        job.fit_score = None
+        job.fit_rationale = None
+        job.criteria_json = None
         session.add(job)
-        updated += 1
     session.commit()
-    if canonicalizer is not None:
-        _refresh_skill_aliases(
-            jobs_by_status(session, JobStatus.shortlisted.value), canonicalizer, aliases_path
-        )
-    return updated
+    return discover(
+        session, config, profile_facts, extract_agent, fit_agent, relevance_agent,
+        canonicalizer=canonicalizer, reporter=reporter, job_ids=set(selected),
+    )
