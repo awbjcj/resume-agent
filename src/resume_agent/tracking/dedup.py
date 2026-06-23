@@ -1,3 +1,4 @@
+import hashlib
 import re
 
 _SENIORITY = re.compile(
@@ -38,3 +39,14 @@ def compute_dedup_key(company: str | None, title: str | None) -> str | None:
     if not company or not company.strip() or not title or not title.strip():
         return None
     return f"{_normalize(company)}|{_normalize_title(title)}"
+
+
+_WHITESPACE = re.compile(r"\s+")
+
+
+def compute_content_fingerprint(jd_text: str | None) -> str | None:
+    """A whitespace/case-insensitive hash of a JD, used as a keyless dedup fallback."""
+    if not jd_text or not jd_text.strip():
+        return None
+    normalized = _WHITESPACE.sub(" ", jd_text.lower()).strip()
+    return hashlib.sha1(normalized.encode("utf-8")).hexdigest()
