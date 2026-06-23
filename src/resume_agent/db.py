@@ -7,8 +7,10 @@ from sqlmodel import Session, SQLModel, create_engine
 from resume_agent.config import get_settings
 from resume_agent.tracking.migrate import (
     ensure_archived_at_column,
+    ensure_content_fingerprint_column,
     ensure_dedup_key_column,
     ensure_posted_at_column,
+    ensure_reject_category_column,
 )
 
 # Import tables so their metadata is registered before create_all().
@@ -51,6 +53,8 @@ def init_db(engine: Engine) -> None:
     ensure_dedup_key_column(engine)
     ensure_posted_at_column(engine)
     ensure_archived_at_column(engine)
+    ensure_reject_category_column(engine)
+    ensure_content_fingerprint_column(engine)
 
 
 def get_session(engine: Engine) -> Session:
