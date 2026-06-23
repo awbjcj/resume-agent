@@ -13,6 +13,7 @@ from resume_agent.api.schemas.jobs import (
     JobDetail,
     JobPatch,
     ResumeVersionOut,
+    SkillTagOut,
 )
 from resume_agent.api.schemas.runs import AddJobTextRequest
 from resume_agent.services import board
@@ -35,6 +36,8 @@ def _job_detail(session: Session, job_id: int) -> JobDetail:
     assert job.id is not None
     application = application_for_job(session, job_id)
     versions = resume_versions_for_job(session, job_id)
+    facets = board.job_detail_facets(session, job_id)
+    skills = [SkillTagOut.model_validate(t) for t in facets.skills] if facets else []
     return JobDetail(
         id=job.id,
         source=job.source,
@@ -53,6 +56,22 @@ def _job_detail(session: Session, job_id: int) -> JobDetail:
         has_progress=has_progress(session, job_id),
         application=ApplicationOut.model_validate(application) if application else None,
         resume_versions=[ResumeVersionOut.model_validate(v) for v in versions],
+        skills=skills,
+        sponsorship_signal=facets.sponsorship_signal if facets else None,
+        salary_min=facets.salary_min if facets else None,
+        salary_max=facets.salary_max if facets else None,
+        salary_currency=facets.salary_currency if facets else None,
+        remote_policy=facets.remote_policy if facets else None,
+        seniority=facets.seniority if facets else None,
+        employment_type=facets.employment_type if facets else None,
+        industry=facets.industry if facets else None,
+        company_size=facets.company_size if facets else None,
+        sic_major=facets.sic_major if facets else None,
+        sic_label=facets.sic_label if facets else None,
+        sic_division=facets.sic_division if facets else None,
+        location_country=facets.location_country if facets else None,
+        location_region=facets.location_region if facets else None,
+        location_city=facets.location_city if facets else None,
     )
 
 

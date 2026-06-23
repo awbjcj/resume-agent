@@ -117,6 +117,49 @@ def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> li
     return tags
 
 
+def _shortlist_row(
+    job: Job, tokens: set[str], aliases: dict[str, str], sic_table: Any
+) -> ShortlistRow:
+    """Project one ``Job`` into the full skill + meta facet row.
+
+    Shared by the board list (``shortlist_rows``) and the single-job detail
+    facets (``job_facets``) so the wire format stays identical across the card
+    preview and the detail modal.
+    """
+    job_id = _require_job_id(job)
+    criteria = job.criteria_json or {}
+    salary = criteria.get("salary_range") or {}
+    loc = criteria.get("location_parts") or {}
+    code = sic_tax.coerce_code(criteria.get("sic_major"), sic_table)
+    division = sic_tax.division_for(code, sic_table)
+    return ShortlistRow(
+        job_id=job_id,
+        company=job.company,
+        title=job.title,
+        location=job.location,
+        fit_score=job.fit_score,
+        fit_rationale=job.fit_rationale,
+        sponsorship_signal=criteria.get("sponsorship_signal"),
+        salary_min=salary.get("minimum"),
+        salary_max=salary.get("maximum"),
+        salary_currency=salary.get("currency"),
+        remote_policy=criteria.get("remote_policy"),
+        seniority=criteria.get("seniority"),
+        employment_type=criteria.get("employment_type"),
+        industry=criteria.get("industry"),
+        company_size=snap_size(criteria.get("company_size")),
+        posted_at=job.posted_at,
+        skills=_skill_tags(criteria, tokens, aliases),
+        sic_major=code,
+        sic_label=sic_tax.display_label(code, sic_table),
+        sic_division=division[1] if division else None,
+        location_country=loc.get("country"),
+        location_region=loc.get("region"),
+        location_city=loc.get("city"),
+        is_us=bool(loc.get("is_us")),
+    )
+
+
 def shortlist_rows(
     session: Session,
     facts: ProfileFacts | None = None,
@@ -132,43 +175,28 @@ def shortlist_rows(
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
     sic_table = sic_tax.load_sic_table()
-    rows = []
-    for job in jobs:
-        job_id = _require_job_id(job)
-        criteria = job.criteria_json or {}
-        salary = criteria.get("salary_range") or {}
-        loc = criteria.get("location_parts") or {}
-        code = sic_tax.coerce_code(criteria.get("sic_major"), sic_table)
-        division = sic_tax.division_for(code, sic_table)
-        rows.append(
-            ShortlistRow(
-                job_id=job_id,
-                company=job.company,
-                title=job.title,
-                location=job.location,
-                fit_score=job.fit_score,
-                fit_rationale=job.fit_rationale,
-                sponsorship_signal=criteria.get("sponsorship_signal"),
-                salary_min=salary.get("minimum"),
-                salary_max=salary.get("maximum"),
-                salary_currency=salary.get("currency"),
-                remote_policy=criteria.get("remote_policy"),
-                seniority=criteria.get("seniority"),
-                employment_type=criteria.get("employment_type"),
-                industry=criteria.get("industry"),
-                company_size=snap_size(criteria.get("company_size")),
-                posted_at=job.posted_at,
-                skills=_skill_tags(criteria, tokens, aliases),
-                sic_major=code,
-                sic_label=sic_tax.display_label(code, sic_table),
-                sic_division=division[1] if division else None,
-                location_country=loc.get("country"),
-                location_region=loc.get("region"),
-                location_city=loc.get("city"),
-                is_us=bool(loc.get("is_us")),
-            )
-        )
-    return rows
+    return [_shortlist_row(job, tokens, aliases, sic_table) for job in jobs]
+
+
+def job_facets(
+    session: Session,
+    job_id: int,
+    facts: ProfileFacts | None = None,
+    aliases_path: str | Path = "data/skill_aliases.json",
+) -> ShortlistRow | None:
+    """Build the skill + meta facets for a single job (detail modal).
+
+    Returns ``None`` when the job does not exist. Reuses the same projection as
+    the board list so ``covered`` (the profile gap signal) is computed once,
+    server-side, against ``facts``.
+    """
+    job = session.get(Job, job_id)
+    if job is None:
+        return None
+    tokens = profile_skill_tokens(facts) if facts is not None else set()
+    aliases = load_aliases(aliases_path)
+    sic_table = sic_tax.load_sic_table()
+    return _shortlist_row(job, tokens, aliases, sic_table)
 
 
 def pipeline_rows(session: Session) -> list[PipelineRow]:

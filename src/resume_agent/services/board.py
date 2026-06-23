@@ -18,6 +18,7 @@ from resume_agent.tracking.queries import (
     ShortlistRow,
     TriageRow,
     archived_rows,
+    job_facets,
     pipeline_rows,
     shortlist_rows,
     triage_rows,
@@ -54,6 +55,18 @@ def list_shortlist(
     elif sort == "salary":
         rows = sorted(rows, key=lambda r: (r.salary_max or r.salary_min or 0), reverse=True)
     return paginate(rows, page=page, page_size=page_size)
+
+
+def job_detail_facets(
+    session: Session, job_id: int, *, facts_path: str = DEFAULT_FACTS
+) -> ShortlistRow | None:
+    """Skill + meta facets for the single-job detail view (modal rail).
+
+    Loads the profile facts the same way the board list does so ``covered``
+    (the profile gap signal) is consistent between the card and the modal.
+    """
+    facts = load_facts(facts_path) if Path(facts_path).exists() else None
+    return job_facets(session, job_id, facts=facts)
 
 
 def list_pipeline(

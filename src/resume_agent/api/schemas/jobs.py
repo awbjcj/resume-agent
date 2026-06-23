@@ -108,6 +108,24 @@ class JobDetail(CamelModel):
     has_progress: bool
     application: ApplicationOut | None
     resume_versions: list[ResumeVersionOut]
+    # Skill + meta facets (parsed from criteria_json server-side so the detail
+    # modal renders the same covered/required channels as the board card).
+    skills: list[SkillTagOut]
+    sponsorship_signal: str | None = None
+    salary_min: int | None = None
+    salary_max: int | None = None
+    salary_currency: str | None = None
+    remote_policy: str | None = None
+    seniority: str | None = None
+    employment_type: str | None = None
+    industry: str | None = None
+    company_size: str | None = None
+    sic_major: str | None = None
+    sic_label: str | None = None
+    sic_division: str | None = None
+    location_country: str | None = None
+    location_region: str | None = None
+    location_city: str | None = None
 
 
 class JobPatch(CamelModel):
