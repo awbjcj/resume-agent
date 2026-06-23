@@ -29,9 +29,12 @@ export function MultiSelect({
     else next.add(opt);
     onChange(next);
   };
+  const triggerLabel = selected.size ? `${selected.size} selected` : "Any";
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-[0.14em]">
+        {label}
+      </Label>
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
@@ -39,13 +42,13 @@ export function MultiSelect({
               id={id}
               variant="outline"
               disabled={disabled}
-              className="w-full justify-start font-normal"
+              className="h-10 w-full justify-between bg-card px-3 font-normal"
             >
-              {selected.size ? `${selected.size} selected` : "Any"}
+              <span>{triggerLabel}</span>
             </Button>
           }
         />
-        <DropdownMenuContent className="max-h-64 overflow-auto">
+        <DropdownMenuContent className="max-h-72 min-w-56 overflow-auto">
           {options.map((opt) => (
             <DropdownMenuCheckboxItem
               key={opt}
