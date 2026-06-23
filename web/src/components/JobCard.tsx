@@ -25,7 +25,7 @@ export function JobCard({
   onOpen: () => void;
   footer?: ReactNode;
 }) {
-  // Must-have first, then best-have — same priority the modal groups by.
+  // Must-have first, then nice-to-have - same priority the modal groups by.
   const sorted = [...row.skills].sort(
     (a, b) => Number(b.required) - Number(a.required),
   );

@@ -1,4 +1,4 @@
-// Full skill set, grouped Must-have / Best-have. Two independent channels:
+// Full skill set, grouped Must-have / Nice-to-have. Two independent channels:
 //   required  -> which group (must vs best)
 //   covered   -> chip fill (solid = you have it, dashed outline = gap)
 // Staggered rise-in on open. Used by the job detail modal rail.
@@ -89,7 +89,7 @@ export function SkillMatrix({
     <div className="space-y-4">
       <Group label="Must-have" tags={must} activeSkills={activeSkills} baseIndex={0} />
       <Group
-        label="Best-have"
+        label="Nice-to-have"
         tags={best}
         activeSkills={activeSkills}
         baseIndex={must.length}
