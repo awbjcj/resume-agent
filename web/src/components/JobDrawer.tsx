@@ -8,6 +8,7 @@ import { ApplicationEditor } from "@/features/job/ApplicationEditor";
 import { StageManager } from "@/features/job/StageManager";
 import { useJobDetail } from "@/features/job/use-job-detail";
 import { useRenderVersion } from "@/features/job/use-job-mutations";
+import { withTokenParam } from "@/lib/api/client";
 
 export function JobDrawer({ jobId, onClose }: { jobId: number; onClose: () => void }) {
   const { data: job, isLoading } = useJobDetail(jobId);
@@ -62,7 +63,7 @@ export function JobDrawer({ jobId, onClose }: { jobId: number; onClose: () => vo
                         {v.pdfPath ? (
                           <a
                             className="text-sm underline"
-                            href={`/api/resume-versions/${v.id}/pdf`}
+                            href={withTokenParam(`/api/resume-versions/${v.id}/pdf`)}
                             target="_blank"
                             rel="noreferrer"
                           >

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { getToken, setToken, unwrap } from "./client";
+import { getToken, setToken, unwrap, withTokenParam } from "./client";
 
 describe("token storage", () => {
   beforeEach(() => localStorage.clear());
@@ -8,6 +8,13 @@ describe("token storage", () => {
     expect(getToken()).toBeNull();
     setToken("abc");
     expect(getToken()).toBe("abc");
+  });
+  it("adds the stored token to browser-native request URLs", () => {
+    expect(withTokenParam("/api/runs/1/events")).toBe("/api/runs/1/events");
+    setToken("a b");
+    expect(withTokenParam("/api/runs/1/events?x=1#tail")).toBe(
+      "/api/runs/1/events?x=1&token=a%20b#tail",
+    );
   });
 });
 

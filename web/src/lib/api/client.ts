@@ -13,6 +13,15 @@ export function setToken(token: string): void {
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
+export function withTokenParam(path: string): string {
+  const token = getToken();
+  if (!token) return path;
+  const hashIndex = path.indexOf("#");
+  const beforeHash = hashIndex === -1 ? path : path.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : path.slice(hashIndex);
+  const separator = beforeHash.includes("?") ? "&" : "?";
+  return `${beforeHash}${separator}token=${encodeURIComponent(token)}${hash}`;
+}
 
 // Absolute same-origin base. The schema paths already start with "/api", so we
 // only need the origin. Using window.location.origin (rather than "" or "/")

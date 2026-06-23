@@ -1,3 +1,4 @@
+import { withTokenParam } from "@/lib/api/client";
 import { useRunStore, type RunRecord } from "./store";
 
 /**
@@ -7,7 +8,7 @@ import { useRunStore, type RunRecord } from "./store";
  * on a terminal state. Returns an unsubscribe function.
  */
 export function watchRun(runId: string, kind: string, onDone?: () => void): () => void {
-  const source = new EventSource(`/api/runs/${runId}/events`);
+  const source = new EventSource(withTokenParam(`/api/runs/${runId}/events`));
 
   source.onmessage = (e) => {
     let data: { state?: string; percent?: number; label?: string; error?: string };
