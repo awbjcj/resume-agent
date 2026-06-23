@@ -7,6 +7,8 @@ an optional ProgressReporter passed straight through.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import httpx
 from playwright.sync_api import Error as PlaywrightError
 from sqlmodel import Session
@@ -16,7 +18,7 @@ from resume_agent.discovery.connectors.config import load_connectors_config
 from resume_agent.discovery.connectors.registry import build_connectors
 from resume_agent.discovery.connectors.runner import PullReport, run_pull
 from resume_agent.discovery.ingest import add_job
-from resume_agent.discovery.pipeline import backfill_rescore, discover, reextract
+from resume_agent.discovery.pipeline import discover, reprocess
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.profile.store import load_facts
@@ -28,6 +30,14 @@ DEFAULT_SEARCH = "config/search.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
 DEFAULT_CONNECTORS = "config/connectors.yaml"
 CONNECTOR_RUNS_PATH = "data/connector_runs.json"
+
+
+@dataclass(frozen=True)
+class RefreshReport:
+    pulled: int
+    totals: dict[str, int]
+    status_counts: dict[str, int]
+    failures: dict[str, dict[str, str]]
 
 
 def add_job_from_text(
@@ -99,53 +109,61 @@ def pull_jobs(
     telemetry_path: str = CONNECTOR_RUNS_PATH,
     limit: int | None = None,
     reporter: ProgressReporter | None = None,
+    finish: bool = True,
 ) -> PullReport:
     """Run every enabled connector and ingest results."""
     search_config = load_search_config(search_path)
     connectors_config = load_connectors_config(connectors_path)
     connectors = build_connectors(connectors_config, get_settings())
     return run_pull(
-        session, connectors, search_config, telemetry_path, limit=limit, reporter=reporter
+        session, connectors, search_config, telemetry_path,
+        limit=limit, reporter=reporter, finish=finish,
     )
 
 
-def reextract_metadata(
+def reprocess_jobs(
     session: Session,
     *,
-    bundle: DiscoveryBundle | None = None,
-    reporter: ProgressReporter | None = None,
-) -> int:
-    """Re-extract criteria_json for already-processed jobs (backfill new fields).
-
-    The dashboard's "Re-extract" discover mode. Does not change status or fit.
-    Returns the number of jobs updated.
-    """
-    bundle = bundle or build_discovery_bundle()
-    if reporter is not None:
-        reporter.begin(1, "Re-extracting job metadata")
-    updated = reextract(session, bundle.extract)
-    if reporter is not None:
-        reporter.step(1, label=f"Re-extracted {updated} job(s)")
-    return updated
-
-
-def rescore_existing(
-    session: Session,
-    *,
+    scopes: list[str],
+    search_path: str = DEFAULT_SEARCH,
     facts_path: str = DEFAULT_FACTS,
     bundle: DiscoveryBundle | None = None,
     reporter: ProgressReporter | None = None,
-) -> int:
-    """Backfill SIC + location for already-shortlisted jobs.
-
-    The dashboard's "Re-score" discover mode. Does not change fit or status.
-    Returns the number of jobs updated.
-    """
+) -> dict[str, int]:
+    """Re-run the full funnel over the chosen scopes; returns final status counts."""
+    config = load_search_config(search_path)
     facts = load_facts(facts_path)
     bundle = bundle or build_discovery_bundle()
-    if reporter is not None:
-        reporter.begin(1, "Backfilling SIC + location")
-    updated = backfill_rescore(session, facts, bundle.fit, canonicalizer=bundle.canonicalizer)
-    if reporter is not None:
-        reporter.step(1, label=f"Rescored {updated} job(s)")
-    return updated
+    return reprocess(
+        session, config, facts, bundle.extract, bundle.fit, scopes,
+        relevance_agent=bundle.relevance, canonicalizer=bundle.canonicalizer,
+        reporter=reporter,
+    )
+
+
+def refresh_jobs(
+    session: Session,
+    *,
+    search_path: str = DEFAULT_SEARCH,
+    connectors_path: str = DEFAULT_CONNECTORS,
+    telemetry_path: str = CONNECTOR_RUNS_PATH,
+    facts_path: str = DEFAULT_FACTS,
+    limit: int | None = None,
+    bundle: DiscoveryBundle | None = None,
+    reporter: ProgressReporter | None = None,
+) -> RefreshReport:
+    """Pull from every connector, then discover the newly-added raw jobs, in one pass."""
+    pull_report = pull_jobs(
+        session, search_path=search_path, connectors_path=connectors_path,
+        telemetry_path=telemetry_path, limit=limit, reporter=reporter, finish=False,
+    )
+    counts = discover_jobs(
+        session, search_path=search_path, facts_path=facts_path,
+        bundle=bundle, reporter=reporter,
+    )
+    return RefreshReport(
+        pulled=sum(pull_report.totals.values()),
+        totals=pull_report.totals,
+        status_counts=counts,
+        failures=pull_report.failures,
+    )

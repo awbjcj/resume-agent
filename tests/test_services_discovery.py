@@ -78,3 +78,67 @@ def test_add_job_from_url_raises_when_no_extraction(monkeypatch):
     with _session() as session:
         with pytest.raises(UrlFetchError, match="Couldn't extract"):
             discovery.add_job_from_url(session, url="https://x/job")
+
+
+# ---------------------------------------------------------------------------
+# Task-7 tests: reprocess_jobs + run_pull finish=False
+# ---------------------------------------------------------------------------
+
+class _FakeResult:
+    def __init__(self, content):
+        self.content = content
+
+
+def _bundle():
+    from resume_agent.discovery.fit import FitScore
+    from resume_agent.models.job import JobCriteriaExtract, SponsorshipSignal
+    from resume_agent.services.agents import DiscoveryBundle
+
+    extract = type("E", (), {
+        "run": lambda self, p: _FakeResult(JobCriteriaExtract.model_validate(dict(
+            sponsorship_signal=SponsorshipSignal.offered, seniority=None,
+            employment_type=None, tech_stack=[], industry=None, company_size=None,
+            yoe_min=None, salary_range=None, remote_policy=None, location=None,
+            must_have_skills=[], nice_to_have_skills=[],
+        )))
+    })()
+    fit = type("F", (), {
+        "run": lambda self, p: _FakeResult(FitScore(score=77, rationale="ok"))
+    })()
+    return DiscoveryBundle(extract=extract, fit=fit, relevance=None, canonicalizer=None)
+
+
+def test_reprocess_jobs_rescores_shortlisted(tmp_path):
+    from resume_agent.services.discovery import reprocess_jobs
+    from resume_agent.tracking.repository import jobs_by_status, save_job
+    from resume_agent.tracking.tables import Job, JobStatus
+
+    facts = tmp_path / "facts.json"
+    facts.write_text('{"contact": {"name": "Ada"}}', "utf-8")
+    search = tmp_path / "search.yaml"
+    search.write_text("titles: []\n", "utf-8")
+
+    with _session() as s:
+        save_job(s, Job(
+            source="x", jd_text="jd", title="Eng",
+            status=JobStatus.shortlisted.value, fit_score=10, criteria_json={},
+        ))
+        counts = reprocess_jobs(
+            s, scopes=["shortlisted"],
+            search_path=str(search), facts_path=str(facts),
+            bundle=_bundle(),
+        )
+        assert jobs_by_status(s, JobStatus.shortlisted.value)[0].fit_score == 77
+        assert counts[JobStatus.shortlisted.value] == 1
+
+
+def test_run_pull_finish_false_does_not_emit_done(tmp_path):
+    from resume_agent.discovery.connectors.runner import run_pull
+    from resume_agent.discovery.search_config import SearchConfig
+    from resume_agent.progress import ProgressReporter, read_progress
+
+    with _session() as s:
+        reporter = ProgressReporter("refresh", tmp_path)
+        run_pull(s, [], SearchConfig(), tmp_path / "runs.json", reporter=reporter, finish=False)
+    rec = read_progress("refresh", tmp_path)
+    assert rec is not None and rec["state"] == "running"  # not "done"

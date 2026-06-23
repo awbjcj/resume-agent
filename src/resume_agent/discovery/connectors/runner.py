@@ -44,6 +44,7 @@ def run_pull(
     telemetry_path: str | Path,
     limit: int | None = None,
     reporter: ProgressReporter | None = None,
+    finish: bool = True,
 ) -> PullReport:
     """Fetch + ingest each connector in order, isolating failures.
 
@@ -77,6 +78,6 @@ def run_pull(
             record_run(telemetry_path, connector.name, added=0, error=f"{type(exc).__name__}: {exc}")
         if reporter:
             reporter.step(index, added=added_total)
-    if reporter:
+    if reporter and finish:
         reporter.done(added=added_total)
     return report
