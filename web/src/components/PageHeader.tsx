@@ -8,10 +8,18 @@ export function PageHeader({
   sub?: string;
 }) {
   return (
-    <header className="mb-6 border-b-2 border-foreground pb-4">
-      <p className="font-mono text-xs uppercase tracking-[0.3em] text-primary">{kicker}</p>
-      <h1 className="font-serif text-4xl font-bold leading-tight">{title}</h1>
-      {sub ? <p className="mt-2 max-w-[70ch] text-muted-foreground">{sub}</p> : null}
+    <header className="mb-7 grid gap-3 border-b pb-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">{kicker}</p>
+        <h1 className="mt-2 text-4xl font-semibold text-foreground md:text-5xl">
+          {title}
+        </h1>
+      </div>
+      {sub ? (
+        <p className="max-w-[64ch] text-base leading-7 text-muted-foreground lg:text-right">
+          {sub}
+        </p>
+      ) : null}
     </header>
   );
 }
