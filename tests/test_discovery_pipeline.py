@@ -1,9 +1,12 @@
+import json
+
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.discovery.ingest import add_job
 from resume_agent.discovery.pipeline import (
     discover,
     reprocess,
+    run_extract,
     run_relevance,
     run_score,
 )
@@ -265,8 +268,100 @@ def test_run_score_refreshes_aliases_when_canonicalizer_given(tmp_path):
             ),
         )
         run_score(s, facts, _SicLocFitAgent(), canonicalizer=canon, aliases_path=path)
-        import json
         assert json.loads(path.read_text("utf-8"))["k8s"] == "kubernetes"
+
+
+class _OneBadExtractAgent:
+    """Raises a JSON parse error on the 'boom' JD, succeeds otherwise.
+
+    Mirrors agno raising mid-parse when the model emits malformed JSON (e.g. a
+    stray comma) for a single job.
+    """
+
+    def run(self, prompt):
+        if "boom" in prompt:
+            raise json.JSONDecodeError("Expecting ',' delimiter", prompt, 0)
+        return _Result(_extract(sponsorship_signal=SponsorshipSignal.offered))
+
+
+class _RawStrExtractAgent:
+    """Returns a raw str for the 'boom' JD, tripping the isinstance type guard."""
+
+    def run(self, prompt):
+        if "boom" in prompt:
+            return _Result("sorry, here is some prose instead of JSON")
+        return _Result(_extract(sponsorship_signal=SponsorshipSignal.offered))
+
+
+class _OneBadFitAgent:
+    """Raises a JSON parse error scoring the 'boom' JD, succeeds otherwise."""
+
+    def run(self, prompt):
+        if "boom" in prompt:
+            raise json.JSONDecodeError("Expecting ',' delimiter", prompt, 0)
+        return _Result(FitScore(score=90, rationale="great fit"))
+
+
+def test_run_extract_skips_failed_job_and_persists_the_rest():
+    """One job with unparseable LLM output must not discard the whole stage."""
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="good role", title="A", status=JobStatus.raw.value))
+        save_job(s, Job(source="x", jd_text="boom role", title="B", status=JobStatus.raw.value))
+
+        run_extract(s, _OneBadExtractAgent())  # must not raise
+
+        extracted = jobs_by_status(s, JobStatus.extracted.value)
+        raw = jobs_by_status(s, JobStatus.raw.value)
+        assert [j.title for j in extracted] == ["A"]  # good job saved
+        assert [j.title for j in raw] == ["B"]  # failed job left raw to retry
+
+
+def test_run_extract_skips_job_when_agent_returns_wrong_type():
+    """A raw-str fallback (isinstance guard -> TypeError) is also isolated."""
+    with _session() as s:
+        save_job(s, Job(source="x", jd_text="good role", title="A", status=JobStatus.raw.value))
+        save_job(s, Job(source="x", jd_text="boom role", title="B", status=JobStatus.raw.value))
+
+        run_extract(s, _RawStrExtractAgent())  # must not raise
+
+        assert [j.title for j in jobs_by_status(s, JobStatus.extracted.value)] == ["A"]
+        assert [j.title for j in jobs_by_status(s, JobStatus.raw.value)] == ["B"]
+
+
+def test_run_score_skips_failed_job_and_persists_the_rest(tmp_path):
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(
+            s,
+            Job(source="x", jd_text="good", title="A", status=JobStatus.filtered.value,
+                criteria_json={}),
+        )
+        save_job(
+            s,
+            Job(source="x", jd_text="boom", title="B", status=JobStatus.filtered.value,
+                criteria_json={}),
+        )
+
+        run_score(s, facts, _OneBadFitAgent(), aliases_path=tmp_path / "a.json")  # must not raise
+
+        shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
+        filtered = jobs_by_status(s, JobStatus.filtered.value)
+        assert [j.title for j in shortlisted] == ["A"]  # good job scored + saved
+        assert [j.title for j in filtered] == ["B"]  # failed job left filtered to retry
+
+
+def test_discover_isolates_a_single_unparseable_job():
+    """End-to-end: one bad job does not zero out the shortlist."""
+    cfg = SearchConfig()
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        add_job(s, source="manual", jd_text="good role")
+        add_job(s, source="manual", jd_text="boom role")
+
+        counts = discover(s, cfg, facts, _OneBadExtractAgent(), _FitAgent())
+
+        assert counts.get(JobStatus.shortlisted.value, 0) == 1
+        assert counts.get(JobStatus.raw.value, 0) == 1  # bad job parked for retry
 
 
 

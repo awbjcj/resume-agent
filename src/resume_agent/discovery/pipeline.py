@@ -41,7 +41,15 @@ def run_extract(
             len(jobs), "Extracting criteria", phase_index=2, phase_count=_DISCOVER_PHASES
         )
     for index, job in enumerate(jobs, 1):
-        criteria = extract_job_criteria(job.jd_text, agent)
+        try:
+            criteria = extract_job_criteria(job.jd_text, agent)
+        except Exception:
+            # A single job's unparseable LLM output (e.g. malformed JSON) must
+            # not abort the stage and discard every other job's work. Leave it
+            # raw so the next discover retries it; mirrors run_relevance.
+            if reporter:
+                reporter.step(index)
+            continue
         job.criteria_json = criteria.model_dump(mode="json")
         job.status = JobStatus.extracted.value
         session.add(job)
@@ -87,7 +95,14 @@ def run_score(
         reporter.begin(len(jobs), "Scoring fit", phase_index=3, phase_count=_DISCOVER_PHASES)
     for index, job in enumerate(jobs, 1):
         location_text = _job_location_text(job)
-        fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
+        try:
+            fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
+        except Exception:
+            # One job's unparseable fit output must not abort scoring; leave it
+            # filtered so the next discover retries it. See run_extract above.
+            if reporter:
+                reporter.step(index)
+            continue
         job.fit_score = fit.score
         job.fit_rationale = fit.rationale
         _write_taxonomy_fields(job, fit, location_text)
