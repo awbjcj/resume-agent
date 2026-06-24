@@ -128,3 +128,49 @@ _Avoid_: dedupe (dedupe is the key + the match; this is the post-match policy)
 The typed result of the Merge decision, carrying the writes the applier performs:
 `Insert`, `Skip`, `UpgradeUrlOnly`, `Rebase`. The applier holds no policy.
 _Avoid_: outcome (reserve IngestOutcome for the inserted/upgraded/skipped tag)
+
+## Board & shortlist filtering
+
+**Board seam**:
+`services/board` — the single place board-data *policy* and *assembled reads*
+live. Owns the mutations (`set_stage`, `set_archived`, `delete`,
+`upsert_application`) and the assembled detail read (`get_job_detail`). Raw list
+projections (`shortlist_rows`, `pipeline_rows`, `triage_rows`) stay in
+`tracking.queries` and are called directly by both adapters — wrapping them in
+board would add shallow pass-throughs and fight the dashboard's rich in-process
+filtering. Adapters cross this seam for mutations; they never re-import
+`tracking.repository` mutation functions.
+_Avoid_: board service (it is the seam, not a layer), repository (the repository
+is what board guards)
+
+**JobDetailRow**:
+The flat read-model for one job's detail view, assembled by `job_detail_row`
+(reusing `_shortlist_row` for the facet half). Field-named to match the
+`JobDetail` API schema exactly, so the router projects it in one
+`JobDetail.model_validate(row)` — no hand-mapping. The detail counterpart to
+`ShortlistRow`.
+_Avoid_: detail DTO, job view (name it for the row it is)
+
+**Filter contract**:
+The cross-language behavioral spec for shortlist filter-and-rank: a checked-in
+fixture of `(rows, filterState) -> ordered [job id]` cases, rows in the camelCase
+`ShortlistItem` wire shape. It is the single interface for a predicate that
+genuinely runs in two runtimes — `dashboard/filtering.py` (Streamlit, Python) and
+`web/src/lib/filters` (React, TS). Both implementations stay; the contract is the
+one thing that cannot drift. Lives in `contracts/` beside `openapi.json`.
+_Avoid_: filter test, fixture (it is the interface, not one side's test)
+
+**Conformance harness**:
+The thin per-runtime runner that feeds the Filter contract through one
+implementation and asserts the ordered ids — pytest through `filtering.py`, vitest
+through `apply.ts`/`sort.ts`. Owns no behavior; only proves an adapter satisfies
+the contract. Language-local edge cases (None vs undefined, tz-naive dates) stay in
+ordinary unit tests; shared behavior lives in the contract.
+_Avoid_: unit test (a conformance harness asserts the shared contract, not
+language-local edges)
+
+**Composite rank**:
+The weighted fit/salary/recency sort key (`PRESETS`) for the shortlist. Sorted at
+full precision so Python and JS order identically — the `round`/`Math.round` step
+is display-only and never enters the ordering. The Filter contract pins this.
+_Avoid_: composite score (the score is the value; the rank is its use as sort key)
