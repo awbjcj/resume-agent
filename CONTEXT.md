@@ -137,7 +137,7 @@ live. Owns the mutations (`set_stage`, `set_archived`, `delete`,
 `upsert_application`) and the assembled detail read (`get_job_detail`). Raw list
 projections (`shortlist_rows`, `pipeline_rows`, `triage_rows`) stay in
 `tracking.queries` and are called directly by both adapters — wrapping them in
-board would add shallow pass-throughs and fight the dashboard's rich in-process
+board would add shallow pass-throughs and fight the frontend's rich in-process
 filtering. Adapters cross this seam for mutations; they never re-import
 `tracking.repository` mutation functions.
 _Avoid_: board service (it is the seam, not a layer), repository (the repository
@@ -155,7 +155,7 @@ _Avoid_: detail DTO, job view (name it for the row it is)
 The cross-language behavioral spec for shortlist filter-and-rank: a checked-in
 fixture of `(rows, filterState) -> ordered [job id]` cases, rows in the camelCase
 `ShortlistItem` wire shape. It is the single interface for a predicate that
-genuinely runs in two runtimes — `dashboard/filtering.py` (Streamlit, Python) and
+genuinely runs in two runtimes — `services/shortlist_filtering.py` (Python) and
 `web/src/lib/filters` (React, TS). Both implementations stay; the contract is the
 one thing that cannot drift. Lives in `contracts/` beside `openapi.json`.
 _Avoid_: filter test, fixture (it is the interface, not one side's test)

@@ -33,9 +33,9 @@ SKILL_ALIASES_PATH = Path("data/skill_aliases.json")
 _SIC_TABLE = sic.load_sic_table()
 
 
-# The LLM-bound discover phases the dashboard shows a per-phase bar for; the
-# cheap, instant run_filter step is not surfaced. relevance may be skipped (no
-# agent), in which case the strip simply opens at phase 2.
+# The LLM-bound discover phases surfaced to progress consumers; the cheap,
+# instant run_filter step is not surfaced. relevance may be skipped (no agent),
+# in which case the strip simply opens at phase 2.
 _DISCOVER_PHASES = 3
 
 

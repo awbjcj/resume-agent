@@ -1,6 +1,4 @@
-// Per-job display formatters, ported from the Streamlit dashboard's
-// salary_label / meta_line helpers so the React card + modal show the same
-// compact, null-omitting meta the old dashboard did.
+// Per-job display formatters shared by the React card and modal.
 
 export function salaryLabel(
   min: number | null | undefined,

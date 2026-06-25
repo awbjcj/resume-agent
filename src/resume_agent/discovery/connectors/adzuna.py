@@ -1,3 +1,4 @@
+import re
 from urllib.parse import urlsplit
 
 import httpx
@@ -11,8 +12,10 @@ from resume_agent.discovery.connectors.harvest import gate_and_limit
 from resume_agent.discovery.connectors.text import html_to_markdown, is_materially_richer
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
 from resume_agent.discovery.search_config import SearchConfig
-from resume_agent.discovery.url_ingest.fetch import fetch_page, is_linkedin
+from resume_agent.discovery.url_ingest.browser import render_pages
+from resume_agent.discovery.url_ingest.fetch import is_linkedin
 from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
+from resume_agent.discovery.url_ingest.models import PageContent
 
 _BASE = "https://api.adzuna.com/v1/api/jobs"
 _DETAIL_SELECTORS = (
@@ -47,13 +50,14 @@ def parse_adzuna(payload: dict) -> list[RawJob]:
     return jobs
 
 
+# Markdown image syntax (company logos, icons) is never JD content; markdownify
+# emits it for every <img>, so strip it before measuring/keeping a candidate.
+_MD_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+
+
 def _clean_lines(text: str) -> str:
-    lines = [line.strip() for line in text.splitlines()]
+    lines = [_MD_IMAGE.sub("", line).strip() for line in text.splitlines()]
     return "\n".join(line for line in lines if line)
-
-
-def _words(text: str) -> list[str]:
-    return [word for word in text.split() if word.strip()]
 
 
 def _json_ld_descriptions(soup: BeautifulSoup) -> list[str]:
@@ -95,7 +99,8 @@ def _candidate_texts(html: str) -> list[str]:
     for selector in _DETAIL_SELECTORS:
         for node in soup.select(selector):
             if isinstance(node, Tag):
-                text = _clean_lines(node.get_text("\n", strip=True))
+                # Markdown (not flat get_text) so headings/bullets in the JD survive.
+                text = _clean_lines(html_to_markdown(node.decode_contents()))
                 if text:
                     candidates.append(text)
     candidates.append(_clean_lines(html_to_markdown(html)))
@@ -103,23 +108,30 @@ def _candidate_texts(html: str) -> list[str]:
 
 
 def _best_detail_text(html: str, fallback: str) -> str | None:
-    candidates = _candidate_texts(html)
-    if not candidates:
-        return None
-    best = max(candidates, key=lambda text: len(_words(text)))
-    return best if is_materially_richer(best, fallback) else None
+    """First materially-richer candidate in specificity order (clean JD over page chrome).
 
-
-def enrich_adzuna_job(job: RawJob) -> RawJob:
-    """Try to replace Adzuna's snippet with a full description from redirect_url.
-
-    Adzuna search results expose only a description snippet. The redirect target is
-    the best available source for complete JD text, so enrichment is best-effort:
-    failures leave the original RawJob intact and are recorded by the connector.
+    ``_candidate_texts`` is ordered most-specific first (JSON-LD JobPosting, then the
+    job-description containers, then ``article``/``main``, then whole-page markdown last).
+    Picking the first that clears the richness bar prefers the clean employer-authored
+    description over a longer whole-page dump full of nav and footer links.
     """
-    if not job.url:
+    for candidate in _candidate_texts(html):
+        if is_materially_richer(candidate, fallback):
+            return candidate
+    return None
+
+
+def enrich_adzuna_job(job: RawJob, page: PageContent | None) -> RawJob:
+    """Replace Adzuna's snippet with the full JD from an already-rendered detail page.
+
+    Adzuna search results expose only a snippet, and its redirect link is a bot-gated
+    click-tracker that only a real browser can follow to the employer posting. ``page``
+    is that post-redirect page (rendered upstream by ``render_pages``). Enrichment stays
+    best-effort: a missing page, or one with nothing materially richer than the snippet,
+    leaves the original RawJob intact.
+    """
+    if page is None:
         return job
-    page = fetch_page(job.url)
     host = (urlsplit(page.final_url).hostname or "").lower()
     title = job.title
     company = job.company
@@ -154,6 +166,33 @@ def enrich_adzuna_job(job: RawJob) -> RawJob:
     )
 
 
+def enrich_adzuna_jobs(jobs: list[RawJob]) -> tuple[list[RawJob], dict[str, str]]:
+    """Render every job's redirect link in one browser pass, then enrich each in place.
+
+    A single browser context is reused across the batch (distinct ads are safe; the
+    boomerang only bites when the *same* ad is re-clicked). Failures are isolated: a
+    redirect that won't render, or a launch that fails outright, leaves snippets intact
+    and is recorded in the returned failures map.
+    """
+    urls = [job.url for job in jobs if job.url]
+    try:
+        pages = render_pages(urls)
+    except Exception as exc:  # noqa: BLE001 - no browser -> keep every snippet.
+        return jobs, {"adzuna": type(exc).__name__}
+    enriched: list[RawJob] = []
+    failures: dict[str, str] = {}
+    for job in jobs:
+        page = pages.get(job.url) if job.url else None
+        if job.url and page is None:
+            failures[job.url] = "render_failed"
+        try:
+            enriched.append(enrich_adzuna_job(job, page))
+        except Exception as exc:  # noqa: BLE001 - extraction must not kill the pull.
+            failures[job.url or job.title or "unknown"] = type(exc).__name__
+            enriched.append(job)
+    return enriched, failures
+
+
 class AdzunaConnector:
     """Keyword aggregator. One search call; results filtered client-side too."""
 
@@ -176,14 +215,7 @@ class AdzunaConnector:
         jobs, filtered = gate_and_limit(parse_adzuna(self._get_results(search)), search, limit)
         if not self.enrich_details:
             return FetchResult(jobs=jobs, filtered=filtered)
-        enriched: list[RawJob] = []
-        failures: dict[str, str] = {}
-        for job in jobs:
-            try:
-                enriched.append(enrich_adzuna_job(job))
-            except Exception as exc:  # noqa: BLE001 - optional detail fetch must not kill pull.
-                failures[job.url or job.title or "unknown"] = type(exc).__name__
-                enriched.append(job)
+        enriched, failures = enrich_adzuna_jobs(jobs)
         return FetchResult(jobs=enriched, failures=failures, filtered=filtered)
 
     def _get_results(self, search: SearchConfig) -> dict:

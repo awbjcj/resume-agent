@@ -5,6 +5,7 @@ from pathlib import Path
 from resume_agent.discovery.connectors.adzuna import (
     AdzunaConnector,
     enrich_adzuna_job,
+    enrich_adzuna_jobs,
     parse_adzuna,
 )
 from resume_agent.discovery.connectors.base import RawJob
@@ -105,7 +106,18 @@ def test_adzuna_builds_targeted_params():
     assert "what" not in p
 
 
-def test_enrich_adzuna_job_replaces_snippet_from_jobposting_json_ld(monkeypatch):
+def _raw(jd_text="Short Python preview.", url="https://www.adzuna.com/jobs/1"):
+    return RawJob(
+        source="adzuna",
+        url=url,
+        company="Acme",
+        title="Platform Engineer",
+        location="Remote",
+        jd_text=jd_text,
+    )
+
+
+def test_enrich_adzuna_job_replaces_snippet_from_jobposting_json_ld():
     words = " ".join(f"detail{i}" for i in range(70))
     html = f"""
     <html><head>
@@ -114,26 +126,99 @@ def test_enrich_adzuna_job_replaces_snippet_from_jobposting_json_ld(monkeypatch)
       </script>
     </head><body>shell</body></html>
     """
+    page = PageContent(html=html, final_url="https://company.example/jobs/1", rendered=True)
 
-    def fake_fetch_page(url):
-        assert url == "https://www.adzuna.com/jobs/1"
-        return PageContent(html=html, final_url="https://company.example/jobs/1", rendered=False)
+    enriched = enrich_adzuna_job(_raw(), page)
 
-    import resume_agent.discovery.connectors.adzuna as mod
-
-    monkeypatch.setattr(mod, "fetch_page", fake_fetch_page)
-    raw = RawJob(
-        source="adzuna",
-        url="https://www.adzuna.com/jobs/1",
-        company="Acme",
-        title="Platform Engineer",
-        location="Remote",
-        jd_text="Short Python preview.",
-    )
-
-    enriched = enrich_adzuna_job(raw)
-
-    assert enriched.url == raw.url
+    assert enriched.url == "https://www.adzuna.com/jobs/1"
     assert enriched.company == "Acme"
     assert "Build Python services." in enriched.jd_text
     assert "detail69" in enriched.jd_text
+
+
+def test_enrich_adzuna_job_keeps_markdown_structure_from_dom():
+    items = "".join(f"<li>requirement {i} bullet item</li>" for i in range(20))
+    html = f"""
+    <html><body>
+      <div class="job-description">
+        <h2>Responsibilities</h2>
+        <ul>{items}</ul>
+      </div>
+    </body></html>
+    """
+    page = PageContent(html=html, final_url="https://company.example/jobs/1", rendered=True)
+
+    enriched = enrich_adzuna_job(_raw(), page)
+
+    # Markdown (not flat text): heading + bullets survive for display/extraction.
+    assert "## Responsibilities" in enriched.jd_text
+    assert "- requirement 0 bullet item" in enriched.jd_text
+
+
+def test_enrich_adzuna_job_strips_logo_images():
+    body = " ".join(f"para {i} text content here" for i in range(20))
+    html = f"""
+    <html><body>
+      <div class="job-description">
+        <img src="https://cdn.example/logo.png" alt="Acme logo"/>
+        <p>{body}</p>
+      </div>
+    </body></html>
+    """
+    page = PageContent(html=html, final_url="https://company.example/jobs/1", rendered=True)
+
+    enriched = enrich_adzuna_job(_raw(), page)
+
+    assert "![" not in enriched.jd_text  # logo markdown removed
+    assert "logo.png" not in enriched.jd_text
+    assert enriched.jd_text.startswith("para 0 text content here")
+
+
+def test_enrich_adzuna_job_keeps_snippet_when_page_missing():
+    raw = _raw()
+    assert enrich_adzuna_job(raw, None) is raw
+
+
+def test_enrich_jobs_batch_renders_once_and_enriches(monkeypatch):
+    words = " ".join(f"word{i}" for i in range(80))
+    page = PageContent(
+        html=f"<html><body><article>{words}</article></body></html>",
+        final_url="https://company.example/jobs/1",
+        rendered=True,
+    )
+    calls = {}
+
+    def fake_render_pages(urls):
+        calls["urls"] = list(urls)
+        return {"https://www.adzuna.com/jobs/1": page}
+
+    import resume_agent.discovery.connectors.adzuna as mod
+
+    monkeypatch.setattr(mod, "render_pages", fake_render_pages)
+    jobs = [_raw(url="https://www.adzuna.com/jobs/1"), _raw(url="https://www.adzuna.com/jobs/2")]
+
+    enriched, failures = enrich_adzuna_jobs(jobs)
+
+    # One render pass for the whole batch, both urls handed in together.
+    assert calls["urls"] == [
+        "https://www.adzuna.com/jobs/1",
+        "https://www.adzuna.com/jobs/2",
+    ]
+    assert "word79" in enriched[0].jd_text
+    assert enriched[1].jd_text == "Short Python preview."  # no page -> snippet kept
+    assert failures == {"https://www.adzuna.com/jobs/2": "render_failed"}
+
+
+def test_enrich_jobs_falls_back_to_snippets_when_browser_unavailable(monkeypatch):
+    def boom(urls):
+        raise RuntimeError("no browser")
+
+    import resume_agent.discovery.connectors.adzuna as mod
+
+    monkeypatch.setattr(mod, "render_pages", boom)
+    jobs = [_raw()]
+
+    enriched, failures = enrich_adzuna_jobs(jobs)
+
+    assert enriched is jobs  # contract: snippets intact, pull not aborted
+    assert failures == {"adzuna": "RuntimeError"}

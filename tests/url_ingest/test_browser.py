@@ -81,3 +81,82 @@ def test_fetch_rendered_waits_for_selector(monkeypatch):
     )
 
     assert page.waited_for == ("div.jd", 1234)
+
+
+class _RedirectPage:
+    """A page whose ``url`` resolves to a post-redirect destination after goto."""
+
+    def __init__(self, destinations):
+        self._destinations = destinations
+        self.url = None
+        self.closed = False
+
+    def goto(self, url, wait_until=None, timeout=None):
+        dest = self._destinations.get(url)
+        if dest is None:
+            raise RuntimeError(f"blocked: {url}")
+        self.url = dest
+
+    def wait_for_timeout(self, ms):
+        return None
+
+    def content(self):
+        return f"<html>{self.url}</html>"
+
+    def close(self):
+        self.closed = True
+
+
+class _MultiPageContext:
+    def __init__(self, destinations):
+        self._destinations = destinations
+        self.pages = []
+        self.closed = False
+
+    def new_page(self):
+        page = _RedirectPage(self._destinations)
+        self.pages.append(page)
+        return page
+
+    def close(self):
+        self.closed = True
+
+
+def test_render_pages_captures_final_url_and_isolates_failures(monkeypatch):
+    destinations = {
+        "https://www.adzuna.com/land/ad/1": "https://www.dice.com/job-detail/1",
+        # ad 2 has no destination -> goto raises -> omitted from results
+    }
+    context = _MultiPageContext(destinations)
+    chromium = _FakeChromium(context)
+    monkeypatch.setattr(browser, "sync_playwright", lambda: _FakePlaywright(chromium))
+
+    pages = browser.render_pages(
+        [
+            "https://www.adzuna.com/land/ad/1",
+            "https://www.adzuna.com/land/ad/2",
+            "https://www.adzuna.com/land/ad/1",  # duplicate -> rendered once
+        ],
+        user_data_dir="/tmp/p",
+        settle_ms=0,
+        pace_seconds=0.0,
+    )
+
+    assert set(pages) == {"https://www.adzuna.com/land/ad/1"}
+    result = pages["https://www.adzuna.com/land/ad/1"]
+    assert result.final_url == "https://www.dice.com/job-detail/1"
+    assert result.rendered is True
+    assert "dice.com" in result.html
+    # one page per distinct url (dedup), each closed; context closed.
+    assert len(context.pages) == 2
+    assert all(page.closed for page in context.pages)
+    assert context.closed is True
+
+
+def test_render_pages_empty_urls_skips_browser(monkeypatch):
+    monkeypatch.setattr(
+        browser,
+        "sync_playwright",
+        lambda: (_ for _ in ()).throw(AssertionError("no browser")),
+    )
+    assert browser.render_pages([]) == {}

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_agent.dashboard.filtering import FilterState, apply_filters, sort_rows
+from resume_agent.services.shortlist_filtering import FilterState, apply_filters, sort_rows
 from resume_agent.tracking.queries import ShortlistRow, SkillTag
 
 CONTRACT = Path(__file__).resolve().parents[1] / "contracts" / "shortlist_filter.contract.json"

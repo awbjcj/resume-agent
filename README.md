@@ -39,11 +39,11 @@ points where _you_ (not the agent) make the call.
 | ---------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Ingest**       | `pull` / `scrape` / `addjob` | Raw jobs land in the DB (deduped by URL or JD text). `pull` runs every enabled job-board connector; `scrape` drives LinkedIn; `addjob` takes one by hand. |
 | **Discover**     | `discover`                   | Agents extract structured criteria, apply your hard filters, and score fit → `shortlisted`.                                                               |
-| **👤 Approve**   | dashboard or `approve`       | The cost gate: you approve only the jobs worth paying to tailor.                                                                                          |
+| **👤 Approve**   | web app or `approve`         | The cost gate: you approve only the jobs worth paying to tailor.                                                                                          |
 | **Tailor**       | `tailor`                     | A writer agent drafts a fact-locked resume; a reviewer panel critiques and a reviser loops until it passes.                                               |
 | **Cover letter** | `cover-letter`               | Drafts a fact-locked cover letter per job, gated by a deterministic provenance check, and renders it to PDF.                                              |
 | **Render**       | `render`                     | A chosen resume version becomes a PDF in `output/`.                                                                                                       |
-| **👤 Track**     | dashboard / `sync-status`    | Log submission status and notes by hand, or let `sync-status` read Gmail and **propose** status moves for you to apply.                                   |
+| **👤 Track**     | web app / `sync-status`      | Log submission status and notes by hand, or let `sync-status` read Gmail and **propose** status moves for you to apply.                                   |
 
 ---
 
@@ -103,7 +103,7 @@ updates. It authenticates with a Google OAuth client — there is no password in
 3. The first `sync-status` run opens a browser consent screen once; the granted
    token is cached to `data/gmail_token.json` (git-ignored) and reused after that.
 
-Skip this entirely if you'd rather track statuses by hand in the dashboard.
+Skip this entirely if you'd rather track statuses by hand in the web app.
 
 All commands below are shown as `uv run resume-agent …`. If you'd rather not
 prefix every call, activate the venv first (`source .venv/bin/activate`, or
@@ -126,18 +126,18 @@ uv run resume-agent addjob --company "Acme" --title "Backend Engineer" --jd-file
 uv run resume-agent discover
 uv run resume-agent match-gap                 # optional: see missing high-demand skills
 
-# 4. Review the shortlist and approve the keepers (opens the dashboard)
-uv run resume-agent dashboard
+# 4. Review the shortlist and approve the keepers in the web app
+make dev                                # http://localhost:5173
 
 # 5. Tailor every approved job, and draft matching cover letters
 uv run resume-agent tailor --approved
 uv run resume-agent cover-letter --approved
 
-# 6. Render a specific resume version to PDF (id shown in the dashboard)
+# 6. Render a specific resume version to PDF (id shown in the web app)
 uv run resume-agent render 12
 
-# 7. Track submissions back in the dashboard
-uv run resume-agent dashboard
+# 7. Track submissions back in the web app
+make dev                                # http://localhost:5173
 
 # 8. Later, let Gmail propose status updates (review first, then apply)
 uv run resume-agent sync-status               # lists proposals only
@@ -244,7 +244,7 @@ uv run resume-agent match-gap --job-id 7      # gaps for one target job
 uv run resume-agent match-gap --llm           # optional synonym pass, e.g. k8s/Kubernetes
 ```
 
-### `approve` — the cost gate (CLI alternative to the dashboard)
+### `approve` — the cost gate (CLI alternative to the web app)
 
 Marks a shortlisted job `approved` so it's eligible for tailoring.
 
@@ -289,21 +289,14 @@ earlier PDF.
 uv run resume-agent render 12 [--config config/render.yaml]
 ```
 
-### `dashboard` — the visual control room
+### Web app — visual boards
 
-Launches the Streamlit app with four views:
-
-- **Shortlist** — fit scores + rationales, with an _Approve for tailoring_ button.
-- **Pipeline board** — every job by stage, with its PDF download, review
-  critiques, and an editable application status + notes.
-- **Analytics** — response / interview / offer rates sliced by **source** and by
-  **fit-score band**, so you can see which connectors and which scores actually
-  convert.
-- **Match-gap** — skills your target jobs demand that your profile does not
-  show, ranked by frequency.
+Runs the FastAPI backend and React frontend with Shortlist, Pipeline, Triage,
+Analytics, and Match-gap views. Use it to approve shortlisted jobs, inspect
+rendered artifacts, edit application status/notes, and prune stale jobs.
 
 ```bash
-uv run resume-agent dashboard [--db-url …]
+make dev                                # http://localhost:5173
 ```
 
 ### `sync-status` — let Gmail propose status updates
@@ -325,8 +318,8 @@ uv run resume-agent sync-status --max-results 100
 
 ## API server
 
-The same pipeline is exposed over HTTP for the future React/shadcn frontend (and
-any API client):
+The same pipeline is exposed over HTTP for the React frontend (and any API
+client):
 
 ```bash
 uv run resume-agent serve                       # http://127.0.0.1:8000
@@ -344,8 +337,8 @@ uv run resume-agent serve --host 0.0.0.0 --port 8080
   route except `/api/health`; set `CORS_ORIGINS` (comma-separated) for your
   frontend dev server. Both are off-by-default-friendly for local single-user use.
 
-Deferred (not yet exposed over HTTP): Gmail `sync-status`, analytics, match-gap,
-`profile build`, LinkedIn `scrape`.
+Deferred (not yet exposed over HTTP): Gmail `sync-status`, `profile build`, and
+LinkedIn `scrape`.
 
 ---
 

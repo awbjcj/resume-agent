@@ -1,6 +1,5 @@
 // Structured meta panel for the modal rail. Labeled rows, null-omitting,
-// surfacing every facet the old Streamlit dashboard exposed per job and the
-// React app had been hiding (salary, seniority, remote, sponsorship, ...).
+// surfacing the full per-job facet set.
 
 import { salaryLabel, recency } from "@/lib/format";
 import type { JobDetail } from "@/features/job/use-job-detail";

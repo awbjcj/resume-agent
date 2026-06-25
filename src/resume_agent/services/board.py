@@ -2,7 +2,7 @@
 
 Read side wraps tracking.queries with the core server-side filters the API
 exposes; rich faceting stays client-side for now. Mutation side wraps
-tracking.repository, preserving the exact semantics the CLI/Streamlit use today.
+tracking.repository, preserving the existing job/application semantics.
 """
 
 from __future__ import annotations
@@ -102,7 +102,7 @@ def list_triage(
     return paginate(rows, page=page, page_size=page_size)
 
 
-# --- mutations (preserve current CLI/Streamlit semantics) -----------------
+# --- mutations (preserve current job/application semantics) ---------------
 
 def set_stage(session: Session, job_id: int, status: str) -> Job | None:
     job = get_job(session, job_id)

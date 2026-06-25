@@ -9,7 +9,7 @@ WEB_HOST ?= localhost
 WEB_PORT ?= 5173
 PYTEST_ARGS ?= tests/api -v
 
-.PHONY: help setup setup-browser api web dev dashboard test test-api test-py test-web lint lint-py lint-web build build-web preview verify openapi client kill-port
+.PHONY: help setup setup-browser api web dev test test-api test-py test-web lint lint-py lint-web build build-web preview verify openapi client kill-port
 
 help:
 	@echo "Common targets:"
@@ -17,7 +17,6 @@ help:
 	@echo "  make api            Run FastAPI backend at http://$(HOST):$(PORT)"
 	@echo "  make web            Run Vite frontend at http://$(WEB_HOST):$(WEB_PORT)"
 	@echo "  make dev            Run backend and frontend together"
-	@echo "  make dashboard      Run the Streamlit dashboard"
 	@echo "  make test           Run API and frontend tests"
 	@echo "  make test-py        Run the full Python test suite"
 	@echo "  make lint           Run Python and frontend linters"
@@ -49,9 +48,6 @@ web:
 
 dev:
 	$(MAKE) -j2 api web
-
-dashboard:
-	$(UV) run resume-agent dashboard
 
 test: test-api test-web
 

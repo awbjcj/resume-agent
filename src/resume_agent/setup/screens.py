@@ -651,7 +651,7 @@ class HandoffScreen(Screen[None]):
         if app.state.resume_path:
             commands.append("uv run resume-agent profile build   # extract facts from your resume")
         commands.append("uv run resume-agent discover            # run the discovery funnel")
-        commands.append("uv run resume-agent dashboard           # open the review board")
+        commands.append("make dev                                # open the web review board")
         self.query_one("#next", Static).update(
             "[bold]Next steps:[/bold]\n\n  " + "\n  ".join(commands)
         )

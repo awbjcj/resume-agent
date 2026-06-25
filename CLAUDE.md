@@ -17,8 +17,8 @@ are tested against fixture JSON payloads, not live endpoints.
 
 ## API layer (`api/`)
 
-The FastAPI app is the **third thin adapter** over the domain code, alongside the
-CLI and Streamlit — all three call the same `services/` use-case layer
+The FastAPI app is a thin adapter over the domain code, alongside the CLI — both
+call the same `services/` use-case layer
 (`discovery`, `tailoring`, `cover_letters`, `rendering`, `board`). No business
 logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
 `api/app.py` is the factory (lifespan runs `init_db`, stores the engine on
@@ -45,8 +45,7 @@ logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
 - **In-memory sqlite tests** need a shared connection: `make_engine` gives
   `sqlite://` a `StaticPool` + `check_same_thread=False` so the request threadpool
   sees the schema the lifespan thread created.
-- **Deferred (not exposed over HTTP):** Gmail sync, analytics, match-gap, profile
-  build, LinkedIn scrape.
+- **Deferred (not exposed over HTTP):** Gmail sync, profile build, LinkedIn scrape.
 
 ---
 
@@ -110,7 +109,7 @@ the single gate for irreversible paths. `delete_job` refuses jobs with progress 
 cascades incidental children in FK-safe order otherwise. `prune_run` (config:
 `config/prune.yaml`) archives rejected/low-fit/stale zero-progress jobs, reports
 primary reason counts, then hard-deletes archived zero-progress jobs older than
-`retention_days`. Surfaced via the dashboard Triage page and
+`retention_days`. Surfaced via the web Triage page and
 `resume-agent prune [--dry-run]`.
 
 ---
@@ -202,6 +201,18 @@ aggressiveness determines how many detail fetches are issued.
 - **Tesla/Google endpoints are reverse-engineered.** They have no public API contract and could change
   without notice. Each is isolated to its own module behind `_BACKENDS`; a parse failure records to
   `.failures` and never aborts the pull.
+- **Adzuna enrichment needs a real (non-headless) browser.** The API returns only a truncated snippet,
+  and `redirect_url` is a bot-gated `/land/ad/` click-tracker — bare `httpx` gets `403` and *headless*
+  Chromium is challenged ("suspicious behaviour"); only a non-headless browser follows the redirect to
+  the employer/aggregator posting (Dice, Greenhouse, …). So `AdzunaConnector.fetch` (when
+  `enrich_details=True`, the default) relevance-gates the snippets, then `enrich_adzuna_jobs` calls
+  `browser.render_pages` to drive **one shared visible browser context** over every survivor's
+  `redirect_url` (distinct ads are safe; re-clicking the *same* ad boomerangs to a search page),
+  captures each post-redirect `final_url`, and extracts the JD via `enrich_adzuna_job(job, page)`
+  (LinkedIn/Greenhouse branches, else JSON-LD → description selectors → whole-page markdown, taking the
+  **first** materially-richer candidate in specificity order, with logo `![](…)` images stripped).
+  Any render/extract failure leaves the snippet intact and is recorded in `.failures`. Enrichment is
+  un-exercised by the offline suite (the browser is faked); a pull is slower and pops a window.
 - **Discovery + tailor LLM calls run concurrently** via asyncio. Each phase keeps a sync public
   signature and runs `asyncio.run(gather_isolated(...))` internally: load rows → fan out the pure
   async LLM siblings (`aextract_job_criteria`, `ascore_fit`, `ajudge_relevance`, `arun_tailor_review`)

@@ -109,7 +109,10 @@ def tailor_jobs(
         for job, res in zip(targets, rounds_results):
             if not res.ok or res.value is None:
                 continue
-            results[job.id] = _persist_rounds(session, job, res.value)
+            job_id = job.id
+            if job_id is None:
+                raise ValueError("Cannot tailor a job that has not been persisted")
+            results[job_id] = _persist_rounds(session, job, res.value)
     if reporter:
         reporter.done()
     return results

@@ -28,7 +28,7 @@ _INSTRUCTIONS = [
 ]
 
 
-def build_extract_agent(model_id: str | None = None) -> Runner:
+def build_extract_agent(model_id: str | None = None) -> AgentRunner:
     s = get_settings()
     model = build_model(model_id or s.cheap_model)
     return AgentRunner(

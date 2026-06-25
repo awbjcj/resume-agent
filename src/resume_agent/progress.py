@@ -1,11 +1,9 @@
-"""Cross-process progress channel for long-running CLI commands.
+"""Cross-process progress channel for long-running commands.
 
-The CLI commands (``pull`` / ``discover`` / ``tailor``) run in their own OS
-process; the Streamlit dashboard runs in another. To show a *live* progress bar
-there is no shared memory to lean on — the running command writes its progress to
-a small JSON file and the dashboard polls it. One file per process
-(``data/progress/{name}.json``) so a ``pull`` and a ``discover`` running at once
-never clobber each other's record.
+CLI commands and API background runs execute outside the web request/response
+loop. To show live progress, the running command writes a small JSON record and
+readers poll it or stream it over SSE. Process-keyed CLI records live under
+``data/progress/{name}.json``; run-keyed API records live under ``data/runs/``.
 
 Mirrors ``discovery/connectors/telemetry.py`` — pure file IO, no third-party deps,
 so the writer side is testable without a server and the reader side without a
@@ -25,7 +23,7 @@ PROGRESS_ROOT = Path("data/progress")
 #: Where the API persists one JSON record per background run (run_id-keyed).
 RUNS_ROOT = Path("data/runs")
 
-#: The processes that emit progress. The dashboard polls these in order.
+#: Legacy process-keyed progress emitters.
 PROCESSES = ("pull", "discover", "tailor")
 
 #: Throttle ``step`` writes to at most one per this many seconds (begin/done and
@@ -169,7 +167,7 @@ class ProgressReporter:
         """Mark the process finished (``done``) or failed (``error``)."""
         if not self._record:
             # done() without begin() (e.g. nothing to process) — still emit a
-            # terminal record so the dashboard can show a completed bar.
+            # terminal record so progress consumers can show completion.
             self._record = {
                 "process": self.process,
                 "label": self.process,
@@ -251,7 +249,7 @@ def progress_stats(record: dict, *, now: datetime | None = None) -> ProgressStat
 
     ETA assumes a steady per-item rate over the *current phase only* — measured
     from ``started_at`` to ``updated_at`` (which is when ``current`` was true),
-    not to wall-clock now, so the rate is not skewed by dashboard poll lag.
+    not to wall-clock now, so the rate is not skewed by reader poll lag.
     """
     now = now or datetime.now(timezone.utc)
     total = int(record.get("total") or 0)
@@ -288,7 +286,7 @@ def progress_stats(record: dict, *, now: datetime | None = None) -> ProgressStat
 
 
 def is_displayable(record: dict, *, now: datetime | None = None) -> bool:
-    """Whether the dashboard should show this record.
+    """Whether UI consumers should show this record.
 
     Running records always show; finished ones linger for ``TERMINAL_TTL_SECONDS``
     so a completed run gives a brief ✓/✕ confirmation before the bar collapses.

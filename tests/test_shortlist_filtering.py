@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from resume_agent.dashboard.filtering import (
+from resume_agent.services.shortlist_filtering import (
     FilterState,
     apply_filters,
     available_cities,

@@ -1,5 +1,3 @@
-import os
-import subprocess
 from pathlib import Path
 from typing import cast
 
@@ -418,18 +416,6 @@ def render_cmd(
         typer.echo(f"Resume version #{version_id} not found.")
         raise typer.Exit(code=1)
     typer.echo(f"Rendered version #{version_id} -> {path}")
-
-
-@app.command("dashboard")
-def dashboard_cmd(
-    db_url: str | None = typer.Option(None, help="Override the database URL for the dashboard."),
-) -> None:
-    """Launch the Streamlit dashboard (shortlist checkpoint + pipeline board)."""
-    app_path = str(Path(__file__).parent / "dashboard" / "app.py")
-    env = dict(os.environ)
-    if db_url:
-        env["DB_URL"] = db_url
-    subprocess.run(["streamlit", "run", app_path], env=env)
 
 
 @app.command("setup")
