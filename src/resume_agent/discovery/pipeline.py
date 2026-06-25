@@ -1,11 +1,23 @@
+import asyncio
 from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.discovery.extract import Runner, extract_job_criteria
+from resume_agent.concurrency import gather_isolated
+from resume_agent.config import get_settings
+from resume_agent.discovery.extract import (  # noqa: F401
+    Runner,
+    aextract_job_criteria,
+    extract_job_criteria,
+)
 from resume_agent.discovery.filter import apply_filters
-from resume_agent.discovery.fit import FitScore, compose_fit_input, score_fit
-from resume_agent.discovery.relevance import judge_relevance
+from resume_agent.discovery.fit import (  # noqa: F401
+    FitScore,
+    ascore_fit,
+    compose_fit_input,
+    score_fit,
+)
+from resume_agent.discovery.relevance import ajudge_relevance, judge_relevance  # noqa: F401
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
@@ -45,21 +57,24 @@ def run_extract(
         reporter.begin(
             len(jobs), "Extracting criteria", phase_index=2, phase_count=_DISCOVER_PHASES
         )
-    for index, job in enumerate(jobs, 1):
-        try:
-            criteria = extract_job_criteria(job.jd_text, agent)
-        except Exception:
-            # A single job's unparseable LLM output (e.g. malformed JSON) must
-            # not abort the stage and discard every other job's work. Leave it
-            # raw so the next discover retries it; mirrors run_relevance.
-            if reporter:
-                reporter.step(index)
-            continue
-        job.criteria_json = criteria.model_dump(mode="json")
-        job.status = JobStatus.extracted.value
-        session.add(job)
-        if reporter:
-            reporter.step(index)
+    if jobs:
+        sem = asyncio.Semaphore(get_settings().llm_concurrency)
+        on_complete = (lambda n: reporter.step(n)) if reporter else None
+        results = asyncio.run(
+            gather_isolated(
+                jobs,
+                lambda job: aextract_job_criteria(job.jd_text, agent, sem=sem),
+                on_complete=on_complete,
+            )
+        )
+        for job, res in zip(jobs, results):
+            if not res.ok or res.value is None:
+                # Leave failed jobs raw so the next discover retries them.
+                continue
+            criteria = res.value
+            job.criteria_json = criteria.model_dump(mode="json")
+            job.status = JobStatus.extracted.value
+            session.add(job)
     session.commit()
 
 
@@ -94,23 +109,32 @@ def run_score(
     jobs = _stage_jobs(session, JobStatus.filtered.value, job_ids)
     if reporter:
         reporter.begin(len(jobs), "Scoring fit", phase_index=3, phase_count=_DISCOVER_PHASES)
-    for index, job in enumerate(jobs, 1):
-        location_text = _job_location_text(job)
-        try:
-            fit = score_fit(compose_fit_input(job.jd_text, profile_facts, location_text), agent)
-        except Exception:
-            # One job's unparseable fit output must not abort scoring; leave it
-            # filtered so the next discover retries it. See run_extract above.
-            if reporter:
-                reporter.step(index)
-            continue
-        job.fit_score = fit.score
-        job.fit_rationale = fit.rationale
-        _write_taxonomy_fields(job, fit, location_text)
-        job.status = JobStatus.shortlisted.value
-        session.add(job)
-        if reporter:
-            reporter.step(index)
+    if jobs:
+        locations = [_job_location_text(job) for job in jobs]
+        pairs = list(zip(jobs, locations))
+        sem = asyncio.Semaphore(get_settings().llm_concurrency)
+        on_complete = (lambda n: reporter.step(n)) if reporter else None
+        results = asyncio.run(
+            gather_isolated(
+                pairs,
+                lambda pair: ascore_fit(
+                    compose_fit_input(pair[0].jd_text, profile_facts, pair[1]),
+                    agent,
+                    sem=sem,
+                ),
+                on_complete=on_complete,
+            )
+        )
+        for (job, location_text), res in zip(pairs, results):
+            if not res.ok or res.value is None:
+                # Leave failed jobs filtered so the next discover retries them.
+                continue
+            fit = res.value
+            job.fit_score = fit.score
+            job.fit_rationale = fit.rationale
+            _write_taxonomy_fields(job, fit, location_text)
+            job.status = JobStatus.shortlisted.value
+            session.add(job)
     session.commit()
     if canonicalizer is not None:
         _refresh_skill_aliases(
@@ -172,32 +196,38 @@ def run_relevance(
         return 0
 
     jobs = _stage_jobs(session, JobStatus.raw.value, job_ids)
+    judged = [job for job in jobs if (job.jd_text or "").strip()]
+    skipped = len(jobs) - len(judged)
     if reporter:
         reporter.begin(
             len(jobs), "Checking relevance", phase_index=1, phase_count=_DISCOVER_PHASES
         )
     rejected = 0
-    for index, job in enumerate(jobs, 1):
-        jd_text = job.jd_text or ""
-        if not jd_text.strip():
-            if reporter:
-                reporter.step(index)
-            continue
-        try:
-            verdict = judge_relevance(target, job.title, jd_text, agent)
-        except Exception:
-            if reporter:
-                reporter.step(index)
-            continue
-        if not verdict.keep:
-            reason = (verdict.reason or "model rejected").strip()
-            job.status = JobStatus.rejected.value
-            job.reject_reason = f"off-target role: {reason}"
-            job.reject_category = "relevance"
-            session.add(job)
-            rejected += 1
-        if reporter:
-            reporter.step(index)
+    if judged:
+        sem = asyncio.Semaphore(get_settings().llm_concurrency)
+        on_complete = (lambda n: reporter.step(skipped + n)) if reporter else None
+        results = asyncio.run(
+            gather_isolated(
+                judged,
+                lambda job: ajudge_relevance(
+                    target, job.title, job.jd_text or "", agent, sem=sem
+                ),
+                on_complete=on_complete,
+            )
+        )
+        for job, res in zip(judged, results):
+            if not res.ok or res.value is None:
+                continue
+            verdict = res.value
+            if not verdict.keep:
+                reason = (verdict.reason or "model rejected").strip()
+                job.status = JobStatus.rejected.value
+                job.reject_reason = f"off-target role: {reason}"
+                job.reject_category = "relevance"
+                session.add(job)
+                rejected += 1
+    if reporter:
+        reporter.step(len(jobs))
     session.commit()
     return rejected
 
