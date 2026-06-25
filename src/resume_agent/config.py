@@ -2,6 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from pydantic import Field
 import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -29,6 +30,10 @@ class Settings(BaseSettings):
     premium_model: str = "claude-opus-4-8"
     api_token: str = ""  # when non-empty, the API requires Authorization: Bearer <token>
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
+    # Concurrency + retry for LLM fan-out (discovery + tailor).
+    llm_concurrency: int = Field(default=8, ge=1)
+    llm_retries: int = Field(default=2, ge=0)
+    llm_retry_delay: int = Field(default=1, ge=0)
 
 
 @lru_cache

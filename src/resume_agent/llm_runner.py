@@ -1,22 +1,28 @@
+import asyncio
 from typing import Any, Protocol
 
 from resume_agent.config import get_settings
 
 
 class Runner(Protocol):
-    """Minimal callable surface the pipeline expects from an LLM agent."""
+    """Minimal surface the pipeline expects from an LLM agent."""
 
     def run(self, prompt: str) -> Any: ...
 
+    async def arun(self, prompt: str) -> Any: ...
+
 
 class AgentRunner:
-    """Adapter that narrows third-party agent APIs to ``run(prompt: str)``."""
+    """Adapter that narrows third-party agent APIs to ``run`` / ``arun``."""
 
     def __init__(self, agent: Any) -> None:
         self._agent = agent
 
     def run(self, prompt: str) -> Any:
         return self._agent.run(prompt)
+
+    async def arun(self, prompt: str) -> Any:
+        return await self._agent.arun(prompt)
 
 
 # Providers selectable via a ``provider:model`` prefix on any model id. A bare id
@@ -87,3 +93,19 @@ def build_model(model_id: str, api_key: str | None = None) -> Any:
     from agno.models.anthropic import Claude
 
     return Claude(id=model, api_key=key)
+
+
+async def acall(agent: Runner, prompt: str, *, sem: asyncio.Semaphore) -> Any:
+    """Run one agent call, holding a semaphore permit only for its duration."""
+    async with sem:
+        return await agent.arun(prompt)
+
+
+def retry_kwargs() -> dict[str, Any]:
+    """agno per-agent retry config, spread into every ``Agent(...)`` we build."""
+    s = get_settings()
+    return {
+        "retries": s.llm_retries,
+        "delay_between_retries": s.llm_retry_delay,
+        "exponential_backoff": True,
+    }
