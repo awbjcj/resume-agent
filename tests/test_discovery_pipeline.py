@@ -157,6 +157,46 @@ def test_run_relevance_keeps_job_on_agent_error():
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
 
 
+def test_run_extract_runs_concurrently_and_isolates_failures(monkeypatch):
+    import time
+
+    monkeypatch.setenv("LLM_CONCURRENCY", "8")
+    from resume_agent.config import get_settings
+
+    get_settings.cache_clear()
+
+    class _SlowExtract:
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            import asyncio
+
+            await asyncio.sleep(0.05)
+            if "boom" in prompt:
+                return _Result("not-a-criteria-object")
+            return _Result(_extract(industry="fintech"))
+
+    try:
+        with _session() as s:
+            for i in range(5):
+                add_job(
+                    s, source="manual", jd_text=("boom" if i == 2 else f"jd{i}"),
+                    title=f"T{i}", company=f"C{i}",
+                )
+            t0 = time.perf_counter()
+            run_extract(s, _SlowExtract())
+            elapsed = time.perf_counter() - t0
+
+            extracted = jobs_by_status(s, JobStatus.extracted.value)
+            raw = jobs_by_status(s, JobStatus.raw.value)
+            assert len(extracted) == 4
+            assert len(raw) == 1
+        assert elapsed < 0.2
+    finally:
+        get_settings.cache_clear()
+
+
 def test_discover_extracts_filters_scores_and_shortlists():
     cfg = SearchConfig(sponsorship_required=True)
     facts = ProfileFacts(contact=Contact(name="Ada"))
