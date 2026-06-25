@@ -24,6 +24,8 @@ describe("ShortlistContainer", () => {
         HttpResponse.json({
           data: [],
           pagination: { page: 1, pageSize: 200, totalItems: 0, totalPages: 0 },
+          facets: {},
+          total: 0,
         }),
       ),
     );
@@ -48,6 +50,8 @@ describe("ShortlistContainer", () => {
             },
           ],
           pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+          facets: { skills: {} },
+          total: 1,
         }),
       ),
     );

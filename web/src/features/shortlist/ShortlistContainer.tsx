@@ -1,39 +1,53 @@
-import { useMemo } from "react";
+import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
-import { BoardSkeleton } from "@/components/skeletons";
+import { BulkActionBar } from "@/components/BulkActionBar";
+import { BulkPreviewButton } from "@/components/BulkPreviewButton";
 import { EmptyState } from "@/components/EmptyState";
-import { MetricRow } from "@/components/MetricRow";
-import { PageHeader } from "@/components/PageHeader";
 import { FilterDesk } from "@/components/FilterDesk";
 import { JobCard } from "@/components/JobCard";
 import { JobModal } from "@/components/JobModal";
-import { applyFilters } from "@/lib/filters/apply";
-import { sortRows } from "@/lib/filters/sort";
-import { useShortlist } from "./use-shortlist";
-import { useBoardFilters } from "./use-board-filters";
+import { MetricRow } from "@/components/MetricRow";
+import { PageHeader } from "@/components/PageHeader";
+import { BoardSkeleton } from "@/components/skeletons";
+import { Button } from "@/components/ui/button";
+import {
+  type ShortlistItem,
+  useBoardQuery,
+} from "@/features/board/use-board-query";
+import { useBulkAction } from "@/features/board/use-bulk-action";
+import { useSelection } from "@/features/board/use-selection";
+
 import { useApprove } from "./use-approve";
+import { useBoardFilters } from "./use-board-filters";
 
 export function ShortlistContainer() {
-  const { data: rows, isLoading, error } = useShortlist();
   const [filters, setFilters] = useBoardFilters();
+  const { rows, facets, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } =
+    useBoardQuery<ShortlistItem>("shortlist", filters);
+  const selection = useSelection();
+  const { reconcile } = selection;
+  const bulk = useBulkAction("shortlist");
   const approve = useApprove();
   const [params, setParams] = useSearchParams();
 
-  const visible = useMemo(
-    () => (rows ? sortRows(applyFilters(rows, filters), filters) : []),
-    [rows, filters],
-  );
+  useEffect(() => {
+    reconcile(rows.map((row) => row.jobId), total);
+  }, [rows, total, reconcile]);
 
   if (isLoading) return <BoardSkeleton />;
   if (error) return <EmptyState title="Failed to load" body={(error as Error).message} />;
 
-  const avg = rows?.length
-    ? Math.round(rows.reduce((a, r) => a + (r.fitScore ?? 0), 0) / rows.length)
+  const avg = rows.length
+    ? Math.round(rows.reduce((sum, row) => sum + (row.fitScore ?? 0), 0) / rows.length)
     : 0;
-  const sponsored = rows?.filter((r) => r.sponsorshipSignal === "offered").length ?? 0;
+  const sponsored = rows.filter((row) => row.sponsorshipSignal === "offered").length;
   const openId = params.get("job");
+  const loadedIds = rows.map((row) => row.jobId);
+  const allLoadedSelected =
+    rows.length > 0 && rows.every((row) => selection.isSelected(row.jobId));
+  const bulkSelection = { mode: selection.mode, ids: selection.ids };
+  const bulkArgs = { selection: bulkSelection, filter: filters };
 
   const openJob = (id: number) =>
     setParams(
@@ -61,39 +75,74 @@ export function ShortlistContainer() {
       />
       <MetricRow
         items={[
-          ["Awaiting review", String(rows?.length ?? 0)],
-          ["Avg fit", String(avg)],
-          ["Sponsorship offered", String(sponsored)],
+          ["Awaiting review", total.toLocaleString()],
+          ["Avg fit in view", String(avg)],
+          ["Sponsorship offered in view", String(sponsored)],
         ]}
       />
-      {!rows?.length ? (
+      <FilterDesk filter={filters} facets={facets} total={total} onChange={setFilters} />
+      {!rows.length ? (
         <EmptyState
-          title="Nothing shortlisted yet"
+          title={total === 0 ? "Nothing shortlisted yet" : "No jobs loaded"}
           body="Run a discover to score jobs and surface the keepers here."
         />
       ) : (
         <>
-          <FilterDesk rows={rows} state={filters} onChange={setFilters} />
-          {visible.length === 0 ? (
-            <EmptyState
-              title="No jobs match these filters"
-              body="Loosen a filter or clear the skill tags."
+          <BulkActionBar
+            count={selection.count}
+            isAllMatching={selection.isAllMatching}
+            pageCount={rows.length}
+            total={total}
+            onSelectAllMatching={() => selection.selectAllMatching(total)}
+            onClear={selection.clear}
+          >
+            <BulkPreviewButton
+              label="Approve"
+              title={`Approve ${selection.count.toLocaleString()} selected job(s)?`}
+              preview={() => bulk.preview({ ...bulkArgs, action: "approve" })}
+              run={() =>
+                bulk.run({ ...bulkArgs, action: "approve" }).then((result) => {
+                  selection.clear();
+                  return result;
+                })
+              }
             />
-          ) : (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-              {visible.map((row) => (
-                <JobCard
-                  key={row.jobId}
-                  row={row}
-                  activeSkills={filters.skills}
-                  onOpen={() => openJob(row.jobId)}
-                  footer={
-                    <Button className="w-full" onClick={() => approve.mutate(row.jobId)}>
-                      Approve for tailoring
-                    </Button>
-                  }
-                />
-              ))}
+            <BulkPreviewButton
+              label="Archive"
+              title={`Archive ${selection.count.toLocaleString()} selected job(s)?`}
+              preview={() => bulk.preview({ ...bulkArgs, action: "archive" })}
+              run={() =>
+                bulk.run({ ...bulkArgs, action: "archive" }).then((result) => {
+                  selection.clear();
+                  return result;
+                })
+              }
+            />
+          </BulkActionBar>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+            {rows.map((row) => (
+              <JobCard
+                key={row.jobId}
+                row={row}
+                activeSkills={filters.skills}
+                selected={selection.isSelected(row.jobId)}
+                onSelect={() =>
+                  selection.toggle(row.jobId, loadedIds.indexOf(row.jobId), false, loadedIds)
+                }
+                onOpen={() => openJob(row.jobId)}
+                footer={
+                  <Button className="w-full" onClick={() => approve.mutate(row.jobId)}>
+                    Approve for tailoring
+                  </Button>
+                }
+              />
+            ))}
+          </div>
+          {hasNextPage && (
+            <div className="mt-5 flex justify-center">
+              <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                {isFetchingNextPage ? "Loading..." : "Load more"}
+              </Button>
             </div>
           )}
         </>
