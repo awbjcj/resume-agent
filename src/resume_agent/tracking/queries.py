@@ -15,8 +15,9 @@ from resume_agent.tracking.repository import (
     has_progress,
     latest_rendered_resume_version,
     latest_resume_version,
+    resume_versions_for_job,
 )
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_agent.tracking.tables import Application, Job, JobStatus, ResumeVersion
 
 
 def _require_job_id(job: Job) -> int:
@@ -58,6 +59,45 @@ class ShortlistRow:
     location_region: str | None = None
     location_city: str | None = None
     is_us: bool = False
+
+
+@dataclass
+class JobDetailRow:
+    # Detail-only columns (named to match the JobDetail schema: id, not job_id).
+    id: int
+    source: str
+    url: str | None
+    jd_text: str
+    status: str
+    criteria_json: dict[str, Any] | None
+    archived_at: datetime | None
+    created_at: datetime
+    has_progress: bool
+    application: Application | None
+    resume_versions: list[ResumeVersion]
+    # Facet half mirrors ShortlistRow and is reused via _shortlist_row.
+    company: str | None
+    title: str | None
+    location: str | None
+    fit_score: int | None
+    fit_rationale: str | None
+    sponsorship_signal: str | None
+    salary_min: int | None
+    salary_max: int | None
+    salary_currency: str | None
+    remote_policy: str | None
+    seniority: str | None
+    employment_type: str | None
+    industry: str | None
+    company_size: str | None
+    posted_at: datetime | None
+    skills: list[SkillTag]
+    sic_major: str | None = None
+    sic_label: str | None = None
+    sic_division: str | None = None
+    location_country: str | None = None
+    location_region: str | None = None
+    location_city: str | None = None
 
 
 @dataclass
@@ -197,6 +237,58 @@ def job_facets(
     aliases = load_aliases(aliases_path)
     sic_table = sic_tax.load_sic_table()
     return _shortlist_row(job, tokens, aliases, sic_table)
+
+
+def job_detail_row(
+    session: Session,
+    job_id: int,
+    facts: ProfileFacts | None = None,
+    aliases_path: str | Path = "data/skill_aliases.json",
+) -> JobDetailRow | None:
+    """Assemble the full detail read-model for one job."""
+    job = session.get(Job, job_id)
+    if job is None:
+        return None
+    tokens = profile_skill_tokens(facts) if facts is not None else set()
+    aliases = load_aliases(aliases_path)
+    sic_table = sic_tax.load_sic_table()
+    facets = _shortlist_row(job, tokens, aliases, sic_table)
+    jid = _require_job_id(job)
+    return JobDetailRow(
+        id=jid,
+        source=job.source,
+        url=job.url,
+        jd_text=job.jd_text,
+        status=job.status,
+        criteria_json=job.criteria_json,
+        archived_at=job.archived_at,
+        created_at=job.created_at,
+        has_progress=has_progress(session, jid),
+        application=application_for_job(session, jid),
+        resume_versions=resume_versions_for_job(session, jid),
+        company=facets.company,
+        title=facets.title,
+        location=facets.location,
+        fit_score=facets.fit_score,
+        fit_rationale=facets.fit_rationale,
+        sponsorship_signal=facets.sponsorship_signal,
+        salary_min=facets.salary_min,
+        salary_max=facets.salary_max,
+        salary_currency=facets.salary_currency,
+        remote_policy=facets.remote_policy,
+        seniority=facets.seniority,
+        employment_type=facets.employment_type,
+        industry=facets.industry,
+        company_size=facets.company_size,
+        posted_at=facets.posted_at,
+        skills=facets.skills,
+        sic_major=facets.sic_major,
+        sic_label=facets.sic_label,
+        sic_division=facets.sic_division,
+        location_country=facets.location_country,
+        location_region=facets.location_region,
+        location_city=facets.location_city,
+    )
 
 
 def pipeline_rows(session: Session) -> list[PipelineRow]:
