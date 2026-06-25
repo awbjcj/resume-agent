@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
@@ -47,9 +46,11 @@ describe("TriageContainer", () => {
       ),
     );
     wrap(<TriageContainer />);
-    await waitFor(() => expect(screen.getByText("Eng")).toBeInTheDocument());
-    expect(screen.queryByText(/1 selected/i)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("checkbox", { name: /select acme eng/i }));
-    expect(screen.getByText(/1 selected/i)).toBeInTheDocument();
+    const rowCheckbox = await screen.findByRole("checkbox", { name: /select acme eng/i });
+    expect(screen.queryByRole("status", { name: /1 selected/i })).not.toBeInTheDocument();
+    fireEvent.click(rowCheckbox);
+    await waitFor(() =>
+      expect(screen.getByRole("status", { name: /1 selected/i })).toBeInTheDocument(),
+    );
   });
 });

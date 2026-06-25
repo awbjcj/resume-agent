@@ -67,7 +67,13 @@ export function JobTable({
                 checked={selection.isSelected(row.jobId)}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onToggle(row.jobId, index, event.shiftKey, ordered);
+                }}
+                onCheckedChange={(checked, details) => {
+                  const nextChecked = Boolean(checked);
+                  if (nextChecked === selection.isSelected(row.jobId)) return;
+                  const event = details.event as Event & { shiftKey?: boolean };
+                  const shift = Boolean(event.shiftKey);
+                  onToggle(row.jobId, index, shift, ordered);
                 }}
               />
             </TableCell>

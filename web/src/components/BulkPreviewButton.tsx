@@ -50,7 +50,9 @@ export function BulkPreviewButton({
       }
       confirmLabel={confirmLabel ?? label}
       confirmDisabled={loading || !result}
-      onConfirm={run}
+      onConfirm={async () => {
+        await run();
+      }}
     />
   );
 }

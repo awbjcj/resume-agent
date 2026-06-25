@@ -158,7 +158,12 @@ export function PipelineContainer() {
             onSelectAllMatching={() => selection.selectAllMatching(total)}
             onClear={selection.clear}
           >
-            <Select value={targetStatus} onValueChange={setTargetStatus}>
+            <Select
+              value={targetStatus}
+              onValueChange={(value) => {
+                if (value) setTargetStatus(value);
+              }}
+            >
               <SelectTrigger size="sm" className="bg-card">
                 <SelectValue />
               </SelectTrigger>

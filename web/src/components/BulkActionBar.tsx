@@ -24,7 +24,11 @@ export function BulkActionBar({
   return (
     <div className="mb-4 rounded-lg border bg-card shadow-sm">
       <div className="flex flex-wrap items-center gap-2 p-3">
-        <span className="rounded-full bg-secondary px-3 py-1 text-sm">
+        <span
+          role="status"
+          aria-label={`${count.toLocaleString()} selected`}
+          className="rounded-full bg-secondary px-3 py-1 text-sm"
+        >
           <strong>{count.toLocaleString()}</strong> selected
         </span>
         {children}
