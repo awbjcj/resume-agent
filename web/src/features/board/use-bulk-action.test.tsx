@@ -16,10 +16,10 @@ function wrapper({ children }: { children: ReactNode }) {
 
 describe("useBulkAction", () => {
   it("sends filter for query scope and returns the result", async () => {
-    let received: any;
+    let received: Record<string, unknown> | undefined;
     server.use(
       http.post("/api/jobs/bulk", async ({ request }) => {
-        received = await request.json();
+        received = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ affected: 10, skipped: 1, reasons: { hasProgress: 1 } });
       }),
     );
@@ -31,9 +31,11 @@ describe("useBulkAction", () => {
       selection: { mode: "query", ids: new Set<number>() },
       filter,
     });
-    expect(received.scope).toBe("query");
-    expect(received.source).toEqual(["adzuna"]);
-    expect(received.dryRun).toBe(true);
+    expect(received).toMatchObject({
+      scope: "query",
+      source: ["adzuna"],
+      dryRun: true,
+    });
     expect(res.affected).toBe(10);
   });
 });

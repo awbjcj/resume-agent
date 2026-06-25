@@ -42,7 +42,7 @@ export function useBoardQuery<T>(
             query: { ...baseParams, page: pageParam } as Record<string, string | number | boolean>,
           },
         }),
-      ) as Promise<BoardPage<T>>,
+      ) as unknown as Promise<BoardPage<T>>,
     initialPageParam: 1,
     getNextPageParam: (last) =>
       last.pagination.page < last.pagination.totalPages ? last.pagination.page + 1 : undefined,

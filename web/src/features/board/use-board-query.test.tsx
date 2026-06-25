@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { emptyFilterState } from "@/lib/filters/types";
 import { server } from "@/test/server";
 
-import { useBoardQuery } from "./use-board-query";
+import { type TriageItem, useBoardQuery } from "./use-board-query";
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -27,7 +27,7 @@ describe("useBoardQuery", () => {
       ),
     );
     const { result } = renderHook(
-      () => useBoardQuery("triage", emptyFilterState(), { archived: false }),
+      () => useBoardQuery<TriageItem>("triage", emptyFilterState(), { archived: false }),
       { wrapper },
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
