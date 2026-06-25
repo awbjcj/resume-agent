@@ -26,7 +26,17 @@ def test_add_job_from_text_inserts(tmp_path):
 def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
     seen = {}
 
-    def fake_discover(session, config, facts, extract, fit, relevance, canonicalizer=None, reporter=None):
+    def fake_discover(
+        session,
+        config,
+        facts,
+        extract,
+        fit,
+        relevance,
+        canonicalizer=None,
+        reporter=None,
+        job_ids=None,
+    ):
         seen["relevance"] = relevance
         seen["canonicalizer"] = canonicalizer
         return {"raw": 0, "shortlisted": 2}
@@ -142,3 +152,31 @@ def test_run_pull_finish_false_does_not_emit_done(tmp_path):
         run_pull(s, [], SearchConfig(), tmp_path / "runs.json", reporter=reporter, finish=False)
     rec = read_progress("refresh", tmp_path)
     assert rec is not None and rec["state"] == "running"  # not "done"
+
+
+def test_refresh_jobs_discovers_only_pull_changed_raw_jobs(monkeypatch):
+    from resume_agent.discovery.connectors.runner import PullReport
+    from resume_agent.services.discovery import RefreshReport, refresh_jobs
+
+    seen = {}
+
+    def fake_pull_jobs(session, **kwargs):
+        return PullReport(totals={"manual": 1}, changed_raw_job_ids=[42])
+
+    def fake_discover_jobs(session, **kwargs):
+        seen["job_ids"] = kwargs["job_ids"]
+        return {"shortlisted": 1}
+
+    monkeypatch.setattr(discovery, "pull_jobs", fake_pull_jobs)
+    monkeypatch.setattr(discovery, "discover_jobs", fake_discover_jobs)
+
+    with _session() as s:
+        report = refresh_jobs(s)
+
+    assert report == RefreshReport(
+        pulled=1,
+        totals={"manual": 1},
+        status_counts={"shortlisted": 1},
+        failures={},
+    )
+    assert seen["job_ids"] == {42}
