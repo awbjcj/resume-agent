@@ -3,11 +3,14 @@ import type { components } from "@/lib/api/schema";
 export type ShortlistItem = components["schemas"]["ShortlistItem"];
 export type SkillTag = components["schemas"]["SkillTagOut"];
 
-export type SortKey = "fit" | "salary" | "recency" | "composite";
+export type SortKey = "fit" | "salary" | "recency" | "composite" | "company" | "stage";
 export type Preset = "balanced" | "pay_first" | "freshest";
 
 export interface FilterState {
+  q: string;
   salaryMin: number | null;
+  source: Set<string>;
+  status: Set<string>;
   remote: Set<string>;
   sponsorship: Set<string>;
   seniority: Set<string>;
@@ -18,6 +21,8 @@ export interface FilterState {
   city: Set<string>;
   companySize: Set<string>;
   fitMin: number | null;
+  maxFit: number | null;
+  staleDays: number | null;
   skills: Set<string>;
   sort: SortKey;
   preset: Preset;
@@ -25,7 +30,10 @@ export interface FilterState {
 
 export function emptyFilterState(): FilterState {
   return {
+    q: "",
     salaryMin: null,
+    source: new Set(),
+    status: new Set(),
     remote: new Set(),
     sponsorship: new Set(),
     seniority: new Set(),
@@ -36,6 +44,8 @@ export function emptyFilterState(): FilterState {
     city: new Set(),
     companySize: new Set(),
     fitMin: null,
+    maxFit: null,
+    staleDays: null,
     skills: new Set(),
     sort: "fit",
     preset: "balanced",
