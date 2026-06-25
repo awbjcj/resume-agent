@@ -21,7 +21,7 @@
 | `src/resume_agent/api/routers/jobs.py` | Collapse `_job_detail` (32–75) to `board.get_job_detail` + `JobDetail.model_validate` | Modify |
 | `src/resume_agent/dashboard/pages.py` | Mutations → `board.set_stage`/`set_archived`/`delete`/`upsert_application`; drop repository mutation imports | Modify |
 | `tests/test_job_detail_row.py` | Unit test for the read-model assembly | Create |
-| `tests/api/test_jobs.py` | API test: detail shape unchanged through the new path | Create or extend |
+| `tests/api/test_job_detail.py` | API test: detail shape unchanged through the new path | Extend |
 | `tests/test_dashboard_seam.py` | Fitness test: dashboard imports no mutation funcs from `tracking.repository` | Create |
 | `src/resume_agent/services/prune.py` | `prune()` use-case: load config, merge sparse overrides, dispatch preview/run | Create |
 | `src/resume_agent/cli.py:445-482` · `api/routers/prune.py` · `dashboard/pages.py:744-773` | Call `services.prune`; drop the duplicated override-merge | Modify |
@@ -40,8 +40,6 @@
 - [ ] **Step 1: Write the failing test**
 
 ```python
-from datetime import datetime, timezone
-
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.tracking.queries import job_detail_row
 from resume_agent.tracking.repository import save_application
@@ -217,7 +215,7 @@ git commit -m "feat(queries): add JobDetailRow read-model for the detail view"
 **Files:**
 - Modify: `src/resume_agent/services/board.py`
 - Modify: `src/resume_agent/api/routers/jobs.py:32-75,78-128`
-- Test: `tests/api/test_jobs.py`
+- Test: `tests/api/test_job_detail.py`
 
 - [ ] **Step 1: Write the failing API test**
 
@@ -226,7 +224,8 @@ from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.tracking.repository import save_application
+from resume_agent.tracking.tables import Application, Job, JobStatus
 
 
 def _client():
@@ -249,6 +248,8 @@ def test_job_detail_returns_full_shape():
             client.app, company="Acme", title="SWE", status=JobStatus.tailored.value,
             fit_score=77, criteria_json={"remote_policy": "remote"},
         )
+        with get_session(client.app.state.engine) as session:
+            save_application(session, Application(job_id=jid, status="submitted", notes="ref"))
         resp = client.get(f"/api/jobs/{jid}")
         body = resp.json()
     assert resp.status_code == 200
@@ -256,6 +257,8 @@ def test_job_detail_returns_full_shape():
     assert body["jdText"] == "jd body"
     assert body["remotePolicy"] == "remote"
     assert body["hasProgress"] is True
+    assert body["application"]["status"] == "submitted"
+    assert body["application"]["notes"] == "ref"
     assert body["resumeVersions"] == []
     assert "skills" in body
 
@@ -269,7 +272,7 @@ def test_job_detail_404_for_missing():
 
 - [ ] **Step 2: Run to verify it passes against the OLD router, then we refactor without breaking it**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_jobs.py -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_job_detail.py -v`
 Expected: PASS (the old `_job_detail` already returns this shape). This test is the safety net for the refactor.
 
 - [ ] **Step 3: Add `board.get_job_detail`**
@@ -313,14 +316,14 @@ In `patch_job` replace the trailing `return _job_detail(session, job_id)` with `
 
 - [ ] **Step 5: Run the API tests + contract gate**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/api/test_jobs.py tests/api/test_openapi_contract.py -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_job_detail.py tests/api/test_openapi_contract.py -v`
 Expected: PASS. The `JobDetail` schema is unchanged, so OpenAPI does not drift.
 
 - [ ] **Step 6: Lint + commit**
 
 ```bash
 ruff check src/resume_agent/services/board.py src/resume_agent/api/routers/jobs.py
-git add src/resume_agent/services/board.py src/resume_agent/api/routers/jobs.py tests/api/test_jobs.py
+git add src/resume_agent/services/board.py src/resume_agent/api/routers/jobs.py tests/api/test_job_detail.py
 git commit -m "refactor(api): project JobDetail via board.get_job_detail in one model_validate"
 ```
 
@@ -521,7 +524,7 @@ In `src/resume_agent/cli.py`, replace the body of the prune command (453–482) 
 
 ```python
     with get_session(_engine(db_url)) as session:
-        report = prune(
+        report = run_prune(
             session, dry_run=dry_run, fit_threshold=fit,
             stale_days=stale_days, retention_days=retention_days, config_path=config,
         )
@@ -539,7 +542,7 @@ In `src/resume_agent/cli.py`, replace the body of the prune command (453–482) 
         )
 ```
 
-Update the CLI imports: add `from resume_agent.services.prune import prune`; remove `load_prune_config` and `prune_preview`/`prune_run` from their import lines if no longer used elsewhere in `cli.py` (let `ruff` confirm).
+Update the CLI imports: add `from resume_agent.services.prune import prune as run_prune`; remove `load_prune_config` and `prune_preview`/`prune_run` from their import lines if no longer used elsewhere in `cli.py` (let `ruff` confirm). The alias is required because the Typer command function is already named `prune`.
 
 - [ ] **Step 6: Point the API at the use-case**
 

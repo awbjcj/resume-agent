@@ -31,6 +31,7 @@ class IngestOutcome(str, Enum):
 class IngestCounts:
     added: dict[str, int]
     upgraded: dict[str, int]
+    changed_raw_job_ids: list[int]
 
 
 def save_or_upgrade(
@@ -127,10 +128,12 @@ def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> I
     """Insert/upgrade RawJobs and return separate insert/upgrade counts per incoming source."""
     added: Counter[str] = Counter()
     upgraded: Counter[str] = Counter()
+    changed_raw_job_ids: list[int] = []
+    seen_changed_raw: set[int] = set()
     for raw in raw_jobs:
         if not raw.jd_text.strip():
             continue
-        _job, outcome = save_or_upgrade(
+        job, outcome = save_or_upgrade(
             session,
             source=raw.source,
             jd_text=raw.jd_text,
@@ -142,9 +145,24 @@ def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> I
         )
         if outcome is IngestOutcome.inserted:
             added[raw.source] += 1
+            if job is not None and job.id is not None:
+                seen_changed_raw.add(job.id)
+                changed_raw_job_ids.append(job.id)
         elif outcome is IngestOutcome.upgraded:
             upgraded[raw.source] += 1
-    return IngestCounts(added=dict(added), upgraded=dict(upgraded))
+            if (
+                job is not None
+                and job.id is not None
+                and job.status == JobStatus.raw.value
+                and job.id not in seen_changed_raw
+            ):
+                seen_changed_raw.add(job.id)
+                changed_raw_job_ids.append(job.id)
+    return IngestCounts(
+        added=dict(added),
+        upgraded=dict(upgraded),
+        changed_raw_job_ids=changed_raw_job_ids,
+    )
 
 
 def ingest_jobs(session: Session, raw_jobs: Iterable[RawJob]) -> dict[str, int]:

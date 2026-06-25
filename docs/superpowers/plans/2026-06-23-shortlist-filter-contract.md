@@ -385,14 +385,14 @@ Append to `contracts/shortlist_filter.contract.json` `cases` array (before the c
 
 ```json
     ,{
-      "name": "composite sort, freshest preset, recency separates near-equal rows",
+      "name": "composite sort, freshest preset, raw score breaks rounded display tie",
       "filterState": { "sort": "composite", "preset": "freshest" },
       "rows": [
-        { "jobId": 1, "fitScore": 60, "postedAt": "2026-06-15T00:00:00Z" },
-        { "jobId": 2, "fitScore": 60, "postedAt": "2026-06-01T00:00:00Z" },
-        { "jobId": 3, "fitScore": 60, "postedAt": "2026-06-16T00:00:00Z" }
+        { "jobId": 1, "fitScore": 60, "postedAt": "2026-06-15T23:59:58Z" },
+        { "jobId": 2, "fitScore": 60, "postedAt": "2026-06-16T00:00:00Z" },
+        { "jobId": 3, "fitScore": 59, "postedAt": "2026-06-16T00:00:00Z" }
       ],
-      "expected": [3, 1, 2]
+      "expected": [2, 1, 3]
     }
 ```
 
@@ -424,7 +424,7 @@ git commit -m "fix(filters): order composite rank on unrounded score in both run
 
 - [ ] **Step 1: Add filter-membership + sponsorship/remote facet cases to the contract**
 
-Add cases to `contracts/shortlist_filter.contract.json` covering: salaryMin gates USD only (non-USD passes through), each facet set (remote/sponsorship/seniority/employmentType/industry/companySize/country/region/city) gating membership, and a multi-facet AND case. Use the same shape as Task 1. Pick expected ids by hand from the predicate.
+Add cases to `contracts/shortlist_filter.contract.json` covering: salaryMin gates USD only (non-USD passes through), each facet set (remote/sponsorship/seniority/employmentType/industry/companySize/country/region/city) gating membership, null/unknown facet values passing selected filters as neutral, and a multi-facet AND case. Use the same shape as Task 1. Pick expected ids by hand from the predicate. Include the null-neutral case before thinning the existing per-language tests that currently pin it.
 
 - [ ] **Step 2: Run both harnesses**
 
@@ -434,7 +434,7 @@ Expected: all new cases PASS in both. Any failure is a genuine cross-runtime dri
 
 - [ ] **Step 3: Thin the per-language tests**
 
-In `tests/test_dashboard_filtering.py` and the `web/src/lib/filters/*.test.ts` files, delete the membership/sort assertions now covered by the contract. Keep only language-local edge cases. Run each suite to confirm still green.
+In `tests/test_dashboard_filtering.py` and the `web/src/lib/filters/*.test.ts` files, delete only the membership/sort assertions now covered by the contract, including the null-neutral facet behavior once the contract case exists. Keep language-local edge cases. Run each suite to confirm still green.
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_dashboard_filtering.py -q`
 Run (from `web/`): `npm run test -- src/lib/filters`

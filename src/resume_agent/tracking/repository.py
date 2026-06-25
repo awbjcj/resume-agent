@@ -54,21 +54,31 @@ def find_existing(
     content_fingerprint: str | None = None,
 ) -> Job | None:
     """Match for dedupe: URL, then identical JD, then dedup_key, then (keyless) fingerprint."""
+    archived_col = cast(Any, Job.archived_at)
     if url:
-        by_url = session.exec(select(Job).where(Job.url == url)).first()
+        by_url = session.exec(
+            select(Job).where(Job.url == url, archived_col.is_(None))
+        ).first()
         if by_url is not None:
             return by_url
     if jd_text:
-        by_jd = session.exec(select(Job).where(Job.jd_text == jd_text)).first()
+        by_jd = session.exec(
+            select(Job).where(Job.jd_text == jd_text, archived_col.is_(None))
+        ).first()
         if by_jd is not None:
             return by_jd
     if dedup_key:
-        by_key = session.exec(select(Job).where(Job.dedup_key == dedup_key)).first()
+        by_key = session.exec(
+            select(Job).where(Job.dedup_key == dedup_key, archived_col.is_(None))
+        ).first()
         if by_key is not None:
             return by_key
     if dedup_key is None and content_fingerprint:
         return session.exec(
-            select(Job).where(Job.content_fingerprint == content_fingerprint)
+            select(Job).where(
+                Job.content_fingerprint == content_fingerprint,
+                archived_col.is_(None),
+            )
         ).first()
     return None
 

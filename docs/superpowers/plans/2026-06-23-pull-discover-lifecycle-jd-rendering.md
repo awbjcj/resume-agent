@@ -14,6 +14,32 @@
 - Web: `cd web && npm run test` (vitest)
 - OpenAPI regen: `bash scripts/gen_ts_client.sh`
 
+## Review corrections before implementation
+
+Apply these corrections to the task snippets below where they differ:
+
+- **Dedup must ignore archived rows.** `find_existing` should only match active jobs
+  (`archived_at IS NULL`) for URL, exact JD, dedup key, and content fingerprint
+  matches. Add a regression test where an archived duplicate URL/JD/fingerprint does
+  not block inserting a new active row.
+- **Keep reprocess scoping local.** Add a private `_stage_jobs(session, status, job_ids)`
+  helper in `discovery/pipeline.py` and have relevance/extract/filter/score use it,
+  rather than repeating the same `job_ids` list filter in four stage modules. This
+  keeps the reprocess scope seam deep and improves locality.
+- **Align refresh semantics with the design.** The design says refresh discovers
+  "newly-added raw rows"; the simple implementation discovers the current raw backlog.
+  Pick one explicitly. To match the design literally, carry inserted job ids out of
+  `ingest_jobs_with_outcomes`/`PullReport` and call `discover(..., job_ids=ids)`.
+  To keep the simpler backlog behavior, update the design/plan wording to say so.
+- **Make API defaults real.** Defaults on `ReprocessParams.scopes` and
+  `RefreshParams.limit` do not make the request body optional. Either make the router
+  params optional and construct defaults in the handler, or remove the schema defaults
+  and require bodies everywhere.
+- **Make web reprocess wording match the UI.** The current dialog is a single scope
+  select while the backend accepts a scope list. Either implement a real multi-scope
+  selector, or describe it as a single-scope select and keep the list shape only for
+  CLI/API extensibility.
+
 ---
 
 ## File-structure map
