@@ -1,6 +1,12 @@
 from agno.agent import Agent
 
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
+from resume_agent.llm_runner import (
+    AgentRunner,
+    Runner,
+    build_model,
+    retry_kwargs,
+    use_json_mode_for,
+)
 from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.tailor.agents import model_for_tier
 
@@ -27,6 +33,7 @@ def build_cover_letter_agent(model_id: str | None = None) -> Runner:
             instructions=_DRAFT_INSTRUCTIONS,
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )
 
@@ -40,5 +47,6 @@ def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
             instructions=_REVISE_INSTRUCTIONS,
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )

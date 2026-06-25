@@ -1,7 +1,13 @@
 from agno.agent import Agent
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
+from resume_agent.llm_runner import (
+    AgentRunner,
+    Runner,
+    build_model,
+    retry_kwargs,
+    use_json_mode_for,
+)
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.style_guide import compose_instructions
@@ -63,6 +69,7 @@ def build_tailor_agent(model_id: str | None = None, style_guide: str | None = No
             instructions=compose_instructions(_TAILOR_INSTRUCTIONS, style_guide),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )
 
@@ -76,6 +83,7 @@ def build_reviser_agent(model_id: str | None = None, style_guide: str | None = N
             instructions=compose_instructions(_REVISER_INSTRUCTIONS, style_guide),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )
 
@@ -93,5 +101,6 @@ def build_reviewer_agent(
             ),
             output_schema=ReviewCritique,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )

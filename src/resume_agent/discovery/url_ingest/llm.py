@@ -3,7 +3,13 @@ from bs4 import BeautifulSoup
 
 from resume_agent.config import get_settings
 from resume_agent.discovery.url_ingest.models import ExtractedJob
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
+from resume_agent.llm_runner import (
+    AgentRunner,
+    Runner,
+    build_model,
+    retry_kwargs,
+    use_json_mode_for,
+)
 
 _INSTRUCTIONS = [
     "Extract the company, job title, location, and full job-description text.",
@@ -22,6 +28,7 @@ def build_url_extract_agent(model_id: str | None = None) -> Runner:
             instructions=_INSTRUCTIONS,
             output_schema=ExtractedJob,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )
 
