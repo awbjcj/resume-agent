@@ -1,3 +1,5 @@
+import asyncio
+
 from agno.agent import Agent
 from pydantic import BaseModel, ConfigDict
 
@@ -5,7 +7,9 @@ from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
+    acall,
     build_model,
+    retry_kwargs,
     resolve_api_key,
     use_json_mode_for,
 )
@@ -40,6 +44,7 @@ def build_relevance_agent(model_id: str | None = None) -> Runner | None:
             instructions=_INSTRUCTIONS,
             output_schema=RelevanceVerdict,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )
 
@@ -59,5 +64,26 @@ def judge_relevance(
     result = agent.run(compose_relevance_input(target_role, title, jd_text))
     verdict = result.content
     if not isinstance(verdict, RelevanceVerdict):
-        raise TypeError(f"Expected RelevanceVerdict from agent, got {type(verdict).__name__}")
+        raise TypeError(
+            f"Expected RelevanceVerdict from agent, got {type(verdict).__name__}"
+        )
+    return verdict
+
+
+async def ajudge_relevance(
+    target_role: str,
+    title: str | None,
+    jd_text: str,
+    agent: Runner,
+    *,
+    sem: asyncio.Semaphore,
+) -> RelevanceVerdict:
+    result = await acall(
+        agent, compose_relevance_input(target_role, title, jd_text), sem=sem
+    )
+    verdict = result.content
+    if not isinstance(verdict, RelevanceVerdict):
+        raise TypeError(
+            f"Expected RelevanceVerdict from agent, got {type(verdict).__name__}"
+        )
     return verdict

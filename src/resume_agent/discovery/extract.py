@@ -1,7 +1,16 @@
+import asyncio
+
 from agno.agent import Agent
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
+from resume_agent.llm_runner import (
+    AgentRunner,
+    Runner,
+    acall,
+    build_model,
+    retry_kwargs,
+    use_json_mode_for,
+)
 from resume_agent.models.job import JobCriteria, JobCriteriaExtract
 
 
@@ -29,12 +38,25 @@ def build_extract_agent(model_id: str | None = None) -> Runner:
             instructions=_INSTRUCTIONS,
             output_schema=JobCriteriaExtract,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )
 
 
 def extract_job_criteria(jd_text: str, agent: Runner) -> JobCriteria:
     result = agent.run(jd_text)
+    extracted = result.content
+    if not isinstance(extracted, JobCriteriaExtract):
+        raise TypeError(
+            f"Expected JobCriteriaExtract from agent, got {type(extracted).__name__}"
+        )
+    return extracted.to_criteria()
+
+
+async def aextract_job_criteria(
+    jd_text: str, agent: Runner, *, sem: asyncio.Semaphore
+) -> JobCriteria:
+    result = await acall(agent, jd_text, sem=sem)
     extracted = result.content
     if not isinstance(extracted, JobCriteriaExtract):
         raise TypeError(

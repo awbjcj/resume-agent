@@ -1,8 +1,17 @@
+import asyncio
+
 from agno.agent import Agent
 from pydantic import BaseModel, ConfigDict, Field
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
+from resume_agent.llm_runner import (
+    AgentRunner,
+    Runner,
+    acall,
+    build_model,
+    retry_kwargs,
+    use_json_mode_for,
+)
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.profile import ProfileFacts
 
@@ -47,6 +56,7 @@ def build_fit_agent(model_id: str | None = None) -> Runner:
             instructions=_INSTRUCTIONS,
             output_schema=FitScore,
             use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
         )
     )
 
@@ -65,6 +75,16 @@ def compose_fit_input(
 
 def score_fit(input_text: str, agent: Runner) -> FitScore:
     result = agent.run(input_text)
+    fit = result.content
+    if not isinstance(fit, FitScore):
+        raise TypeError(f"Expected FitScore from agent, got {type(fit).__name__}")
+    return fit
+
+
+async def ascore_fit(
+    input_text: str, agent: Runner, *, sem: asyncio.Semaphore
+) -> FitScore:
+    result = await acall(agent, input_text, sem=sem)
     fit = result.content
     if not isinstance(fit, FitScore):
         raise TypeError(f"Expected FitScore from agent, got {type(fit).__name__}")
