@@ -2,35 +2,13 @@ import { render, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { FilterDesk } from "./FilterDesk";
-import { emptyFilterState, type ShortlistItem } from "@/lib/filters/types";
-
-const row = (over: Partial<ShortlistItem> = {}): ShortlistItem =>
-  ({
-    jobId: 1,
-    company: "Acme",
-    title: "Engineer",
-    location: "Remote",
-    fitScore: 70,
-    fitRationale: null,
-    sponsorshipSignal: null,
-    salaryMin: null,
-    salaryMax: null,
-    salaryCurrency: null,
-    remotePolicy: null,
-    seniority: null,
-    employmentType: null,
-    industry: null,
-    companySize: null,
-    postedAt: null,
-    skills: [],
-    ...over,
-  }) as ShortlistItem;
+import { emptyFilterState } from "@/lib/filters/types";
 
 describe("FilterDesk min-fit slider", () => {
   it("emits a numeric fitMin when the slider is driven by keyboard", () => {
     const onChange = vi.fn();
     const { container } = render(
-      <FilterDesk rows={[row()]} state={emptyFilterState()} onChange={onChange} />,
+      <FilterDesk filter={emptyFilterState()} facets={{}} total={0} onChange={onChange} />,
     );
 
     // base-ui drives value changes through its hidden native range input.
