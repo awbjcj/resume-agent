@@ -1080,9 +1080,6 @@
       "ReprocessParams": {
         "properties": {
           "scopes": {
-            "default": [
-              "shortlisted"
-            ],
             "items": {
               "type": "string"
             },
@@ -2545,11 +2542,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RefreshParams"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshParams"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Params"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2601,11 +2605,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReprocessParams"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ReprocessParams"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Params"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {

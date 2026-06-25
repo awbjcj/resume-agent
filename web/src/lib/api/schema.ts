@@ -686,13 +686,8 @@ export interface components {
         };
         /** ReprocessParams */
         ReprocessParams: {
-            /**
-             * Scopes
-             * @default [
-             *       "shortlisted"
-             *     ]
-             */
-            scopes: string[];
+            /** Scopes */
+            scopes?: string[];
         };
         /** ResumeVersionOut */
         ResumeVersionOut: {
@@ -1333,9 +1328,9 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["RefreshParams"];
+                "application/json": components["schemas"]["RefreshParams"] | null;
             };
         };
         responses: {
@@ -1368,9 +1363,9 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["ReprocessParams"];
+                "application/json": components["schemas"]["ReprocessParams"] | null;
             };
         };
         responses: {
