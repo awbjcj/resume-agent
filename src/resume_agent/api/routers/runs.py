@@ -64,13 +64,16 @@ def launch_discover(
 
 @router.post("/reprocess", response_model=RunOut, status_code=202)
 def launch_reprocess(
-    params: ReprocessParams, request: Request, mgr: RunManager = Depends(get_run_manager)
+    request: Request,
+    params: ReprocessParams | None = None,
+    mgr: RunManager = Depends(get_run_manager),
 ):
     engine = _engine(request)
+    scopes = params.scopes if params is not None and params.scopes else ["shortlisted"]
 
     def work(reporter):
         with get_session(engine) as session:
-            return {"statusCounts": reprocess_jobs(session, scopes=params.scopes, reporter=reporter)}
+            return {"statusCounts": reprocess_jobs(session, scopes=scopes, reporter=reporter)}
 
     run_id = mgr.submit("reprocess", work)
     record = mgr.get(run_id)
@@ -80,13 +83,16 @@ def launch_reprocess(
 
 @router.post("/refresh", response_model=RunOut, status_code=202)
 def launch_refresh(
-    params: RefreshParams, request: Request, mgr: RunManager = Depends(get_run_manager)
+    request: Request,
+    params: RefreshParams | None = None,
+    mgr: RunManager = Depends(get_run_manager),
 ):
     engine = _engine(request)
+    limit = params.limit if params is not None else None
 
     def work(reporter):
         with get_session(engine) as session:
-            report = refresh_jobs(session, limit=params.limit, reporter=reporter)
+            report = refresh_jobs(session, limit=limit, reporter=reporter)
             return {
                 "pulled": report.pulled,
                 "totals": report.totals,

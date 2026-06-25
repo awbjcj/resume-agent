@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import Field
+
 from resume_agent.api.schemas.base import CamelModel
 
 
@@ -38,7 +40,7 @@ class DiscoverParams(CamelModel):
 
 
 class ReprocessParams(CamelModel):
-    scopes: list[str] = ["shortlisted"]
+    scopes: list[str] = Field(default_factory=lambda: ["shortlisted"])
 
 
 class RefreshParams(CamelModel):
