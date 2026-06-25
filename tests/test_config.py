@@ -59,3 +59,33 @@ def test_settings_has_model_tier_defaults():
     settings = _settings(env_file=None)
     assert settings.mid_model == "claude-sonnet-4-6"
     assert settings.premium_model == "claude-opus-4-8"
+
+
+def test_concurrency_settings_defaults(monkeypatch):
+    for key in ("LLM_CONCURRENCY", "LLM_RETRIES", "LLM_RETRY_DELAY"):
+        monkeypatch.delenv(key, raising=False)
+    settings = _settings(env_file=None)
+    assert settings.llm_concurrency == 8
+    assert settings.llm_retries == 2
+    assert settings.llm_retry_delay == 1
+
+
+def test_concurrency_settings_reject_invalid_values(monkeypatch):
+    from pydantic import ValidationError
+
+    for key in ("LLM_CONCURRENCY", "LLM_RETRIES", "LLM_RETRY_DELAY"):
+        monkeypatch.delenv(key, raising=False)
+
+    monkeypatch.setenv("LLM_CONCURRENCY", "0")
+    with pytest.raises(ValidationError):
+        _settings(env_file=None)
+
+    monkeypatch.setenv("LLM_CONCURRENCY", "1")
+    monkeypatch.setenv("LLM_RETRIES", "-1")
+    with pytest.raises(ValidationError):
+        _settings(env_file=None)
+
+    monkeypatch.setenv("LLM_RETRIES", "0")
+    monkeypatch.setenv("LLM_RETRY_DELAY", "-1")
+    with pytest.raises(ValidationError):
+        _settings(env_file=None)
