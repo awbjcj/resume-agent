@@ -76,6 +76,48 @@ def test_loop_revises_until_gate_passes():
     assert rounds[-1].verdict.passed is True
 
 
+def test_arun_tailor_review_passes_with_async_agents():
+    import asyncio
+
+    from resume_agent.tailor.workflow import arun_tailor_review
+
+    class _Content:
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            return _Result(ResumeContent(contact=Contact(name="Ada")))
+
+    class _FactCheckAsync:
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            return _Result(ReviewCritique(reviewer="fact-check", score=100, passed=True))
+
+    config = ReviewConfig(
+        max_rounds=1,
+        score_threshold=50,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+
+    async def go():
+        return await arun_tailor_review(
+            "jd",
+            JobCriteria(),
+            ProfileFacts(contact=Contact(name="Ada")),
+            config,
+            _Content(),
+            {"fact-check": _FactCheckAsync()},
+            _Content(),
+            sem=asyncio.Semaphore(8),
+        )
+
+    rounds = asyncio.run(go())
+    assert len(rounds) == 1
+    assert rounds[0].round_num == 1
+
+
 def test_loop_stops_at_max_rounds_when_never_passing():
     config = ReviewConfig(
         max_rounds=2,
