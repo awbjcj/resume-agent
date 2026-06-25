@@ -102,8 +102,9 @@ resume already tailored to the old text is not silently re-based.
 
 ### Archive, delete, prune
 `Job.archived_at` (orthogonal to `status`) soft-hides a job; every view filters
-`archived_at IS NULL` except dedupe lookup, which intentionally still sees trash-bin
-jobs to avoid duplicate re-ingest. `has_progress(session, job_id)` — status in
+`archived_at IS NULL` — including the dedupe lookup (`find_existing`), so an archived
+(trash-binned) duplicate never blocks re-ingesting the same job as a fresh active row.
+`has_progress(session, job_id)` — status in
 {approved, tailored, rendered} OR any Application/ResumeVersion/CoverLetter — is
 the single gate for irreversible paths. `delete_job` refuses jobs with progress and
 cascades incidental children in FK-safe order otherwise. `prune_run` (config:
