@@ -1,4 +1,6 @@
-from resume_agent.llm_runner import Runner
+import asyncio
+
+from resume_agent.llm_runner import Runner, acall
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
@@ -30,6 +32,16 @@ def tailor(input_text: str, agent: Runner) -> ResumeContent:
     content = result.content
     if not isinstance(content, ResumeContent):
         raise TypeError(f"Expected ResumeContent from tailor agent, got {type(content).__name__}")
+    return content
+
+
+async def atailor(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ResumeContent:
+    result = await acall(agent, input_text, sem=sem)
+    content = result.content
+    if not isinstance(content, ResumeContent):
+        raise TypeError(
+            f"Expected ResumeContent from tailor agent, got {type(content).__name__}"
+        )
     return content
 
 
@@ -69,4 +81,14 @@ def revise(input_text: str, agent: Runner) -> ResumeContent:
     content = result.content
     if not isinstance(content, ResumeContent):
         raise TypeError(f"Expected ResumeContent from reviser agent, got {type(content).__name__}")
+    return content
+
+
+async def arevise(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ResumeContent:
+    result = await acall(agent, input_text, sem=sem)
+    content = result.content
+    if not isinstance(content, ResumeContent):
+        raise TypeError(
+            f"Expected ResumeContent from reviser agent, got {type(content).__name__}"
+        )
     return content

@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Mapping
 
 from resume_agent.llm_runner import Runner
@@ -5,10 +6,17 @@ from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
-from resume_agent.tailor.panel import run_panel
+from resume_agent.tailor.panel import arun_panel, run_panel
 from resume_agent.tailor.provenance import provenance_critique
 from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.tailoring import compose_revise_input, compose_tailor_input, revise, tailor
+from resume_agent.tailor.tailoring import (
+    arevise,
+    atailor,
+    compose_revise_input,
+    compose_tailor_input,
+    revise,
+    tailor,
+)
 from resume_agent.tailor.verdict import PanelVerdict, aggregate
 
 
@@ -49,5 +57,45 @@ def run_tailor_review(
         content = revise(
             compose_revise_input(content, verdict.critiques, profile_facts, config.length_budget),
             reviser_agent,
+        )
+    return rounds
+
+
+async def arun_tailor_review(
+    jd_text: str,
+    criteria: JobCriteria,
+    profile_facts: ProfileFacts,
+    config: ReviewConfig,
+    tailor_agent: Runner,
+    reviewer_agents: Mapping[str, Runner],
+    reviser_agent: Runner,
+    *,
+    sem: asyncio.Semaphore,
+) -> list[TailorRound]:
+    """Async twin of run_tailor_review; DB writes happen after callers gather."""
+    content = await atailor(
+        compose_tailor_input(jd_text, criteria, profile_facts, config.length_budget),
+        tailor_agent,
+        sem=sem,
+    )
+    rounds: list[TailorRound] = []
+    for round_num in range(1, config.max_rounds + 1):
+        provenance = provenance_critique(content, profile_facts)
+        if provenance.passed:
+            panel = await arun_panel(
+                content, profile_facts, jd_text, config, reviewer_agents, sem=sem
+            )
+            critiques = [provenance, *panel]
+        else:
+            critiques = [provenance]
+        verdict = aggregate(critiques, config)
+
+        rounds.append(TailorRound(round_num=round_num, content=content, verdict=verdict))
+        if verdict.passed or round_num == config.max_rounds:
+            break
+        content = await arevise(
+            compose_revise_input(content, verdict.critiques, profile_facts, config.length_budget),
+            reviser_agent,
+            sem=sem,
         )
     return rounds
