@@ -42,6 +42,22 @@ def test_score_fit_returns_fitscore():
     assert out.score == 82
 
 
+def test_ascore_fit_uses_arun():
+    import asyncio
+
+    from resume_agent.discovery.fit import ascore_fit
+
+    class _AsyncAgent:
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            return _FakeResult(FitScore(score=88, rationale="ok"))
+
+    out = asyncio.run(ascore_fit("input", _AsyncAgent(), sem=asyncio.Semaphore(2)))
+    assert isinstance(out, FitScore) and out.score == 88
+
+
 def test_fit_score_rejects_out_of_range_score():
     with pytest.raises(ValidationError):
         FitScore(score=101, rationale="too high")
