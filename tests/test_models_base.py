@@ -1,3 +1,5 @@
+from pydantic import Field
+
 from resume_agent.models.base import ExtensibleModel, FactItem, Source, new_id
 
 
@@ -31,3 +33,39 @@ def test_fact_item_source_round_trips():
     f = FactItem(source=Source.github)
     assert f.source == Source.github
     assert f.model_dump()["source"] == "github"
+
+
+class _CollectionModel(ExtensibleModel):
+    items: list[str] = Field(default_factory=list)
+    mapping: dict[str, int] = Field(default_factory=dict)
+    maybe: list[str] | None = None
+
+
+def test_null_list_field_coerced_to_empty():
+    # JSON-mode LLM providers may emit ``null`` for an empty non-nullable list
+    # despite the schema; coerce it rather than failing the whole structured result.
+    m = _CollectionModel.model_validate({"items": None})
+    assert m.items == []
+
+
+def test_null_dict_field_coerced_to_empty():
+    m = _CollectionModel.model_validate({"mapping": None})
+    assert m.mapping == {}
+
+
+def test_nullable_collection_field_keeps_none():
+    # A genuinely Optional collection must stay None -- coercion only applies to
+    # non-nullable fields where None could never be valid anyway.
+    m = _CollectionModel.model_validate({"maybe": None})
+    assert m.maybe is None
+
+
+def test_profilefacts_coerces_null_collections():
+    from resume_agent.models.profile import ProfileFacts
+
+    facts = ProfileFacts.model_validate(
+        {"contact": {"name": "X"}, "experience": None, "skills": None, "interests": None}
+    )
+    assert facts.experience == []
+    assert facts.skills == {}
+    assert facts.interests == []

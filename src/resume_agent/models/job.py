@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from resume_agent.models.base import ExtensibleModel
 
@@ -94,6 +94,19 @@ class JobCriteriaExtract(BaseModel):
     location: str | None
     must_have_skills: list[str]
     nice_to_have_skills: list[str]
+
+    @field_validator("tech_stack", "must_have_skills", "nice_to_have_skills", mode="before")
+    @classmethod
+    def _null_list_to_empty(cls, value: object) -> object:
+        """Coerce ``null`` -> ``[]`` for required list fields.
+
+        JSON-mode providers (no native structured outputs) treat the schema as a
+        hint and follow the "leave unknown fields null" instruction literally,
+        emitting ``null`` for empty list fields. Keeping the fields non-nullable
+        preserves the zero-optional schema Anthropic's grammar compiler needs, so
+        the coercion happens here instead of widening the type to ``| None``.
+        """
+        return [] if value is None else value
 
     def to_criteria(self) -> JobCriteria:
         """Map the lean extraction result onto the persisted domain model."""

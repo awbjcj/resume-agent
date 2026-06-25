@@ -109,6 +109,32 @@ def test_extraction_schema_within_anthropic_limits():
     assert counts["union"] <= 16, f"union params must be <=16, got {counts['union']}"
 
 
+def test_extract_coerces_null_list_fields_to_empty():
+    """JSON-mode providers honour 'leave unknown fields null' literally, emitting
+    ``null`` for empty list fields. The schema is non-nullable (zero optionals,
+    to satisfy Anthropic's grammar compiler), so a before-validator must coerce
+    ``None`` -> ``[]`` rather than letting validation fail and the job be skipped.
+    """
+    base = dict(
+        sponsorship_signal=SponsorshipSignal.silent,
+        seniority=None,
+        employment_type=None,
+        tech_stack=None,
+        industry=None,
+        company_size=None,
+        yoe_min=None,
+        salary_range=None,
+        remote_policy=None,
+        location=None,
+        must_have_skills=None,
+        nice_to_have_skills=None,
+    )
+    extract = JobCriteriaExtract.model_validate(base)
+    assert extract.tech_stack == []
+    assert extract.must_have_skills == []
+    assert extract.nice_to_have_skills == []
+
+
 def test_build_extract_agent_is_agent(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     assert isinstance(build_extract_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
