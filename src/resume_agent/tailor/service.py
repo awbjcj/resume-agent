@@ -1,33 +1,26 @@
+import asyncio
 from collections.abc import Mapping, Sequence
 
 from sqlmodel import Session
 
+from resume_agent.concurrency import gather_isolated
+from resume_agent.config import get_settings
 from resume_agent.llm_runner import Runner
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.progress import ProgressReporter
 from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.workflow import run_tailor_review
+from resume_agent.tailor.workflow import TailorRound, arun_tailor_review
 from resume_agent.tracking.repository import save_job, save_resume_version
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 
 
-def tailor_job(
-    session: Session,
-    job: Job,
-    profile_facts: ProfileFacts,
-    config: ReviewConfig,
-    tailor_agent: Runner,
-    reviewer_agents: Mapping[str, Runner],
-    reviser_agent: Runner,
+def _persist_rounds(
+    session: Session, job: Job, rounds: list[TailorRound]
 ) -> list[ResumeVersion]:
-    """Run the loop for one job, persist each round as a ResumeVersion, mark the job tailored."""
+    """Persist each review round as a ResumeVersion and mark the job tailored."""
     if job.id is None:
         raise ValueError("Cannot tailor a job that has not been persisted")
-    criteria = JobCriteria.model_validate(job.criteria_json or {})
-    rounds = run_tailor_review(
-        job.jd_text, criteria, profile_facts, config, tailor_agent, reviewer_agents, reviser_agent
-    )
     versions: list[ResumeVersion] = []
     for r in rounds:
         version = ResumeVersion(
@@ -44,6 +37,35 @@ def tailor_job(
     return versions
 
 
+def tailor_job(
+    session: Session,
+    job: Job,
+    profile_facts: ProfileFacts,
+    config: ReviewConfig,
+    tailor_agent: Runner,
+    reviewer_agents: Mapping[str, Runner],
+    reviser_agent: Runner,
+) -> list[ResumeVersion]:
+    """Run the loop for one job and persist each round. Marks the job tailored."""
+    if job.id is None:
+        raise ValueError("Cannot tailor a job that has not been persisted")
+    criteria = JobCriteria.model_validate(job.criteria_json or {})
+    sem = asyncio.Semaphore(get_settings().llm_concurrency)
+    rounds = asyncio.run(
+        arun_tailor_review(
+            job.jd_text,
+            criteria,
+            profile_facts,
+            config,
+            tailor_agent,
+            reviewer_agents,
+            reviser_agent,
+            sem=sem,
+        )
+    )
+    return _persist_rounds(session, job, rounds)
+
+
 def tailor_jobs(
     session: Session,
     targets: Sequence[Job],
@@ -54,25 +76,40 @@ def tailor_jobs(
     reviser_agent: Runner,
     reporter: ProgressReporter | None = None,
 ) -> dict[int, list[ResumeVersion]]:
-    """Tailor each target in turn, reporting per-job progress.
-
-    Returns ``{job_id: versions}`` in input order. Progress is one step per job
-    (a job's review rounds are not surfaced individually), so the total is simply
-    the number of targets and the ETA is honest from the first completed job.
-    """
+    """Tailor targets concurrently, then persist successful jobs serially."""
+    for job in targets:
+        if job.id is None:
+            raise ValueError("Cannot tailor a job that has not been persisted")
     if reporter:
-        reporter.begin(len(targets), "Starting")
+        reporter.begin(len(targets), "Tailoring")
     results: dict[int, list[ResumeVersion]] = {}
-    for index, job in enumerate(targets, 1):
-        if reporter:
-            reporter.step(index - 1, label=f"Tailoring job #{job.id}")
-        versions = tailor_job(
-            session, job, profile_facts, config, tailor_agent, reviewer_agents, reviser_agent
+    if targets:
+        sem = asyncio.Semaphore(get_settings().llm_concurrency)
+        on_complete = (lambda n: reporter.step(n)) if reporter else None
+
+        def _criteria(job: Job) -> JobCriteria:
+            return JobCriteria.model_validate(job.criteria_json or {})
+
+        rounds_results = asyncio.run(
+            gather_isolated(
+                list(targets),
+                lambda job: arun_tailor_review(
+                    job.jd_text,
+                    _criteria(job),
+                    profile_facts,
+                    config,
+                    tailor_agent,
+                    reviewer_agents,
+                    reviser_agent,
+                    sem=sem,
+                ),
+                on_complete=on_complete,
+            )
         )
-        if job.id is not None:
-            results[job.id] = versions
-        if reporter:
-            reporter.step(index)
+        for job, res in zip(targets, rounds_results):
+            if not res.ok or res.value is None:
+                continue
+            results[job.id] = _persist_rounds(session, job, res.value)
     if reporter:
         reporter.done()
     return results
