@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Jobs */
+        post: operations["bulk_jobs_api_jobs_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/from-url": {
         parameters: {
             query?: never;
@@ -449,6 +466,135 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** BoardPage[PipelineItem] */
+        BoardPage_PipelineItem_: {
+            /** Data */
+            data: components["schemas"]["PipelineItem"][];
+            /** Facets */
+            facets: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            pagination: components["schemas"]["Pagination"];
+            /** Total */
+            total: number;
+        };
+        /** BoardPage[ShortlistItem] */
+        BoardPage_ShortlistItem_: {
+            /** Data */
+            data: components["schemas"]["ShortlistItem"][];
+            /** Facets */
+            facets: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            pagination: components["schemas"]["Pagination"];
+            /** Total */
+            total: number;
+        };
+        /** BoardPage[TriageItem] */
+        BoardPage_TriageItem_: {
+            /** Data */
+            data: components["schemas"]["TriageItem"][];
+            /** Facets */
+            facets: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            pagination: components["schemas"]["Pagination"];
+            /** Total */
+            total: number;
+        };
+        /** BulkRequest */
+        BulkRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "archive" | "restore" | "delete" | "approve" | "setStatus";
+            /**
+             * Archived
+             * @default false
+             */
+            archived: boolean;
+            /**
+             * Board
+             * @enum {string}
+             */
+            board: "shortlist" | "triage" | "pipeline";
+            /** City */
+            city?: string[];
+            /** Companysize */
+            companySize?: string[];
+            /** Country */
+            country?: string[];
+            /**
+             * Dryrun
+             * @default true
+             */
+            dryRun: boolean;
+            /** Employmenttype */
+            employmentType?: string[];
+            /** Ids */
+            ids?: number[];
+            /** Industry */
+            industry?: string[];
+            /** Maxfit */
+            maxFit?: number | null;
+            /** Minfit */
+            minFit?: number | null;
+            /** Minsalary */
+            minSalary?: number | null;
+            /**
+             * Preset
+             * @default balanced
+             */
+            preset: string;
+            /** Q */
+            q?: string | null;
+            /** Region */
+            region?: string[];
+            /** Remote */
+            remote?: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "ids" | "query";
+            /** Seniority */
+            seniority?: string[];
+            /** Skills */
+            skills?: string[];
+            /**
+             * Sortby
+             * @default fit
+             */
+            sortBy: string;
+            /** Source */
+            source?: string[];
+            /** Sponsorship */
+            sponsorship?: string[];
+            /** Staledays */
+            staleDays?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Statusin */
+            statusIn?: string[];
+        };
+        /** BulkResultOut */
+        BulkResultOut: {
+            /** Affected */
+            affected: number;
+            /** Reasons */
+            reasons: {
+                [key: string]: number;
+            };
+            /** Skipped */
+            skipped: number;
+        };
         /** CohortOut */
         CohortOut: {
             /** Applications */
@@ -582,24 +728,6 @@ export interface components {
             gaps: components["schemas"]["GapOut"][];
             /** Targettotal */
             targetTotal: number;
-        };
-        /** Page[PipelineItem] */
-        Page_PipelineItem_: {
-            /** Data */
-            data: components["schemas"]["PipelineItem"][];
-            pagination: components["schemas"]["Pagination"];
-        };
-        /** Page[ShortlistItem] */
-        Page_ShortlistItem_: {
-            /** Data */
-            data: components["schemas"]["ShortlistItem"][];
-            pagination: components["schemas"]["Pagination"];
-        };
-        /** Page[TriageItem] */
-        Page_TriageItem_: {
-            /** Data */
-            data: components["schemas"]["TriageItem"][];
-            pagination: components["schemas"]["Pagination"];
         };
         /** Pagination */
         Pagination: {
@@ -1007,6 +1135,41 @@ export interface operations {
             };
         };
     };
+    bulk_jobs_api_jobs_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     launch_add_from_url_api_jobs_from_url_post: {
         parameters: {
             query?: never;
@@ -1214,8 +1377,22 @@ export interface operations {
     get_pipeline_api_pipeline_get: {
         parameters: {
             query?: {
+                source?: string | null;
                 status?: string | null;
+                remote?: string | null;
+                sponsorship?: string | null;
+                seniority?: string | null;
+                employmentType?: string | null;
+                industry?: string | null;
+                country?: string | null;
+                region?: string | null;
+                city?: string | null;
+                companySize?: string | null;
+                skills?: string | null;
                 minFit?: number | null;
+                maxFit?: number | null;
+                minSalary?: number | null;
+                staleDays?: number | null;
                 q?: string | null;
                 sortBy?: string;
                 page?: number;
@@ -1235,7 +1412,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_PipelineItem_"];
+                    "application/json": components["schemas"]["BoardPage_PipelineItem_"];
                 };
             };
             /** @description Validation Error */
@@ -1557,7 +1734,23 @@ export interface operations {
     get_shortlist_api_shortlist_get: {
         parameters: {
             query?: {
+                q?: string | null;
+                source?: string | null;
+                status?: string | null;
+                remote?: string | null;
+                sponsorship?: string | null;
+                seniority?: string | null;
+                employmentType?: string | null;
+                industry?: string | null;
+                country?: string | null;
+                region?: string | null;
+                city?: string | null;
+                companySize?: string | null;
+                skills?: string | null;
                 minFit?: number | null;
+                maxFit?: number | null;
+                minSalary?: number | null;
+                staleDays?: number | null;
                 sortBy?: string;
                 page?: number;
                 pageSize?: number;
@@ -1576,7 +1769,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_ShortlistItem_"];
+                    "application/json": components["schemas"]["BoardPage_ShortlistItem_"];
                 };
             };
             /** @description Validation Error */
@@ -1629,8 +1822,23 @@ export interface operations {
         parameters: {
             query?: {
                 archived?: boolean;
+                q?: string | null;
+                source?: string | null;
                 status?: string | null;
+                remote?: string | null;
+                sponsorship?: string | null;
+                seniority?: string | null;
+                employmentType?: string | null;
+                industry?: string | null;
+                country?: string | null;
+                region?: string | null;
+                city?: string | null;
+                companySize?: string | null;
+                skills?: string | null;
                 minFit?: number | null;
+                maxFit?: number | null;
+                minSalary?: number | null;
+                staleDays?: number | null;
                 sortBy?: string;
                 page?: number;
                 pageSize?: number;
@@ -1649,7 +1857,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_TriageItem_"];
+                    "application/json": components["schemas"]["BoardPage_TriageItem_"];
                 };
             };
             /** @description Validation Error */
