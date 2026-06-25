@@ -11,7 +11,8 @@ def _client():
 
 def _seed(app, **kw):
     with get_session(app.state.engine) as s:
-        job = Job(source="manual", jd_text="x", **kw)
+        source = kw.pop("source", "manual")
+        job = Job(source=source, jd_text="x", **kw)
         s.add(job)
         s.commit()
         s.refresh(job)
