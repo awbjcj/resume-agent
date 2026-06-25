@@ -61,6 +61,30 @@ def test_extract_maps_to_criteria_and_passes_text():
     assert agent.received == "jd text"
 
 
+def test_aextract_job_criteria_uses_arun_and_semaphore():
+    import asyncio
+
+    from resume_agent.discovery.extract import aextract_job_criteria
+
+    class _AsyncAgent:
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            self.received = prompt
+            return _FakeResult(_extract(industry="fintech"))
+
+    agent = _AsyncAgent()
+
+    async def go():
+        return await aextract_job_criteria("jd text", agent, sem=asyncio.Semaphore(2))
+
+    out = asyncio.run(go())
+    assert isinstance(out, JobCriteria)
+    assert out.industry == "fintech"
+    assert agent.received == "jd text"
+
+
 def test_extract_fills_salary_defaults_for_null_currency_and_period():
     agent = _FakeAgent(
         _extract(
@@ -141,6 +165,21 @@ def test_extract_coerces_null_list_fields_to_empty():
 def test_build_extract_agent_is_agent(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     assert isinstance(build_extract_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
+
+
+def test_build_extract_agent_carries_retry_config(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    from resume_agent.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        runner = build_extract_agent(model_id="claude-haiku-4-5-20251001")
+        agent = runner._agent  # AgentRunner wraps the agno Agent
+        assert agent.retries == 2
+        assert agent.exponential_backoff is True
+        assert agent.delay_between_retries == 1
+    finally:
+        get_settings.cache_clear()
 
 
 def test_instructions_mention_new_fields():
