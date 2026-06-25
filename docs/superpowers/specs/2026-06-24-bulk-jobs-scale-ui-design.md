@@ -1,7 +1,7 @@
 # Scaling the Job-Management UI (pull / triage / discover / tailor) — Design
 
 **Date:** 2026-06-24
-**Status:** Approved (design); pending implementation plan
+**Status:** Approved (design); implementation plans present and reconciled
 **Surface:** `api/` (board + bulk endpoints, schemas), `services/board.py` (server-side filter/facet/bulk), `tracking/queries.py` + indexes, `web/` (filter control, dense table, selection + bulk engine)
 
 ---
@@ -41,7 +41,7 @@ core domain invariants.
 | What "server-side" means | **In-process Python filtering inside `services/board`** (Approach A preserved — criteria stay in `criteria_json`; rows are loaded once and filtered/counted in Python). One HTTP round-trip per page; **not** SQL WHERE on every facet. |
 | View mode | **Dense table for bulk stages (Triage/prune); cards for the review stage (Shortlist)**; Pipeline keeps stage groups |
 | Filter control | **B+C hybrid:** inline toggle-**pills** for fixed enums; compact searchable **popover-chips** for long/data-driven lists |
-| Pills (C) | Remote, Seniority, Type, Sponsorship, **Source**, **Company-size** (all fixed enums) |
+| Pills (C) | Remote, Seniority, Type, Sponsorship, **Company-size**, plus board-specific **Source/Status** when returned by facets |
 | Popover-chips (B) | **Skills, Industry, Country, State, City** (long / data-driven) |
 | Scalars | Min fit (slider), Min salary (input), Sort (select) — unchanged controls |
 | Selection model | **Two-tier:** header box selects loaded page (id mode); banner escalates to "select all N matching" (query mode); shift-click range within loaded rows |
@@ -69,7 +69,7 @@ tracking/queries (load) ─▶│ list_<board>(filter)  facets(board, filter)   
                                           │  (Pydantic camelCase contract)
                       GET /api/{board}?<BoardFilter>   POST /api/jobs/bulk
                                           │
-        web: useJobQuery (useInfiniteQuery) · useSelection · useBulkAction
+        web: useBoardQuery (useInfiniteQuery) · useSelection · useBulkAction
                                           │
         FacetPills · FacetPopover · ActiveFilterSummary · JobTable · BulkActionBar
 ```
@@ -80,13 +80,17 @@ One filter shape drives lists, facets, and bulk. Wire format is camelCase per th
 `CamelModel` convention; multi-value facets are comma-joined query params (preserving
 today's `use-board-filters` URL convention so filters stay bookmarkable).
 
-Fields: `minFit`, `minSalary`, `q`, `sort`, plus multi-value
-`source`, `remote`, `seniority`, `employmentType`, `sponsorship`, `companySize`,
-`skills`, `industry`, `country`, `region`, `city`. (`archived`/`status` already exist
-for Triage/Pipeline.) Semantics match today's `apply_filters`: non-skill facets AND
-together; skills OR within themselves; a `None` metadata value is not excluded unless
-the filter targets "unknown"; `minSalary` excludes only when `salary_max` is known and
-below the floor.
+Fields: `minFit`, `maxFit`, `minSalary`, `staleDays`, `q`, `sort`, plus multi-value
+`status`, `source`, `remote`, `seniority`, `employmentType`, `sponsorship`, `companySize`,
+`skills`, `industry`, `country`, `region`, `city`. `archived` is a board option rather
+than a facet. Semantics match today's `apply_filters`: non-skill facets AND together;
+skills OR within themselves; a `None` metadata value is not excluded unless the filter
+targets "unknown"; `minSalary` excludes only when `salary_max` is known and below the
+floor. Fit bounds are score predicates, so `minFit`/`maxFit` exclude unknown scores;
+this prevents Low-fit pruning from sweeping in unscored jobs. Sort defaults are
+board-specific: Shortlist/Triage default to fit, Pipeline defaults to stage order.
+Each board reads only the subset its row DTO exposes; unsupported facet fields are no-ops,
+and the UI only renders facet controls present in the server `facets` payload.
 
 ### 3.2 Server-side list, sort, paginate, facets (`services/board.py`)
 
@@ -95,7 +99,8 @@ applies the full `BoardFilter` in Python, sorts, and paginates — returning a `
 **plus a `facets` block and `total`**. The list response carries:
 
 - `data` — the page of rows (camelCase board item).
-- `pagination` — `{ page, pageSize, totalPages, total }` (matched count).
+- `pagination` — `{ page, pageSize, totalItems, totalPages }`; the top-level `total`
+  mirrors `pagination.totalItems` for convenient client access.
 - `facets` — for each facet, its values with counts. **Count semantics:** each facet's
   counts are computed against the active filter **excluding that facet's own
   selections** (standard faceted behavior, so you can still see and add siblings).
@@ -109,7 +114,7 @@ the equivalent logic lives once in `board` (reusing the existing
 
 ```
 POST /api/jobs/bulk
-{ board, filter?, scope: "query" | "ids", ids?, action, status?, dryRun? }
+{ board, scope: "query" | "ids", ids?, action, status?, dryRun?, ...BoardFilter }
 action ∈ { archive, restore, delete, approve, setStatus }
 → { affected, skipped, reasons: { hasProgress: n, ... } }
 ```
@@ -118,12 +123,15 @@ action ∈ { archive, restore, delete, approve, setStatus }
   `scope:"ids"` uses the explicit list. Either way the mutation is **one HTTP request**.
 - `dryRun:true` returns the same `{affected, skipped, reasons}` **without mutating** —
   this powers every confirm dialog's previewed count.
+- The request body flattens `BoardFilter` fields for the OpenAPI/TypeScript contract.
+  The status filter is `statusIn` so it does not collide with the `status` argument for
+  `setStatus`.
 - **Invariants enforced server-side, per matching job:**
   - `delete` reuses the existing `delete_job` FK-safe cascade and **skips
     `has_progress` rows**, reporting them in `reasons.hasProgress`.
   - `archive`/`restore` set/clear `archived_at` (orthogonal to status; reversible).
-  - `approve`/`setStatus` reuse `board.set_stage`; never touch progress jobs' frozen
-    `jd_text` (source-priority invariant untouched — this path only changes status).
+  - `approve`/`setStatus` reuse `board.set_stage` but skip `has_progress` rows rather
+    than silently re-stage them.
 - `POST /api/prune` (CLI/cron threshold semantics) is **unchanged and kept**; the UI no
   longer calls it.
 
@@ -136,13 +144,15 @@ no new columns, no migration beyond index creation.
 
 ### 3.5 Client data layer (`web/`)
 
-- **`useJobQuery(board)`** — owns `BoardFilter` state ↔ URL searchParams ↔ API via
+- **`useBoardQuery(board)`** — owns `BoardFilter` state ↔ URL searchParams ↔ API via
   `useInfiniteQuery`; returns `rows`, `facets`, `total`, `fetchNextPage`,
   `hasNextPage`. Replaces `useShortlist`/`useTriage`/`usePipeline`'s `fetchAllPages`
   and the entire `lib/filters/apply|sort|facets` path (`normalize` + `types` stay).
 - **`useSelection()`** — holds `{ mode: "ids", ids: Set<number> } | { mode: "query" }`.
   Header box → ids of loaded page; banner escalates to `mode:"query"`; shift-click
-  selects a range across loaded rows; clearing resets to empty ids.
+  selects a range across loaded rows; clearing resets to empty ids. On filter/result
+  changes, id-mode selections prune ids that left the loaded result set, and query-mode
+  selections refresh their count to the new `total`.
 - **`useBulkAction(board)`** — POSTs `/api/jobs/bulk`; sends `filter` when
   `mode:"query"`, else `ids`; supports a `dryRun` preview call; invalidates the board
   query and any cross-board caches on success.
@@ -152,11 +162,14 @@ no new columns, no migration beyond index creation.
 Replace `MultiSelect.tsx` + `FilterDesk.tsx` with focused, independently-testable units:
 
 - **`FacetPills`** (C) — fixed enums as one-click toggle pills, all values visible:
-  Remote, Seniority, Type, Sponsorship, Source, Company-size. Selected = filled pill.
+  Remote, Seniority, Type, Sponsorship, Company-size, plus board-specific Source/Status
+  when the server returns those facet maps. Selected = filled pill. Implement with
+  shadcn `ToggleGroup` for accessibility and selected state.
 - **`FacetPopover`** (B) — long/data-driven lists as a compact chip with a count badge;
   click opens a searchable, counted checkbox list: Skills, Industry, Country, State, City.
+  Implement with shadcn `Popover` + `Command`, not dropdown-menu content with an input.
 - **`ActiveFilterSummary`** — every active filter as a removable chip + live
-  "N of M match" (from `facets`/`total`) + Clear all.
+  "N matching" from `BoardPage.total` + Clear all.
 - Scalars (`Min fit` slider, `Min salary` input, `Sort` select) retained.
 - **Polish requirement:** rows tight, aligned to a consistent baseline grid, dense;
   no orphaned/ragged controls.
@@ -174,7 +187,8 @@ Replace `MultiSelect.tsx` + `FilterDesk.tsx` with focused, independently-testabl
 ### 3.8 Pruning reimagined (`web/src/features/triage/`)
 
 `PrunePanel` is replaced by one-click **quick-filter presets** that populate the
-`BoardFilter` bar — e.g. *Low-fit (`<40`)*, *Stale (`>45d`)*, *Off-target rejected*.
+`BoardFilter` bar — e.g. *Low-fit (`<40`, unknown fit excluded)*, *Stale (`>45d`)*,
+*Off-target rejected*.
 Flow: pick a quick filter (or build one) → **Select all N matching** → **Archive/Delete**
 → confirm dialog shows the `dryRun` preview ("4,180 archive · 30 skipped (progress)")
 → one bulk call. Threshold semantics that belong to cron stay in `POST /api/prune`.
@@ -201,10 +215,12 @@ Flow: pick a quick filter (or build one) → **Select all N matching** → **Arc
 ## 5. Testing strategy (offline; agents + network faked)
 
 - **`services/board`** — table-driven: each facet in isolation, AND combination, skills
-  OR, unknown-value pass-through, salary-floor exclusion, every sort key, pagination
-  boundaries, facet-count excluded-self semantics, `total` correctness.
+  OR, unknown-value pass-through for metadata, fit-bound unknown exclusion,
+  salary-floor exclusion, every sort key/default, pagination boundaries,
+  facet-count excluded-self semantics, `total` correctness.
 - **`bulk_apply`** — archive/restore/delete/approve/setStatus by query and by ids;
-  `has_progress` skip + `reasons`; `dryRun` mutates nothing; FK-safe delete cascade.
+  `has_progress` skip + `reasons` for delete/status-moving actions; `dryRun` mutates
+  nothing; FK-safe delete cascade.
 - **API contract** — new `BoardFilter` params, `facets`/`total` in the list envelope,
   `/api/jobs/bulk` request/response; regenerate `contracts/openapi.json` + TS client;
   the `tests/api/test_openapi_contract.py` drift gate must pass.
@@ -238,7 +254,7 @@ Flow: pick a quick filter (or build one) → **Select all N matching** → **Arc
   (a) pause/retire the TS half of the filter-contract plan and keep a single
   API-level golden-fixture test of `board` filtering, or (b) land the contract first as a
   safety net and retire the TS harness as part of this work. Recommended: (b) — keep the
-  Python predicate contract, drop the TS harness when `useJobQuery` lands.
+  Python predicate contract, drop the TS harness when `useBoardQuery` lands.
 - **`docs/superpowers/specs/2026-06-16-job-metadata-filtering-design.md`** locked
   **Approach A** (in-memory filtering, criteria in `criteria_json`). This design honors
   it: server-side filtering is in-process Python, not new SQL columns.
@@ -255,7 +271,7 @@ Flow: pick a quick filter (or build one) → **Select all N matching** → **Arc
 2. **DB indexes** on status/archived_at/fit_score/source/company (+ idempotent test).
 3. **`bulk_apply`** + `POST /api/jobs/bulk` (query/ids, all actions, dryRun, progress
    skip) (+ tests); regenerate OpenAPI + TS client.
-4. **`useJobQuery`** (infinite) replacing `fetchAllPages`; retire client `lib/filters`
+4. **`useBoardQuery`** (infinite) replacing `fetchAllPages`; retire client `lib/filters`
    compute (+ client tests).
 5. **`useSelection`** + **`useBulkAction`** (+ tests).
 6. **Filter control rebuild** — `FacetPills` / `FacetPopover` / `ActiveFilterSummary`
