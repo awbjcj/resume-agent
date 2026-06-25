@@ -15,7 +15,7 @@
 - **camelCase wire**; query params comma-join sets. Bookmarkable filters: filter-state mirrors to the URL search params (preserve today's behavior).
 - **No client-side filtering/sorting/faceting** — the server returns the filtered, sorted page plus facet counts. Do not reintroduce `applyFilters`/`sortRows`.
 - **Destructive actions confirm with a previewed count** from a `dryRun` bulk call; progress-guarded rows are excluded server-side (the UI only reflects the returned `skipped`).
-- Match existing component style (shadcn-style `@/components/ui/*`, Tailwind utility classes, `toast` from `sonner`).
+- Match existing component style (shadcn `base-nova`, Base UI `render` triggers, lucide icons, semantic Tailwind tokens, `toast` from `sonner`). Before Task 5, add or verify the shadcn primitives the new controls require (`toggle-group`, `popover`, `command`, `badge`, `separator`); the current tree already has `badge`/`separator` but not `toggle-group`/`popover`/`command`.
 
 ---
 
@@ -64,6 +64,12 @@ Expected: FAIL — `params.ts` missing; `q`/`source`/`status`/`maxFit`/`staleDay
 - [ ] **Step 3: Extend `FilterState` + `emptyFilterState`**
 
 In `web/src/lib/filters/types.ts`, add to the `FilterState` interface and `emptyFilterState()`:
+
+Also widen `SortKey` to include the board defaults and API sorts used here:
+
+```ts
+export type SortKey = "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+```
 
 ```ts
 // add to interface FilterState
@@ -271,10 +277,13 @@ git commit -m "feat(web): useBoardQuery infinite list with server facets + total
 - Test: `web/src/features/board/use-selection.test.tsx`
 
 **Interfaces:**
-- Produces: `useSelection() -> { mode, ids, count, isAllMatching, toggle(id, index?, shift?), selectPage(ids), selectAllMatching(total), clear, isSelected(id) }`.
+- Produces: `useSelection() -> { mode, ids, count, isAllMatching, toggle(id, index?, shift?), selectPage(ids), selectAllMatching(total), reconcile(loadedIds,total), clear, isSelected(id) }`.
 
 `toggle` with a `shift` flag and the row `index` selects a range from the last-clicked
 index across the loaded rows (the component passes the current ordered id list).
+`reconcile` is called by board containers whenever the filter/result set changes: id-mode
+selections are pruned to loaded ids; query-mode count refreshes to the new `total` so
+"all matching" remains scoped to the current filter.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -297,6 +306,17 @@ describe("useSelection", () => {
     act(() => result.current.clear());
     expect(result.current.count).toBe(0);
     expect(result.current.mode).toBe("ids");
+  });
+
+  it("prunes id mode and refreshes query count after a filter change", () => {
+    const { result } = renderHook(() => useSelection());
+    act(() => result.current.selectPage([1, 2, 3]));
+    act(() => result.current.reconcile([2, 3], 2));
+    expect([...result.current.ids]).toEqual([2, 3]);
+    act(() => result.current.selectAllMatching(4210));
+    act(() => result.current.reconcile([2], 9));
+    expect(result.current.count).toBe(9);
+    expect(result.current.mode).toBe("query");
   });
 });
 ```
@@ -356,6 +376,18 @@ export function useSelection() {
     setMatchingTotal(total);
   }, []);
 
+  const reconcile = useCallback((loadedIds: number[], total: number) => {
+    const loaded = new Set(loadedIds);
+    if (mode === "query") {
+      setMatchingTotal(total);
+      return;
+    }
+    setIds((prev) => {
+      const next = new Set([...prev].filter((id) => loaded.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [mode]);
+
   const isSelected = useCallback(
     (id: number) => (mode === "query" ? true : ids.has(id)),
     [mode, ids],
@@ -369,6 +401,7 @@ export function useSelection() {
     toggle,
     selectPage,
     selectAllMatching,
+    reconcile,
     clear,
     isSelected,
   };
@@ -539,6 +572,12 @@ git commit -m "feat(web): act-by-query bulk action hook with dry-run preview"
 These replace `MultiSelect.tsx` entirely. Compactness is a requirement: pills inline-wrap;
 popover chip shows `Label · N` when active.
 
+Shadcn/base rules for this task:
+- `FacetPills` uses `ToggleGroup multiple` + `ToggleGroupItem`, not custom active buttons.
+- `FacetPopover` uses `Popover` + `Command` for searchable content, not `DropdownMenu` with an `Input` nested inside it.
+- Base UI triggers use `render={<Button />}`. Icons inside `Button` use lucide with `data-icon`; do not use text glyph chevrons.
+- If these primitives are missing, run the project's package runner from `web/` to add them before writing the component.
+
 - [ ] **Step 1: Write the failing tests**
 
 ```tsx
@@ -592,8 +631,9 @@ Expected: FAIL — modules missing.
 
 ```tsx
 // web/src/components/filters/FacetPills.tsx
+import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export function FacetPills({
   label, options, counts, selected, onChange, getLabel,
@@ -605,39 +645,31 @@ export function FacetPills({
   onChange: (s: Set<string>) => void;
   getLabel?: (v: string) => string;
 }) {
-  const toggle = (opt: string) => {
-    const next = new Set(selected);
-    next.has(opt) ? next.delete(opt) : next.add(opt);
-    onChange(next);
-  };
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="text-xs font-semibold uppercase tracking-[0.14em]">{label}</Label>
-      <div className="flex flex-wrap gap-1.5">
+      <ToggleGroup
+        multiple
+        value={[...selected]}
+        onValueChange={(values) => onChange(new Set(values))}
+        className="flex flex-wrap justify-start gap-1.5"
+      >
         {options.map((opt) => {
-          const on = selected.has(opt);
           const n = counts[opt];
+          const text = getLabel ? getLabel(opt) : opt.replace(/_/g, " ");
           return (
-            <button
+            <ToggleGroupItem
               key={opt}
-              type="button"
-              onClick={() => toggle(opt)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-sm transition-colors",
-                on ? "border-primary bg-primary text-primary-foreground"
-                   : "border-border bg-card hover:bg-secondary",
-              )}
+              value={opt}
+              aria-label={`${label}: ${text}${n == null ? "" : ` (${n})`}`}
+              className="h-8 rounded-full px-3"
             >
-              {getLabel ? getLabel(opt) : opt.replace(/_/g, " ")}
-              {n != null && (
-                <span className={cn("ml-1.5 text-xs", on ? "opacity-80" : "text-muted-foreground")}>
-                  {n}
-                </span>
-              )}
-            </button>
+              <span className="truncate">{text}</span>
+              {n != null && <Badge variant="secondary">{n}</Badge>}
+            </ToggleGroupItem>
           );
         })}
-      </div>
+      </ToggleGroup>
     </div>
   );
 }
@@ -648,13 +680,15 @@ export function FacetPills({
 ```tsx
 // web/src/components/filters/FacetPopover.tsx
 import { useMemo, useState } from "react";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
 
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export function FacetPopover({
@@ -680,37 +714,39 @@ export function FacetPopover({
     onChange(next);
   };
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <Popover>
+      <PopoverTrigger
         render={
           <Button variant="outline" size="sm"
             className={cn("rounded-full", selected.size && "border-primary text-primary")}>
             {label}
-            {selected.size > 0 && (
-              <span className="ml-1.5 rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
-                {selected.size}
-              </span>
-            )}
-            <span className="ml-1">▾</span>
+            {selected.size > 0 && <Badge variant="secondary">{selected.size}</Badge>}
+            <ChevronDownIcon data-icon="inline-end" />
           </Button>
         }
       />
-      <DropdownMenuContent className="w-56 p-2">
-        <Input placeholder="search…" value={q} onChange={(e) => setQ(e.target.value)}
-          className="mb-2 h-8" />
-        <div className="max-h-64 overflow-auto">
-          {shown.map((opt) => (
-            <button key={opt} type="button" onClick={() => toggle(opt)}
-              className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-sm hover:bg-secondary">
-              <Checkbox checked={selected.has(opt)} />
-              <span className="flex-1 truncate">{getLabel ? getLabel(opt) : opt}</span>
-              <span className="text-xs text-muted-foreground">{counts[opt]}</span>
-            </button>
-          ))}
-          {shown.length === 0 && <p className="px-1.5 py-2 text-xs text-muted-foreground">No matches</p>}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      <PopoverContent align="start" className="w-72 p-0">
+        <Command>
+          <CommandInput placeholder={`Search ${label.toLowerCase()}...`} value={q} onValueChange={setQ} />
+          <CommandList>
+            <CommandEmpty>No matches</CommandEmpty>
+            <CommandGroup>
+              {shown.map((opt) => {
+                const checked = selected.has(opt);
+                return (
+                  <CommandItem key={opt} value={opt} onSelect={() => toggle(opt)}>
+                    <Checkbox checked={checked} aria-hidden />
+                    <span className="flex-1 truncate">{getLabel ? getLabel(opt) : opt}</span>
+                    <span className="text-xs text-muted-foreground">{counts[opt]}</span>
+                    {checked && <CheckIcon />}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 ```
@@ -743,7 +779,7 @@ git commit -m "feat(web): FacetPills + searchable FacetPopover filter controls"
 
 **Interfaces:**
 - Consumes: `FacetPills`, `FacetPopover` (Task 5), `useBoardQuery` (Task 2), `Facets`.
-- Produces: `ActiveFilterSummary({ filter, total, matched, onRemove, onClear })`; `FilterDesk({ filter, facets, total, matched, onChange })` (no longer takes `rows`).
+- Produces: `ActiveFilterSummary({ filter, total, onRemove, onClear })`; `FilterDesk({ filter, facets, total, onChange })` (no longer takes `rows`). `total` is the server-filtered matching count from `BoardPage.total`; the contract does not include an unfiltered board total.
 
 This is where §7 of the spec lands: with the server filtering, the React `lib/filters`
 compute path is dead. Remove it and the cross-language TS conformance harness.
@@ -770,10 +806,10 @@ describe("ActiveFilterSummary", () => {
     filter.seniority = new Set(["senior"]);
     const onRemove = vi.fn();
     render(
-      <ActiveFilterSummary filter={filter} total={4210} matched={1284}
+      <ActiveFilterSummary filter={filter} total={1284}
         onRemove={onRemove} onClear={vi.fn()} />,
     );
-    expect(screen.getByText(/1,284 of 4,210/)).toBeInTheDocument();
+    expect(screen.getByText(/1,284 matching/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /senior/ }));
     expect(onRemove).toHaveBeenCalledWith("seniority", "senior");
   });
@@ -790,6 +826,7 @@ Expected: FAIL — module missing.
 ```tsx
 // web/src/components/filters/ActiveFilterSummary.tsx
 import { Button } from "@/components/ui/button";
+import { XIcon } from "lucide-react";
 import type { FilterState } from "@/lib/filters/types";
 
 const SET_KEYS: (keyof FilterState)[] = [
@@ -798,11 +835,10 @@ const SET_KEYS: (keyof FilterState)[] = [
 ];
 
 export function ActiveFilterSummary({
-  filter, total, matched, onRemove, onClear,
+  filter, total, onRemove, onClear,
 }: {
   filter: FilterState;
   total: number;
-  matched: number;
   onRemove: (key: keyof FilterState, value: string) => void;
   onClear: () => void;
 }) {
@@ -818,12 +854,15 @@ export function ActiveFilterSummary({
       {chips.map(({ key, value }) => (
         <Button key={`${key}:${value}`} size="sm" variant="secondary"
           className="h-7 rounded-full px-2.5 text-xs" onClick={() => onRemove(key, value)}>
-          {value.replace(/_/g, " ")} ✕
+          {value.replace(/_/g, " ")}
+          <XIcon data-icon="inline-end" />
         </Button>
       ))}
       <span className="ml-auto text-xs text-muted-foreground">
-        {matched.toLocaleString()} of {total.toLocaleString()} match
-        <button className="ml-2 underline" onClick={onClear}>Clear all</button>
+        {total.toLocaleString()} matching
+        <Button variant="link" size="sm" className="h-auto px-2 py-0" onClick={onClear}>
+          Clear all
+        </Button>
       </span>
     </div>
   );
@@ -832,11 +871,11 @@ export function ActiveFilterSummary({
 
 - [ ] **Step 4: Rewrite `FilterDesk` to consume server facets**
 
-Replace `web/src/components/FilterDesk.tsx` so it takes `{ filter, facets, total, matched, onChange }`
+Replace `web/src/components/FilterDesk.tsx` so it takes `{ filter, facets, total, onChange }`
 (no `rows`), renders the scalar controls (Min fit slider, Min salary input, Sort select)
 plus:
-- `FacetPills` for `remote`, `seniority`, `employmentType` (`type`), `sponsorship`, `companySize`, and (Triage) `source` — `options` = a fixed enum list (the current literal arrays in the old `FilterDesk`), `counts` = `facets[name]`.
-- `FacetPopover` for `industry` (getLabel via `facets` keys → label map is gone; use the SIC code as the value and the server-provided label if present — for v1 show the code), `country`, `region`, `city`, `skills` — `counts` = `facets[name]`.
+- `FacetPills` for `remote`, `seniority`, `employmentType` (`type`), `sponsorship`, `companySize`, plus board-specific `status`/`source` only when those facet maps are present. Use current literal arrays for true fixed enums; use `Object.keys(facets.source ?? {})` for source because enabled connectors are data-driven. `counts` = `facets[name]`; do not render an empty pill group.
+- `FacetPopover` for `industry` (getLabel via `facets` keys → label map is gone; use the SIC code as the value and the server-provided label if present — for v1 show the code), `country`, `region`, `city`, `skills` — `counts` = `facets[name]`. Do not render an empty popover if that facet is absent from the current board's `facets`.
 - `ActiveFilterSummary` at the bottom.
 
 Drive every control through `onChange({ ...filter, [k]: nextSet })`. Keep the existing
@@ -855,7 +894,7 @@ In `web/src/features/shortlist/ShortlistContainer.tsx`:
 - Replace `useShortlist()` + `useMemo(applyFilters/sortRows)` with
   `const { rows, facets, total, fetchNextPage, hasNextPage, isLoading } = useBoardQuery<ShortlistItem>("shortlist", filters)`.
 - `visible` is just `rows` (server already filtered/sorted). Drop the `applyFilters`/`sortRows` imports.
-- Pass `facets`/`total`/`matched={rows.length ? total : 0}` to `<FilterDesk>`.
+- Pass `facets`/`total` to `<FilterDesk>`.
 - Add an infinite-scroll sentinel (or a "Load more" button) calling `fetchNextPage` when `hasNextPage`.
 - `avg`/`sponsored` metrics now read from `total`-aware data; compute from `rows` (loaded) and label "in view" to stay honest, or drop to a server metric later. Keep it simple: show `total` for "Awaiting review".
 
@@ -899,7 +938,7 @@ git commit -m "feat(web): server-driven FilterDesk + summary; retire client filt
 - Create: `web/src/components/JobTable.tsx`
 - Create: `web/src/components/BulkActionBar.tsx`
 - Rewrite: `web/src/features/triage/TriageContainer.tsx`
-- Test: `web/src/components/JobTable.test.tsx`, `web/src/features/triage/TriageContainer.test.tsx` (update)
+- Test: `web/src/components/JobTable.test.tsx`, `web/src/components/BulkActionBar.test.tsx`, `web/src/features/triage/TriageContainer.test.tsx` (update)
 
 **Interfaces:**
 - Consumes: `useBoardQuery` (Task 2), `useSelection` (Task 3), `useBulkAction` (Task 4), `FilterDesk` (Task 6), `TriageItem` (`@/lib/api/schema`).
@@ -934,6 +973,32 @@ describe("JobTable", () => {
 });
 ```
 
+Also add the banner guard test:
+
+```tsx
+// web/src/components/BulkActionBar.test.tsx
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { BulkActionBar } from "./BulkActionBar";
+
+describe("BulkActionBar", () => {
+  it("offers select-all-matching only when all loaded rows are selected", () => {
+    const props = {
+      isAllMatching: false,
+      pageCount: 50,
+      total: 120,
+      onSelectAllMatching: vi.fn(),
+      onClear: vi.fn(),
+      children: null,
+    };
+    const { rerender } = render(<BulkActionBar {...props} count={1} />);
+    expect(screen.queryByText(/Select all 120/)).not.toBeInTheDocument();
+    rerender(<BulkActionBar {...props} count={50} />);
+    expect(screen.getByText(/Select all 120/)).toBeInTheDocument();
+  });
+});
+```
+
 - [ ] **Step 2: Run to verify failure**
 
 Run (from `web/`): `npm run test -- src/components/JobTable.test.tsx`
@@ -946,8 +1011,8 @@ Expected: FAIL — module missing.
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FitMeter } from "@/components/FitMeter";
 
 type Row = {
   jobId: number; company: string | null; title: string | null;
@@ -971,7 +1036,11 @@ export function JobTable({
       <TableHeader>
         <TableRow>
           <TableHead className="w-8">
-            <Checkbox checked={allChecked} onCheckedChange={(v) => onToggleAll?.(Boolean(v))} />
+            <Checkbox
+              aria-label="Select all loaded jobs"
+              checked={allChecked}
+              onCheckedChange={(v) => onToggleAll?.(Boolean(v))}
+            />
           </TableHead>
           <TableHead>Company · Title</TableHead>
           <TableHead className="text-right">Fit</TableHead>
@@ -986,6 +1055,7 @@ export function JobTable({
             className="cursor-pointer data-[selected=true]:bg-secondary/60">
             <TableCell onClick={(e) => e.stopPropagation()}>
               <Checkbox
+                aria-label={`Select ${r.company ?? "job"} ${r.title ?? ""}`.trim()}
                 checked={selection.isSelected(r.jobId)}
                 onClick={(e) =>
                   onToggle(r.jobId, i, (e as React.MouseEvent).shiftKey, ordered)
@@ -997,7 +1067,7 @@ export function JobTable({
               <span className="text-muted-foreground"> · {r.title}</span>
             </TableCell>
             <TableCell className="text-right" onClick={() => onOpen(r.jobId)}>
-              <FitMeter score={r.fitScore} compact />
+              <Badge variant="secondary">{r.fitScore ?? "no score"}</Badge>
             </TableCell>
             <TableCell onClick={() => onOpen(r.jobId)}>{r.source}</TableCell>
             <TableCell onClick={() => onOpen(r.jobId)}>{r.location}</TableCell>
@@ -1010,8 +1080,8 @@ export function JobTable({
 }
 ```
 
-(If `FitMeter` lacks a `compact` prop, pass none and render `{r.fitScore}` in a colored
-span instead — keep it to one cell; do not modify `FitMeter` here.)
+Use `Badge` in the dense table rather than `FitMeter`; the current `FitMeter` is a
+card-sized 64px control and has no `compact` prop.
 
 - [ ] **Step 4: Implement `BulkActionBar`**
 
@@ -1019,6 +1089,7 @@ span instead — keep it to one cell; do not modify `FitMeter` here.)
 // web/src/components/BulkActionBar.tsx
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 export function BulkActionBar({
   count, isAllMatching, pageCount, total, onSelectAllMatching, onClear, children,
@@ -1041,13 +1112,16 @@ export function BulkActionBar({
         {children}
         <Button variant="ghost" size="sm" className="ml-auto" onClick={onClear}>Clear</Button>
       </div>
-      {!isAllMatching && total > pageCount && (
-        <div className="border-t bg-primary/5 px-3 py-2 text-sm text-primary">
+      {!isAllMatching && count === pageCount && total > pageCount && (
+        <>
+        <Separator />
+        <div className="bg-primary/5 px-3 py-2 text-sm text-primary">
           All {pageCount} loaded selected.{" "}
-          <button className="underline" onClick={onSelectAllMatching}>
-            Select all {total.toLocaleString()} matching this filter →
-          </button>
+          <Button variant="link" size="sm" className="h-auto px-1 py-0" onClick={onSelectAllMatching}>
+            Select all {total.toLocaleString()} matching this filter
+          </Button>
         </div>
+        </>
       )}
     </div>
   );
@@ -1060,12 +1134,13 @@ Rewrite `web/src/features/triage/TriageContainer.tsx` to:
 - Hold a `FilterState` (via a triage-scoped `useBoardFilters`) and `archived` toggle.
 - `const { rows, facets, total, fetchNextPage, hasNextPage } = useBoardQuery<TriageItem>("triage", filter, { archived })`.
 - `const selection = useSelection();` and `const bulk = useBulkAction("triage");`
-- Render `<FilterDesk filter={filter} facets={facets} total={total} matched={total} onChange={setFilter} />` (triage shows the `source`/`status` pills + scalar controls; the long-list popovers simply render empty if `facets` lacks them — acceptable, triage facets are source/status).
+- Render `<FilterDesk filter={filter} facets={facets} total={total} onChange={setFilter} />` (triage shows the `source`/`status` pills + scalar controls; long-list popovers are omitted when their facet is absent so the toolbar stays compact).
 - Render `<BulkActionBar>` with action buttons wired to a confirm dialog that first calls
   `bulk.preview({...})` to get counts, shows them in `ConfirmDialog`, then `bulk.run({...})`.
   Build `args.selection` from `selection.mode`/`selection.ids` and `args.filter` from the
   current `filter` (so query-scope acts on exactly what's filtered).
 - Render `<JobTable rows={rows} selection={selection} onToggle={selection.toggle} onOpen={openJob} onToggleAll={(c) => c ? selection.selectPage(rows.map(r => r.jobId)) : selection.clear()} allChecked={...} />`.
+- Destructure `const { reconcile } = selection` and add `useEffect(() => reconcile(rows.map((r) => r.jobId), total), [rows, total, reconcile])` so id-mode selections are pruned after filter/page changes and query-mode counts track the current result total.
 - Infinite-scroll sentinel → `fetchNextPage` when `hasNextPage`.
 - Keep the `JobModal` open/close via search params (unchanged).
 
@@ -1077,7 +1152,7 @@ after clicking a checkbox. Mock `/api/jobs/bulk` for the action path.
 
 - [ ] **Step 7: Run web tests + type-check**
 
-Run (from `web/`): `npm run test -- src/components/JobTable.test.tsx src/features/triage && npx tsc --noEmit`
+Run (from `web/`): `npm run test -- src/components/JobTable.test.tsx src/components/BulkActionBar.test.tsx src/features/triage && npx tsc --noEmit`
 Expected: PASS.
 
 - [ ] **Step 8: Commit**
@@ -1098,7 +1173,7 @@ git commit -m "feat(web): dense Triage table with two-tier selection + bulk acti
 - Test: `web/src/features/triage/QuickFilters.test.tsx`
 
 **Interfaces:**
-- Produces: `QuickFilters({ onApply })` where `onApply(patch: Partial<FilterState>)` merges a preset into the active filter. Presets: Low-fit (`maxFit: 40`), Stale (`staleDays: 45`), Off-target (`status: new Set(["rejected"])`).
+- Produces: `QuickFilters({ onApply })` where `onApply(patch: Partial<FilterState>)` merges a preset into the active filter. Presets: Low-fit (`maxFit: 40`, with unknown fit scores excluded by the server), Stale (`staleDays: 45`), Off-target (`status: new Set(["rejected"])`).
 
 Pruning is now: click a quick filter → the table + bulk bar reflect the matching set →
 "Select all N matching" → Archive/Delete (previewed). No separate threshold panel.
@@ -1131,16 +1206,23 @@ Expected: FAIL — module missing.
 ```tsx
 // web/src/features/triage/QuickFilters.tsx
 import { Button } from "@/components/ui/button";
+import { FilterIcon } from "lucide-react";
 import type { FilterState } from "@/lib/filters/types";
 
 export function QuickFilters({ onApply }: { onApply: (patch: Partial<FilterState>) => void }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Quick prune</span>
-      <Button size="sm" variant="outline" onClick={() => onApply({ maxFit: 40 })}>⚡ Low-fit (&lt;40)</Button>
-      <Button size="sm" variant="outline" onClick={() => onApply({ staleDays: 45 })}>⚡ Stale (&gt;45d)</Button>
+      <Button size="sm" variant="outline" onClick={() => onApply({ maxFit: 40 })}>
+        <FilterIcon data-icon="inline-start" /> Low-fit (&lt;40)
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => onApply({ staleDays: 45 })}>
+        <FilterIcon data-icon="inline-start" /> Stale (&gt;45d)
+      </Button>
       <Button size="sm" variant="outline"
-        onClick={() => onApply({ status: new Set(["rejected"]) })}>⚡ Off-target rejected</Button>
+        onClick={() => onApply({ status: new Set(["rejected"]) })}>
+        <FilterIcon data-icon="inline-start" /> Off-target rejected
+      </Button>
     </div>
   );
 }
@@ -1199,6 +1281,7 @@ Expected: FAIL — no selection/bulk bar yet.
   `selected`/`onSelect` props to `JobCard`; if `JobCard` has no such prop, add an optional
   one without changing its existing layout).
 - Render `<BulkActionBar>` (Approve + Archive) above the grid with preview→confirm→run.
+- Call `selection.reconcile(rows.map((r) => r.jobId), total)` after server results change so filtered-out cards are not kept in an id-mode bulk selection.
 - The per-card **Approve** footer button stays for single-job flow.
 
 - [ ] **Step 4: Run tests + type-check**
@@ -1239,9 +1322,10 @@ Expected: FAIL.
 
 - [ ] **Step 3: Wire selection + bulk bar**
 
-- Migrate `PipelineContainer` to `useBoardQuery<PipelineItem>("pipeline", filter)` (replace
+- Migrate `PipelineContainer` to `useBoardQuery<PipelineItem>("pipeline", filter)` with a pipeline-scoped initial filter whose `sort` is `"stage"` (replace
   `usePipeline` + client `q`/`minFit` memo with server `q`/`minFit` in the filter; the
   existing search input now sets `filter.q`, the slider sets `filter.fitMin`).
+- Call `selection.reconcile(rows.map((r) => r.jobId), total)` after server results change, same as Triage.
 - Add `useSelection` + per-card select; render `<BulkActionBar>` with a status `Select`
   (options = the stage list) calling `bulk.run({ action: "setStatus", status, ... })` and an
   Archive button.
