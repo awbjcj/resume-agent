@@ -13,7 +13,7 @@
 - **Wire format is camelCase**; Python stays snake_case. All request/response models extend `CamelModel` (`api/schemas/base.py`).
 - **Error envelope** is `{ "error": { code, message, details? } }` via `ApiException` (`api/errors.py`). Use `422 VALIDATION_ERROR`, `404 NOT_FOUND`, `409 CONFLICT`.
 - **Approach A preserved:** criteria fields stay in `criteria_json`; filtering is in-process Python over loaded rows. The only schema change is **index creation**, never new criteria columns.
-- **Invariants (never break):** `delete_job` refuses `has_progress` jobs and cascades FK-safe; `archived_at` is orthogonal to `status`; `approve`/`setStatus` never touch a progress job's frozen `jd_text`.
+- **Invariants (never break):** `delete_job` refuses `has_progress` jobs and cascades FK-safe; `archived_at` is orthogonal to `status`; bulk `approve`/`setStatus` skip `has_progress` jobs rather than re-stage them.
 - **Additive API only:** new query params are optional with today's defaults; existing `minFit`/`sortBy`/`status`/`archived`/`page`/`pageSize` keep working unchanged.
 - **`pageSize` stays capped at 200** (`ge=1, le=200`).
 - Run the full suite (`.venv/Scripts/python.exe -m pytest`) and `ruff check` before the final commit of each task.
@@ -98,7 +98,8 @@ class BoardFilter:
     city: set[str] = field(default_factory=set)
     company_size: set[str] = field(default_factory=set)
     skills: set[str] = field(default_factory=set)
-    sort: str = "fit"
+    # None means "board default": Shortlist/Triage use fit; Pipeline keeps stage order.
+    sort: str | None = None
     preset: str = "balanced"
 
 
@@ -123,7 +124,7 @@ def to_filter_state(f: BoardFilter) -> FilterState:
         city=set(f.city),
         company_size=set(f.company_size),
         skills=set(f.skills),
-        sort=f.sort,
+        sort=f.sort or "fit",
         preset=f.preset,
     )
 ```
@@ -185,6 +186,7 @@ def test_list_triage_max_fit_keeps_low_scores():
     with _session() as session:
         _job(session, status=JobStatus.rejected.value, fit_score=20, company="Low")
         _job(session, status=JobStatus.rejected.value, fit_score=80, company="High")
+        _job(session, status=JobStatus.rejected.value, fit_score=None, company="Unknown")
         page = board.list_triage(session, filter=BoardFilter(max_fit=40))
     assert {r.company for r in page.data} == {"Low"}
 
@@ -195,11 +197,18 @@ def test_list_shortlist_facet_filter_and_q():
         _job(session, status=JobStatus.shortlisted.value, fit_score=70, company="Beta LLC")
         page = board.list_shortlist(session, filter=BoardFilter(q="acme", min_fit=50))
     assert [r.company for r in page.data] == ["Acme Corp"]
+
+
+def test_list_shortlist_ignores_source_filter_until_source_is_on_shortlist_rows():
+    with _session() as session:
+        _job(session, status=JobStatus.shortlisted.value, source="adzuna", fit_score=90, company="Acme")
+        page = board.list_shortlist(session, filter=BoardFilter(source={"lever"}))
+    assert [r.company for r in page.data] == ["Acme"]
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_services_board.py -v -k "triage_filters or max_fit or facet_filter"`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_services_board.py -v -k "triage_filters or max_fit or facet_filter or ignores_source"`
 Expected: FAIL — `list_triage`/`list_shortlist` do not accept `filter=`.
 
 - [ ] **Step 3: Add the cross-cutting predicate to `board_query.py`**
@@ -228,13 +237,17 @@ def matches_common(row, f: BoardFilter, now: datetime) -> bool:
         if needle not in hay:
             return False
     fit = getattr(row, "fit_score", None)
-    if f.min_fit is not None and fit is not None and fit < f.min_fit:
+    # Fit bounds are score predicates, not null-neutral metadata filters. Unknown
+    # scores must not be swept into Low-fit pruning or Min-fit shortlist views.
+    if f.min_fit is not None and (fit is None or fit < f.min_fit):
         return False
-    if f.max_fit is not None and fit is not None and fit > f.max_fit:
+    if f.max_fit is not None and (fit is None or fit > f.max_fit):
         return False
-    if f.source and getattr(row, "source", None) not in f.source:
+    source = getattr(row, "source", None)
+    if f.source and source is not None and source not in f.source:
         return False
-    if f.status and getattr(row, "status", None) not in f.status:
+    status = getattr(row, "status", None)
+    if f.status and status is not None and status not in f.status:
         return False
     if f.stale_days is not None:
         age = age_days(getattr(row, "posted_at", None), now)
@@ -285,9 +298,10 @@ def list_pipeline(
     f = filter or BoardFilter()
     now = datetime.now(timezone.utc)
     rows = [r for r in pipeline_rows(session) if matches_common(r, f, now)]
-    if f.sort == "fit":
+    sort = f.sort or "stage"
+    if sort == "fit":
         rows = sort_by_fit_desc(rows)
-    elif f.sort == "company":
+    elif sort == "company":
         rows = sorted(rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower()))
     return paginate(rows, page=page, page_size=page_size)
 
@@ -300,9 +314,10 @@ def list_triage(
     now = datetime.now(timezone.utc)
     rows = archived_rows(session) if archived else triage_rows(session)
     rows = [r for r in rows if matches_common(r, f, now)]
-    if f.sort == "fit":
+    sort = f.sort or "fit"
+    if sort == "fit":
         rows = sort_by_fit_desc(rows)
-    elif f.sort == "company":
+    elif sort == "company":
         rows = sorted(rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower()))
     return paginate(rows, page=page, page_size=page_size)
 ```
@@ -525,11 +540,11 @@ Expected: FAIL — no `total`/`facets` keys; `source`/`q` ignored.
 - [ ] **Step 3: Add `BoardPage` to `base.py`**
 
 ```python
-# src/resume_agent/api/schemas/base.py  (append)
+# src/resume_agent/api/schemas/base.py  (append; add Field to the pydantic import)
 class BoardPage(CamelModel, Generic[T]):
     data: list[T]
     pagination: Pagination
-    facets: dict[str, dict[str, int]] = {}
+    facets: dict[str, dict[str, int]] = Field(default_factory=dict)
     total: int = 0
 ```
 
@@ -579,7 +594,7 @@ def board_filter_params(
     max_fit: int | None = Query(None, alias="maxFit"),
     min_salary: int | None = Query(None, alias="minSalary"),
     stale_days: int | None = Query(None, alias="staleDays"),
-    sort: str = Query("fit", alias="sortBy"),
+    sort: str | None = Query(None, alias="sortBy"),
     preset: str = "balanced",
     source: str | None = None,
     status: str | None = None,
@@ -669,7 +684,8 @@ git commit -m "feat(api): BoardPage envelope (facets+total) + filter query param
 - Produces: `BulkResult` dataclass `{affected:int, skipped:int, reasons:dict[str,int]}`; `bulk_apply(session, *, board, action, scope, filter, ids, status, dry_run) -> BulkResult`. Schemas `BulkRequest` / `BulkResultOut`.
 
 Actions: `archive`, `restore`, `delete`, `approve` (= setStatus `approved`), `setStatus`
-(requires `status`). `delete` skips `has_progress` rows → `reasons["hasProgress"]`.
+(requires `status`). `delete`, `approve`, and `setStatus` skip `has_progress` rows
+→ `reasons["hasProgress"]`.
 `dry_run=True` mutates nothing but returns the same counts.
 
 - [ ] **Step 1: Write the failing service tests**
@@ -677,12 +693,16 @@ Actions: `archive`, `restore`, `delete`, `approve` (= setStatus `approved`), `se
 ```python
 # tests/test_services_board.py  (append)
 from resume_agent.services.board import bulk_apply
+from resume_agent.tracking.tables import ResumeVersion
 
 
 def test_bulk_delete_by_query_skips_progress_and_reports():
     with _session() as session:
         _job(session, status=JobStatus.rejected.value, source="adzuna", fit_score=10)
-        _job(session, status=JobStatus.rendered.value, source="adzuna", fit_score=10)  # progress
+        protected = _job(session, status=JobStatus.rejected.value, source="adzuna", fit_score=10)
+        assert protected.id is not None
+        session.add(ResumeVersion(job_id=protected.id))  # makes a triage-visible row progress-guarded
+        session.commit()
         res = bulk_apply(
             session, board="triage", action="delete", scope="query",
             filter=BoardFilter(source={"adzuna"}),
@@ -764,8 +784,10 @@ def bulk_apply(
                 restore_job(session, job_id)
             res.affected += 1
         elif action in ("approve", "setStatus"):
+            if action == "setStatus" and status is None:
+                raise ValueError("setStatus requires status")
             new_status = JobStatus.approved.value if action == "approve" else status
-            if has_progress(session, job_id) and action == "setStatus":
+            if has_progress(session, job_id):
                 # never silently re-stage a progress job from a bulk call
                 res.skipped += 1
                 res.reasons["hasProgress"] = res.reasons.get("hasProgress", 0) + 1
@@ -786,6 +808,8 @@ def bulk_apply(
 
 from __future__ import annotations
 
+from pydantic import Field
+
 from resume_agent.api.schemas.base import CamelModel
 
 
@@ -793,7 +817,7 @@ class BulkRequest(CamelModel):
     board: str                       # triage | shortlist | pipeline
     action: str                      # archive | restore | delete | approve | setStatus
     scope: str = "ids"               # ids | query
-    ids: list[int] = []
+    ids: list[int] = Field(default_factory=list)
     status: str | None = None        # required when action == setStatus
     archived: bool = False           # triage query scope: act over archived rows
     dry_run: bool = False
@@ -803,18 +827,18 @@ class BulkRequest(CamelModel):
     max_fit: int | None = None
     min_salary: int | None = None
     stale_days: int | None = None
-    source: list[str] = []
-    status_in: list[str] = []
-    remote: list[str] = []
-    sponsorship: list[str] = []
-    seniority: list[str] = []
-    employment_type: list[str] = []
-    industry: list[str] = []
-    country: list[str] = []
-    region: list[str] = []
-    city: list[str] = []
-    company_size: list[str] = []
-    skills: list[str] = []
+    source: list[str] = Field(default_factory=list)
+    status_in: list[str] = Field(default_factory=list)
+    remote: list[str] = Field(default_factory=list)
+    sponsorship: list[str] = Field(default_factory=list)
+    seniority: list[str] = Field(default_factory=list)
+    employment_type: list[str] = Field(default_factory=list)
+    industry: list[str] = Field(default_factory=list)
+    country: list[str] = Field(default_factory=list)
+    region: list[str] = Field(default_factory=list)
+    city: list[str] = Field(default_factory=list)
+    company_size: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
 
 
 class BulkResultOut(CamelModel):
@@ -876,7 +900,10 @@ def test_bulk_delete_by_query_endpoint():
     client = _client()
     with client:
         _seed(client.app, status=JobStatus.rejected.value, source="adzuna", fit_score=5)
-        _seed(client.app, status=JobStatus.rendered.value, source="adzuna", fit_score=5)
+        protected = _seed(client.app, status=JobStatus.rejected.value, source="adzuna", fit_score=5)
+        with get_session(client.app.state.engine) as session:
+            session.add(ResumeVersion(job_id=protected))
+            session.commit()
         body = client.post("/api/jobs/bulk", json={
             "board": "triage", "action": "delete", "scope": "query", "source": ["adzuna"],
         }).json()
@@ -885,8 +912,8 @@ def test_bulk_delete_by_query_endpoint():
     assert body["reasons"]["hasProgress"] == 1
 ```
 
-(Reuse the `_client`/`_seed` helpers already in `test_job_mutations.py`; if absent, copy
-the two helpers from `test_boards.py`.)
+(Reuse the `_client`/`_seed` helpers already in `test_job_mutations.py`; import
+`get_session` and `ResumeVersion` if they are not already in that file.)
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_board.py tests/api/test_job_mutations.py -v -k bulk`
 Expected: PASS.
@@ -908,7 +935,7 @@ git commit -m "feat(api): act-by-query bulk endpoint (archive/restore/delete/app
 - Test: `tests/test_db_indexes.py` (create)
 
 **Interfaces:**
-- Produces: `ensure_indexes(engine)` — idempotent `CREATE INDEX IF NOT EXISTS` for `status`, `archived_at`, `fit_score`, `source`, `company` on the `job` table; called at the end of `init_db`.
+- Produces: `ensure_indexes(engine)` — idempotent `CREATE INDEX IF NOT EXISTS` for `status`, `archived_at`, `fit_score`, `source`, `company` on the `jobs` table; called at the end of `init_db`.
 
 Using `CREATE INDEX IF NOT EXISTS` (not `Field(index=True)`) so **existing** databases
 gain the indexes without a migration framework.
@@ -927,7 +954,7 @@ def test_job_filter_indexes_exist():
     init_db(engine)
     with get_session(engine) as session:
         names = {r[0] for r in session.exec(text(
-            "select name from sqlite_master where type='index' and tbl_name='job'"
+            "select name from sqlite_master where type='index' and tbl_name='jobs'"
         ))}
     for col in ("status", "archived_at", "fit_score", "source", "company"):
         assert any(col in n for n in names), f"missing index for {col}: {names}"
@@ -958,11 +985,11 @@ _JOB_INDEXES = {
 def ensure_indexes(engine) -> None:
     with engine.begin() as conn:
         for name, col in _JOB_INDEXES.items():
-            conn.execute(text(f'CREATE INDEX IF NOT EXISTS {name} ON job ({col})'))
+            conn.execute(text(f'CREATE INDEX IF NOT EXISTS {name} ON jobs ({col})'))
 ```
 
-Call `ensure_indexes(engine)` as the last line of `init_db`. (Confirm the table name is
-`job` by reading `tables.py`; SQLModel lowercases the class name by default.)
+Call `ensure_indexes(engine)` as the last line of `init_db`. Use the explicit table name
+from `Job.__tablename__` (`jobs` in the current tree).
 
 - [ ] **Step 4: Run the index test**
 
