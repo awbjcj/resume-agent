@@ -27,15 +27,20 @@ _SIC_TABLE = sic.load_sic_table()
 _DISCOVER_PHASES = 3
 
 
+def _stage_jobs(session: Session, status: str, job_ids: set[int] | None = None) -> list[Job]:
+    jobs = jobs_by_status(session, status)
+    if job_ids is None:
+        return jobs
+    return [job for job in jobs if job.id in job_ids]
+
+
 def run_extract(
     session: Session,
     agent: Runner,
     reporter: ProgressReporter | None = None,
     job_ids: set[int] | None = None,
 ) -> None:
-    jobs = jobs_by_status(session, JobStatus.raw.value)
-    if job_ids is not None:
-        jobs = [job for job in jobs if job.id in job_ids]
+    jobs = _stage_jobs(session, JobStatus.raw.value, job_ids)
     if reporter:
         reporter.begin(
             len(jobs), "Extracting criteria", phase_index=2, phase_count=_DISCOVER_PHASES
@@ -63,9 +68,7 @@ def run_filter(
     config: SearchConfig,
     job_ids: set[int] | None = None,
 ) -> None:
-    jobs = jobs_by_status(session, JobStatus.extracted.value)
-    if job_ids is not None:
-        jobs = [job for job in jobs if job.id in job_ids]
+    jobs = _stage_jobs(session, JobStatus.extracted.value, job_ids)
     for job in jobs:
         criteria = JobCriteria.model_validate(job.criteria_json or {})
         decision = apply_filters(criteria, config)
@@ -88,9 +91,7 @@ def run_score(
     reporter: ProgressReporter | None = None,
     job_ids: set[int] | None = None,
 ) -> None:
-    jobs = jobs_by_status(session, JobStatus.filtered.value)
-    if job_ids is not None:
-        jobs = [job for job in jobs if job.id in job_ids]
+    jobs = _stage_jobs(session, JobStatus.filtered.value, job_ids)
     if reporter:
         reporter.begin(len(jobs), "Scoring fit", phase_index=3, phase_count=_DISCOVER_PHASES)
     for index, job in enumerate(jobs, 1):
@@ -170,9 +171,7 @@ def run_relevance(
     if target is None or agent is None:
         return 0
 
-    jobs = jobs_by_status(session, JobStatus.raw.value)
-    if job_ids is not None:
-        jobs = [job for job in jobs if job.id in job_ids]
+    jobs = _stage_jobs(session, JobStatus.raw.value, job_ids)
     if reporter:
         reporter.begin(
             len(jobs), "Checking relevance", phase_index=1, phase_count=_DISCOVER_PHASES

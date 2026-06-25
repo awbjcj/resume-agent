@@ -90,6 +90,7 @@ def discover_jobs(
     facts_path: str = DEFAULT_FACTS,
     bundle: DiscoveryBundle | None = None,
     reporter: ProgressReporter | None = None,
+    job_ids: set[int] | None = None,
 ) -> dict[str, int]:
     """Run the full discovery funnel; return final status counts."""
     config = load_search_config(search_path)
@@ -97,7 +98,7 @@ def discover_jobs(
     bundle = bundle or build_discovery_bundle()
     return discover(
         session, config, facts, bundle.extract, bundle.fit, bundle.relevance,
-        canonicalizer=bundle.canonicalizer, reporter=reporter,
+        canonicalizer=bundle.canonicalizer, reporter=reporter, job_ids=job_ids,
     )
 
 
@@ -159,7 +160,7 @@ def refresh_jobs(
     )
     counts = discover_jobs(
         session, search_path=search_path, facts_path=facts_path,
-        bundle=bundle, reporter=reporter,
+        bundle=bundle, reporter=reporter, job_ids=set(pull_report.changed_raw_job_ids),
     )
     return RefreshReport(
         pulled=sum(pull_report.totals.values()),

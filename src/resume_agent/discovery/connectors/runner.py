@@ -20,6 +20,7 @@ class PullReport:
 
     totals: dict[str, int] = field(default_factory=dict)
     failures: dict[str, dict[str, str]] = field(default_factory=dict)
+    changed_raw_job_ids: list[int] = field(default_factory=list)
 
 
 def _run_note(result: FetchResult, added_count: int, upgraded_count: int) -> str | None:
@@ -65,6 +66,7 @@ def run_pull(
             added_count = summary.added.get(connector.name, sum(summary.added.values()))
             upgraded_count = summary.upgraded.get(connector.name, sum(summary.upgraded.values()))
             report.totals[connector.name] = added_count
+            report.changed_raw_job_ids.extend(summary.changed_raw_job_ids)
             added_total += added_count
             if result.failures:
                 report.failures[connector.name] = result.failures
