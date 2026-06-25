@@ -1,5 +1,5 @@
 // Full skill set, grouped Must-have / Nice-to-have. Two independent channels:
-//   required  -> which group (must vs best)
+//   required  -> which group (must vs nice)
 //   covered   -> chip fill (solid = you have it, dashed outline = gap)
 // Staggered rise-in on open. Used by the job detail modal rail.
 

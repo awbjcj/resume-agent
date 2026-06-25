@@ -91,7 +91,7 @@ const REPROCESS_SCOPES: { value: ReprocessScope; label: string }[] = [
   { value: "shortlisted", label: "Re-score shortlist" },
   { value: "rejected:relevance", label: "Reconsider off-target" },
   { value: "rejected:filtered", label: "Reconsider hard-filtered" },
-  { value: "all", label: "Everything (non-submitted)" },
+  { value: "all", label: "Everything (no progress)" },
 ];
 
 export function ReprocessDialog() {
@@ -106,8 +106,8 @@ export function ReprocessDialog() {
         <DialogHeader>
           <DialogTitle>Reprocess</DialogTitle>
           <DialogDescription>
-            Re-run the full funnel over a scope. Can change fit + status. Submitted jobs
-            are never touched.
+            Re-run the full funnel over one scope. Can change fit + status. Jobs with
+            progress are never touched.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-1.5">
