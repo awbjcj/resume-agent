@@ -184,6 +184,7 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/discovery/connectors/google.py` | Google Careers JSON API |
 | `src/resume_agent/discovery/connectors/text.py` | Relevance gates + `html_to_text` |
 | `src/resume_agent/discovery/connectors/runner.py` | Pull orchestration, `+N added, N upgraded` telemetry |
+| `src/resume_agent/concurrency.py` | `gather_isolated` — ordered, error-isolated async fan-out |
 | `src/resume_agent/discovery/ingest.py` | `save_or_upgrade`, source-priority logic |
 | `src/resume_agent/tracking/dedup.py` | `compute_dedup_key` — `company|normalized_title` |
 | `tests/test_discovery_ingest.py` | Ingest + dedup + priority tests |
@@ -201,5 +202,13 @@ aggressiveness determines how many detail fetches are issued.
 - **Tesla/Google endpoints are reverse-engineered.** They have no public API contract and could change
   without notice. Each is isolated to its own module behind `_BACKENDS`; a parse failure records to
   `.failures` and never aborts the pull.
-- **Tailor loop is synchronous.** Parallel reviewer panels and job-level concurrency are deferred
-  while this pass reduces cost through leaner prompts.
+- **Discovery + tailor LLM calls run concurrently** via asyncio. Each phase keeps a sync public
+  signature and runs `asyncio.run(gather_isolated(...))` internally: load rows → fan out the pure
+  async LLM siblings (`aextract_job_criteria`, `ascore_fit`, `ajudge_relevance`, `arun_tailor_review`)
+  → apply to the Session + commit on the single event-loop thread (no locks). One global
+  `asyncio.Semaphore(Settings.llm_concurrency)` per `asyncio.run` caps in-flight calls
+  (`llm_concurrency` is validated `>= 1`); it is acquired **only** inside `llm_runner.acall`
+  (the leaf), so nested tailor fan-out (jobs × panel) can't deadlock. Retry/backoff is agno's
+  per-agent config via `retry_kwargs()` (`exponential_backoff=True`); note it retries bare
+  `Exception`, so a parse failure costs `llm_retries` extra calls — kept low (default 2).
+  A job whose LLM work fails is skipped (left in its prior status) and retried next run.
