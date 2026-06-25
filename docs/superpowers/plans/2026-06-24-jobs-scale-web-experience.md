@@ -748,6 +748,13 @@ git commit -m "feat(web): FacetPills + searchable FacetPopover filter controls"
 This is where §7 of the spec lands: with the server filtering, the React `lib/filters`
 compute path is dead. Remove it and the cross-language TS conformance harness.
 
+> **In-flight note (verified 2026-06-24):** the working tree already holds partly-applied
+> shortlist-filter-contract files — `web/src/lib/filters/contract.test.ts`, a modified
+> `sort.ts`/`apply.test.ts`/`sort.test.ts`, and `contracts/shortlist_filter.contract.json`.
+> Step 7 below removes the now-dead TS harness; this is the intended §7 retirement, not a
+> merge conflict. Commit or stash that in-flight work before starting so the deletions are
+> a clean diff.
+
 - [ ] **Step 1: Write the failing `ActiveFilterSummary` test**
 
 ```tsx

@@ -17,6 +17,7 @@
 - **Additive API only:** new query params are optional with today's defaults; existing `minFit`/`sortBy`/`status`/`archived`/`page`/`pageSize` keep working unchanged.
 - **`pageSize` stays capped at 200** (`ge=1, le=200`).
 - Run the full suite (`.venv/Scripts/python.exe -m pytest`) and `ruff check` before the final commit of each task.
+- **In-flight compatibility (verified 2026-06-24):** this plan is written against the current working tree, which already contains compatible uncommitted refactors — `board.job_detail_facets` renamed to `board.get_job_detail`; prune logic extracted to `services/prune.py` (router calls it; `/api/prune` unchanged); `filtering.composite_score` split into `_composite_raw` + wrapper; `queries.py` additive (`JobDetailRow`/`job_detail_row`/`is_us`). None collide: this plan reuses only `FilterState`/`apply_filters`/`sort_rows`, rewrites `list_*`, and appends new symbols (`board_facets`, `bulk_apply`, the bulk endpoint). **Commit (or stash) that in-flight work before executing** so each task's diff stays clean.
 
 ---
 
