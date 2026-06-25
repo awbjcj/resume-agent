@@ -28,4 +28,14 @@ describe("useSelection", () => {
     expect(result.current.count).toBe(9);
     expect(result.current.mode).toBe("query");
   });
+
+  it("downgrades query selection to visible ids when a row is toggled", () => {
+    const { result } = renderHook(() => useSelection());
+    act(() => result.current.selectAllMatching(4210));
+    expect(result.current.isSelected(2)).toBe(true);
+    act(() => result.current.toggle(2, 1, false, [1, 2, 3]));
+    expect(result.current.mode).toBe("ids");
+    expect(result.current.count).toBe(2);
+    expect([...result.current.ids]).toEqual([1, 3]);
+  });
 });

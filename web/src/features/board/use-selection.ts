@@ -20,6 +20,11 @@ export function useSelection() {
       setMode("ids");
       setMatchingTotal(0);
       setIds((prev) => {
+        if (mode === "query") {
+          const next = new Set(ordered ?? []);
+          next.delete(id);
+          return next;
+        }
         const next = new Set(prev);
         if (shift && index != null && lastIndex.current != null && ordered) {
           const [a, b] = [lastIndex.current, index].sort((x, y) => x - y);
@@ -33,7 +38,7 @@ export function useSelection() {
       });
       if (index != null) lastIndex.current = index;
     },
-    [],
+    [mode],
   );
 
   const selectPage = useCallback((pageIds: number[]) => {
@@ -44,7 +49,9 @@ export function useSelection() {
 
   const selectAllMatching = useCallback((total: number) => {
     setMode("query");
+    setIds(new Set());
     setMatchingTotal(total);
+    lastIndex.current = null;
   }, []);
 
   const reconcile = useCallback(
