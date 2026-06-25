@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from resume_agent.progress import (
     ProgressReporter,
@@ -13,6 +14,52 @@ from resume_agent.progress import (
 def test_read_progress_missing_returns_none(tmp_path):
     assert read_progress("pull", tmp_path) is None
     assert read_all(tmp_path) == {}
+
+
+def test_read_progress_retries_transient_oserror(monkeypatch, tmp_path):
+    """A live record momentarily unreadable (Windows ``os.replace``/``open``
+    sharing violation) must NOT read as None — that turns into a spurious 404 on
+    the SSE/GET run-lookup gates. read_progress retries the transient OSError and
+    still returns the existing record."""
+    ProgressReporter("pull", tmp_path).done()  # a real, present record
+
+    real_read_text = Path.read_text
+    calls = {"n": 0}
+
+    def flaky_read_text(self, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise PermissionError(13, "The process cannot access the file")
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", flaky_read_text)
+
+    rec = read_progress("pull", tmp_path)
+    assert rec is not None and rec["state"] == "done"
+    assert calls["n"] >= 2  # proved it retried past the transient failure
+
+
+def test_read_progress_persistent_oserror_returns_none(monkeypatch, tmp_path):
+    """An unreadable-forever file exhausts the retries and falls back to None."""
+    ProgressReporter("pull", tmp_path).done()
+
+    def always_raises(self, *args, **kwargs):
+        raise PermissionError(13, "locked")
+
+    monkeypatch.setattr(Path, "read_text", always_raises)
+    assert read_progress("pull", tmp_path) is None
+
+
+def test_read_progress_corrupt_json_returns_none_without_retry(monkeypatch, tmp_path):
+    """Corrupt content is terminal, not transient — return None immediately so a
+    poll loop never spins on a permanently-broken file."""
+    (tmp_path / "pull.json").write_text("{ not json", encoding="utf-8")
+
+    sleeps = {"n": 0}
+    monkeypatch.setattr("resume_agent.progress.time.sleep", lambda _s: sleeps.__setitem__("n", sleeps["n"] + 1))
+
+    assert read_progress("pull", tmp_path) is None
+    assert sleeps["n"] == 0  # JSONDecodeError did not trigger a retry/backoff
 
 
 def test_reporter_begin_step_done_roundtrips(tmp_path):

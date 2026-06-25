@@ -65,19 +65,40 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+#: Bounded retry for a transient read failure (Windows ``os.replace``/``open``
+#: sharing violation while a run is actively writing progress). Each attempt
+#: backs off this long; total worst-case stall is tiny but enough to clear the
+#: replace window.
+_READ_RETRIES = 3
+_READ_BACKOFF_SECONDS = 0.02
+
+
 def read_progress(process: str, root: Path | str = PROGRESS_ROOT) -> dict | None:
     """Return the latest record for one process, or None if it has never run.
 
-    A truncated/half-written file (the writer is mid-flush) reads as None rather
-    than raising — the next poll picks up the complete record.
+    Distinguishes three cases that all used to collapse to None:
+
+    * **Absent** (never ran) → None.
+    * **Corrupt** (unparseable JSON) → None immediately; spinning would never help.
+    * **Transiently unreadable** → the file exists but ``open`` lost a race with
+      the writer's atomic :func:`os.replace` (a Windows sharing violation surfaces
+      as ``PermissionError``/``OSError``). This is momentary, so we retry briefly
+      rather than report the run missing. Reporting it missing is what made a live
+      SSE/GET run-lookup gate 404 a perfectly healthy run.
     """
     p = _path(process, root)
-    if not p.exists():
-        return None
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
+    for attempt in range(_READ_RETRIES):
+        if not p.exists():
+            return None
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
+        except OSError:
+            if attempt == _READ_RETRIES - 1:
+                return None
+            time.sleep(_READ_BACKOFF_SECONDS)
+    return None
 
 
 def read_all(root: Path | str = PROGRESS_ROOT) -> dict[str, dict]:
