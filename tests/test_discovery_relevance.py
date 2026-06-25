@@ -35,6 +35,24 @@ def test_judge_relevance_returns_verdict():
     assert verdict.keep is False and "trucking" in verdict.reason
 
 
+def test_ajudge_relevance_uses_arun():
+    import asyncio
+
+    from resume_agent.discovery.relevance import ajudge_relevance
+
+    class _AsyncAgent:
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            return _Result(RelevanceVerdict(keep=True, reason="ok"))
+
+    out = asyncio.run(
+        ajudge_relevance("target", "Eng", "jd", _AsyncAgent(), sem=asyncio.Semaphore(2))
+    )
+    assert isinstance(out, RelevanceVerdict) and out.keep is True
+
+
 def test_judge_relevance_type_guard():
     with pytest.raises(TypeError):
         judge_relevance("AI roles", "T", "jd", _Agent("not a verdict"))
