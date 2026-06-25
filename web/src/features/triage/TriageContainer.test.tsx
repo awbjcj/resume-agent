@@ -38,14 +38,18 @@ describe("TriageContainer", () => {
             },
           ],
           pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+          facets: { source: { adzuna: 1 }, status: { raw: 1 } },
+          total: 1,
         }),
+      ),
+      http.post("/api/jobs/bulk", () =>
+        HttpResponse.json({ affected: 1, skipped: 0, reasons: {} }),
       ),
     );
     wrap(<TriageContainer />);
     await waitFor(() => expect(screen.getByText("Eng")).toBeInTheDocument());
-    const archive = screen.getByRole("button", { name: /archive selected/i });
-    expect(archive).toBeDisabled();
-    await userEvent.click(screen.getByRole("checkbox", { name: /select job 3/i }));
-    expect(archive).toBeEnabled();
+    expect(screen.queryByText(/1 selected/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("checkbox", { name: /select acme eng/i }));
+    expect(screen.getByText(/1 selected/i)).toBeInTheDocument();
   });
 });
