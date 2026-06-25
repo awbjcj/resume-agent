@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 
 import {
   AlertDialog,
@@ -17,13 +17,15 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = "Confirm",
+  confirmDisabled,
   onConfirm,
 }: {
   trigger: ReactElement;
   title: string;
-  description: string;
+  description: ReactNode;
   confirmLabel?: string;
-  onConfirm: () => void;
+  confirmDisabled?: boolean;
+  onConfirm: () => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -38,6 +40,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
+            disabled={confirmDisabled}
             onClick={() => {
               onConfirm();
               setOpen(false);
