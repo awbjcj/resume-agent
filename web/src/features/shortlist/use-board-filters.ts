@@ -18,6 +18,12 @@ const SET_KEYS = [
   "skills",
 ] as const;
 
+function parsePositiveNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function stateToParams(s: FilterState): URLSearchParams {
   const p = new URLSearchParams();
   if (s.q.trim()) p.set("q", s.q.trim());
@@ -37,15 +43,11 @@ export function stateToParams(s: FilterState): URLSearchParams {
 export function paramsToState(p: URLSearchParams): FilterState {
   const s = emptyFilterState();
   const q = p.get("q");
-  const salary = p.get("salaryMin");
-  const fit = p.get("fitMin");
-  const maxFit = p.get("maxFit");
-  const staleDays = p.get("staleDays");
   if (q) s.q = q;
-  if (salary) s.salaryMin = Number(salary);
-  if (fit) s.fitMin = Number(fit);
-  if (maxFit) s.maxFit = Number(maxFit);
-  if (staleDays) s.staleDays = Number(staleDays);
+  s.salaryMin = parsePositiveNumber(p.get("salaryMin"));
+  s.fitMin = parsePositiveNumber(p.get("fitMin"));
+  s.maxFit = parsePositiveNumber(p.get("maxFit"));
+  s.staleDays = parsePositiveNumber(p.get("staleDays"));
   if (p.get("sort")) s.sort = p.get("sort") as SortKey;
   if (p.get("preset")) s.preset = p.get("preset") as Preset;
   for (const k of SET_KEYS) {

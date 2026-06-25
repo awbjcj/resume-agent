@@ -44,8 +44,6 @@ export function ShortlistContainer() {
   const sponsored = rows.filter((row) => row.sponsorshipSignal === "offered").length;
   const openId = params.get("job");
   const loadedIds = rows.map((row) => row.jobId);
-  const allLoadedSelected =
-    rows.length > 0 && rows.every((row) => selection.isSelected(row.jobId));
   const bulkSelection = { mode: selection.mode, ids: selection.ids };
   const bulkArgs = { selection: bulkSelection, filter: filters };
 

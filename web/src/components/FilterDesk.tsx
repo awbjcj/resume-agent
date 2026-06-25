@@ -164,7 +164,7 @@ export function FilterDesk({
             min={0}
             step={10000}
             className="h-10 bg-card"
-            value={filter.salaryMin ?? 0}
+            value={filter.salaryMin ?? ""}
             onChange={(event) => set({ salaryMin: Number(event.target.value) || null })}
           />
         </div>
