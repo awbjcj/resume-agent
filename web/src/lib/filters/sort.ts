@@ -22,7 +22,7 @@ function ageDays(row: ShortlistItem, now: Date): number | null {
   return (now.getTime() - new Date(row.postedAt).getTime()) / MS_PER_DAY;
 }
 
-export function compositeScore(row: ShortlistItem, preset: Preset, now: Date): number {
+function compositeRaw(row: ShortlistItem, preset: Preset, now: Date): number {
   const [wFit, wSalary, wRecency] = PRESETS[preset] ?? PRESETS.balanced;
   const fitN = row.fitScore ?? NEUTRAL;
 
@@ -36,7 +36,12 @@ export function compositeScore(row: ShortlistItem, preset: Preset, now: Date): n
       ? Math.min(100, Math.max(0, 100 - (age / RECENCY_WINDOW_DAYS) * 100))
       : NEUTRAL;
 
-  return Math.round((wFit * fitN + wSalary * salaryN + wRecency * recencyN) * 10000) / 10000;
+  return wFit * fitN + wSalary * salaryN + wRecency * recencyN;
+}
+
+export function compositeScore(row: ShortlistItem, preset: Preset, now: Date): number {
+  // Display value. Ordering uses the raw score (see compositeRaw).
+  return Math.round(compositeRaw(row, preset, now) * 10000) / 10000;
 }
 
 export function sortRows(
@@ -68,7 +73,7 @@ export function sortRows(
 
   if (state.sort === "composite") {
     return arr.sort(
-      (a, b) => compositeScore(b, state.preset, now) - compositeScore(a, state.preset, now),
+      (a, b) => compositeRaw(b, state.preset, now) - compositeRaw(a, state.preset, now),
     );
   }
 
