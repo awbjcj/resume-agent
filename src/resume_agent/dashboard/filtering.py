@@ -85,7 +85,7 @@ def _age_days(row: ShortlistRow, now: datetime) -> float | None:
     return (now - posted).total_seconds() / 86400.0
 
 
-def composite_score(row: ShortlistRow, preset: str, now: datetime) -> float:
+def _composite_raw(row: ShortlistRow, preset: str, now: datetime) -> float:
     w_fit, w_salary, w_recency = PRESETS.get(preset, PRESETS["balanced"])
 
     fit_n = float(row.fit_score) if row.fit_score is not None else NEUTRAL
@@ -106,7 +106,12 @@ def composite_score(row: ShortlistRow, preset: str, now: datetime) -> float:
         else NEUTRAL
     )
 
-    return round(w_fit * fit_n + w_salary * salary_n + w_recency * recency_n, 4)
+    return w_fit * fit_n + w_salary * salary_n + w_recency * recency_n
+
+
+def composite_score(row: ShortlistRow, preset: str, now: datetime) -> float:
+    """Display value. Ordering uses the raw score (see _composite_raw)."""
+    return round(_composite_raw(row, preset, now), 4)
 
 
 def sort_rows(
@@ -132,7 +137,7 @@ def sort_rows(
             reverse=True,
         )
     if state.sort == "composite":
-        return sorted(rows, key=lambda row: composite_score(row, state.preset, now), reverse=True)
+        return sorted(rows, key=lambda row: _composite_raw(row, state.preset, now), reverse=True)
     return sorted(
         rows,
         key=lambda row: (row.fit_score is not None, row.fit_score or 0),
