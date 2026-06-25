@@ -49,6 +49,8 @@ describe("PipelineContainer", () => {
             },
           ],
           pagination: { page: 1, pageSize: 200, totalItems: 2, totalPages: 1 },
+          facets: { status: { approved: 1, rendered: 1 } },
+          total: 2,
         }),
       ),
     );
