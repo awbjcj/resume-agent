@@ -729,24 +729,6 @@ export interface components {
             /** Targettotal */
             targetTotal: number;
         };
-        /** Page[PipelineItem] */
-        Page_PipelineItem_: {
-            /** Data */
-            data: components["schemas"]["PipelineItem"][];
-            pagination: components["schemas"]["Pagination"];
-        };
-        /** Page[ShortlistItem] */
-        Page_ShortlistItem_: {
-            /** Data */
-            data: components["schemas"]["ShortlistItem"][];
-            pagination: components["schemas"]["Pagination"];
-        };
-        /** Page[TriageItem] */
-        Page_TriageItem_: {
-            /** Data */
-            data: components["schemas"]["TriageItem"][];
-            pagination: components["schemas"]["Pagination"];
-        };
         /** Pagination */
         Pagination: {
             /** Page */
@@ -1416,7 +1398,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_PipelineItem_"];
+                    "application/json": components["schemas"]["BoardPage_PipelineItem_"];
                 };
             };
             /** @description Validation Error */
@@ -1757,7 +1739,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_ShortlistItem_"];
+                    "application/json": components["schemas"]["BoardPage_ShortlistItem_"];
                 };
             };
             /** @description Validation Error */
@@ -1830,7 +1812,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_TriageItem_"];
+                    "application/json": components["schemas"]["BoardPage_TriageItem_"];
                 };
             };
             /** @description Validation Error */

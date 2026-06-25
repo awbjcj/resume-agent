@@ -1071,66 +1071,6 @@
         "title": "MatchGapOut",
         "type": "object"
       },
-      "Page_PipelineItem_": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/PipelineItem"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "pagination": {
-            "$ref": "#/components/schemas/Pagination"
-          }
-        },
-        "required": [
-          "data",
-          "pagination"
-        ],
-        "title": "Page[PipelineItem]",
-        "type": "object"
-      },
-      "Page_ShortlistItem_": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/ShortlistItem"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "pagination": {
-            "$ref": "#/components/schemas/Pagination"
-          }
-        },
-        "required": [
-          "data",
-          "pagination"
-        ],
-        "title": "Page[ShortlistItem]",
-        "type": "object"
-      },
-      "Page_TriageItem_": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/TriageItem"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "pagination": {
-            "$ref": "#/components/schemas/Pagination"
-          }
-        },
-        "required": [
-          "data",
-          "pagination"
-        ],
-        "title": "Page[TriageItem]",
-        "type": "object"
-      },
       "Pagination": {
         "properties": {
           "page": {
@@ -2791,7 +2731,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_PipelineItem_"
+                  "$ref": "#/components/schemas/BoardPage_PipelineItem_"
                 }
               }
             },
@@ -3396,7 +3336,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_ShortlistItem_"
+                  "$ref": "#/components/schemas/BoardPage_ShortlistItem_"
                 }
               }
             },
@@ -3573,7 +3513,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_TriageItem_"
+                  "$ref": "#/components/schemas/BoardPage_TriageItem_"
                 }
               }
             },
