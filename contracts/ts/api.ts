@@ -1377,8 +1377,22 @@ export interface operations {
     get_pipeline_api_pipeline_get: {
         parameters: {
             query?: {
+                source?: string | null;
                 status?: string | null;
+                remote?: string | null;
+                sponsorship?: string | null;
+                seniority?: string | null;
+                employmentType?: string | null;
+                industry?: string | null;
+                country?: string | null;
+                region?: string | null;
+                city?: string | null;
+                companySize?: string | null;
+                skills?: string | null;
                 minFit?: number | null;
+                maxFit?: number | null;
+                minSalary?: number | null;
+                staleDays?: number | null;
                 q?: string | null;
                 sortBy?: string;
                 page?: number;
