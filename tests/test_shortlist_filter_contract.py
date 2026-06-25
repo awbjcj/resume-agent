@@ -93,7 +93,7 @@ def row_from_wire(d: dict) -> ShortlistRow:
 def filter_state_from_wire(d: dict) -> FilterState:
     state = FilterState()
     for k, v in d.items():
-        attr = _STATE_CAMEL_TO_SNAKE.get(k, k)
+        attr: str = _STATE_CAMEL_TO_SNAKE[k] if k in _STATE_CAMEL_TO_SNAKE else k
         if k in _SET_KEYS:
             setattr(state, attr, set(v))
         else:

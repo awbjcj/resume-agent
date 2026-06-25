@@ -99,22 +99,30 @@ class _FakeResult:
         self.content = content
 
 
-def _bundle():
-    from resume_agent.discovery.fit import FitScore
-    from resume_agent.models.job import JobCriteriaExtract, SponsorshipSignal
-    from resume_agent.services.agents import DiscoveryBundle
+class _ExtractRunner:
+    def run(self, prompt: str):
+        from resume_agent.models.job import JobCriteriaExtract, SponsorshipSignal
 
-    extract = type("E", (), {
-        "run": lambda self, p: _FakeResult(JobCriteriaExtract.model_validate(dict(
+        return _FakeResult(JobCriteriaExtract.model_validate(dict(
             sponsorship_signal=SponsorshipSignal.offered, seniority=None,
             employment_type=None, tech_stack=[], industry=None, company_size=None,
             yoe_min=None, salary_range=None, remote_policy=None, location=None,
             must_have_skills=[], nice_to_have_skills=[],
         )))
-    })()
-    fit = type("F", (), {
-        "run": lambda self, p: _FakeResult(FitScore(score=77, rationale="ok"))
-    })()
+
+
+class _FitRunner:
+    def run(self, prompt: str):
+        from resume_agent.discovery.fit import FitScore
+
+        return _FakeResult(FitScore(score=77, rationale="ok"))
+
+
+def _bundle():
+    from resume_agent.services.agents import DiscoveryBundle
+
+    extract = _ExtractRunner()
+    fit = _FitRunner()
     return DiscoveryBundle(extract=extract, fit=fit, relevance=None, canonicalizer=None)
 
 

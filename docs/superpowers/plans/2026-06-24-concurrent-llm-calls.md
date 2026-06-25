@@ -16,10 +16,11 @@
 
 - **Leaf-only semaphore.** The `asyncio.Semaphore` is acquired solely in `acall(agent, prompt, *, sem)`. Orchestration coroutines (the per-job loop, the panel gather) never hold a permit while awaiting a child that needs one — that is what prevents the nested-fan-out deadlock. Do **not** move the semaphore into `gather_isolated`.
 - **Semaphore construction.** On Python 3.10+ `asyncio.Semaphore(n)` does **not** bind to a loop at construction; it binds lazily on first `async with`. So constructing it *before* `asyncio.run(...)` and using it inside is correct here.
+- **Validate semaphore size.** `Settings.llm_concurrency` must be `>= 1`; `0` would create a zero-permit semaphore and hang every `acall`. Retry count/delay must be `>= 0`.
 - **Pure LLM functions only inside the fan-out.** The async siblings (`aextract_job_criteria`, `ascore_fit`, `ajudge_relevance`, `areview_one`, `atailor`, `arevise`, `arun_tailor_review`) touch **no** `Session`. All DB mutation happens after the gather, serially, on the main thread.
 - **Error isolation semantics.** Discovery already skips a failed job (leaves it in its prior status for the next run); `gather_isolated` reproduces this. Tailor previously had *no* per-job isolation — a failure aborted the whole run and lost earlier work only if uncommitted. The new tailor path **improves** this: a failed job is skipped (left in `approved`), peers still persist. This is an intentional, documented behavior change on the *error* path; the *success* path produces identical DB state.
 - **Keep the sync siblings.** `score_fit`, `extract_job_criteria`, `judge_relevance`, `review_one`, `run_panel`, `tailor`, `revise`, `run_tailor_review` stay as-is (still call `agent.run`). Their unit tests stay green unchanged. Only the higher-level phase orchestrators switch to the async siblings.
-- **Fakes that flow into async paths need `arun`.** Confirmed sites: `tests/test_discovery_pipeline.py` (`_ExtractAgent`, `_FitAgent`, `_Judge`, `_ReextractAgent`), `tests/test_tailor_service.py` (`_ContentAgent`, `_FactCheck`), `tests/test_services_discovery.py` (`_bundle()` dynamic fakes). Add `async def arun(self, prompt): return self.run(prompt)` to each. The final task runs the full suite to catch any straggler.
+- **Fakes that flow into async paths need `arun`.** Confirmed sites: `tests/test_discovery_pipeline.py` (`_ExtractAgent`, `_FitAgent`, `_Judge`, `_ReextractAgent`, `_SicLocFitAgent`, `_OneBadExtractAgent`, `_RawStrExtractAgent`, `_OneBadFitAgent`), `tests/test_tailor_service.py` (`_ContentAgent`, `_FactCheck`), `tests/test_services_discovery.py` (`_bundle()` dynamic fakes). Add `async def arun(self, prompt): return self.run(prompt)` to each. The final task runs the full suite to catch any straggler.
 
 ---
 
@@ -34,6 +35,9 @@
 Create or append to `tests/test_config.py`:
 
 ```python
+import pytest
+
+
 def test_concurrency_settings_defaults(monkeypatch):
     for key in ("LLM_CONCURRENCY", "LLM_RETRIES", "LLM_RETRY_DELAY"):
         monkeypatch.delenv(key, raising=False)
@@ -43,28 +47,58 @@ def test_concurrency_settings_defaults(monkeypatch):
     assert s.llm_concurrency == 8
     assert s.llm_retries == 2
     assert s.llm_retry_delay == 1
+
+
+def test_concurrency_settings_reject_invalid_values(monkeypatch):
+    from pydantic import ValidationError
+
+    from resume_agent.config import Settings
+
+    for key in ("LLM_CONCURRENCY", "LLM_RETRIES", "LLM_RETRY_DELAY"):
+        monkeypatch.delenv(key, raising=False)
+
+    monkeypatch.setenv("LLM_CONCURRENCY", "0")
+    with pytest.raises(ValidationError):
+        Settings()
+
+    monkeypatch.setenv("LLM_CONCURRENCY", "1")
+    monkeypatch.setenv("LLM_RETRIES", "-1")
+    with pytest.raises(ValidationError):
+        Settings()
+
+    monkeypatch.setenv("LLM_RETRIES", "0")
+    monkeypatch.setenv("LLM_RETRY_DELAY", "-1")
+    with pytest.raises(ValidationError):
+        Settings()
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_config.py::test_concurrency_settings_defaults -v`
-Expected: FAIL — `AttributeError: 'Settings' object has no attribute 'llm_concurrency'`.
+Run: `.venv/Scripts/python.exe -m pytest tests/test_config.py -v`
+Expected: FAIL — `AttributeError: 'Settings' object has no attribute 'llm_concurrency'`
+or missing validation fields.
 
 - [ ] **Step 3: Add the fields**
 
-In `src/resume_agent/config.py`, after the `cors_origins` line inside `Settings`:
+In `src/resume_agent/config.py`, add the import:
+
+```python
+from pydantic import Field
+```
+
+Then, after the `cors_origins` line inside `Settings`:
 
 ```python
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
     # Concurrency + retry for LLM fan-out (discovery + tailor).
-    llm_concurrency: int = 8  # max in-flight LLM calls across all phases
-    llm_retries: int = 2  # agno per-agent retries (covers 429s; see CLAUDE.md note)
-    llm_retry_delay: int = 1  # agno delay_between_retries seconds, exponential
+    llm_concurrency: int = Field(default=8, ge=1)  # max in-flight LLM calls
+    llm_retries: int = Field(default=2, ge=0)  # agno per-agent retries
+    llm_retry_delay: int = Field(default=1, ge=0)  # agno delay seconds, exponential
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_config.py::test_concurrency_settings_defaults -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_config.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -606,7 +640,11 @@ git commit -m "feat: add async siblings for extract/score/relevance"
 
 - [ ] **Step 1: Add `arun` to the existing pipeline fakes**
 
-In `tests/test_discovery_pipeline.py`, add this method to each of `_ExtractAgent`, `_FitAgent`, `_Judge`, and `_ReextractAgent` (right after their `run` method):
+In `tests/test_discovery_pipeline.py`, add this method to every fake class that
+can flow into `run_extract`, `run_score`, or `run_relevance`: `_ExtractAgent`,
+`_FitAgent`, `_Judge`, `_ReextractAgent`, `_SicLocFitAgent`,
+`_OneBadExtractAgent`, `_RawStrExtractAgent`, and `_OneBadFitAgent` (right after
+their `run` method):
 
 ```python
     async def arun(self, prompt):
@@ -881,6 +919,43 @@ def test_arun_panel_runs_reviewers_concurrently_in_order():
 
     assert [c.reviewer for c in critiques] == ["a", "b", "c"]  # input order preserved
     assert elapsed < 0.12  # ~50ms concurrent vs ~150ms serial
+
+
+def test_arun_panel_settles_reviewers_before_raising():
+    import asyncio
+
+    import pytest
+
+    from resume_agent.tailor.panel import arun_panel
+
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="boom"), ReviewerSpec(name="slow")])
+    events: list[str] = []
+
+    class _Agent:
+        def __init__(self, name, *, fail=False):
+            self.name = name
+            self.fail = fail
+
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            events.append(f"{self.name}:start")
+            await asyncio.sleep(0.01 if self.fail else 0.05)
+            if self.fail:
+                events.append(f"{self.name}:raise")
+                raise RuntimeError("reviewer down")
+            events.append(f"{self.name}:done")
+            return _Result(ReviewCritique(reviewer=self.name, score=80, passed=True))
+
+    agents = {"boom": _Agent("boom", fail=True), "slow": _Agent("slow")}
+
+    async def go():
+        return await arun_panel(_content(), _facts(), "jd", config, agents, sem=asyncio.Semaphore(8))
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(go())
+    assert "slow:done" in events
 ```
 
 Append to `tests/test_tailor_workflow.py` (it already constructs `JobCriteria`, `ProfileFacts`, `ReviewConfig`, and a sync content/critique fake — reuse those imports; add an async fake):
@@ -933,7 +1008,7 @@ def test_arun_tailor_review_passes_with_async_agents():
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_panel.py::test_arun_panel_runs_reviewers_concurrently_in_order tests/test_tailor_workflow.py::test_arun_tailor_review_passes_with_async_agents -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_panel.py::test_arun_panel_runs_reviewers_concurrently_in_order tests/test_tailor_panel.py::test_arun_panel_settles_reviewers_before_raising tests/test_tailor_workflow.py::test_arun_tailor_review_passes_with_async_agents -v`
 Expected: FAIL — `arun_panel` / `arun_tailor_review` not defined.
 
 - [ ] **Step 3: Implement async tailor leaf calls**
@@ -1014,15 +1089,25 @@ async def arun_panel(
 ) -> list[ReviewCritique]:
     """Run configured reviewers concurrently; results in reviewer order.
 
-    A reviewer error propagates (no isolation here) so the job fails and is
+    Reviewer errors are re-raised only after all reviewers settle. There is no
+    reviewer-level isolation: one failed reviewer fails this job, which is then
     isolated at the job level in tailor_jobs.
     """
     inputs = _panel_inputs(content, profile_facts, jd_text, config)
-    return list(
-        await asyncio.gather(
-            *(areview_one(text, reviewer_agents[name], sem=sem) for name, text in inputs)
-        )
+    outputs = await asyncio.gather(
+        *(areview_one(text, reviewer_agents[name], sem=sem) for name, text in inputs),
+        return_exceptions=True,
     )
+    critiques: list[ReviewCritique] = []
+    first_error: BaseException | None = None
+    for output in outputs:
+        if isinstance(output, BaseException):
+            first_error = first_error or output
+        else:
+            critiques.append(output)
+    if first_error is not None:
+        raise first_error
+    return critiques
 ```
 
 - [ ] **Step 5: Implement the async workflow**
@@ -1219,12 +1304,41 @@ def test_tailor_jobs_isolates_a_failing_job():
         assert _require_id(bad_job.id) not in results  # failure isolated
         assert ok_job.status == JobStatus.tailored.value
         assert bad_job.status == JobStatus.approved.value  # left for retry
+
+
+def test_tailor_jobs_rejects_unpersisted_job_before_llm_work():
+    import pytest
+
+    config = ReviewConfig(
+        max_rounds=1,
+        score_threshold=50,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+
+    class _NoCall:
+        def run(self, prompt):
+            raise AssertionError("LLM should not be called")
+
+        async def arun(self, prompt):
+            raise AssertionError("LLM should not be called")
+
+    with _session() as s:
+        job = Job(
+            source="manual", jd_text="jd", status=JobStatus.approved.value,
+            criteria_json=JobCriteria().model_dump(mode="json"),
+        )
+        with pytest.raises(ValueError):
+            tailor_jobs(
+                s, [job], ProfileFacts(contact=Contact(name="Ada")), config,
+                tailor_agent=_NoCall(), reviewer_agents={"fact-check": _NoCall()},
+                reviser_agent=_NoCall(),
+            )
 ```
 
 - [ ] **Step 3: Run tests to verify they fail**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_service.py -k "concurrently or isolates" -v`
-Expected: FAIL — `_SlowContent.run`/`_Boom.run` raise `NotImplementedError` because `tailor_jobs` still calls `.run` serially (and the timing assertion fails).
+Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_service.py -k "concurrently or isolates or unpersisted" -v`
+Expected: FAIL — `_SlowContent.run`/`_Boom.run` raise `NotImplementedError` because `tailor_jobs` still calls `.run` serially (and the timing assertion fails). The unpersisted-job test documents the current guard and may already pass before the rewrite.
 
 - [ ] **Step 4: Rewrite the service**
 
@@ -1308,6 +1422,9 @@ def tailor_jobs(
     fails is skipped (left in its prior status for the next run) so it never aborts
     its peers. Progress steps as each job's LLM work completes.
     """
+    for job in targets:
+        if job.id is None:
+            raise ValueError("Cannot tailor a job that has not been persisted")
     if reporter:
         reporter.begin(len(targets), "Tailoring")
     results: dict[int, list[ResumeVersion]] = {}
@@ -1396,7 +1513,7 @@ def _bundle():
 - [ ] **Step 2: Run the full test suite**
 
 Run: `.venv/Scripts/python.exe -m pytest`
-Expected: PASS — all tests green. If any test fails because a fake it passes into discovery/tailor lacks `arun`, add `async def arun(self, prompt): return self.run(prompt)` to that fake and re-run. (Known candidates already handled: pipeline, tailor service, services discovery.)
+Expected: PASS — all tests green. If any test fails because a fake it passes into discovery/tailor lacks `arun`, add `async def arun(self, prompt): return self.run(prompt)` to that fake and re-run. (Known candidates already handled: all discovery pipeline fakes, tailor service fakes, and services discovery fakes.)
 
 - [ ] **Step 3: Lint**
 
@@ -1433,7 +1550,8 @@ with:
   signature and runs `asyncio.run(gather_isolated(...))` internally: load rows → fan out the pure
   async LLM siblings (`aextract_job_criteria`, `ascore_fit`, `ajudge_relevance`, `arun_tailor_review`)
   → apply to the Session + commit on the single event-loop thread (no locks). One global
-  `asyncio.Semaphore(Settings.llm_concurrency)` per `asyncio.run` caps in-flight calls; it is acquired
+  `asyncio.Semaphore(Settings.llm_concurrency)` per `asyncio.run` caps in-flight calls
+  (`llm_concurrency` is validated `>= 1`); it is acquired
   **only** inside `llm_runner.acall` (the leaf), so nested tailor fan-out (jobs × panel) can't deadlock.
   Retry/backoff is agno's per-agent config via `retry_kwargs()` (`exponential_backoff=True`); note it
   retries bare `Exception`, so a parse failure costs `llm_retries` extra calls — kept low (default 2).
@@ -1467,6 +1585,7 @@ git commit -m "docs: record concurrent LLM fan-out design"
 - asyncio + `arun`, contained behind sync signatures → Tasks 3, 6, 8 (asyncio.run inside `run_*`/`tailor_jobs`; note: contained at the pipeline/tailor layer that services call, equivalent to the spec's "service boundary").
 - Both tailor axes under one shared semaphore → Tasks 7 (arun_panel/arun_tailor_review) + 8 (one sem, nested).
 - Leaf-only semaphore / deadlock avoidance → Task 3 (`acall`) + design notes.
+- Reviewer-panel failures settle sibling calls before re-raising → Task 7.
 - agno backoff retry + bare-except caveat → Tasks 1, 3, 4 + docs Task 10.
 - New `concurrency.py` → Task 2.
 - Progress under concurrency (step on completion) → Tasks 6, 8 (`on_complete`).
@@ -1483,3 +1602,4 @@ git commit -m "docs: record concurrent LLM fan-out design"
 - Timing-based assertions (`elapsed < ...`) use 4–5× margins; if a loaded CI flakes, raise the bound — they prove "not serial," not exact latency.
 - Tailor error path now isolates per job (improvement over serial all-or-nothing); documented in Task 8 and CLAUDE.md.
 - `asyncio.run` is created per phase in discovery (3 loops/discover) — phases are sequential so a per-phase semaphore is equivalent to a shared one; only tailor needs one shared sem (its nesting is within a single phase).
+- `llm_concurrency` is validated as `>= 1`; a value of `0` would otherwise deadlock every leaf call waiting on the semaphore.
