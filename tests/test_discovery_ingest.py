@@ -3,7 +3,9 @@ from sqlmodel import Session, SQLModel, create_engine
 from resume_agent.discovery.ingest import IngestOutcome, add_job, save_or_upgrade
 from resume_agent.tracking.repository import (
     application_for_job,
+    archive_job,
     get_cover_letter,
+    jobs_by_status,
     resume_versions_for_job,
     save_cover_letter,
     save_resume_version,
@@ -271,3 +273,26 @@ def test_keyless_near_duplicate_collapses_via_fingerprint():
         assert first is not None
         assert second is None  # deduped by fingerprint, not inserted
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
+
+
+def test_archived_duplicate_does_not_block_new_active_job():
+    with _session() as s:
+        archived = add_job(
+            s,
+            source="manual",
+            url="https://jobs.example/1",
+            jd_text="Build great systems",
+        )
+        assert archived is not None and archived.id is not None
+        archive_job(s, archived.id)
+
+        active = add_job(
+            s,
+            source="manual",
+            url="https://jobs.example/1",
+            jd_text="Build  great systems",
+        )
+
+        assert active is not None
+        assert active.id != archived.id
+        assert [j.id for j in jobs_by_status(s, JobStatus.raw.value)] == [active.id]
