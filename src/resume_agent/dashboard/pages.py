@@ -35,6 +35,8 @@ from resume_agent.dashboard.ui import (
 )
 from resume_agent.progress import PROGRESS_ROOT, is_displayable, read_all
 from resume_agent.profile.store import load_facts
+from resume_agent.services import board
+from resume_agent.services.prune import prune
 from resume_agent.tracking.analytics import fit_band_stats, source_stats
 from resume_agent.tracking.match_gap import MatchGapReport, match_gap, normalize_skill
 from resume_agent.tracking.prune_config import load_prune_config
@@ -46,19 +48,7 @@ from resume_agent.tracking.queries import (
     shortlist_rows,
     triage_rows,
 )
-from resume_agent.tracking.repository import (
-    application_for_job,
-    archive_job,
-    delete_job,
-    get_job,
-    prune_preview,
-    prune_run,
-    restore_job,
-    save_application,
-    save_job,
-    update_application_status,
-)
-from resume_agent.tracking.tables import Application, ApplicationStatus, JobStatus
+from resume_agent.tracking.tables import ApplicationStatus, JobStatus
 
 _STATUS_ORDER = [s.value for s in JobStatus]
 _FACTS_PATH = "data/profile/facts.json"
@@ -736,38 +726,53 @@ def _confirm_delete(session, job_ids: list[int]) -> None:
     st.write(f"Delete {len(job_ids)} job(s)? This cannot be undone.")
     if st.button("Confirm delete", key="confirm_delete"):
         for jid in job_ids:
-            delete_job(session, jid)
+            board.delete(session, jid)
         _clear_checkboxes(job_ids)
         st.rerun()
 
 
 def _render_prune_panel(session) -> None:
-    config = load_prune_config(_PRUNE_CONFIG_PATH)
+    config = load_prune_config(_PRUNE_CONFIG_PATH)  # defaults for the widgets only
     with st.expander("Prune (archive junk, expire old)"):
         c1, c2, c3 = st.columns(3)
         fit = c1.number_input("Fit below", 0, 100, config.fit_threshold, key="prune_fit")
         stale = c2.number_input("Stale days", 0, 3650, config.stale_days, key="prune_stale")
         retain = c3.number_input("Retention days", 0, 3650, config.retention_days, key="prune_retain")
-        run_config = config.model_copy(
-            update={"fit_threshold": fit, "stale_days": stale, "retention_days": retain}
+        preview = prune(
+            session,
+            dry_run=True,
+            fit_threshold=fit,
+            stale_days=stale,
+            retention_days=retain,
         )
-        preview = prune_preview(session, run_config)
         st.caption(
             f"{preview.rejected} rejected · {preview.low_fit} low-fit · {preview.stale} stale "
             f"→ {preview.archived} archive · {preview.expired} expire · "
             f"{preview.skipped} skipped (have progress)"
         )
         if st.button("Prune now", key="prune_now"):
-            _confirm_prune(session, run_config)
+            _confirm_prune(session, fit, stale, retain)
 
 
 @st.dialog("Run prune")
-def _confirm_prune(session, run_config) -> None:
-    report = prune_preview(session, run_config)
+def _confirm_prune(session, fit: int, stale: int, retain: int) -> None:
+    report = prune(
+        session,
+        dry_run=True,
+        fit_threshold=fit,
+        stale_days=stale,
+        retention_days=retain,
+    )
     st.write(
         f"Archive {report.archived} job(s) and permanently delete {report.expired} "
         "expired archived job(s)? Expiry cannot be undone."
     )
     if st.button("Confirm prune", key="confirm_prune"):
-        prune_run(session, run_config)
+        prune(
+            session,
+            dry_run=False,
+            fit_threshold=fit,
+            stale_days=stale,
+            retention_days=retain,
+        )
         st.rerun()
