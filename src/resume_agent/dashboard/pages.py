@@ -81,10 +81,6 @@ def render_progress_strip(root=PROGRESS_ROOT) -> None:
     _progress_fragment(root)
 
 
-def _new_application(job_id: int, status: str, notes: str) -> Application:
-    return Application(job_id=job_id, status=status, notes=notes or None)
-
-
 def analytics_table_rows(session, by: str = "source") -> list[dict]:
     stats = source_stats(session) if by == "source" else fit_band_stats(session)
     header = "Source" if by == "source" else "Fit band"
@@ -301,13 +297,10 @@ def render_shortlist_page(session) -> None:
                 # width and (via CSS margin-top:auto) sits flush at the bottom of
                 # every equal-height card — aligning across the row.
                 if st.button("Approve for tailoring  →", key=f"approve-{row.job_id}"):
-                    job = get_job(session, row.job_id)
-                    if job is None:
+                    if board.set_stage(session, row.job_id, JobStatus.approved.value) is None:
                         st.error(f"Job #{row.job_id} no longer exists.")
                         st.rerun()
                         return
-                    job.status = JobStatus.approved.value
-                    save_job(session, job)
                     st.success(f"Approved {row.title or 'job'} #{row.job_id}.")
                     st.rerun()
 
@@ -415,14 +408,9 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
             )
         with save_col:
             if st.button("Save", key=f"save-{row.job_id}"):
-                application = application_for_job(session, row.job_id)
-                if application is None:
-                    save_application(session, _new_application(row.job_id, new_status, notes))
-                elif application.id is None:
-                    st.error("Cannot update an application that has not been persisted.")
-                    return
-                else:
-                    update_application_status(session, application.id, new_status, notes or None)
+                board.upsert_application(
+                    session, row.job_id, status=new_status, notes=notes or None
+                )
                 # No st.rerun() here: an immediate rerun restarts the script and
                 # discards this message, so the click appears to do nothing. The
                 # selectbox keeps its value via widget state, so a rerun is needless.
@@ -440,14 +428,11 @@ def _render_pipeline_card(session, row: PipelineRow) -> None:
             )
         with set_col:
             if st.button("Set stage", key=f"setstage-{row.job_id}"):
-                job = get_job(session, row.job_id)
-                if job is not None:
-                    job.status = new_stage
-                    save_job(session, job)
+                if board.set_stage(session, row.job_id, new_stage) is not None:
                     st.rerun()
         with arch_col:
             if st.button("Archive", key=f"arch-{row.job_id}"):
-                archive_job(session, row.job_id)
+                board.set_archived(session, row.job_id, True)
                 st.session_state[_UNDO_KEY] = [row.job_id]
                 st.rerun()
         with del_col:
@@ -650,7 +635,7 @@ def _render_archive_undo(session) -> None:
     msg.success(f"Archived {len(last_archived)} job(s).")
     if action.button("Undo archive", key="triage_undo_archive"):
         for jid in last_archived:
-            restore_job(session, jid)
+            board.set_archived(session, jid, False)
         st.session_state[_UNDO_KEY] = []
         _clear_checkboxes(last_archived)
         st.rerun()
@@ -705,14 +690,14 @@ def _render_action_bar(session, selected, deletable_ids, show_archived) -> None:
         if show_archived:
             if cols[0].button("Restore selected", key="triage_restore", disabled=not selected):
                 for jid in selected:
-                    restore_job(session, jid)
+                    board.set_archived(session, jid, False)
                 _clear_checkboxes(selected)
                 st.rerun()
             return
         if cols[0].button("Archive selected", key="triage_archive", disabled=not selected):
             archived = sorted(selected)
             for jid in archived:
-                archive_job(session, jid)
+                board.set_archived(session, jid, True)
             st.session_state[_UNDO_KEY] = archived
             _clear_checkboxes(archived)
             st.rerun()
