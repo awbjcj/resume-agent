@@ -69,3 +69,67 @@ def test_build_model_deepseek_branch():
     model = build_model("deepseek:deepseek-chat", api_key="sk-test")
     assert isinstance(model, DeepSeek)
     assert model.id == "deepseek-chat"
+
+
+def test_agent_runner_arun_delegates():
+    import asyncio
+
+    from resume_agent.llm_runner import AgentRunner
+
+    class _AsyncAgent:
+        async def arun(self, prompt):
+            return f"got {prompt}"
+
+    out = asyncio.run(AgentRunner(_AsyncAgent()).arun("hi"))
+    assert out == "got hi"
+
+
+def test_acall_respects_semaphore_limit():
+    import asyncio
+
+    from resume_agent.concurrency import gather_isolated
+    from resume_agent.llm_runner import acall
+
+    state = {"now": 0, "max": 0}
+
+    class _Result:
+        def __init__(self, content):
+            self.content = content
+
+    class _Agent:
+        def run(self, prompt):
+            return _Result(prompt)
+
+        async def arun(self, prompt):
+            state["now"] += 1
+            state["max"] = max(state["max"], state["now"])
+            await asyncio.sleep(0.02)
+            state["now"] -= 1
+            return _Result(prompt)
+
+    async def go():
+        sem = asyncio.Semaphore(2)
+        return await gather_isolated(
+            range(6), lambda i: acall(_Agent(), str(i), sem=sem)
+        )
+
+    results = asyncio.run(go())
+    assert state["max"] <= 2
+    assert all(r.ok for r in results)
+
+
+def test_retry_kwargs_reads_settings(monkeypatch):
+    monkeypatch.setenv("LLM_RETRIES", "5")
+    monkeypatch.setenv("LLM_RETRY_DELAY", "3")
+    from resume_agent.config import get_settings
+    from resume_agent.llm_runner import retry_kwargs
+
+    get_settings.cache_clear()
+    try:
+        assert retry_kwargs() == {
+            "retries": 5,
+            "delay_between_retries": 3,
+            "exponential_backoff": True,
+        }
+    finally:
+        get_settings.cache_clear()
