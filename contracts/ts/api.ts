@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Jobs */
+        post: operations["bulk_jobs_api_jobs_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/from-url": {
         parameters: {
             query?: never;
@@ -448,6 +465,135 @@ export interface components {
             notes?: string | null;
             /** Status */
             status: string;
+        };
+        /** BoardPage[PipelineItem] */
+        BoardPage_PipelineItem_: {
+            /** Data */
+            data: components["schemas"]["PipelineItem"][];
+            /** Facets */
+            facets: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            pagination: components["schemas"]["Pagination"];
+            /** Total */
+            total: number;
+        };
+        /** BoardPage[ShortlistItem] */
+        BoardPage_ShortlistItem_: {
+            /** Data */
+            data: components["schemas"]["ShortlistItem"][];
+            /** Facets */
+            facets: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            pagination: components["schemas"]["Pagination"];
+            /** Total */
+            total: number;
+        };
+        /** BoardPage[TriageItem] */
+        BoardPage_TriageItem_: {
+            /** Data */
+            data: components["schemas"]["TriageItem"][];
+            /** Facets */
+            facets: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            pagination: components["schemas"]["Pagination"];
+            /** Total */
+            total: number;
+        };
+        /** BulkRequest */
+        BulkRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "archive" | "restore" | "delete" | "approve" | "setStatus";
+            /**
+             * Archived
+             * @default false
+             */
+            archived: boolean;
+            /**
+             * Board
+             * @enum {string}
+             */
+            board: "shortlist" | "triage" | "pipeline";
+            /** City */
+            city?: string[];
+            /** Companysize */
+            companySize?: string[];
+            /** Country */
+            country?: string[];
+            /**
+             * Dryrun
+             * @default true
+             */
+            dryRun: boolean;
+            /** Employmenttype */
+            employmentType?: string[];
+            /** Ids */
+            ids?: number[];
+            /** Industry */
+            industry?: string[];
+            /** Maxfit */
+            maxFit?: number | null;
+            /** Minfit */
+            minFit?: number | null;
+            /** Minsalary */
+            minSalary?: number | null;
+            /**
+             * Preset
+             * @default balanced
+             */
+            preset: string;
+            /** Q */
+            q?: string | null;
+            /** Region */
+            region?: string[];
+            /** Remote */
+            remote?: string[];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "ids" | "query";
+            /** Seniority */
+            seniority?: string[];
+            /** Skills */
+            skills?: string[];
+            /**
+             * Sortby
+             * @default fit
+             */
+            sortBy: string;
+            /** Source */
+            source?: string[];
+            /** Sponsorship */
+            sponsorship?: string[];
+            /** Staledays */
+            staleDays?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Statusin */
+            statusIn?: string[];
+        };
+        /** BulkResultOut */
+        BulkResultOut: {
+            /** Affected */
+            affected: number;
+            /** Reasons */
+            reasons: {
+                [key: string]: number;
+            };
+            /** Skipped */
+            skipped: number;
         };
         /** CohortOut */
         CohortOut: {
@@ -994,6 +1140,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_jobs_api_jobs_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResultOut"];
                 };
             };
             /** @description Validation Error */

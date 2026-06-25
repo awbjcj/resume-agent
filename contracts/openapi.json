@@ -211,6 +211,356 @@
         "title": "ApplicationUpsert",
         "type": "object"
       },
+      "BoardPage_PipelineItem_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineItem"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "facets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Facets",
+            "type": "object"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "pagination",
+          "facets",
+          "total"
+        ],
+        "title": "BoardPage[PipelineItem]",
+        "type": "object"
+      },
+      "BoardPage_ShortlistItem_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ShortlistItem"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "facets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Facets",
+            "type": "object"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "pagination",
+          "facets",
+          "total"
+        ],
+        "title": "BoardPage[ShortlistItem]",
+        "type": "object"
+      },
+      "BoardPage_TriageItem_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TriageItem"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "facets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Facets",
+            "type": "object"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "pagination",
+          "facets",
+          "total"
+        ],
+        "title": "BoardPage[TriageItem]",
+        "type": "object"
+      },
+      "BulkRequest": {
+        "properties": {
+          "action": {
+            "enum": [
+              "archive",
+              "restore",
+              "delete",
+              "approve",
+              "setStatus"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "archived": {
+            "default": false,
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "board": {
+            "enum": [
+              "shortlist",
+              "triage",
+              "pipeline"
+            ],
+            "title": "Board",
+            "type": "string"
+          },
+          "city": {
+            "items": {
+              "type": "string"
+            },
+            "title": "City",
+            "type": "array"
+          },
+          "companySize": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Companysize",
+            "type": "array"
+          },
+          "country": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Country",
+            "type": "array"
+          },
+          "dryRun": {
+            "default": true,
+            "title": "Dryrun",
+            "type": "boolean"
+          },
+          "employmentType": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Employmenttype",
+            "type": "array"
+          },
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ids",
+            "type": "array"
+          },
+          "industry": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Industry",
+            "type": "array"
+          },
+          "maxFit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxfit"
+          },
+          "minFit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minfit"
+          },
+          "minSalary": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minsalary"
+          },
+          "preset": {
+            "default": "balanced",
+            "title": "Preset",
+            "type": "string"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q"
+          },
+          "region": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Region",
+            "type": "array"
+          },
+          "remote": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Remote",
+            "type": "array"
+          },
+          "scope": {
+            "enum": [
+              "ids",
+              "query"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "seniority": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Seniority",
+            "type": "array"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skills",
+            "type": "array"
+          },
+          "sortBy": {
+            "default": "fit",
+            "title": "Sortby",
+            "type": "string"
+          },
+          "source": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "array"
+          },
+          "sponsorship": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sponsorship",
+            "type": "array"
+          },
+          "staleDays": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Staledays"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "statusIn": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Statusin",
+            "type": "array"
+          }
+        },
+        "required": [
+          "board",
+          "action",
+          "scope"
+        ],
+        "title": "BulkRequest",
+        "type": "object"
+      },
+      "BulkResultOut": {
+        "properties": {
+          "affected": {
+            "title": "Affected",
+            "type": "integer"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Reasons",
+            "type": "object"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "affected",
+          "skipped",
+          "reasons"
+        ],
+        "title": "BulkResultOut",
+        "type": "object"
+      },
       "CohortOut": {
         "properties": {
           "applications": {
@@ -1945,6 +2295,62 @@
           }
         },
         "summary": "Create Manual Job"
+      }
+    },
+    "/api/jobs/bulk": {
+      "post": {
+        "operationId": "bulk_jobs_api_jobs_bulk_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Jobs"
       }
     },
     "/api/jobs/from-url": {
