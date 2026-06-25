@@ -56,9 +56,8 @@ function CommandGroup({ className, ...props }: React.ComponentProps<"div">) {
 function CommandItem({
   className,
   onSelect,
-  value: _value,
   ...props
-}: Omit<React.ComponentProps<"button">, "value"> & {
+}: Omit<React.ComponentProps<"button">, "onSelect"> & {
   value?: string;
   onSelect?: () => void;
 }) {

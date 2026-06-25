@@ -7,6 +7,11 @@ type PopoverContextValue = {
   setOpen: (open: boolean) => void;
 };
 
+type PopoverTriggerElementProps = {
+  onClick?: React.MouseEventHandler<HTMLElement>;
+  "aria-expanded"?: boolean;
+};
+
 const PopoverContext = React.createContext<PopoverContextValue | null>(null);
 
 function Popover({ children }: { children: React.ReactNode }) {
@@ -18,16 +23,16 @@ function PopoverTrigger({
   render,
   children,
 }: {
-  render?: React.ReactElement<{ onClick?: React.MouseEventHandler; "aria-expanded"?: boolean }>;
+  render?: React.ReactElement<PopoverTriggerElementProps>;
   children?: React.ReactNode;
 }) {
   const ctx = React.useContext(PopoverContext);
   if (!ctx) return null;
   const trigger = render ?? <button type="button">{children}</button>;
-  if (!React.isValidElement(trigger)) return null;
+  if (!React.isValidElement<PopoverTriggerElementProps>(trigger)) return null;
   return React.cloneElement(trigger, {
     "aria-expanded": ctx.open,
-    onClick: (event: React.MouseEvent) => {
+    onClick: (event: React.MouseEvent<HTMLElement>) => {
       trigger.props.onClick?.(event);
       if (!event.defaultPrevented) ctx.setOpen(!ctx.open);
     },
@@ -35,7 +40,7 @@ function PopoverTrigger({
 }
 
 function PopoverContent({
-  align: _align,
+  align = "start",
   className,
   ...props
 }: React.ComponentProps<"div"> & { align?: "start" | "center" | "end" }) {
@@ -46,6 +51,8 @@ function PopoverContent({
       data-slot="popover-content"
       className={cn(
         "z-50 mt-2 rounded-lg border bg-popover text-popover-foreground shadow-md outline-none",
+        align === "center" && "mx-auto",
+        align === "end" && "ml-auto",
         className,
       )}
       {...props}
