@@ -2,7 +2,8 @@ from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_agent.tracking.repository import save_application
+from resume_agent.tracking.tables import Application, Job, JobStatus, ResumeVersion
 
 
 def _client():
@@ -13,17 +14,27 @@ def test_job_detail_includes_versions_and_application():
     client = _client()
     with client:
         with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
-            job = Job(source="manual", jd_text="hello", status=JobStatus.tailored.value)
+            job = Job(
+                source="manual",
+                jd_text="hello",
+                status=JobStatus.tailored.value,
+                criteria_json={"remote_policy": "remote"},
+            )
             s.add(job)
             s.commit()
             s.refresh(job)
             assert job.id is not None
             s.add(ResumeVersion(job_id=job.id, round=0, review_score=88))
+            save_application(s, Application(job_id=job.id, status="submitted", notes="ref"))
             s.commit()
             jid = job.id
         body = client.get(f"/api/jobs/{jid}").json()
     assert body["id"] == jid
     assert body["jdText"] == "hello"
+    assert body["remotePolicy"] == "remote"
+    assert body["hasProgress"] is True
+    assert body["application"]["status"] == "submitted"
+    assert body["application"]["notes"] == "ref"
     assert body["resumeVersions"][0]["reviewScore"] == 88
 
 
