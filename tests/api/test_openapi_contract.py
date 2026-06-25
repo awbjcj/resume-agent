@@ -10,7 +10,8 @@ def test_openapi_exposes_core_paths():
     spec = create_app(db_url="sqlite://").openapi()
     paths = spec["paths"]
     for p in ("/api/shortlist", "/api/pipeline", "/api/triage", "/api/jobs/{job_id}",
-              "/api/discover", "/api/runs/{run_id}", "/api/runs/{run_id}/events"):
+              "/api/discover", "/api/reprocess", "/api/refresh",
+              "/api/runs/{run_id}", "/api/runs/{run_id}/events"):
         assert p in paths, f"missing {p}"
 
 
