@@ -14,6 +14,9 @@ class _FakeAgent:
     def run(self, prompt):
         return _FakeResult(self._content)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 class _FakeGitHub:
     def fetch_profile(self, username):

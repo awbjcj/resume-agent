@@ -28,6 +28,9 @@ class _Agent:
         self.received = prompt
         return _Result(self._content)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def _facts():
     return ProfileFacts(contact=Contact(name="Ada Lovelace"))

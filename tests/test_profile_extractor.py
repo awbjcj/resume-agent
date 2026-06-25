@@ -20,6 +20,9 @@ class _FakeAgent:
         self.received = prompt
         return _FakeResult(self._content)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_extract_returns_profilefacts_and_passes_text():
     facts = ProfileFacts(contact=Contact(name="Ada"))

@@ -18,6 +18,9 @@ class _ContentAgent:
     def run(self, prompt):
         return _Result(ResumeContent(contact=Contact(name="Ada")))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 class _FactCheck:
     """Fails the first round, passes afterward (simulating a fix after revise)."""
@@ -31,6 +34,9 @@ class _FactCheck:
         issues = [] if passed else [ReviewIssue(severity=Severity.blocking, message="unsupported claim")]
         return _Result(ReviewCritique(reviewer="fact-check", score=100 if passed else 0, passed=passed, issues=issues))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 class _Good:
     def __init__(self, name):
@@ -38,6 +44,9 @@ class _Good:
 
     def run(self, prompt):
         return _Result(ReviewCritique(reviewer=self.name, score=95, passed=True))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
 
 
 def test_loop_revises_until_gate_passes():
@@ -77,6 +86,9 @@ def test_loop_stops_at_max_rounds_when_never_passing():
     class _AlwaysFail:
         def run(self, prompt):
             return _Result(ReviewCritique(reviewer="fact-check", score=0, passed=False))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
 
     rounds = run_tailor_review(
         jd_text="x",
@@ -120,9 +132,15 @@ def test_broken_provenance_short_circuits_panel():
                 )
             )
 
+        async def arun(self, prompt):
+            return self.run(prompt)
+
     class _ExplodingReviewer:
         def run(self, prompt):
             raise AssertionError("panel should be skipped when provenance is broken")
+
+        async def arun(self, prompt):
+            return self.run(prompt)
 
     config = ReviewConfig(
         max_rounds=1,

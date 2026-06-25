@@ -110,12 +110,18 @@ class _ExtractRunner:
             must_have_skills=[], nice_to_have_skills=[],
         )))
 
+    async def arun(self, prompt: str):
+        return self.run(prompt)
+
 
 class _FitRunner:
     def run(self, prompt: str):
         from resume_agent.discovery.fit import FitScore
 
         return _FakeResult(FitScore(score=77, rationale="ok"))
+
+    async def arun(self, prompt: str):
+        return self.run(prompt)
 
 
 def _bundle():

@@ -31,4 +31,7 @@ def test_llm_fallback_used_only_when_rules_inconclusive():
         def run(self, prompt):
             return _Result()
 
+        async def arun(self, prompt):
+            return self.run(prompt)
+
     assert classify_email(_email("Re: your application"), llm=_LLM()) == "interview"

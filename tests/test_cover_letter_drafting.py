@@ -22,6 +22,9 @@ class _FakeAgent:
         self.prompt = prompt
         return _Result(self._content)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def _facts():
     return ProfileFacts(

@@ -27,6 +27,9 @@ class _FakeRunner:
     def run(self, prompt):
         return _FakeResult(SkillClusters(clusters=self._clusters))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_canonicalizer_collapses_synonyms_with_a_fake_agent():
     canon = build_skill_canonicalizer(agent=_FakeRunner([["kubernetes", "k8s"]]))

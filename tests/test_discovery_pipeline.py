@@ -60,10 +60,16 @@ class _ExtractAgent:
             return _Result(_extract(sponsorship_signal=SponsorshipSignal.denied))
         return _Result(_extract(sponsorship_signal=SponsorshipSignal.offered))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 class _FitAgent:
     def run(self, prompt):
         return _Result(FitScore(score=90, rationale="great fit"))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
 
 
 class _Judge:
@@ -74,6 +80,9 @@ class _Judge:
         reason = "ok" if keep else "off-target"
         return _Result(RelevanceVerdict(keep=keep, reason=reason))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 class _ReextractAgent:
     def __init__(self, content):
@@ -83,6 +92,9 @@ class _ReextractAgent:
     def run(self, prompt):
         self.prompts.append(prompt)
         return _Result(self._content)
+
+    async def arun(self, prompt):
+        return self.run(prompt)
 
 
 def test_run_relevance_rejects_offtarget_keeps_match():
@@ -134,6 +146,9 @@ def test_run_relevance_keeps_job_on_agent_error():
     class _Boom:
         def run(self, prompt):
             raise RuntimeError("api down")
+
+        async def arun(self, prompt):
+            return self.run(prompt)
 
     cfg = SearchConfig(target_role="AI roles")
     with _session() as s:
@@ -228,6 +243,9 @@ class _SicLocFitAgent:
             )
         )
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_run_score_writes_sic_and_location_into_criteria(tmp_path):
     facts = ProfileFacts(contact=Contact(name="Ada"))
@@ -283,6 +301,9 @@ class _OneBadExtractAgent:
             raise json.JSONDecodeError("Expecting ',' delimiter", prompt, 0)
         return _Result(_extract(sponsorship_signal=SponsorshipSignal.offered))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 class _RawStrExtractAgent:
     """Returns a raw str for the 'boom' JD, tripping the isinstance type guard."""
@@ -292,6 +313,9 @@ class _RawStrExtractAgent:
             return _Result("sorry, here is some prose instead of JSON")
         return _Result(_extract(sponsorship_signal=SponsorshipSignal.offered))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 class _OneBadFitAgent:
     """Raises a JSON parse error scoring the 'boom' JD, succeeds otherwise."""
@@ -300,6 +324,9 @@ class _OneBadFitAgent:
         if "boom" in prompt:
             raise json.JSONDecodeError("Expecting ',' delimiter", prompt, 0)
         return _Result(FitScore(score=90, rationale="great fit"))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
 
 
 def test_run_extract_skips_failed_job_and_persists_the_rest():

@@ -25,6 +25,9 @@ class _FakeAgent:
     def run(self, prompt):
         return _FakeResult(self._content)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_compose_includes_profile_and_jd():
     facts = ProfileFacts(contact=Contact(name="Ada Lovelace"))

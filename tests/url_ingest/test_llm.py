@@ -25,6 +25,9 @@ class _FakeAgent:
     def run(self, prompt):
         return _Result(ExtractedJob(title="Eng", company="Initech", jd_text="Do work."))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_extract_fields_returns_schema():
     job = extract_fields("page text", _FakeAgent())
@@ -36,6 +39,9 @@ def test_extract_fields_returns_schema():
 class _BadAgent:
     def run(self, prompt):
         return _Result("not a schema")
+
+    async def arun(self, prompt):
+        return self.run(prompt)
 
 
 def test_extract_fields_rejects_wrong_type():

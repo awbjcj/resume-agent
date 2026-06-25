@@ -14,6 +14,9 @@ class _Agent:
     def run(self, prompt):
         raise AssertionError("LLM should not run for known domains")
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_greenhouse_url_uses_parser(monkeypatch):
     html = (
@@ -59,6 +62,9 @@ def test_unknown_site_uses_llm(monkeypatch):
                 content = ExtractedJob(title="Lead", company="Acme", jd_text="Lead the team.")
             return _R()
 
+        async def arun(self, prompt):
+            return self.run(prompt)
+
     job = service.job_from_url("https://acme.test/job", agent=_LLM())
 
     assert job is not None
@@ -88,6 +94,9 @@ def test_recognized_ats_without_a_reader_falls_back_to_llm(monkeypatch):
             class _R:
                 content = ExtractedJob(title="Eng", company="Acme", jd_text="real jd")
             return _R()
+
+        async def arun(self, prompt):
+            return self.run(prompt)
 
     job = service.job_from_url("https://jobs.lever.co/acme/abc-123", agent=_LLM())
 
@@ -120,6 +129,9 @@ def test_spoof_host_does_not_route_to_known_parser(monkeypatch):
             class _R:
                 content = ExtractedJob(title="X", company="Y", jd_text="real jd")
             return _R()
+
+        async def arun(self, prompt):
+            return self.run(prompt)
 
     job = service.job_from_url("https://notlinkedin.com.evil.io/job", agent=_LLM())
 

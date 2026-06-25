@@ -19,10 +19,16 @@ class _ContentAgent:
     def run(self, prompt):
         return _Result(ResumeContent(contact=Contact(name="Ada")))
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 class _FactCheck:
     def run(self, prompt):
         return _Result(ReviewCritique(reviewer="fact-check", score=100, passed=True))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
 
 
 def _session() -> Session:

@@ -29,6 +29,9 @@ class _FakeAgent:
         self.received = prompt
         return _FakeResult(self._content)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def _extract(**overrides):
     base = dict(

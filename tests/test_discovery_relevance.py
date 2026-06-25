@@ -19,6 +19,9 @@ class _Agent:
     def run(self, prompt):
         return _Result(self._verdict)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_compose_input_includes_role_title_and_truncated_snippet():
     text = compose_relevance_input("AI roles", "CDL Driver", "x" * 1000)

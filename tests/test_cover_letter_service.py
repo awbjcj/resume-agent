@@ -40,6 +40,9 @@ class _Agent:
     def run(self, prompt):
         return _Result(self._content)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def test_generate_revises_until_provenance_clean_then_persists():
     draft_agent = _Agent(_letter("GHOST"))
