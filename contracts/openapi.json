@@ -159,6 +159,17 @@
       },
       "ApplicationOut": {
         "properties": {
+          "coverLetterId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverletterid"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -177,6 +188,17 @@
               }
             ],
             "title": "Notes"
+          },
+          "resumeVersionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumeversionid"
           },
           "status": {
             "title": "Status",
