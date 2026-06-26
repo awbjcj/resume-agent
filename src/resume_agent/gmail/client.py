@@ -15,6 +15,7 @@ class EmailMessage:
     subject: str
     snippet: str
     thread_id: str | None = None
+    message_id: str | None = None
 
 
 def build_gmail_service(credentials_path: str = CREDENTIALS_PATH, token_path: str = TOKEN_PATH):
@@ -73,6 +74,7 @@ def fetch_recent_messages(service, max_results: int = 50) -> list[EmailMessage]:
                 subject=_header(headers, "Subject"),
                 snippet=msg.get("snippet", ""),
                 thread_id=msg.get("threadId"),
+                message_id=ref["id"],
             )
         )
     return messages

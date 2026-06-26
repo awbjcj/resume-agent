@@ -20,6 +20,7 @@ class Proposal:
     current_status: str
     proposed_status: str
     evidence: str
+    message_id: str
 
 
 def _is_forward(current: str, proposed: str) -> bool:
@@ -54,6 +55,13 @@ def propose_transitions(emails, pairs: list[tuple[Application, Job]], classify) 
             continue
         proposed_app_ids.add(app.id)
         proposals.append(
-            Proposal(app.id, f"{job.company} - {job.title}", app.status, proposed, email.subject)
+            Proposal(
+                app.id,
+                f"{job.company} - {job.title}",
+                app.status,
+                proposed,
+                email.subject,
+                email.message_id or "",
+            )
         )
     return proposals
