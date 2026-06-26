@@ -5,9 +5,8 @@ import typst
 from sqlmodel import Session
 
 from resume_agent.models.cover_letter import CoverLetterContent
-from resume_agent.render.renderer import output_filename
+from resume_agent.render.export import cover_letter_pdf_name, export_job_artifacts, job_dir
 from resume_agent.tracking.repository import get_cover_letter, get_job, save_cover_letter
-from resume_agent.tracking.tables import utcnow
 
 TEMPLATE = "templates/cover_letter.typ"
 RenderFn = Callable[[CoverLetterContent, str | Path, str | Path], Path]
@@ -42,15 +41,14 @@ def render_cover_letter(
         return None
     job = get_job(session, cover.job_id)
     content = CoverLetterContent.model_validate(cover.content_json or {})
-    company = (job.company if job else None) or "company"
-    title = (job.title if job else None) or "role"
-    filename = output_filename(
-        company, title, utcnow().strftime("%Y%m%d"), f"cl{cover.id or cover_letter_id}"
-    )
-    out_path = Path(output_dir) / filename
+    out_dir = job_dir(output_dir, job) if job is not None else Path(output_dir)
+    out_path = out_dir / cover_letter_pdf_name(cover)
 
     render_fn(content, out_path, template_path)
 
     cover.pdf_path = str(out_path)
     save_cover_letter(session, cover)
+    if job is not None:
+        assert job.id is not None
+        export_job_artifacts(session, job.id, base=output_dir)
     return out_path

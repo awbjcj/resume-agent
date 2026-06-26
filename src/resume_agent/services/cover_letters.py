@@ -10,6 +10,7 @@ from resume_agent.cover_letter.render import render_cover_letter
 from resume_agent.cover_letter.service import generate_cover_letter
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
+from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.agents import build_cover_letter_bundle
 from resume_agent.services.tailoring import resolve_targets
 
@@ -48,6 +49,7 @@ def write_cover_letters(
             raise RuntimeError("Cover letter was not persisted")
         assert job.id is not None
         path = render_cover_letter(session, cover.id)
+        export_job_artifacts(session, job.id)
         results.append(
             CoverLetterResult(
                 job_id=job.id, cover_letter_id=cover.id,

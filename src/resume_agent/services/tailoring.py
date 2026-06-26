@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
+from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.agents import TailorBundle, build_tailor_bundle  # noqa: F401  (TailorBundle re-exported for callers/tests)
 from resume_agent.tailor.review_config import load_review_config
 from resume_agent.tailor.service import tailor_jobs
@@ -42,7 +43,10 @@ def tailor(
     facts = load_facts(facts_path)
     style_guide = load_style_guide(config.style_guide_path)
     bundle = build_tailor_bundle(config, style_guide=style_guide)
-    return tailor_jobs(
+    results = tailor_jobs(
         session, targets, facts, config,
         bundle.tailor, bundle.reviewers, bundle.reviser, reporter=reporter,
     )
+    for job_id in results:
+        export_job_artifacts(session, job_id)
+    return results
