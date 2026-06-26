@@ -11,7 +11,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from resume_agent.discovery.connectors.text import is_materially_richer
+from resume_agent.discovery.connectors.text import (
+    clean_job_description_text,
+    is_materially_richer,
+)
 from resume_agent.discovery.source_tier import source_rank
 from resume_agent.tracking.dedup import compute_content_fingerprint, compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
@@ -50,7 +53,7 @@ class IncomingJob:
     ) -> "IncomingJob":
         return cls(
             source=source,
-            jd_text=jd_text.strip(),
+            jd_text=clean_job_description_text(jd_text),
             url=_clean(url),
             company=_clean(company),
             title=_clean(title),

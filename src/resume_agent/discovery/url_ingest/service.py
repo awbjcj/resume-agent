@@ -3,6 +3,7 @@ from urllib.parse import urlsplit
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import identify_host
+from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
 from resume_agent.discovery.url_ingest.fetch import fetch_page, is_linkedin
 from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
@@ -43,7 +44,7 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
         target = identify_host(page.final_url)
         reader = _READERS.get(target.ats) if target else None
         extracted = reader(page.html) if reader else extract_fields(html_to_text(page.html), agent)
-    jd_text = (extracted.jd_text or "").strip()
+    jd_text = clean_job_description_text(extracted.jd_text or "")
     if not jd_text:
         return None
     return RawJob(
