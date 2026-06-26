@@ -565,6 +565,43 @@ In `src/resume_agent/discovery/connectors/runner.py`, add to `PullReport`:
     skipped: dict[str, int] = field(default_factory=dict)
 ```
 
+Update `_run_note` to accept `skipped_count` and include it when non-zero. Also rename the existing fetch-failure text from "skipped source(s)" to "failed source(s)" so duplicate skips are not confused with fetch failures:
+
+```python
+def _run_note(
+    result: FetchResult,
+    added_count: int,
+    upgraded_count: int,
+    skipped_count: int,
+) -> str | None:
+    """Non-fatal note: upgrades, duplicate skips, skipped sub-sources, and filters."""
+    if not result.filtered and not result.failures and not upgraded_count and not skipped_count:
+        return None
+    parts: list[str] = [f"+{added_count} added"]
+    if upgraded_count:
+        parts.append(f"{upgraded_count} upgraded")
+    if skipped_count:
+        parts.append(f"{skipped_count} skipped")
+    if result.filtered:
+        parts.append(f"filtered {result.filtered} off-target")
+    if result.failures:
+        items = ", ".join(f"{name} ({reason})" for name, reason in result.failures.items())
+        parts.append(f"failed {len(result.failures)} source(s): {items}")
+    return "; ".join(parts)
+```
+
+Add a small payload helper so partial SSE progress and final run results share one shape:
+
+```python
+def _pull_result(report: PullReport) -> dict[str, object]:
+    return {
+        "totals": report.totals,
+        "upgraded": report.upgraded,
+        "skipped": report.skipped,
+        "failures": report.failures,
+    }
+```
+
 In `run_pull`, after computing `upgraded_count`, add the skipped lookup and store all three (the `.get(connector.name, sum(...))` fallback already yields the single-entry total):
 
 ```python
@@ -572,6 +609,22 @@ In `run_pull`, after computing `upgraded_count`, add the skipped lookup and stor
             report.totals[connector.name] = added_count
             report.upgraded[connector.name] = upgraded_count
             report.skipped[connector.name] = skipped_count
+```
+
+Update the `record_run` call to pass `skipped_count`, and publish the partial source result through the existing progress record after each connector:
+
+```python
+            record_run(
+                telemetry_path,
+                connector.name,
+                added=added_count,
+                error=_run_note(result, added_count, upgraded_count, skipped_count),
+            )
+...
+        if reporter:
+            reporter.step(index, added=added_total, result=_pull_result(report))
+    if reporter and finish:
+        reporter.done(added=added_total, result=_pull_result(report))
 ```
 
 - [ ] **Step 4: Run runner + ingest tests to verify they pass**
@@ -596,7 +649,7 @@ git commit -m "feat(sources): PullReport carries per-source upgraded + skipped c
 
 **Interfaces:**
 - Consumes: `build_source_connectors` (Task 3), `PullReport` (Task 5).
-- Produces: `pull_jobs(session, *, source_ids: list[str] | None = None, ...)` — builds connectors via `build_source_connectors`; `None` pulls all enabled.
+- Produces: `pull_jobs(session, *, source_ids: list[str] | None = None, ...)` — builds connectors via `build_source_connectors`; `None` pulls all enabled and pullable entries.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -644,7 +697,7 @@ def pull_jobs(
     reporter: ProgressReporter | None = None,
     finish: bool = True,
 ) -> PullReport:
-    """Run the selected (or all enabled) per-entry connectors and ingest results."""
+    """Run the selected (or all enabled + pullable) per-entry connectors and ingest results."""
     search_config = load_search_config(search_path)
     connectors_config = load_connectors_config(connectors_path)
     connectors = build_source_connectors(connectors_config, get_settings(), source_ids=source_ids)
