@@ -10,7 +10,7 @@ export type PullRunResult = {
 export interface RunRecord {
   runId: string;
   kind: string;
-  status: "running" | "succeeded" | "failed" | "cancelled";
+  status: "running" | "cancelling" | "succeeded" | "failed" | "cancelled";
   percent: number;
   phase: string;
   current: number;

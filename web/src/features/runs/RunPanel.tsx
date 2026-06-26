@@ -6,6 +6,7 @@ import type { RunRecord } from "@/lib/runs/store";
 
 const STATUS_LABEL: Record<RunRecord["status"], string> = {
   running: "",
+  cancelling: "cancelling",
   succeeded: "done",
   failed: "failed",
   cancelled: "cancelled",
@@ -15,6 +16,7 @@ function rightLabel(r: RunRecord): string {
   if (r.status === "succeeded") return "100% · done";
   if (r.status === "failed") return "failed";
   if (r.status === "cancelled") return `${Math.round(r.percent)}% · cancelled`;
+  if (r.status === "cancelling") return `${Math.round(r.percent)}% · cancelling`;
   const eta = r.etaText ? ` · ~${r.etaText} left` : "";
   return `${Math.round(r.percent)}%${eta}`;
 }
@@ -46,7 +48,7 @@ export function RunPanel() {
                   className={`tabular-nums ${
                     r.status === "failed"
                       ? "text-destructive"
-                      : r.status === "cancelled"
+                      : r.status === "cancelled" || r.status === "cancelling"
                         ? "text-muted-foreground"
                         : ""
                   }`}
@@ -69,7 +71,9 @@ export function RunPanel() {
               value={Math.round(r.percent)}
               aria-label={`${r.kind} progress ${STATUS_LABEL[r.status] || `${Math.round(r.percent)} percent`}`}
               className={`mt-1.5 h-1.5 ${
-                r.status === "cancelled" || r.status === "failed" ? "opacity-50" : ""
+                r.status === "cancelled" || r.status === "cancelling" || r.status === "failed"
+                  ? "opacity-50"
+                  : ""
               }`}
             />
             {r.error && <p className="mt-1 text-xs text-destructive">{r.error}</p>}

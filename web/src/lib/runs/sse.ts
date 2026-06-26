@@ -7,7 +7,11 @@ import { useRunStore, type PullRunResult, type RunRecord } from "./store";
  * error, ... }, where state is pending|running|done|error and the stream closes
  * on a terminal state. Returns an unsubscribe function.
  */
-export function watchRun(runId: string, kind: string, onDone?: () => void): () => void {
+export function watchRun(
+  runId: string,
+  kind: string,
+  onDone?: (run: RunRecord) => void,
+): () => void {
   const source = new EventSource(withTokenParam(`/api/runs/${runId}/events`));
 
   source.onmessage = (e) => {
@@ -34,8 +38,10 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
           ? "failed"
           : state === "cancelled"
             ? "cancelled"
+            : state === "cancelling"
+              ? "cancelling"
             : "running";
-    useRunStore.getState().upsert({
+    const run: RunRecord = {
       runId,
       kind,
       status,
@@ -46,17 +52,18 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
       etaText: data.etaText ?? null,
       error: data.error ?? undefined,
       result: data.result ?? null,
-    });
+    };
+    useRunStore.getState().upsert(run);
     if (state === "done" || state === "error" || state === "cancelled") {
       source.close();
-      onDone?.();
+      onDone?.(run);
       // Let the finished bar linger briefly, then clear it.
       setTimeout(() => useRunStore.getState().remove(runId), 4000);
     }
   };
 
   source.onerror = () => {
-    useRunStore.getState().upsert({
+    const run: RunRecord = {
       runId,
       kind,
       status: "failed",
@@ -67,9 +74,10 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
       etaText: null,
       error: "stream error",
       result: null,
-    });
+    };
+    useRunStore.getState().upsert(run);
     source.close();
-    onDone?.();
+    onDone?.(run);
   };
 
   return () => source.close();
