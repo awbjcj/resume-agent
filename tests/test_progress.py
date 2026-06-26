@@ -3,6 +3,7 @@ from pathlib import Path
 
 from resume_agent.progress import (
     ProgressReporter,
+    atomic_write_text,
     clear_progress,
     is_displayable,
     progress_stats,
@@ -14,6 +15,26 @@ from resume_agent.progress import (
 def test_read_progress_missing_returns_none(tmp_path):
     assert read_progress("pull", tmp_path) is None
     assert read_all(tmp_path) == {}
+
+
+def test_atomic_write_retries_transient_windows_replace_error(monkeypatch, tmp_path):
+    target = tmp_path / "run.json"
+    real_replace = __import__("os").replace
+    calls = {"n": 0}
+
+    def flaky_replace(src, dst):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise PermissionError(5, "Access is denied")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr("resume_agent.progress.os.replace", flaky_replace)
+    monkeypatch.setattr("resume_agent.progress.time.sleep", lambda _seconds: None)
+
+    atomic_write_text(target, '{"state": "done"}')
+
+    assert target.read_text(encoding="utf-8") == '{"state": "done"}'
+    assert calls["n"] == 2
 
 
 def test_read_progress_retries_transient_oserror(monkeypatch, tmp_path):
