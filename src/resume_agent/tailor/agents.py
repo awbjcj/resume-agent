@@ -31,6 +31,14 @@ _REVISER_INSTRUCTIONS = [
     "Do not introduce any claim that lacks a provenance id pointing at a real profile fact.",
 ]
 
+_REVISION_INSTRUCTIONS = [
+    "Apply the user's instruction to the resume content.",
+    "Change ONLY what the instruction asks; keep everything else intact.",
+    "Use ONLY facts present in the candidate profile. Never invent anything.",
+    "Preserve fact-lock: every bullet, experience, project, and selected skill MUST keep a provenance id pointing at a real profile fact.",
+    "If the instruction cannot be satisfied truthfully, make the closest truthful change and keep provenance valid.",
+]
+
 REVIEWER_INSTRUCTIONS: dict[str, list[str]] = {
     "fact-check": [
         "You are a fact-checker. Verify every claim in the resume traces to a fact in the candidate profile.",
@@ -81,6 +89,20 @@ def build_reviser_agent(model_id: str | None = None, style_guide: str | None = N
             model=model,
             description="You revise resume content while keeping it strictly fact-locked.",
             instructions=compose_instructions(_REVISER_INSTRUCTIONS, style_guide),
+            output_schema=ResumeContent,
+            use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
+        )
+    )
+
+
+def build_revision_agent(model_id: str | None = None, style_guide: str | None = None) -> Runner:
+    model = build_model(model_id or model_for_tier("premium"))
+    return AgentRunner(
+        Agent(
+            model=model,
+            description="You revise resume content per a user's instruction, strictly fact-locked.",
+            instructions=compose_instructions(_REVISION_INSTRUCTIONS, style_guide),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

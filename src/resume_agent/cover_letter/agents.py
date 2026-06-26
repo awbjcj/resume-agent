@@ -23,6 +23,14 @@ _REVISE_INSTRUCTIONS = [
     "Keep it concise and truthful; introduce no new unsupported claims.",
 ]
 
+_REVISION_INSTRUCTIONS = [
+    "Apply the user's instruction to the cover letter.",
+    "Change ONLY what the instruction asks; keep everything else intact.",
+    "Use ONLY facts present in the candidate profile. Never invent anything.",
+    "Every paragraph's provenance list must keep ids that point at real profile facts.",
+    "If the instruction cannot be satisfied truthfully, make the closest truthful change.",
+]
+
 
 def build_cover_letter_agent(model_id: str | None = None) -> Runner:
     model = build_model(model_id or model_for_tier("premium"))
@@ -45,6 +53,20 @@ def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
             model=model,
             description="You revise cover letters to keep every claim fact-locked.",
             instructions=_REVISE_INSTRUCTIONS,
+            output_schema=CoverLetterContent,
+            use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
+        )
+    )
+
+
+def build_cover_letter_revision_agent(model_id: str | None = None) -> Runner:
+    model = build_model(model_id or model_for_tier("premium"))
+    return AgentRunner(
+        Agent(
+            model=model,
+            description="You revise cover letters per a user's instruction without fabricating.",
+            instructions=_REVISION_INSTRUCTIONS,
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
