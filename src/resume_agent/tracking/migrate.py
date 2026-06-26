@@ -94,3 +94,48 @@ def ensure_content_fingerprint_column(engine: Engine) -> None:
                     text("UPDATE jobs SET content_fingerprint = :f WHERE id = :i"),
                     {"f": fingerprint, "i": row_id},
                 )
+
+
+def _table_columns(engine: Engine, table: str) -> list[str]:
+    with engine.begin() as conn:
+        return [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))]
+
+
+def ensure_resume_version_revision_columns(engine: Engine) -> None:
+    """Idempotently add revision lineage columns to ``resume_versions``."""
+    cols = _table_columns(engine, "resume_versions")
+    if not cols:
+        return
+    with engine.begin() as conn:
+        if "origin" not in cols:
+            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN origin VARCHAR"))
+            conn.execute(text("UPDATE resume_versions SET origin = 'tailor' WHERE origin IS NULL"))
+        if "instruction" not in cols:
+            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN instruction VARCHAR"))
+        if "parent_version_id" not in cols:
+            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN parent_version_id INTEGER"))
+
+
+def ensure_cover_letter_revision_columns(engine: Engine) -> None:
+    """Idempotently add revision lineage columns to ``cover_letters``."""
+    cols = _table_columns(engine, "cover_letters")
+    if not cols:
+        return
+    with engine.begin() as conn:
+        if "origin" not in cols:
+            conn.execute(text("ALTER TABLE cover_letters ADD COLUMN origin VARCHAR"))
+            conn.execute(text("UPDATE cover_letters SET origin = 'draft' WHERE origin IS NULL"))
+        if "instruction" not in cols:
+            conn.execute(text("ALTER TABLE cover_letters ADD COLUMN instruction VARCHAR"))
+        if "parent_id" not in cols:
+            conn.execute(text("ALTER TABLE cover_letters ADD COLUMN parent_id INTEGER"))
+
+
+def ensure_application_cover_letter_id_column(engine: Engine) -> None:
+    """Idempotently add ``applications.cover_letter_id``."""
+    cols = _table_columns(engine, "applications")
+    if not cols:
+        return
+    if "cover_letter_id" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE applications ADD COLUMN cover_letter_id INTEGER"))
