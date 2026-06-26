@@ -1204,6 +1204,55 @@
         "title": "MatchGapOut",
         "type": "object"
       },
+      "NotificationOut": {
+        "properties": {
+          "applicationId": {
+            "title": "Applicationid",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "messageId": {
+            "title": "Messageid",
+            "type": "string"
+          },
+          "proposedStatus": {
+            "title": "Proposedstatus",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "applicationId",
+          "kind",
+          "proposedStatus",
+          "evidence",
+          "messageId",
+          "state",
+          "createdAt"
+        ],
+        "title": "NotificationOut",
+        "type": "object"
+      },
       "Pagination": {
         "properties": {
           "page": {
