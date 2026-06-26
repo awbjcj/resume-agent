@@ -367,6 +367,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sources Route */
+        get: operations["list_sources_route_api_sources_get"];
+        put?: never;
+        /** Add Source Route */
+        post: operations["add_source_route_api_sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Source Route */
+        post: operations["preview_source_route_api_sources_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Source Route */
+        delete: operations["remove_source_route_api_sources__source_id__delete"];
+        options?: never;
+        head?: never;
+        /** Set Enabled Route */
+        patch: operations["set_enabled_route_api_sources__source_id__patch"];
+        trace?: never;
+    };
     "/api/tailor": {
         parameters: {
             query?: never;
@@ -431,6 +484,13 @@ export interface components {
             location?: string | null;
             /** Title */
             title?: string | null;
+            /** Url */
+            url: string;
+        };
+        /** AddSourceIn */
+        AddSourceIn: {
+            /** Label */
+            label?: string | null;
             /** Url */
             url: string;
         };
@@ -806,6 +866,8 @@ export interface components {
         PullParams: {
             /** Limit */
             limit?: number | null;
+            /** Sourceids */
+            sourceIds?: string[] | null;
         };
         /** RefreshParams */
         RefreshParams: {
@@ -864,6 +926,11 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** SetEnabledIn */
+        SetEnabledIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** ShortlistItem */
         ShortlistItem: {
             /** Company */
@@ -921,6 +988,47 @@ export interface components {
             name: string;
             /** Required */
             required: boolean;
+        };
+        /** SourceOut */
+        SourceOut: {
+            /** Detail */
+            detail: string;
+            /** Displayname */
+            displayName: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Pullable */
+            pullable: boolean;
+            /** Type */
+            type: string;
+        };
+        /** SourcePreviewIn */
+        SourcePreviewIn: {
+            /** Label */
+            label?: string | null;
+            /** Url */
+            url: string;
+        };
+        /** SourcePreviewOut */
+        SourcePreviewOut: {
+            /** Error */
+            error?: string | null;
+            /** Kind */
+            kind?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Rolecount */
+            roleCount?: number | null;
+            /** Token */
+            token?: string | null;
+            /** Url */
+            url: string;
         };
         /** TailorParams */
         TailorParams: {
@@ -1770,6 +1878,175 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BoardPage_ShortlistItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_route_api_sources_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_source_route_api_sources_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddSourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_source_route_api_sources_preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourcePreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourcePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_source_route_api_sources__source_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_enabled_route_api_sources__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetEnabledIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"];
                 };
             };
             /** @description Validation Error */
