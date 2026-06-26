@@ -1,43 +1,68 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { BoardSkeleton } from "@/components/skeletons";
+import { BulkActionBar } from "@/components/BulkActionBar";
+import { BulkPreviewButton } from "@/components/BulkPreviewButton";
 import { EmptyState } from "@/components/EmptyState";
+import { FilterDesk } from "@/components/FilterDesk";
+import { JobModal } from "@/components/JobModal";
+import { JobTable } from "@/components/JobTable";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { JobModal } from "@/components/JobModal";
-import { TriageCard } from "./TriageCard";
-import { PrunePanel } from "./PrunePanel";
-import { useTriage } from "./use-triage";
-import { useArchive, useDeleteJob, useRestore } from "./use-triage-mutations";
+import { BoardSkeleton } from "@/components/skeletons";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  type TriageItem,
+  useBoardQuery,
+} from "@/features/board/use-board-query";
+import { useBulkAction } from "@/features/board/use-bulk-action";
+import { useSelection } from "@/features/board/use-selection";
+import { useBoardFilters } from "@/features/shortlist/use-board-filters";
+
+import { QuickFilters } from "./QuickFilters";
 
 export function TriageContainer() {
   const [archived, setArchived] = useState(false);
-  const { data: rows, isLoading } = useTriage(archived);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [filter, setFilter] = useBoardFilters();
+  const { rows, facets, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useBoardQuery<TriageItem>("triage", filter, { archived });
+  const selection = useSelection();
+  const { reconcile } = selection;
+  const bulk = useBulkAction("triage");
   const [params, setParams] = useSearchParams();
-  const archive = useArchive();
-  const restore = useRestore();
-  const del = useDeleteJob();
 
-  const toggle = (id: number, on: boolean) =>
-    setSelected((s) => {
-      const n = new Set(s);
-      if (on) n.add(id);
-      else n.delete(id);
-      return n;
-    });
+  useEffect(() => {
+    reconcile(rows.map((row) => row.jobId), total);
+  }, [rows, total, reconcile]);
 
   if (isLoading) return <BoardSkeleton />;
 
-  const deletable = new Set((rows ?? []).filter((r) => !r.hasProgress).map((r) => r.jobId));
-  const allSelectedDeletable = selected.size > 0 && [...selected].every((id) => deletable.has(id));
   const openId = params.get("job");
-  const clearSel = () => setSelected(new Set());
+  const loadedIds = rows.map((row) => row.jobId);
+  const allLoadedSelected =
+    rows.length > 0 && rows.every((row) => selection.isSelected(row.jobId));
+  const bulkSelection = { mode: selection.mode, ids: selection.ids };
+  const bulkArgs = { selection: bulkSelection, filter, archived };
+  const action: "restore" | "archive" = archived ? "restore" : "archive";
+
+  const openJob = (id: number) =>
+    setParams(
+      (p) => {
+        p.set("job", String(id));
+        return p;
+      },
+      { replace: true },
+    );
+  const closeJob = () =>
+    setParams(
+      (p) => {
+        p.delete("job");
+        return p;
+      },
+      { replace: true },
+    );
 
   return (
     <>
@@ -54,93 +79,74 @@ export function TriageContainer() {
       </div>
       <MetricRow
         items={[
-          ["In view", String(rows?.length ?? 0)],
-          ["Deletable", String(deletable.size)],
+          ["Loaded", rows.length.toLocaleString()],
+          ["Matching", total.toLocaleString()],
         ]}
       />
-      <PrunePanel />
-      {!rows?.length ? (
+      <FilterDesk filter={filter} facets={facets} total={total} onChange={setFilter} />
+      <QuickFilters onApply={(patch) => setFilter({ ...filter, ...patch })} />
+      {!rows.length ? (
         <EmptyState
           title="Nothing to triage"
           body="Run a pull to bring in jobs, or toggle archived."
         />
       ) : (
         <>
-          <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
-            <span className="rounded-full bg-secondary px-3 py-1.5 text-sm">
-              <strong>{selected.size}</strong> selected
-            </span>
-            {archived ? (
-              <Button
-                disabled={!selected.size}
-                onClick={() => {
-                  selected.forEach((id) => restore.mutate(id));
-                  clearSel();
-                }}
-              >
-                Restore selected
-              </Button>
-            ) : (
-              <Button
-                disabled={!selected.size}
-                onClick={() => {
-                  selected.forEach((id) => archive.mutate(id));
-                  clearSel();
-                }}
-              >
-                Archive selected
-              </Button>
-            )}
-            <ConfirmDialog
-              trigger={
-                <Button variant="destructive" disabled={!allSelectedDeletable}>
-                  Delete selected
-                </Button>
+          <BulkActionBar
+            count={selection.count}
+            isAllMatching={selection.isAllMatching}
+            pageCount={rows.length}
+            total={total}
+            onSelectAllMatching={() => selection.selectAllMatching(total)}
+            onClear={selection.clear}
+          >
+            <BulkPreviewButton
+              label={archived ? "Restore" : "Archive"}
+              title={`${archived ? "Restore" : "Archive"} ${selection.count.toLocaleString()} selected job(s)?`}
+              preview={() => bulk.preview({ ...bulkArgs, action })}
+              run={() =>
+                bulk.run({ ...bulkArgs, action }).then((result) => {
+                  selection.clear();
+                  return result;
+                })
               }
-              title={`Delete ${selected.size} job(s)?`}
-              description="This cannot be undone."
-              confirmLabel="Confirm delete"
-              onConfirm={() => {
-                selected.forEach((id) => del.mutate(id));
-                clearSel();
-              }}
             />
-          </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-            {rows.map((row) => (
-              <TriageCard
-                key={row.jobId}
-                row={row}
-                checked={selected.has(row.jobId)}
-                onCheck={(v) => toggle(row.jobId, v)}
-                onOpen={() =>
-                  setParams(
-                    (p) => {
-                      p.set("job", String(row.jobId));
-                      return p;
-                    },
-                    { replace: true },
-                  )
-                }
-              />
-            ))}
-          </div>
+            <BulkPreviewButton
+              label="Delete"
+              title={`Delete ${selection.count.toLocaleString()} selected job(s)?`}
+              confirmLabel="Confirm delete"
+              variant="destructive"
+              preview={() => bulk.preview({ ...bulkArgs, action: "delete" })}
+              run={() =>
+                bulk.run({ ...bulkArgs, action: "delete" }).then((result) => {
+                  selection.clear();
+                  return result;
+                })
+              }
+            />
+          </BulkActionBar>
+          <JobTable
+            rows={rows}
+            selection={selection}
+            onToggle={selection.toggle}
+            onOpen={openJob}
+            onToggleAll={(checked) => (checked ? selection.selectPage(loadedIds) : selection.clear())}
+            allChecked={allLoadedSelected}
+          />
+          {hasNextPage && (
+            <div className="mt-5 flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? "Loading..." : "Load more"}
+              </Button>
+            </div>
+          )}
         </>
       )}
-      {openId && (
-        <JobModal
-          jobId={Number(openId)}
-          onClose={() =>
-            setParams(
-              (p) => {
-                p.delete("job");
-                return p;
-              },
-              { replace: true },
-            )
-          }
-        />
-      )}
+      {openId && <JobModal jobId={Number(openId)} onClose={closeJob} />}
     </>
   );
 }

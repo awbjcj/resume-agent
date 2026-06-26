@@ -1,6 +1,3 @@
-import { useMemo } from "react";
-
-import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -10,22 +7,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MultiSelect } from "./MultiSelect";
-import {
-  availableCities,
-  availableCountries,
-  availableIndustries,
-  availableSkillCloud,
-  availableStates,
-} from "@/lib/filters/facets";
-import { normalizeSkill } from "@/lib/filters/normalize";
-import type { FilterState, Preset, ShortlistItem, SortKey } from "@/lib/filters/types";
+import { Slider } from "@/components/ui/slider";
+import { emptyFilterState, type FilterState, type Preset, type SortKey } from "@/lib/filters/types";
+import { industryLabel } from "@/lib/filters/sic-labels";
+import type { Facets } from "@/features/board/use-board-query";
+
+import { ActiveFilterSummary } from "./filters/ActiveFilterSummary";
+import { FacetPopover } from "./filters/FacetPopover";
 
 const SORTS: [SortKey, string][] = [
   ["fit", "Fit"],
   ["salary", "Salary"],
   ["recency", "Recency"],
   ["composite", "Composite"],
+  ["company", "Company"],
+  ["stage", "Stage"],
 ];
 const PRESETS: [Preset, string][] = [
   ["balanced", "Balanced"],
@@ -33,41 +29,99 @@ const PRESETS: [Preset, string][] = [
   ["freshest", "Freshest"],
 ];
 
+const REMOTE = ["remote", "hybrid", "onsite"];
+const SPONSORSHIP = ["offered", "silent", "denied"];
+const SENIORITY = ["junior", "mid", "senior", "staff", "principal"];
+const EMPLOYMENT_TYPE = ["full_time", "contract", "internship", "part_time"];
+
+// Every facet renders as the same compact active-filter popover. `options`
+// seeds the canonical values for enumerated facets so they stay selectable even
+// at zero count; `getLabel` resolves wire values to display names (industry
+// codes → SIC labels).
+type FacetSpec = {
+  key: (typeof SET_KEYS)[number];
+  label: string;
+  options?: string[];
+  getLabel?: (value: string) => string;
+};
+
+const SET_KEYS = [
+  "source",
+  "status",
+  "remote",
+  "sponsorship",
+  "seniority",
+  "employmentType",
+  "industry",
+  "country",
+  "region",
+  "city",
+  "companySize",
+  "skills",
+] as const;
+
+function countsWithSelected(counts: Record<string, number> | undefined, selected: Set<string>) {
+  const next = { ...(counts ?? {}) };
+  for (const value of selected) next[value] ??= 0;
+  return next;
+}
+
+function hasOptions(counts: Record<string, number>, selected: Set<string>) {
+  return Object.keys(counts).length > 0 || selected.size > 0;
+}
+
+function pretty(value: string) {
+  return value.replace(/_/g, " ");
+}
+
 export function FilterDesk({
-  rows,
-  state,
+  filter,
+  facets,
+  total,
   onChange,
 }: {
-  rows: ShortlistItem[];
-  state: FilterState;
+  filter: FilterState;
+  facets: Facets;
+  total: number;
   onChange: (s: FilterState) => void;
 }) {
-  const set = (patch: Partial<FilterState>) => onChange({ ...state, ...patch });
-
-  const countries = useMemo(() => availableCountries(rows), [rows]);
-  const states = useMemo(() => availableStates(rows, state.country), [rows, state.country]);
-  const cities = useMemo(
-    () => availableCities(rows, state.country, state.region),
-    [rows, state.country, state.region],
-  );
-  const industries = useMemo(() => availableIndustries(rows), [rows]);
-  const skills = useMemo(() => availableSkillCloud(rows), [rows]);
-  const sizes = useMemo(
-    () => [...new Set(rows.map((r) => r.companySize).filter(Boolean) as string[])].sort(),
-    [rows],
-  );
-
-  // Flatten SIC [division, [[code,label],...]] to a single code list + label map.
-  const sicCodes: string[] = [];
-  const sicLabels: Record<string, string> = {};
-  for (const [, codes] of industries) {
-    for (const [code, label] of codes) {
-      if (!(code in sicLabels)) {
-        sicCodes.push(code);
-        sicLabels[code] = label;
-      }
+  const set = (patch: Partial<FilterState>) => onChange({ ...filter, ...patch });
+  const setFacet = (key: (typeof SET_KEYS)[number], value: Set<string>) =>
+    onChange({ ...filter, [key]: value });
+  const removeFilter = (key: keyof FilterState, value: string) => {
+    if ((SET_KEYS as readonly string[]).includes(key)) {
+      const next = new Set(filter[key as (typeof SET_KEYS)[number]]);
+      next.delete(value);
+      set({ [key]: next } as Partial<FilterState>);
+      return;
     }
-  }
+    if (key === "q") set({ q: "" });
+    else if (key === "fitMin") set({ fitMin: null });
+    else if (key === "maxFit") set({ maxFit: null });
+    else if (key === "salaryMin") set({ salaryMin: null });
+    else if (key === "staleDays") set({ staleDays: null });
+  };
+  const clearFilters = () => {
+    const cleared = emptyFilterState();
+    cleared.sort = filter.sort;
+    cleared.preset = filter.preset;
+    onChange(cleared);
+  };
+
+  const facetSpecs: FacetSpec[] = [
+    { key: "source", label: "Source" },
+    { key: "status", label: "Status" },
+    { key: "remote", label: "Remote", options: REMOTE },
+    { key: "sponsorship", label: "Sponsorship", options: SPONSORSHIP },
+    { key: "seniority", label: "Seniority", options: SENIORITY },
+    { key: "employmentType", label: "Type", options: EMPLOYMENT_TYPE },
+    { key: "industry", label: "Industry", getLabel: industryLabel },
+    { key: "country", label: "Country" },
+    { key: "region", label: "Region" },
+    { key: "city", label: "City" },
+    { key: "companySize", label: "Company size" },
+    { key: "skills", label: "Skills" },
+  ];
 
   return (
     <section
@@ -78,14 +132,28 @@ export function FilterDesk({
         <div>
           <div className="text-sm font-semibold">Filter &amp; sort</div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Narrow the board before approving jobs for tailoring.
+            Server-filtered results with live facet counts.
           </p>
         </div>
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {rows.length} candidates
+          {total.toLocaleString()} matching
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="f-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
+            Search
+          </Label>
+          <Input
+            id="f-q"
+            type="search"
+            className="h-10 bg-card"
+            value={filter.q}
+            onChange={(event) => set({ q: event.target.value })}
+          />
+        </div>
+
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="f-salary" className="text-xs font-semibold uppercase tracking-[0.14em]">
             Min salary (USD)
@@ -96,121 +164,63 @@ export function FilterDesk({
             min={0}
             step={10000}
             className="h-10 bg-card"
-            value={state.salaryMin ?? 0}
-            onChange={(e) => set({ salaryMin: Number(e.target.value) || null })}
+            value={filter.salaryMin ?? ""}
+            onChange={(event) => set({ salaryMin: Number(event.target.value) || null })}
           />
         </div>
+
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="f-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
-            Min fit
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="f-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
+              Min fit
+            </Label>
+            <span className="text-xs tabular-nums text-muted-foreground">{filter.fitMin ?? 0}</span>
+          </div>
           <Slider
             id="f-fit"
             aria-label="Min fit"
             min={0}
             max={100}
             step={1}
-            value={[state.fitMin ?? 0]}
-            onValueChange={(v) => set({ fitMin: (v as number[])[0] || null })}
+            value={[filter.fitMin ?? 0]}
+            onValueChange={(value) => {
+              const fit = (value as number[])[0] ?? 0;
+              set({ fitMin: fit === 0 ? null : fit });
+            }}
           />
         </div>
+
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="f-sort" className="text-xs font-semibold uppercase tracking-[0.14em]">
             Sort by
           </Label>
-          <Select value={state.sort} onValueChange={(v) => set({ sort: v as SortKey })}>
+          <Select value={filter.sort} onValueChange={(value) => set({ sort: value as SortKey })}>
             <SelectTrigger id="f-sort" className="h-10 w-full bg-card">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SORTS.map(([k, l]) => (
-                <SelectItem key={k} value={k}>
-                  {l}
+              {SORTS.map(([key, label]) => (
+                <SelectItem key={key} value={key}>
+                  {label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <MultiSelect
-          label="Company size"
-          options={sizes}
-          selected={state.companySize}
-          onChange={(s) => set({ companySize: s })}
-        />
 
-        <MultiSelect
-          label="Remote"
-          options={["remote", "hybrid", "onsite"]}
-          selected={state.remote}
-          onChange={(s) => set({ remote: s })}
-        />
-        <MultiSelect
-          label="Sponsorship"
-          options={["offered", "silent", "denied"]}
-          selected={state.sponsorship}
-          onChange={(s) => set({ sponsorship: s })}
-        />
-        <MultiSelect
-          label="Seniority"
-          options={["junior", "mid", "senior", "staff", "principal"]}
-          selected={state.seniority}
-          onChange={(s) => set({ seniority: s })}
-        />
-        <MultiSelect
-          label="Type"
-          options={["full_time", "contract", "internship", "part_time"]}
-          selected={state.employmentType}
-          onChange={(s) => set({ employmentType: s })}
-        />
-
-        <MultiSelect
-          label="Country"
-          options={countries}
-          selected={state.country}
-          onChange={(s) => set({ country: s })}
-        />
-        <MultiSelect
-          label="State (US)"
-          options={states}
-          selected={state.region}
-          onChange={(s) => set({ region: s })}
-        />
-        <MultiSelect
-          label="City"
-          options={cities}
-          selected={state.city}
-          onChange={(s) => set({ city: s })}
-        />
-        <MultiSelect
-          label="Industry"
-          options={sicCodes}
-          getLabel={(c) => sicLabels[c] ?? c}
-          selected={state.industry}
-          onChange={(s) => set({ industry: s })}
-        />
-
-        <MultiSelect
-          label="Skills (any match)"
-          options={skills.map((t) => t.name)}
-          // Operate in display-name space; state.skills holds normalized tokens,
-          // so map back through normalizeSkill for the checked state and forward
-          // on change. (Comparing raw names to tokens left every box unchecked.)
-          selected={new Set(skills.filter((t) => state.skills.has(normalizeSkill(t.name))).map((t) => t.name))}
-          onChange={(picked) => set({ skills: new Set([...picked].map(normalizeSkill)) })}
-        />
-        {state.sort === "composite" && (
+        {filter.sort === "composite" && (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="f-preset" className="text-xs font-semibold uppercase tracking-[0.14em]">
               Preset
             </Label>
-            <Select value={state.preset} onValueChange={(v) => set({ preset: v as Preset })}>
+            <Select value={filter.preset} onValueChange={(value) => set({ preset: value as Preset })}>
               <SelectTrigger id="f-preset" className="h-10 w-full bg-card">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PRESETS.map(([k, l]) => (
-                  <SelectItem key={k} value={k}>
-                    {l}
+                {PRESETS.map(([key, label]) => (
+                  <SelectItem key={key} value={key}>
+                    {label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -218,6 +228,31 @@ export function FilterDesk({
           </div>
         )}
       </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {facetSpecs.map(({ key, label, options, getLabel }) => {
+          const counts = countsWithSelected(facets[key], filter[key]);
+          for (const option of options ?? []) counts[option] ??= 0;
+          if (!hasOptions(counts, filter[key])) return null;
+          return (
+            <FacetPopover
+              key={key}
+              label={label}
+              counts={counts}
+              selected={filter[key]}
+              onChange={(next) => setFacet(key, next)}
+              getLabel={getLabel ?? pretty}
+            />
+          );
+        })}
+      </div>
+
+      <ActiveFilterSummary
+        filter={filter}
+        total={total}
+        onRemove={removeFilter}
+        onClear={clearFilters}
+      />
     </section>
   );
 }

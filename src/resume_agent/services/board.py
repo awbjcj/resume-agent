@@ -7,7 +7,12 @@ tracking.repository, preserving the existing job/application semantics.
 
 from __future__ import annotations
 
+from collections import Counter
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import re
+from typing import Any, Literal, Sequence
 
 from sqlmodel import Session
 
@@ -28,33 +33,283 @@ from resume_agent.tracking.repository import (
     archive_job,
     delete_job,
     get_job,
+    has_progress,
     restore_job,
     save_application,
     save_job,
     update_application_status,
 )
-from resume_agent.tracking.tables import Application, Job
+from resume_agent.tracking.tables import Application, Job, JobStatus
 
 DEFAULT_FACTS = "data/profile/facts.json"
+BoardName = Literal["shortlist", "triage", "pipeline"]
+BulkAction = Literal["archive", "restore", "delete", "approve", "setStatus"]
+SelectionScope = Literal["ids", "query"]
+Facets = dict[str, dict[str, int]]
+
+
+@dataclass(frozen=True)
+class BoardFilter:
+    q: str | None = None
+    source: tuple[str, ...] = ()
+    status: tuple[str, ...] = ()
+    remote: tuple[str, ...] = ()
+    sponsorship: tuple[str, ...] = ()
+    seniority: tuple[str, ...] = ()
+    employment_type: tuple[str, ...] = ()
+    industry: tuple[str, ...] = ()
+    country: tuple[str, ...] = ()
+    region: tuple[str, ...] = ()
+    city: tuple[str, ...] = ()
+    company_size: tuple[str, ...] = ()
+    skills: tuple[str, ...] = ()
+    min_fit: int | None = None
+    max_fit: int | None = None
+    min_salary: int | None = None
+    stale_days: int | None = None
+    sort: str = "fit"
+    archived: bool = False
+
+
+@dataclass(frozen=True)
+class BoardListResult:
+    page: Page
+    facets: Facets
+
+
+@dataclass(frozen=True)
+class BulkResult:
+    affected: int
+    skipped: int
+    reasons: dict[str, int]
+
+
+_PUNCT = re.compile(r"[^a-z0-9+#. ]+")
+_WS = re.compile(r"\s+")
+
+
+def _normalize_token(value: str) -> str:
+    return _WS.sub(" ", _PUNCT.sub(" ", value.lower())).strip()
+
+
+def _selected(values: Sequence[str]) -> set[str]:
+    return {v for v in values if v}
+
+
+def _row_value(row: Any, key: str) -> str | None:
+    if key == "source":
+        return getattr(row, "source", None)
+    if key == "status":
+        return getattr(row, "status", None)
+    if key == "remote":
+        return getattr(row, "remote_policy", None)
+    if key == "sponsorship":
+        return getattr(row, "sponsorship_signal", None)
+    if key == "seniority":
+        return getattr(row, "seniority", None)
+    if key == "employmentType":
+        return getattr(row, "employment_type", None)
+    if key == "industry":
+        return getattr(row, "sic_major", None) or getattr(row, "industry", None)
+    if key == "country":
+        return getattr(row, "location_country", None)
+    if key == "region":
+        return getattr(row, "location_region", None)
+    if key == "city":
+        return getattr(row, "location_city", None)
+    if key == "companySize":
+        return getattr(row, "company_size", None)
+    return None
+
+
+def _row_text(row: Any) -> str:
+    fields = (
+        getattr(row, "company", None),
+        getattr(row, "title", None),
+        getattr(row, "location", None),
+        getattr(row, "source", None),
+        getattr(row, "status", None),
+        getattr(row, "jd_text", None),
+    )
+    return " ".join(str(v) for v in fields if v).lower()
+
+
+def _row_skill_tokens(row: Any) -> set[str]:
+    return {_normalize_token(tag.name) for tag in getattr(row, "skills", []) if tag.name}
+
+
+def _aware(dt: datetime) -> datetime:
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+def _passes_filter(row: Any, f: BoardFilter) -> bool:
+    if f.q and f.q.strip().lower() not in _row_text(row):
+        return False
+
+    score = getattr(row, "fit_score", None)
+    if f.min_fit is not None and (score is None or score < f.min_fit):
+        return False
+    if f.max_fit is not None and (score is None or score > f.max_fit):
+        return False
+
+    if f.min_salary is not None:
+        salary = getattr(row, "salary_max", None) or getattr(row, "salary_min", None)
+        currency = (getattr(row, "salary_currency", None) or "USD").upper()
+        if currency != "USD" or salary is None or salary < f.min_salary:
+            return False
+
+    if f.stale_days is not None:
+        posted_at = getattr(row, "posted_at", None)
+        if posted_at is None:
+            return False
+        cutoff = datetime.now(timezone.utc) - timedelta(days=f.stale_days)
+        if _aware(posted_at) > cutoff:
+            return False
+
+    set_filters = (
+        ("source", f.source),
+        ("status", f.status),
+        ("remote", f.remote),
+        ("sponsorship", f.sponsorship),
+        ("seniority", f.seniority),
+        ("employmentType", f.employment_type),
+        ("industry", f.industry),
+        ("country", f.country),
+        ("region", f.region),
+        ("city", f.city),
+        ("companySize", f.company_size),
+    )
+    for key, raw_selected in set_filters:
+        selected = _selected(raw_selected)
+        if selected and _row_value(row, key) not in selected:
+            return False
+
+    selected_skills = {_normalize_token(v) for v in f.skills if v}
+    if selected_skills and not (_row_skill_tokens(row) & selected_skills):
+        return False
+
+    return True
+
+
+def _apply_board_filter(rows: list[Any], f: BoardFilter) -> list[Any]:
+    return [row for row in rows if _passes_filter(row, f)]
+
+
+def _posted_sort_value(row: Any) -> datetime:
+    posted_at = getattr(row, "posted_at", None)
+    return _aware(posted_at) if posted_at is not None else datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _salary_sort_value(row: Any) -> int:
+    return getattr(row, "salary_max", None) or getattr(row, "salary_min", None) or 0
+
+
+def _sort_rows(rows: list[Any], sort: str) -> list[Any]:
+    if sort in {"fit", "composite"}:
+        return _by_fit_desc(rows)
+    if sort == "salary":
+        return sorted(rows, key=_salary_sort_value, reverse=True)
+    if sort == "recency":
+        return sorted(rows, key=_posted_sort_value, reverse=True)
+    if sort == "company":
+        return sorted(rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower()))
+    if sort == "stage":
+        return sorted(rows, key=lambda r: (getattr(r, "status", ""), (r.company or "").lower()))
+    return rows
+
+
+def _count_values(rows: list[Any], key: str) -> dict[str, int]:
+    counts: Counter[str] = Counter()
+    for row in rows:
+        value = _row_value(row, key)
+        if value:
+            counts[value] += 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _count_skills(rows: list[Any]) -> dict[str, int]:
+    counts: Counter[str] = Counter()
+    for row in rows:
+        for token in _row_skill_tokens(row):
+            if token:
+                counts[token] += 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def board_facets(rows: list[Any]) -> Facets:
+    facets: Facets = {}
+    for key in (
+        "source",
+        "status",
+        "remote",
+        "sponsorship",
+        "seniority",
+        "employmentType",
+        "industry",
+        "country",
+        "region",
+        "city",
+        "companySize",
+    ):
+        counts = _count_values(rows, key)
+        if counts:
+            facets[key] = counts
+    skills = _count_skills(rows)
+    if skills:
+        facets["skills"] = skills
+    return facets
 
 
 def _by_fit_desc(rows):
     return sorted(rows, key=lambda r: (r.fit_score is not None, r.fit_score or -1), reverse=True)
 
 
+def _board_rows(
+    session: Session,
+    board: BoardName,
+    f: BoardFilter,
+    *,
+    facts_path: str = DEFAULT_FACTS,
+) -> list[Any]:
+    if board == "shortlist":
+        facts = load_facts(facts_path) if Path(facts_path).exists() else None
+        rows = shortlist_rows(session, facts=facts)
+    elif board == "pipeline":
+        rows = pipeline_rows(session)
+    elif board == "triage":
+        rows = archived_rows(session) if f.archived else triage_rows(session)
+    else:
+        raise ValueError(f"Unknown board {board!r}")
+    return _sort_rows(_apply_board_filter(rows, f), f.sort)
+
+
+def list_board(
+    session: Session,
+    board: BoardName,
+    *,
+    board_filter: BoardFilter | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    facts_path: str = DEFAULT_FACTS,
+) -> BoardListResult:
+    f = board_filter or BoardFilter(sort="stage" if board == "pipeline" else "fit")
+    rows = _board_rows(session, board, f, facts_path=facts_path)
+    return BoardListResult(
+        page=paginate(rows, page=page, page_size=page_size),
+        facets=board_facets(rows),
+    )
+
+
 def list_shortlist(
-    session: Session, *, min_fit: int | None = None, sort: str = "fit",
+    session: Session, *, board_filter: BoardFilter | None = None,
+    min_fit: int | None = None, sort: str = "fit",
     page: int = 1, page_size: int = 50, facts_path: str = DEFAULT_FACTS,
 ) -> Page[ShortlistRow]:
-    facts = load_facts(facts_path) if Path(facts_path).exists() else None
-    rows = shortlist_rows(session, facts=facts)
-    if min_fit is not None:
-        rows = [r for r in rows if (r.fit_score or 0) >= min_fit]
-    if sort == "fit":
-        rows = _by_fit_desc(rows)
-    elif sort == "salary":
-        rows = sorted(rows, key=lambda r: (r.salary_max or r.salary_min or 0), reverse=True)
-    return paginate(rows, page=page, page_size=page_size)
+    f = board_filter or BoardFilter(min_fit=min_fit, sort=sort)
+    return list_board(
+        session, "shortlist", board_filter=f, page=page,
+        page_size=page_size, facts_path=facts_path,
+    ).page
 
 
 def get_job_detail(
@@ -68,38 +323,98 @@ def get_job_detail(
 def list_pipeline(
     session: Session, *, status: str | None = None, min_fit: int | None = None,
     q: str | None = None, sort: str = "stage", page: int = 1, page_size: int = 50,
+    board_filter: BoardFilter | None = None,
 ) -> Page[PipelineRow]:
-    # sort defaults to "stage" = the native pipeline_rows order (status, company,
-    # title); only "fit"/"company" re-sort. An unknown sort falls through to native.
-    rows = pipeline_rows(session)
-    if status is not None:
-        rows = [r for r in rows if r.status == status]
-    if min_fit is not None:
-        rows = [r for r in rows if (r.fit_score or 0) >= min_fit]
-    if q:
-        needle = q.strip().lower()
-        rows = [r for r in rows if needle in f"{r.company or ''} {r.title or ''}".lower()]
-    if sort == "fit":
-        rows = _by_fit_desc(rows)
-    elif sort == "company":
-        rows = sorted(rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower()))
-    return paginate(rows, page=page, page_size=page_size)
+    f = board_filter or BoardFilter(
+        status=(status,) if status else (), min_fit=min_fit, q=q, sort=sort,
+    )
+    return list_board(
+        session, "pipeline", board_filter=f, page=page, page_size=page_size,
+    ).page
 
 
 def list_triage(
     session: Session, *, archived: bool = False, status: str | None = None,
     min_fit: int | None = None, sort: str = "fit", page: int = 1, page_size: int = 50,
+    board_filter: BoardFilter | None = None,
 ) -> Page[TriageRow]:
-    rows = archived_rows(session) if archived else triage_rows(session)
-    if status is not None:
-        rows = [r for r in rows if r.status == status]
-    if min_fit is not None:
-        rows = [r for r in rows if (r.fit_score or 0) >= min_fit]
-    if sort == "fit":
-        rows = _by_fit_desc(rows)
-    elif sort == "company":
-        rows = sorted(rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower()))
-    return paginate(rows, page=page, page_size=page_size)
+    f = board_filter or BoardFilter(
+        status=(status,) if status else (), min_fit=min_fit, sort=sort, archived=archived,
+    )
+    return list_board(
+        session, "triage", board_filter=f, page=page, page_size=page_size,
+    ).page
+
+
+def _target_ids(
+    session: Session,
+    *,
+    board: BoardName,
+    scope: SelectionScope,
+    board_filter: BoardFilter,
+    ids: Sequence[int],
+) -> list[int]:
+    if scope == "ids":
+        return list(dict.fromkeys(ids))
+    if scope == "query":
+        return [row.job_id for row in _board_rows(session, board, board_filter)]
+    raise ValueError(f"Unknown bulk scope {scope!r}")
+
+
+def bulk_apply(
+    session: Session,
+    *,
+    board: BoardName,
+    action: BulkAction,
+    scope: SelectionScope,
+    board_filter: BoardFilter,
+    ids: Sequence[int] = (),
+    status: str | None = None,
+    dry_run: bool = True,
+) -> BulkResult:
+    target_ids = _target_ids(
+        session, board=board, scope=scope, board_filter=board_filter, ids=ids,
+    )
+    affected = 0
+    skipped = 0
+    reasons: Counter[str] = Counter()
+    progress_guarded = action in {"delete", "approve", "setStatus"}
+
+    for job_id in target_ids:
+        job = get_job(session, job_id)
+        if job is None:
+            skipped += 1
+            reasons["missing"] += 1
+            continue
+        if progress_guarded and has_progress(session, job_id):
+            skipped += 1
+            reasons["hasProgress"] += 1
+            continue
+
+        if dry_run:
+            affected += 1
+            continue
+
+        if action == "archive":
+            set_archived(session, job_id, True)
+        elif action == "restore":
+            set_archived(session, job_id, False)
+        elif action == "delete":
+            if not delete(session, job_id):
+                skipped += 1
+                reasons["hasProgress"] += 1
+                continue
+        elif action == "approve":
+            set_stage(session, job_id, JobStatus.approved.value)
+        elif action == "setStatus":
+            if status is None:
+                raise ValueError("status is required for setStatus")
+            set_stage(session, job_id, status)
+        else:
+            raise ValueError(f"Unknown bulk action {action!r}")
+        affected += 1
+
+    return BulkResult(affected=affected, skipped=skipped, reasons=dict(reasons))
 
 
 # --- mutations (preserve current job/application semantics) ---------------

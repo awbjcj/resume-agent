@@ -11,7 +11,8 @@ def _client():
 
 def _seed(app, **kw):
     with get_session(app.state.engine) as s:
-        job = Job(source="manual", jd_text="x", **kw)
+        source = kw.pop("source", "manual")
+        job = Job(source=source, jd_text="x", **kw)
         s.add(job)
         s.commit()
         s.refresh(job)
@@ -72,3 +73,22 @@ def test_post_manual_job_creates():
         resp = client.post("/api/jobs", json={"jdText": "Need a dev", "company": "Acme"})
     assert resp.status_code == 201
     assert resp.json()["company"] == "Acme"
+
+
+def test_bulk_delete_query_dry_run_uses_board_filter():
+    client = _client()
+    with client:
+        _seed(client.app, status=JobStatus.raw.value, source="adzuna")
+        _seed(client.app, status=JobStatus.raw.value, source="manual")
+        resp = client.post(
+            "/api/jobs/bulk",
+            json={
+                "board": "triage",
+                "action": "delete",
+                "scope": "query",
+                "source": ["adzuna"],
+                "dryRun": True,
+            },
+        )
+    assert resp.status_code == 200
+    assert resp.json() == {"affected": 1, "skipped": 0, "reasons": {}}

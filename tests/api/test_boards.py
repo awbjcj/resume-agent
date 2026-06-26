@@ -28,6 +28,8 @@ def test_pipeline_returns_paginated_envelope():
     assert body["pagination"]["pageSize"] == 10
     assert body["data"][0]["company"] == "Acme"
     assert "fitScore" in body["data"][0]
+    assert body["total"] == 1
+    assert body["facets"]["status"]["tailored"] == 1
 
 
 def test_pipeline_status_filter():

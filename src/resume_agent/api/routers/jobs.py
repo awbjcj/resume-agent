@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from resume_agent.api.deps import get_session
 from resume_agent.api.errors import ApiException
+from resume_agent.api.schemas.bulk import BulkRequest, BulkResultOut
 from resume_agent.api.schemas.jobs import (
     ApplicationOut,
     ApplicationUpsert,
@@ -55,6 +56,47 @@ def delete_job_endpoint(job_id: int, session: Session = Depends(get_session)) ->
     if not board.delete(session, job_id):
         raise ApiException(409, "CONFLICT", "Job has progress and cannot be deleted")
     return Response(status_code=204)
+
+
+def _bulk_filter(body: BulkRequest) -> board.BoardFilter:
+    return board.BoardFilter(
+        q=body.q,
+        source=tuple(body.source),
+        status=tuple(body.status_in),
+        remote=tuple(body.remote),
+        sponsorship=tuple(body.sponsorship),
+        seniority=tuple(body.seniority),
+        employment_type=tuple(body.employment_type),
+        industry=tuple(body.industry),
+        country=tuple(body.country),
+        region=tuple(body.region),
+        city=tuple(body.city),
+        company_size=tuple(body.company_size),
+        skills=tuple(body.skills),
+        min_fit=body.min_fit,
+        max_fit=body.max_fit,
+        min_salary=body.min_salary,
+        stale_days=body.stale_days,
+        sort=body.sort_by,
+        archived=body.archived,
+    )
+
+
+@router.post("/jobs/bulk", response_model=BulkResultOut)
+def bulk_jobs(body: BulkRequest, session: Session = Depends(get_session)):
+    if body.action == "setStatus" and not body.status:
+        raise ApiException(422, "VALIDATION_ERROR", "status is required for setStatus")
+    result = board.bulk_apply(
+        session,
+        board=body.board,
+        action=body.action,
+        scope=body.scope,
+        board_filter=_bulk_filter(body),
+        ids=body.ids,
+        status=body.status,
+        dry_run=body.dry_run,
+    )
+    return BulkResultOut.model_validate(result)
 
 
 @router.put("/jobs/{job_id}/application", response_model=ApplicationOut)

@@ -33,3 +33,8 @@ class Pagination(CamelModel):
 class Page(CamelModel, Generic[T]):
     data: list[T]
     pagination: Pagination
+
+
+class BoardPage(Page[T], Generic[T]):
+    facets: dict[str, dict[str, int]]
+    total: int

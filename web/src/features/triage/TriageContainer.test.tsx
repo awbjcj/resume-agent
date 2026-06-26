@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
@@ -38,14 +37,20 @@ describe("TriageContainer", () => {
             },
           ],
           pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+          facets: { source: { adzuna: 1 }, status: { raw: 1 } },
+          total: 1,
         }),
+      ),
+      http.post("/api/jobs/bulk", () =>
+        HttpResponse.json({ affected: 1, skipped: 0, reasons: {} }),
       ),
     );
     wrap(<TriageContainer />);
-    await waitFor(() => expect(screen.getByText("Eng")).toBeInTheDocument());
-    const archive = screen.getByRole("button", { name: /archive selected/i });
-    expect(archive).toBeDisabled();
-    await userEvent.click(screen.getByRole("checkbox", { name: /select job 3/i }));
-    expect(archive).toBeEnabled();
+    const rowCheckbox = await screen.findByRole("checkbox", { name: /select acme eng/i });
+    expect(screen.queryByRole("status", { name: /1 selected/i })).not.toBeInTheDocument();
+    fireEvent.click(rowCheckbox);
+    await waitFor(() =>
+      expect(screen.getByRole("status", { name: /1 selected/i })).toBeInTheDocument(),
+    );
   });
 });

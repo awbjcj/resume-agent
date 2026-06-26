@@ -1,14 +1,34 @@
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { PipelineItem } from "./use-pipeline";
 
-export function PipelineCard({ row, onOpen }: { row: PipelineItem; onOpen: () => void }) {
+export function PipelineCard({
+  row,
+  onOpen,
+  selected,
+  onSelect,
+}: {
+  row: PipelineItem;
+  onOpen: () => void;
+  selected?: boolean;
+  onSelect?: (checked: boolean) => void;
+}) {
   return (
-    <Card className="p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
+    <Card className="flex items-start gap-3 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
+      {onSelect && (
+        <div className="pt-1">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(value) => onSelect(Boolean(value))}
+            aria-label={`Select ${row.company ?? "job"} ${row.title ?? ""}`.trim()}
+          />
+        </div>
+      )}
       <button
         type="button"
         onClick={onOpen}
-        className="group w-full rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+        className="group min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

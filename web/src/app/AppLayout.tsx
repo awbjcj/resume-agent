@@ -92,14 +92,14 @@ export function AppLayout() {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex min-h-16 items-center gap-3 border-b bg-background/88 px-5 py-3 backdrop-blur md:px-8 lg:px-10">
+        <header className="sticky top-0 z-10 flex min-h-16 flex-wrap items-center gap-3 border-b bg-background/88 px-5 py-3 backdrop-blur md:px-8 lg:px-10">
           <SidebarTrigger className="md:hidden" />
           <div className="hidden min-w-0 md:block">
             <div className="text-sm font-medium">Job search operations</div>
             <div className="text-xs text-muted-foreground">Pull, discover, review, and ship.</div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-          <RunActions />
+          <div className="ml-auto flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+            <RunActions />
             <ThemeToggle />
           </div>
         </header>
