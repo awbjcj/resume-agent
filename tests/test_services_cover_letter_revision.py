@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sqlmodel import Session
 
 from resume_agent.db import init_db, make_engine
@@ -5,7 +7,7 @@ from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterPara
 from resume_agent.models.profile import Contact, Experience, ProfileFacts
 from resume_agent.services.agents import CoverLetterBundle
 from resume_agent.services.cover_letter_revision import revise_cover_letter_version
-from resume_agent.tracking.repository import save_cover_letter, save_job
+from resume_agent.tracking.repository import get_cover_letter, save_cover_letter, save_job
 from resume_agent.tracking.tables import CoverLetter, Job
 
 
@@ -45,14 +47,23 @@ def _letter(provenance="exp1"):
 def test_revise_cover_letter_persists_lineage_and_fact_flag(monkeypatch):
     engine = make_engine("sqlite://")
     init_db(engine)
-    exports = []
+    renders = []
     monkeypatch.setattr(
         "resume_agent.services.cover_letter_revision.load_facts",
         lambda path: _facts(),
     )
+
+    def fake_render(session, cover_letter_id):
+        cover = get_cover_letter(session, cover_letter_id)
+        assert cover is not None
+        cover.pdf_path = f"output/cover-letter-v{cover_letter_id}-revision.pdf"
+        save_cover_letter(session, cover)
+        renders.append(cover_letter_id)
+        return Path(cover.pdf_path)
+
     monkeypatch.setattr(
-        "resume_agent.services.cover_letter_revision.export_job_artifacts",
-        lambda session, job_id: exports.append(job_id),
+        "resume_agent.services.cover_letter_revision.render_cover_letter",
+        fake_render,
     )
 
     with Session(engine) as session:
@@ -76,4 +87,5 @@ def test_revise_cover_letter_persists_lineage_and_fact_flag(monkeypatch):
         assert child.instruction == "warmer tone"
         assert child.parent_id == parent.id
         assert child.fact_check_passed is False
-        assert exports == [job.id]
+        assert child.pdf_path == f"output/cover-letter-v{child.id}-revision.pdf"
+        assert renders == [child.id]
