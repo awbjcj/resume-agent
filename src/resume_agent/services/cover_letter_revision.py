@@ -1,0 +1,53 @@
+"""Prompt-driven cover-letter revision service."""
+
+from __future__ import annotations
+
+from sqlmodel import Session
+
+from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
+from resume_agent.cover_letter.revision import apply_revision, compose_user_revision_input
+from resume_agent.models.cover_letter import CoverLetterContent
+from resume_agent.profile.store import load_facts
+from resume_agent.render.export import export_job_artifacts
+from resume_agent.services.agents import CoverLetterBundle, build_cover_letter_bundle
+from resume_agent.tracking.repository import get_cover_letter, save_cover_letter
+from resume_agent.tracking.tables import CoverLetter
+
+DEFAULT_FACTS = "data/profile/facts.json"
+
+
+def revise_cover_letter_version(
+    session: Session,
+    cover_letter_id: int,
+    instruction: str,
+    *,
+    facts_path: str = DEFAULT_FACTS,
+    bundle: CoverLetterBundle | None = None,
+) -> CoverLetter | None:
+    parent = get_cover_letter(session, cover_letter_id)
+    if parent is None:
+        return None
+
+    facts = load_facts(facts_path)
+    bundle = bundle or build_cover_letter_bundle()
+    current = CoverLetterContent.model_validate(parent.content_json or {})
+    revised = apply_revision(
+        compose_user_revision_input(current, instruction, facts),
+        bundle.revision,
+    )
+
+    bad = unsupported_provenance(revised, collect_fact_ids(facts))
+    child = save_cover_letter(
+        session,
+        CoverLetter(
+            job_id=parent.job_id,
+            resume_version_id=parent.resume_version_id,
+            content_json=revised.model_dump(mode="json"),
+            fact_check_passed=not bad,
+            origin="revision",
+            instruction=instruction,
+            parent_id=parent.id,
+        ),
+    )
+    export_job_artifacts(session, child.job_id)
+    return child
