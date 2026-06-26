@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from resume_agent.config import load_yaml
 from resume_agent.models.base import ExtensibleModel
@@ -9,6 +9,7 @@ from resume_agent.models.base import ExtensibleModel
 class GreenhouseBoard(ExtensibleModel):
     token: str
     company: str | None = None
+    enabled: bool = True
 
     def display(self) -> str:
         return self.company or self.token
@@ -22,6 +23,7 @@ class GreenhouseConfig(ExtensibleModel):
 class LeverBoard(ExtensibleModel):
     token: str
     company: str | None = None
+    enabled: bool = True
 
     def display(self) -> str:
         return self.company or self.token
@@ -45,9 +47,22 @@ class LinkedInConfig(ExtensibleModel):
     enabled: bool = False
 
 
+class CompanyUrl(ExtensibleModel):
+    url: str
+    enabled: bool = True
+    label: str | None = None
+
+
 class CompaniesConfig(ExtensibleModel):
     enabled: bool = False
-    urls: list[str] = Field(default_factory=list)
+    urls: list[CompanyUrl] = Field(default_factory=list)
+
+    @field_validator("urls", mode="before")
+    @classmethod
+    def _coerce_bare_strings(cls, value):
+        if isinstance(value, list):
+            return [{"url": item} if isinstance(item, str) else item for item in value]
+        return value
 
 
 class ConnectorsConfig(ExtensibleModel):
