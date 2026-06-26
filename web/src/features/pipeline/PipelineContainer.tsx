@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { SearchIcon } from "lucide-react";
 
 import { BulkActionBar } from "@/components/BulkActionBar";
 import { BulkPreviewButton } from "@/components/BulkPreviewButton";
@@ -38,8 +39,40 @@ function pipelineFilter() {
   return filter;
 }
 
+function normalizeFitInput(value: number) {
+  const fit = Math.min(100, Math.max(0, Math.round(value)));
+  return fit === 0 ? null : fit;
+}
+
+type PipelineFilterDraft = {
+  sourceQ: string;
+  sourceFitMin: number | null;
+  q: string;
+  fitMin: number;
+};
+
+function pipelineDraftFromFilter(filter: ReturnType<typeof pipelineFilter>): PipelineFilterDraft {
+  return {
+    sourceQ: filter.q,
+    sourceFitMin: filter.fitMin,
+    q: filter.q,
+    fitMin: filter.fitMin ?? 0,
+  };
+}
+
+function isPipelineDraftCurrent(
+  draft: PipelineFilterDraft,
+  filter: ReturnType<typeof pipelineFilter>,
+) {
+  return draft.sourceQ === filter.q && draft.sourceFitMin === filter.fitMin;
+}
+
 export function PipelineContainer() {
   const [filter, setFilter] = useState(pipelineFilter);
+  const [filterDraft, setFilterDraft] = useState(() => pipelineDraftFromFilter(filter));
+  const draft = isPipelineDraftCurrent(filterDraft, filter)
+    ? filterDraft
+    : pipelineDraftFromFilter(filter);
   const [targetStatus, setTargetStatus] = useState("approved");
   const { rows, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useBoardQuery<PipelineItem>("pipeline", filter);
@@ -70,6 +103,20 @@ export function PipelineContainer() {
   const loadedIds = rows.map((row) => row.jobId);
   const bulkSelection = { mode: selection.mode, ids: selection.ids };
   const bulkArgs = { selection: bulkSelection, filter };
+  const committedQ = draft.q.trim();
+  const committedFitMin = normalizeFitInput(draft.fitMin);
+  const hasFilterDraftChanges =
+    committedQ !== filter.q.trim() || committedFitMin !== filter.fitMin;
+  const applyFilters = () => {
+    if (!hasFilterDraftChanges) return;
+    setFilter({ ...filter, q: committedQ, fitMin: committedFitMin });
+    setFilterDraft({
+      sourceQ: committedQ,
+      sourceFitMin: committedFitMin,
+      q: committedQ,
+      fitMin: committedFitMin ?? 0,
+    });
+  };
 
   const openJob = (id: number) =>
     setParams(
@@ -111,7 +158,13 @@ export function PipelineContainer() {
           ["Stages active", String(byStage.size)],
         ]}
       />
-      <div className="mb-7 grid grid-cols-1 gap-4 rounded-lg border bg-card p-5 shadow-[0_1px_2px_rgba(24,32,38,0.04)] sm:grid-cols-2">
+      <form
+        className="mb-7 grid grid-cols-1 gap-4 rounded-lg border bg-card p-5 shadow-[0_1px_2px_rgba(24,32,38,0.04)] sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          applyFilters();
+        }}
+      >
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="pipe-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
             Company/title
@@ -119,8 +172,8 @@ export function PipelineContainer() {
           <Input
             id="pipe-q"
             className="h-10 bg-card"
-            value={filter.q}
-            onChange={(event) => setFilter({ ...filter, q: event.target.value })}
+            value={draft.q}
+            onChange={(event) => setFilterDraft({ ...draft, q: event.target.value })}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -128,21 +181,27 @@ export function PipelineContainer() {
             <Label htmlFor="pipe-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
               Min fit
             </Label>
-            <span className="text-xs tabular-nums text-muted-foreground">{filter.fitMin ?? 0}</span>
+            <span className="text-xs tabular-nums text-muted-foreground">{draft.fitMin}</span>
           </div>
           <Slider
             id="pipe-fit"
             aria-label="Min fit"
             min={0}
             max={100}
-            value={[filter.fitMin ?? 0]}
+            value={[draft.fitMin]}
             onValueChange={(value) => {
               const fit = (value as number[])[0] ?? 0;
-              setFilter({ ...filter, fitMin: fit === 0 ? null : fit });
+              setFilterDraft({ ...draft, fitMin: normalizeFitInput(fit) ?? 0 });
             }}
           />
         </div>
-      </div>
+        <div className="flex items-end">
+          <Button type="submit" className="w-full lg:w-auto" disabled={!hasFilterDraftChanges}>
+            <SearchIcon data-icon="inline-start" />
+            Apply filters
+          </Button>
+        </div>
+      </form>
       {!rows.length ? (
         <EmptyState
           title="No jobs in the pipeline"
