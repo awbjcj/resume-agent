@@ -1,7 +1,7 @@
 # Gap-Closing Advisor (Spec B)
 
 **Date:** 2026-06-26
-**Status:** Approved (design)
+**Status:** Approved (revised after engineering review)
 **Scope note:** This is **Spec B** of a two-spec split. Spec A
 (`2026-06-26-match-gap-skill-intelligence-design.md`) builds the skill-demand
 dashboard and produces the `{skill, jobs, theme}` shapes and the `SkillDrawer`
@@ -57,8 +57,8 @@ Source: agno provider web-search docs (Gemini `search=True`; Anthropic
 
 New `Settings.search_mode: "auto" | "native" | "tool" | "off"` (default `auto`):
 
-- **native** — use the provider's native search per the table; DeepSeek (no native)
-  falls back to tool.
+- **native** — require the provider's native search per the table; unsupported
+  providers fail configuration with a clear error.
 - **tool** — attach an agno function-calling search tool to any provider.
 - **auto** (default) — native where supported, else tool. Anthropic being the
   default provider means native Claude web search works with zero config.
@@ -73,17 +73,23 @@ It resolves the provider via the existing `split_provider`, picks native vs tool
 per `mode`, and returns the agno model (a Responses model for OpenAI native) plus
 the `tools` list to spread into `Agent(...)`. SDK imports stay lazy per branch.
 
-The agno tool itself is selected by `Settings.search_provider`
-(`duckduckgo` default / `tavily` / `exa`), reading `Settings.tavily_api_key` /
-`Settings.exa_api_key` when keyed. DuckDuckGo needs no key.
+The model-agnostic fallback is one keyless Agno DuckDuckGo/DDGS search tool. V1
+does not add a provider registry, Tavily/Exa settings, or unused API-key branches;
+those can be added when a concrete reliability or quota requirement exists. The
+required `ddgs` package is declared explicitly because Agno treats tool backends
+as optional dependencies.
+
+`native` is an explicit assertion: it fails configuration for a provider without
+native search. `auto` is the mode that falls back to the model-agnostic tool.
 
 ### 2.3 New Settings
 
 - `search_mode: str = "auto"`
-- `search_provider: str = "duckduckgo"`
-- `tavily_api_key: str = ""`, `exa_api_key: str = ""`
 - `github_token: str = ""` (raises GitHub API rate limits; optional)
 - `advisor_model: str = ""` → falls back to `premium_model` when blank
+
+`search_mode` is a validated literal, not an unchecked string. When it is `off`,
+the advisor is unavailable rather than generating an ungrounded recommendation.
 
 ---
 
@@ -97,6 +103,11 @@ So generation is two LLM calls:
    Prompted with the skill/theme context (§4.2); returns prose + a citations list.
 2. **Formatter agent** — schema-only (cheap tier, no tools), `output_schema =
    SuggestionDraft`. Parses stage-1 prose into the structured draft.
+
+The service rejects an empty or unusable formatter result. Resource and citation
+URLs must use `http` or `https`, and every non-GitHub resource must occur in the
+stage-1 research evidence. This prevents the formatter from manufacturing a link
+that was never returned by search.
 
 This one pipeline works identically for native and tool modes and every provider.
 
@@ -123,13 +134,16 @@ SuggestionDraft {
 
 ```
 generate_suggestion(
-  session, *, kind: "skill"|"theme", key: str,
-  search_agent, formatter, github, facts, cluster_map, reporter=None,
+  session, *, context: SuggestionContext,
+  search_agent, formatter, github, facts, reporter=None,
 ) -> SkillSuggestion
 ```
 
-Steps: assemble context (§4.2) → stage-1 search → stage-2 format → verify GitHub
-repos via `github` → compute fingerprint (§5) → upsert the `SkillSuggestion` row.
+Steps: resolve and validate context from server-owned demand-graph data (§4.2) →
+stage-1 search → stage-2 format → validate evidence URLs → verify GitHub repos
+via `github` → compute fingerprint (§5) → atomically upsert the
+`SkillSuggestion` row. Client-supplied member skills or job context are never
+accepted.
 
 ### 4.2 Context assembly
 
@@ -138,6 +152,11 @@ repos via `github` → compute fingerprint (§5) → upsert the `SkillSuggestion
   it (from the Spec A demand graph / `_target_jobs`).
 - **theme**: the theme label + its member canonical skills + the jobs demanding any
   of them. The prompt asks for a learning *path* across the set.
+
+`SuggestionContext` contains `kind`, stable `key`, display label, canonical member
+skills, and sorted demanding job IDs plus human-readable company/title context.
+The same resolver is used by POST generation and GET staleness checks, preventing
+the two paths from drifting.
 
 ### 4.3 Run endpoints (router: `api/routers/suggestions.py`)
 
@@ -163,16 +182,21 @@ SkillSuggestion(SQLModel, table=True):
   payload_json: dict (JSON)   # the verified SuggestionOut payload
   fingerprint: str
   generated_at: datetime
-  # unique (kind, key)
+  # database-enforced unique (kind, key)
 ```
 
-Upserted on regenerate (delete-then-insert or update in place). **Fingerprint** =
-stable hash of `(key, sorted(profile_coverage_tokens), sorted(theme_member_skills))`.
-`GET` recomputes the current fingerprint from live facts + cluster map; `stale =
-stored.fingerprint != current` — e.g. after the user updates their profile or
-re-clusters. Drives a "Regenerate" affordance.
+Upserted on regenerate with an update-in-place transaction. **Fingerprint** =
+stable hash of `(kind, key, sorted(profile_coverage_tokens),
+sorted(theme_member_skills), sorted(demanding_job_ids), schema_version)`.
+`GET` resolves the same live server context and recomputes the fingerprint;
+`stale = stored.fingerprint != current` — e.g. after the user updates their
+profile, re-clusters, or changes the target-job set. Drives a "Regenerate"
+affordance. A database uniqueness constraint prevents concurrent generation from
+creating duplicate rows.
 
-A migration adds the table (follow the repo's existing migration pattern).
+The existing `init_db`/`SQLModel.metadata.create_all` path creates this additive
+table for existing databases; no column-ALTER migration is required. Ensure the
+model is imported into metadata before `create_all` runs.
 
 ---
 
@@ -182,12 +206,15 @@ A migration adds the table (follow the repo's existing migration pattern).
 verify_repo(owner: str, name: str, *, token: str = "") -> RepoMeta | None
 ```
 
-GETs `https://api.github.com/repos/{owner}/{name}` (httpx; `Authorization: Bearer`
-when `token` set). Returns `RepoMeta{ full_name, url, stars, description }` on 200,
-`None` on 404/error (repo dropped). A helper parses `owner/name` out of a GitHub
-URL. The service maps each `RepoRef` through `verify_repo`, replacing `why` +
-adding `stars`/`description`, dropping unresolved. All other links pass through
-unchanged with their citation. Faked offline.
+GETs `https://api.github.com/repos/{owner}/{name}` through a reused `httpx.Client`
+(`Authorization: Bearer` when `token` set). URL parsing uses `urllib.parse`,
+requires the exact `github.com` host, and validates owner/repository path segments
+before constructing the fixed GitHub API URL. Returns
+`RepoMeta{ full_name, url, stars, description }` on 200 and `None` only on 404.
+Authentication, rate-limit, network, malformed-JSON, and 5xx failures fail the
+Run so the last good cached suggestion remains intact. Verified repos are
+deduplicated; non-GitHub resources are retained only when they pass the evidence
+URL rules in §3. Faked offline.
 
 ---
 
@@ -220,7 +247,9 @@ SuggestionEnvelope { suggestion: SuggestionOut | null, stale: bool }
 - Each theme group in the dashboard gets a **learning-path** button (same flow with
   `kind: "theme"`), opening the drawer in theme mode.
 - New presentational component `SuggestionPanel.tsx` (the rendered suggestion),
-  tested with MSW for cached / empty / loading states.
+  tested with MSW for cached / empty / loading / error states. It renders source
+  citations, exposes active generation state, uses a skeleton while loading, and
+  never leaves controls permanently disabled after a failed launch.
 
 ---
 
@@ -233,10 +262,13 @@ SuggestionEnvelope { suggestion: SuggestionOut | null, stale: bool }
   formatter (returns a `SuggestionDraft`), and fake `github` (verifies/drops);
   asserts repos verified, dead repos dropped, fingerprint computed, row upserted.
 - Fingerprint staleness: changing profile coverage flips `stale`.
+- Fingerprint staleness: changing theme membership or demanding jobs also flips
+  `stale`; client-supplied members/context are rejected or ignored.
 - Run endpoint: POST → poll to `done`; GET returns the cached envelope.
 - OpenAPI contract gate regenerated and green.
-- Frontend: `SuggestionPanel` + drawer wiring (cached/empty/generate) with MSW;
-  `use-suggestion` hooks.
+- Frontend: `SuggestionPanel` + skill/theme drawer wiring
+  (cached/empty/loading/error/generating) with MSW; query invalidation refetches
+  the exact parameterized cache key; keyboard and axe checks cover the panel.
 
 ---
 
@@ -254,7 +286,8 @@ SuggestionEnvelope { suggestion: SuggestionOut | null, stale: bool }
 | Path | Change |
 |------|--------|
 | `src/resume_agent/llm_runner.py` | `build_search_equipped(model_id, mode)` + native/tool strategy; OpenAI Responses variant. |
-| `src/resume_agent/config.py` (Settings) | `search_mode`, `search_provider`, `tavily_api_key`, `exa_api_key`, `github_token`, `advisor_model`. |
+| `src/resume_agent/config.py` (Settings) | Validated `search_mode`, `github_token`, `advisor_model`. |
+| `pyproject.toml`, `uv.lock` | Declare the keyless DDGS search-tool dependency. |
 | `src/resume_agent/suggestions/agents.py` | **New.** `build_search_agent()`, `build_formatter_agent()`, `SuggestionDraft` + nested models. |
 | `src/resume_agent/github/repos.py` | **New.** `verify_repo`, `RepoMeta`, URL parser. |
 | `src/resume_agent/services/suggestions.py` | **New.** `generate_suggestion` + context assembly + fingerprint. |

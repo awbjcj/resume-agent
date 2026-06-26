@@ -1,7 +1,7 @@
 # Match/Gap → Skill-Demand Intelligence Dashboard (Spec A)
 
 **Date:** 2026-06-26
-**Status:** Approved (design)
+**Status:** Approved (revised after engineering review)
 **Scope note:** This is **Spec A** of a two-spec split. Spec B — the LLM
 web-search "how to close this gap" advisor (GitHub repos / learning resources,
 DeepSeek-vs-Gemini/OpenAI web-search capability check) — is deliberately deferred
@@ -65,6 +65,11 @@ MatchGapOut {
   (existing) tested against the canonical skill. **No LLM in the read path.**
 - `edges[]` carries `source` so the client can recompute weighted demand under any
   filter (e.g. filter to one company → re-sum that subset).
+- `source` is a closed enum (`"must" | "nice" | "tech"`), not an arbitrary
+  string. There is at most one edge per `(jobId, canonical skill, source)`;
+  duplicate values inside one criteria list must not inflate demand. The same
+  skill appearing in different source lists intentionally produces one edge per
+  source.
 - Skills present on jobs but absent from the persisted cluster map pass through as
   identity-canonical with `themeId = null`, and set `clustersStale = true`.
 
@@ -78,24 +83,25 @@ rollups with zero round-trips. Payload stays in the KB–low-MB range.
 
 ### 2.2 Aggregation source
 
-`match_gap` (in `tracking/match_gap.py`) changes from "must-have only, gaps only"
-to "all three lists, all skills":
+An additive `build_demand_graph` projection in `tracking/match_gap.py` covers all
+three lists and all skills. The legacy `match_gap` report and CLI contract remain
+unchanged:
 
 - Read `must_have_skills`, `nice_to_have_skills`, `tech_stack` from each target
   job's `criteria_json` (helper analogous to today's `_must_have_skills`, one per
   source, each tagged with its `source`).
 - Build `edges` (one per job×skill×source), `skills` (deduped union with coverage +
   theme), `jobs` (id/company/title/seniority), `themes`.
-- Weight constants `WEIGHT = {"must": 3, "nice": 2, "tech": 1}` live as a module
-  constant (tunable). The **backend does not pre-multiply** — it emits raw edges and
-  lets the client apply weights, so the Essential↔Popular toggle is a pure client
-  re-sum.
+- Weight constants `SOURCE_WEIGHT = {must: 3, nice: 2, tech: 1}` live once in the
+  pure frontend aggregation module. The **backend does not define or apply
+  weights** — it emits raw typed edges and lets the client apply weights, so the
+  Essential↔Popular toggle is a pure client re-sum.
 
 ### 2.3 Cluster map persistence (extend the taxonomy seam)
 
-`taxonomy/skills.py` already persists a flat `token→canonical` alias map via
-`refresh_aliases` / `merge_aliases` (monotonic, existing choices win for stability).
-Extend this into a **cluster map** with three parts, persisted as JSON under
+`taxonomy/skills.py` already owns skill normalization concepts. Add a focused
+`taxonomy/clusters.py` persistence module for a **cluster map** with three parts,
+persisted as JSON under
 `data/profile/` (alongside facts) or `data/taxonomy/`:
 
 ```
@@ -108,7 +114,16 @@ cluster_map.json {
 
 Merges stay **monotonic** (existing canonical/theme choices win) so the dashboard is
 stable across refreshes. Loading is identity-on-missing (no file → empty maps →
-everything passes through, `clustersStale = true`).
+everything passes through, `clustersStale = true`). A malformed file is treated as
+empty and reported as stale rather than breaking the dashboard read path.
+
+The persisted map is validated at the boundary: keys and values are normalized
+non-empty strings, aliases may only point to canonical tokens from the current
+input, and the theme output must be an exact partition of the canonical skills
+(every skill exactly once, no unknown members). Invalid LLM output fails the Run
+without replacing the last good map. Writes use a unique temporary file followed
+by an atomic replace; concurrent refreshes for the same map are coalesced or
+serialized.
 
 ### 2.4 Refresh Run (LLM dedup + theming, off the read path)
 
@@ -122,7 +137,8 @@ everything passes through, `clustersStale = true`).
 4. **Pass 2 — theming:** a **new** agent (`build_skill_themer` or similar, cheap
    tier, structured output `{ themes: [{ label, skills: [...] }] }`) assigns each
    canonical skill to a theme; output → `themeOf` + `themeLabel`.
-5. Persists via a monotonic merge into `cluster_map.json`.
+5. Validates the complete dedup/theme result, then persists via a monotonic merge
+   into `cluster_map.json`.
 
 Both passes run under the existing concurrency seam (`gather_isolated` + shared
 `asyncio.Semaphore`, acquired only inside `llm_runner.acall`). Uses agno's
@@ -152,20 +168,24 @@ All under `web/src/features/match-gap/`.
 A React-free, unit-tested function: `(payload: MatchGapOut, filters: Filters) →
 DerivedView`. Owns **all** logic:
 
-- Apply filters (company set, seniority set, gaps-only) to `edges` by `jobId`.
+- Apply filters (company, seniority, gaps-only) to `edges` by `jobId`.
 - Apply weighting mode (Essential = source weights 3/2/1; Popular = distinct-job
   count) to produce each skill's score.
 - Produce: `cloudItems` (skill, score, covered, themeId), `rankedRows` (sorted,
   with exact counts + per-source breakdown), `themeGroups`, `byCompany` table,
-  `byPosition` table, and a `jobsForSkill(skill)` reverse lookup.
+  `byPosition` table, and reverse lookups for both skills and themes.
+
+Every rollup recomputes scores from that facet's own edge subset. A company's
+top-skill score must never reuse the score from the full filtered dataset.
 
 `DerivedView` is the single contract every component renders from.
 
 ### 3.2 Components
 
 - **`Filters`** — shadcn `select` (company), `select` (seniority), `switch`
-  (gaps-only), `toggle-group` (Essential ↔ Popular). State in a small `zustand`
-  store (or URL params for shareable views).
+  (gaps-only), `toggle-group` (Essential ↔ Popular). Keep state local for v1;
+  move it to URL params only when shareable views are required. Each control has
+  an explicit accessible label.
 - **`WordCloud`** — **CSS/flex weighted tag cloud.** Font-size bucketed by score,
   color = gap (accent) vs covered (muted), deterministic order (score desc). Each
   word is a real `<button>` (a11y + click → drawer). Chosen over `@visx/wordcloud` /
@@ -183,6 +203,20 @@ DerivedView`. Owns **all** logic:
   (collapsible `select`/`accordion`).
 - **`RefreshClustersButton`** — POSTs `/api/match-gap/refresh-clusters`, watches SSE
   via existing run hooks; prominent when `clustersStale`.
+
+**Visual direction:** an editorial analytics workbench that extends the existing
+teal, grid-backed house style. The ranked list is the primary precise reading
+surface; the cloud is a secondary exploratory index. Use one shared bordered
+analysis surface with clear dividers and restrained radius instead of a grid of
+independent generic cards. Gap/covered state uses text or icons in addition to
+color. Motion is limited to a short staggered reveal and is disabled under
+`prefers-reduced-motion`.
+
+The page provides distinct loading, request-error, no-target-jobs, and
+no-results-for-current-filters states. The sheet has a title and description,
+scrolls on small screens, returns focus on close, and exposes skill/theme status
+and scores to assistive technology. Controls and all cloud/ranked interactions
+remain usable at 320 px and by keyboard.
 
 ### 3.3 Data hook
 
@@ -203,9 +237,12 @@ infrastructure.
 
 **Frontend (vitest + MSW):**
 - `aggregate.ts` unit tests: weighting modes, company/seniority filtering,
-  gaps-only, by-company/by-position rollups, reverse lookup.
+  gaps-only, facet-local by-company/by-position scores, duplicate-edge defense,
+  and skill/theme reverse lookup.
 - Component tests: filter wiring re-derives the view; clicking a word opens the
-  drawer with the right jobs; `clustersStale` surfaces the refresh button.
+  drawer with the right jobs; theme selection opens the combined job set;
+  `clustersStale` surfaces the refresh button; request-error and filtered-empty
+  states are meaningful; core views pass an axe accessibility check.
 
 ---
 
@@ -223,9 +260,9 @@ infrastructure.
 
 | Path | Change |
 |------|--------|
-| `src/resume_agent/tracking/match_gap.py` | Reframe to demand-graph report (all 3 sources, edges, coverage, themes). |
+| `src/resume_agent/tracking/match_gap.py` | Add demand-graph report beside the unchanged legacy report. |
 | `src/resume_agent/tracking/canonicalize.py` | Strengthen dedup prompt; add theming agent (`build_skill_themer`). |
-| `src/resume_agent/taxonomy/skills.py` | Extend alias map → cluster map (aliases + themeOf + themeLabel), monotonic merge. |
+| `src/resume_agent/taxonomy/clusters.py` | New cluster-map persistence (aliases + themeOf + themeLabel), validation, monotonic merge. |
 | `src/resume_agent/api/schemas/match_gap.py` | New camelCase schemas (JobLite/SkillNode/DemandEdge/Theme/MatchGapOut). |
 | `src/resume_agent/api/routers/match_gap.py` | Rich projection GET; new `POST /refresh-clusters` Run endpoint. |
 | `src/resume_agent/api/runs/manager.py` (wiring) | Register the refresh-clusters worker. |
