@@ -1,21 +1,32 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+import type { CoverLetterItem } from "@/features/job/CoverLetterRow";
 import { StatusBadge } from "./StatusBadge";
 import { FitDial } from "./FitDial";
 import { JobMeta } from "./JobMeta";
 import { SkillMatrix } from "./SkillMatrix";
 import { DrawerSkeleton } from "./skeletons";
 import { ApplicationEditor } from "@/features/job/ApplicationEditor";
+import { CoverLettersTab } from "@/features/job/CoverLettersTab";
 import { StageManager } from "@/features/job/StageManager";
+import { VersionRow } from "@/features/job/VersionRow";
 import { useJobDetail } from "@/features/job/use-job-detail";
-import { useRenderVersion } from "@/features/job/use-job-mutations";
-import { withTokenParam } from "@/lib/api/client";
 import { JdBody } from "./JdBody";
+
+type ClosedLoopApplication = {
+  resumeVersionId?: number | null;
+  coverLetterId?: number | null;
+};
+
+type ClosedLoopJob = {
+  coverLetters?: CoverLetterItem[];
+  application?: ClosedLoopApplication | null;
+};
 
 export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => void }) {
   const { data: job, isLoading } = useJobDetail(jobId);
-  const render = useRenderVersion(jobId);
+  const closedLoopJob = job as (NonNullable<typeof job> & ClosedLoopJob) | undefined;
+  const coverLetters = closedLoopJob?.coverLetters ?? [];
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -80,6 +91,14 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
                         </span>
                       )}
                     </TabsTrigger>
+                    <TabsTrigger value="coverLetters" className="text-sm">
+                      Cover letters
+                      {coverLetters.length > 0 && (
+                        <span className="ml-1.5 tabular-nums opacity-60">
+                          {coverLetters.length}
+                        </span>
+                      )}
+                    </TabsTrigger>
                     <TabsTrigger value="application" className="text-sm">Application</TabsTrigger>
                     <TabsTrigger value="manage" className="text-sm">Manage</TabsTrigger>
                   </TabsList>
@@ -108,35 +127,27 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
                       )}
                       <ul className="mt-2 space-y-2">
                         {job.resumeVersions.map((v) => (
-                          <li
+                          <VersionRow
                             key={v.id}
-                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/60 p-3"
-                          >
-                            <span className="text-sm">
-                              Round {v.round} · score {v.reviewScore ?? "—"} ·{" "}
-                              {v.factCheckPassed ? "fact-check ✓" : "fact-check ✗"}
-                            </span>
-                            {v.pdfPath ? (
-                              <a
-                                className="text-sm underline"
-                                href={withTokenParam(`/api/resume-versions/${v.id}/pdf`)}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Download PDF
-                              </a>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => render.mutate(v.id)}
-                              >
-                                Render
-                              </Button>
-                            )}
-                          </li>
+                            jobId={jobId}
+                            version={v}
+                            appliedVersionId={
+                              closedLoopJob?.application?.resumeVersionId ?? null
+                            }
+                          />
                         ))}
                       </ul>
+                    </TabsContent>
+
+                    <TabsContent value="coverLetters" className="mt-0">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Cover letters
+                      </h3>
+                      <CoverLettersTab
+                        jobId={jobId}
+                        coverLetters={coverLetters}
+                        appliedId={closedLoopJob?.application?.coverLetterId ?? null}
+                      />
                     </TabsContent>
 
                     <TabsContent value="application" className="mt-0">
