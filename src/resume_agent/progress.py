@@ -53,10 +53,16 @@ def atomic_write_text(path: Path, text: str) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
-        os.replace(tmp, path)
-    except BaseException:
+        for attempt in range(_WRITE_RETRIES):
+            try:
+                os.replace(tmp, path)
+                return
+            except OSError:
+                if attempt == _WRITE_RETRIES - 1:
+                    raise
+                time.sleep(_WRITE_BACKOFF_SECONDS)
+    finally:
         Path(tmp).unlink(missing_ok=True)
-        raise
 
 
 def _now_iso() -> str:
@@ -69,6 +75,8 @@ def _now_iso() -> str:
 #: replace window.
 _READ_RETRIES = 3
 _READ_BACKOFF_SECONDS = 0.02
+_WRITE_RETRIES = 3
+_WRITE_BACKOFF_SECONDS = 0.02
 
 
 def read_progress(process: str, root: Path | str = PROGRESS_ROOT) -> dict | None:
