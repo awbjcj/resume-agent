@@ -10,6 +10,7 @@ from typing import Mapping
 
 from resume_agent.cover_letter.agents import (
     build_cover_letter_agent,
+    build_cover_letter_revision_agent,
     build_cover_letter_reviser_agent,
 )
 from resume_agent.discovery.extract import build_extract_agent
@@ -19,6 +20,7 @@ from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
 from resume_agent.llm_runner import Runner
 from resume_agent.tailor.agents import (
     build_reviewer_agent,
+    build_revision_agent,
     build_reviser_agent,
     build_tailor_agent,
     model_for_tier,
@@ -40,12 +42,14 @@ class TailorBundle:
     tailor: Runner
     reviser: Runner
     reviewers: Mapping[str, Runner]
+    revision: Runner
 
 
 @dataclass
 class CoverLetterBundle:
     draft: Runner
     reviser: Runner
+    revision: Runner
 
 
 def build_discovery_bundle() -> DiscoveryBundle:
@@ -68,6 +72,7 @@ def build_tailor_bundle(config, style_guide: str | None = None) -> TailorBundle:
         tailor=build_tailor_agent(style_guide=style_guide),
         reviser=build_reviser_agent(style_guide=style_guide),
         reviewers=reviewers,
+        revision=build_revision_agent(style_guide=style_guide),
     )
 
 
@@ -75,6 +80,7 @@ def build_cover_letter_bundle() -> CoverLetterBundle:
     return CoverLetterBundle(
         draft=build_cover_letter_agent(),
         reviser=build_cover_letter_reviser_agent(),
+        revision=build_cover_letter_revision_agent(),
     )
 
 
@@ -84,7 +90,8 @@ __all__ = [
     "build_url_extract_agent",
     # re-exported so tests can monkeypatch them on this module:
     "build_extract_agent", "build_fit_agent", "build_relevance_agent",
-    "build_tailor_agent", "build_reviser_agent", "build_reviewer_agent",
+    "build_tailor_agent", "build_reviser_agent", "build_revision_agent", "build_reviewer_agent",
     "build_cover_letter_agent", "build_cover_letter_reviser_agent",
+    "build_cover_letter_revision_agent",
     "model_for_tier", "build_skill_canonicalizer",
 ]
