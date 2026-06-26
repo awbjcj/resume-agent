@@ -32,7 +32,9 @@ from resume_agent.tracking.repository import (
     application_for_job,
     archive_job,
     delete_job,
+    get_cover_letter,
     get_job,
+    get_resume_version,
     has_progress,
     restore_job,
     save_application,
@@ -444,3 +446,29 @@ def upsert_application(
     updated = update_application_status(session, existing.id, status, notes)
     assert updated is not None  # existing.id was just confirmed present
     return updated
+
+
+def select_resume_version(
+    session: Session, job_id: int, version_id: int
+) -> Application | None:
+    if get_job(session, job_id) is None:
+        return None
+    version = get_resume_version(session, version_id)
+    if version is None or version.job_id != job_id:
+        return None
+    application = application_for_job(session, job_id) or Application(job_id=job_id)
+    application.resume_version_id = version_id
+    return save_application(session, application)
+
+
+def select_cover_letter(
+    session: Session, job_id: int, cover_letter_id: int
+) -> Application | None:
+    if get_job(session, job_id) is None:
+        return None
+    cover_letter = get_cover_letter(session, cover_letter_id)
+    if cover_letter is None or cover_letter.job_id != job_id:
+        return None
+    application = application_for_job(session, job_id) or Application(job_id=job_id)
+    application.cover_letter_id = cover_letter_id
+    return save_application(session, application)
