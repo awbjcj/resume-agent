@@ -21,6 +21,9 @@ const AnalyticsPage = lazy(() =>
 const MatchGapPage = lazy(() =>
   import("@/features/match-gap/MatchGapPage").then((m) => ({ default: m.MatchGapPage })),
 );
+const SourcesPage = lazy(() =>
+  import("@/features/sources/SourcesPage").then((m) => ({ default: m.SourcesPage })),
+);
 
 const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}</Suspense>;
 
@@ -34,6 +37,7 @@ export const router = createBrowserRouter([
       { path: "triage", element: page(<TriagePage />) },
       { path: "analytics", element: page(<AnalyticsPage />) },
       { path: "match-gap", element: page(<MatchGapPage />) },
+      { path: "sources", element: page(<SourcesPage />) },
     ],
   },
 ]);
