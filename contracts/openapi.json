@@ -2490,10 +2490,19 @@
         "summary": "Launch Cover Letters"
       }
     },
-    "/api/discover": {
-      "post": {
-        "operationId": "launch_discover_api_discover_post",
+    "/api/cover-letters/{cover_letter_id}/pdf": {
+      "get": {
+        "operationId": "download_cover_letter_pdf_api_cover_letters__cover_letter_id__pdf_get",
         "parameters": [
+          {
+            "in": "path",
+            "name": "cover_letter_id",
+            "required": true,
+            "schema": {
+              "title": "Cover Letter Id",
+              "type": "integer"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -2511,30 +2520,11 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/DiscoverParams"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Params"
-              }
-            }
-          }
-        },
         "responses": {
-          "202": {
+          "200": {
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RunOut"
-                }
+                "schema": {}
               }
             },
             "description": "Successful Response"
@@ -2550,35 +2540,22 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Launch Discover"
+        "summary": "Download Cover Letter Pdf"
       }
     },
-    "/api/health": {
-      "get": {
-        "operationId": "health_api_health_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Health Api Health Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Health"
-      }
-    },
-    "/api/jobs": {
+    "/api/cover-letters/{cover_letter_id}/revise": {
       "post": {
-        "operationId": "create_manual_job_api_jobs_post",
+        "operationId": "revise_cover_letter_endpoint_api_cover_letters__cover_letter_id__revise_post",
         "parameters": [
+          {
+            "in": "path",
+            "name": "cover_letter_id",
+            "required": true,
+            "schema": {
+              "title": "Cover Letter Id",
+              "type": "integer"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -2600,18 +2577,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddJobTextRequest"
+                "$ref": "#/components/schemas/ReviseRequest"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
+                  "$ref": "#/components/schemas/CoverLetterOut"
                 }
               }
             },
@@ -2628,12 +2605,12 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Create Manual Job"
+        "summary": "Revise Cover Letter Endpoint"
       }
     },
-    "/api/jobs/bulk": {
+    "/api/discover": {
       "post": {
-        "operationId": "bulk_jobs_api_jobs_bulk_post",
+        "operationId": "launch_discover_api_discover_post",
         "parameters": [
           {
             "in": "header",
