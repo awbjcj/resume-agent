@@ -7,13 +7,57 @@ from markdownify import markdownify as _markdownify
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.search_config import SearchConfig
 
+_MATERIAL_ICON_TOKENS = frozenset(
+    {
+        "business_center",
+        "corporate_fare",
+        "event",
+        "laptop_windows",
+        "location_on",
+        "payments",
+        "place",
+        "schedule",
+        "school",
+        "work",
+    }
+)
+_ESCAPED_ICON_TOKEN = re.compile(
+    r"(?<!\S)\\_([a-z][a-z0-9]*(?:\\_[a-z0-9]+)*)\\_(?=\s|$|[,.])"
+)
+_PLAIN_ICON_TOKEN = re.compile(
+    r"(?<!\S)_([a-z][a-z0-9]*(?:_[a-z0-9]+)*)_(?=\s|$|[,.])"
+)
+_ESCAPED_STRONG = re.compile(r"\\\*\\\*([^*\n]+?)\\\*\\\*")
+
+
+def _drop_icon_token(match: re.Match[str]) -> str:
+    token = match.group(1).replace("\\_", "_").lower()
+    return "" if token in _MATERIAL_ICON_TOKENS else match.group(0)
+
+
+def clean_job_description_text(text: str) -> str:
+    """Remove source chrome tokens that leak into fetched job descriptions."""
+    if not text:
+        return ""
+    cleaned = _ESCAPED_ICON_TOKEN.sub(_drop_icon_token, text)
+    cleaned = _PLAIN_ICON_TOKEN.sub(_drop_icon_token, cleaned)
+    cleaned = _ESCAPED_STRONG.sub(r"\1", cleaned)
+    cleaned = re.sub(r"[ \t]+([,.;:])", r"\1", cleaned)
+    lines = (
+        re.sub(r"[ \t]{2,}", " ", line).strip()
+        for line in cleaned.splitlines()
+    )
+    cleaned = "\n".join(lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
 
 def html_to_text(raw: str) -> str:
     """Unescape HTML entities then strip tags to readable text."""
     if not raw:
         return ""
     soup = BeautifulSoup(html.unescape(raw), "html.parser")
-    return soup.get_text(separator="\n", strip=True)
+    return clean_job_description_text(soup.get_text(separator="\n", strip=True))
 
 
 def html_to_markdown(raw: str) -> str:
@@ -24,7 +68,8 @@ def html_to_markdown(raw: str) -> str:
     """
     if not raw:
         return ""
-    return _markdownify(html.unescape(raw), heading_style="ATX", bullets="-").strip()
+    converted = _markdownify(html.unescape(raw), heading_style="ATX", bullets="-").strip()
+    return clean_job_description_text(converted)
 
 
 # Word-count floor + gain a replacement JD must clear to count as "materially
