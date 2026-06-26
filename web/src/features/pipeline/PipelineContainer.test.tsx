@@ -29,7 +29,9 @@ describe("PipelineContainer", () => {
               title: "Eng",
               status: "approved",
               fitScore: 70,
-              jdText: "x",
+              jdText:
+                "Google \\_corporate\\_fare\\_ Google \\_place\\_ San Francisco, CA " +
+                "\\_laptop\\_windows\\_ Remote eligible \\*\\*Mid\\*\\*",
               critiqueJson: null,
               pdfPath: null,
               applicationStatus: null,
@@ -59,6 +61,11 @@ describe("PipelineContainer", () => {
     // each stage label appears in both the section header and a card badge
     expect(screen.getAllByText(/approved/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/rendered/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("fit 70")).toBeInTheDocument();
+    expect(screen.getByText("fit 88")).toBeInTheDocument();
+    expect(screen.getByText(/Remote eligible Mid/)).toBeInTheDocument();
+    expect(screen.queryByText(/corporate/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/laptop/)).not.toBeInTheDocument();
     expect(screen.getByText("Dev")).toBeInTheDocument();
   });
 });
