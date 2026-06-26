@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import cast
 
 import typer
+from sqlmodel import select
 
 from resume_agent.config import load_yaml, get_settings
 from resume_agent.db import get_session, init_db, make_engine
@@ -16,6 +17,7 @@ from resume_agent.profile.build import build_profile
 from resume_agent.progress import ProgressReporter
 from resume_agent.profile.store import load_facts, save_facts
 from resume_agent.profile.validate import validate_profile
+from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.cover_letters import write_cover_letters
 from resume_agent.services.discovery import (
     UrlFetchError,
@@ -33,7 +35,7 @@ from resume_agent.tracking.queries import application_job_pairs
 from resume_agent.tracking.repository import get_job, save_job, update_application_status
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
 from resume_agent.tracking.match_gap import match_gap
-from resume_agent.tracking.tables import JobStatus
+from resume_agent.tracking.tables import Job, JobStatus
 
 app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
 profile_app = typer.Typer(help="Build and manage your fact-lock profile.")
@@ -416,6 +418,31 @@ def render_cmd(
         typer.echo(f"Resume version #{version_id} not found.")
         raise typer.Exit(code=1)
     typer.echo(f"Rendered version #{version_id} -> {path}")
+
+
+@app.command("export")
+def export_cmd(
+    job_id: int | None = typer.Argument(None, help="Job id to export."),
+    all_jobs: bool = typer.Option(False, "--all", help="Export every job."),
+    output: str = typer.Option("output", "--output", help="Base output directory."),
+    db_url: str | None = typer.Option(None, "--db-url", help="Override the database URL."),
+) -> None:
+    """Write per-job folders from the database-authoritative version store."""
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        if all_jobs:
+            ids = [job.id for job in session.exec(select(Job)).all() if job.id is not None]
+        elif job_id is not None:
+            ids = [job_id]
+        else:
+            typer.echo("Pass a JOB_ID or --all.")
+            raise typer.Exit(code=1)
+
+        count = 0
+        for current_job_id in ids:
+            if export_job_artifacts(session, current_job_id, base=output) is not None:
+                count += 1
+    typer.echo(f"Exported {count} job folder(s) to {output}/")
 
 
 @app.command("setup")
