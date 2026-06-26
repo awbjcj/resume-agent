@@ -54,6 +54,7 @@ def test_tailor_launch_passes_params(monkeypatch, tmp_path):
     def fake_tailor(session, *, job_ids=None, approved=False, reporter=None, **kw):
         captured["job_ids"] = job_ids
         captured["approved"] = approved
+        captured["fail_on_partial"] = kw.get("fail_on_partial")
         reporter.begin(1, "x")  # type: ignore[attr-defined]
         reporter.step(1)  # type: ignore[attr-defined]
         return {}
@@ -63,6 +64,7 @@ def test_tailor_launch_passes_params(monkeypatch, tmp_path):
     with client:
         client.post("/api/tailor", json={"jobIds": [1, 2], "approved": False})
     assert captured["job_ids"] == [1, 2]
+    assert captured["fail_on_partial"] is True
 
 
 def test_reprocess_endpoint_launches_run(monkeypatch, tmp_path):
