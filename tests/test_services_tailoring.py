@@ -11,8 +11,20 @@ def _session():
     return get_session(engine)
 
 
+class _RunnerStub:
+    def __init__(self, result: str):
+        self.result = result
+
+    def run(self, prompt: str) -> str:
+        return self.result
+
+    async def arun(self, prompt: str) -> str:
+        return self.result
+
+
 def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
     captured = {}
+    exports = []
 
     def fake_tailor_jobs(session, targets, facts, config, tailor, reviewers, reviser, reporter=None):
         captured["targets"] = [j.id for j in targets]
@@ -27,7 +39,17 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
     monkeypatch.setattr(tailoring, "load_style_guide", lambda p: None)
     monkeypatch.setattr(
         tailoring, "build_tailor_bundle",
-        lambda config, style_guide=None: tailoring.TailorBundle(tailor="t", reviser="r", reviewers={}),  # type: ignore[arg-type]
+        lambda config, style_guide=None: tailoring.TailorBundle(
+            tailor=_RunnerStub("t"),
+            reviser=_RunnerStub("r"),
+            reviewers={},
+            revision=_RunnerStub("revise"),
+        ),
+    )
+    monkeypatch.setattr(
+        tailoring,
+        "export_job_artifacts",
+        lambda session, job_id: exports.append(job_id),
     )
     with _session() as session:
         job = Job(source="manual", jd_text="x", status=JobStatus.approved.value)
@@ -38,6 +60,7 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
         result = tailoring.tailor(session, job_ids=[job.id])
     assert captured["targets"] == [job.id]
     assert result
+    assert exports == [job.id]
 
 
 def test_render_resume_version_returns_path(monkeypatch, tmp_path):
