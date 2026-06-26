@@ -258,45 +258,38 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
     for board in config.greenhouse.boards:
         views.append(SourceView(
             id=f"greenhouse:{board.token}", kind="greenhouse", type="board",
-            display_name=board.display(), enabled=board.enabled, detail=board.token,
+            display_name=board.display(), enabled=board.enabled, pullable=board.enabled,
+            detail=board.token,
         ))
     for board in config.lever.boards:
         views.append(SourceView(
             id=f"lever:{board.token}", kind="lever", type="board",
-            display_name=board.display(), enabled=board.enabled, detail=board.token,
+            display_name=board.display(), enabled=board.enabled, pullable=board.enabled,
+            detail=board.token,
         ))
     for entry in config.companies.urls:
         views.append(SourceView(
             id=company_url_id(entry.url), kind=_company_kind(entry.url), type="board",
-            display_name=entry.label or entry.url, enabled=entry.enabled, detail=entry.url,
+            display_name=entry.label or entry.url, enabled=entry.enabled, pullable=entry.enabled,
+            detail=entry.url,
         ))
 
     key_set = bool(settings.adzuna_app_id and settings.adzuna_app_key)
     views.append(SourceView(
         id="adzuna", kind="adzuna", type="aggregator", display_name="Adzuna",
-        enabled=config.adzuna.enabled,
+        enabled=config.adzuna.enabled, pullable=config.adzuna.enabled and key_set,
         detail=f"{config.adzuna.country.upper()} · {'key set' if key_set else 'no API key'}",
     ))
     views.append(SourceView(
         id="remoteok", kind="remoteok", type="aggregator", display_name="RemoteOK",
-        enabled=config.remoteok.enabled, detail="aggregator",
+        enabled=config.remoteok.enabled, pullable=config.remoteok.enabled, detail="aggregator",
     ))
     views.append(SourceView(
         id="linkedin", kind="linkedin", type="aggregator", display_name="LinkedIn",
-        enabled=config.linkedin.enabled, detail="scraper",
+        enabled=config.linkedin.enabled, pullable=config.linkedin.enabled, detail="scraper",
     ))
     return views
-
-
-def project_source_ids(config: ConnectorsConfig, source_ids: list[str] | None) -> set[str]:
-    """The set of entry ids to pull. None -> every *enabled* entry."""
-    enabled = {v.id for v in list_source_views(config, Settings(_env_file=None)) if v.enabled}
-    if source_ids is None:
-        return enabled
-    return {sid for sid in source_ids if sid in {v.id for v in list_source_views(config, Settings(_env_file=None))}}
 ```
-
-> Note: `project_source_ids` builds views with a throwaway `Settings` only to read ids/enabled (the Adzuna key state does not affect identity). Task 3 supplies the real settings when building connectors.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -377,15 +370,15 @@ def build_source_connectors(
     settings: Settings,
     source_ids: list[str] | None = None,
 ) -> list[Connector]:
-    """One single-entry connector per enabled, selected source.
+    """One single-entry connector per enabled, pullable, selected source.
 
     Each connector's ``name`` is the stable source id, so ``run_pull`` keys
-    telemetry per entry. ``source_ids=None`` selects every enabled entry.
+    telemetry per entry. ``source_ids=None`` selects every enabled + pullable entry.
     """
-    selected = source_ids  # None means "all enabled"
+    selected = set(source_ids) if source_ids is not None else None  # None means "all pullable enabled"
 
-    def picked(source_id: str, enabled: bool) -> bool:
-        if not enabled:
+    def picked(source_id: str, enabled: bool, pullable: bool = True) -> bool:
+        if not enabled or not pullable:
             return False
         return selected is None or source_id in selected
 
@@ -412,12 +405,12 @@ def build_source_connectors(
     if picked("remoteok", config.remoteok.enabled):
         connectors.append(_named(RemoteOKConnector(), "remoteok"))
 
-    if config.adzuna.enabled and settings.adzuna_app_id and settings.adzuna_app_key:
-        if selected is None or "adzuna" in selected:
-            connectors.append(_named(
-                AdzunaConnector(settings.adzuna_app_id, settings.adzuna_app_key, config.adzuna.country),
-                "adzuna",
-            ))
+    adzuna_pullable = bool(settings.adzuna_app_id and settings.adzuna_app_key)
+    if picked("adzuna", config.adzuna.enabled, adzuna_pullable):
+        connectors.append(_named(
+            AdzunaConnector(settings.adzuna_app_id, settings.adzuna_app_key, config.adzuna.country),
+            "adzuna",
+        ))
 
     if picked("linkedin", config.linkedin.enabled):
         connectors.append(_named(build_linkedin_scraper(), "linkedin"))
