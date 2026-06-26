@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from resume_agent.discovery.connectors.config import ConnectorsConfig, load_connectors_config
+from resume_agent.discovery.connectors.config import (
+    CompaniesConfig,
+    CompanyUrl,
+    ConnectorsConfig,
+    GreenhouseConfig,
+    load_connectors_config,
+)
 
 
 def test_defaults_are_all_disabled():
@@ -48,9 +54,27 @@ def test_companies_loads_urls():
         {"companies": {"enabled": True, "urls": ["https://careers.acme.com"]}}
     )
     assert cfg.companies.enabled is True
-    assert cfg.companies.urls == ["https://careers.acme.com"]
+    assert cfg.companies.urls == [CompanyUrl(url="https://careers.acme.com")]
 
 
 def test_example_file_has_companies_section():
     cfg = load_connectors_config(Path("config/connectors.yaml.example"))
     assert cfg.companies.urls
+
+
+def test_company_url_accepts_bare_string_for_backcompat():
+    cfg = CompaniesConfig.model_validate({"enabled": True, "urls": ["https://x.co"]})
+    assert cfg.urls == [CompanyUrl(url="https://x.co", enabled=True, label=None)]
+
+
+def test_company_url_accepts_object_form():
+    cfg = CompaniesConfig.model_validate(
+        {"enabled": True, "urls": [{"url": "https://x.co", "enabled": False, "label": "X"}]}
+    )
+    assert cfg.urls[0].enabled is False
+    assert cfg.urls[0].label == "X"
+
+
+def test_board_enabled_defaults_true_when_absent():
+    cfg = GreenhouseConfig.model_validate({"enabled": True, "boards": [{"token": "anthropic"}]})
+    assert cfg.boards[0].enabled is True
