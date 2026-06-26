@@ -1262,7 +1262,7 @@ def _client():
 def test_list_sources_returns_views(monkeypatch):
     from resume_agent.discovery.connectors.sources import SourceView
     monkeypatch.setattr(sources_router, "list_sources",
-                        lambda **kw: [SourceView("remoteok", "remoteok", "aggregator", "RemoteOK", True, "aggregator")])
+                        lambda **kw: [SourceView("remoteok", "remoteok", "aggregator", "RemoteOK", True, True, "aggregator")])
     client = _client()
     with client:
         body = client.get("/api/sources").json()
@@ -2131,6 +2131,6 @@ git commit -m "chore(sources): migrate commented-out board backlog to disabled r
 - §9 testing (back-compat, projection, skipped, CRUD, router, OpenAPI gate, web smoke) → Tasks 1–11, 13–16. ✓
 - Contract regeneration drift gate → Task 11. ✓
 
-**Placeholder scan:** No "TBD"/"add error handling"/"similar to" — each code step carries full code. Two soft references (`withQueryClient`/MSW helper path and the e2e harness shape) are explicitly flagged to match existing repo files (`use-bulk-run.test.tsx`, `e2e/smoke.spec.ts`) because their exact form is repo-local; implementers adapt the import path, not the logic.
+**Placeholder scan:** No "TBD"/"add error handling"/"similar to". New modules/components carry full code; existing-file edits are written as concrete deltas at the target call site. Two soft references (`withQueryClient`/MSW helper path and the e2e harness shape) are explicitly flagged to match existing repo files (`use-bulk-run.test.tsx`, `e2e/smoke.spec.ts`) because their exact form is repo-local; implementers adapt the import path, not the logic.
 
-**Type consistency:** `SourceView` (id, kind, type, display_name, enabled, detail) is identical across Tasks 2, 7, 9, 10. `SourcePreview` fields (ok, url, kind, token, label, role_count, error) match between Task 8 (dataclass) and Task 9 (`SourcePreviewOut`). `build_source_connectors(config, settings, source_ids=None)` signature is identical in Tasks 3, 6. `pull_jobs(..., source_ids=None, ...)` matches between Tasks 6 and 10. Wire field `sourceIds`/`roleCount`/`displayName` (camel) ↔ snake (`source_ids`/`role_count`/`display_name`) consistent via `CamelModel`.
+**Type consistency:** `SourceView` (id, kind, type, display_name, enabled, pullable, detail) is identical across Tasks 2, 7, 9, 10, 13, 15. `SourcePreview` fields (ok, url, kind, token, label, role_count, error) match between Task 8 (dataclass) and Task 9 (`SourcePreviewOut`). `build_source_connectors(config, settings, source_ids=None)` signature is identical in Tasks 3, 6. `pull_jobs(..., source_ids=None, ...)` matches between Tasks 6 and 10. Wire field `sourceIds`/`roleCount`/`displayName` (camel) ↔ snake (`source_ids`/`role_count`/`display_name`) consistent via `CamelModel`.
