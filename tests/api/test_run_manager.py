@@ -18,6 +18,17 @@ class InlineExecutor(Executor):
         return fut
 
 
+class QueuedExecutor(Executor):
+    """Accepts work without starting it, like a saturated thread pool."""
+
+    def __init__(self):
+        self.future: Future | None = None
+
+    def submit(self, fn, /, *args, **kwargs):
+        self.future = Future()
+        return self.future
+
+
 def test_create_run_starts_pending(tmp_path):
     mgr = RunManager(root=tmp_path, executor=InlineExecutor())
     run_id = mgr.create("discover")
@@ -93,6 +104,42 @@ def test_request_cancel_rejects_unknown_and_terminal_runs(tmp_path):
 
     run_id = mgr.submit("pull", work)  # runs to done synchronously
     assert mgr.request_cancel(run_id) is False  # already terminal
+
+
+def test_request_cancel_immediately_cancels_queued_run(tmp_path):
+    executor = QueuedExecutor()
+    mgr = RunManager(root=tmp_path, executor=executor)
+    run_id = mgr.submit("tailor", lambda reporter: {"jobs": []})
+
+    assert mgr.request_cancel(run_id) is True
+    rec = mgr.get(run_id)
+    assert rec is not None
+    assert rec["state"] == "cancelled"
+    assert executor.future is not None and executor.future.cancelled()
+
+
+def test_request_cancel_marks_running_run_as_cancelling(tmp_path):
+    executor = QueuedExecutor()
+    mgr = RunManager(root=tmp_path, executor=executor)
+    run_id = mgr.submit("tailor", lambda reporter: {"jobs": []})
+    assert executor.future is not None
+    assert executor.future.set_running_or_notify_cancel() is True
+
+    assert mgr.request_cancel(run_id) is True
+    rec = mgr.get(run_id)
+    assert rec is not None
+    assert rec["state"] == "cancelling"
+    assert rec["label"] == "Cancelling"
+
+
+def test_reporter_done_honours_a_late_cancel_request(tmp_path):
+    flag = {"cancel": False}
+    rep = RunProgressReporter("rid", "tailor", tmp_path, cancel_check=lambda: flag["cancel"])
+    rep.begin(1, "Tailoring")
+    flag["cancel"] = True
+
+    with pytest.raises(RunCancelled):
+        rep.done(result={"jobs": []})
 
 
 def test_submit_stamps_terminal_on_base_exception(tmp_path):
