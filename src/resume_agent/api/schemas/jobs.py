@@ -74,6 +74,9 @@ class ResumeVersionOut(CamelModel):
     id: int
     job_id: int
     round: int
+    origin: str = "tailor"
+    instruction: str | None = None
+    parent_version_id: int | None = None
     review_score: int | None
     fact_check_passed: bool
     pdf_path: str | None
@@ -81,9 +84,23 @@ class ResumeVersionOut(CamelModel):
     created_at: datetime
 
 
+class CoverLetterOut(CamelModel):
+    id: int
+    job_id: int
+    resume_version_id: int | None = None
+    origin: str = "draft"
+    instruction: str | None = None
+    parent_id: int | None = None
+    fact_check_passed: bool
+    pdf_path: str | None
+    created_at: datetime
+
+
 class ApplicationOut(CamelModel):
     id: int
     job_id: int
+    resume_version_id: int | None = None
+    cover_letter_id: int | None = None
     status: str
     notes: str | None
     submitted_at: datetime | None
@@ -108,6 +125,7 @@ class JobDetail(CamelModel):
     has_progress: bool
     application: ApplicationOut | None
     resume_versions: list[ResumeVersionOut]
+    cover_letters: list[CoverLetterOut] = []
     # Skill + meta facets (parsed from criteria_json server-side so the detail
     # modal renders the same covered/required channels as the board card).
     skills: list[SkillTagOut]
@@ -136,6 +154,11 @@ class JobPatch(CamelModel):
 class ApplicationUpsert(CamelModel):
     status: str
     notes: str | None = None
+
+
+class ReviseRequest(CamelModel):
+    instruction: str
+    re_review: bool = False
 
 
 class PruneOverrides(CamelModel):
