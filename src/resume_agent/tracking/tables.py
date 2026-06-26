@@ -82,6 +82,7 @@ class Application(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="jobs.id", index=True)
     resume_version_id: int | None = Field(default=None, foreign_key="resume_versions.id")
+    cover_letter_id: int | None = Field(default=None, foreign_key="cover_letters.id")
     status: str = Field(default=ApplicationStatus.ready.value, index=True)
     submitted_at: datetime | None = None
     notes: str | None = None
