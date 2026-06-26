@@ -103,15 +103,18 @@ logic in the router. Responsibilities:
 
 - `list_sources(connectors_path, settings) -> list[SourceView]` — project
   `connectors.yaml` + settings into a unified list. Each item:
-  `{id, kind, displayName, enabled, type: "board"|"aggregator", detail}`.
-  Aggregators carry derived state: Adzuna `keyPresent` (from `settings`),
-  LinkedIn `disabled`.
+  `{id, kind, displayName, enabled, pullable, type: "board"|"aggregator", detail}`.
+  `enabled` is the persisted user toggle; `pullable` is runtime readiness after
+  derived checks such as Adzuna API credentials. Aggregators surface readiness in
+  `detail` as well, e.g. `US · no API key`.
 - `preview_source(url) -> SourcePreview` — run `detect_ats(url)` + a **bounded
   test-fetch** through the existing `harvest`/connector seam. Returns
-  `{kind, token|label, company?, openRoleCount, ok|error}`. **No write.**
-- `add_source(url, label, connectors_path)` — re-validate, then write to the
-  correct YAML section: a Greenhouse/Lever token → its typed `boards` list; any
-  other detected ATS (Ashby/Workday/Tesla/Google) or unknown → `companies.urls`.
+  `{ok, url, kind, token, label, roleCount, error}`. **No write.**
+- `add_source(url, label, connectors_path)` — re-run the same preview/test-fetch
+  validation, then write to the correct YAML section: a Greenhouse/Lever token →
+  its typed `boards` list; any other **detected and supported** ATS
+  (Ashby/Workday/Tesla/Google) → `companies.urls`. Undetectable or unreachable
+  URLs are rejected with `SourceError` and are not saved.
 - `set_enabled(id, enabled, connectors_path)` / `remove_source(id, connectors_path)`.
 - All writes are **atomic**: serialize to a temp file, then `os.replace` over the
   target, so a concurrent pull or hand-edit never reads a torn file.
@@ -136,8 +139,8 @@ updated.
 - Extend `PullParams` (`api/schemas/runs.py`) with `sourceIds: list[str] | None`.
 - `pull_jobs` (`services/discovery.py`) gains an optional selector. It **projects**
   `ConnectorsConfig` down to the selected entries, then the **existing**
-  `build_connectors` + `run_pull` run unchanged. `sourceIds = None` → pull every
-  enabled entry ("pull all").
+  `run_pull` ingestion loop runs unchanged. `sourceIds = None` → pull every
+  enabled and pullable entry ("pull all").
 - **Per-entry fan-out (the main backend change):** to produce the per-board
   breakdown (Decision #5), pull builds **one connector per entry**
   (`GreenhouseConnector([anthropic])`, not one connector holding all boards). Then
@@ -161,8 +164,11 @@ updated.
 - Carry `upgraded` + `skipped` per source on `PullReport` (today it carries only
   `totals` = added and `failures`). Each source row then reports all four numbers.
 - Surfaced **live** through the existing `RunManager` / `ProgressReporter` / SSE
-  (`/api/runs/{id}/events`) — **no new run infrastructure**. Per-URL fetch failures
-  already flow through `FetchResult.failures` and render inline per source row.
+  (`/api/runs/{id}/events`) — **no new run infrastructure**. `run_pull` writes a
+  partial `result` payload after each source, and the final run result uses the
+  same shape: `{totals, upgraded, skipped, failures}` keyed by stable source id.
+  Per-URL fetch failures already flow through `FetchResult.failures` and render
+  inline per source row.
 
 ## 6. Frontend — `web/src/features/sources/`
 
@@ -175,9 +181,12 @@ updated.
     add/remove**; show "needs API key" (Adzuna, when `.env` keys missing) and
     "disabled / scraper" (LinkedIn) states.
 - **Add dialog:** paste URL → live preview (`POST /api/sources/preview`) showing
-  detected ATS + open-role count + an editable display name → **Add**.
+  detected ATS + role count + an editable display name → **Add**. Add remains
+  disabled until preview returns `ok: true`.
 - **Pull controls:** per-row **Pull**, plus **Pull selected** / **Pull all**.
-  Results stream into a per-source live panel reusing the existing run/SSE hook.
+  Rows with `pullable: false` keep their enable toggle but disable selection and
+  pull actions. Results stream into a per-source live panel reusing the existing
+  run/SSE hook and the run `result` payload.
 
 ```
 BOARDS & CAREERS PAGES
@@ -240,6 +249,8 @@ Offline, matching the existing suite (all agent/browser/network seams faked):
   enable/disable; remove; atomic write).
 - **Router tests** against the in-memory app (`StaticPool` sqlite), including the
   OpenAPI drift gate.
-- **Preview/test-fetch** exercised through the faked connector seam.
-- **Web:** a component/e2e smoke test for the Sources page (add dialog preview,
-  toggle, pull-selected wiring).
+- **Preview/test-fetch** exercised through the faked connector seam; direct
+  `add_source` rejects failed preview results before writing YAML.
+- **Web:** component/e2e smoke tests for the Sources page covering add dialog
+  preview, non-pullable row disabled state, toggle, pull-selected wiring, and the
+  per-source result panel fed by the run store.

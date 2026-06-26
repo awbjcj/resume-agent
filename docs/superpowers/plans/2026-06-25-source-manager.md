@@ -13,6 +13,7 @@
 ## Global Constraints
 
 - **Wire format is camelCase.** All API request/response schemas extend `CamelModel` (`api/schemas/base.py`); Python stays snake_case; DTO→schema is `Model.model_validate(row)`.
+- **Source enabled vs pullable are distinct.** `enabled` is the persisted user toggle in `connectors.yaml`; `pullable` is derived runtime readiness (for example Adzuna requires both `enabled` and API credentials). UI rows may be enabled but not pullable, and must disable selection/per-row pull in that state.
 - **Tests are offline.** No API key, no network. Fake every agent/browser/connector seam. Run with `.venv/Scripts/python.exe -m pytest`.
 - **Config models extend `ExtensibleModel`** (`resume_agent/models/base.py`) — keep that base for any new config model.
 - **Back-compatibility of `connectors.yaml` is mandatory.** Existing files (bare-string `companies.urls`, boards without `enabled`) must keep loading unchanged.
@@ -140,10 +141,10 @@ git commit -m "feat(sources): per-entry enabled flag + CompanyUrl object form (b
 **Interfaces:**
 - Consumes: `ConnectorsConfig` (Task 1), `Settings`, `identify_host` (`discovery/connectors/detect.py:163`).
 - Produces:
-  - `@dataclass(frozen=True) SourceView` with `id: str`, `kind: str`, `type: str` (`"board"|"aggregator"`), `display_name: str`, `enabled: bool`, `detail: str`.
+  - `@dataclass(frozen=True) SourceView` with `id: str`, `kind: str`, `type: str` (`"board"|"aggregator"`), `display_name: str`, `enabled: bool`, `pullable: bool`, `detail: str`.
   - `company_url_id(url: str) -> str` → `"companies:" + sha1(url)[:8]`.
   - `list_source_views(config: ConnectorsConfig, settings: Settings) -> list[SourceView]`.
-  - `project_source_ids(config, source_ids: list[str] | None) -> list[str]` (helper returning the entry ids to pull; `None` → all enabled). *(Used by Task 3.)*
+  - Selection is implemented directly in `build_source_connectors` (Task 3), so this module stays a pure identity/read-model helper and does not construct throwaway `Settings`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -189,7 +190,7 @@ def test_list_source_views_covers_boards_and_aggregators():
 
     assert by_id["greenhouse:anthropic"] == SourceView(
         id="greenhouse:anthropic", kind="greenhouse", type="board",
-        display_name="Anthropic", enabled=True, detail="anthropic",
+        display_name="Anthropic", enabled=True, pullable=True, detail="anthropic",
     )
     # disabled lever board still listed, enabled=False
     assert by_id["lever:zoox"].enabled is False
@@ -238,6 +239,7 @@ class SourceView:
     type: str  # "board" | "aggregator"
     display_name: str
     enabled: bool
+    pullable: bool
     detail: str
 
 
@@ -1027,9 +1029,10 @@ from resume_agent.services.sources import SourcePreview
 
 def test_source_out_projects_view_with_camel_alias():
     view = SourceView(id="greenhouse:x", kind="greenhouse", type="board",
-                      display_name="X", enabled=True, detail="x")
+                      display_name="X", enabled=True, pullable=True, detail="x")
     dumped = SourceOut.model_validate(view).model_dump(by_alias=True)
     assert dumped["displayName"] == "X"
+    assert dumped["pullable"] is True
     assert dumped["type"] == "board"
 
 
@@ -1062,6 +1065,7 @@ class SourceOut(CamelModel):
     type: str
     display_name: str
     enabled: bool
+    pullable: bool
     detail: str
 
 
@@ -1394,6 +1398,7 @@ export type Source = {
   type: "board" | "aggregator";
   displayName: string;
   enabled: boolean;
+  pullable: boolean;
   detail: string;
 };
 
