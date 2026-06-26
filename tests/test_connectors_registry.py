@@ -2,7 +2,7 @@ from typing import Any, cast
 
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.registry import build_connectors
+from resume_agent.discovery.connectors.registry import build_connectors, build_source_connectors
 
 
 def _settings(**kwargs):
@@ -80,3 +80,52 @@ def test_companies_ordered_with_ats_sources_before_aggregators():
     settings = _settings(adzuna_app_id="x", adzuna_app_key="y")
     names = [c.name for c in build_connectors(cfg, settings)]
     assert names == ["greenhouse", "lever", "companies", "remoteok", "adzuna", "linkedin"]
+
+
+def _full_cfg():
+    return ConnectorsConfig.model_validate(
+        {
+            "greenhouse": {
+                "enabled": True,
+                "boards": [{"token": "anthropic"}, {"token": "scaleai", "enabled": False}],
+            },
+            "companies": {
+                "enabled": True,
+                "urls": [{"url": "https://jobs.ashbyhq.com/openai"}],
+            },
+            "remoteok": {"enabled": True},
+            "adzuna": {"enabled": False},
+            "linkedin": {"enabled": False},
+        }
+    )
+
+
+def test_build_source_connectors_is_one_per_enabled_entry():
+    names = [connector.name for connector in build_source_connectors(_full_cfg(), _settings())]
+    assert names == [
+        "greenhouse:anthropic",
+        "companies:" + __import__("hashlib").sha1(b"https://jobs.ashbyhq.com/openai").hexdigest()[:8],
+        "remoteok",
+    ]
+
+
+def test_build_source_connectors_honors_explicit_selection():
+    names = [
+        connector.name
+        for connector in build_source_connectors(
+            _full_cfg(), _settings(), source_ids=["remoteok"]
+        )
+    ]
+    assert names == ["remoteok"]
+
+
+def test_build_source_connectors_skips_adzuna_without_keys():
+    cfg = ConnectorsConfig.model_validate(
+        {
+            "adzuna": {"enabled": True, "country": "us"},
+            "remoteok": {"enabled": False},
+            "linkedin": {"enabled": False},
+        }
+    )
+    names = [connector.name for connector in build_source_connectors(cfg, _settings())]
+    assert "adzuna" not in names
