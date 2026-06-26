@@ -4,17 +4,25 @@ import { describe, expect, it, vi } from "vitest";
 import { FilterDesk } from "./FilterDesk";
 import { emptyFilterState } from "@/lib/filters/types";
 
-describe("FilterDesk min-fit slider", () => {
-  it("keeps slider movement local until filters are applied", () => {
+describe("FilterDesk min-fit input", () => {
+  it("uses a numeric input instead of a slider", () => {
+    render(
+      <FilterDesk filter={emptyFilterState()} facets={{}} total={0} onChange={vi.fn()} />,
+    );
+
+    expect(screen.getByRole("spinbutton", { name: "Min fit" })).toBeInTheDocument();
+    expect(screen.queryByRole("slider", { name: "Min fit" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the numeric value local until filters are applied", () => {
     const onChange = vi.fn();
-    const { container } = render(
+    render(
       <FilterDesk filter={emptyFilterState()} facets={{}} total={0} onChange={onChange} />,
     );
 
-    // base-ui drives value changes through its hidden native range input.
-    const input = container.querySelector('input[type="range"]') as HTMLInputElement;
-    expect(input).toBeTruthy();
-    fireEvent.change(input, { target: { value: "1" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Min fit" }), {
+      target: { value: "65" },
+    });
 
     expect(onChange).not.toHaveBeenCalled();
 
@@ -22,6 +30,6 @@ describe("FilterDesk min-fit slider", () => {
 
     expect(onChange).toHaveBeenCalledTimes(1);
     const patch = onChange.mock.calls.at(-1)![0];
-    expect(patch.fitMin).toBe(1);
+    expect(patch.fitMin).toBe(65);
   });
 });
