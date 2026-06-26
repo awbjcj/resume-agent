@@ -23,6 +23,32 @@ def test_parse_google_jobs():
     assert j.url == "https://careers.google.com/jobs/results/1/"
 
 
+def test_parse_google_jobs_removes_material_icon_tokens():
+    page = {
+        "jobs": [
+            {
+                "title": "Forward Deployed Engineer",
+                "locations": [{"display": "San Francisco, CA"}],
+                "description": (
+                    "<p>Google _corporate_fare_ Google _place_ San Francisco, CA "
+                    "_laptop_windows_ Remote eligible **Mid**</p>"
+                    "<p>Build applied AI systems.</p>"
+                ),
+                "apply_url": "https://careers.google.com/jobs/results/2/",
+            }
+        ]
+    }
+
+    job = google.parse_jobs(page)[0]
+
+    assert "corporate_fare" not in job.jd_text
+    assert "_place_" not in job.jd_text
+    assert "laptop_windows" not in job.jd_text
+    assert "\\*\\*" not in job.jd_text
+    assert "Remote eligible Mid" in job.jd_text
+    assert "Build applied AI systems." in job.jd_text
+
+
 def test_fetch_google_is_search_shaped(monkeypatch):
     sent = {}
 

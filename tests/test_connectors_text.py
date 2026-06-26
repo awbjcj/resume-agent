@@ -1,5 +1,6 @@
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.text import (
+    clean_job_description_text,
     filter_by_search,
     html_to_text,
     primary_search_term,
@@ -118,3 +119,24 @@ def test_html_to_markdown_empty():
     from resume_agent.discovery.connectors.text import html_to_markdown
 
     assert html_to_markdown("") == ""
+
+
+def test_clean_job_description_text_removes_source_chrome_tokens():
+    raw = (
+        "Google \\_corporate\\_fare\\_ Google \\_place\\_ San Francisco, CA "
+        "\\_laptop\\_windows\\_ Remote eligible \\*\\*Mid\\*\\* role"
+    )
+
+    cleaned = clean_job_description_text(raw)
+
+    assert "\\_corporate" not in cleaned
+    assert "\\_place" not in cleaned
+    assert "\\_laptop" not in cleaned
+    assert "\\*\\*" not in cleaned
+    assert "Remote eligible Mid role" in cleaned
+
+
+def test_clean_job_description_text_preserves_real_markdown_bold():
+    raw = "Build **payment** systems with Python."
+
+    assert clean_job_description_text(raw) == raw
