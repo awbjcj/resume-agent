@@ -201,8 +201,18 @@ def test_list_source_views_covers_boards_and_aggregators():
     # aggregators present with fixed ids
     assert by_id["adzuna"].type == "aggregator"
     assert "key set" in by_id["adzuna"].detail
+    assert by_id["adzuna"].pullable is True
     assert by_id["remoteok"].type == "aggregator"
     assert by_id["linkedin"].enabled is False
+    assert by_id["linkedin"].pullable is False
+
+
+def test_adzuna_without_keys_is_enabled_but_not_pullable():
+    views = list_source_views(_cfg(), _settings())
+    adzuna = next(v for v in views if v.id == "adzuna")
+    assert adzuna.enabled is True
+    assert adzuna.pullable is False
+    assert "no API key" in adzuna.detail
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -345,6 +355,16 @@ def test_build_source_connectors_is_one_per_enabled_entry():
 def test_build_source_connectors_honors_explicit_selection():
     names = [c.name for c in build_source_connectors(_full_cfg(), _settings(), source_ids=["remoteok"])]
     assert names == ["remoteok"]
+
+
+def test_build_source_connectors_skips_adzuna_without_keys():
+    cfg = ConnectorsConfig.model_validate({
+        "adzuna": {"enabled": True, "country": "us"},
+        "remoteok": {"enabled": False},
+        "linkedin": {"enabled": False},
+    })
+    names = [c.name for c in build_source_connectors(cfg, _settings())]
+    assert "adzuna" not in names
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
