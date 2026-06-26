@@ -1,0 +1,79 @@
+"""Prompt-driven resume revision service."""
+
+from __future__ import annotations
+
+from sqlmodel import Session
+
+from resume_agent.models.resume import ResumeContent
+from resume_agent.profile.store import load_facts
+from resume_agent.render.export import export_job_artifacts
+from resume_agent.services.agents import TailorBundle, build_tailor_bundle
+from resume_agent.tailor.panel import run_panel
+from resume_agent.tailor.provenance import provenance_critique
+from resume_agent.tailor.review_config import load_review_config
+from resume_agent.tailor.revision import apply_revision, compose_user_revision_input
+from resume_agent.tailor.style_guide import load_style_guide
+from resume_agent.tailor.verdict import aggregate
+from resume_agent.tracking.repository import get_job, get_resume_version, save_resume_version
+from resume_agent.tracking.tables import ResumeVersion
+
+DEFAULT_REVIEW = "config/review.yaml"
+DEFAULT_FACTS = "data/profile/facts.json"
+
+
+def revise_resume_version(
+    session: Session,
+    version_id: int,
+    instruction: str,
+    *,
+    re_review: bool = False,
+    review_path: str = DEFAULT_REVIEW,
+    facts_path: str = DEFAULT_FACTS,
+    bundle: TailorBundle | None = None,
+) -> ResumeVersion | None:
+    parent = get_resume_version(session, version_id)
+    if parent is None:
+        return None
+
+    facts = load_facts(facts_path)
+    config = load_review_config(review_path) if re_review or bundle is None else None
+    if bundle is None:
+        assert config is not None
+        style_guide = load_style_guide(config.style_guide_path)
+        bundle = build_tailor_bundle(config, style_guide=style_guide)
+
+    current = ResumeContent.model_validate(parent.content_json or {})
+    revised = apply_revision(
+        compose_user_revision_input(current, instruction, facts),
+        bundle.revision,
+    )
+
+    provenance = provenance_critique(revised, facts)
+    critiques = [provenance]
+    review_score = None
+    fact_check_passed = provenance.passed
+    job = get_job(session, parent.job_id)
+
+    if re_review and provenance.passed and job is not None:
+        assert config is not None
+        critiques.extend(run_panel(revised, facts, job.jd_text, config, bundle.reviewers))
+        verdict = aggregate(critiques, config)
+        review_score = verdict.aggregate_score
+        fact_check_passed = verdict.gate_passed
+
+    child = save_resume_version(
+        session,
+        ResumeVersion(
+            job_id=parent.job_id,
+            round=parent.round,
+            content_json=revised.model_dump(mode="json"),
+            review_score=review_score,
+            fact_check_passed=fact_check_passed,
+            critique_json=[c.model_dump(mode="json") for c in critiques],
+            origin="revision",
+            instruction=instruction,
+            parent_version_id=parent.id,
+        ),
+    )
+    export_job_artifacts(session, child.job_id)
+    return child
