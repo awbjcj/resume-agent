@@ -12,12 +12,13 @@ from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_sk
 from resume_agent.tracking.match_gap import profile_skill_tokens
 from resume_agent.tracking.repository import (
     application_for_job,
+    cover_letters_for_job,
     has_progress,
     latest_rendered_resume_version,
     latest_resume_version,
     resume_versions_for_job,
 )
-from resume_agent.tracking.tables import Application, Job, JobStatus, ResumeVersion
+from resume_agent.tracking.tables import Application, CoverLetter, Job, JobStatus, ResumeVersion
 
 
 def _require_job_id(job: Job) -> int:
@@ -75,6 +76,7 @@ class JobDetailRow:
     has_progress: bool
     application: Application | None
     resume_versions: list[ResumeVersion]
+    cover_letters: list[CoverLetter]
     # Facet half mirrors ShortlistRow and is reused via _shortlist_row.
     company: str | None
     title: str | None
@@ -266,6 +268,7 @@ def job_detail_row(
         has_progress=has_progress(session, jid),
         application=application_for_job(session, jid),
         resume_versions=resume_versions_for_job(session, jid),
+        cover_letters=cover_letters_for_job(session, jid),
         company=facets.company,
         title=facets.title,
         location=facets.location,

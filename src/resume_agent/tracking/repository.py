@@ -109,6 +109,10 @@ def resume_versions_for_job(session: Session, job_id: int) -> list[ResumeVersion
     return list(session.exec(select(ResumeVersion).where(ResumeVersion.job_id == job_id)).all())
 
 
+def cover_letters_for_job(session: Session, job_id: int) -> list[CoverLetter]:
+    return list(session.exec(select(CoverLetter).where(CoverLetter.job_id == job_id)).all())
+
+
 def get_resume_version(session: Session, version_id: int) -> ResumeVersion | None:
     return session.get(ResumeVersion, version_id)
 
