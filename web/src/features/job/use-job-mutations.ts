@@ -3,14 +3,6 @@ import { toast } from "sonner";
 
 import { api, unwrap } from "@/lib/api/client";
 
-function postUntyped<T>(path: string, options?: unknown): Promise<T> {
-  const post = api.POST as (
-    path: string,
-    options?: unknown,
-  ) => Promise<{ data?: T; error?: unknown }>;
-  return unwrap(post(path, options));
-}
-
 function invalidateBoards(qc: ReturnType<typeof useQueryClient>, jobId: number) {
   qc.invalidateQueries({ queryKey: ["job", jobId] });
   for (const k of ["shortlist", "pipeline", "triage"]) {
@@ -70,13 +62,15 @@ export function useReviseVersion(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { versionId: number; instruction: string; reReview?: boolean }) =>
-      postUntyped("/api/resume-versions/{version_id}/revise", {
-        params: { path: { version_id: vars.versionId } },
-        body: {
-          instruction: vars.instruction,
-          reReview: vars.reReview ?? false,
-        },
-      }),
+      unwrap(
+        api.POST("/api/resume-versions/{version_id}/revise", {
+          params: { path: { version_id: vars.versionId } },
+          body: {
+            instruction: vars.instruction,
+            reReview: vars.reReview ?? false,
+          },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
 }
@@ -85,9 +79,11 @@ export function useSelectResume(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (versionId: number) =>
-      postUntyped("/api/jobs/{job_id}/select-resume/{version_id}", {
-        params: { path: { job_id: jobId, version_id: versionId } },
-      }),
+      unwrap(
+        api.POST("/api/jobs/{job_id}/select-resume/{version_id}", {
+          params: { path: { job_id: jobId, version_id: versionId } },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
 }
@@ -96,10 +92,12 @@ export function useReviseCoverLetter(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { coverLetterId: number; instruction: string }) =>
-      postUntyped("/api/cover-letters/{cover_letter_id}/revise", {
-        params: { path: { cover_letter_id: vars.coverLetterId } },
-        body: { instruction: vars.instruction },
-      }),
+      unwrap(
+        api.POST("/api/cover-letters/{cover_letter_id}/revise", {
+          params: { path: { cover_letter_id: vars.coverLetterId } },
+          body: { instruction: vars.instruction, reReview: false },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
 }
@@ -108,9 +106,11 @@ export function useSelectCoverLetter(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (coverLetterId: number) =>
-      postUntyped("/api/jobs/{job_id}/select-cover-letter/{cover_letter_id}", {
-        params: { path: { job_id: jobId, cover_letter_id: coverLetterId } },
-      }),
+      unwrap(
+        api.POST("/api/jobs/{job_id}/select-cover-letter/{cover_letter_id}", {
+          params: { path: { job_id: jobId, cover_letter_id: coverLetterId } },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
 }
