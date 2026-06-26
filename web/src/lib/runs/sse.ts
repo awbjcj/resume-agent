@@ -1,5 +1,5 @@
 import { withTokenParam } from "@/lib/api/client";
-import { useRunStore, type RunRecord } from "./store";
+import { useRunStore, type PullRunResult, type RunRecord } from "./store";
 
 /**
  * Subscribe to a run's SSE stream. The backend (api/runs/sse.py) emits default
@@ -19,6 +19,7 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
       total?: number;
       etaText?: string | null;
       error?: string;
+      result?: PullRunResult | Record<string, unknown> | null;
     };
     try {
       data = JSON.parse(e.data);
@@ -44,6 +45,7 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
       total: typeof data.total === "number" ? data.total : 0,
       etaText: data.etaText ?? null,
       error: data.error ?? undefined,
+      result: data.result ?? null,
     });
     if (state === "done" || state === "error" || state === "cancelled") {
       source.close();
@@ -64,6 +66,7 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
       total: 0,
       etaText: null,
       error: "stream error",
+      result: null,
     });
     source.close();
     onDone?.();

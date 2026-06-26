@@ -1,5 +1,12 @@
 import { create } from "zustand";
 
+export type PullRunResult = {
+  totals?: Record<string, number>;
+  upgraded?: Record<string, number>;
+  skipped?: Record<string, number>;
+  failures?: Record<string, Record<string, string>>;
+};
+
 export interface RunRecord {
   runId: string;
   kind: string;
@@ -10,6 +17,7 @@ export interface RunRecord {
   total: number;
   etaText: string | null;
   error?: string;
+  result?: PullRunResult | Record<string, unknown> | null;
 }
 
 interface RunState {
