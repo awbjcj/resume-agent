@@ -323,7 +323,7 @@ git commit -m "feat(sources): stable source ids + SourceView projection helpers"
 
 **Interfaces:**
 - Consumes: `ConnectorsConfig`, `Settings`, `SourceView` ids (Task 2), connector classes.
-- Produces: `build_source_connectors(config: ConnectorsConfig, settings: Settings, source_ids: list[str] | None = None) -> list[Connector]` — one connector per **enabled, selected** entry, each with its instance `.name` set to the stable source id (boards/companies) or the fixed aggregator id. Order: greenhouse boards, lever boards, companies urls, remoteok, adzuna, linkedin.
+- Produces: `build_source_connectors(config: ConnectorsConfig, settings: Settings, source_ids: list[str] | None = None) -> list[Connector]` — one connector per **enabled, pullable, selected** entry, each with its instance `.name` set to the stable source id (boards/companies) or the fixed aggregator id. Order: greenhouse boards, lever boards, companies urls, remoteok, adzuna, linkedin.
 
 - [ ] **Step 1: Write the failing tests**
 
