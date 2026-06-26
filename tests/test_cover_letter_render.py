@@ -45,7 +45,8 @@ def test_render_cover_letter_writes_pdf_path(tmp_path):
         assert fetched is not None
         assert fetched.pdf_path == str(out)
         assert out is not None
-        assert "acme_corp" in out.name and "cl" in out.name
+        assert out.name == f"cover-letter-v{cover.id}-draft.pdf"
+        assert "acme_corp-backend_engineer" in out.parent.name
 
 
 def test_render_missing_cover_letter_returns_none(tmp_path):
