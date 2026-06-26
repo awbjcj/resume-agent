@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cover-letters/{cover_letter_id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Cover Letter Pdf */
+        get: operations["download_cover_letter_pdf_api_cover_letters__cover_letter_id__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cover-letters/{cover_letter_id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revise Cover Letter Endpoint */
+        post: operations["revise_cover_letter_endpoint_api_cover_letters__cover_letter_id__revise_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/discover": {
         parameters: {
             query?: never;
@@ -49,6 +83,23 @@ export interface paths {
         put?: never;
         /** Launch Discover */
         post: operations["launch_discover_api_discover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gmail/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Gmail Sync */
+        post: operations["launch_gmail_sync_api_gmail_sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -159,6 +210,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/select-cover-letter/{cover_letter_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Select Cover Letter Endpoint */
+        post: operations["select_cover_letter_endpoint_api_jobs__job_id__select_cover_letter__cover_letter_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/select-resume/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Select Resume Endpoint */
+        post: operations["select_resume_endpoint_api_jobs__job_id__select_resume__version_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/match-gap": {
         parameters: {
             query?: never;
@@ -170,6 +255,57 @@ export interface paths {
         get: operations["get_match_gap_api_match_gap_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notifications */
+        get: operations["list_notifications_api_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{notification_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept */
+        post: operations["accept_api_notifications__notification_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{notification_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss */
+        post: operations["dismiss_api_notifications__notification_id__dismiss_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -289,6 +425,23 @@ export interface paths {
         put?: never;
         /** Render Endpoint */
         post: operations["render_endpoint_api_resume_versions__version_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-versions/{version_id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revise Endpoint */
+        post: operations["revise_endpoint_api_resume_versions__version_id__revise_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -503,12 +656,16 @@ export interface components {
         };
         /** ApplicationOut */
         ApplicationOut: {
+            /** Coverletterid */
+            coverLetterId?: number | null;
             /** Id */
             id: number;
             /** Jobid */
             jobId: number;
             /** Notes */
             notes: string | null;
+            /** Resumeversionid */
+            resumeVersionId?: number | null;
             /** Status */
             status: string;
             /** Submittedat */
@@ -674,6 +831,33 @@ export interface components {
             /** Responses */
             responses: number;
         };
+        /** CoverLetterOut */
+        CoverLetterOut: {
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Factcheckpassed */
+            factCheckPassed: boolean;
+            /** Id */
+            id: number;
+            /** Instruction */
+            instruction?: string | null;
+            /** Jobid */
+            jobId: number;
+            /**
+             * Origin
+             * @default draft
+             */
+            origin: string;
+            /** Parentid */
+            parentId?: number | null;
+            /** Pdfpath */
+            pdfPath: string | null;
+            /** Resumeversionid */
+            resumeVersionId?: number | null;
+        };
         /** CoverLetterParams */
         CoverLetterParams: {
             /**
@@ -711,6 +895,11 @@ export interface components {
             company: string | null;
             /** Companysize */
             companySize?: string | null;
+            /**
+             * Coverletters
+             * @default []
+             */
+            coverLetters: components["schemas"]["CoverLetterOut"][];
             /**
              * Createdat
              * Format: date-time
@@ -788,6 +977,28 @@ export interface components {
             gaps: components["schemas"]["GapOut"][];
             /** Targettotal */
             targetTotal: number;
+        };
+        /** NotificationOut */
+        NotificationOut: {
+            /** Applicationid */
+            applicationId: number;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Evidence */
+            evidence: string;
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Messageid */
+            messageId: string;
+            /** Proposedstatus */
+            proposedStatus: string;
+            /** State */
+            state: string;
         };
         /** Pagination */
         Pagination: {
@@ -894,14 +1105,33 @@ export interface components {
             factCheckPassed: boolean;
             /** Id */
             id: number;
+            /** Instruction */
+            instruction?: string | null;
             /** Jobid */
             jobId: number;
+            /**
+             * Origin
+             * @default tailor
+             */
+            origin: string;
+            /** Parentversionid */
+            parentVersionId?: number | null;
             /** Pdfpath */
             pdfPath: string | null;
             /** Reviewscore */
             reviewScore: number | null;
             /** Round */
             round: number;
+        };
+        /** ReviseRequest */
+        ReviseRequest: {
+            /** Instruction */
+            instruction: string;
+            /**
+             * Rereview
+             * @default false
+             */
+            reReview: boolean;
         };
         /** RunOut */
         RunOut: {
@@ -1151,6 +1381,76 @@ export interface operations {
             };
         };
     };
+    download_cover_letter_pdf_api_cover_letters__cover_letter_id__pdf_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cover_letter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revise_cover_letter_endpoint_api_cover_letters__cover_letter_id__revise_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cover_letter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverLetterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     launch_discover_api_discover_post: {
         parameters: {
             query?: never;
@@ -1165,6 +1465,37 @@ export interface operations {
                 "application/json": components["schemas"]["DiscoverParams"] | null;
             };
         };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_gmail_sync_api_gmail_sync_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             202: {
@@ -1451,6 +1782,74 @@ export interface operations {
             };
         };
     };
+    select_cover_letter_endpoint_api_jobs__job_id__select_cover_letter__cover_letter_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+                cover_letter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    select_resume_endpoint_api_jobs__job_id__select_resume__version_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_match_gap_api_match_gap_get: {
         parameters: {
             query?: never;
@@ -1469,6 +1868,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_api_notifications_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_api_notifications__notification_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notification_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_api_notifications__notification_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notification_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOut"];
                 };
             };
             /** @description Validation Error */
@@ -1719,6 +2215,43 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revise_endpoint_api_resume_versions__version_id__revise_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviseRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
