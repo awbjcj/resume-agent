@@ -162,6 +162,31 @@ def test_pipeline_rows_include_pdf_and_application_status():
         assert row.fit_score == 90
 
 
+def test_pipeline_rows_clean_legacy_source_chrome_tokens():
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="google",
+                jd_text=(
+                    "Google \\_corporate\\_fare\\_ Google \\_place\\_ San Francisco, CA "
+                    "\\_laptop\\_windows\\_ Remote eligible \\*\\*Mid\\*\\*"
+                ),
+                company="Google",
+                title="Forward Deployed Engineer",
+                status=JobStatus.approved.value,
+            ),
+        )
+
+        row = pipeline_rows(s)[0]
+
+        assert "\\_corporate" not in row.jd_text
+        assert "\\_place" not in row.jd_text
+        assert "\\_laptop" not in row.jd_text
+        assert "\\*\\*" not in row.jd_text
+        assert row.jd_text == "Google Google San Francisco, CA Remote eligible Mid"
+
+
 def test_pipeline_rows_distinguish_no_version_from_empty_critiques():
     # The board must tell "never tailored" (no ResumeVersion) apart from
     # "tailored, reviewers raised nothing": None vs []. Collapsing both to []

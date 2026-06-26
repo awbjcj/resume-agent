@@ -1,3 +1,6 @@
+from typing import cast
+
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
@@ -39,6 +42,29 @@ def test_pipeline_status_filter():
         _seed(client.app, status=JobStatus.raw.value, company="Drop")
         body = client.get("/api/pipeline?status=tailored").json()
     assert [r["company"] for r in body["data"]] == ["Keep"]
+
+
+def test_pipeline_response_cleans_legacy_jd_tokens():
+    client = _client()
+    with client:
+        app = cast(FastAPI, client.app)
+        with get_session(app.state.engine) as session:
+            session.add(
+                Job(
+                    source="google",
+                    jd_text=(
+                        "Google \\_corporate\\_fare\\_ Google \\_place\\_ San Francisco, CA "
+                        "\\_laptop\\_windows\\_ Remote eligible \\*\\*Mid\\*\\*"
+                    ),
+                    status=JobStatus.approved.value,
+                    company="Google",
+                    title="Forward Deployed Engineer",
+                )
+            )
+            session.commit()
+        body = client.get("/api/pipeline?status=approved").json()
+
+    assert body["data"][0]["jdText"] == "Google Google San Francisco, CA Remote eligible Mid"
 
 
 def test_triage_archived_query():

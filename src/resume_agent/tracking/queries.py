@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from sqlmodel import Session, select
 
+from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.taxonomy import sic as sic_tax
 from resume_agent.taxonomy.company_size import snap as snap_size
@@ -260,7 +261,7 @@ def job_detail_row(
         id=jid,
         source=job.source,
         url=job.url,
-        jd_text=job.jd_text,
+        jd_text=clean_job_description_text(job.jd_text),
         status=job.status,
         criteria_json=job.criteria_json,
         archived_at=job.archived_at,
@@ -319,7 +320,7 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 title=job.title,
                 status=job.status,
                 fit_score=job.fit_score,
-                jd_text=job.jd_text,
+                jd_text=clean_job_description_text(job.jd_text),
                 # None means "never tailored" (no version); [] means a version
                 # exists but reviewers raised nothing. The board reads them apart.
                 critique_json=(version.critique_json or []) if version else None,
