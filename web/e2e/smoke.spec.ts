@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 
 // Hermetic smoke: intercept the API so no backend is required.
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/notifications", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/shortlist*", (route) =>
     route.fulfill({
       json: {
@@ -50,4 +51,18 @@ test("loads shortlist and opens a job drawer", async ({ page }) => {
   await expect(page.getByText("Staff Engineer")).toBeVisible();
   await page.getByText("Staff Engineer").click();
   await expect(page.getByRole("heading", { name: /staff engineer/i })).toBeVisible();
+});
+
+test("min-fit numeric input applies the server filter", async ({ page }) => {
+  await page.goto("/");
+  const minFit = page.getByRole("spinbutton", { name: "Min fit" });
+
+  await minFit.fill("65");
+  const filteredRequest = page.waitForRequest(
+    (request) => new URL(request.url()).searchParams.get("minFit") === "65",
+  );
+  await page.getByRole("button", { name: /apply filters/i }).click();
+
+  await filteredRequest;
+  await expect(minFit).toHaveValue("65");
 });
