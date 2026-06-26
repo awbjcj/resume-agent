@@ -17,7 +17,7 @@ import json
 import time
 import uuid
 from collections.abc import Callable
-from concurrent.futures import Executor, ThreadPoolExecutor
+from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -62,6 +62,9 @@ class RunProgressReporter(ProgressReporter):
         if self._cancel_check is not None and self._cancel_check():
             raise RunCancelled
 
+    def checkpoint(self) -> None:
+        self._raise_if_cancelled()
+
     def begin(
         self,
         total: int,
@@ -86,6 +89,7 @@ class RunProgressReporter(ProgressReporter):
         super().step(current, label=label, **extra)
 
     def done(self, *, error: str | None = None, **extra: object) -> None:
+        self._raise_if_cancelled()
         super().done(error=error, kind=self.kind, **extra)
 
     def cancelled(self, **extra: object) -> None:
@@ -101,6 +105,7 @@ class RunManager:
         # under the GIL add/discard/contains are atomic, and a missed read just
         # defers the stop to the next checkpoint.
         self._cancel_requested: set[str] = set()
+        self._futures: dict[str, Future] = {}
 
     def request_cancel(self, run_id: str) -> bool:
         """Flag a run for cooperative cancellation.
@@ -112,6 +117,14 @@ class RunManager:
         if record is None or record.get("state") in ("done", "error", "cancelled"):
             return False
         self._cancel_requested.add(run_id)
+        future = self._futures.get(run_id)
+        if future is not None and future.cancel():
+            record.update(state="cancelled", label="Cancelled", error=None, updated_at=_now())
+            self._write(run_id, record)
+            self._cancel_requested.discard(run_id)
+            return True
+        record.update(state="cancelling", label="Cancelling", updated_at=_now())
+        self._write(run_id, record)
         return True
 
     def is_cancel_requested(self, run_id: str) -> bool:
@@ -151,7 +164,9 @@ class RunManager:
             finally:
                 self._cancel_requested.discard(run_id)
 
-        self.executor.submit(_runner)
+        future = self.executor.submit(_runner)
+        self._futures[run_id] = future
+        future.add_done_callback(lambda _future: self._futures.pop(run_id, None))
         return run_id
 
     def get(self, run_id: str) -> dict | None:

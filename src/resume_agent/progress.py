@@ -163,6 +163,9 @@ class ProgressReporter:
         self._record.update(extra)
         self._flush(force=current >= int(self._record.get("total") or 0))
 
+    def checkpoint(self) -> None:
+        """Raise when external cancellation is requested; base reporters never cancel."""
+
     def done(self, *, error: str | None = None, **extra: object) -> None:
         """Mark the process finished (``done``) or failed (``error``)."""
         if not self._record:

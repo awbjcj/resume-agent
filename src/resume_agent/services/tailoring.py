@@ -35,6 +35,7 @@ def tailor(
     review_path: str = DEFAULT_REVIEW,
     facts_path: str = DEFAULT_FACTS,
     reporter: ProgressReporter | None = None,
+    fail_on_partial: bool = False,
 ) -> dict[int, list[ResumeVersion]]:
     targets = resolve_targets(session, job_ids=job_ids, approved=approved)
     if not targets:
@@ -49,4 +50,10 @@ def tailor(
     )
     for job_id in results:
         export_job_artifacts(session, job_id)
+    if fail_on_partial and len(results) != len(targets):
+        failed_ids = [str(job.id) for job in targets if job.id not in results]
+        raise RuntimeError(
+            f"Tailoring failed for {len(failed_ids)} of {len(targets)} jobs "
+            f"(job IDs: {', '.join(failed_ids)})"
+        )
     return results

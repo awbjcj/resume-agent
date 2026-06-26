@@ -146,6 +146,7 @@ def launch_tailor(
                 job_ids=params.job_ids,
                 approved=params.approved,
                 reporter=reporter,
+                fail_on_partial=True,
             )
             return {
                 "jobs": [

@@ -104,6 +104,7 @@ def tailor_jobs(
                     sem=sem,
                 ),
                 on_complete=on_complete,
+                checkpoint=reporter.checkpoint if reporter else None,
             )
         )
         for job, res in zip(targets, rounds_results):

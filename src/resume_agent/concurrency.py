@@ -30,6 +30,8 @@ async def gather_isolated(
     fn: Callable[[T], Awaitable[R]],
     *,
     on_complete: Callable[[int], None] | None = None,
+    checkpoint: Callable[[], None] | None = None,
+    poll_interval: float = 0.1,
 ) -> list[Result[R]]:
     """Run ``fn(item)`` for every item concurrently; results stay in input order."""
     results: list[Result[R]] = [Result(ok=False) for _ in items]
@@ -55,5 +57,26 @@ async def gather_isolated(
                     # discard every sibling's in-flight LLM result.
                     pass
 
-    await asyncio.gather(*(run_one(i, item) for i, item in enumerate(items)))
+    tasks = [asyncio.create_task(run_one(i, item)) for i, item in enumerate(items)]
+    if checkpoint is None:
+        await asyncio.gather(*tasks)
+        return results
+
+    pending = set(tasks)
+    try:
+        while pending:
+            checkpoint()
+            done, pending = await asyncio.wait(
+                pending,
+                timeout=poll_interval,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if done:
+                await asyncio.gather(*done)
+        checkpoint()
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
     return results
