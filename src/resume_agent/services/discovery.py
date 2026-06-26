@@ -15,7 +15,7 @@ from sqlmodel import Session
 
 from resume_agent.config import get_settings
 from resume_agent.discovery.connectors.config import load_connectors_config
-from resume_agent.discovery.connectors.registry import build_connectors
+from resume_agent.discovery.connectors.registry import build_source_connectors
 from resume_agent.discovery.connectors.runner import PullReport, run_pull
 from resume_agent.discovery.ingest import add_job
 from resume_agent.discovery.pipeline import discover, reprocess
@@ -109,13 +109,14 @@ def pull_jobs(
     connectors_path: str = DEFAULT_CONNECTORS,
     telemetry_path: str = CONNECTOR_RUNS_PATH,
     limit: int | None = None,
+    source_ids: list[str] | None = None,
     reporter: ProgressReporter | None = None,
     finish: bool = True,
 ) -> PullReport:
-    """Run every enabled connector and ingest results."""
+    """Run selected or all enabled pullable source connectors and ingest results."""
     search_config = load_search_config(search_path)
     connectors_config = load_connectors_config(connectors_path)
-    connectors = build_connectors(connectors_config, get_settings())
+    connectors = build_source_connectors(connectors_config, get_settings(), source_ids=source_ids)
     return run_pull(
         session, connectors, search_config, telemetry_path,
         limit=limit, reporter=reporter, finish=finish,

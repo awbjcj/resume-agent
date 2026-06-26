@@ -114,8 +114,18 @@ def launch_pull(
 
     def work(reporter):
         with get_session(engine) as session:
-            report = pull_jobs(session, limit=params.limit, reporter=reporter)
-            return {"totals": report.totals, "failures": report.failures}
+            report = pull_jobs(
+                session,
+                limit=params.limit,
+                source_ids=params.source_ids,
+                reporter=reporter,
+            )
+            return {
+                "totals": report.totals,
+                "upgraded": report.upgraded,
+                "skipped": report.skipped,
+                "failures": report.failures,
+            }
 
     run_id = mgr.submit("pull", work)
     record = mgr.get(run_id)
