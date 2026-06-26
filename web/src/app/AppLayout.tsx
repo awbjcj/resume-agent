@@ -28,6 +28,7 @@ import {
 import { RunActions } from "@/features/runs/RunActions";
 import { RunPanel } from "@/features/runs/RunPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationsBell } from "@/features/notifications/NotificationsBell";
 
 const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
   { to: "/", label: "Shortlist", end: true, icon: Briefcase },
@@ -102,6 +103,7 @@ export function AppLayout() {
           </div>
           <div className="ml-auto flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
             <RunActions />
+            <NotificationsBell />
             <ThemeToggle />
           </div>
         </header>
