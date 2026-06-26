@@ -4,7 +4,13 @@ from resume_agent.tracking.tables import Application, ApplicationStatus, Job
 
 
 def _email(subject, domain="acme.com"):
-    return EmailMessage(sender=f"r@{domain}", sender_domain=domain, subject=subject, snippet="")
+    return EmailMessage(
+        sender=f"r@{domain}",
+        sender_domain=domain,
+        subject=subject,
+        snippet="",
+        message_id=f"mid-{subject}",
+    )
 
 
 def _pair(app_id, status, company):
@@ -27,7 +33,16 @@ def _classify(email):
 def test_proposes_forward_transition():
     pairs = [_pair(1, ApplicationStatus.submitted.value, "Acme")]
     props = propose_transitions([_email("interview invite")], pairs, _classify)
-    assert props == [Proposal(1, "Acme - Eng", "submitted", "interview", "interview invite")]
+    assert props == [
+        Proposal(
+            1,
+            "Acme - Eng",
+            "submitted",
+            "interview",
+            "interview invite",
+            "mid-interview invite",
+        )
+    ]
 
 
 def test_skips_backward_transition():
