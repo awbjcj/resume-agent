@@ -69,6 +69,9 @@ class ResumeVersion(SQLModel, table=True):
     review_score: int | None = None
     fact_check_passed: bool = False
     critique_json: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
+    origin: str = Field(default="tailor", index=True)
+    instruction: str | None = None
+    parent_version_id: int | None = Field(default=None, foreign_key="resume_versions.id")
     schema_version: int = 1
     created_at: datetime = Field(default_factory=utcnow)
 
