@@ -16,7 +16,7 @@ export function TriageCard({
   onOpen: () => void;
 }) {
   return (
-    <Card className="flex items-start gap-4 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
+    <Card className="min-w-0 flex items-start gap-4 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
       <div className="pt-1">
         <Checkbox
           checked={checked}
@@ -29,7 +29,7 @@ export function TriageCard({
         onClick={onOpen}
         className="group min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
       >
-        <div className="text-lg font-semibold leading-snug group-hover:text-primary">
+        <div className="break-words text-lg font-semibold leading-snug group-hover:text-primary">
           {row.title ?? "—"}
         </div>
         <div className="mt-1 text-sm text-muted-foreground">

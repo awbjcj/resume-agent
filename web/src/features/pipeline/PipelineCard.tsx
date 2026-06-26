@@ -15,7 +15,7 @@ export function PipelineCard({
   onSelect?: (checked: boolean) => void;
 }) {
   return (
-    <Card className="flex items-start gap-3 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
+    <Card className="min-w-0 flex items-start gap-3 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
       {onSelect && (
         <div className="pt-1">
           <Checkbox
@@ -32,7 +32,7 @@ export function PipelineCard({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-lg font-semibold leading-snug group-hover:text-primary">
+            <div className="break-words text-lg font-semibold leading-snug group-hover:text-primary">
               {row.title ?? "—"}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">{row.company ?? "—"}</div>
@@ -44,7 +44,7 @@ export function PipelineCard({
             </span>
           </div>
         </div>
-        <p className="mt-4 line-clamp-3 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+        <p className="mt-4 line-clamp-3 break-words whitespace-pre-line text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
           {row.jdText}
         </p>
       </button>

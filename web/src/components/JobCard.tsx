@@ -41,7 +41,7 @@ export function JobCard({
     row.sponsorshipSignal && SPONSORSHIP_PILL[row.sponsorshipSignal];
 
   return (
-    <Card className="flex min-h-[280px] flex-col gap-4 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
+    <Card className="min-w-0 flex min-h-[280px] flex-col gap-4 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
       <div className="flex flex-1 items-start gap-3">
         {onSelect && (
           <div className="pt-1">
@@ -59,7 +59,7 @@ export function JobCard({
         >
           <FitMeter score={row.fitScore} />
           <div className="min-w-0 flex-1">
-            <div className="text-xl font-semibold leading-snug group-hover:text-primary">
+            <div className="break-words text-xl font-semibold leading-snug group-hover:text-primary">
               {row.title ?? "—"}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
@@ -106,7 +106,7 @@ export function JobCard({
             )}
 
             {row.fitRationale && (
-              <p className="mt-4 line-clamp-4 text-sm leading-6 text-muted-foreground">
+              <p className="mt-4 line-clamp-4 break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
                 {row.fitRationale}
               </p>
             )}
