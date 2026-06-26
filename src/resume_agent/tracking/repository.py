@@ -19,6 +19,7 @@ from resume_agent.tracking.tables import (
     CoverLetter,
     Job,
     JobStatus,
+    Notification,
     ResumeVersion,
     utcnow,
 )
@@ -178,6 +179,32 @@ def save_cover_letter(session: Session, cover_letter: CoverLetter) -> CoverLette
 
 def get_cover_letter(session: Session, cover_letter_id: int) -> CoverLetter | None:
     return session.get(CoverLetter, cover_letter_id)
+
+
+def save_notification(session: Session, notification: Notification) -> Notification:
+    session.add(notification)
+    session.commit()
+    session.refresh(notification)
+    return notification
+
+
+def get_notification(session: Session, notification_id: int) -> Notification | None:
+    return session.get(Notification, notification_id)
+
+
+def notification_by_key(
+    session: Session, application_id: int, message_id: str
+) -> Notification | None:
+    return session.exec(
+        select(Notification).where(
+            Notification.application_id == application_id,
+            Notification.message_id == message_id,
+        )
+    ).first()
+
+
+def pending_notifications(session: Session) -> list[Notification]:
+    return list(session.exec(select(Notification).where(Notification.state == "pending")).all())
 
 
 _PROGRESS_STATUSES = {

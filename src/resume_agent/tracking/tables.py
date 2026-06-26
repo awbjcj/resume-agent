@@ -96,5 +96,21 @@ class CoverLetter(SQLModel, table=True):
     content_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     pdf_path: str | None = None
     fact_check_passed: bool = False
+    origin: str = Field(default="draft", index=True)
+    instruction: str | None = None
+    parent_id: int | None = Field(default=None, foreign_key="cover_letters.id")
     schema_version: int = 1
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class Notification(SQLModel, table=True):
+    __tablename__ = cast(Any, "notifications")
+
+    id: int | None = Field(default=None, primary_key=True)
+    application_id: int = Field(foreign_key="applications.id", index=True)
+    kind: str
+    proposed_status: str
+    evidence: str
+    message_id: str = Field(index=True)
+    state: str = Field(default="pending", index=True)
     created_at: datetime = Field(default_factory=utcnow)
