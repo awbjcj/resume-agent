@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prettifyPlainText } from "./prettify";
+import { cleanJobDescriptionText, prettifyPlainText } from "./prettify";
 
 describe("prettifyPlainText", () => {
   it("preserves every line of newline-heavy legacy text", () => {
@@ -21,5 +21,23 @@ describe("prettifyPlainText", () => {
 
   it("returns empty string for empty input", () => {
     expect(prettifyPlainText("")).toBe("");
+  });
+});
+
+describe("cleanJobDescriptionText", () => {
+  it("removes source chrome icon tokens and escaped bold markers", () => {
+    const raw =
+      "Google \\_corporate\\_fare\\_ Google \\_place\\_ San Francisco, CA " +
+      "\\_laptop\\_windows\\_ Remote eligible \\*\\*Mid\\*\\* role";
+
+    expect(cleanJobDescriptionText(raw)).toBe(
+      "Google Google San Francisco, CA Remote eligible Mid role",
+    );
+  });
+
+  it("preserves real markdown bold", () => {
+    expect(cleanJobDescriptionText("Build **payment** systems")).toBe(
+      "Build **payment** systems",
+    );
   });
 });
