@@ -197,6 +197,28 @@ def launch_cover_letters(
     return record_to_run(run_id, record)
 
 
+@router.post("/gmail/sync", response_model=RunOut, status_code=202)
+def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manager)):
+    engine = _engine(request)
+
+    def work(reporter):
+        from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
+        from resume_agent.services.notifications import sync_notifications
+
+        reporter.begin(1, "Scanning Gmail")
+        service = build_gmail_service()
+        emails = fetch_recent_messages(service)
+        with get_session(engine) as session:
+            pending = sync_notifications(session, emails)
+        reporter.step(1)
+        return {"pending": len(pending)}
+
+    run_id = mgr.submit("gmailSync", work)
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(run_id, record)
+
+
 @router.post("/jobs/from-url", response_model=RunOut, status_code=202)
 def launch_add_from_url(
     params: AddJobUrlParams,
