@@ -1677,6 +1677,24 @@
         "title": "ResumeVersionOut",
         "type": "object"
       },
+      "ReviseRequest": {
+        "properties": {
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "reReview": {
+            "default": false,
+            "title": "Rereview",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "instruction"
+        ],
+        "title": "ReviseRequest",
+        "type": "object"
+      },
       "RunOut": {
         "properties": {
           "current": {
