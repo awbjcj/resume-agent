@@ -1783,25 +1783,61 @@ git commit -m "feat(web): Add Source dialog with live preview"
 - Test: `web/src/features/sources/SourcesPage.test.tsx`
 
 **Interfaces:**
-- Consumes: `useSources`, `useSetEnabled`, `useRemoveSource` (Task 13), `useLaunchRun` + `launchers.pullSources` (Task 13), `<AddSourceDialog />` (Task 14), UI primitives (`switch`, `badge`, `checkbox`, `button`, `card`).
+- Consumes: `useSources`, `useSetEnabled`, `useRemoveSource` (Task 13), `useLaunchRun` + `launchers.pullSources` (Task 13), `<AddSourceDialog />` (Task 14), UI primitives (`switch`, `badge`, `checkbox`, `button`) and existing card surface tokens.
 - Produces: `<SourcesPage />` exported; route `path: "sources"`; nav entry `{ to: "/sources", label: "Sources", icon: Radar }`.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `web/src/features/sources/SourcesPage.test.tsx` (stub `GET /api/sources` → one board + one aggregator):
+Create `web/src/features/sources/SourcesPage.test.tsx` (stub `GET /api/sources` → one pullable board + one non-pullable Adzuna aggregator with `detail: "US · no API key"`):
 
 ```tsx
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
 import { SourcesPage } from "./SourcesPage";
+import { useRunStore } from "@/lib/runs/store";
 import { withQueryClient } from "@/test/utils";
 
 describe("SourcesPage", () => {
+  beforeEach(() => {
+    useRunStore.setState({ runs: {} });
+  });
+
   it("renders boards and aggregators sections", async () => {
     render(<SourcesPage />, { wrapper: withQueryClient });
     await waitFor(() => expect(screen.getByText(/Boards & careers pages/i)).toBeInTheDocument());
     expect(screen.getByText(/Aggregators/i)).toBeInTheDocument();
+  });
+
+  it("disables pull controls for non-pullable sources", async () => {
+    render(<SourcesPage />, { wrapper: withQueryClient });
+    await waitFor(() => expect(screen.getByText(/no API key/i)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Pull Adzuna/i })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: /Select Adzuna/i })).toBeDisabled();
+  });
+
+  it("renders the latest per-source pull result", async () => {
+    useRunStore.getState().upsert({
+      runId: "r1",
+      kind: "pull",
+      status: "running",
+      percent: 50,
+      phase: "Pulling greenhouse:anthropic",
+      current: 1,
+      total: 2,
+      etaText: null,
+      result: {
+        totals: { "greenhouse:anthropic": 3 },
+        upgraded: { "greenhouse:anthropic": 1 },
+        skipped: { "greenhouse:anthropic": 8 },
+        failures: {},
+      },
+    });
+    render(<SourcesPage />, { wrapper: withQueryClient });
+    await waitFor(() => expect(screen.getByText(/Latest pull result/i)).toBeInTheDocument());
+    expect(screen.getByText("+3 added")).toBeInTheDocument();
+    expect(screen.getByText("1 upd")).toBeInTheDocument();
+    expect(screen.getByText("8 skip")).toBeInTheDocument();
   });
 });
 ```
@@ -1817,6 +1853,7 @@ Create `web/src/features/sources/SourcesPage.tsx`:
 
 ```tsx
 import { useState } from "react";
+import { Play, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -1824,6 +1861,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/PageHeader";
 import { useLaunchRun, launchers } from "@/features/runs/use-launch-run";
+import { useRunStore, type PullRunResult } from "@/lib/runs/store";
 import { AddSourceDialog } from "./AddSourceDialog";
 import {
   useSources, useSetEnabled, useRemoveSource, type Source,
@@ -1835,22 +1873,79 @@ function Row({ source, checked, onToggleCheck }: {
   const setEnabled = useSetEnabled();
   const remove = useRemoveSource();
   const { launch } = useLaunchRun();
+  const disabled = !source.pullable;
   return (
-    <div className="flex items-center gap-3 border-b py-2">
-      <Checkbox checked={checked} onCheckedChange={() => onToggleCheck(source.id)} />
+    <li className="flex min-h-12 items-center gap-3 border-b py-2" aria-disabled={disabled}>
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        aria-label={`Select ${source.displayName}`}
+        onCheckedChange={() => onToggleCheck(source.id)}
+      />
       <span className="min-w-0 flex-1 truncate font-medium">{source.displayName}</span>
       <Badge variant="outline">{source.kind}</Badge>
       <span className="hidden w-48 truncate text-xs text-muted-foreground md:inline">{source.detail}</span>
-      <Switch checked={source.enabled}
+      <Switch aria-label={`Enable ${source.displayName}`} checked={source.enabled}
         onCheckedChange={(v) => setEnabled.mutate({ id: source.id, enabled: v })} />
       <Button size="sm" variant="secondary"
-        onClick={() => launch("pull", () => launchers.pullSources([source.id]))}>
+        aria-label={`Pull ${source.displayName}`}
+        disabled={disabled}
+        onClick={() => launch("pull", () => launchers.pullSources([source.id]), ["shortlist", "pipeline", "triage", "sources"])}>
+        <Play className="size-3.5" aria-hidden="true" />
         Pull
       </Button>
       {source.type === "board" && (
-        <Button size="sm" variant="ghost" onClick={() => remove.mutate(source.id)}>✕</Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label={`Remove ${source.displayName}`}
+          onClick={() => remove.mutate(source.id)}
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+        </Button>
       )}
-    </div>
+    </li>
+  );
+}
+
+function SourceResultPanel({ sources }: { sources: Source[] }) {
+  const runsMap = useRunStore((s) => s.runs);
+  const latestPull = Object.values(runsMap)
+    .reverse()
+    .find((r) => r.kind === "pull" && r.result);
+  const result = latestPull?.result as PullRunResult | undefined;
+  if (!result) return null;
+
+  const labels = new Map(sources.map((s) => [s.id, s.displayName]));
+  const ids = new Set([
+    ...Object.keys(result.totals ?? {}),
+    ...Object.keys(result.upgraded ?? {}),
+    ...Object.keys(result.skipped ?? {}),
+    ...Object.keys(result.failures ?? {}),
+  ]);
+
+  return (
+    <section aria-labelledby="sources-results" className="rounded-lg border bg-card p-4">
+      <h2 id="sources-results" className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        Latest pull result
+      </h2>
+      <ul className="mt-3 divide-y">
+        {[...ids].map((id) => {
+          const failed = Object.keys(result.failures?.[id] ?? {}).length;
+          return (
+            <li key={id} className="grid gap-2 py-2 text-sm md:grid-cols-[minmax(0,1fr)_repeat(4,auto)] md:items-center">
+              <span className="truncate font-medium">{labels.get(id) ?? id}</span>
+              <span className="tabular-nums">+{result.totals?.[id] ?? 0} added</span>
+              <span className="tabular-nums">{result.upgraded?.[id] ?? 0} upd</span>
+              <span className="tabular-nums">{result.skipped?.[id] ?? 0} skip</span>
+              <span className={failed ? "text-destructive" : "text-muted-foreground"}>
+                {failed ? `${failed} failed` : "0 failed"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -1872,10 +1967,10 @@ export function SourcesPage() {
       <div className="flex flex-wrap items-center gap-2">
         <AddSourceDialog />
         <Button variant="outline" size="sm" disabled={selected.size === 0}
-          onClick={() => launch("pull", () => launchers.pullSources([...selected]))}>
+          onClick={() => launch("pull", () => launchers.pullSources([...selected]), ["shortlist", "pipeline", "triage", "sources"])}>
           Pull selected ({selected.size})
         </Button>
-        <Button size="sm" onClick={() => launch("pull", () => launchers.pullSources(null))}>
+        <Button size="sm" onClick={() => launch("pull", () => launchers.pullSources(null), ["shortlist", "pipeline", "triage", "sources"])}>
           Pull all
         </Button>
       </div>
@@ -1886,18 +1981,27 @@ export function SourcesPage() {
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Boards &amp; careers pages
             </h2>
-            {boards.map((s) => (
-              <Row key={s.id} source={s} checked={selected.has(s.id)} onToggleCheck={toggle} />
-            ))}
+            {boards.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recurring boards yet.</p>
+            ) : (
+              <ul role="list">
+                {boards.map((s) => (
+                  <Row key={s.id} source={s} checked={selected.has(s.id)} onToggleCheck={toggle} />
+                ))}
+              </ul>
+            )}
           </section>
           <section>
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Aggregators
             </h2>
-            {aggregators.map((s) => (
-              <Row key={s.id} source={s} checked={selected.has(s.id)} onToggleCheck={toggle} />
-            ))}
+            <ul role="list">
+              {aggregators.map((s) => (
+                <Row key={s.id} source={s} checked={selected.has(s.id)} onToggleCheck={toggle} />
+              ))}
+            </ul>
           </section>
+          <SourceResultPanel sources={data} />
         </>
       )}
     </div>
@@ -1956,7 +2060,7 @@ import { test, expect } from "@playwright/test";
 test("sources page lists sections and add control", async ({ page }) => {
   await page.goto("/sources");
   await expect(page.getByRole("heading", { name: /Boards & careers pages/i })).toBeVisible();
-  await expect(page.getByText("+ Add source")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add source" })).toBeVisible();
 });
 ```
 
