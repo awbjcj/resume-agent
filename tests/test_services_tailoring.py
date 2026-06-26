@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.services import rendering, tailoring
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
@@ -61,6 +63,46 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
     assert captured["targets"] == [job.id]
     assert result
     assert exports == [job.id]
+
+
+def test_tailor_can_fail_loudly_when_a_target_produces_no_resume(monkeypatch):
+    monkeypatch.setattr(
+        tailoring, "load_review_config",
+        lambda p: type("C", (), {"style_guide_path": None, "reviewers": []})(),
+    )
+    monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
+    monkeypatch.setattr(tailoring, "load_style_guide", lambda p: None)
+    monkeypatch.setattr(
+        tailoring,
+        "build_tailor_bundle",
+        lambda config, style_guide=None: tailoring.TailorBundle(
+            tailor=_RunnerStub("t"), reviser=_RunnerStub("r"), reviewers={},
+            revision=_RunnerStub("revise"),
+        ),
+    )
+
+    with _session() as session:
+        jobs = [
+            Job(source="manual", jd_text=f"job {i}", status=JobStatus.approved.value)
+            for i in range(2)
+        ]
+        session.add_all(jobs)
+        session.commit()
+        for job in jobs:
+            session.refresh(job)
+        monkeypatch.setattr(
+            tailoring,
+            "tailor_jobs",
+            lambda *args, **kwargs: {jobs[0].id: ["v1"]},
+        )
+        monkeypatch.setattr(tailoring, "export_job_artifacts", lambda *args, **kwargs: None)
+
+        with pytest.raises(RuntimeError, match="failed for 1 of 2 jobs"):
+            tailoring.tailor(
+                session,
+                job_ids=[job.id for job in jobs if job.id is not None],
+                fail_on_partial=True,
+            )
 
 
 def test_render_resume_version_returns_path(monkeypatch, tmp_path):
