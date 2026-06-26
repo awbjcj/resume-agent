@@ -10,8 +10,10 @@ from sqlmodel import Session
 
 from resume_agent.api.deps import get_session
 from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.jobs import ResumeVersionOut
+from resume_agent.api.schemas.jobs import ApplicationOut, ResumeVersionOut, ReviseRequest
+from resume_agent.services.board import select_resume_version
 from resume_agent.services.rendering import render_resume_version
+from resume_agent.services.revision import revise_resume_version
 from resume_agent.tracking.repository import get_resume_version
 
 router = APIRouter()
@@ -38,3 +40,28 @@ def render_endpoint(version_id: int, session: Session = Depends(get_session)):
     if version is None:
         raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
     return ResumeVersionOut.model_validate(version)
+
+
+@router.post("/resume-versions/{version_id}/revise", response_model=ResumeVersionOut)
+def revise_endpoint(
+    version_id: int, body: ReviseRequest, session: Session = Depends(get_session)
+):
+    version = revise_resume_version(
+        session,
+        version_id,
+        body.instruction,
+        re_review=body.re_review,
+    )
+    if version is None:
+        raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
+    return ResumeVersionOut.model_validate(version)
+
+
+@router.post("/jobs/{job_id}/select-resume/{version_id}", response_model=ApplicationOut)
+def select_resume_endpoint(
+    job_id: int, version_id: int, session: Session = Depends(get_session)
+):
+    application = select_resume_version(session, job_id, version_id)
+    if application is None:
+        raise ApiException(404, "NOT_FOUND", "Job or resume version not found")
+    return ApplicationOut.model_validate(application)
