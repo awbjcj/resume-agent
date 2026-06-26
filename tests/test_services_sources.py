@@ -81,6 +81,32 @@ def test_set_enabled_and_remove(tmp_path):
     assert "greenhouse:anthropic" not in {source.id for source in svc.list_sources(path)}
 
 
+def test_enabling_child_source_enables_parent_group(tmp_path):
+    path = _write(
+        tmp_path,
+        """
+        greenhouse: {enabled: false, boards: [{token: anthropic, enabled: false}]}
+        lever: {enabled: false, boards: [{token: zoox, enabled: false}]}
+        companies: {enabled: false, urls: [{url: "https://jobs.ashbyhq.com/openai", enabled: false}]}
+        adzuna: {enabled: false, country: us}
+        remoteok: {enabled: false}
+        linkedin: {enabled: false}
+        """,
+    )
+
+    greenhouse = svc.set_source_enabled("greenhouse:anthropic", True, connectors_path=path)
+    lever = svc.set_source_enabled("lever:zoox", True, connectors_path=path)
+    company_id = svc.company_url_id("https://jobs.ashbyhq.com/openai")
+    company = svc.set_source_enabled(company_id, True, connectors_path=path)
+
+    assert greenhouse.enabled is True
+    assert greenhouse.pullable is True
+    assert lever.enabled is True
+    assert lever.pullable is True
+    assert company.enabled is True
+    assert company.pullable is True
+
+
 def test_remove_unknown_raises(tmp_path):
     path = _write(tmp_path, BASE)
 

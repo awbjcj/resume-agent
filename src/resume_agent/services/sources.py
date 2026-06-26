@@ -200,14 +200,20 @@ def _apply_enabled(config: ConnectorsConfig, source_id: str, enabled: bool) -> b
 
     for board in config.greenhouse.boards:
         if f"greenhouse:{board.token}" == source_id:
+            if enabled:
+                config.greenhouse.enabled = True
             board.enabled = enabled
             return True
     for board in config.lever.boards:
         if f"lever:{board.token}" == source_id:
+            if enabled:
+                config.lever.enabled = True
             board.enabled = enabled
             return True
     for entry in config.companies.urls:
         if company_url_id(entry.url) == source_id:
+            if enabled:
+                config.companies.enabled = True
             entry.enabled = enabled
             return True
     return False
