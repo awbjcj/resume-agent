@@ -734,7 +734,7 @@ git commit -m "feat(sources): pull_jobs(source_ids=...) selects via per-entry fa
   - `add_source(url: str, label: str | None = None, connectors_path=DEFAULT_CONNECTORS) -> SourceView`
   - `set_source_enabled(source_id: str, enabled: bool, connectors_path=DEFAULT_CONNECTORS) -> SourceView`
   - `remove_source(source_id: str, connectors_path=DEFAULT_CONNECTORS) -> None`
-  - raises `SourceError(message)` (mapped to a 400 by the router) for not-found / undetectable / duplicate.
+  - raises `SourceError(message)` (mapped to a 400 by the router) for not-found / undetectable or failed preview / duplicate.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -975,6 +975,8 @@ git commit -m "feat(sources): list/add/toggle/remove service with atomic YAML wr
 Create `tests/test_services_sources_preview.py`:
 
 ```python
+import pytest
+
 from resume_agent.services import sources as svc
 from resume_agent.discovery.connectors.base import FetchResult, RawJob
 from resume_agent.discovery.connectors.detect import AtsTarget
@@ -1000,6 +1002,18 @@ def test_preview_counts_roles_from_test_fetch(monkeypatch):
     assert p.kind == "greenhouse"
     assert p.token == "cohere"
     assert p.role_count == 1
+
+
+def test_add_source_requires_successful_preview(tmp_path, monkeypatch):
+    path = tmp_path / "connectors.yaml"
+    path.write_text("greenhouse: {enabled: true, boards: []}\ncompanies: {enabled: true, urls: []}\n")
+    monkeypatch.setattr(
+        svc,
+        "preview_source",
+        lambda url, label=None: svc.SourcePreview(ok=False, url=url, error="preview failed"),
+    )
+    with pytest.raises(svc.SourceError, match="preview failed"):
+        svc.add_source("https://nope.example", connectors_path=str(path))
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -1018,7 +1032,8 @@ from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
-from resume_agent.services.discovery import DEFAULT_SEARCH, load_search_config
+from resume_agent.discovery.search_config import load_search_config
+from resume_agent.services.discovery import DEFAULT_SEARCH
 
 _PREVIEW_LIMIT = 50
 
@@ -1056,6 +1071,42 @@ def preview_source(url: str, label: str | None = None, search_path: str = DEFAUL
         return SourcePreview(ok=False, url=url, kind=target.ats, token=target.token or None, error=reason)
     return SourcePreview(ok=True, url=url, kind=target.ats, token=target.token or None,
                          label=label, role_count=len(result.jobs))
+```
+
+Then tighten `add_source` so the service, not only the dialog, enforces the same detection + bounded test-fetch before saving:
+
+```python
+def add_source(url: str, label: str | None = None, connectors_path: str = DEFAULT_CONNECTORS) -> SourceView:
+    preview = preview_source(url, label=label)
+    if not preview.ok:
+        raise SourceError(preview.error or "Could not validate this source.")
+
+    config = load_connectors_config(connectors_path)
+    target = detect_ats(url)
+    if target is None:
+        raise SourceError("Could not detect a known ATS behind this URL.")
+
+    if target.ats == "greenhouse" and target.token:
+        if any(b.token == target.token for b in config.greenhouse.boards):
+            raise SourceError(f"Greenhouse board '{target.token}' is already a source.")
+        config.greenhouse.enabled = True
+        config.greenhouse.boards.append(GreenhouseBoard(token=target.token, company=label))
+        new_id = f"greenhouse:{target.token}"
+    elif target.ats == "lever" and target.token:
+        if any(b.token == target.token for b in config.lever.boards):
+            raise SourceError(f"Lever board '{target.token}' is already a source.")
+        config.lever.enabled = True
+        config.lever.boards.append(LeverBoard(token=target.token, company=label))
+        new_id = f"lever:{target.token}"
+    else:
+        if any(u.url == url for u in config.companies.urls):
+            raise SourceError("This URL is already a source.")
+        config.companies.enabled = True
+        config.companies.urls.append(CompanyUrl(url=url, label=label))
+        new_id = company_url_id(url)
+
+    _save(connectors_path, config)
+    return _view(config, new_id)
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
