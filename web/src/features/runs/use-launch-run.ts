@@ -7,7 +7,34 @@ import { useRunStore } from "@/lib/runs/store";
 
 type RunOut = { runId: string; kind: string };
 
-const DEFAULT_INVALIDATE = ["shortlist", "pipeline", "triage"];
+const DEFAULT_INVALIDATE = ["shortlist", "pipeline", "triage", "job"];
+
+function announceCompletion(run: import("@/lib/runs/store").RunRecord) {
+  if (run.status === "failed") {
+    toast.error(`${run.kind} failed: ${run.error ?? "unknown error"}`);
+    return;
+  }
+  if (run.status === "cancelled") {
+    toast.info(`${run.kind} cancelled`);
+    return;
+  }
+  if (run.kind === "tailor") {
+    const rawJobs = (run.result as { jobs?: unknown } | null)?.jobs;
+    const jobs: unknown[] = Array.isArray(rawJobs) ? rawJobs : [];
+    const versions = jobs.reduce<number>(
+      (total, job) => {
+        const count = (job as { versionCount?: unknown } | null)?.versionCount;
+        return total + (typeof count === "number" ? count : 0);
+      },
+      0,
+    );
+    toast.success(
+      `Tailoring complete: ${versions} resume versions created. Open a job's Versions tab to render PDF.`,
+    );
+    return;
+  }
+  toast.success(`${run.kind} completed`);
+}
 
 export function useLaunchRun() {
   const qc = useQueryClient();
@@ -28,9 +55,10 @@ export function useLaunchRun() {
         total: 0,
         etaText: null,
       });
-      watchRun(run.runId, kind, () =>
-        invalidate.forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
-      );
+      watchRun(run.runId, kind, (completed) => {
+        invalidate.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+        announceCompletion(completed);
+      });
       return true;
     } catch (e) {
       toast.error(`Failed to start ${kind}: ${(e as Error).message}`);
