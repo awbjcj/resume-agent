@@ -1458,19 +1458,74 @@ git commit -m "test(sources): backend suite + lint green"
 **Files:**
 - Create: `web/src/features/sources/use-sources.ts`
 - Modify: `web/src/features/runs/use-launch-run.ts:64-72`
+- Modify: `web/src/lib/runs/store.ts`
+- Modify: `web/src/lib/runs/sse.ts`
 - Test: `web/src/features/sources/use-sources.test.tsx`
 
 **Interfaces:**
-- Consumes: generated `api` client (`/api/sources*`, `/api/pull`), `@tanstack/react-query`, `useLaunchRun`.
-- Produces: `useSources()` query; `useAddSource()`, `useSetEnabled()`, `useRemoveSource()` mutations (invalidate `["sources"]`); `usePreview()` (manual trigger); a `pullSources(ids)` launcher entry.
+- Consumes: generated `api` client (`/api/sources*`, `/api/pull`), `@tanstack/react-query`, `useLaunchRun`, the existing run SSE stream.
+- Produces: `useSources()` query; `useAddSource()`, `useSetEnabled()`, `useRemoveSource()` mutations (invalidate `["sources"]`); `previewSource(url, label?)`; a `pullSources(ids)` launcher entry; `RunRecord.result` preserved from SSE so the Sources page can render the live/final per-source breakdown.
 
 - [ ] **Step 1: Add the `pullSources` launcher**
 
 In `web/src/features/runs/use-launch-run.ts`, add to the `launchers` object:
 
 ```typescript
-  pullSources: (sourceIds: string[] | null) =>
-    unwrap(api.POST("/api/pull", { body: { limit: null, sourceIds } })),
+  pullSources: (sourceIds: string[] | null, opts: PullOptions = {}) =>
+    unwrap(api.POST("/api/pull", { body: { limit: opts.limit ?? null, sourceIds } })),
+```
+
+In `web/src/lib/runs/store.ts`, preserve the run result payload:
+
+```typescript
+export type PullRunResult = {
+  totals?: Record<string, number>;
+  upgraded?: Record<string, number>;
+  skipped?: Record<string, number>;
+  failures?: Record<string, Record<string, string>>;
+};
+
+export interface RunRecord {
+  runId: string;
+  kind: string;
+  status: "running" | "succeeded" | "failed" | "cancelled";
+  percent: number;
+  phase: string;
+  current: number;
+  total: number;
+  etaText: string | null;
+  error?: string;
+  result?: PullRunResult | Record<string, unknown> | null;
+}
+```
+
+In `web/src/lib/runs/sse.ts`, import the result type, then parse and store `result` from each SSE frame:
+
+```typescript
+import { useRunStore, type PullRunResult, type RunRecord } from "./store";
+
+    let data: {
+      state?: string;
+      percent?: number;
+      label?: string;
+      current?: number;
+      total?: number;
+      etaText?: string | null;
+      error?: string;
+      result?: PullRunResult | Record<string, unknown> | null;
+    };
+    useRunStore.getState().upsert({
+      runId,
+      kind,
+      status,
+      percent: typeof data.percent === "number" ? data.percent : 0,
+      phase: data.label ?? "",
+      current: typeof data.current === "number" ? data.current : 0,
+      total: typeof data.total === "number" ? data.total : 0,
+      etaText: data.etaText ?? null,
+      error: data.error ?? undefined,
+      result: data.result ?? null,
+    });
 ```
 
 - [ ] **Step 2: Write the failing hook test**
@@ -1536,8 +1591,10 @@ export function useSources() {
   });
 }
 
-export function previewSource(url: string): Promise<Preview> {
-  return unwrap(api.POST("/api/sources/preview", { body: { url } })) as Promise<Preview>;
+export function previewSource(url: string, label?: string | null): Promise<Preview> {
+  return unwrap(
+    api.POST("/api/sources/preview", { body: { url, label: label ?? null } }),
+  ) as Promise<Preview>;
 }
 
 export function useAddSource() {
@@ -1608,13 +1665,14 @@ import { withQueryClient } from "@/test/utils";
 describe("AddSourceDialog", () => {
   it("enables Add only after a successful preview", async () => {
     render(<AddSourceDialog />, { wrapper: withQueryClient });
-    fireEvent.click(screen.getByText("+ Add source"));
+    fireEvent.click(screen.getByRole("button", { name: "Add source" }));
     fireEvent.change(screen.getByLabelText(/careers or board URL/i), {
       target: { value: "https://jobs.ashbyhq.com/x" },
     });
     fireEvent.click(screen.getByText("Preview"));
     await waitFor(() => expect(screen.getByText(/7 roles/i)).toBeInTheDocument());
-    expect(screen.getByText("Add source").closest("button")).not.toBeDisabled();
+    const addButtons = screen.getAllByRole("button", { name: "Add source" });
+    expect(addButtons[addButtons.length - 1]).not.toBeDisabled();
   });
 });
 ```
@@ -1630,6 +1688,7 @@ Create `web/src/features/sources/AddSourceDialog.tsx`:
 
 ```tsx
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -1652,7 +1711,10 @@ export function AddSourceDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger render={<Button variant="outline" size="sm">+ Add source</Button>} />
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <Plus className="size-4" aria-hidden="true" />
+        Add source
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Add a job source</DialogTitle></DialogHeader>
 
@@ -1667,7 +1729,7 @@ export function AddSourceDialog() {
           <Button variant="secondary" disabled={!url.trim() || previewing}
             onClick={async () => {
               setPreviewing(true);
-              try { setPreview(await previewSource(url.trim())); }
+              try { setPreview(await previewSource(url.trim(), label.trim() || null)); }
               finally { setPreviewing(false); }
             }}>
             {previewing ? "Checking…" : "Preview"}
