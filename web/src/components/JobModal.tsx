@@ -23,6 +23,12 @@ type ClosedLoopJob = {
   application?: ClosedLoopApplication | null;
 };
 
+const tabTriggerClass =
+  "h-10 flex-none rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground after:hidden hover:bg-background/70 data-active:bg-background data-active:text-foreground data-active:shadow-sm data-active:ring-1 data-active:ring-border/70";
+
+const tabCountClass =
+  "ml-1.5 inline-flex min-w-5 justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground";
+
 export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => void }) {
   const { data: job, isLoading } = useJobDetail(jobId);
   const closedLoopJob = job as (NonNullable<typeof job> & ClosedLoopJob) | undefined;
@@ -81,26 +87,26 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
 
               <section className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <Tabs defaultValue="jd" className="flex min-h-0 flex-1 flex-col">
-                  <TabsList className="h-auto shrink-0 flex-wrap justify-start gap-1 rounded-none border-b bg-transparent px-6 pt-5 text-base">
-                    <TabsTrigger value="jd" className="text-sm">Job description</TabsTrigger>
-                    <TabsTrigger value="versions" className="text-sm">
+                  <TabsList className="h-auto w-full shrink-0 flex-wrap justify-start gap-2 rounded-none border-b bg-muted/25 px-6 py-4 text-base group-data-horizontal/tabs:h-auto">
+                    <TabsTrigger value="jd" className={tabTriggerClass}>Job description</TabsTrigger>
+                    <TabsTrigger value="versions" className={tabTriggerClass}>
                       Versions
                       {job.resumeVersions.length > 0 && (
-                        <span className="ml-1.5 tabular-nums opacity-60">
+                        <span className={tabCountClass}>
                           {job.resumeVersions.length}
                         </span>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="coverLetters" className="text-sm">
+                    <TabsTrigger value="coverLetters" className={tabTriggerClass}>
                       Cover letters
                       {coverLetters.length > 0 && (
-                        <span className="ml-1.5 tabular-nums opacity-60">
+                        <span className={tabCountClass}>
                           {coverLetters.length}
                         </span>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="application" className="text-sm">Application</TabsTrigger>
-                    <TabsTrigger value="manage" className="text-sm">Manage</TabsTrigger>
+                    <TabsTrigger value="application" className={tabTriggerClass}>Application</TabsTrigger>
+                    <TabsTrigger value="manage" className={tabTriggerClass}>Manage</TabsTrigger>
                   </TabsList>
 
                   <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
