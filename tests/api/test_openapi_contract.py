@@ -11,7 +11,7 @@ def test_openapi_exposes_core_paths():
     paths = spec["paths"]
     for p in ("/api/shortlist", "/api/pipeline", "/api/triage", "/api/jobs/{job_id}",
               "/api/discover", "/api/reprocess", "/api/refresh",
-              "/api/runs/{run_id}", "/api/runs/{run_id}/events"):
+              "/api/runs/{run_id}", "/api/runs/{run_id}/events", "/api/sources"):
         assert p in paths, f"missing {p}"
 
 
