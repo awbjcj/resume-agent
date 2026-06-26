@@ -64,6 +64,8 @@ export type ReprocessScope =
 export const launchers = {
   pull: (opts: PullOptions = {}) =>
     unwrap(api.POST("/api/pull", { body: { limit: opts.limit ?? null } })),
+  pullSources: (sourceIds: string[] | null, opts: PullOptions = {}) =>
+    unwrap(api.POST("/api/pull", { body: { limit: opts.limit ?? null, sourceIds } })),
   discover: () => unwrap(api.POST("/api/discover", { body: {} })),
   reprocess: (scopes: ReprocessScope[]) =>
     unwrap(api.POST("/api/reprocess", { body: { scopes } })),
