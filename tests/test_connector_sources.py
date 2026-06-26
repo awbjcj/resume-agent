@@ -72,3 +72,25 @@ def test_adzuna_without_keys_is_enabled_but_not_pullable():
     assert adzuna.enabled is True
     assert adzuna.pullable is False
     assert "no API key" in adzuna.detail
+
+
+def test_board_sources_are_disabled_when_parent_group_is_disabled():
+    cfg = ConnectorsConfig.model_validate(
+        {
+            "greenhouse": {"enabled": False, "boards": [{"token": "anthropic"}]},
+            "lever": {"enabled": False, "boards": [{"token": "zoox"}]},
+            "companies": {
+                "enabled": False,
+                "urls": [{"url": "https://jobs.ashbyhq.com/openai"}],
+            },
+        }
+    )
+    views = {view.id: view for view in list_source_views(cfg, _settings())}
+
+    assert views["greenhouse:anthropic"].enabled is False
+    assert views["greenhouse:anthropic"].pullable is False
+    assert views["lever:zoox"].enabled is False
+    assert views["lever:zoox"].pullable is False
+    company_id = company_url_id("https://jobs.ashbyhq.com/openai")
+    assert views[company_id].enabled is False
+    assert views[company_id].pullable is False

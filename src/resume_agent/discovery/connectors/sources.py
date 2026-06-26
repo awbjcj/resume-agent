@@ -34,40 +34,43 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
     views: list[SourceView] = []
 
     for board in config.greenhouse.boards:
+        enabled = config.greenhouse.enabled and board.enabled
         views.append(
             SourceView(
                 id=f"greenhouse:{board.token}",
                 kind="greenhouse",
                 type="board",
                 display_name=board.display(),
-                enabled=board.enabled,
-                pullable=board.enabled,
+                enabled=enabled,
+                pullable=enabled,
                 detail=board.token,
             )
         )
 
     for board in config.lever.boards:
+        enabled = config.lever.enabled and board.enabled
         views.append(
             SourceView(
                 id=f"lever:{board.token}",
                 kind="lever",
                 type="board",
                 display_name=board.display(),
-                enabled=board.enabled,
-                pullable=board.enabled,
+                enabled=enabled,
+                pullable=enabled,
                 detail=board.token,
             )
         )
 
     for entry in config.companies.urls:
+        enabled = config.companies.enabled and entry.enabled
         views.append(
             SourceView(
                 id=company_url_id(entry.url),
                 kind=_company_kind(entry.url),
                 type="board",
                 display_name=entry.label or entry.url,
-                enabled=entry.enabled,
-                pullable=entry.enabled,
+                enabled=enabled,
+                pullable=enabled,
                 detail=entry.url,
             )
         )
