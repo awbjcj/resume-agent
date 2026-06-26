@@ -1606,9 +1606,36 @@
             "title": "Id",
             "type": "integer"
           },
+          "instruction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruction"
+          },
           "jobId": {
             "title": "Jobid",
             "type": "integer"
+          },
+          "origin": {
+            "default": "tailor",
+            "title": "Origin",
+            "type": "string"
+          },
+          "parentVersionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentversionid"
           },
           "pdfPath": {
             "anyOf": [
