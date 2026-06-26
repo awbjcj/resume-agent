@@ -147,15 +147,15 @@ def _passes_filter(row: Any, f: BoardFilter) -> bool:
         return False
 
     score = getattr(row, "fit_score", None)
-    if f.min_fit is not None and (score is None or score < f.min_fit):
+    if f.min_fit is not None and score is not None and score < f.min_fit:
         return False
-    if f.max_fit is not None and (score is None or score > f.max_fit):
+    if f.max_fit is not None and score is not None and score > f.max_fit:
         return False
 
     if f.min_salary is not None:
         salary = getattr(row, "salary_max", None) or getattr(row, "salary_min", None)
         currency = (getattr(row, "salary_currency", None) or "USD").upper()
-        if currency != "USD" or salary is None or salary < f.min_salary:
+        if currency == "USD" and salary is not None and salary < f.min_salary:
             return False
 
     if f.stale_days is not None:

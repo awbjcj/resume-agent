@@ -41,6 +41,56 @@ def test_list_pipeline_filters_by_status_and_min_fit():
     assert page.data[0].company == "Acme"
 
 
+def test_board_min_filters_only_drop_known_failing_values():
+    with _session() as session:
+        _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=90,
+            company="Known pass",
+            criteria_json={"salary_range": {"maximum": 180000, "currency": "USD"}},
+        )
+        _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=90,
+            company="Low salary",
+            criteria_json={"salary_range": {"maximum": 100000, "currency": "USD"}},
+        )
+        _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=20,
+            company="Low fit",
+            criteria_json={"salary_range": {"maximum": 180000, "currency": "USD"}},
+        )
+        _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=None,
+            company="Unknown fit salary",
+            criteria_json={},
+        )
+        _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=90,
+            company="Non USD salary",
+            criteria_json={"salary_range": {"maximum": 100000, "currency": "EUR"}},
+        )
+        result = board.list_board(
+            session,
+            "shortlist",
+            board_filter=board.BoardFilter(min_fit=50, min_salary=150000),
+        )
+
+    assert {row.company for row in result.page.data} == {
+        "Known pass",
+        "Unknown fit salary",
+        "Non USD salary",
+    }
+
+
 def test_set_stage_changes_status():
     with _session() as session:
         job = _job(session, status=JobStatus.shortlisted.value)
