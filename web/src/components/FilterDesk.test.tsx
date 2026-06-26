@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { FilterDesk } from "./FilterDesk";
 import { emptyFilterState } from "@/lib/filters/types";
@@ -63,5 +63,22 @@ describe("FilterDesk", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: /skills/i }));
     expect(await screen.findAllByText("go")).toHaveLength(2);
+  });
+
+  it("keeps search and salary drafts local until filters are applied", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<FilterDesk filter={emptyFilterState()} facets={facets} total={1} onChange={onChange} />);
+
+    await user.type(screen.getByLabelText("Search"), "a");
+    await user.type(screen.getByLabelText(/min salary/i), "120000");
+
+    expect(onChange).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /apply filters/i }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0].q).toBe("a");
+    expect(onChange.mock.calls[0][0].salaryMin).toBe(120000);
   });
 });

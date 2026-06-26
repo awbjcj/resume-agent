@@ -1,3 +1,7 @@
+import { useId, useMemo, useState } from "react";
+import { SearchIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -74,6 +78,52 @@ function pretty(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function salaryInputValue(value: number | null) {
+  return value == null ? "" : String(value);
+}
+
+function parseSalaryInput(value: string): { value: number | null; valid: boolean } {
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null, valid: true };
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return { value: null, valid: false };
+  return { value: parsed === 0 ? null : Math.round(parsed), valid: true };
+}
+
+function normalizeFitInput(value: number) {
+  const fit = Math.min(100, Math.max(0, Math.round(value)));
+  return fit === 0 ? null : fit;
+}
+
+type PrimaryFilterDraft = {
+  sourceQ: string;
+  sourceSalaryMin: number | null;
+  sourceFitMin: number | null;
+  q: string;
+  salaryMin: string;
+  fitMin: number;
+};
+
+function primaryDraftFromFilter(filter: FilterState): PrimaryFilterDraft {
+  return {
+    sourceQ: filter.q,
+    sourceSalaryMin: filter.salaryMin,
+    sourceFitMin: filter.fitMin,
+    q: filter.q,
+    salaryMin: salaryInputValue(filter.salaryMin),
+    fitMin: filter.fitMin ?? 0,
+  };
+}
+
+function isPrimaryDraftCurrent(draft: PrimaryFilterDraft, filter: FilterState) {
+  return (
+    draft.sourceQ === filter.q &&
+    draft.sourceSalaryMin === filter.salaryMin &&
+    draft.sourceFitMin === filter.fitMin
+  );
+}
+
 export function FilterDesk({
   filter,
   facets,
@@ -85,6 +135,11 @@ export function FilterDesk({
   total: number;
   onChange: (s: FilterState) => void;
 }) {
+  const [primaryDraft, setPrimaryDraft] = useState(() => primaryDraftFromFilter(filter));
+  const primaryFormId = useId();
+  const draft = isPrimaryDraftCurrent(primaryDraft, filter)
+    ? primaryDraft
+    : primaryDraftFromFilter(filter);
   const set = (patch: Partial<FilterState>) => onChange({ ...filter, ...patch });
   const setFacet = (key: (typeof SET_KEYS)[number], value: Set<string>) =>
     onChange({ ...filter, [key]: value });
@@ -106,6 +161,31 @@ export function FilterDesk({
     cleared.sort = filter.sort;
     cleared.preset = filter.preset;
     onChange(cleared);
+  };
+
+  const salaryDraft = useMemo(() => parseSalaryInput(draft.salaryMin), [draft.salaryMin]);
+  const committedQ = draft.q.trim();
+  const committedFitMin = normalizeFitInput(draft.fitMin);
+  const hasPrimaryDraftChanges =
+    committedQ !== filter.q.trim() ||
+    salaryDraft.value !== filter.salaryMin ||
+    committedFitMin !== filter.fitMin;
+
+  const applyPrimaryFilters = () => {
+    if (!salaryDraft.valid || !hasPrimaryDraftChanges) return;
+    set({
+      q: committedQ,
+      salaryMin: salaryDraft.value,
+      fitMin: committedFitMin,
+    });
+    setPrimaryDraft({
+      sourceQ: committedQ,
+      sourceSalaryMin: salaryDraft.value,
+      sourceFitMin: committedFitMin,
+      q: committedQ,
+      salaryMin: salaryInputValue(salaryDraft.value),
+      fitMin: committedFitMin ?? 0,
+    });
   };
 
   const facetSpecs: FacetSpec[] = [
@@ -132,63 +212,84 @@ export function FilterDesk({
         <div>
           <div className="text-sm font-semibold">Filter &amp; sort</div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Server-filtered results with live facet counts.
+            Server-filtered results with facet counts.
           </p>
         </div>
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {total.toLocaleString()} matching
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {total.toLocaleString()} matching
+          </div>
+          <Button
+            type="submit"
+            form={primaryFormId}
+            size="sm"
+            disabled={!hasPrimaryDraftChanges || !salaryDraft.valid}
+          >
+            <SearchIcon data-icon="inline-start" />
+            Apply filters
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="f-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
-            Search
-          </Label>
-          <Input
-            id="f-q"
-            type="search"
-            className="h-10 bg-card"
-            value={filter.q}
-            onChange={(event) => set({ q: event.target.value })}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="f-salary" className="text-xs font-semibold uppercase tracking-[0.14em]">
-            Min salary (USD)
-          </Label>
-          <Input
-            id="f-salary"
-            type="number"
-            min={0}
-            step={10000}
-            className="h-10 bg-card"
-            value={filter.salaryMin ?? ""}
-            onChange={(event) => set({ salaryMin: Number(event.target.value) || null })}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="f-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
-              Min fit
+        <form
+          id={primaryFormId}
+          className="contents"
+          onSubmit={(event) => {
+            event.preventDefault();
+            applyPrimaryFilters();
+          }}
+        >
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="f-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
+              Search
             </Label>
-            <span className="text-xs tabular-nums text-muted-foreground">{filter.fitMin ?? 0}</span>
+            <Input
+              id="f-q"
+              type="search"
+              className="h-10 bg-card"
+              value={draft.q}
+              onChange={(event) => setPrimaryDraft({ ...draft, q: event.target.value })}
+            />
           </div>
-          <Slider
-            id="f-fit"
-            aria-label="Min fit"
-            min={0}
-            max={100}
-            step={1}
-            value={[filter.fitMin ?? 0]}
-            onValueChange={(value) => {
-              const fit = (value as number[])[0] ?? 0;
-              set({ fitMin: fit === 0 ? null : fit });
-            }}
-          />
-        </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="f-salary" className="text-xs font-semibold uppercase tracking-[0.14em]">
+              Min salary (USD)
+            </Label>
+            <Input
+              id="f-salary"
+              type="number"
+              min={0}
+              step={10000}
+              className="h-10 bg-card"
+              value={draft.salaryMin}
+              aria-invalid={salaryDraft.valid ? undefined : true}
+              onChange={(event) => setPrimaryDraft({ ...draft, salaryMin: event.target.value })}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="f-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
+                Min fit
+              </Label>
+              <span className="text-xs tabular-nums text-muted-foreground">{draft.fitMin}</span>
+            </div>
+            <Slider
+              id="f-fit"
+              aria-label="Min fit"
+              min={0}
+              max={100}
+              step={1}
+              value={[draft.fitMin]}
+              onValueChange={(value) => {
+                const fit = (value as number[])[0] ?? 0;
+                setPrimaryDraft({ ...draft, fitMin: normalizeFitInput(fit) ?? 0 });
+              }}
+            />
+          </div>
+        </form>
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="f-sort" className="text-xs font-semibold uppercase tracking-[0.14em]">
