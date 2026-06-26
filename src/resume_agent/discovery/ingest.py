@@ -31,6 +31,7 @@ class IngestOutcome(str, Enum):
 class IngestCounts:
     added: dict[str, int]
     upgraded: dict[str, int]
+    skipped: dict[str, int]
     changed_raw_job_ids: list[int]
 
 
@@ -128,6 +129,7 @@ def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> I
     """Insert/upgrade RawJobs and return separate insert/upgrade counts per incoming source."""
     added: Counter[str] = Counter()
     upgraded: Counter[str] = Counter()
+    skipped: Counter[str] = Counter()
     changed_raw_job_ids: list[int] = []
     seen_changed_raw: set[int] = set()
     for raw in raw_jobs:
@@ -158,9 +160,12 @@ def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> I
             ):
                 seen_changed_raw.add(job.id)
                 changed_raw_job_ids.append(job.id)
+        elif outcome is IngestOutcome.skipped:
+            skipped[raw.source] += 1
     return IngestCounts(
         added=dict(added),
         upgraded=dict(upgraded),
+        skipped=dict(skipped),
         changed_raw_job_ids=changed_raw_job_ids,
     )
 
