@@ -7,6 +7,7 @@ import { BulkPreviewButton } from "@/components/BulkPreviewButton";
 import { EmptyState } from "@/components/EmptyState";
 import { JobModal } from "@/components/JobModal";
 import { MetricRow } from "@/components/MetricRow";
+import { MinFitInput } from "@/components/MinFitInput";
 import { PageHeader } from "@/components/PageHeader";
 import { BoardSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import {
   type PipelineItem,
   useBoardQuery,
@@ -31,7 +31,7 @@ import { emptyFilterState } from "@/lib/filters/types";
 
 import { PipelineCard } from "./PipelineCard";
 
-const STAGE_ORDER = ["raw", "shortlisted", "approved", "tailored", "rendered", "rejected"];
+const STAGE_ORDER = ["tailored", "raw", "shortlisted", "approved", "rendered", "rejected"];
 
 function pipelineFilter() {
   const filter = emptyFilterState();
@@ -103,6 +103,7 @@ export function PipelineContainer() {
   const loadedIds = rows.map((row) => row.jobId);
   const bulkSelection = { mode: selection.mode, ids: selection.ids };
   const bulkArgs = { selection: bulkSelection, filter };
+  const selectedStatus = filter.status.size === 1 ? [...filter.status][0] : "all";
   const committedQ = draft.q.trim();
   const committedFitMin = normalizeFitInput(draft.fitMin);
   const hasFilterDraftChanges =
@@ -159,7 +160,7 @@ export function PipelineContainer() {
         ]}
       />
       <form
-        className="mb-7 grid grid-cols-1 gap-4 rounded-lg border bg-card p-5 shadow-[0_1px_2px_rgba(24,32,38,0.04)] sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+        className="mb-7 grid grid-cols-1 gap-4 rounded-lg border bg-card p-5 shadow-[0_1px_2px_rgba(24,32,38,0.04)] sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,0.6fr)_auto]"
         onSubmit={(event) => {
           event.preventDefault();
           applyFilters();
@@ -176,24 +177,39 @@ export function PipelineContainer() {
             onChange={(event) => setFilterDraft({ ...draft, q: event.target.value })}
           />
         </div>
+        <MinFitInput
+          id="pipe-fit"
+          value={draft.fitMin}
+          onChange={(fitMin) => setFilterDraft({ ...draft, fitMin })}
+        />
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="pipe-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
-              Min fit
-            </Label>
-            <span className="text-xs tabular-nums text-muted-foreground">{draft.fitMin}</span>
-          </div>
-          <Slider
-            id="pipe-fit"
-            aria-label="Min fit"
-            min={0}
-            max={100}
-            value={[draft.fitMin]}
-            onValueChange={(value) => {
-              const fit = (value as number[])[0] ?? 0;
-              setFilterDraft({ ...draft, fitMin: normalizeFitInput(fit) ?? 0 });
-            }}
-          />
+          <Label
+            htmlFor="pipe-status"
+            className="text-xs font-semibold uppercase tracking-[0.14em]"
+          >
+            Status
+          </Label>
+          <Select
+            value={selectedStatus}
+            onValueChange={(value) =>
+              setFilter({
+                ...filter,
+                status: !value || value === "all" ? new Set<string>() : new Set([value]),
+              })
+            }
+          >
+            <SelectTrigger id="pipe-status" className="h-10 w-full bg-card">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {STAGE_ORDER.map((stage) => (
+                <SelectItem key={stage} value={stage}>
+                  {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-end">
           <Button type="submit" className="w-full lg:w-auto" disabled={!hasFilterDraftChanges}>
