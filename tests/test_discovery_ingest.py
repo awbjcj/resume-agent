@@ -296,3 +296,24 @@ def test_archived_duplicate_does_not_block_new_active_job():
         assert active is not None
         assert active.id != archived.id
         assert [j.id for j in jobs_by_status(s, JobStatus.raw.value)] == [active.id]
+
+
+def test_skipped_outcome_is_counted():
+    from resume_agent.discovery.connectors.base import RawJob
+    from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
+
+    with _session() as s:
+        job = RawJob(
+            source="greenhouse",
+            url="https://x/1",
+            company="Acme",
+            title="AI Engineer",
+            location="Remote",
+            jd_text="Build agents.",
+        )
+        first = ingest_jobs_with_outcomes(s, [job])
+        assert first.added.get("greenhouse") == 1
+
+        again = ingest_jobs_with_outcomes(s, [job])
+        assert again.added.get("greenhouse", 0) == 0
+        assert again.skipped.get("greenhouse") == 1

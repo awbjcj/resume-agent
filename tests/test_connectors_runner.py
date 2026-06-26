@@ -128,3 +128,28 @@ def test_run_pull_attributes_mixed_added_and_upgraded_to_connector(tmp_path):
     assert runs["companies"]["added"] == 1
     note = runs["companies"]["error"]
     assert "+1 added" in note and "1 upgraded" in note
+
+
+def test_run_pull_reports_upgraded_and_skipped(tmp_path):
+    job = RawJob(
+        source="greenhouse",
+        url="https://x/1",
+        company="Acme",
+        title="AI Engineer",
+        location="Remote",
+        jd_text="Build agents.",
+    )
+
+    class OneBoard:
+        name = "greenhouse:acme"
+
+        def fetch(self, search, limit=None):
+            return FetchResult(jobs=[job])
+
+    search = SearchConfig.model_validate({})
+    with _session() as s:
+        run_pull(s, [OneBoard()], search, tmp_path / "runs.json")
+        report = run_pull(s, [OneBoard()], search, tmp_path / "runs.json")
+
+    assert report.skipped.get("greenhouse:acme") == 1
+    assert report.totals.get("greenhouse:acme") == 0
