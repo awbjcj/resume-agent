@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { SearchIcon } from "lucide-react";
 
+import { MinFitInput } from "@/components/MinFitInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { emptyFilterState, type FilterState, type Preset, type SortKey } from "@/lib/filters/types";
 import { industryLabel } from "@/lib/filters/sic-labels";
 import type { Facets } from "@/features/board/use-board-query";
@@ -269,26 +269,11 @@ export function FilterDesk({
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="f-fit" className="text-xs font-semibold uppercase tracking-[0.14em]">
-                Min fit
-              </Label>
-              <span className="text-xs tabular-nums text-muted-foreground">{draft.fitMin}</span>
-            </div>
-            <Slider
-              id="f-fit"
-              aria-label="Min fit"
-              min={0}
-              max={100}
-              step={1}
-              value={[draft.fitMin]}
-              onValueChange={(value) => {
-                const fit = (value as number[])[0] ?? 0;
-                setPrimaryDraft({ ...draft, fitMin: normalizeFitInput(fit) ?? 0 });
-              }}
-            />
-          </div>
+          <MinFitInput
+            id="f-fit"
+            value={draft.fitMin}
+            onChange={(fitMin) => setPrimaryDraft({ ...draft, fitMin })}
+          />
         </form>
 
         <div className="flex flex-col gap-1.5">
