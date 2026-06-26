@@ -32,6 +32,34 @@ def test_gather_isolated_empty():
     assert asyncio.run(gather_isolated([], lambda x: x)) == []  # type: ignore[arg-type]
 
 
+def test_gather_isolated_cancels_in_flight_tasks_when_checkpoint_raises():
+    class StopRun(Exception):
+        pass
+
+    cancelled = 0
+    checks = 0
+
+    async def fn(x):
+        nonlocal cancelled
+        try:
+            await asyncio.sleep(10)
+            return x
+        except asyncio.CancelledError:
+            cancelled += 1
+            raise
+
+    def checkpoint():
+        nonlocal checks
+        checks += 1
+        if checks >= 2:
+            raise StopRun
+
+    with __import__("pytest").raises(StopRun):
+        asyncio.run(gather_isolated([0, 1, 2], fn, checkpoint=checkpoint, poll_interval=0.001))
+
+    assert cancelled == 3
+
+
 def test_result_defaults():
     r = Result(ok=False)
     assert r.value is None and r.error is None
