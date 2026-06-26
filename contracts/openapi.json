@@ -655,6 +655,85 @@
         "title": "CohortOut",
         "type": "object"
       },
+      "CoverLetterOut": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "factCheckPassed": {
+            "title": "Factcheckpassed",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "instruction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruction"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "origin": {
+            "default": "draft",
+            "title": "Origin",
+            "type": "string"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentid"
+          },
+          "pdfPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdfpath"
+          },
+          "resumeVersionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumeversionid"
+          }
+        },
+        "required": [
+          "id",
+          "jobId",
+          "factCheckPassed",
+          "pdfPath",
+          "createdAt"
+        ],
+        "title": "CoverLetterOut",
+        "type": "object"
+      },
       "CoverLetterParams": {
         "properties": {
           "approved": {
@@ -771,6 +850,14 @@
               }
             ],
             "title": "Companysize"
+          },
+          "coverLetters": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CoverLetterOut"
+            },
+            "title": "Coverletters",
+            "type": "array"
           },
           "createdAt": {
             "format": "date-time",
