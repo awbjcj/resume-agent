@@ -5,10 +5,10 @@ from __future__ import annotations
 from sqlmodel import Session
 
 from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
+from resume_agent.cover_letter.render import render_cover_letter
 from resume_agent.cover_letter.revision import apply_revision, compose_user_revision_input
 from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.profile.store import load_facts
-from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.agents import CoverLetterBundle, build_cover_letter_bundle
 from resume_agent.tracking.repository import get_cover_letter, save_cover_letter
 from resume_agent.tracking.tables import CoverLetter
@@ -49,5 +49,7 @@ def revise_cover_letter_version(
             parent_id=parent.id,
         ),
     )
-    export_job_artifacts(session, child.job_id)
+    if child.id is None:
+        raise RuntimeError("Revised cover letter was not persisted")
+    render_cover_letter(session, child.id)
     return child
