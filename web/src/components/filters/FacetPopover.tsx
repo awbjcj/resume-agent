@@ -104,6 +104,7 @@ export function FacetPopover({
 
       <PopoverContent
         align="start"
+        side={presentation === "field" ? "top" : "bottom"}
         className="max-h-[var(--available-height)] w-80 max-w-[calc(100vw-2rem)] gap-0 overflow-hidden p-0"
       >
         <PopoverHeader className="shrink-0 gap-2 p-4 pb-3">
