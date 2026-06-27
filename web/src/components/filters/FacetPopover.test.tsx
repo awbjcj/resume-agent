@@ -62,4 +62,28 @@ describe("FacetPopover", () => {
     expect(screen.getByText("No matching skills")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Done filtering Skills" })).toBeInTheDocument();
   });
+
+  it("resets its search when a controlled parent closes it", () => {
+    const props = {
+      label: "Skills",
+      counts,
+      selected: new Set<string>(),
+      onChange: vi.fn<(selected: Set<string>) => void>(),
+      onOpenChange: vi.fn<(open: boolean) => void>(),
+    };
+    const { rerender } = render(<FacetPopover {...props} open />);
+
+    fireEvent.change(screen.getByPlaceholderText("Search skills..."), {
+      target: { value: "rea" },
+    });
+    expect(screen.queryByText("python")).not.toBeInTheDocument();
+
+    rerender(<FacetPopover {...props} open={false} />);
+    rerender(<FacetPopover {...props} open />);
+
+    expect(screen.getByPlaceholderText("Search skills...")).toHaveValue("");
+    expect(screen.getByText("python")).toBeInTheDocument();
+    expect(screen.getByText("react")).toBeInTheDocument();
+    expect(screen.getByText("go")).toBeInTheDocument();
+  });
 });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,14 @@ export function FacetPopover({
   const shown = options.filter((option) =>
     (getLabel ? getLabel(option) : option).toLowerCase().includes(query.toLowerCase()),
   );
+
+  useEffect(() => {
+    if (!open) {
+      // The controlled close boundary intentionally starts a fresh search session.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setQuery("");
+    }
+  }, [open]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) setQuery("");
