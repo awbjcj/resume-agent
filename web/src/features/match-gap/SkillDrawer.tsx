@@ -7,8 +7,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-
-export type SuggestionKind = "skill" | "theme";
+import { SuggestionPanel } from "./SuggestionPanel";
+import {
+  useGenerateSuggestion,
+  useSuggestion,
+  type SuggestionKind,
+} from "./use-suggestion";
 
 type Job = {
   id: number;
@@ -30,6 +34,13 @@ export function SkillDrawer({
   jobs: Job[];
   onClose: () => void;
 }) {
+  const { data: envelope, isLoading, isError, refetch } = useSuggestion(
+    kind,
+    targetKey,
+    targetKey !== null,
+  );
+  const { generate, generating } = useGenerateSuggestion();
+
   return (
     <Sheet open={targetKey !== null} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-xl">
@@ -67,6 +78,19 @@ export function SkillDrawer({
               ))}
             </ul>
           )}
+        </section>
+
+        <section aria-label="Gap-closing advisor" className="border-t px-6 py-6">
+          <SuggestionPanel
+            envelope={envelope}
+            isLoading={isLoading}
+            isError={isError}
+            onRetry={() => void refetch()}
+            onGenerate={() => {
+              if (targetKey) void generate(kind, targetKey);
+            }}
+            generating={generating}
+          />
         </section>
       </SheetContent>
     </Sheet>

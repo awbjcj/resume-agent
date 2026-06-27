@@ -4,10 +4,26 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { axe } from "vitest-axe";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "@/test/server";
 import { MatchGapContainer } from "./MatchGapContainer";
+
+const mocks = vi.hoisted(() => ({
+  watchRun: vi.fn(() => vi.fn()),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+  toastInfo: vi.fn(),
+}));
+
+vi.mock("@/lib/runs/sse", () => ({ watchRun: mocks.watchRun }));
+vi.mock("sonner", () => ({
+  toast: {
+    success: mocks.toastSuccess,
+    error: mocks.toastError,
+    info: mocks.toastInfo,
+  },
+}));
 
 const wrap = (ui: ReactNode) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -34,8 +50,15 @@ const populated = {
 };
 
 describe("MatchGapContainer", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("opens the demanding jobs drawer from a skill action", async () => {
-    server.use(http.get("/api/match-gap", () => HttpResponse.json(populated)));
+    server.use(
+      http.get("/api/match-gap", () => HttpResponse.json(populated)),
+      http.get("/api/suggestions", () =>
+        HttpResponse.json({ suggestion: null, stale: false }),
+      ),
+    );
     wrap(<MatchGapContainer />);
 
     const skillActions = await screen.findAllByRole("button", { name: /Kubernetes, gap/ });
@@ -47,7 +70,22 @@ describe("MatchGapContainer", () => {
   });
 
   it("opens a theme with the union of its demanding jobs", async () => {
-    server.use(http.get("/api/match-gap", () => HttpResponse.json(populated)));
+    let getKind: string | null = null;
+    let getKey: string | null = null;
+    let postBody: unknown;
+    server.use(
+      http.get("/api/match-gap", () => HttpResponse.json(populated)),
+      http.get("/api/suggestions", ({ request }) => {
+        const url = new URL(request.url);
+        getKind = url.searchParams.get("kind");
+        getKey = url.searchParams.get("key");
+        return HttpResponse.json({ suggestion: null, stale: false });
+      }),
+      http.post("/api/suggestions/generate", async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json({ runId: "theme-run", kind: "suggestion" });
+      }),
+    );
     wrap(<MatchGapContainer />);
 
     await userEvent.click(
@@ -58,6 +96,13 @@ describe("MatchGapContainer", () => {
     expect(within(drawer).getByRole("heading", { name: "Cloud / Infrastructure" })).toBeInTheDocument();
     expect(within(drawer).getByText("Stripe")).toBeInTheDocument();
     expect(within(drawer).getByText("Datadog")).toBeInTheDocument();
+    expect(getKind).toBe("theme");
+    expect(getKey).toBe("infra");
+
+    await userEvent.click(
+      await within(drawer).findByRole("button", { name: /how to close this gap/i }),
+    );
+    await waitFor(() => expect(postBody).toEqual({ kind: "theme", key: "infra" }));
   });
 
   it("shows the empty state when there are no target jobs", async () => {
