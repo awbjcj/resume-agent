@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 function fitValue(value: string): number {
   if (!value) return 0;
@@ -17,27 +18,44 @@ export function MinFitInput({
   value: number;
   onChange: (value: number) => void;
 }) {
+  const descriptionId = `${id}-description`;
+
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
       <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-[0.14em]">
         Min fit
       </Label>
-      <div className="flex items-center gap-2">
-        <Input
-          id={id}
-          type="number"
+      <div className="flex min-h-10 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
+          <Input
+            id={id}
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            inputMode="numeric"
+            placeholder="Any"
+            className="h-10 w-20 bg-card text-right tabular-nums"
+            value={value === 0 ? "" : value}
+            aria-describedby={descriptionId}
+            onChange={(event) => onChange(fitValue(event.target.value))}
+          />
+          <span className="shrink-0 text-sm tabular-nums text-muted-foreground">/ 100</span>
+        </div>
+        <Slider
+          aria-label="Minimum fit slider"
+          value={[value]}
           min={0}
           max={100}
           step={1}
-          inputMode="numeric"
-          placeholder="Any"
-          className="h-10 bg-card tabular-nums"
-          value={value === 0 ? "" : value}
-          onChange={(event) => onChange(fitValue(event.target.value))}
+          onValueChange={(nextValue) =>
+            onChange(typeof nextValue === "number" ? nextValue : (nextValue[0] ?? 0))
+          }
         />
-        <span className="shrink-0 text-sm tabular-nums text-muted-foreground">/ 100</span>
       </div>
-      <p className="text-xs text-muted-foreground">Leave blank to include every fit score.</p>
+      <p id={descriptionId} className="text-xs text-muted-foreground">
+        Blank or 0 includes every fit score.
+      </p>
     </div>
   );
 }

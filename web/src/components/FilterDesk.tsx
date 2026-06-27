@@ -1,7 +1,8 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { SearchIcon } from "lucide-react";
 
 import { MinFitInput } from "@/components/MinFitInput";
+import { SalaryThresholdInput } from "@/components/SalaryThresholdInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -136,6 +137,7 @@ export function FilterDesk({
   onChange: (s: FilterState) => void;
 }) {
   const [primaryDraft, setPrimaryDraft] = useState(() => primaryDraftFromFilter(filter));
+  const [openFacet, setOpenFacet] = useState<(typeof SET_KEYS)[number] | null>(null);
   const primaryFormId = useId();
   const draft = isPrimaryDraftCurrent(primaryDraft, filter)
     ? primaryDraft
@@ -143,6 +145,8 @@ export function FilterDesk({
   const set = (patch: Partial<FilterState>) => onChange({ ...filter, ...patch });
   const setFacet = (key: (typeof SET_KEYS)[number], value: Set<string>) =>
     onChange({ ...filter, [key]: value });
+  const handleFacetOpenChange = (key: (typeof SET_KEYS)[number], nextOpen: boolean) =>
+    setOpenFacet((current) => (nextOpen ? key : current === key ? null : current));
   const removeFilter = (key: keyof FilterState, value: string) => {
     if ((SET_KEYS as readonly string[]).includes(key)) {
       const next = new Set(filter[key as (typeof SET_KEYS)[number]]);
@@ -190,7 +194,6 @@ export function FilterDesk({
 
   const facetSpecs: FacetSpec[] = [
     { key: "source", label: "Source" },
-    { key: "status", label: "Status" },
     { key: "remote", label: "Remote", options: REMOTE },
     { key: "sponsorship", label: "Sponsorship", options: SPONSORSHIP },
     { key: "seniority", label: "Seniority", options: SENIORITY },
@@ -202,11 +205,31 @@ export function FilterDesk({
     { key: "companySize", label: "Company size" },
     { key: "skills", label: "Skills" },
   ];
+  const statusCounts = countsWithSelected(facets.status, filter.status);
+  const showStatus = hasOptions(statusCounts, filter.status);
+  const isOpenFacetRenderable =
+    openFacet === null ||
+    (openFacet === "status"
+      ? showStatus
+      : facetSpecs.some(({ key, options }) => {
+          if (key !== openFacet) return false;
+          const counts = countsWithSelected(facets[key], filter[key]);
+          for (const option of options ?? []) counts[option] ??= 0;
+          return hasOptions(counts, filter[key]);
+        }));
+
+  useEffect(() => {
+    if (!isOpenFacetRenderable) {
+      // A vanished server facet starts a fresh popover session if it returns.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOpenFacet(null);
+    }
+  }, [isOpenFacetRenderable]);
 
   return (
     <section
       aria-label="Filter and sort"
-      className="mb-7 rounded-lg border bg-card p-5 shadow-[0_1px_2px_rgba(24,32,38,0.04)]"
+      className="mb-7 rounded-lg border bg-card p-4 sm:p-5"
     >
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -231,54 +254,49 @@ export function FilterDesk({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <form
-          id={primaryFormId}
-          className="contents"
-          onSubmit={(event) => {
-            event.preventDefault();
-            applyPrimaryFilters();
-          }}
-        >
+      <form
+        id={primaryFormId}
+        className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          applyPrimaryFilters();
+        }}
+      >
+        {showStatus && (
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="f-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
-              Search
-            </Label>
-            <Input
-              id="f-q"
-              type="search"
-              className="h-10 bg-card"
-              value={draft.q}
-              onChange={(event) => setPrimaryDraft({ ...draft, q: event.target.value })}
+            <span className="text-xs font-semibold uppercase tracking-[0.14em]">
+              Application stage
+            </span>
+            <FacetPopover
+              label="Status"
+              counts={statusCounts}
+              selected={filter.status}
+              onChange={(next) => setFacet("status", next)}
+              open={openFacet === "status"}
+              onOpenChange={(nextOpen) => handleFacetOpenChange("status", nextOpen)}
+              getLabel={pretty}
+              presentation="field"
             />
+            <p className="text-xs text-muted-foreground">Narrow the pipeline by current stage.</p>
           </div>
+        )}
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="f-salary" className="text-xs font-semibold uppercase tracking-[0.14em]">
-              Min salary (USD)
-            </Label>
-            <Input
-              id="f-salary"
-              type="number"
-              min={0}
-              step={10000}
-              className="h-10 bg-card"
-              value={draft.salaryMin}
-              aria-invalid={salaryDraft.valid ? undefined : true}
-              onChange={(event) => setPrimaryDraft({ ...draft, salaryMin: event.target.value })}
-            />
-          </div>
+        <MinFitInput
+          id="f-fit"
+          value={draft.fitMin}
+          onChange={(fitMin) => setPrimaryDraft({ ...draft, fitMin })}
+        />
 
-          <MinFitInput
-            id="f-fit"
-            value={draft.fitMin}
-            onChange={(fitMin) => setPrimaryDraft({ ...draft, fitMin })}
-          />
-        </form>
+        <SalaryThresholdInput
+          id="f-salary"
+          value={draft.salaryMin}
+          valid={salaryDraft.valid}
+          onChange={(salaryMin) => setPrimaryDraft({ ...draft, salaryMin })}
+        />
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="f-sort" className="text-xs font-semibold uppercase tracking-[0.14em]">
-            Sort by
+            Sort
           </Label>
           <Select value={filter.sort} onValueChange={(value) => set({ sort: value as SortKey })}>
             <SelectTrigger id="f-sort" className="h-10 w-full bg-card">
@@ -292,6 +310,21 @@ export function FilterDesk({
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">Order the matching roles.</p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="f-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
+            Search
+          </Label>
+          <Input
+            id="f-q"
+            type="search"
+            className="h-10 bg-card"
+            value={draft.q}
+            onChange={(event) => setPrimaryDraft({ ...draft, q: event.target.value })}
+          />
+          <p className="text-xs text-muted-foreground">Title, company, or keyword.</p>
         </div>
 
         {filter.sort === "composite" && (
@@ -311,11 +344,12 @@ export function FilterDesk({
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">Tune the composite ranking.</p>
           </div>
         )}
-      </div>
+      </form>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
         {facetSpecs.map(({ key, label, options, getLabel }) => {
           const counts = countsWithSelected(facets[key], filter[key]);
           for (const option of options ?? []) counts[option] ??= 0;
@@ -327,6 +361,8 @@ export function FilterDesk({
               counts={counts}
               selected={filter[key]}
               onChange={(next) => setFacet(key, next)}
+              open={openFacet === key}
+              onOpenChange={(nextOpen) => handleFacetOpenChange(key, nextOpen)}
               getLabel={getLabel ?? pretty}
             />
           );
