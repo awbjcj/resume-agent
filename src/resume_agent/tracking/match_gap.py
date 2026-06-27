@@ -9,7 +9,7 @@ from resume_agent.models.profile import ProfileFacts
 from resume_agent.tracking.tables import Job, JobStatus
 
 if TYPE_CHECKING:
-    from resume_agent.tracking.skill_clusters import ClusterMap
+    from resume_agent.taxonomy.clusters import ClusterMap
 
 _PUNCT = re.compile(r"[^a-z0-9+#. ]+")
 _WS = re.compile(r"\s+")
@@ -159,6 +159,7 @@ def build_demand_graph(
     profile_tokens = profile_skill_tokens(facts)
     jobs: list[JobLite] = []
     skill_nodes: dict[str, SkillNode] = {}
+    display_for: dict[str, str] = {}
     edges: list[DemandEdge] = []
 
     for job in target_jobs:
@@ -178,20 +179,22 @@ def build_demand_graph(
         emitted: set[tuple[str, SkillSource]] = set()
         for key, source in _SKILL_SOURCES:
             for raw_skill in _criteria_skill_values(job, key):
-                skill = normalize_skill(raw_skill)
-                edge_key = (skill, source)
-                if not skill or edge_key in emitted:
+                token = normalize_skill(raw_skill)
+                edge_key = (token, source)
+                if not token or edge_key in emitted:
                     continue
                 emitted.add(edge_key)
+                display_for.setdefault(token, raw_skill.strip())
+                display = display_for[token]
                 skill_nodes.setdefault(
-                    skill,
+                    token,
                     SkillNode(
-                        skill=skill,
+                        skill=display,
                         theme_id=None,
-                        covered=skill in profile_tokens,
+                        covered=token in profile_tokens,
                     ),
                 )
-                edges.append(DemandEdge(job_id=job.id, skill=skill, source=source))
+                edges.append(DemandEdge(job_id=job.id, skill=display, source=source))
 
     themes: list[ThemeNode] = []
     return DemandGraph(

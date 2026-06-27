@@ -45,8 +45,8 @@ def test_build_demand_graph_reads_all_sources_coverage_and_job_facets():
             criteria={
                 "seniority": "senior",
                 "must_have_skills": "Python",
-                "nice_to_have_skills": ["Kubernetes"],
-                "tech_stack": ["Docker"],
+                "nice_to_have_skills": [" Kubernetes ", "Go"],
+                "tech_stack": ["Linux"],
             },
         )
 
@@ -66,14 +66,16 @@ def test_build_demand_graph_reads_all_sources_coverage_and_job_facets():
             )
         ]
         assert graph.skills == [
-            SkillNode(skill="python", theme_id=None, covered=True),
-            SkillNode(skill="kubernetes", theme_id=None, covered=False),
-            SkillNode(skill="docker", theme_id=None, covered=False),
+            SkillNode(skill="Python", theme_id=None, covered=True),
+            SkillNode(skill="Kubernetes", theme_id=None, covered=False),
+            SkillNode(skill="Go", theme_id=None, covered=False),
+            SkillNode(skill="Linux", theme_id=None, covered=False),
         ]
         assert graph.edges == [
-            DemandEdge(job_id=job.id, skill="python", source="must"),
-            DemandEdge(job_id=job.id, skill="kubernetes", source="nice"),
-            DemandEdge(job_id=job.id, skill="docker", source="tech"),
+            DemandEdge(job_id=job.id, skill="Python", source="must"),
+            DemandEdge(job_id=job.id, skill="Kubernetes", source="nice"),
+            DemandEdge(job_id=job.id, skill="Go", source="nice"),
+            DemandEdge(job_id=job.id, skill="Linux", source="tech"),
         ]
         assert graph.themes == []
         assert graph.clusters_stale is True
@@ -84,7 +86,7 @@ def test_build_demand_graph_dedupes_skill_nodes_and_each_job_source_edge():
         first = _job(
             session,
             criteria={
-                "must_have_skills": ["Python", "PYTHON", " python "],
+                "must_have_skills": [" Python ", "PYTHON", " python "],
                 "nice_to_have_skills": ["Python"],
             },
         )
@@ -95,12 +97,12 @@ def test_build_demand_graph_dedupes_skill_nodes_and_each_job_source_edge():
         assert first.id is not None
         assert second.id is not None
         assert graph.skills == [
-            SkillNode(skill="python", theme_id=None, covered=False)
+            SkillNode(skill="Python", theme_id=None, covered=False)
         ]
         assert graph.edges == [
-            DemandEdge(job_id=first.id, skill="python", source="must"),
-            DemandEdge(job_id=first.id, skill="python", source="nice"),
-            DemandEdge(job_id=second.id, skill="python", source="tech"),
+            DemandEdge(job_id=first.id, skill="Python", source="must"),
+            DemandEdge(job_id=first.id, skill="Python", source="nice"),
+            DemandEdge(job_id=second.id, skill="Python", source="tech"),
         ]
 
 
