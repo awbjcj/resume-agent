@@ -46,32 +46,38 @@ def _validated_map(
 def _flatten_aliases(aliases: dict[str, str]) -> dict[str, str]:
     """Resolve every alias to a terminal token; only self-cycles are valid."""
     flattened: dict[str, str] = {}
-    resolving: set[str] = set()
-
-    def terminal_for(token: str) -> str:
-        if token in flattened:
-            return flattened[token]
-        if token in resolving:
-            raise ValueError(f"alias cycle detected at {token!r}")
-
-        target = aliases.get(token)
-        if target is None:
-            return token
-        if target == token:
-            flattened[token] = token
-            return token
-
-        resolving.add(token)
-        try:
-            terminal = terminal_for(target)
-        finally:
-            resolving.remove(token)
-        flattened[token] = terminal
-        return terminal
 
     for alias in aliases:
-        terminal_for(alias)
-    return flattened
+        if alias in flattened:
+            continue
+
+        path: list[str] = []
+        seen: set[str] = set()
+        token = alias
+        while True:
+            if token in flattened:
+                terminal = flattened[token]
+                break
+            if token in seen:
+                raise ValueError(f"alias cycle detected at {token!r}")
+
+            target = aliases.get(token)
+            if target is None:
+                terminal = token
+                break
+            if target == token:
+                flattened[token] = token
+                terminal = token
+                break
+
+            seen.add(token)
+            path.append(token)
+            token = target
+
+        for path_token in path:
+            flattened[path_token] = terminal
+
+    return {alias: flattened[alias] for alias in aliases}
 
 
 def _canonicalize_theme_keys(
@@ -148,14 +154,18 @@ def save_cluster_map(cmap: ClusterMap, path: str | Path) -> None:
 
 
 def merge_cluster_map(existing: ClusterMap, new: ClusterMap) -> ClusterMap:
-    """Monotonically add entries while enforcing terminal alias targets."""
+    """Add entries without redirecting existing terminal canonical tokens."""
 
     def merge_map(current: dict[str, str], proposed: dict[str, str]) -> dict[str, str]:
         merged = dict(proposed)
         merged.update(current)
         return merged
 
-    aliases = _flatten_aliases(merge_map(existing.aliases, new.aliases))
+    existing_aliases = _flatten_aliases(existing.aliases)
+    protected_aliases = dict(existing_aliases)
+    for terminal in existing_aliases.values():
+        protected_aliases.setdefault(terminal, terminal)
+    aliases = _flatten_aliases(merge_map(protected_aliases, new.aliases))
     existing_themes = _canonicalize_theme_keys(existing.theme_of, aliases)
     new_themes = _canonicalize_theme_keys(new.theme_of, aliases)
     return ClusterMap(

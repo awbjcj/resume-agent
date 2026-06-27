@@ -98,6 +98,18 @@ def test_load_cluster_map_cyclic_aliases_degrade_to_empty(tmp_path):
     assert load_cluster_map(path) == ClusterMap.empty()
 
 
+def test_load_cluster_map_flattens_deep_alias_chain_without_recursion(tmp_path):
+    path = tmp_path / "clusters.json"
+    aliases = {f"skill{index}": f"skill{index + 1}" for index in range(1500)}
+    path.write_text(json.dumps({"aliases": aliases}), encoding="utf-8")
+
+    loaded = load_cluster_map(path)
+
+    assert len(loaded.aliases) == 1500
+    assert loaded.aliases["skill0"] == "skill1500"
+    assert loaded.aliases["skill1499"] == "skill1500"
+
+
 def test_save_cluster_map_roundtrips_deterministically_without_fixed_temp(tmp_path):
     path = tmp_path / "clusters.json"
     fixed_temp = tmp_path / "clusters.json.tmp"
@@ -168,10 +180,23 @@ def test_merge_cluster_map_is_monotonic_with_existing_values_winning():
     )
 
     assert merge_cluster_map(existing, new) == ClusterMap(
-        aliases={"k8s": "kubernetes", "kube": "kubernetes"},
+        aliases={
+            "k8s": "kubernetes",
+            "kubernetes": "kubernetes",
+            "kube": "kubernetes",
+        },
         theme_of={"kubernetes": "infra", "react": "frontend"},
         theme_label={"infra": "Infrastructure", "frontend": "Frontend"},
     )
+
+
+def test_merge_cluster_map_protects_existing_terminal_from_redirection():
+    merged = merge_cluster_map(
+        ClusterMap(aliases={"a": "b"}),
+        ClusterMap(aliases={"b": "c"}),
+    )
+
+    assert merged.aliases == {"a": "b", "b": "b"}
 
 
 def test_merge_cluster_map_rejects_cycle_before_last_good_file_is_replaced(tmp_path):
@@ -181,7 +206,10 @@ def test_merge_cluster_map_rejects_cycle_before_last_good_file_is_replaced(tmp_p
     last_good = path.read_text(encoding="utf-8")
 
     with pytest.raises(ValueError, match="alias cycle"):
-        merged = merge_cluster_map(existing, ClusterMap(aliases={"b": "a"}))
+        merged = merge_cluster_map(
+            existing,
+            ClusterMap(aliases={"c": "d", "d": "c"}),
+        )
         save_cluster_map(merged, path)
 
     assert path.read_text(encoding="utf-8") == last_good
