@@ -13,13 +13,18 @@ from resume_agent.llm_runner import (
 )
 from resume_agent.models.job import JobCriteria, JobCriteriaExtract
 
-
 _INSTRUCTIONS = [
     "Extract structured hiring criteria from the job description text.",
     "Infer the sponsorship signal: 'offered', 'denied', or 'silent' when the text says nothing.",
     "Infer seniority as one of: junior, mid, senior, staff, principal -- leave null if unclear.",
     "Infer employment type as one of: full_time, contract, internship, part_time -- leave null if unclear.",
     "List the concrete tech stack (languages, frameworks, tools) named in the post.",
+    "Emit each skill as a short keyword or term, NOT a sentence or descriptive phrase;",
+    "e.g. 'Architecture Analysis (common cause and cascading faults, fault tolerant "
+    "and fail-operational architectures)' becomes 'Fault-Tolerant Architecture', and "
+    "'Building pipelines for structured and unstructured data using vector databases "
+    "and RAG' becomes 'Data Pipelines', 'Vector Databases', 'RAG'.",
+    "When a skill is phrased as a sentence, summarize it into a few keywords.",
     "Emit each skill as a single atomic skill -- never combine several into one item;",
     "e.g. 'Python, C++ or C' becomes three separate skill entries.",
     "Capture the industry or domain (e.g. fintech, healthcare) when stated.",
