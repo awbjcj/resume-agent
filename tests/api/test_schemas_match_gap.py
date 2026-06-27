@@ -1,22 +1,44 @@
-from resume_agent.api.schemas.match_gap import GapOut, MatchGapOut
-from resume_agent.tracking.match_gap import GapRow
+from resume_agent.api.schemas.match_gap import (
+    DemandEdgeOut,
+    MatchGapOut,
+    SkillNodeOut,
+)
+from resume_agent.tracking.match_gap import DemandEdge, SkillNode
 
 
-def test_gap_out_projects_demand_share():
-    dto = GapRow(skill="Kubernetes", demand_count=3, target_total=4)
-    out = GapOut.model_validate(dto)
-    assert out.skill == "Kubernetes"
-    assert out.demand_count == 3
-    assert out.demand_share == 75  # derived property
+def test_skill_node_out_camelizes_theme_id():
+    out = SkillNodeOut.model_validate(SkillNode("Kubernetes", "t1", False))
+    assert out.model_dump(by_alias=True) == {
+        "skill": "Kubernetes",
+        "themeId": "t1",
+        "covered": False,
+    }
 
 
-def test_gap_out_serializes_camelcase():
-    body = GapOut.model_validate(GapRow(skill="Go", demand_count=1, target_total=2)).model_dump(
-        by_alias=True
-    )
-    assert set(body) == {"skill", "demandCount", "targetTotal", "demandShare"}
+def test_demand_edge_out_camelizes_job_id():
+    out = DemandEdgeOut.model_validate(DemandEdge(7, "Go", "must"))
+    assert out.model_dump(by_alias=True) == {
+        "jobId": 7,
+        "skill": "Go",
+        "source": "must",
+    }
 
 
 def test_match_gap_out_shape():
-    out = MatchGapOut(target_total=0, gaps=[])
-    assert out.model_dump(by_alias=True) == {"targetTotal": 0, "gaps": []}
+    out = MatchGapOut(
+        target_total=0,
+        clusters_stale=False,
+        jobs=[],
+        skills=[],
+        edges=[],
+        themes=[],
+    )
+    dumped = out.model_dump(by_alias=True)
+    assert set(dumped) == {
+        "targetTotal",
+        "clustersStale",
+        "jobs",
+        "skills",
+        "edges",
+        "themes",
+    }
