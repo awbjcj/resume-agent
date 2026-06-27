@@ -71,8 +71,10 @@ def themes_to_pairs(
         group_members: set[str] = set()
         for raw_skill in theme.skills:
             skill = raw_skill.strip()
-            if not skill or skill in group_members:
-                continue
+            if not skill:
+                raise ValueError("theme skill members must be nonblank")
+            if skill in group_members:
+                raise ValueError(f"duplicate skill token in theme: {skill!r}")
             if skill not in tokens:
                 raise ValueError(f"unknown skill token in theme output: {skill!r}")
             if skill in assigned:

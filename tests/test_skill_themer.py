@@ -10,7 +10,7 @@ from resume_agent.tracking.canonicalize import (
 
 def test_themes_to_pairs_returns_trimmed_exact_partition():
     themes = [
-        ThemeGroup(label="  Backend  ", skills=[" python ", "django", "python"]),
+        ThemeGroup(label="  Backend  ", skills=[" python ", "django"]),
         ThemeGroup(label="Data", skills=["postgresql"]),
     ]
 
@@ -25,6 +25,27 @@ def test_themes_to_pairs_rejects_unknown_and_missing_members():
 
     with pytest.raises(ValueError):
         themes_to_pairs(themes, {"python", "django"})
+
+
+def test_themes_to_pairs_rejects_missing_member_without_unknown_member():
+    themes = [ThemeGroup(label="Backend", skills=["python"])]
+
+    with pytest.raises(ValueError):
+        themes_to_pairs(themes, {"python", "django"})
+
+
+def test_themes_to_pairs_rejects_duplicate_member_in_same_group():
+    themes = [ThemeGroup(label="Backend", skills=["python", " python "])]
+
+    with pytest.raises(ValueError):
+        themes_to_pairs(themes, {"python"})
+
+
+def test_themes_to_pairs_rejects_blank_skill_member():
+    themes = [ThemeGroup(label="Backend", skills=["python", "   "])]
+
+    with pytest.raises(ValueError):
+        themes_to_pairs(themes, {"python"})
 
 
 def test_themes_to_pairs_rejects_member_in_multiple_groups():
