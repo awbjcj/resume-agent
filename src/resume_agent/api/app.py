@@ -23,6 +23,7 @@ from resume_agent.api.routers import prune as prune_router
 from resume_agent.api.routers import resumes
 from resume_agent.api.routers import runs as runs_router
 from resume_agent.api.routers import sources as sources_router
+from resume_agent.api.routers import suggestions as suggestions_router
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.config import get_settings
 from resume_agent.db import init_db, make_engine
@@ -92,6 +93,7 @@ def create_app(
     app.include_router(sources_router.router, prefix="/api", dependencies=guarded)
     app.include_router(analytics_router.router, prefix="/api", dependencies=guarded)
     app.include_router(match_gap_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(suggestions_router.router, prefix="/api", dependencies=guarded)
     app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so
