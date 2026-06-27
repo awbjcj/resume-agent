@@ -261,6 +261,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/match-gap/refresh-clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Match Gap Clusters */
+        post: operations["refresh_match_gap_clusters_api_match_gap_refresh_clusters_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notifications": {
         parameters: {
             query?: never;
@@ -868,19 +885,20 @@ export interface components {
             /** Jobids */
             jobIds?: number[] | null;
         };
-        /** DiscoverParams */
-        DiscoverParams: Record<string, never>;
-        /** GapOut */
-        GapOut: {
-            /** Demandcount */
-            demandCount: number;
-            /** Demandshare */
-            demandShare: number;
+        /** DemandEdgeOut */
+        DemandEdgeOut: {
+            /** Jobid */
+            jobId: number;
             /** Skill */
             skill: string;
-            /** Targettotal */
-            targetTotal: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "must" | "nice" | "tech";
         };
+        /** DiscoverParams */
+        DiscoverParams: Record<string, never>;
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -964,6 +982,17 @@ export interface components {
             /** Url */
             url: string | null;
         };
+        /** JobLiteOut */
+        JobLiteOut: {
+            /** Company */
+            company?: string | null;
+            /** Id */
+            id: number;
+            /** Seniority */
+            seniority?: string | null;
+            /** Title */
+            title?: string | null;
+        };
         /** JobPatch */
         JobPatch: {
             /** Archived */
@@ -973,10 +1002,18 @@ export interface components {
         };
         /** MatchGapOut */
         MatchGapOut: {
-            /** Gaps */
-            gaps: components["schemas"]["GapOut"][];
+            /** Clustersstale */
+            clustersStale: boolean;
+            /** Edges */
+            edges: components["schemas"]["DemandEdgeOut"][];
+            /** Jobs */
+            jobs: components["schemas"]["JobLiteOut"][];
+            /** Skills */
+            skills: components["schemas"]["SkillNodeOut"][];
             /** Targettotal */
             targetTotal: number;
+            /** Themes */
+            themes: components["schemas"]["ThemeOut"][];
         };
         /** NotificationOut */
         NotificationOut: {
@@ -1210,6 +1247,15 @@ export interface components {
             /** Title */
             title: string | null;
         };
+        /** SkillNodeOut */
+        SkillNodeOut: {
+            /** Covered */
+            covered: boolean;
+            /** Skill */
+            skill: string;
+            /** Themeid */
+            themeId?: string | null;
+        };
         /** SkillTagOut */
         SkillTagOut: {
             /** Covered */
@@ -1269,6 +1315,13 @@ export interface components {
             approved: boolean;
             /** Jobids */
             jobIds?: number[] | null;
+        };
+        /** ThemeOut */
+        ThemeOut: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
         };
         /** TriageItem */
         TriageItem: {
@@ -1868,6 +1921,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_match_gap_clusters_api_match_gap_refresh_clusters_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

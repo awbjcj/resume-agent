@@ -759,37 +759,37 @@
         "title": "CoverLetterParams",
         "type": "object"
       },
-      "DiscoverParams": {
-        "properties": {},
-        "title": "DiscoverParams",
-        "type": "object"
-      },
-      "GapOut": {
+      "DemandEdgeOut": {
         "properties": {
-          "demandCount": {
-            "title": "Demandcount",
-            "type": "integer"
-          },
-          "demandShare": {
-            "title": "Demandshare",
+          "jobId": {
+            "title": "Jobid",
             "type": "integer"
           },
           "skill": {
             "title": "Skill",
             "type": "string"
           },
-          "targetTotal": {
-            "title": "Targettotal",
-            "type": "integer"
+          "source": {
+            "enum": [
+              "must",
+              "nice",
+              "tech"
+            ],
+            "title": "Source",
+            "type": "string"
           }
         },
         "required": [
+          "jobId",
           "skill",
-          "demandCount",
-          "targetTotal",
-          "demandShare"
+          "source"
         ],
-        "title": "GapOut",
+        "title": "DemandEdgeOut",
+        "type": "object"
+      },
+      "DiscoverParams": {
+        "properties": {},
+        "title": "DiscoverParams",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1155,6 +1155,52 @@
         "title": "JobDetail",
         "type": "object"
       },
+      "JobLiteOut": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "seniority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seniority"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "JobLiteOut",
+        "type": "object"
+      },
       "JobPatch": {
         "properties": {
           "archived": {
@@ -1185,21 +1231,50 @@
       },
       "MatchGapOut": {
         "properties": {
-          "gaps": {
+          "clustersStale": {
+            "title": "Clustersstale",
+            "type": "boolean"
+          },
+          "edges": {
             "items": {
-              "$ref": "#/components/schemas/GapOut"
+              "$ref": "#/components/schemas/DemandEdgeOut"
             },
-            "title": "Gaps",
+            "title": "Edges",
+            "type": "array"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobLiteOut"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillNodeOut"
+            },
+            "title": "Skills",
             "type": "array"
           },
           "targetTotal": {
             "title": "Targettotal",
             "type": "integer"
+          },
+          "themes": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeOut"
+            },
+            "title": "Themes",
+            "type": "array"
           }
         },
         "required": [
           "targetTotal",
-          "gaps"
+          "clustersStale",
+          "jobs",
+          "skills",
+          "edges",
+          "themes"
         ],
         "title": "MatchGapOut",
         "type": "object"
@@ -2050,6 +2125,35 @@
         "title": "ShortlistItem",
         "type": "object"
       },
+      "SkillNodeOut": {
+        "properties": {
+          "covered": {
+            "title": "Covered",
+            "type": "boolean"
+          },
+          "skill": {
+            "title": "Skill",
+            "type": "string"
+          },
+          "themeId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Themeid"
+          }
+        },
+        "required": [
+          "skill",
+          "covered"
+        ],
+        "title": "SkillNodeOut",
+        "type": "object"
+      },
       "SkillTagOut": {
         "properties": {
           "covered": {
@@ -2236,6 +2340,24 @@
           }
         },
         "title": "TailorParams",
+        "type": "object"
+      },
+      "ThemeOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "ThemeOut",
         "type": "object"
       },
       "TriageItem": {
@@ -3308,6 +3430,52 @@
           }
         },
         "summary": "Get Match Gap"
+      }
+    },
+    "/api/match-gap/refresh-clusters": {
+      "post": {
+        "operationId": "refresh_match_gap_clusters_api_match_gap_refresh_clusters_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Match Gap Clusters"
       }
     },
     "/api/notifications": {
