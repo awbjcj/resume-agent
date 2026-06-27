@@ -104,9 +104,9 @@ export function FacetPopover({
 
       <PopoverContent
         align="start"
-        className="w-80 max-w-[calc(100vw-2rem)] gap-0 overflow-hidden p-0"
+        className="max-h-[var(--available-height)] w-80 max-w-[calc(100vw-2rem)] gap-0 overflow-hidden p-0"
       >
-        <PopoverHeader className="gap-2 p-4 pb-3">
+        <PopoverHeader className="shrink-0 gap-2 p-4 pb-3">
           <div className="flex items-center justify-between gap-3">
             <PopoverTitle>Filter by {label}</PopoverTitle>
             <Badge variant="secondary">
@@ -116,14 +116,14 @@ export function FacetPopover({
           <PopoverDescription>Select options to narrow this view.</PopoverDescription>
         </PopoverHeader>
 
-        <Command>
+        <Command className="min-h-0 flex-1">
           <CommandInput
             placeholder={`Search ${label.toLowerCase()}...`}
             aria-label={`Search ${label}`}
             value={query}
             onValueChange={setQuery}
           />
-          <CommandList className="max-h-64">
+          <CommandList className="min-h-0 max-h-64 flex-1">
             {shown.length === 0 && (
               <CommandEmpty>No matching {label.toLowerCase()}</CommandEmpty>
             )}
@@ -151,7 +151,7 @@ export function FacetPopover({
           </CommandList>
         </Command>
 
-        <div className="flex items-center justify-between gap-2 border-t bg-muted/30 p-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t bg-muted/30 p-2">
           <Button
             type="button"
             variant="ghost"

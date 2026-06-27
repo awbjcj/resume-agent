@@ -29,6 +29,20 @@ function renderFacet({
 }
 
 describe("FacetPopover", () => {
+  it("renders field presentation as a full-width, h-10 trigger", () => {
+    render(
+      <FacetPopover
+        label="Skills"
+        counts={counts}
+        selected={new Set<string>()}
+        onChange={vi.fn<(selected: Set<string>) => void>()}
+        presentation="field"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Skills" })).toHaveClass("h-10", "w-full");
+  });
+
   it("shows its controlled presentation and selected count", () => {
     renderFacet({ selected: new Set(["python"]) });
 
@@ -42,6 +56,12 @@ describe("FacetPopover", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear Skills filter" }));
 
     expect(onChange).toHaveBeenCalledWith(new Set());
+  });
+
+  it("disables Clear when no Skills are selected", () => {
+    renderFacet();
+
+    expect(screen.getByRole("button", { name: "Clear Skills filter" })).toBeDisabled();
   });
 
   it("closes from the Done action", () => {
@@ -101,6 +121,45 @@ describe("FacetPopover", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Done filtering Skills" }));
     expect(screen.queryByText("Filter by Skills")).not.toBeInTheDocument();
+  });
+
+  it("resets search after a direct uncontrolled close and reopen", () => {
+    render(
+      <FacetPopover
+        label="Skills"
+        counts={counts}
+        selected={new Set<string>()}
+        onChange={vi.fn<(selected: Set<string>) => void>()}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Skills" });
+    fireEvent.click(trigger);
+    fireEvent.change(screen.getByPlaceholderText("Search skills..."), {
+      target: { value: "rea" },
+    });
+
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+
+    expect(screen.getByPlaceholderText("Search skills...")).toHaveValue("");
+    expect(screen.getByText("python")).toBeInTheDocument();
+  });
+
+  it("contains the popup while allowing only its option list to scroll", () => {
+    renderFacet();
+
+    const content = document.querySelector('[data-slot="popover-content"]');
+    const command = document.querySelector('[data-slot="command"]');
+    const list = document.querySelector('[data-slot="command-list"]');
+    const header = document.querySelector('[data-slot="popover-header"]');
+    const footer = screen.getByRole("button", { name: "Done filtering Skills" }).parentElement;
+
+    expect(content).toHaveClass("max-h-[var(--available-height)]", "overflow-hidden");
+    expect(command).toHaveClass("min-h-0", "flex-1");
+    expect(list).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(header).toHaveClass("shrink-0");
+    expect(footer).toHaveClass("shrink-0");
   });
 
   it("resets its search when a controlled parent closes it", () => {
