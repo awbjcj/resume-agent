@@ -1,5 +1,6 @@
 import asyncio
-from typing import Any, Protocol
+from dataclasses import dataclass
+from typing import Any, Literal, Protocol
 
 from resume_agent.config import get_settings
 
@@ -29,6 +30,33 @@ class AgentRunner:
 # (no recognised prefix) stays Anthropic, so existing config keeps working.
 PROVIDERS = ("anthropic", "openai", "gemini", "deepseek")
 
+ANTHROPIC_WEB_SEARCH_TOOL = {
+    "type": "web_search_20250305",
+    "name": "web_search",
+    "max_uses": 5,
+}
+OPENAI_WEB_SEARCH_TOOL = {"type": "web_search_preview"}
+
+SearchMode = Literal["auto", "native", "tool", "off"]
+SearchStrategy = Literal[
+    "none",
+    "tool",
+    "native_anthropic",
+    "native_openai",
+    "native_gemini",
+]
+_NATIVE_SEARCH_STRATEGIES: dict[str, SearchStrategy] = {
+    "anthropic": "native_anthropic",
+    "openai": "native_openai",
+    "gemini": "native_gemini",
+}
+
+
+@dataclass(frozen=True)
+class SearchPlan:
+    provider: str
+    strategy: SearchStrategy
+
 
 def split_provider(model_id: str) -> tuple[str, str]:
     """Split ``"provider:model"`` into ``(provider, model)``.
@@ -41,6 +69,22 @@ def split_provider(model_id: str) -> tuple[str, str]:
     if sep and prefix in PROVIDERS:
         return prefix, rest
     return "anthropic", model_id
+
+
+def plan_search(model_id: str, mode: SearchMode) -> SearchPlan:
+    """Choose a provider-native or tool-backed search strategy without I/O."""
+    provider, _model = split_provider(model_id)
+    if mode == "off":
+        return SearchPlan(provider, "none")
+    if mode == "tool":
+        return SearchPlan(provider, "tool")
+
+    native_strategy = _NATIVE_SEARCH_STRATEGIES.get(provider)
+    if mode == "native" and native_strategy is None:
+        raise ValueError(
+            f"search_mode=native but provider {provider!r} has no native web search"
+        )
+    return SearchPlan(provider, native_strategy or "tool")
 
 
 def resolve_api_key(model_id: str) -> str:
@@ -93,6 +137,37 @@ def build_model(model_id: str, api_key: str | None = None) -> Any:
     from agno.models.anthropic import Claude
 
     return Claude(id=model, api_key=key)
+
+
+def build_search_equipped(
+    model_id: str,
+    mode: SearchMode | None = None,
+) -> tuple[Any, list[Any]]:
+    """Build a model and its search tools for advisor research."""
+    settings = get_settings()
+    plan = plan_search(model_id, mode or settings.search_mode)
+    if plan.strategy == "none":
+        raise ValueError("advisor web search is disabled by search_mode=off")
+    _provider, model_name = split_provider(model_id)
+    api_key = resolve_api_key(model_id) or None
+
+    if plan.strategy == "native_openai":
+        from agno.models.openai.responses import OpenAIResponses
+
+        return OpenAIResponses(id=model_name, api_key=api_key), [OPENAI_WEB_SEARCH_TOOL]
+    if plan.strategy == "native_gemini":
+        from agno.models.google import Gemini
+
+        return Gemini(id=model_name, api_key=api_key, search=True), []
+
+    model = build_model(model_id, api_key=api_key)
+    if plan.strategy == "native_anthropic":
+        return model, [ANTHROPIC_WEB_SEARCH_TOOL]
+    if plan.strategy == "tool":
+        from agno.tools.duckduckgo import DuckDuckGoTools
+
+        return model, [DuckDuckGoTools()]
+    raise AssertionError(f"unhandled search strategy: {plan.strategy}")
 
 
 async def acall(agent: Runner, prompt: str, *, sem: asyncio.Semaphore) -> Any:
