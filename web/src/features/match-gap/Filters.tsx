@@ -36,7 +36,7 @@ export function Filters({
           }
         >
           <SelectTrigger id="match-gap-company" className="w-44" aria-label="Filter by company">
-            <SelectValue placeholder="Company" />
+            <SelectValue>{value.company ?? "All companies"}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>All companies</SelectItem>
@@ -64,7 +64,7 @@ export function Filters({
             className="w-40"
             aria-label="Filter by seniority"
           >
-            <SelectValue placeholder="Seniority" />
+            <SelectValue>{value.seniority ?? "All levels"}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>All levels</SelectItem>
