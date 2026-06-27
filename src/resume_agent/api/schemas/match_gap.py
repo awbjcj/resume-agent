@@ -7,15 +7,6 @@ from typing import Literal
 from resume_agent.api.schemas.base import CamelModel
 
 
-class GapOut(CamelModel):
-    """Legacy projection retained until the router migrates in Task 7."""
-
-    skill: str
-    demand_count: int
-    target_total: int
-    demand_share: int
-
-
 class JobLiteOut(CamelModel):
     id: int
     company: str | None = None
