@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, cast
 
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -118,3 +118,21 @@ class Notification(SQLModel, table=True):
     message_id: str = Field(index=True)
     state: str = Field(default="pending", index=True)
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class SkillSuggestion(SQLModel, table=True):
+    __tablename__ = cast(Any, "skill_suggestions")
+    __table_args__ = (
+        UniqueConstraint("kind", "key", name="uq_skill_suggestion_kind_key"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    kind: str = Field(index=True)
+    key: str = Field(index=True)
+    payload_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    fingerprint: str = ""
+    generated_at: datetime = Field(default_factory=utcnow)
+    schema_version: int = 1

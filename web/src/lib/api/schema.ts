@@ -261,6 +261,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/match-gap/refresh-clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Match Gap Clusters */
+        post: operations["refresh_match_gap_clusters_api_match_gap_refresh_clusters_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notifications": {
         parameters: {
             query?: never;
@@ -573,6 +590,40 @@ export interface paths {
         patch: operations["set_enabled_route_api_sources__source_id__patch"];
         trace?: never;
     };
+    "/api/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Suggestion */
+        get: operations["get_suggestion_api_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suggestions/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Generate */
+        post: operations["launch_generate_api_suggestions_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tailor": {
         parameters: {
             query?: never;
@@ -868,18 +919,29 @@ export interface components {
             /** Jobids */
             jobIds?: number[] | null;
         };
-        /** DiscoverParams */
-        DiscoverParams: Record<string, never>;
-        /** GapOut */
-        GapOut: {
-            /** Demandcount */
-            demandCount: number;
-            /** Demandshare */
-            demandShare: number;
+        /** DemandEdgeOut */
+        DemandEdgeOut: {
+            /** Jobid */
+            jobId: number;
             /** Skill */
             skill: string;
-            /** Targettotal */
-            targetTotal: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "must" | "nice" | "tech";
+        };
+        /** DiscoverParams */
+        DiscoverParams: Record<string, never>;
+        /** GenerateParams */
+        GenerateParams: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "theme";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -964,6 +1026,17 @@ export interface components {
             /** Url */
             url: string | null;
         };
+        /** JobLiteOut */
+        JobLiteOut: {
+            /** Company */
+            company?: string | null;
+            /** Id */
+            id: number;
+            /** Seniority */
+            seniority?: string | null;
+            /** Title */
+            title?: string | null;
+        };
         /** JobPatch */
         JobPatch: {
             /** Archived */
@@ -973,10 +1046,18 @@ export interface components {
         };
         /** MatchGapOut */
         MatchGapOut: {
-            /** Gaps */
-            gaps: components["schemas"]["GapOut"][];
+            /** Clustersstale */
+            clustersStale: boolean;
+            /** Edges */
+            edges: components["schemas"]["DemandEdgeOut"][];
+            /** Jobs */
+            jobs: components["schemas"]["JobLiteOut"][];
+            /** Skills */
+            skills: components["schemas"]["SkillNodeOut"][];
             /** Targettotal */
             targetTotal: number;
+            /** Themes */
+            themes: components["schemas"]["ThemeOut"][];
         };
         /** NotificationOut */
         NotificationOut: {
@@ -1044,6 +1125,15 @@ export interface components {
             /** Title */
             title: string | null;
         };
+        /** ProjectOut */
+        ProjectOut: {
+            /** Skillsdemonstrated */
+            skillsDemonstrated: string[];
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
         /** PruneOverrides */
         PruneOverrides: {
             /**
@@ -1085,10 +1175,41 @@ export interface components {
             /** Limit */
             limit?: number | null;
         };
+        /** RepoOut */
+        RepoOut: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /** Stars */
+            stars?: number | null;
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
+            /** Why */
+            why: string;
+        };
         /** ReprocessParams */
         ReprocessParams: {
             /** Scopes */
             scopes?: string[];
+        };
+        /** ResourceOut */
+        ResourceOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "course" | "doc" | "tutorial";
+            /** Title */
+            title: string;
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
         };
         /** ResumeVersionOut */
         ResumeVersionOut: {
@@ -1210,6 +1331,15 @@ export interface components {
             /** Title */
             title: string | null;
         };
+        /** SkillNodeOut */
+        SkillNodeOut: {
+            /** Covered */
+            covered: boolean;
+            /** Skill */
+            skill: string;
+            /** Themeid */
+            themeId?: string | null;
+        };
         /** SkillTagOut */
         SkillTagOut: {
             /** Covered */
@@ -1260,6 +1390,39 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** SuggestionEnvelope */
+        SuggestionEnvelope: {
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            suggestion?: components["schemas"]["SuggestionOut"] | null;
+        };
+        /** SuggestionOut */
+        SuggestionOut: {
+            /** Bridge */
+            bridge: string;
+            /** Citations */
+            citations: string[];
+            /**
+             * Generatedat
+             * Format: date-time
+             */
+            generatedAt: string;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "theme";
+            project?: components["schemas"]["ProjectOut"] | null;
+            /** Repos */
+            repos: components["schemas"]["RepoOut"][];
+            /** Resources */
+            resources: components["schemas"]["ResourceOut"][];
+        };
         /** TailorParams */
         TailorParams: {
             /**
@@ -1269,6 +1432,13 @@ export interface components {
             approved: boolean;
             /** Jobids */
             jobIds?: number[] | null;
+        };
+        /** ThemeOut */
+        ThemeOut: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
         };
         /** TriageItem */
         TriageItem: {
@@ -1868,6 +2038,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_match_gap_clusters_api_match_gap_refresh_clusters_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */
@@ -2580,6 +2781,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_suggestion_api_suggestions_get: {
+        parameters: {
+            query: {
+                kind: "skill" | "theme";
+                key: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_generate_api_suggestions_generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateParams"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

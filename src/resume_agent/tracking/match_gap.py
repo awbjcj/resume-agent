@@ -1,11 +1,15 @@
 import re
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 from sqlmodel import Session, select
 
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.tracking.tables import Job, JobStatus
+
+if TYPE_CHECKING:
+    from resume_agent.taxonomy.clusters import ClusterMap
 
 _PUNCT = re.compile(r"[^a-z0-9+#. ]+")
 _WS = re.compile(r"\s+")
@@ -18,6 +22,13 @@ TARGET_STATUSES = (
 )
 
 Canonicalizer = Callable[[set[str]], dict[str, str]]
+SkillSource = Literal["must", "nice", "tech"]
+
+_SKILL_SOURCES: tuple[tuple[str, SkillSource], ...] = (
+    ("must_have_skills", "must"),
+    ("nice_to_have_skills", "nice"),
+    ("tech_stack", "tech"),
+)
 
 
 def normalize_skill(skill: str) -> str:
@@ -37,6 +48,44 @@ def profile_skill_tokens(facts: ProfileFacts) -> set[str]:
                 tokens.add(normalize_skill(alias))
     tokens.discard("")
     return tokens
+
+
+@dataclass
+class JobLite:
+    id: int
+    company: str | None
+    title: str | None
+    seniority: str | None
+
+
+@dataclass
+class DemandEdge:
+    job_id: int
+    skill: str
+    source: SkillSource
+
+
+@dataclass
+class SkillNode:
+    skill: str
+    theme_id: str | None
+    covered: bool
+
+
+@dataclass
+class ThemeNode:
+    id: str
+    label: str
+
+
+@dataclass
+class DemandGraph:
+    target_total: int
+    clusters_stale: bool
+    jobs: list[JobLite]
+    skills: list[SkillNode]
+    edges: list[DemandEdge]
+    themes: list[ThemeNode]
 
 
 @dataclass
@@ -79,6 +128,95 @@ def _must_have_skills(job: Job) -> list[str]:
     if not isinstance(raw, (list, tuple, set)):
         return []
     return [str(skill) for skill in raw if str(skill).strip()]
+
+
+def _criteria_skill_values(job: Job, key: str) -> list[str]:
+    raw = (job.criteria_json or {}).get(key) or []
+    if isinstance(raw, str):
+        return [raw]
+    if not isinstance(raw, Collection) or isinstance(raw, (Mapping, bytes)):
+        return []
+    return [str(skill) for skill in raw if str(skill).strip()]
+
+
+def collect_target_skill_tokens(session: Session) -> set[str]:
+    tokens: set[str] = set()
+    for job in _target_jobs(session):
+        for key, _source in _SKILL_SOURCES:
+            for skill in _criteria_skill_values(job, key):
+                if token := normalize_skill(skill):
+                    tokens.add(token)
+    return tokens
+
+
+def build_demand_graph(
+    session: Session,
+    facts: ProfileFacts,
+    cluster_map: "ClusterMap | None" = None,
+) -> DemandGraph:
+    """Build normalized target-job skill demand for dashboard consumers."""
+    target_jobs = _target_jobs(session)
+    profile_tokens = profile_skill_tokens(facts)
+    aliases = cluster_map.aliases if cluster_map else {}
+    theme_of = cluster_map.theme_of if cluster_map else {}
+    theme_label = cluster_map.theme_label if cluster_map else {}
+    profile_canonical = {aliases.get(token, token) for token in profile_tokens}
+    jobs: list[JobLite] = []
+    skill_nodes: dict[str, SkillNode] = {}
+    display_for: dict[str, str] = {}
+    edges: list[DemandEdge] = []
+
+    for job in target_jobs:
+        if job.id is None:
+            continue
+        criteria = job.criteria_json or {}
+        seniority = criteria.get("seniority")
+        jobs.append(
+            JobLite(
+                id=job.id,
+                company=job.company,
+                title=job.title,
+                seniority=seniority if isinstance(seniority, str) else None,
+            )
+        )
+
+        emitted: set[tuple[str, SkillSource]] = set()
+        for key, source in _SKILL_SOURCES:
+            for raw_skill in _criteria_skill_values(job, key):
+                token = normalize_skill(raw_skill)
+                canonical = aliases.get(token, token)
+                edge_key = (canonical, source)
+                if not canonical or edge_key in emitted:
+                    continue
+                emitted.add(edge_key)
+                display_for.setdefault(canonical, raw_skill.strip())
+                display = display_for[canonical]
+                theme_id = theme_of.get(canonical)
+                skill_nodes.setdefault(
+                    canonical,
+                    SkillNode(
+                        skill=display,
+                        theme_id=theme_id,
+                        covered=canonical in profile_canonical,
+                    ),
+                )
+                edges.append(DemandEdge(job_id=job.id, skill=display, source=source))
+
+    used_themes = {
+        node.theme_id for node in skill_nodes.values() if node.theme_id is not None
+    }
+    themes = [
+        ThemeNode(id=theme_id, label=theme_label.get(theme_id, theme_id))
+        for theme_id in sorted(used_themes)
+    ]
+    return DemandGraph(
+        target_total=len(jobs),
+        clusters_stale=any(node.theme_id is None for node in skill_nodes.values()),
+        jobs=jobs,
+        skills=list(skill_nodes.values()),
+        edges=edges,
+        themes=themes,
+    )
 
 
 def match_gap(

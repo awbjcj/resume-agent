@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 import yaml
@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     llm_concurrency: int = Field(default=8, ge=1)
     llm_retries: int = Field(default=2, ge=0)
     llm_retry_delay: int = Field(default=1, ge=0)
+    search_mode: Literal["auto", "native", "tool", "off"] = "auto"
+    advisor_model: str = ""
 
 
 @lru_cache
