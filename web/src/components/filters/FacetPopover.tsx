@@ -27,8 +27,8 @@ type FacetPopoverProps = {
   counts: Record<string, number>;
   selected: Set<string>;
   onChange: (selected: Set<string>) => void;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   getLabel?: (value: string) => string;
   presentation?: "chip" | "field";
 };
@@ -44,6 +44,9 @@ export function FacetPopover({
   presentation = "chip",
 }: FacetPopoverProps) {
   const [query, setQuery] = useState("");
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = open !== undefined;
+  const resolvedOpen = isControlled ? open : uncontrolledOpen;
   const options = useMemo(
     () =>
       Object.entries(counts)
@@ -56,16 +59,17 @@ export function FacetPopover({
   );
 
   useEffect(() => {
-    if (!open) {
+    if (!resolvedOpen) {
       // The controlled close boundary intentionally starts a fresh search session.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery("");
     }
-  }, [open]);
+  }, [resolvedOpen]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) setQuery("");
-    onOpenChange(nextOpen);
+    if (!isControlled) setUncontrolledOpen(nextOpen);
+    onOpenChange?.(nextOpen);
   };
 
   const toggle = (option: string) => {
@@ -76,7 +80,7 @@ export function FacetPopover({
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={resolvedOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger
         render={
           <Button

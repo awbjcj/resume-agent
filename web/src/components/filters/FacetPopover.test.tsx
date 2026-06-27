@@ -63,6 +63,46 @@ describe("FacetPopover", () => {
     expect(screen.getByRole("button", { name: "Done filtering Skills" })).toBeInTheDocument();
   });
 
+  it("selects and deselects counted options", () => {
+    const onChange = vi.fn<(selected: Set<string>) => void>();
+    const props = {
+      label: "Skills",
+      counts,
+      onChange,
+      open: true,
+      onOpenChange: vi.fn<(open: boolean) => void>(),
+    };
+    const { rerender } = render(
+      <FacetPopover {...props} selected={new Set<string>()} />,
+    );
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /react/i }));
+    expect(onChange).toHaveBeenLastCalledWith(new Set(["react"]));
+
+    rerender(<FacetPopover {...props} selected={new Set(["react"])} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /react/i }));
+    expect(onChange).toHaveBeenLastCalledWith(new Set());
+  });
+
+  it("opens and closes from Done without controlled props", () => {
+    render(
+      <FacetPopover
+        label="Skills"
+        counts={counts}
+        selected={new Set<string>()}
+        onChange={vi.fn<(selected: Set<string>) => void>()}
+      />,
+    );
+
+    expect(screen.queryByText("Filter by Skills")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /skills/i }));
+    expect(screen.getByText("Filter by Skills")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Done filtering Skills" }));
+    expect(screen.queryByText("Filter by Skills")).not.toBeInTheDocument();
+  });
+
   it("resets its search when a controlled parent closes it", () => {
     const props = {
       label: "Skills",
