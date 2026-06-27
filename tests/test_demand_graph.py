@@ -135,6 +135,27 @@ def test_build_demand_graph_aliases_dedupe_edges_and_cover_canonical_skill():
         ]
 
 
+def test_build_demand_graph_applies_aliases_to_profile_skill_coverage():
+    with _session() as session:
+        _job(
+            session,
+            criteria={"must_have_skills": ["Kubernetes"]},
+        )
+        cmap = ClusterMap(
+            aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"}
+        )
+
+        graph = build_demand_graph(
+            session,
+            _facts({"infra": [Skill(name="K8s")]}),
+            cmap,
+        )
+
+        assert graph.skills == [
+            SkillNode(skill="Kubernetes", theme_id=None, covered=True)
+        ]
+
+
 def test_build_demand_graph_emits_only_used_sorted_themes_with_label_fallback():
     with _session() as session:
         _job(
