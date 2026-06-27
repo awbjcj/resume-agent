@@ -792,6 +792,31 @@
         "title": "DiscoverParams",
         "type": "object"
       },
+      "GenerateParams": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "skill",
+              "theme"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key"
+        ],
+        "title": "GenerateParams",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1508,6 +1533,32 @@
         "title": "PipelineItem",
         "type": "object"
       },
+      "ProjectOut": {
+        "properties": {
+          "skillsDemonstrated": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skillsdemonstrated",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "summary",
+          "skillsDemonstrated"
+        ],
+        "title": "ProjectOut",
+        "type": "object"
+      },
       "PruneOverrides": {
         "properties": {
           "dryRun": {
@@ -1638,6 +1689,53 @@
         "title": "RefreshParams",
         "type": "object"
       },
+      "RepoOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "stars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stars"
+          },
+          "url": {
+            "format": "uri",
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "why"
+        ],
+        "title": "RepoOut",
+        "type": "object"
+      },
       "ReprocessParams": {
         "properties": {
           "scopes": {
@@ -1649,6 +1747,36 @@
           }
         },
         "title": "ReprocessParams",
+        "type": "object"
+      },
+      "ResourceOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "course",
+              "doc",
+              "tutorial"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "format": "uri",
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "kind"
+        ],
+        "title": "ResourceOut",
         "type": "object"
       },
       "ResumeVersionOut": {
@@ -2315,6 +2443,96 @@
           "url"
         ],
         "title": "SourcePreviewOut",
+        "type": "object"
+      },
+      "SuggestionEnvelope": {
+        "properties": {
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "SuggestionEnvelope",
+        "type": "object"
+      },
+      "SuggestionOut": {
+        "properties": {
+          "bridge": {
+            "title": "Bridge",
+            "type": "string"
+          },
+          "citations": {
+            "items": {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "generatedAt": {
+            "format": "date-time",
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "skill",
+              "theme"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "repos": {
+            "items": {
+              "$ref": "#/components/schemas/RepoOut"
+            },
+            "title": "Repos",
+            "type": "array"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceOut"
+            },
+            "title": "Resources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "repos",
+          "resources",
+          "bridge",
+          "citations",
+          "generatedAt"
+        ],
+        "title": "SuggestionOut",
         "type": "object"
       },
       "TailorParams": {
@@ -5184,6 +5402,132 @@
           }
         },
         "summary": "Set Enabled Route"
+      }
+    },
+    "/api/suggestions": {
+      "get": {
+        "operationId": "get_suggestion_api_suggestions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "skill",
+                "theme"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Suggestion"
+      }
+    },
+    "/api/suggestions/generate": {
+      "post": {
+        "operationId": "launch_generate_api_suggestions_generate_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateParams"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Generate"
       }
     },
     "/api/tailor": {
