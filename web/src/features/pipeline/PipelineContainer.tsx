@@ -29,9 +29,13 @@ import { useSelection } from "@/features/board/use-selection";
 import { useBulkRun } from "@/features/runs/use-bulk-run";
 import { emptyFilterState } from "@/lib/filters/types";
 
-import { PipelineCard } from "./PipelineCard";
-
-const STAGE_ORDER = ["tailored", "raw", "shortlisted", "approved", "rendered", "rejected"];
+import { PipelineStageSection } from "./PipelineStageSection";
+import {
+  initialOpenPipelineStages,
+  orderPipelineStages,
+  PIPELINE_STAGE_ORDER,
+  pipelineStageLabel,
+} from "./pipeline-stages";
 
 function pipelineFilter() {
   const filter = emptyFilterState();
@@ -74,6 +78,7 @@ export function PipelineContainer() {
     ? filterDraft
     : pipelineDraftFromFilter(filter);
   const [targetStatus, setTargetStatus] = useState("approved");
+  const [openStages, setOpenStages] = useState(initialOpenPipelineStages);
   const { rows, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useBoardQuery<PipelineItem>("pipeline", filter);
   const selection = useSelection();
@@ -94,10 +99,7 @@ export function PipelineContainer() {
 
   if (isLoading) return <BoardSkeleton />;
 
-  const stages = [
-    ...STAGE_ORDER.filter((stage) => byStage.has(stage)),
-    ...[...byStage.keys()].filter((stage) => !STAGE_ORDER.includes(stage)),
-  ];
+  const stages = orderPipelineStages(byStage.keys());
   const rendered = byStage.get("rendered")?.length ?? 0;
   const openId = params.get("job");
   const loadedIds = rows.map((row) => row.jobId);
@@ -116,6 +118,14 @@ export function PipelineContainer() {
       sourceFitMin: committedFitMin,
       q: committedQ,
       fitMin: committedFitMin ?? 0,
+    });
+  };
+  const setStageOpen = (stage: string, open: boolean) => {
+    setOpenStages((current) => {
+      const next = new Set(current);
+      if (open) next.add(stage);
+      else next.delete(stage);
+      return next;
     });
   };
 
@@ -167,22 +177,6 @@ export function PipelineContainer() {
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="pipe-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
-            Company/title
-          </Label>
-          <Input
-            id="pipe-q"
-            className="h-10 bg-card"
-            value={draft.q}
-            onChange={(event) => setFilterDraft({ ...draft, q: event.target.value })}
-          />
-        </div>
-        <MinFitInput
-          id="pipe-fit"
-          value={draft.fitMin}
-          onChange={(fitMin) => setFilterDraft({ ...draft, fitMin })}
-        />
-        <div className="flex flex-col gap-1.5">
           <Label
             htmlFor="pipe-status"
             className="text-xs font-semibold uppercase tracking-[0.14em]"
@@ -203,13 +197,29 @@ export function PipelineContainer() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              {STAGE_ORDER.map((stage) => (
+              {PIPELINE_STAGE_ORDER.map((stage) => (
                 <SelectItem key={stage} value={stage}>
-                  {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                  {pipelineStageLabel(stage)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <MinFitInput
+          id="pipe-fit"
+          value={draft.fitMin}
+          onChange={(fitMin) => setFilterDraft({ ...draft, fitMin })}
+        />
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pipe-q" className="text-xs font-semibold uppercase tracking-[0.14em]">
+            Company/title
+          </Label>
+          <Input
+            id="pipe-q"
+            className="h-10 bg-card"
+            value={draft.q}
+            onChange={(event) => setFilterDraft({ ...draft, q: event.target.value })}
+          />
         </div>
         <div className="flex items-end">
           <Button type="submit" className="w-full lg:w-auto" disabled={!hasFilterDraftChanges}>
@@ -243,9 +253,9 @@ export function PipelineContainer() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STAGE_ORDER.map((stage) => (
+                {PIPELINE_STAGE_ORDER.map((stage) => (
                   <SelectItem key={stage} value={stage}>
-                    {stage}
+                    {pipelineStageLabel(stage)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -278,29 +288,18 @@ export function PipelineContainer() {
             />
           </BulkActionBar>
           {stages.map((stage) => (
-            <section key={stage} className="mb-8">
-              <div className="mb-3 flex items-center justify-between border-b pb-2">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {stage}
-                </h2>
-                <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">
-                  {byStage.get(stage)!.length}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-                {byStage.get(stage)!.map((row) => (
-                  <PipelineCard
-                    key={row.jobId}
-                    row={row}
-                    selected={selection.isSelected(row.jobId)}
-                    onSelect={() =>
-                      selection.toggle(row.jobId, loadedIds.indexOf(row.jobId), false, loadedIds)
-                    }
-                    onOpen={() => openJob(row.jobId)}
-                  />
-                ))}
-              </div>
-            </section>
+            <PipelineStageSection
+              key={stage}
+              stage={stage}
+              rows={byStage.get(stage)!}
+              open={openStages.has(stage)}
+              onOpenChange={(open) => setStageOpen(stage, open)}
+              isSelected={selection.isSelected}
+              onSelect={(row) =>
+                selection.toggle(row.jobId, loadedIds.indexOf(row.jobId), false, loadedIds)
+              }
+              onOpen={(row) => openJob(row.jobId)}
+            />
           ))}
           {hasNextPage && (
             <div className="mt-5 flex justify-center">

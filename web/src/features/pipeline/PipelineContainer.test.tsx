@@ -18,6 +18,19 @@ const wrap = (ui: ReactNode) => {
   );
 };
 
+const pipelineItem = (jobId: number, status: string, title: string) => ({
+  jobId,
+  company: `${status} Co`,
+  title,
+  status,
+  fitScore: 80,
+  jdText: `${status} description`,
+  critiqueJson: null,
+  pdfPath: null,
+  applicationStatus: null,
+  hasProgress: status === "tailored" || status === "rendered",
+});
+
 describe("PipelineContainer", () => {
   it("groups cards by stage", async () => {
     server.use(
@@ -58,7 +71,8 @@ describe("PipelineContainer", () => {
       ),
     );
     wrap(<PipelineContainer />);
-    await waitFor(() => expect(screen.getByText("Eng")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Dev")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /approved.*1 job/i }));
     // each stage label appears in both the section header and a card badge
     expect(screen.getAllByText(/approved/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/rendered/i).length).toBeGreaterThan(0);
@@ -67,7 +81,6 @@ describe("PipelineContainer", () => {
     expect(screen.getByText(/Remote eligible Mid/)).toBeInTheDocument();
     expect(screen.queryByText(/corporate/)).not.toBeInTheDocument();
     expect(screen.queryByText(/laptop/)).not.toBeInTheDocument();
-    expect(screen.getByText("Dev")).toBeInTheDocument();
   });
 
   it("puts the tailored stage before every other status", async () => {
@@ -111,7 +124,57 @@ describe("PipelineContainer", () => {
     await waitFor(() => expect(screen.getByText("Tailored role")).toBeInTheDocument());
 
     const stageHeadings = screen.getAllByRole("heading", { level: 2 });
-    expect(stageHeadings.map((heading) => heading.textContent)).toEqual(["tailored", "raw"]);
+    expect(stageHeadings.map((heading) => heading.textContent)).toEqual(["Tailored", "Raw"]);
+  });
+
+  it("orders stages by post-processing priority and collapses inactive groups", async () => {
+    server.use(
+      http.get("/api/pipeline", () =>
+        HttpResponse.json({
+          data: [
+            pipelineItem(1, "raw", "Raw role"),
+            pipelineItem(2, "approved", "Approved role"),
+            pipelineItem(3, "rendered", "Rendered role"),
+            pipelineItem(4, "tailored", "Tailored role"),
+            pipelineItem(5, "screening", "Screening role"),
+          ],
+          pagination: { page: 1, pageSize: 200, totalItems: 5, totalPages: 1 },
+          facets: {
+            status: { raw: 1, approved: 1, rendered: 1, tailored: 1, screening: 1 },
+          },
+          total: 5,
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    wrap(<PipelineContainer />);
+
+    const tailored = await screen.findByRole("button", { name: /tailored.*1 job/i });
+    const rendered = screen.getByRole("button", { name: /rendered.*1 job/i });
+    const approved = screen.getByRole("button", { name: /approved.*1 job/i });
+    const stageHeadings = screen.getAllByRole("heading", { level: 2 });
+
+    expect(stageHeadings.map((heading) => heading.textContent)).toEqual([
+      "Tailored",
+      "Rendered",
+      "Approved",
+      "Raw",
+      "Screening",
+    ]);
+    expect(tailored).toHaveAttribute("aria-expanded", "true");
+    expect(rendered).toHaveAttribute("aria-expanded", "true");
+    expect(approved).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Tailored role")).toBeInTheDocument();
+    expect(screen.getByText("Rendered role")).toBeInTheDocument();
+    expect(screen.queryByText("Approved role")).not.toBeInTheDocument();
+    expect(screen.queryByText("Raw role")).not.toBeInTheDocument();
+    expect(screen.queryByText("Screening role")).not.toBeInTheDocument();
+
+    await user.click(approved);
+    expect(screen.getByText("Approved role")).toBeInTheDocument();
+    await user.click(approved);
+    expect(screen.queryByText("Approved role")).not.toBeInTheDocument();
   });
 
   it("filters the pipeline by status through the server query", async () => {
