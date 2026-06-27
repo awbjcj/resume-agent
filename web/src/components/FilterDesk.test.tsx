@@ -48,7 +48,7 @@ describe("FilterDesk", () => {
     const controls = [
       screen.getByRole("button", { name: "Status" }),
       screen.getByRole("spinbutton", { name: "Min fit" }),
-      screen.getByRole("spinbutton", { name: "Min salary" }),
+      screen.getByRole("spinbutton", { name: "Min salary (USD)" }),
       screen.getByRole("combobox", { name: "Sort" }),
       screen.getByRole("searchbox", { name: "Search" }),
     ];
@@ -76,6 +76,36 @@ describe("FilterDesk", () => {
     await user.click(screen.getByRole("button", { name: "Source" }));
     expect(screen.queryByText("Filter by Status")).not.toBeInTheDocument();
     expect(screen.getByText("Filter by Source")).toBeInTheDocument();
+  });
+
+  it("does not reopen a facet that disappeared during a server refresh", async () => {
+    const user = userEvent.setup();
+    const filter = emptyFilterState();
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <FilterDesk
+        filter={filter}
+        facets={{ source: { greenhouse: 3 } }}
+        total={3}
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Source" }));
+    expect(screen.getByText("Filter by Source")).toBeInTheDocument();
+
+    rerender(<FilterDesk filter={filter} facets={{}} total={0} onChange={onChange} />);
+    expect(screen.queryByText("Filter by Source")).not.toBeInTheDocument();
+
+    rerender(
+      <FilterDesk
+        filter={filter}
+        facets={{ source: { greenhouse: 3 } }}
+        total={3}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.queryByText("Filter by Source")).not.toBeInTheDocument();
   });
 
   it("renders the resolved industry name, not the SIC code", async () => {
@@ -114,7 +144,7 @@ describe("FilterDesk", () => {
     render(<FilterDesk filter={emptyFilterState()} facets={facets} total={1} onChange={onChange} />);
 
     await user.type(screen.getByLabelText("Search"), "a");
-    await user.type(screen.getByLabelText(/min salary/i), "120000");
+    await user.type(screen.getByLabelText("Min salary (USD)"), "120000");
 
     expect(onChange).not.toHaveBeenCalled();
 
@@ -130,12 +160,17 @@ describe("FilterDesk", () => {
     render(<FilterDesk filter={emptyFilterState()} facets={facets} total={1} onChange={onChange} />);
 
     expect(screen.getByText("Any annual salary")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Min salary" }), {
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Min salary (USD)" }), {
       target: { value: "0" },
     });
     expect(screen.getByText("Any annual salary")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Min salary" }), {
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Min salary (USD)" }), {
+      target: { value: "1500" },
+    });
+    expect(screen.getByText("$1,500+ / year")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Min salary (USD)" }), {
       target: { value: "120000" },
     });
 
@@ -153,12 +188,12 @@ describe("FilterDesk", () => {
       <FilterDesk filter={emptyFilterState()} facets={facets} total={1} onChange={vi.fn()} />,
     );
 
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Min salary" }), {
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Min salary (USD)" }), {
       target: { value: "-1" },
     });
 
     expect(screen.getByText("Enter a non-negative annual salary.")).toBeVisible();
-    expect(screen.getByRole("spinbutton", { name: "Min salary" })).toHaveAttribute(
+    expect(screen.getByRole("spinbutton", { name: "Min salary (USD)" })).toHaveAttribute(
       "aria-invalid",
       "true",
     );

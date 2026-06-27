@@ -6,14 +6,8 @@ export function salarySummary(value: string) {
   if (!Number.isFinite(salary) || salary <= 0) return "Any annual salary";
 
   const rounded = Math.round(salary);
-  if (rounded >= 1_000_000) {
-    const millions = Number((rounded / 1_000_000).toFixed(1));
-    return `$${millions}M+ / year`;
-  }
-  if (rounded >= 1_000) {
-    return `$${Math.round(rounded / 1_000)}k+ / year`;
-  }
-  return `$${rounded}+ / year`;
+  if (rounded >= 1_000 && rounded % 1_000 === 0) return `$${rounded / 1_000}k+ / year`;
+  return `$${rounded.toLocaleString("en-US")}+ / year`;
 }
 
 export function SalaryThresholdInput({
@@ -32,7 +26,7 @@ export function SalaryThresholdInput({
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-[0.14em]">
-        Min salary
+        Min salary (USD)
       </Label>
       <div className="relative">
         <span

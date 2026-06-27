@@ -21,7 +21,7 @@ export function MinFitInput({
   const descriptionId = `${id}-description`;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
       <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-[0.14em]">
         Min fit
       </Label>

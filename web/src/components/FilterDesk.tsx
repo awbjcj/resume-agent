@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { SearchIcon } from "lucide-react";
 
 import { MinFitInput } from "@/components/MinFitInput";
@@ -207,6 +207,24 @@ export function FilterDesk({
   ];
   const statusCounts = countsWithSelected(facets.status, filter.status);
   const showStatus = hasOptions(statusCounts, filter.status);
+  const isOpenFacetRenderable =
+    openFacet === null ||
+    (openFacet === "status"
+      ? showStatus
+      : facetSpecs.some(({ key, options }) => {
+          if (key !== openFacet) return false;
+          const counts = countsWithSelected(facets[key], filter[key]);
+          for (const option of options ?? []) counts[option] ??= 0;
+          return hasOptions(counts, filter[key]);
+        }));
+
+  useEffect(() => {
+    if (!isOpenFacetRenderable) {
+      // A vanished server facet starts a fresh popover session if it returns.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOpenFacet(null);
+    }
+  }, [isOpenFacetRenderable]);
 
   return (
     <section

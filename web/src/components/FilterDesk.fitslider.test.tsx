@@ -15,6 +15,10 @@ describe("FilterDesk min-fit input", () => {
       "aria-label",
       "Minimum fit slider",
     );
+    expect(screen.getByText("Min fit").parentElement).toHaveClass(
+      "sm:col-span-2",
+      "xl:col-span-1",
+    );
   });
 
   it("keeps the numeric value local until filters are applied", () => {
@@ -34,5 +38,47 @@ describe("FilterDesk min-fit input", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     const patch = onChange.mock.calls.at(-1)![0];
     expect(patch.fitMin).toBe(65);
+  });
+
+  it("keeps a slider change local until filters are applied", () => {
+    const onChange = vi.fn();
+    render(
+      <FilterDesk filter={emptyFilterState()} facets={{}} total={0} onChange={onChange} />,
+    );
+
+    fireEvent.change(screen.getByRole("slider", { hidden: true }), {
+      target: { value: "72" },
+    });
+
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /apply filters/i }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0].fitMin).toBe(72);
+  });
+
+  it("clears applied fit and salary thresholds only when filters are applied", () => {
+    const onChange = vi.fn();
+    render(
+      <FilterDesk
+        filter={{ ...emptyFilterState(), fitMin: 65, salaryMin: 120000 }}
+        facets={{}}
+        total={0}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Min fit" }), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Min salary (USD)" }), {
+      target: { value: "" },
+    });
+
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /apply filters/i }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toMatchObject({ fitMin: null, salaryMin: null });
   });
 });
