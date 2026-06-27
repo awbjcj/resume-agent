@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { FilterDesk } from "./FilterDesk";
+import { salarySummary } from "./SalaryThresholdInput";
 import { emptyFilterState } from "@/lib/filters/types";
 
 const facets = {
@@ -13,6 +14,13 @@ const facets = {
 };
 
 describe("FilterDesk", () => {
+  it.each([
+    ["1000000", "$1M+ / year"],
+    ["1500000", "$1.5M+ / year"],
+  ])("formats an exact million salary %s as %s", (salary, summary) => {
+    expect(salarySummary(salary)).toBe(summary);
+  });
+
   it("renders the desk with a Min fit control", () => {
     render(<FilterDesk filter={emptyFilterState()} facets={facets} total={1} onChange={() => {}} />);
     expect(screen.getByText("Min fit")).toBeInTheDocument();
