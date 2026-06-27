@@ -62,6 +62,42 @@ def test_load_cluster_map_validates_trims_and_normalizes_maps(tmp_path):
     )
 
 
+def test_load_cluster_map_flattens_alias_chains_and_canonicalizes_themes(tmp_path):
+    path = tmp_path / "clusters.json"
+    path.write_text(
+        json.dumps(
+            {
+                "aliases": {"a": "b", "b": "c", "c": "c"},
+                "theme_of": {"b": "terminal-theme"},
+                "theme_label": {"terminal-theme": "Terminal"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert load_cluster_map(path) == ClusterMap(
+        aliases={"a": "c", "b": "c", "c": "c"},
+        theme_of={"c": "terminal-theme"},
+        theme_label={"terminal-theme": "Terminal"},
+    )
+
+
+def test_load_cluster_map_cyclic_aliases_degrade_to_empty(tmp_path):
+    path = tmp_path / "clusters.json"
+    path.write_text(
+        json.dumps(
+            {
+                "aliases": {"a": "b", "b": "a"},
+                "theme_of": {"a": "cycle"},
+                "theme_label": {"cycle": "Cycle"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert load_cluster_map(path) == ClusterMap.empty()
+
+
 def test_save_cluster_map_roundtrips_deterministically_without_fixed_temp(tmp_path):
     path = tmp_path / "clusters.json"
     fixed_temp = tmp_path / "clusters.json.tmp"
@@ -126,7 +162,7 @@ def test_merge_cluster_map_is_monotonic_with_existing_values_winning():
         theme_label={"infra": "Infrastructure"},
     )
     new = ClusterMap(
-        aliases={"k8s": "k8s", "kube": "kubernetes"},
+        aliases={"k8s": "k8s", "kube": "k8s"},
         theme_of={"kubernetes": "platform", "react": "frontend"},
         theme_label={"infra": "Renamed", "frontend": "Frontend"},
     )
@@ -136,3 +172,17 @@ def test_merge_cluster_map_is_monotonic_with_existing_values_winning():
         theme_of={"kubernetes": "infra", "react": "frontend"},
         theme_label={"infra": "Infrastructure", "frontend": "Frontend"},
     )
+
+
+def test_merge_cluster_map_rejects_cycle_before_last_good_file_is_replaced(tmp_path):
+    path = tmp_path / "clusters.json"
+    existing = ClusterMap(aliases={"a": "b"})
+    save_cluster_map(existing, path)
+    last_good = path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="alias cycle"):
+        merged = merge_cluster_map(existing, ClusterMap(aliases={"b": "a"}))
+        save_cluster_map(merged, path)
+
+    assert path.read_text(encoding="utf-8") == last_good
+    assert load_cluster_map(path) == existing

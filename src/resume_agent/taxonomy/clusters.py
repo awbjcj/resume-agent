@@ -43,6 +43,50 @@ def _validated_map(
     return validated
 
 
+def _flatten_aliases(aliases: dict[str, str]) -> dict[str, str]:
+    """Resolve every alias to a terminal token; only self-cycles are valid."""
+    flattened: dict[str, str] = {}
+    resolving: set[str] = set()
+
+    def terminal_for(token: str) -> str:
+        if token in flattened:
+            return flattened[token]
+        if token in resolving:
+            raise ValueError(f"alias cycle detected at {token!r}")
+
+        target = aliases.get(token)
+        if target is None:
+            return token
+        if target == token:
+            flattened[token] = token
+            return token
+
+        resolving.add(token)
+        try:
+            terminal = terminal_for(target)
+        finally:
+            resolving.remove(token)
+        flattened[token] = terminal
+        return terminal
+
+    for alias in aliases:
+        terminal_for(alias)
+    return flattened
+
+
+def _canonicalize_theme_keys(
+    theme_of: dict[str, str], aliases: dict[str, str]
+) -> dict[str, str]:
+    """Move themes to terminal tokens, preferring an explicit terminal theme."""
+    canonical: dict[str, str] = {}
+    for token, theme_id in theme_of.items():
+        canonical.setdefault(aliases.get(token, token), theme_id)
+    for token, theme_id in theme_of.items():
+        if aliases.get(token, token) == token:
+            canonical[token] = theme_id
+    return canonical
+
+
 def load_cluster_map(path: str | Path) -> ClusterMap:
     """Load and validate a cluster map; any unreadable boundary is empty."""
     try:
@@ -52,13 +96,22 @@ def load_cluster_map(path: str | Path) -> ClusterMap:
     if not isinstance(data, dict):
         return ClusterMap.empty()
 
+    aliases = _validated_map(
+        data.get("aliases"),
+        normalize_keys=True,
+        normalize_values=True,
+    )
+    try:
+        aliases = _flatten_aliases(aliases)
+    except ValueError:
+        return ClusterMap.empty()
+    theme_of = _canonicalize_theme_keys(
+        _validated_map(data.get("theme_of"), normalize_keys=True),
+        aliases,
+    )
     return ClusterMap(
-        aliases=_validated_map(
-            data.get("aliases"),
-            normalize_keys=True,
-            normalize_values=True,
-        ),
-        theme_of=_validated_map(data.get("theme_of"), normalize_keys=True),
+        aliases=aliases,
+        theme_of=theme_of,
         theme_label=_validated_map(data.get("theme_label")),
     )
 
@@ -95,15 +148,18 @@ def save_cluster_map(cmap: ClusterMap, path: str | Path) -> None:
 
 
 def merge_cluster_map(existing: ClusterMap, new: ClusterMap) -> ClusterMap:
-    """Monotonically add new entries while preserving existing decisions."""
+    """Monotonically add entries while enforcing terminal alias targets."""
 
     def merge_map(current: dict[str, str], proposed: dict[str, str]) -> dict[str, str]:
         merged = dict(proposed)
         merged.update(current)
         return merged
 
+    aliases = _flatten_aliases(merge_map(existing.aliases, new.aliases))
+    existing_themes = _canonicalize_theme_keys(existing.theme_of, aliases)
+    new_themes = _canonicalize_theme_keys(new.theme_of, aliases)
     return ClusterMap(
-        aliases=merge_map(existing.aliases, new.aliases),
-        theme_of=merge_map(existing.theme_of, new.theme_of),
+        aliases=aliases,
+        theme_of=merge_map(existing_themes, new_themes),
         theme_label=merge_map(existing.theme_label, new.theme_label),
     )

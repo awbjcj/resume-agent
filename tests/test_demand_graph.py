@@ -1,7 +1,7 @@
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.clusters import ClusterMap, merge_cluster_map
 from resume_agent.tracking.match_gap import (
     DemandEdge,
     DemandGraph,
@@ -154,6 +154,34 @@ def test_build_demand_graph_applies_aliases_to_profile_skill_coverage():
         assert graph.skills == [
             SkillNode(skill="Kubernetes", theme_id=None, covered=True)
         ]
+
+
+def test_build_demand_graph_dedupes_flattened_alias_chain_with_coverage():
+    with _session() as session:
+        job = _job(
+            session,
+            criteria={"must_have_skills": ["A", "B", "C"]},
+        )
+        cmap = merge_cluster_map(
+            ClusterMap.empty(),
+            ClusterMap(
+                aliases={"a": "b", "b": "c"},
+                theme_of={"b": "terminal-theme"},
+                theme_label={"terminal-theme": "Terminal"},
+            ),
+        )
+
+        graph = build_demand_graph(
+            session,
+            _facts({"category": [Skill(name="B")]}),
+            cmap,
+        )
+
+        assert job.id is not None
+        assert graph.skills == [
+            SkillNode(skill="A", theme_id="terminal-theme", covered=True)
+        ]
+        assert graph.edges == [DemandEdge(job_id=job.id, skill="A", source="must")]
 
 
 def test_build_demand_graph_emits_only_used_sorted_themes_with_label_fallback():
