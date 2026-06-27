@@ -5,13 +5,16 @@ import { FilterDesk } from "./FilterDesk";
 import { emptyFilterState } from "@/lib/filters/types";
 
 describe("FilterDesk min-fit input", () => {
-  it("uses a numeric input instead of a slider", () => {
+  it("pairs an exact numeric input with an accessible slider", () => {
     render(
       <FilterDesk filter={emptyFilterState()} facets={{}} total={0} onChange={vi.fn()} />,
     );
 
     expect(screen.getByRole("spinbutton", { name: "Min fit" })).toBeInTheDocument();
-    expect(screen.queryByRole("slider", { name: "Min fit" })).not.toBeInTheDocument();
+    expect(screen.getByRole("slider", { hidden: true })).toHaveAttribute(
+      "aria-label",
+      "Minimum fit slider",
+    );
   });
 
   it("keeps the numeric value local until filters are applied", () => {
