@@ -157,6 +157,10 @@ def build_demand_graph(
     """Build normalized target-job skill demand for dashboard consumers."""
     target_jobs = _target_jobs(session)
     profile_tokens = profile_skill_tokens(facts)
+    aliases = cluster_map.aliases if cluster_map else {}
+    theme_of = cluster_map.theme_of if cluster_map else {}
+    theme_label = cluster_map.theme_label if cluster_map else {}
+    profile_canonical = {aliases.get(token, token) for token in profile_tokens}
     jobs: list[JobLite] = []
     skill_nodes: dict[str, SkillNode] = {}
     display_for: dict[str, str] = {}
@@ -180,26 +184,34 @@ def build_demand_graph(
         for key, source in _SKILL_SOURCES:
             for raw_skill in _criteria_skill_values(job, key):
                 token = normalize_skill(raw_skill)
-                edge_key = (token, source)
-                if not token or edge_key in emitted:
+                canonical = aliases.get(token, token)
+                edge_key = (canonical, source)
+                if not canonical or edge_key in emitted:
                     continue
                 emitted.add(edge_key)
-                display_for.setdefault(token, raw_skill.strip())
-                display = display_for[token]
+                display_for.setdefault(canonical, raw_skill.strip())
+                display = display_for[canonical]
+                theme_id = theme_of.get(canonical)
                 skill_nodes.setdefault(
-                    token,
+                    canonical,
                     SkillNode(
                         skill=display,
-                        theme_id=None,
-                        covered=token in profile_tokens,
+                        theme_id=theme_id,
+                        covered=canonical in profile_canonical,
                     ),
                 )
                 edges.append(DemandEdge(job_id=job.id, skill=display, source=source))
 
-    themes: list[ThemeNode] = []
+    used_themes = {
+        node.theme_id for node in skill_nodes.values() if node.theme_id is not None
+    }
+    themes = [
+        ThemeNode(id=theme_id, label=theme_label.get(theme_id, theme_id))
+        for theme_id in sorted(used_themes)
+    ]
     return DemandGraph(
         target_total=len(jobs),
-        clusters_stale=bool(skill_nodes) and not themes,
+        clusters_stale=any(node.theme_id is None for node in skill_nodes.values()),
         jobs=jobs,
         skills=list(skill_nodes.values()),
         edges=edges,
