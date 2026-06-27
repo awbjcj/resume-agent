@@ -96,7 +96,9 @@ function summarize(
 export function deriveView(payload: Payload, filters: Filters): DerivedView {
   const jobById = new Map(payload.jobs.map((job) => [job.id, job]));
   const coveredBySkill = new Map(payload.skills.map((skill) => [skill.skill, skill.covered]));
-  const themeBySkill = new Map(payload.skills.map((skill) => [skill.skill, skill.themeId]));
+  const themeBySkill = new Map(
+    payload.skills.map((skill) => [skill.skill, skill.themeId ?? null]),
+  );
   const labelByTheme = new Map(payload.themes.map((theme) => [theme.id, theme.label]));
 
   const edges = payload.edges.filter((edge) => {
