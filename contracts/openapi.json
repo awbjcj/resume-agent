@@ -769,6 +769,10 @@
             "title": "Skill",
             "type": "string"
           },
+          "skillKey": {
+            "title": "Skillkey",
+            "type": "string"
+          },
           "source": {
             "enum": [
               "must",
@@ -782,7 +786,8 @@
         "required": [
           "jobId",
           "skill",
-          "source"
+          "source",
+          "skillKey"
         ],
         "title": "DemandEdgeOut",
         "type": "object"
@@ -790,31 +795,6 @@
       "DiscoverParams": {
         "properties": {},
         "title": "DiscoverParams",
-        "type": "object"
-      },
-      "GenerateParams": {
-        "additionalProperties": false,
-        "properties": {
-          "key": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Key",
-            "type": "string"
-          },
-          "kind": {
-            "enum": [
-              "skill",
-              "theme"
-            ],
-            "title": "Kind",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind",
-          "key"
-        ],
-        "title": "GenerateParams",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1279,6 +1259,13 @@
               "$ref": "#/components/schemas/SkillNodeOut"
             },
             "title": "Skills",
+            "type": "array"
+          },
+          "suggestionStatuses": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionStatusOut"
+            },
+            "title": "Suggestionstatuses",
             "type": "array"
           },
           "targetTotal": {
@@ -2259,9 +2246,36 @@
             "title": "Covered",
             "type": "boolean"
           },
+          "jobCount": {
+            "title": "Jobcount",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "members": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Members",
+            "type": "object"
+          },
+          "must": {
+            "title": "Must",
+            "type": "integer"
+          },
+          "nice": {
+            "title": "Nice",
+            "type": "integer"
+          },
           "skill": {
             "title": "Skill",
             "type": "string"
+          },
+          "tech": {
+            "title": "Tech",
+            "type": "integer"
           },
           "themeId": {
             "anyOf": [
@@ -2277,7 +2291,13 @@
         },
         "required": [
           "skill",
-          "covered"
+          "covered",
+          "key",
+          "members",
+          "must",
+          "nice",
+          "tech",
+          "jobCount"
         ],
         "title": "SkillNodeOut",
         "type": "object"
@@ -2535,6 +2555,178 @@
         "title": "SuggestionOut",
         "type": "object"
       },
+      "SuggestionRunAcceptedOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "skill",
+              "theme"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "outcome": {
+            "const": "accepted",
+            "title": "Outcome",
+            "type": "string"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "kind",
+          "key",
+          "runId"
+        ],
+        "title": "SuggestionRunAcceptedOut",
+        "type": "object"
+      },
+      "SuggestionRunNotFoundOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "skill",
+              "theme"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "outcome": {
+            "const": "not_found",
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "kind",
+          "key"
+        ],
+        "title": "SuggestionRunNotFoundOut",
+        "type": "object"
+      },
+      "SuggestionRunsOut": {
+        "properties": {
+          "results": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "accepted": "#/components/schemas/SuggestionRunAcceptedOut",
+                  "not_found": "#/components/schemas/SuggestionRunNotFoundOut"
+                },
+                "propertyName": "outcome"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SuggestionRunAcceptedOut"
+                },
+                {
+                  "$ref": "#/components/schemas/SuggestionRunNotFoundOut"
+                }
+              ]
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "SuggestionRunsOut",
+        "type": "object"
+      },
+      "SuggestionRunsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionTarget"
+            },
+            "maxItems": 25,
+            "minItems": 1,
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "title": "SuggestionRunsRequest",
+        "type": "object"
+      },
+      "SuggestionStatusOut": {
+        "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "skill",
+              "theme"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "stale"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "state",
+          "generatedAt"
+        ],
+        "title": "SuggestionStatusOut",
+        "type": "object"
+      },
+      "SuggestionTarget": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "skill",
+              "theme"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key"
+        ],
+        "title": "SuggestionTarget",
+        "type": "object"
+      },
       "TailorParams": {
         "properties": {
           "approved": {
@@ -2562,18 +2754,43 @@
       },
       "ThemeOut": {
         "properties": {
+          "essentialScore": {
+            "title": "Essentialscore",
+            "type": "integer"
+          },
+          "gapCount": {
+            "title": "Gapcount",
+            "type": "integer"
+          },
           "id": {
             "title": "Id",
             "type": "string"
           },
+          "jobCount": {
+            "title": "Jobcount",
+            "type": "integer"
+          },
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "popularScore": {
+            "title": "Popularscore",
+            "type": "integer"
+          },
+          "skillCount": {
+            "title": "Skillcount",
+            "type": "integer"
           }
         },
         "required": [
           "id",
-          "label"
+          "label",
+          "essentialScore",
+          "popularScore",
+          "jobCount",
+          "skillCount",
+          "gapCount"
         ],
         "title": "ThemeOut",
         "type": "object"
@@ -5404,6 +5621,62 @@
         "summary": "Set Enabled Route"
       }
     },
+    "/api/suggestion-runs": {
+      "post": {
+        "operationId": "launch_suggestion_runs_api_suggestion_runs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionRunsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionRunsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Suggestion Runs"
+      }
+    },
     "/api/suggestions": {
       "get": {
         "operationId": "get_suggestion_api_suggestions_get",
@@ -5499,7 +5772,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GenerateParams"
+                "$ref": "#/components/schemas/SuggestionTarget"
               }
             }
           },
