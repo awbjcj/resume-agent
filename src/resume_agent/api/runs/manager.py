@@ -97,10 +97,26 @@ class RunProgressReporter(ProgressReporter):
 
 
 class RunManager:
-    def __init__(self, *, root: Path | str = RUNS_ROOT, executor: Executor | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        root: Path | str = RUNS_ROOT,
+        executor: Executor | None = None,
+        kind_workers: dict[str, int] | None = None,
+    ) -> None:
         self.root = Path(root)
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
-        self._owns_executor = executor is None
+        self._owned_executors: list[Executor] = []
+        if executor is None:
+            self._owned_executors.append(self.executor)
+        self._kind_executors = {
+            kind: ThreadPoolExecutor(
+                max_workers=workers,
+                thread_name_prefix=f"resume-agent-{kind}",
+            )
+            for kind, workers in (kind_workers or {}).items()
+        }
+        self._owned_executors.extend(self._kind_executors.values())
         # Run ids flagged for cooperative cancellation. A plain set is enough:
         # under the GIL add/discard/contains are atomic, and a missed read just
         # defers the stop to the next checkpoint.
@@ -164,7 +180,8 @@ class RunManager:
             finally:
                 self._cancel_requested.discard(run_id)
 
-        future = self.executor.submit(_runner)
+        executor = self._kind_executors.get(kind, self.executor)
+        future = executor.submit(_runner)
         self._futures[run_id] = future
         future.add_done_callback(lambda _future: self._futures.pop(run_id, None))
         return run_id
@@ -196,8 +213,8 @@ class RunManager:
         return removed
 
     def shutdown(self) -> None:
-        if self._owns_executor:
-            self.executor.shutdown(wait=False)
+        for executor in self._owned_executors:
+            executor.shutdown(wait=False)
 
     def _write(self, run_id: str, record: dict) -> None:
         atomic_write_text(self.root / f"{run_id}.json", json.dumps(record, indent=2))

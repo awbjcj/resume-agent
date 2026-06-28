@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     llm_concurrency: int = Field(default=8, ge=1)
     llm_retries: int = Field(default=2, ge=0)
     llm_retry_delay: int = Field(default=1, ge=0)
+    suggestion_batch_concurrency: int = Field(default=3, ge=1, le=16)
     search_mode: Literal["auto", "native", "tool", "off"] = "auto"
     advisor_model: str = ""
 

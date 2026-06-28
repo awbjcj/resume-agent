@@ -27,6 +27,7 @@ from resume_agent.api.routers import suggestions as suggestions_router
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.config import get_settings
 from resume_agent.db import init_db, make_engine
+from resume_agent.progress import RUNS_ROOT
 
 
 def spa_dist_dir() -> Path:
@@ -63,10 +64,23 @@ def create_app(
     app = FastAPI(title="Resume Agent API", version="0.1.0", lifespan=lifespan)
     app.state.settings = resolved_settings
     app.state.db_url = resolved_db
-    app.state.run_manager = (
-        RunManager(root=runs_root, executor=run_executor)
-        if runs_root is not None
-        else RunManager(executor=run_executor)
+    manager_root = runs_root if runs_root is not None else RUNS_ROOT
+    # The in-memory test adapter uses one StaticPool connection shared by every
+    # thread, so concurrent sessions cannot safely transact on it. File-backed
+    # SQLite and production databases retain the configured suggestion width.
+    suggestion_workers = (
+        1
+        if resolved_db in {"sqlite://", "sqlite://:memory:", "sqlite:///:memory:"}
+        else resolved_settings.suggestion_batch_concurrency
+    )
+    app.state.run_manager = RunManager(
+        root=manager_root,
+        executor=run_executor,
+        kind_workers=(
+            {"suggestion": suggestion_workers}
+            if run_executor is None
+            else None
+        ),
     )
     app.dependency_overrides[get_settings_dep] = lambda: resolved_settings
 
