@@ -42,7 +42,7 @@ function Slider({
               key={index}
               index={index}
               aria-label={_values.length === 1 ? props["aria-label"] : undefined}
-              className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+              className="relative block size-3 shrink-0 rounded-full border border-background bg-primary ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
             />
           ))}
         </SliderPrimitive.Track>
