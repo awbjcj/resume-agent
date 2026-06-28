@@ -68,16 +68,24 @@ def test_build_demand_graph_reads_all_sources_coverage_and_job_facets():
             )
         ]
         assert graph.skills == [
-            SkillNode(skill="Python", theme_id=None, covered=True),
-            SkillNode(skill="Kubernetes", theme_id=None, covered=False),
-            SkillNode(skill="Go", theme_id=None, covered=False),
-            SkillNode(skill="Linux", theme_id=None, covered=False),
+            SkillNode("Go", None, False, "go", {"Go": 1}, nice=1, job_count=1),
+            SkillNode(
+                "Kubernetes",
+                None,
+                False,
+                "kubernetes",
+                {"Kubernetes": 1},
+                nice=1,
+                job_count=1,
+            ),
+            SkillNode("Linux", None, False, "linux", {"Linux": 1}, tech=1, job_count=1),
+            SkillNode("Python", None, True, "python", {"Python": 1}, must=1, job_count=1),
         ]
         assert graph.edges == [
-            DemandEdge(job_id=job.id, skill="Python", source="must"),
-            DemandEdge(job_id=job.id, skill="Kubernetes", source="nice"),
-            DemandEdge(job_id=job.id, skill="Go", source="nice"),
-            DemandEdge(job_id=job.id, skill="Linux", source="tech"),
+            DemandEdge(job.id, "Python", "must", "python"),
+            DemandEdge(job.id, "Go", "nice", "go"),
+            DemandEdge(job.id, "Kubernetes", "nice", "kubernetes"),
+            DemandEdge(job.id, "Linux", "tech", "linux"),
         ]
         assert graph.themes == []
         assert graph.clusters_stale is True
@@ -99,12 +107,22 @@ def test_build_demand_graph_dedupes_skill_nodes_and_each_job_source_edge():
         assert first.id is not None
         assert second.id is not None
         assert graph.skills == [
-            SkillNode(skill="Python", theme_id=None, covered=False)
+            SkillNode(
+                "PYTHON",
+                None,
+                False,
+                "python",
+                {"PYTHON": 2, "Python": 1, "python": 1},
+                must=1,
+                nice=1,
+                tech=1,
+                job_count=2,
+            )
         ]
         assert graph.edges == [
-            DemandEdge(job_id=first.id, skill="Python", source="must"),
-            DemandEdge(job_id=first.id, skill="Python", source="nice"),
-            DemandEdge(job_id=second.id, skill="Python", source="tech"),
+            DemandEdge(first.id, "PYTHON", "must", "python"),
+            DemandEdge(first.id, "PYTHON", "nice", "python"),
+            DemandEdge(second.id, "PYTHON", "tech", "python"),
         ]
 
 
@@ -127,11 +145,20 @@ def test_build_demand_graph_aliases_dedupe_edges_and_cover_canonical_skill():
 
         assert job.id is not None
         assert graph.skills == [
-            SkillNode(skill="K8s", theme_id=None, covered=True)
+            SkillNode(
+                "K8s",
+                None,
+                True,
+                "kubernetes",
+                {"K8s": 1, "k8s": 1, "KUBERNETES": 1, "Kubernetes": 1},
+                must=1,
+                nice=1,
+                job_count=1,
+            )
         ]
         assert graph.edges == [
-            DemandEdge(job_id=job.id, skill="K8s", source="must"),
-            DemandEdge(job_id=job.id, skill="K8s", source="nice"),
+            DemandEdge(job.id, "K8s", "must", "kubernetes"),
+            DemandEdge(job.id, "K8s", "nice", "kubernetes"),
         ]
 
 
@@ -152,7 +179,15 @@ def test_build_demand_graph_applies_aliases_to_profile_skill_coverage():
         )
 
         assert graph.skills == [
-            SkillNode(skill="Kubernetes", theme_id=None, covered=True)
+            SkillNode(
+                "Kubernetes",
+                None,
+                True,
+                "kubernetes",
+                {"Kubernetes": 1},
+                must=1,
+                job_count=1,
+            )
         ]
 
 
@@ -179,9 +214,17 @@ def test_build_demand_graph_dedupes_flattened_alias_chain_with_coverage():
 
         assert job.id is not None
         assert graph.skills == [
-            SkillNode(skill="A", theme_id="terminal-theme", covered=True)
+            SkillNode(
+                "A",
+                "terminal-theme",
+                True,
+                "c",
+                {"A": 1, "B": 1, "C": 1},
+                must=1,
+                job_count=1,
+            )
         ]
-        assert graph.edges == [DemandEdge(job_id=job.id, skill="A", source="must")]
+        assert graph.edges == [DemandEdge(job.id, "A", "must", "c")]
 
 
 def test_build_demand_graph_emits_only_used_sorted_themes_with_label_fallback():
@@ -205,12 +248,28 @@ def test_build_demand_graph_emits_only_used_sorted_themes_with_label_fallback():
         graph = build_demand_graph(session, _facts(), cmap)
 
         assert graph.skills == [
-            SkillNode(skill="React", theme_id="z-frontend", covered=False),
-            SkillNode(skill="Kubernetes", theme_id="a-infra", covered=False),
+            SkillNode(
+                "Kubernetes",
+                "a-infra",
+                False,
+                "kubernetes",
+                {"Kubernetes": 1},
+                must=1,
+                job_count=1,
+            ),
+            SkillNode(
+                "React",
+                "z-frontend",
+                False,
+                "react",
+                {"React": 1},
+                must=1,
+                job_count=1,
+            ),
         ]
         assert graph.themes == [
-            ThemeNode(id="a-infra", label="Cloud/Infra"),
-            ThemeNode(id="z-frontend", label="z-frontend"),
+            ThemeNode("a-infra", "Cloud/Infra", 3, 1, 1, 1, 1),
+            ThemeNode("z-frontend", "z-frontend", 3, 1, 1, 1, 1),
         ]
         assert graph.clusters_stale is False
 
@@ -228,7 +287,7 @@ def test_build_demand_graph_is_stale_when_any_canonical_skill_is_unthemed():
 
         graph = build_demand_graph(session, _facts(), cmap)
 
-        assert graph.themes == [ThemeNode(id="infra", label="Infrastructure")]
+        assert graph.themes == [ThemeNode("infra", "Infrastructure", 3, 1, 1, 1, 1)]
         assert graph.clusters_stale is True
 
 
@@ -263,3 +322,93 @@ def test_collect_target_skill_tokens_unions_sources_and_ignores_nontarget_jobs()
         )
 
         assert collect_target_skill_tokens(session) == {"rust", "go"}
+
+
+def test_build_demand_graph_uses_stable_keys_and_distinct_job_counts():
+    with _session() as session:
+        first = _job(
+            session,
+            criteria={
+                "must_have_skills": ["Python", "Python"],
+                "nice_to_have_skills": ["Python"],
+            },
+        )
+        second = _job(session, criteria={"must_have_skills": ["python3"]})
+        cmap = ClusterMap(
+            aliases={"python": "python", "python3": "python"},
+            theme_of={"python": "backend"},
+            theme_label={"backend": "Backend"},
+        )
+
+        graph = build_demand_graph(session, _facts(), cmap)
+
+        assert first.id is not None
+        assert second.id is not None
+        assert graph.skills == [
+            SkillNode(
+                skill="Python",
+                theme_id="backend",
+                covered=False,
+                key="python",
+                members={"Python": 1, "python3": 1},
+                must=2,
+                nice=1,
+                tech=0,
+                job_count=2,
+            )
+        ]
+        assert {(edge.job_id, edge.skill_key, edge.source) for edge in graph.edges} == {
+            (first.id, "python", "must"),
+            (first.id, "python", "nice"),
+            (second.id, "python", "must"),
+        }
+
+
+def test_build_demand_graph_theme_aggregates_have_named_weightings():
+    with _session() as session:
+        _job(
+            session,
+            criteria={
+                "must_have_skills": ["Python", "SQL"],
+                "tech_stack": ["Python"],
+            },
+        )
+        _job(session, criteria={"nice_to_have_skills": ["Python"]})
+        cmap = ClusterMap(
+            theme_of={"python": "backend", "sql": "backend"},
+            theme_label={"backend": "Backend"},
+        )
+
+        graph = build_demand_graph(
+            session,
+            _facts({"data": [Skill(name="SQL")]}),
+            cmap,
+        )
+
+        assert graph.themes == [
+            ThemeNode(
+                id="backend",
+                label="Backend",
+                essential_score=9,
+                popular_score=3,
+                job_count=2,
+                skill_count=2,
+                gap_count=1,
+            )
+        ]
+
+
+def test_build_demand_graph_output_does_not_depend_on_skill_input_order():
+    def snapshot(raw_skills):
+        with _session() as session:
+            _job(session, criteria={"must_have_skills": raw_skills})
+            cmap = ClusterMap(aliases={"python": "python", "python3": "python"})
+            graph = build_demand_graph(session, _facts(), cmap)
+            return (
+                [(node.key, node.skill, node.members) for node in graph.skills],
+                [(edge.skill_key, edge.skill, edge.source) for edge in graph.edges],
+            )
+
+    assert snapshot(["python3", "Python", "Go"]) == snapshot(
+        ["Go", "Python", "python3"]
+    )
