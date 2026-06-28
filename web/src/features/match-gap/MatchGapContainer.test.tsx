@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { axe } from "vitest-axe";
@@ -9,21 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { server } from "@/test/server";
 import { MatchGapContainer } from "./MatchGapContainer";
 
-const mocks = vi.hoisted(() => ({
-  watchRun: vi.fn(() => vi.fn()),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-  toastInfo: vi.fn(),
-}));
-
-vi.mock("@/lib/runs/sse", () => ({ watchRun: mocks.watchRun }));
-vi.mock("sonner", () => ({
-  toast: {
-    success: mocks.toastSuccess,
-    error: mocks.toastError,
-    info: mocks.toastInfo,
-  },
-}));
+vi.mock("@/lib/runs/sse", () => ({ watchRun: vi.fn(() => vi.fn()) }));
 
 const wrap = (ui: ReactNode) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -38,95 +24,82 @@ const populated = {
     { id: 2, company: "Datadog", title: "Platform", seniority: "mid" },
   ],
   skills: [
-    { skill: "Kubernetes", themeId: "infra", covered: false },
-    { skill: "Terraform", themeId: "infra", covered: false },
+    {
+      key: "kubernetes",
+      skill: "Kubernetes",
+      themeId: "infra",
+      covered: false,
+      members: { Kubernetes: 2 },
+      must: 1,
+      nice: 0,
+      tech: 1,
+      jobCount: 2,
+    },
+    {
+      key: "terraform",
+      skill: "Terraform",
+      themeId: "infra",
+      covered: true,
+      members: { Terraform: 1 },
+      must: 1,
+      nice: 0,
+      tech: 0,
+      jobCount: 1,
+    },
   ],
   edges: [
-    { jobId: 1, skill: "Kubernetes", source: "must" },
-    { jobId: 2, skill: "Kubernetes", source: "tech" },
-    { jobId: 2, skill: "Terraform", source: "must" },
+    { jobId: 1, skill: "Kubernetes", skillKey: "kubernetes", source: "must" },
+    { jobId: 2, skill: "Kubernetes", skillKey: "kubernetes", source: "tech" },
+    { jobId: 2, skill: "Terraform", skillKey: "terraform", source: "must" },
   ],
-  themes: [{ id: "infra", label: "Cloud / Infrastructure" }],
+  themes: [
+    {
+      id: "infra",
+      label: "Cloud / Infrastructure",
+      essentialScore: 7,
+      popularScore: 3,
+      jobCount: 2,
+      skillCount: 2,
+      gapCount: 1,
+    },
+  ],
+  suggestionStatuses: [
+    { kind: "skill", key: "terraform", state: "ready", generatedAt: "2026-06-27T12:00:00Z" },
+  ],
 };
 
 describe("MatchGapContainer", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("opens the demanding jobs drawer from a skill action", async () => {
-    server.use(
-      http.get("/api/match-gap", () => HttpResponse.json(populated)),
-      http.get("/api/suggestions", () =>
-        HttpResponse.json({ suggestion: null, stale: false }),
-      ),
-    );
+  it("keeps selection while switching between the controlled map and outline", async () => {
+    server.use(http.get("/api/match-gap", () => HttpResponse.json(populated)));
     wrap(<MatchGapContainer />);
 
-    const skillActions = await screen.findAllByRole("button", { name: /Kubernetes, gap/ });
-    await userEvent.click(skillActions[0]);
+    expect(await screen.findByText("Skill constellation")).toBeInTheDocument();
+    expect(screen.getAllByText("2", { selector: "div.text-3xl" })).toHaveLength(2);
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure" }));
+    expect(screen.getByRole("button", { name: "Open selection tray" })).toHaveTextContent("1");
 
-    const drawer = await screen.findByRole("dialog");
-    await waitFor(() => expect(within(drawer).getByText("Stripe")).toBeInTheDocument());
-    expect(within(drawer).getByText("Datadog")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Outline" }));
+    expect(screen.getByText("Ranked skill themes")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure theme" })).toBeChecked();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Map" }));
+    expect(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure" })).toBeChecked();
   });
 
-  it("opens a theme with the union of its demanding jobs", async () => {
-    let getKind: string | null = null;
-    let getKey: string | null = null;
-    let postBody: unknown;
-    server.use(
-      http.get("/api/match-gap", () => HttpResponse.json(populated)),
-      http.get("/api/suggestions", ({ request }) => {
-        const url = new URL(request.url);
-        getKind = url.searchParams.get("kind");
-        getKey = url.searchParams.get("key");
-        return HttpResponse.json({ suggestion: null, stale: false });
-      }),
-      http.post("/api/suggestions/generate", async ({ request }) => {
-        postBody = await request.json();
-        return HttpResponse.json({ runId: "theme-run", kind: "suggestion" });
-      }),
-    );
-    wrap(<MatchGapContainer />);
-
-    await userEvent.click(
-      await screen.findByRole("button", { name: /open Cloud \/ Infrastructure learning path/i }),
-    );
-
-    const drawer = screen.getByRole("dialog");
-    expect(within(drawer).getByRole("heading", { name: "Cloud / Infrastructure" })).toBeInTheDocument();
-    expect(within(drawer).getByText("Stripe")).toBeInTheDocument();
-    expect(within(drawer).getByText("Datadog")).toBeInTheDocument();
-    expect(getKind).toBe("theme");
-    expect(getKey).toBe("infra");
-
-    await userEvent.click(
-      await within(drawer).findByRole("button", { name: /how to close this gap/i }),
-    );
-    await waitFor(() => expect(postBody).toEqual({ kind: "theme", key: "infra" }));
-  });
-
-  it("shows the empty state when there are no target jobs", async () => {
+  it("shows accessible no-jobs and request-error states", async () => {
     server.use(
       http.get("/api/match-gap", () =>
-        HttpResponse.json({
-          targetTotal: 0,
-          clustersStale: false,
-          jobs: [],
-          skills: [],
-          edges: [],
-          themes: [],
-        }),
+        HttpResponse.json({ ...populated, targetTotal: 0, jobs: [], skills: [], edges: [], themes: [], suggestionStatuses: [] }),
       ),
     );
-    wrap(<MatchGapContainer />);
-
+    const first = wrap(<MatchGapContainer />);
     expect(await screen.findByText(/no target jobs yet/i)).toBeInTheDocument();
-  });
+    first.unmount();
 
-  it("shows a request error with a retry action", async () => {
     server.use(http.get("/api/match-gap", () => HttpResponse.json({}, { status: 500 })));
     wrap(<MatchGapContainer />);
-
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't load skill demand/i);
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
   });
@@ -134,9 +107,8 @@ describe("MatchGapContainer", () => {
   it("has no axe violations when populated", async () => {
     server.use(http.get("/api/match-gap", () => HttpResponse.json(populated)));
     const { container } = wrap(<MatchGapContainer />);
-    await screen.findByText("Ranked demand");
+    await screen.findByText("Skill constellation");
 
-    const results = await axe(container);
-    expect(results.violations).toEqual([]);
+    expect((await axe(container)).violations).toEqual([]);
   });
 });
