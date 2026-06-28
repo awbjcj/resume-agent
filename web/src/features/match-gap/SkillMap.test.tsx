@@ -1,0 +1,57 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { expect, it, vi } from "vitest";
+
+import type { ThemeRow } from "./aggregate";
+import { SkillMap } from "./SkillMap";
+
+const themeRows: ThemeRow[] = [
+  {
+    id: "backend",
+    label: "Backend",
+    score: 16,
+    jobCount: 3,
+    skillCount: 1,
+    gapCount: 1,
+    skills: [
+      {
+        key: "python",
+        skill: "Python",
+        themeId: "backend",
+        covered: false,
+        score: 9,
+        jobCount: 3,
+        must: 3,
+        nice: 0,
+        tech: 0,
+        members: {},
+      },
+    ],
+  },
+];
+
+it("expands a theme and exposes real skill controls", async () => {
+  const onToggleSelect = vi.fn();
+  const onOpenSkill = vi.fn();
+  render(
+    <SkillMap
+      themeRows={themeRows}
+      stateOf={(kind) => (kind === "skill" ? "ready" : "none")}
+      selected={new Set()}
+      onToggleSelect={onToggleSelect}
+      onOpenSkill={onOpenSkill}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: /expand backend/i }));
+  expect(screen.getByRole("button", { name: /open python details/i })).toBeInTheDocument();
+  expect(screen.getByText("Ready")).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("checkbox", { name: /select python/i }));
+  expect(onToggleSelect).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: "skill", key: "python" }),
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: /open python details/i }));
+  expect(onOpenSkill).toHaveBeenCalledWith(expect.objectContaining({ key: "python" }));
+});
