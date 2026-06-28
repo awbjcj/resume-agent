@@ -2,9 +2,10 @@ import type { components } from "@/lib/api/schema";
 
 type Payload = components["schemas"]["MatchGapOut"];
 type JobLite = Payload["jobs"][number];
-type Edge = Payload["edges"][number];
+type SuggestionKind = "skill" | "theme";
 
 export const SOURCE_WEIGHT = { must: 3, nice: 2, tech: 1 } as const;
+export const UNTHEMED_ID = "__unthemed__";
 
 export interface Filters {
   company: string | null;
@@ -13,7 +14,24 @@ export interface Filters {
   weighting: "essential" | "popular";
 }
 
+export interface SuggestionTarget {
+  kind: SuggestionKind;
+  key: string;
+  label?: string;
+}
+
+export type SuggestionState =
+  | "none"
+  | "ready"
+  | "stale"
+  | "queued"
+  | "researching"
+  | "failed"
+  | "cancelled"
+  | "not_found";
+
 export interface SkillRow {
+  key: string;
   skill: string;
   themeId: string | null;
   covered: boolean;
@@ -22,47 +40,75 @@ export interface SkillRow {
   must: number;
   nice: number;
   tech: number;
+  members: Record<string, number>;
 }
 
-export interface ThemeGroup {
+export interface ThemeRow {
   id: string;
   label: string;
   score: number;
-  skills: SkillRow[];
-}
-
-export interface StatRow {
-  key: string;
-  topSkills: { skill: string; score: number }[];
+  jobCount: number;
+  skillCount: number;
   gapCount: number;
+  skills: SkillRow[];
 }
 
 export interface DerivedView {
   skills: SkillRow[];
-  themes: ThemeGroup[];
-  byCompany: StatRow[];
-  byPosition: StatRow[];
-  jobsForSkill: (skill: string) => JobLite[];
+  themeRows: ThemeRow[];
+  filteredJobCount: number;
+  jobsForSkill: (key: string) => JobLite[];
   jobsForTheme: (themeId: string) => JobLite[];
   companies: string[];
   seniorities: string[];
+  persistedStateOf: (kind: SuggestionKind, key: string) => "ready" | "stale" | undefined;
 }
+
+type Counts = {
+  must: number;
+  nice: number;
+  tech: number;
+  jobs: Set<number>;
+};
 
 function uniqueSorted(values: (string | null | undefined)[]): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value)))].sort();
 }
 
-function summarize(
-  edges: Edge[],
-  coveredBySkill: Map<string, boolean>,
-  themeBySkill: Map<string, string | null>,
-  filters: Filters,
-): SkillRow[] {
-  type Counts = { must: number; nice: number; tech: number; jobs: Set<number> };
-  const countsBySkill = new Map<string, Counts>();
+export function targetId(target: Pick<SuggestionTarget, "kind" | "key">): string {
+  return JSON.stringify([target.kind, target.key]);
+}
 
+export function sortSkillsWithin(
+  skills: SkillRow[],
+  stateOf: (key: string) => SuggestionState,
+): SkillRow[] {
+  return [...skills].sort((left, right) => {
+    const readyDifference =
+      Number(stateOf(right.key) === "ready") - Number(stateOf(left.key) === "ready");
+    return (
+      readyDifference ||
+      right.score - left.score ||
+      left.skill.localeCompare(right.skill) ||
+      left.key.localeCompare(right.key)
+    );
+  });
+}
+
+export function deriveView(payload: Payload, filters: Filters): DerivedView {
+  const jobById = new Map(payload.jobs.map((job) => [job.id, job]));
+  const filteredJobs = payload.jobs.filter(
+    (job) =>
+      (!filters.company || job.company === filters.company) &&
+      (!filters.seniority || job.seniority === filters.seniority),
+  );
+  const filteredJobIds = new Set(filteredJobs.map((job) => job.id));
+  const edges = payload.edges.filter((edge) => filteredJobIds.has(edge.jobId));
+
+  const countsBySkill = new Map<string, Counts>();
+  const jobsBySkill = new Map<string, Set<number>>();
   for (const edge of edges) {
-    const counts = countsBySkill.get(edge.skill) ?? {
+    const counts = countsBySkill.get(edge.skillKey) ?? {
       must: 0,
       nice: 0,
       tech: 0,
@@ -70,115 +116,111 @@ function summarize(
     };
     counts[edge.source] += 1;
     counts.jobs.add(edge.jobId);
-    countsBySkill.set(edge.skill, counts);
+    countsBySkill.set(edge.skillKey, counts);
+    jobsBySkill.set(edge.skillKey, counts.jobs);
   }
 
-  return [...countsBySkill.entries()]
-    .map(([skill, counts]) => ({
-      skill,
-      themeId: themeBySkill.get(skill) ?? null,
-      covered: coveredBySkill.get(skill) ?? false,
-      score:
-        filters.weighting === "popular"
-          ? counts.jobs.size
-          : counts.must * SOURCE_WEIGHT.must +
-            counts.nice * SOURCE_WEIGHT.nice +
-            counts.tech * SOURCE_WEIGHT.tech,
-      jobCount: counts.jobs.size,
-      must: counts.must,
-      nice: counts.nice,
-      tech: counts.tech,
-    }))
-    .filter((row) => !filters.gapsOnly || !row.covered)
-    .sort((left, right) => right.score - left.score || left.skill.localeCompare(right.skill));
-}
+  const skills = payload.skills
+    .flatMap((node): SkillRow[] => {
+      const counts = countsBySkill.get(node.key);
+      if (!counts || (filters.gapsOnly && node.covered)) return [];
+      return [
+        {
+          key: node.key,
+          skill: node.skill,
+          themeId: node.themeId ?? null,
+          covered: node.covered,
+          score:
+            filters.weighting === "popular"
+              ? counts.jobs.size
+              : counts.must * SOURCE_WEIGHT.must +
+                counts.nice * SOURCE_WEIGHT.nice +
+                counts.tech * SOURCE_WEIGHT.tech,
+          jobCount: counts.jobs.size,
+          must: counts.must,
+          nice: counts.nice,
+          tech: counts.tech,
+          members: node.members,
+        },
+      ];
+    })
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.skill.localeCompare(right.skill) ||
+        left.key.localeCompare(right.key),
+    );
 
-export function deriveView(payload: Payload, filters: Filters): DerivedView {
-  const jobById = new Map(payload.jobs.map((job) => [job.id, job]));
-  const coveredBySkill = new Map(payload.skills.map((skill) => [skill.skill, skill.covered]));
-  const themeBySkill = new Map(
-    payload.skills.map((skill) => [skill.skill, skill.themeId ?? null]),
-  );
-  const labelByTheme = new Map(payload.themes.map((theme) => [theme.id, theme.label]));
-
-  const edges = payload.edges.filter((edge) => {
-    const job = jobById.get(edge.jobId);
-    if (!job) return false;
-    if (filters.company && job.company !== filters.company) return false;
-    if (filters.seniority && job.seniority !== filters.seniority) return false;
-    return true;
-  });
-  const skills = summarize(edges, coveredBySkill, themeBySkill, filters);
-
-  const themeGroups = new Map<string, ThemeGroup>();
+  const themeLabels = new Map(payload.themes.map((theme) => [theme.id, theme.label]));
+  const themeGroups = new Map<string, ThemeRow & { jobs: Set<number> }>();
   for (const skill of skills) {
-    const id = skill.themeId ?? "__none__";
-    const label = skill.themeId ? (labelByTheme.get(skill.themeId) ?? skill.themeId) : "Unthemed";
-    const group = themeGroups.get(id) ?? { id, label, score: 0, skills: [] };
-    group.skills.push(skill);
+    const id = skill.themeId ?? UNTHEMED_ID;
+    const group = themeGroups.get(id) ?? {
+      id,
+      label: id === UNTHEMED_ID ? "Unthemed" : (themeLabels.get(id) ?? id),
+      score: 0,
+      jobCount: 0,
+      skillCount: 0,
+      gapCount: 0,
+      skills: [],
+      jobs: new Set<number>(),
+    };
     group.score += skill.score;
+    group.skillCount += 1;
+    group.gapCount += Number(!skill.covered);
+    group.skills.push(skill);
+    for (const jobId of jobsBySkill.get(skill.key) ?? []) group.jobs.add(jobId);
+    group.jobCount = group.jobs.size;
     themeGroups.set(id, group);
   }
-  const themes = [...themeGroups.values()].sort(
-    (left, right) => right.score - left.score || left.label.localeCompare(right.label),
-  );
+  const themeRows = [...themeGroups.values()]
+    .map((theme) => ({
+      id: theme.id,
+      label: theme.label,
+      score: theme.score,
+      jobCount: theme.jobCount,
+      skillCount: theme.skillCount,
+      gapCount: theme.gapCount,
+      skills: theme.skills,
+    }))
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.label.localeCompare(right.label) ||
+        left.id.localeCompare(right.id),
+    );
 
-  const jobIdsBySkill = new Map<string, Set<number>>();
-  for (const edge of edges) {
-    const jobIds = jobIdsBySkill.get(edge.skill) ?? new Set<number>();
-    jobIds.add(edge.jobId);
-    jobIdsBySkill.set(edge.skill, jobIds);
-  }
-
-  const jobsForSkill = (skill: string): JobLite[] =>
-    [...(jobIdsBySkill.get(skill) ?? new Set<number>())]
-      .map((id) => jobById.get(id))
+  const jobsForSkill = (key: string): JobLite[] =>
+    [...(jobsBySkill.get(key) ?? [])]
+      .map((jobId) => jobById.get(jobId))
       .filter((job): job is JobLite => Boolean(job));
 
   const jobsForTheme = (themeId: string): JobLite[] => {
-    const members = new Set(
-      payload.skills.filter((skill) => skill.themeId === themeId).map((skill) => skill.skill),
-    );
-    const jobIds = new Set(
-      edges.filter((edge) => members.has(edge.skill)).map((edge) => edge.jobId),
-    );
+    const jobIds = new Set<number>();
+    for (const skill of skills) {
+      if ((skill.themeId ?? UNTHEMED_ID) !== themeId) continue;
+      for (const jobId of jobsBySkill.get(skill.key) ?? []) jobIds.add(jobId);
+    }
     return [...jobIds]
-      .map((id) => jobById.get(id))
+      .map((jobId) => jobById.get(jobId))
       .filter((job): job is JobLite => Boolean(job));
   };
 
-  const rollup = (facet: (job: JobLite) => string | null | undefined): StatRow[] => {
-    const edgesByKey = new Map<string, Edge[]>();
-    for (const edge of edges) {
-      const job = jobById.get(edge.jobId);
-      if (!job) continue;
-      const key = facet(job);
-      if (!key) continue;
-      const facetEdges = edgesByKey.get(key) ?? [];
-      facetEdges.push(edge);
-      edgesByKey.set(key, facetEdges);
-    }
-
-    return [...edgesByKey.entries()]
-      .map(([key, facetEdges]) => {
-        const rows = summarize(facetEdges, coveredBySkill, themeBySkill, filters);
-        return {
-          key,
-          topSkills: rows.slice(0, 5).map((row) => ({ skill: row.skill, score: row.score })),
-          gapCount: rows.filter((row) => !row.covered).length,
-        };
-      })
-      .sort((left, right) => left.key.localeCompare(right.key));
-  };
+  const persistedStatus = new Map(
+    (payload.suggestionStatuses ?? []).map((status) => [
+      targetId({ kind: status.kind, key: status.key }),
+      status.state,
+    ]),
+  );
 
   return {
     skills,
-    themes,
-    byCompany: rollup((job) => job.company),
-    byPosition: rollup((job) => job.title),
+    themeRows,
+    filteredJobCount: filteredJobs.length,
     jobsForSkill,
     jobsForTheme,
     companies: uniqueSorted(payload.jobs.map((job) => job.company)),
     seniorities: uniqueSorted(payload.jobs.map((job) => job.seniority)),
+    persistedStateOf: (kind, key) => persistedStatus.get(targetId({ kind, key })),
   };
 }
