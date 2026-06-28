@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomTransform } from "d3-zoom";
-import { Maximize2Icon, MinusIcon, PlusIcon } from "lucide-react";
+import { ArrowLeftIcon, Maximize2Icon, MinusIcon, PlusIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,11 +21,12 @@ import {
 } from "./aggregate";
 import {
   buildGraph,
-  nextExpandedThemes,
+  nextFocusedTheme,
+  recommendedLayoutHeight,
   runLayout,
 } from "./skill-map-layout";
 
-const DEFAULT_SIZE = { width: 900, height: 520 };
+const DEFAULT_WIDTH = 900;
 
 export function SkillMap({
   themeRows,
@@ -45,15 +46,15 @@ export function SkillMap({
   const zoomBehaviorRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(
     null,
   );
-  const [dimensions, setDimensions] = useState(DEFAULT_SIZE);
-  const [expanded, setExpanded] = useState<string[]>([]);
+  const [containerWidth, setContainerWidth] = useState(DEFAULT_WIDTH);
+  const [focusedThemeId, setFocusedThemeId] = useState<string | null>(null);
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
 
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(([entry]) => {
       const width = Math.max(320, Math.round(entry.contentRect.width));
-      setDimensions({ width, height: width < 640 ? 460 : 540 });
+      setContainerWidth(width);
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
@@ -73,16 +74,34 @@ export function SkillMap({
     };
   }, []);
 
-  const graph = useMemo(() => buildGraph(themeRows, expanded), [expanded, themeRows]);
+  const activeFocusedThemeId = themeRows.some((theme) => theme.id === focusedThemeId)
+    ? focusedThemeId
+    : null;
+  const graph = useMemo(
+    () => buildGraph(themeRows, activeFocusedThemeId),
+    [activeFocusedThemeId, themeRows],
+  );
+  const dimensions = useMemo(
+    () => ({
+      width: containerWidth,
+      height: recommendedLayoutHeight(graph.nodes, containerWidth),
+    }),
+    [containerWidth, graph.nodes],
+  );
   const nodes = useMemo(
     () => runLayout(graph.nodes, graph.links, dimensions.width, dimensions.height),
     [dimensions, graph.links, graph.nodes],
   );
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const focusedTheme = themeRows.find((theme) => theme.id === activeFocusedThemeId) ?? null;
   const transformStyle = `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`;
 
   const applyZoom = (action: "in" | "out" | "reset") => {
     if (!svgRef.current || !zoomBehaviorRef.current) return;
+    if (action === "reset") setTransform(zoomIdentity);
+    // jsdom does not implement SVGAnimatedLength; the state update above still
+    // makes focus transitions deterministic in component tests.
+    if (!svgRef.current.width?.baseVal) return;
     const svg = select(svgRef.current);
     if (action === "reset") zoomBehaviorRef.current.transform(svg, zoomIdentity);
     else zoomBehaviorRef.current.scaleBy(svg, action === "in" ? 1.25 : 0.8);
@@ -107,19 +126,36 @@ export function SkillMap({
             Skill constellation
           </h2>
           <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            Expand up to two themes. Open a skill for evidence or select it for research.
+            {focusedTheme
+              ? `Showing ${focusedTheme.skillCount} connected skills. Select a checkbox to add research.`
+              : "Choose a theme to focus its branches. Select a checkbox to add research."}
           </p>
         </div>
-        <div className="flex gap-1" aria-label="Map zoom controls">
-          <Button size="icon-sm" variant="outline" aria-label="Zoom out" onClick={() => applyZoom("out")}>
-            <MinusIcon data-icon="inline-start" />
-          </Button>
-          <Button size="icon-sm" variant="outline" aria-label="Reset zoom" onClick={() => applyZoom("reset")}>
-            <Maximize2Icon data-icon="inline-start" />
-          </Button>
-          <Button size="icon-sm" variant="outline" aria-label="Zoom in" onClick={() => applyZoom("in")}>
-            <PlusIcon data-icon="inline-start" />
-          </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {focusedTheme && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setFocusedThemeId(null);
+                applyZoom("reset");
+              }}
+            >
+              <ArrowLeftIcon data-icon="inline-start" />
+              All themes
+            </Button>
+          )}
+          <div className="flex gap-1" aria-label="Map zoom controls">
+            <Button size="icon-sm" variant="outline" aria-label="Zoom out" onClick={() => applyZoom("out")}>
+              <MinusIcon data-icon="inline-start" />
+            </Button>
+            <Button size="icon-sm" variant="outline" aria-label="Reset zoom" onClick={() => applyZoom("reset")}>
+              <Maximize2Icon data-icon="inline-start" />
+            </Button>
+            <Button size="icon-sm" variant="outline" aria-label="Zoom in" onClick={() => applyZoom("in")}>
+              <PlusIcon data-icon="inline-start" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -136,13 +172,10 @@ export function SkillMap({
               const target = nodeById.get(link.target);
               if (!source || !target) return null;
               return (
-                <line
+                <path
                   key={`${link.source}:${link.target}`}
-                  x1={source.x}
-                  y1={source.y}
-                  x2={target.x}
-                  y2={target.y}
-                  className="stroke-border"
+                  d={`M ${source.x} ${source.y} C ${(source.x + target.x) / 2} ${source.y}, ${(source.x + target.x) / 2} ${target.y}, ${target.x} ${target.y}`}
+                  className="fill-none stroke-border"
                   strokeWidth="1.5"
                 />
               );
@@ -161,36 +194,40 @@ export function SkillMap({
               key: node.entityKey,
               label: node.label,
             };
-            const open = node.kind === "theme" && expanded.includes(node.entityKey);
+            const focused = node.kind === "theme" && activeFocusedThemeId === node.entityKey;
             return (
               <div
                 key={node.id}
                 className="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
                 style={{ left: node.x, top: node.y }}
               >
-                <div className="relative flex items-center gap-1.5">
-                  <Checkbox
-                    aria-label={`Select ${node.label}`}
-                    checked={selected.has(targetId(target))}
-                    onCheckedChange={() => onToggleSelect(target)}
-                    className="bg-background"
-                  />
+                <div className="relative flex items-center gap-2.5">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-card shadow-xs">
+                    <Checkbox
+                      aria-label={`Select ${node.label}`}
+                      checked={selected.has(targetId(target))}
+                      onCheckedChange={() => onToggleSelect(target)}
+                      className="size-5 bg-background"
+                    />
+                  </span>
                   <Button
                     variant={node.kind === "theme" ? "default" : "outline"}
+                    aria-pressed={node.kind === "theme" ? focused : undefined}
                     aria-label={
                       node.kind === "theme"
-                        ? `${open ? "Collapse" : "Expand"} ${node.label}`
+                        ? `${focused ? "Show all themes from" : "Focus"} ${node.label}`
                         : `Open ${node.label} details`
                     }
                     onClick={() => {
                       if (node.kind === "theme") {
-                        setExpanded((current) => nextExpandedThemes(current, node.entityKey));
+                        setFocusedThemeId((current) => nextFocusedTheme(current, node.entityKey));
+                        applyZoom("reset");
                       } else if (node.skill) {
                         onOpenSkill(node.skill);
                       }
                     }}
                     className={cn(
-                      "rounded-full px-3 text-xs shadow-sm",
+                      "max-w-50 whitespace-normal rounded-full px-3 py-2 text-center text-xs leading-tight shadow-sm",
                       node.kind === "skill" &&
                         (node.covered ? "border-covered" : "border-gap"),
                       ready && "ring-2 ring-ready ring-offset-2 ring-offset-background",
@@ -209,8 +246,11 @@ export function SkillMap({
 
       <footer className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t px-4 py-3 text-xs text-muted-foreground sm:px-5">
         <span>
-          {themeRows.length} {themeRows.length === 1 ? "theme" : "themes"} ·{" "}
-          {themeRows.reduce((total, theme) => total + theme.skillCount, 0)} skills
+          {focusedTheme ? `Focused on ${focusedTheme.label}` : `${themeRows.length} ${themeRows.length === 1 ? "theme" : "themes"}`} ·{" "}
+          {focusedTheme
+            ? focusedTheme.skillCount
+            : themeRows.reduce((total, theme) => total + theme.skillCount, 0)}{" "}
+          skills
         </span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-primary" />Theme</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-gap" />Gap</span>
