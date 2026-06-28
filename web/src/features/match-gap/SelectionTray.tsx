@@ -68,7 +68,7 @@ function TrayContents({
 }: SelectionTrayProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
         <span className="font-mono text-xs text-muted-foreground">
           {targets.length} selected
         </span>
@@ -78,7 +78,7 @@ function TrayContents({
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {launchError && (
           <Alert variant="destructive" className="mb-3">
             <AlertCircleIcon aria-hidden="true" />
@@ -91,12 +91,12 @@ function TrayContents({
             Select themes or skills from the map or outline.
           </p>
         ) : (
-          <ul className="divide-y border-y">
+          <ul className="flex flex-col gap-2">
             {targets.map((target) => {
               const state = stateOf(target.kind, target.key);
               const retryable = state === "failed" || state === "cancelled";
               return (
-                <li key={targetId(target)} className="py-3">
+                <li key={targetId(target)} className="rounded-md border bg-background px-4 py-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -137,7 +137,7 @@ function TrayContents({
         )}
       </div>
 
-      <div className="border-t p-4">
+      <div className="border-t p-5">
         <Button
           className="w-full"
           disabled={targets.length === 0 || generating}
@@ -175,7 +175,7 @@ export function SelectionTray(props: SelectionTrayProps) {
         aria-labelledby="selection-tray-title"
         className="sticky top-4 hidden max-h-[calc(100vh-2rem)] min-h-96 flex-col border bg-card xl:flex"
       >
-        <div className="border-b px-4 py-4">
+        <div className="border-b px-5 py-5">
           <h2 id="selection-tray-title" className="text-sm font-semibold">
             Research selection
           </h2>

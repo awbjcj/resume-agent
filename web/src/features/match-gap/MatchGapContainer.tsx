@@ -137,7 +137,7 @@ export function MatchGapContainer() {
               </EmptyHeader>
             </Empty>
           ) : (
-            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]">
+            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
               <Tabs value={activeView} onValueChange={setActiveView} className="min-w-0">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <TabsList aria-label="Skill demand view">
