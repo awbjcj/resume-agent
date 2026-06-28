@@ -590,6 +590,23 @@ export interface paths {
         patch: operations["set_enabled_route_api_sources__source_id__patch"];
         trace?: never;
     };
+    "/api/suggestion-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Suggestion Runs */
+        post: operations["launch_suggestion_runs_api_suggestion_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/suggestions": {
         parameters: {
             query?: never;
@@ -925,6 +942,8 @@ export interface components {
             jobId: number;
             /** Skill */
             skill: string;
+            /** Skillkey */
+            skillKey: string;
             /**
              * Source
              * @enum {string}
@@ -933,16 +952,6 @@ export interface components {
         };
         /** DiscoverParams */
         DiscoverParams: Record<string, never>;
-        /** GenerateParams */
-        GenerateParams: {
-            /** Key */
-            key: string;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "skill" | "theme";
-        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1054,6 +1063,8 @@ export interface components {
             jobs: components["schemas"]["JobLiteOut"][];
             /** Skills */
             skills: components["schemas"]["SkillNodeOut"][];
+            /** Suggestionstatuses */
+            suggestionStatuses?: components["schemas"]["SuggestionStatusOut"][];
             /** Targettotal */
             targetTotal: number;
             /** Themes */
@@ -1335,8 +1346,22 @@ export interface components {
         SkillNodeOut: {
             /** Covered */
             covered: boolean;
+            /** Jobcount */
+            jobCount: number;
+            /** Key */
+            key: string;
+            /** Members */
+            members: {
+                [key: string]: number;
+            };
+            /** Must */
+            must: number;
+            /** Nice */
+            nice: number;
             /** Skill */
             skill: string;
+            /** Tech */
+            tech: number;
             /** Themeid */
             themeId?: string | null;
         };
@@ -1423,6 +1448,78 @@ export interface components {
             /** Resources */
             resources: components["schemas"]["ResourceOut"][];
         };
+        /** SuggestionRunAcceptedOut */
+        SuggestionRunAcceptedOut: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "theme";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            outcome: "accepted";
+            /** Runid */
+            runId: string;
+        };
+        /** SuggestionRunNotFoundOut */
+        SuggestionRunNotFoundOut: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "theme";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            outcome: "not_found";
+        };
+        /** SuggestionRunsOut */
+        SuggestionRunsOut: {
+            /** Results */
+            results: (components["schemas"]["SuggestionRunAcceptedOut"] | components["schemas"]["SuggestionRunNotFoundOut"])[];
+        };
+        /** SuggestionRunsRequest */
+        SuggestionRunsRequest: {
+            /** Targets */
+            targets: components["schemas"]["SuggestionTarget"][];
+        };
+        /** SuggestionStatusOut */
+        SuggestionStatusOut: {
+            /**
+             * Generatedat
+             * Format: date-time
+             */
+            generatedAt: string;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "theme";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "stale";
+        };
+        /** SuggestionTarget */
+        SuggestionTarget: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "theme";
+        };
         /** TailorParams */
         TailorParams: {
             /**
@@ -1435,10 +1532,20 @@ export interface components {
         };
         /** ThemeOut */
         ThemeOut: {
+            /** Essentialscore */
+            essentialScore: number;
+            /** Gapcount */
+            gapCount: number;
             /** Id */
             id: string;
+            /** Jobcount */
+            jobCount: number;
             /** Label */
             label: string;
+            /** Popularscore */
+            popularScore: number;
+            /** Skillcount */
+            skillCount: number;
         };
         /** TriageItem */
         TriageItem: {
@@ -2794,6 +2901,41 @@ export interface operations {
             };
         };
     };
+    launch_suggestion_runs_api_suggestion_runs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionRunsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionRunsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_suggestion_api_suggestions_get: {
         parameters: {
             query: {
@@ -2839,7 +2981,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GenerateParams"];
+                "application/json": components["schemas"]["SuggestionTarget"];
             };
         };
         responses: {
