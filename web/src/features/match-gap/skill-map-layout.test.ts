@@ -1,7 +1,13 @@
 import { expect, it } from "vitest";
 
 import type { ThemeRow } from "./aggregate";
-import { buildGraph, nextExpandedThemes, runLayout } from "./skill-map-layout";
+import {
+  buildGraph,
+  nextFocusedTheme,
+  recommendedLayoutHeight,
+  runLayout,
+  type MapNode,
+} from "./skill-map-layout";
 
 const themes: ThemeRow[] = [
   {
@@ -37,31 +43,37 @@ const themes: ThemeRow[] = [
   },
 ];
 
-it("builds prefixed hubs and only expanded skill leaves", () => {
-  const collapsed = buildGraph(themes, []);
-  const expanded = buildGraph(themes, ["backend"]);
+it("builds all hubs in overview and isolates a focused theme with its leaves", () => {
+  const collapsed = buildGraph(themes, null);
+  const focused = buildGraph(themes, "backend");
 
   expect(collapsed.nodes.map((node) => node.id)).toEqual([
     "theme:backend",
     "theme:cloud",
   ]);
-  expect(expanded.nodes.map((node) => node.id)).toContain("skill:python");
-  expect(expanded.links).toContainEqual({
+  expect(focused.nodes.map((node) => node.id)).toEqual([
+    "theme:backend",
+    "skill:python",
+  ]);
+  expect(focused.nodes.map((node) => node.id)).not.toContain("theme:cloud");
+  expect(focused.links).toContainEqual({
     source: "theme:backend",
     target: "skill:python",
   });
 });
 
-it("keeps only the two most recently expanded themes", () => {
-  expect(nextExpandedThemes(["one", "two"], "three")).toEqual(["two", "three"]);
-  expect(nextExpandedThemes(["one", "two"], "two")).toEqual(["one"]);
+it("toggles a single focused theme", () => {
+  expect(nextFocusedTheme(null, "backend")).toBe("backend");
+  expect(nextFocusedTheme("backend", "backend")).toBeNull();
+  expect(nextFocusedTheme("backend", "cloud")).toBe("cloud");
 });
 
 it("lays out cloned inputs deterministically without mutating links", () => {
-  const graph = buildGraph(themes, ["backend"]);
+  const graph = buildGraph(themes, "backend");
   const linksBefore = structuredClone(graph.links);
-  const forward = runLayout(graph.nodes, graph.links, 800, 500);
-  const reverse = runLayout([...graph.nodes].reverse(), graph.links, 800, 500);
+  const height = recommendedLayoutHeight(graph.nodes, 800);
+  const forward = runLayout(graph.nodes, graph.links, 800, height);
+  const reverse = runLayout([...graph.nodes].reverse(), graph.links, 800, height);
 
   expect(graph.links).toEqual(linksBefore);
   expect(forward.map(({ id, x, y }) => [id, Math.round(x), Math.round(y)]).sort()).toEqual(
@@ -70,4 +82,28 @@ it("lays out cloned inputs deterministically without mutating links", () => {
   expect(forward.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y))).toBe(
     true,
   );
+});
+
+function overlaps(left: MapNode, right: MapNode) {
+  return (
+    Math.abs(left.x - right.x) < (left.width + right.width) / 2 + 12 &&
+    Math.abs(left.y - right.y) < (left.height + right.height) / 2 + 12
+  );
+}
+
+it("keeps the rendered node boxes separated in overview and focus layouts", () => {
+  for (const graph of [buildGraph(themes, null), buildGraph(themes, "backend")]) {
+    const width = 800;
+    const nodes = runLayout(
+      graph.nodes,
+      graph.links,
+      width,
+      recommendedLayoutHeight(graph.nodes, width),
+    );
+    for (let left = 0; left < nodes.length; left += 1) {
+      for (let right = left + 1; right < nodes.length; right += 1) {
+        expect(overlaps(nodes[left], nodes[right])).toBe(false);
+      }
+    }
+  }
 });
