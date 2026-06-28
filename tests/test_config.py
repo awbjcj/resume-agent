@@ -62,12 +62,18 @@ def test_settings_has_model_tier_defaults():
 
 
 def test_concurrency_settings_defaults(monkeypatch):
-    for key in ("LLM_CONCURRENCY", "LLM_RETRIES", "LLM_RETRY_DELAY"):
+    for key in (
+        "LLM_CONCURRENCY",
+        "LLM_RETRIES",
+        "LLM_RETRY_DELAY",
+        "SUGGESTION_BATCH_CONCURRENCY",
+    ):
         monkeypatch.delenv(key, raising=False)
     settings = _settings(env_file=None)
     assert settings.llm_concurrency == 8
     assert settings.llm_retries == 2
     assert settings.llm_retry_delay == 1
+    assert settings.suggestion_batch_concurrency == 3
 
 
 def test_concurrency_settings_reject_invalid_values(monkeypatch):
@@ -87,5 +93,17 @@ def test_concurrency_settings_reject_invalid_values(monkeypatch):
 
     monkeypatch.setenv("LLM_RETRIES", "0")
     monkeypatch.setenv("LLM_RETRY_DELAY", "-1")
+    with pytest.raises(ValidationError):
+        _settings(env_file=None)
+
+
+def test_suggestion_batch_concurrency_has_bounded_range(monkeypatch):
+    from pydantic import ValidationError
+
+    monkeypatch.setenv("SUGGESTION_BATCH_CONCURRENCY", "0")
+    with pytest.raises(ValidationError):
+        _settings(env_file=None)
+
+    monkeypatch.setenv("SUGGESTION_BATCH_CONCURRENCY", "17")
     with pytest.raises(ValidationError):
         _settings(env_file=None)
