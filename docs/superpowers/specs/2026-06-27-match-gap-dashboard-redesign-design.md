@@ -1,238 +1,333 @@
 # Match / Gap dashboard redesign — design
 
 **Date:** 2026-06-27
-**Status:** Approved for planning
+**Status:** Reviewed; approved for implementation
 **Supersedes interaction:** the current `web/src/features/match-gap/` dashboard
 (`MatchGapContainer` + `RankedList` + `WordCloud` + `StatTables` + `SkillDrawer`)
-and extends the `match-gap-skill-intelligence` / `gap-closing-advisor` specs
-(2026-06-26) that shipped it.
+and refines the 2026-06-26 match-gap intelligence and gap-closing advisor
+designs.
 
 ---
 
-## 1. Problem
+## 1. Outcome
 
-The shipped Match/Gap dashboard surfaces a weighted skill-demand view but has
-seven concrete gaps the user identified:
+The dashboard becomes a technical skill atlas: a theme-first workspace with an
+interactive constellation, a dense ranked outline, a large evidence modal, and
+a persistent multi-select suggestion queue.
 
-1. The clustered/themed skills are never *plotted* — themes are a flat list. The
-   user wants an interactive node-link graph: cluster nodes connected to member
-   skills, all interactive.
-2. The skill detail lives in a cramped right-side `Sheet` (`sm:max-w-xl`); it
-   needs a large modal like the Job detail to hold real content.
-3. The ranked-demand list renders **every** skill flat — unusable at thousands.
-   It should be cluster-first and dense, with the long tail compacted.
-4. The "By company" / "By position" `StatTables` are redundant with filters and
-   should be removed; clusters should be prioritized over detailed skills
-   everywhere.
-5. There is no status tracking of which skills already have generated
-   suggestions; those should be surfaced and prioritized in layout.
-6. Suggestions should target *generalized* skills (Python ≠ Java) without being
-   too detailed (`English fluency` = `English`).
-7. The user must be able to multi-select skills and generate suggestions for all
-   of them asynchronously.
+It must solve seven problems:
 
-## 2. Taxonomy — the spine
+1. Plot themes and generalized skills as an interactive node-link map.
+2. Replace the narrow skill `Sheet` with a large evidence `Dialog`.
+3. Make thousands of skills scannable by grouping and progressively revealing
+   the long tail.
+4. Remove redundant company/position tables and keep filtering in one place.
+5. Show persisted and live suggestion status consistently in every view.
+6. Generate advice for generalized skills, not raw JD phrasings.
+7. Launch and monitor multiple suggestion runs without exhausting the shared
+   run executor.
 
-Three tiers, all already latent in `data/profile/cluster_map.json`
-(`ClusterMap`):
+## 2. Domain model and stable identity
 
-| Tier | Example | Source | Role |
+The taxonomy has three tiers:
+
+| Tier | Example | Identity | Role |
 | --- | --- | --- | --- |
-| **Theme** | "Backend" | `theme_of` / `theme_label` | Graph **hub**, collapsed ranked-list row, grouping unit |
-| **Generalized skill** | "Python" | `aliases` survivor (synonym-merged) | **Actionable unit** — graph leaf, expandable list detail, primary suggestion target. `Python ≠ Java`; `English fluency`/`fluent English` → one |
-| **Raw phrasing** | `python3`, `Python (3.x)` | raw JD string normalized into a generalized skill | Member detail + its own frequency; **modal only** |
+| Theme | Backend | stable `themeId` | map hub and ranked group |
+| Generalized skill | Python | stable canonical `key` | actionable suggestion target |
+| Raw phrasing | Python 3.x | exact trimmed string | evidence shown in the modal |
 
-Suggestions fire at the **generalized-skill** tier by default; the existing
-`kind=theme` path is **kept** for deliberate whole-theme learning-path requests
-(§6), never the default.
+The generalized-skill `key` is the canonical alias survivor from `ClusterMap`.
+It is not a display label. `skill` remains the human-readable label for backward
+compatibility, chosen from the most frequent raw phrasing. Ties are resolved by
+`casefold()` ascending, then the original string ascending. Changing frequency
+may change `skill`; it must never change the `key`, selection identity,
+suggestion cache identity, graph node identity, or React key.
 
-## 3. Backend & contract changes
+Suggestions default to `kind="skill"` with the stable generalized-skill key.
+`kind="theme"` remains available for deliberate whole-theme learning paths.
+Raw phrasings are never suggestion targets.
 
-All changes are **additive** to the demand graph. The legacy `match_gap()`
-report and the `resume-agent` CLI path are untouched (fact-lock and
-source-priority invariants are unaffected — this is read-only analytics over
-`criteria_json`).
+Legacy persisted suggestion rows may use the old display label as their key.
+Reads resolve canonical keys first, then current display labels as a compatibility
+fallback. A successful regeneration rewrites the legacy row to the canonical
+key. If canonical and legacy rows both exist, the canonical row wins. This is a
+one-version migration path, not a second public contract.
 
-### 3.1 Retain members + frequencies (`tracking/match_gap.py`)
+## 3. Backend architecture
 
-`build_demand_graph` currently keeps only the **first** raw phrasing per
-canonical (`display_for.setdefault(...)`) and emits one edge per canonical,
-discarding the per-phrasing detail point 3 needs. Change `SkillNode` to
-accumulate:
+### 3.1 Deepen the demand-graph module
 
-- `members: dict[str, int]` — raw phrasing → job-frequency (distinct jobs that
-  used that exact phrasing).
-- `must` / `nice` / `tech: int` — per-source distinct-job counts (the "source
-  mix").
-- `job_count: int` — distinct demanding jobs (already derivable; make explicit).
+`tracking.match_gap.build_demand_graph` remains the single module that owns
+normalization, aliasing, distinct-job counting, source counting, display-label
+selection, edge projection, and theme aggregation. Callers receive a complete
+graph; they do not reproduce aggregation rules.
 
-Add a `ThemeNode` aggregate: `skill_count`, `gap_count`, `score` (weighted
-demand summed over member generalized skills), so the ranked theme rows and hub
-sizes do not require the client to re-aggregate from edges. The client *may*
-still re-aggregate under filters (company/seniority), so the server values are
-the **unfiltered** baseline; filtered recomputation stays client-side in
-`aggregate.ts` (which already does this).
+For each generalized skill, accumulate:
 
-`display` for a generalized skill = the highest-frequency member phrasing
-(deterministic tiebreak by string), not merely the first seen.
+- `key: str` — stable canonical identity.
+- `skill: str` — display label retained for existing consumers.
+- `members: dict[str, int]` — exact trimmed phrasing to distinct-job count.
+- `must`, `nice`, `tech: int` — distinct-job count per source.
+- `jobCount: int` — distinct demanding jobs across all sources.
+- `themeId` and `covered` — existing classification.
 
-### 3.2 Contract (`api/schemas/match_gap.py`)
+For each edge, add `skillKey` while retaining the existing display `skill`.
+The implementation accumulates edges by canonical key and projects the final
+display label once; it must not perform a second database/job traversal.
 
-Extend `SkillNodeOut` with `members: dict[str,int]`, `must`, `nice`, `tech`,
-`jobCount`; extend `ThemeOut` with `score`, `skillCount`, `gapCount`. Regenerate
-`contracts/openapi.json` + `contracts/ts/api.ts` via `bash scripts/gen_ts_client.sh`;
-the drift gate (`tests/api/test_openapi_contract.py`) must pass.
+For each theme, expose unfiltered baseline aggregates:
 
-### 3.3 Suggestion-status endpoint (point 5)
+- `essentialScore` — sum of `must*3 + nice*2 + tech` over member skills.
+- `popularScore` — sum of generalized-skill distinct-job counts.
+- `jobCount` — distinct jobs demanding at least one member skill.
+- `skillCount` and `gapCount`.
 
-New `GET /api/suggestions/status` → `[{kind, key, state: "ready"|"stale", generatedAt}]`
-for every persisted `SkillSuggestion`, with `stale` computed against the current
-fingerprint (reuse `suggestion_fingerprint` + the current demand graph + profile
-facts, exactly as `get_suggestion` does for one row). This lets the dashboard
-badge and sort **without** issuing N per-skill requests. Live `researching` /
-`queued` / `failed` states are **not** persisted — they come from the client run
-store (§4.3).
+These values describe the unfiltered graph. The dashboard always recomputes
+theme metrics from filtered edges when company, seniority, gaps-only, or
+weighting changes.
 
-### 3.4 Batch generation endpoint (point 7)
+Counting invariants:
 
-New `POST /api/suggestions/generate-batch` accepting
-`{ items: [{kind, key}, …] }` (deduped, bounded length). It resolves each
-context (404 on any unknown target is reported per-item, not fatal) and spawns
-**one independent run per item** via `RunManager.submit("suggestion", work)` —
-reusing the existing `generate_suggestion` worker verbatim — bounded by a new
-`Settings.suggestion_batch_concurrency` (validated `>= 1`, default e.g. 3). The
-endpoint returns `{ runs: [{kind, key, runId}, …] }`. Per-skill status, retry,
-and SSE all fall out of the existing run machinery; no new progress plumbing.
+- Repeating one exact phrasing in one job counts once in `members`.
+- The same canonical skill in two source arrays counts once in each source and
+  once in `jobCount`.
+- Blank normalized keys are dropped.
+- Output order is deterministic and independent of input insertion order.
+- Missing or stale clustering assigns skills to the synthetic client group
+  `__unthemed__`; no synthetic theme is persisted.
 
-Concurrency bound: the batch must not launch an unbounded number of blocking
-threadpool workers. Implementation options for the planner: a bounded worker
-pool / semaphore inside the batch submission, or a small queue the `RunManager`
-drains at the configured width. The existing per-call LLM `Settings.llm_concurrency`
-semaphore (inside `llm_runner.acall`) still applies underneath; the suggestion
-agents are synchronous (`search_agent.run`), so the **run-level** cap is what
-bounds true parallelism here.
+### 3.2 Dashboard snapshot instead of a status-list endpoint
 
-## 4. Frontend
+`GET /api/match-gap` remains the dashboard read interface. Extend
+`MatchGapOut` additively with `suggestionStatuses` rather than adding a second
+unpaginated status-list request.
 
-Replaces `MatchGapContainer`. New structure under `web/src/features/match-gap/`.
+Each status row is `{kind, key, state, generatedAt}` where `state` is `ready` or
+`stale`. The router builds the demand graph once, then a suggestion catalog
+module joins persisted `SkillSuggestion` rows to that graph and computes the
+current fingerprint. Rows whose targets are no longer in the graph are omitted.
 
-### 4.1 Tabbed workspace shell (layout C)
+This gives the client one internally consistent snapshot, avoids duplicate graph
+construction, and avoids N per-skill reads. Completing a suggestion run
+invalidates the existing `match-gap` TanStack Query key.
 
-`MatchGapContainer` becomes: `PageHeader` → sticky **filter bar** (existing
-`Filters`: company · seniority · gaps-only · weighting · `RefreshClustersButton`)
-→ `Tabs` with `Map` | `Ranked list`. Filters **and** the selection basket live
-in container state so both persist across tab switches. `MetricRow` (target
-jobs / distinct skills / open gaps) stays above the tabs.
+### 3.3 Suggestion run submission module
 
-**Removed:** `WordCloud.tsx`, `StatTables.tsx` (point 4 — by-company/by-position
-are covered by the company/seniority filters). Their tests are removed with them.
+Single and batch launch routes must share one implementation. Add a suggestion
+run submission module that owns context resolution, worker closure construction,
+agent construction, repository verification, worker-session lifetime, and
+`RunManager.submit`. Routers only validate requests and serialize outcomes.
 
-### 4.2 Ranked list — theme rows → skills (points 3, 4, 5)
+Keep the existing `POST /api/suggestions/generate` interface for compatibility;
+delegate it to the shared module.
 
-`RankedList` is rewritten to render **theme rows** ranked by aggregate weighted
-demand: each row shows a demand bar, skill count, and gap count, and is
-collapsible. Expanding a theme reveals its generalized skills (frequency,
-covered/gap, **status badge**). Ordering rules:
+Add `POST /api/suggestion-runs`:
 
-- Themes sorted by `score` desc (respecting the `essential`/`popular` weighting
-  toggle, computed client-side as today).
-- Within an expanded theme, generalized skills sort by `score` desc, but
-  **ready-suggestion skills float to the top of their group** (status as
-  tiebreaker over demand — point 5, "badge in place + sort within group").
-- Long tail compacted: themes past a threshold collapse under "Show N more
-  themes"; within a theme, skills past a threshold fold under "Show N more".
-- Each skill row carries a **select checkbox** feeding the basket (§4.4) and a
-  click target opening the modal (§4.5).
+```json
+{
+  "targets": [
+    { "kind": "skill", "key": "python" },
+    { "kind": "theme", "key": "backend" }
+  ]
+}
+```
 
-### 4.3 Map — collapsed constellation via d3-force (point 1)
+Rules:
 
-New `SkillMap.tsx`. A `d3-force` simulation renders **theme hubs** by default
-(node radius ∝ `sqrt(score)`); `d3-zoom` provides pan/zoom. Clicking a hub
-**injects** that theme's generalized-skill nodes + hub→skill links into the
-simulation (and re-heats it); clicking empty space or the hub again removes
-them — so only 1–2 themes are ever exploded (the "collapsed constellation").
-Node encoding (shared with the list/modal):
+- `targets` contains 1–25 items; models forbid extra fields.
+- Keys are trimmed, non-empty, and at most 200 characters.
+- Exact duplicate `(kind, key)` pairs collapse, preserving first-seen order.
+- Every valid target produces one independent suggestion run.
+- Unknown targets are per-item outcomes and do not abort valid siblings.
+- Response order matches the deduplicated request order.
 
-- **size** = weighted demand,
-- **color** = gap (warning) vs covered (muted),
-- **gold ring** = a suggestion is `ready` (from §3.3 + run store),
-- click a skill node → modal; tick-select → basket.
+The `202` response is a discriminated list:
 
-Rendering: React owns the SVG (`<g>` per node/link); `d3-force` owns positions
-via a simulation held in a ref, updated on `tick`. **Testing:** the offline
-suite ticks the simulation deterministically (`simulation.stop()` then a fixed
-number of `simulation.tick()` calls, seeded initial positions) and asserts on
-the resulting React-rendered nodes/edges — no animation, no timers. New deps:
-`d3-force`, `d3-zoom`, `@types/d3-force`, `@types/d3-zoom`.
+```json
+{
+  "results": [
+    { "outcome": "accepted", "kind": "skill", "key": "python", "runId": "..." },
+    { "outcome": "not_found", "kind": "theme", "key": "missing" }
+  ]
+}
+```
 
-Degenerate case: when `clustersStale` or no themes exist, all skills fall under a
-single "Unthemed" hub and the existing `RefreshClustersButton` nudge invites a
-cluster refresh (the background Run already exists). The Map must render
-something coherent in this state, not crash.
+All validation errors use the existing structured API error interface. Internal
+exceptions never leak through per-item `not_found` handling.
 
-### 4.4 Selection tray (point 7, mockup B)
+### 3.4 Per-kind run executor lanes
 
-`SelectionTray.tsx` — a right-side panel that opens when ≥1 skill/theme is
-ticked (in the list *or* the Map). It holds the basket, shows **per-item live
-status** (○ none · ⏱ queued · ◐ researching · ★ ready · ⚠ failed ↻) by joining
-the status endpoint (§3.3) with the client run store, and exposes one
-"⚡ Generate all" that calls the batch endpoint (§3.4) and then watches the
-returned runs. Per-item retry re-submits just that item. Basket state lives in
-container state (persists across tabs).
+Do not resize the shared executor and do not wait on a semaphore inside a shared
+worker. Both approaches let a large suggestion batch starve unrelated runs.
 
-### 4.5 Skill detail modal (point 2, mockup A — job-modal idiom)
+Deepen `RunManager` with managed per-kind executor lanes. The constructor accepts
+`kind_workers={"suggestion": Settings.suggestion_batch_concurrency}`; `submit`
+selects the suggestion lane by run kind and otherwise uses the existing default
+executor. `RunManager` owns and shuts down every executor it creates. Injected
+executors remain caller-owned.
 
-`SkillModal.tsx` built on `Dialog` (mirrors `JobModal`: `max-w-6xl`, masthead +
-two-pane). Masthead: skill name + theme pill + gap/covered pill + suggestion
-status pill + demand/role counts. Left **evidence rail**: member phrasings +
-frequencies, source mix (must/nice/tech), demanding roles. Right **tabbed main**:
-`Suggestion` (the existing `SuggestionPanel` content — bridge/repos/resources/
-project/citations, generate/regenerate) · `Roles` (the demanding-jobs list).
-`SkillDrawer.tsx` (the `Sheet`) is **replaced** by this modal; `SuggestionPanel`
-is reused inside it.
+`suggestion_batch_concurrency` defaults to 3 and validates `1 <= value <= 16`.
+Direct single-suggestion launches use the same lane, so the cap is global across
+single and batch launches. Tests must prove both the cap and that a saturated
+suggestion lane does not block a non-suggestion run.
 
-### 4.6 Status model (point 5, client)
+## 4. Frontend information architecture
 
-A `useSuggestionStatus()` query wraps §3.3. Effective per-key state =
-`failed`/`researching`/`queued` from the run store if a run is in flight, else
-`ready`/`stale` from the status endpoint, else `none`. This single derivation
-feeds the Map ring, the list badge/sort, and the tray.
+### 4.1 Visual direction
 
-## 5. Phased implementation plan (one spec)
+Use a restrained technical-atlas aesthetic that fits the existing neutral/teal
+application: crisp borders, compact editorial typography, a subtle plotted
+background in the map, and one semantic amber/gold token for generated advice.
+Avoid gradients, oversized cards, heavy shadows, and decorative rounding.
 
-1. **Backend & contract.** Demand-graph members/frequencies + theme aggregates;
-   schema extensions + `gen_ts_client.sh` regen + drift gate; `GET /suggestions/status`;
-   `POST /suggestions/generate-batch` + `suggestion_batch_concurrency`. Unit
-   tests against fixtures (offline).
-2. **Frontend shell + ranked list.** Tabbed workspace; theme-row ranked list with
-   expand/compaction; status badges + within-group sort; delete `WordCloud` /
-   `StatTables`. Wire `useSuggestionStatus`.
-3. **Constellation Map.** `SkillMap` with `d3-force`/`d3-zoom`; collapse/expand;
-   shared encoding; degenerate `clustersStale` handling; deterministic-tick tests.
-4. **Modal + selection tray + batch.** `SkillModal` (replace `SkillDrawer`);
-   `SelectionTray`; batch wiring + per-item status/retry.
+All state colors are semantic CSS variables in `web/src/index.css`; light and
+dark values are defined together. Color is never the only signal: every state
+also has text and an icon. Existing Geist typography and the project spacing
+scale remain authoritative.
 
-Each phase ends green (`pytest` for backend, the web test runner for frontend)
-and independently reviewable.
+### 4.2 Workspace shell
+
+`MatchGapContainer` owns filters, active tab, open skill, and the typed selection
+basket. Layout:
+
+1. `PageHeader`.
+2. Sticky filter bar.
+3. Filter-aware metrics: matching jobs, visible generalized skills, open gaps.
+4. `Tabs`: `Map` and `Ranked list`.
+5. Selection tray as a desktop sticky rail or mobile `Sheet`.
+
+Filters persist across tab changes. Selection identity is `(kind, stable key)`,
+stored as typed targets rather than colon-delimited strings. Removing
+`WordCloud` and `StatTables` does not remove their filter coverage.
+
+The existing Base UI shadcn project is authoritative. New implementation uses:
+
+- `TabsList` containing all `TabsTrigger` elements.
+- `Collapsible`/`Accordion` for theme disclosure.
+- `Checkbox` as a sibling of row actions, never nested inside a button.
+- `Badge` for status, `Skeleton` for loading, `Alert` for failures, and `Empty`
+  for empty states.
+- `Dialog` with a visible `DialogTitle` and `DialogDescription`.
+- Base UI `render`, not Radix `asChild`, for custom triggers.
+- Lucide icons with `data-icon` in buttons and no manual icon sizing there.
+
+The plan includes adding missing `@shadcn` primitives and correcting the current
+filter controls to use Base UI `Select items`, `SelectGroup`, and `Field`.
+
+### 4.3 Ranked outline
+
+Theme rows are ranked by the currently selected weighting and filtered edges.
+Each row shows label, score, visible skill count, gap count, a demand bar, a
+selection checkbox, and a disclosure control. Expanding shows generalized-skill
+rows with label, job frequency, coverage, suggestion status, selection checkbox,
+and an explicit detail action.
+
+Only `ready` suggestions float above normal demand order. `researching`,
+`queued`, `failed`, and `stale` remain in demand order so transient state does
+not reshuffle the list. Ties use label then stable key.
+
+Initially show 12 themes and 8 skills per expanded theme. “Show N more” reveals
+the next chunk; it never mounts the full long tail at once. Counts always report
+the complete filtered totals.
+
+### 4.4 Constellation map
+
+The map renders theme hubs initially and allows at most two expanded themes.
+Expanding a third collapses the least recently expanded theme. Skill leaves link
+only to their theme hub.
+
+`d3-force` computes positions synchronously from cloned nodes and links. The
+layout seeds positions from stable IDs, sets a deterministic random source,
+stops the simulation, ticks a fixed count, and never mutates caller-owned input.
+`ResizeObserver` supplies the plot dimensions. `d3-zoom` controls a shared
+transform and is cleaned up on unmount.
+
+React renders SVG links and an HTML node layer. Real `<button>` and `Checkbox`
+controls provide keyboard, focus, and screen-reader behavior; no SVG circle is
+given a fake button role. The map includes zoom in/out/reset controls, a legend,
+concise usage instructions, and a synchronized textual summary.
+
+Encoding:
+
+- Radius = clamped square root of current filtered score.
+- Theme hub = primary semantic token.
+- Gap = semantic gap token; covered = muted token.
+- Ready suggestion = semantic ready ring plus `Ready` label/tooltip.
+- Focus and selection have distinct non-color treatments.
+
+With no themes, visible skills appear under one `Unthemed` hub. With no visible
+skills after filtering, use `Empty` and keep filter-reset and cluster-refresh
+actions available.
+
+### 4.5 Skill detail modal
+
+`SkillModal` uses the Job modal's information hierarchy, not its bespoke shadow
+or rounded styling. It is a controlled `Dialog` with a large desktop layout and
+a single-column mobile layout.
+
+- Masthead: display label, theme, coverage, persisted/live status, demand count.
+- Evidence rail: raw phrasings sorted by count, source mix, demanding roles.
+- Main tabs: `Suggestion` and `Roles`.
+- `SuggestionPanel` remains the content module and targets the stable key.
+
+Focus returns to the invoking control on close. Long content scrolls inside the
+dialog; the page behind it does not.
+
+### 4.6 Selection tray and effective status
+
+The basket supports skill and theme targets from either view. Desktop uses a
+sticky `<aside>` that participates in layout; mobile uses a titled `Sheet`.
+Each item shows label, status text/icon, remove, and retry where applicable.
+
+Persisted `ready`/`stale` state comes from the match-gap snapshot. A feature-local
+run registry maps each launched run ID to its target and retains the latest
+failed/cancelled outcome until retry or dismissal. Effective precedence is:
+
+1. queued or running local run;
+2. retained failed/cancelled outcome;
+3. persisted ready or stale status;
+4. none.
+
+On success, keep the item in `researching` until invalidating and refetching the
+match-gap query completes, then clear the local run state. This prevents a flash
+from `researching` back to `none`. The global SSE store maps backend `pending`
+to `queued` and preserves feature metadata when progress records merge.
+
+“Generate all” is disabled while the launch request is pending, reports
+per-target `not_found` outcomes, and watches every accepted run independently.
+One failed run never blocks sibling completion or retry.
+
+## 5. Accessibility, responsiveness, and performance
+
+- WCAG 2.1 AA contrast; status is never color-only.
+- Logical headings with one page `h1`.
+- Full keyboard path through tabs, theme disclosure, map nodes, checkboxes,
+  dialog, tray, zoom controls, and retries.
+- Reduced-motion mode removes animated transitions.
+- Tested widths: 320, 768, 1024, and 1440 px.
+- Loading, request error, no jobs, no filter matches, stale clustering, partial
+  batch failure, and total batch failure all have explicit states.
+- Only two themes' skill nodes exist in the map at once; ranked long tails are
+  chunked; status lookup is O(1) by stable target key.
 
 ## 6. Out of scope
 
-- The `match_gap()` legacy report and CLI (untouched).
-- Co-occurrence edges between skills (considered, rejected for v1 in favor of
-  theme-hub hierarchy).
-- Per-raw-phrasing suggestions ("too detailed" — point 6).
-- Changing the clustering/refresh Run itself (only consumed, not modified) beyond
-  what the new theme aggregates require.
+- Changing the legacy `match_gap()` CLI report.
+- Co-occurrence edges between skills.
+- Suggestions for raw phrasings.
+- Replacing the clustering algorithm or refresh run.
+- Persisting background run state across browser reloads.
 
-## 7. Risks & notes
+## 7. Acceptance criteria
 
-- **Empty/stale clusters** make the Map and theme rows degenerate to "Unthemed";
-  handled via §4.3 + the refresh nudge, but the first-run experience depends on a
-  cluster refresh having been run.
-- **Batch fan-out** must respect `suggestion_batch_concurrency`; a large basket
-  must not exhaust the run threadpool. Verified by a test asserting in-flight
-  runs never exceed the cap.
-- **d3-force is the only new runtime dependency**; its non-determinism is
-  contained by ticking synchronously in tests.
-- **Contract drift** is the usual gate — every schema change regenerates the TS
-  client and must pass `test_openapi_contract.py`.
+- Display-label changes do not orphan selections or persisted suggestions.
+- Exact raw-phrasing and source counts obey distinct-job semantics.
+- Filtered theme scores, counts, map radii, and metrics agree.
+- One match-gap request supplies graph data and persisted suggestion statuses.
+- Batch results are ordered, typed, bounded, and partial-success safe.
+- Suggestion concurrency cannot starve unrelated run kinds.
+- Map and list expose the same targets and effective statuses.
+- Every interactive control is keyboard accessible and axe-clean.
+- Backend tests, frontend tests, TypeScript, lint, OpenAPI drift, and production
+  build pass.
