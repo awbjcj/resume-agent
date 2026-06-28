@@ -30,7 +30,7 @@ const themeRows: ThemeRow[] = [
   },
 ];
 
-it("expands a theme and exposes real skill controls", async () => {
+it("focuses a theme and exposes real skill controls", async () => {
   const onToggleSelect = vi.fn();
   const onOpenSkill = vi.fn();
   render(
@@ -43,7 +43,7 @@ it("expands a theme and exposes real skill controls", async () => {
     />,
   );
 
-  await userEvent.click(screen.getByRole("button", { name: /expand backend/i }));
+  await userEvent.click(screen.getByRole("button", { name: /focus backend/i }));
   expect(screen.getByRole("button", { name: /open python details/i })).toBeInTheDocument();
   expect(screen.getByText("Ready")).toBeInTheDocument();
 
