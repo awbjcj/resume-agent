@@ -52,17 +52,27 @@ class SkillThemes(ExtensibleModel):
     themes: list[ThemeGroup] = Field(default_factory=list)
 
 
+# Label for the theme that absorbs tokens the model failed to classify.
+_CATCH_ALL_THEME = "Other"
+
 Themer = Callable[[set[str]], list[tuple[str, list[str]]]]
 
 
 def clusters_to_mapping(clusters: list[list[str]], tokens: set[str]) -> dict[str, str]:
     mapping: dict[str, str] = {}
     for cluster in clusters:
-        if not cluster:
+        # The input token set is authoritative. The model sometimes rewrites a
+        # token (case/punctuation) or invents one, so project each member back
+        # onto an input token and ignore anything that does not land there — the
+        # canonical must be a real input token or _validated_aliases rejects it.
+        members = [token for raw in cluster if (token := normalize_skill(raw)) in tokens]
+        if not members:
             continue
-        canonical = cluster[0]
-        for token in cluster:
-            mapping[token] = canonical
+        canonical = next(
+            (mapping[token] for token in members if token in mapping), members[0]
+        )
+        for token in members:
+            mapping.setdefault(token, canonical)
     return {token: mapping.get(token, token) for token in tokens}
 
 
@@ -71,46 +81,69 @@ def themes_to_pairs(
 ) -> list[tuple[str, list[str]]]:
     pairs: list[tuple[str, list[str]]] = []
     assigned: set[str] = set()
+    first_labels: dict[str, str] = {}
+    pair_indexes: dict[str, int] = {}
 
     for theme in themes:
         label = theme.label.strip()
         if not label:
             raise ValueError("theme labels must be nonblank")
+        label_key = normalize_skill(label)
+        first_label = first_labels.setdefault(label_key, label)
 
         members: list[str] = []
-        group_members: set[str] = set()
         for raw_skill in theme.skills:
-            skill = raw_skill.strip()
-            if not skill:
+            if not raw_skill.strip():
                 raise ValueError("theme skill members must be nonblank")
-            if skill in group_members:
-                raise ValueError(f"duplicate skill token in theme: {skill!r}")
+            # Project onto the authoritative input set. A member the model rewrote
+            # or invented (not an input token) is dropped here; the real token it
+            # stands for is then backfilled into the catch-all theme below.
+            skill = normalize_skill(raw_skill)
             if skill not in tokens:
-                raise ValueError(f"unknown skill token in theme output: {skill!r}")
+                continue
+            # Theming is a many-to-one classification, not a clean partition: the
+            # model legitimately wants ambiguous tokens (e.g. a vector DB) in more
+            # than one theme. Keep the first assignment and drop later repeats so a
+            # single such token never aborts the whole refresh.
             if skill in assigned:
-                raise ValueError(f"skill token appears in multiple themes: {skill!r}")
-            group_members.add(skill)
+                continue
             assigned.add(skill)
             members.append(skill)
 
-        if not members:
-            raise ValueError("theme groups must contain at least one skill token")
-        pairs.append((label, members))
+        # A theme whose members were all duplicates of earlier themes contributes
+        # nothing after the keep-first repair; omit it rather than emit it empty.
+        if members:
+            if label_key in pair_indexes:
+                index = pair_indexes[label_key]
+                existing_label, existing_members = pairs[index]
+                pairs[index] = (existing_label, existing_members + members)
+            else:
+                pair_indexes[label_key] = len(pairs)
+                pairs.append((first_label, members))
 
-    missing = tokens - assigned
-    if missing:
-        raise ValueError(f"theme output is missing skill tokens: {sorted(missing)!r}")
+    # The model also drops tokens it cannot place (niche skills like 'ascii' or
+    # 'retool'). Rather than abort the whole refresh, gather the leftovers into a
+    # catch-all theme so every skill stays visible — extending an existing
+    # catch-all group if the model already produced one.
+    leftovers = sorted(tokens - assigned)
+    if leftovers:
+        for index, (label, members) in enumerate(pairs):
+            if label.casefold() == _CATCH_ALL_THEME.casefold():
+                pairs[index] = (label, members + leftovers)
+                break
+        else:
+            pairs.append((_CATCH_ALL_THEME, leftovers))
 
     return pairs
 
 
 def _default_agent() -> Runner:
     settings = get_settings()
-    model = build_model(settings.cheap_model)
+    model = build_model(settings.premium_model)
     return AgentRunner(
         Agent(
             model=model,
-            description="You canonicalize skill names into synonym clusters.",
+            description="Partition technical-skill tokens into conservative synonym clusters.",
             instructions=_INSTRUCTIONS,
             output_schema=SkillClusters,
             use_json_mode=use_json_mode_for(model),
@@ -120,11 +153,11 @@ def _default_agent() -> Runner:
 
 def _default_themer_agent() -> Runner:
     settings = get_settings()
-    model = build_model(settings.cheap_model)
+    model = build_model(settings.mid_model)
     return AgentRunner(
         Agent(
             model=model,
-            description="You organize canonical technical skills into broad themes.",
+            description="Partition canonical technical skills into dashboard-ready themes.",
             instructions=_THEME_INSTRUCTIONS,
             output_schema=SkillThemes,
             use_json_mode=use_json_mode_for(model),
