@@ -6,6 +6,8 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from datetime import datetime
+from threading import Lock
 from typing import Any, Callable, Literal
 from urllib.parse import urlsplit, urlunsplit
 
@@ -19,6 +21,7 @@ from resume_agent.tracking.tables import SkillSuggestion, utcnow
 
 SuggestionKind = Literal["skill", "theme"]
 RepoVerifier = Callable[[str, str], RepoMeta | None]
+_SQLITE_SUGGESTION_WRITE_LOCK = Lock()
 
 
 class SuggestionTargetNotFound(ValueError):
@@ -36,6 +39,14 @@ class SuggestionContext:
     jobs_context: str
 
 
+@dataclass(frozen=True)
+class SuggestionStatus:
+    kind: SuggestionKind
+    key: str
+    state: Literal["ready", "stale"]
+    generated_at: datetime
+
+
 def resolve_suggestion_context(
     graph: DemandGraph,
     *,
@@ -43,23 +54,41 @@ def resolve_suggestion_context(
     key: str,
 ) -> SuggestionContext:
     if kind == "skill":
-        skill = next((candidate for candidate in graph.skills if candidate.skill == key), None)
+        skill = next(
+            (
+                candidate
+                for candidate in graph.skills
+                if candidate.key == key
+                or candidate.skill == key
+                or key in candidate.members
+            ),
+            None,
+        )
         if skill is None:
             raise SuggestionTargetNotFound(kind, key)
         label = skill.skill
-        members = (skill.skill,)
+        canonical_key = skill.key
+        members = tuple(sorted(skill.members, key=lambda item: (item.casefold(), item)))
+        edge_keys = {skill.key}
     else:
         theme = next((candidate for candidate in graph.themes if candidate.id == key), None)
         if theme is None:
             raise SuggestionTargetNotFound(kind, key)
         label = theme.label
+        canonical_key = theme.id
         members = tuple(
-            sorted(skill.skill for skill in graph.skills if skill.theme_id == theme.id)
+            sorted(skill.key for skill in graph.skills if skill.theme_id == theme.id)
         )
+        edge_keys = set(members)
 
-    member_set = set(members)
     job_ids = tuple(
-        sorted({edge.job_id for edge in graph.edges if edge.skill in member_set})
+        sorted(
+            {
+                edge.job_id
+                for edge in graph.edges
+                if (edge.skill_key or edge.skill) in edge_keys
+            }
+        )
     )
     jobs_by_id = {job.id: job for job in graph.jobs}
     jobs_context = "; ".join(
@@ -68,7 +97,55 @@ def resolve_suggestion_context(
         for job_id in job_ids
         if job_id in jobs_by_id
     )
-    return SuggestionContext(kind, key, label, members, job_ids, jobs_context)
+    return SuggestionContext(kind, canonical_key, label, members, job_ids, jobs_context)
+
+
+def find_suggestion_row(
+    session: Session,
+    context: SuggestionContext,
+) -> SkillSuggestion | None:
+    rows = session.exec(
+        select(SkillSuggestion).where(SkillSuggestion.kind == context.kind)
+    ).all()
+    canonical = next((row for row in rows if row.key == context.key), None)
+    if canonical is not None or context.kind == "theme":
+        return canonical
+    legacy_keys = {context.label, *context.members}
+    return next((row for row in rows if row.key in legacy_keys), None)
+
+
+def suggestion_statuses(
+    session: Session,
+    graph: DemandGraph,
+    coverage: set[str],
+) -> list[SuggestionStatus]:
+    selected: dict[tuple[SuggestionKind, str], tuple[SkillSuggestion, SuggestionContext]] = {}
+    for row in session.exec(select(SkillSuggestion)).all():
+        if row.kind not in ("skill", "theme"):
+            continue
+        kind: SuggestionKind = row.kind
+        try:
+            context = resolve_suggestion_context(graph, kind=kind, key=row.key)
+        except SuggestionTargetNotFound:
+            continue
+        identity = (kind, context.key)
+        existing = selected.get(identity)
+        if existing is None or row.key == context.key:
+            selected[identity] = (row, context)
+
+    return [
+        SuggestionStatus(
+            kind=kind,
+            key=key,
+            state=(
+                "ready"
+                if row.fingerprint == suggestion_fingerprint(context, coverage)
+                else "stale"
+            ),
+            generated_at=row.generated_at,
+        )
+        for (kind, key), (row, context) in sorted(selected.items())
+    ]
 
 
 def suggestion_fingerprint(
@@ -216,18 +293,18 @@ def generate_suggestion(
 
     payload = _payload_from_evidence(formatted, research, verify)
     fingerprint = suggestion_fingerprint(context, coverage)
-    row = session.exec(
-        select(SkillSuggestion).where(
-            SkillSuggestion.kind == context.kind,
-            SkillSuggestion.key == context.key,
-        )
-    ).first()
-    if row is None:
-        row = SkillSuggestion(kind=context.kind, key=context.key)
-        session.add(row)
-    row.payload_json = payload
-    row.fingerprint = fingerprint
-    row.generated_at = utcnow()
-    session.commit()
-    session.refresh(row)
+    # Suggestion research runs concurrently, but SQLite allows only one writer.
+    # Keep the lock around the short persistence phase, never the network/LLM work.
+    with _SQLITE_SUGGESTION_WRITE_LOCK:
+        row = find_suggestion_row(session, context)
+        if row is None:
+            row = SkillSuggestion(kind=context.kind, key=context.key)
+            session.add(row)
+        else:
+            row.key = context.key
+        row.payload_json = payload
+        row.fingerprint = fingerprint
+        row.generated_at = utcnow()
+        session.commit()
+        session.refresh(row)
     return row
