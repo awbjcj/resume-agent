@@ -1,7 +1,13 @@
-import { Label } from "@/components/ui/label";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -23,37 +29,49 @@ export function Filters({
   companies: string[];
   seniorities: string[];
 }) {
+  const companyItems = [
+    { label: "All companies", value: ALL },
+    ...companies.map((company) => ({ label: company, value: company })),
+  ];
+  const seniorityItems = [
+    { label: "All levels", value: ALL },
+    ...seniorities.map((seniority) => ({ label: seniority, value: seniority })),
+  ];
+
   return (
-    <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-      <div className="grid gap-1.5">
-        <Label htmlFor="match-gap-company" className="text-xs text-muted-foreground">
+    <FieldGroup className="flex-row flex-wrap items-end gap-4">
+      <Field className="w-auto gap-1.5">
+        <FieldLabel htmlFor="match-gap-company" className="text-xs text-muted-foreground">
           Company
-        </Label>
+        </FieldLabel>
         <Select
+          items={companyItems}
           value={value.company ?? ALL}
           onValueChange={(company) =>
             onChange({ ...value, company: company === ALL ? null : company })
           }
         >
           <SelectTrigger id="match-gap-company" className="w-44" aria-label="Filter by company">
-            <SelectValue>{value.company ?? "All companies"}</SelectValue>
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>All companies</SelectItem>
-            {companies.map((company) => (
-              <SelectItem key={company} value={company}>
-                {company}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {companyItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
-      </div>
+      </Field>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="match-gap-seniority" className="text-xs text-muted-foreground">
+      <Field className="w-auto gap-1.5">
+        <FieldLabel htmlFor="match-gap-seniority" className="text-xs text-muted-foreground">
           Seniority
-        </Label>
+        </FieldLabel>
         <Select
+          items={seniorityItems}
           value={value.seniority ?? ALL}
           onValueChange={(seniority) =>
             onChange({ ...value, seniority: seniority === ALL ? null : seniority })
@@ -64,30 +82,33 @@ export function Filters({
             className="w-40"
             aria-label="Filter by seniority"
           >
-            <SelectValue>{value.seniority ?? "All levels"}</SelectValue>
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>All levels</SelectItem>
-            {seniorities.map((seniority) => (
-              <SelectItem key={seniority} value={seniority}>
-                {seniority}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {seniorityItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
-      </div>
+      </Field>
 
-      <div className="flex h-8 items-center gap-2">
+      <Field orientation="horizontal" className="h-8 w-auto">
         <Switch
           id="match-gap-gaps-only"
           checked={value.gapsOnly}
           onCheckedChange={(gapsOnly) => onChange({ ...value, gapsOnly })}
         />
-        <Label htmlFor="match-gap-gaps-only">Gaps only</Label>
-      </div>
+        <FieldLabel htmlFor="match-gap-gaps-only">Gaps only</FieldLabel>
+      </Field>
 
-      <div className="grid gap-1.5">
-        <span className="text-xs text-muted-foreground">Weighting</span>
+      <Field className="w-auto gap-1.5">
+        <FieldTitle className="text-xs font-normal text-muted-foreground">
+          Weighting
+        </FieldTitle>
         <ToggleGroup
           aria-label="Demand weighting"
           value={[value.weighting]}
@@ -99,7 +120,7 @@ export function Filters({
           <ToggleGroupItem value="essential">Essential</ToggleGroupItem>
           <ToggleGroupItem value="popular">Popular</ToggleGroupItem>
         </ToggleGroup>
-      </div>
-    </div>
+      </Field>
+    </FieldGroup>
   );
 }

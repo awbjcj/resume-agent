@@ -1,19 +1,33 @@
-import { useMemo, useState } from "react";
-import { ArrowUpRight, Layers3 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { AlertCircleIcon, NetworkIcon, Rows3Icon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
 import { BoardSkeleton } from "@/components/skeletons";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { deriveView, type Filters as FilterValue } from "./aggregate";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  deriveView,
+  targetId,
+  type Filters as FilterValue,
+  type SkillRow,
+  type SuggestionTarget,
+} from "./aggregate";
 import { Filters } from "./Filters";
 import { RankedList } from "./RankedList";
 import { RefreshClustersButton } from "./RefreshClustersButton";
-import { SkillDrawer } from "./SkillDrawer";
-import { StatTables } from "./StatTables";
+import { SelectionTray } from "./SelectionTray";
+import { SkillMap } from "./SkillMap";
+import { SkillModal } from "./SkillModal";
 import { useMatchGap, useRefreshClusters } from "./use-match-gap";
-import { WordCloud } from "./WordCloud";
+import { useSuggestionRuns } from "./use-suggestion-runs";
 
 const DEFAULT_FILTERS: FilterValue = {
   company: null,
@@ -22,58 +36,76 @@ const DEFAULT_FILTERS: FilterValue = {
   weighting: "essential",
 };
 
-type DrawerSelection =
-  | { kind: "skill"; key: string; label: string }
-  | { kind: "theme"; key: string; label: string }
-  | null;
-
 export function MatchGapContainer() {
   const { data, isLoading, isError, refetch } = useMatchGap();
   const { refresh } = useRefreshClusters();
   const [filters, setFilters] = useState<FilterValue>(DEFAULT_FILTERS);
-  const [selected, setSelected] = useState<DrawerSelection>(null);
+  const [activeView, setActiveView] = useState("map");
+  const [selection, setSelection] = useState<SuggestionTarget[]>([]);
+  const [openSkill, setOpenSkill] = useState<SkillRow | null>(null);
   const view = useMemo(() => (data ? deriveView(data, filters) : null), [data, filters]);
+  const persistedStateOf = useCallback(
+    (kind: "skill" | "theme", key: string) => view?.persistedStateOf(kind, key),
+    [view],
+  );
+  const suggestionRuns = useSuggestionRuns(persistedStateOf);
+  const selectedIds = useMemo(
+    () => new Set(selection.map((target) => targetId(target))),
+    [selection],
+  );
+
+  const toggleSelection = useCallback((target: SuggestionTarget) => {
+    const id = targetId(target);
+    setSelection((current) =>
+      current.some((candidate) => targetId(candidate) === id)
+        ? current.filter((candidate) => targetId(candidate) !== id)
+        : [...current, target],
+    );
+  }, []);
+  const removeSelection = useCallback((target: SuggestionTarget) => {
+    const id = targetId(target);
+    setSelection((current) => current.filter((candidate) => targetId(candidate) !== id));
+  }, []);
 
   if (isLoading) return <BoardSkeleton />;
 
   if (isError) {
     return (
-      <div role="alert" className="space-y-3">
-        <EmptyState
-          title="Couldn't load skill demand"
-          body="The dashboard request failed. Retry after checking the API connection."
-        />
-        <Button type="button" variant="outline" onClick={() => void refetch()}>
-          Retry
-        </Button>
-      </div>
+      <Alert variant="destructive">
+        <AlertCircleIcon aria-hidden="true" />
+        <AlertTitle>Couldn't load skill demand</AlertTitle>
+        <AlertDescription>
+          Check the API connection, then try again.
+          <Button className="mt-3 block" type="button" variant="outline" onClick={() => void refetch()}>
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>
     );
   }
-
-  const drawerJobs = selected
-    ? selected.kind === "skill"
-      ? (view?.jobsForSkill(selected.key) ?? [])
-      : (view?.jobsForTheme(selected.key) ?? [])
-    : [];
 
   return (
     <>
       <PageHeader
-        kicker="Closed loop"
+        kicker="Demand intelligence"
         title="Match / Gap"
-        sub="A weighted view of what target roles demand, what your profile already proves, and where focused learning has the most leverage."
+        sub="See what target roles demand, what your profile already proves, and where focused learning has the most leverage."
       />
 
       {!data || data.targetTotal === 0 || !view ? (
-        <EmptyState
-          title="No target jobs yet"
-          body="Shortlist or approve jobs to populate the demand graph."
-        />
+        <Empty className="min-h-80 border">
+          <EmptyHeader>
+            <EmptyTitle>No target jobs yet</EmptyTitle>
+            <EmptyDescription>
+              Shortlist or approve jobs to populate the demand graph.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <div className="space-y-7">
+        <div className="space-y-6">
           <section
             aria-label="Dashboard controls"
-            className="flex flex-wrap items-end justify-between gap-4 border-y bg-card/80 px-5 py-4"
+            className="sticky top-0 z-20 flex flex-wrap items-end justify-between gap-4 border-y bg-background/95 px-4 py-4 backdrop-blur sm:px-5"
           >
             <Filters
               value={filters}
@@ -86,78 +118,87 @@ export function MatchGapContainer() {
 
           <MetricRow
             items={[
-              ["Target jobs", String(data.targetTotal)],
+              ["Filtered jobs", String(view.filteredJobCount)],
               ["Distinct skills", String(view.skills.length)],
               ["Open gaps", String(view.skills.filter((skill) => !skill.covered).length)],
             ]}
           />
 
           {view.skills.length === 0 ? (
-            <EmptyState
-              title="No skills match these filters"
-              body="Clear a filter or include covered skills to restore results."
-            />
+            <Empty className="min-h-72 border">
+              <EmptyHeader>
+                <EmptyTitle>No skills match these filters</EmptyTitle>
+                <EmptyDescription>
+                  Clear a filter or include covered skills to restore results.
+                </EmptyDescription>
+                <Button variant="outline" onClick={() => setFilters(DEFAULT_FILTERS)}>
+                  Reset filters
+                </Button>
+              </EmptyHeader>
+            </Empty>
           ) : (
-            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
-              <RankedList
-                skills={view.skills}
-                onSelect={(skill) => setSelected({ kind: "skill", key: skill, label: skill })}
-              />
-              <WordCloud
-                skills={view.skills}
-                onSelect={(skill) => setSelected({ kind: "skill", key: skill, label: skill })}
+            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]">
+              <Tabs value={activeView} onValueChange={setActiveView} className="min-w-0">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <TabsList aria-label="Skill demand view">
+                    <TabsTrigger value="map">
+                      <NetworkIcon data-icon="inline-start" />
+                      Map
+                    </TabsTrigger>
+                    <TabsTrigger value="outline">
+                      <Rows3Icon data-icon="inline-start" />
+                      Outline
+                    </TabsTrigger>
+                  </TabsList>
+                  <span className="hidden text-xs text-muted-foreground sm:inline">
+                    Select any theme or skill to research it.
+                  </span>
+                </div>
+                <TabsContent value="map">
+                  <SkillMap
+                    themeRows={view.themeRows}
+                    stateOf={suggestionRuns.stateOf}
+                    selected={selectedIds}
+                    onToggleSelect={toggleSelection}
+                    onOpenSkill={setOpenSkill}
+                  />
+                </TabsContent>
+                <TabsContent value="outline">
+                  <RankedList
+                    themeRows={view.themeRows}
+                    stateOf={suggestionRuns.stateOf}
+                    selected={selectedIds}
+                    onToggleSelect={toggleSelection}
+                    onOpenSkill={setOpenSkill}
+                  />
+                </TabsContent>
+              </Tabs>
+
+              <SelectionTray
+                targets={selection}
+                stateOf={suggestionRuns.stateOf}
+                onRemove={removeSelection}
+                onClear={() => setSelection([])}
+                onGenerateAll={(targets) => void suggestionRuns.generateAll(targets)}
+                onRetry={(target) => void suggestionRuns.retry(target)}
+                generating={suggestionRuns.generating}
+                launchError={suggestionRuns.launchError}
               />
             </div>
           )}
-
-          {view.themes.length > 0 && (
-            <section aria-labelledby="theme-paths-title" className="border-y bg-card">
-              <div className="flex items-center gap-3 border-b px-5 py-4">
-                <Layers3 className="size-4 text-primary" />
-                <div>
-                  <h2 id="theme-paths-title" className="text-sm font-semibold">
-                    Theme learning paths
-                  </h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Inspect the roles and skills grouped into each capability area.
-                  </p>
-                </div>
-              </div>
-              <div className="divide-y">
-                {view.themes.map((theme) => (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    aria-label={`Open ${theme.label} learning path`}
-                    onClick={() =>
-                      setSelected({ kind: "theme", key: theme.id, label: theme.label })
-                    }
-                    className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-accent/55 motion-reduce:transition-none"
-                  >
-                    <span>
-                      <span className="block text-sm font-medium">{theme.label}</span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {theme.skills.length} {theme.skills.length === 1 ? "skill" : "skills"}
-                      </span>
-                    </span>
-                    <span className="font-mono text-sm tabular-nums">{theme.score}</span>
-                    <ArrowUpRight className="size-4 text-muted-foreground" />
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <StatTables byCompany={view.byCompany} byPosition={view.byPosition} />
         </div>
       )}
 
-      <SkillDrawer
-        kind={selected?.kind ?? "skill"}
-        targetKey={selected?.key ?? null}
-        label={selected?.label ?? null}
-        jobs={drawerJobs}
-        onClose={() => setSelected(null)}
+      <SkillModal
+        skill={openSkill}
+        themeLabel={
+          openSkill
+            ? (view?.themeRows.find((theme) => theme.id === openSkill.themeId)?.label ?? null)
+            : null
+        }
+        state={openSkill ? suggestionRuns.stateOf("skill", openSkill.key) : "none"}
+        jobs={openSkill ? (view?.jobsForSkill(openSkill.key) ?? []) : []}
+        onClose={() => setOpenSkill(null)}
       />
     </>
   );

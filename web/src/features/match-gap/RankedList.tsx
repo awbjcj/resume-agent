@@ -1,61 +1,210 @@
-import { AlertTriangle, Check } from "lucide-react";
+import { useState } from "react";
+import { ChevronRightIcon, ExternalLinkIcon } from "lucide-react";
 
-import type { SkillRow } from "./aggregate";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
+import {
+  sortSkillsWithin,
+  targetId,
+  type SkillRow,
+  type SuggestionState,
+  type SuggestionTarget,
+  type ThemeRow,
+} from "./aggregate";
+
+const INITIAL_THEMES = 12;
+const INITIAL_SKILLS = 8;
+
+const STATUS_LABEL: Record<SuggestionState, string> = {
+  none: "Not generated",
+  ready: "Ready",
+  stale: "Stale",
+  queued: "Queued",
+  researching: "Researching",
+  failed: "Failed",
+  cancelled: "Cancelled",
+  not_found: "Unavailable",
+};
+
+function StatusBadge({ state }: { state: SuggestionState }) {
+  if (state === "none") return null;
+  const variant = state === "failed" || state === "not_found" ? "destructive" : "outline";
+  return (
+    <Badge variant={variant} className={cn(state === "ready" && "border-ready text-ready")}>
+      {STATUS_LABEL[state]}
+    </Badge>
+  );
+}
 
 export function RankedList({
-  skills,
-  onSelect,
+  themeRows,
+  stateOf,
+  selected,
+  onToggleSelect,
+  onOpenSkill,
 }: {
-  skills: SkillRow[];
-  onSelect: (skill: string) => void;
+  themeRows: ThemeRow[];
+  stateOf: (kind: "skill" | "theme", key: string) => SuggestionState;
+  selected: Set<string>;
+  onToggleSelect: (target: SuggestionTarget) => void;
+  onOpenSkill: (skill: SkillRow) => void;
 }) {
-  const maximum = skills.reduce((current, skill) => Math.max(current, skill.score), 0) || 1;
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [themeLimit, setThemeLimit] = useState(INITIAL_THEMES);
+  const [skillLimits, setSkillLimits] = useState<Record<string, number>>({});
+  const maximum = Math.max(1, ...themeRows.map((theme) => theme.score));
+  const visibleThemes = themeRows.slice(0, themeLimit);
 
   return (
-    <section aria-labelledby="ranked-skills-title" className="border-y bg-card">
-      <div className="flex items-end justify-between gap-4 border-b px-5 py-4">
+    <section aria-labelledby="ranked-themes-title" className="border-y bg-card">
+      <header className="flex items-end justify-between gap-4 border-b px-4 py-4 sm:px-5">
         <div>
-          <h2 id="ranked-skills-title" className="text-sm font-semibold">
-            Ranked demand
+          <h2 id="ranked-themes-title" className="text-sm font-semibold">
+            Ranked skill themes
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Open a skill to inspect the target roles behind its score.
+            Expand a theme to inspect generalized skills and evidence status.
           </p>
         </div>
-        <span className="font-mono text-xs text-muted-foreground">{skills.length} skills</span>
-      </div>
-      <ol className="divide-y">
-        {skills.map((skill, index) => (
-          <li key={skill.skill}>
-            <button
-              type="button"
-              onClick={() => onSelect(skill.skill)}
-              aria-label={`${skill.skill}, ${skill.covered ? "covered" : "gap"}, score ${skill.score}`}
-              className="grid w-full grid-cols-[2rem_minmax(8rem,1fr)_minmax(5rem,1.5fr)_3rem] items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-accent/55 motion-reduce:transition-none"
+        <span className="font-mono text-xs text-muted-foreground">
+          {themeRows.length} themes
+        </span>
+      </header>
+
+      <div className="divide-y">
+        {visibleThemes.map((theme) => {
+          const open = expanded.has(theme.id);
+          const themeTarget = { kind: "theme" as const, key: theme.id, label: theme.label };
+          const orderedSkills = sortSkillsWithin(theme.skills, (key) =>
+            stateOf("skill", key),
+          );
+          const skillLimit = skillLimits[theme.id] ?? INITIAL_SKILLS;
+          return (
+            <Collapsible
+              key={theme.id}
+              open={open}
+              onOpenChange={(next) =>
+                setExpanded((current) => {
+                  const updated = new Set(current);
+                  if (next) updated.add(theme.id);
+                  else updated.delete(theme.id);
+                  return updated;
+                })
+              }
             >
-              <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{skill.skill}</span>
-                <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                  {skill.covered ? <Check className="size-3" /> : <AlertTriangle className="size-3" />}
-                  {skill.covered ? "Covered" : "Gap"} · {skill.jobCount} jobs
-                </span>
-              </span>
-              <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <span
-                  className={`block h-full rounded-full ${skill.covered ? "bg-muted-foreground/45" : "bg-primary"}`}
-                  style={{ width: `${(skill.score / maximum) * 100}%` }}
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-5">
+                <Checkbox
+                  aria-label={`Select ${theme.label} theme`}
+                  checked={selected.has(targetId(themeTarget))}
+                  onCheckedChange={() => onToggleSelect(themeTarget)}
                 />
-              </span>
-              <span className="text-right font-mono text-sm font-semibold tabular-nums">
-                {skill.score}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ol>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-semibold">{theme.label}</span>
+                    <StatusBadge state={stateOf("theme", theme.id)} />
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-3">
+                    <span className="h-1.5 min-w-20 flex-1 overflow-hidden rounded-full bg-muted">
+                      <span
+                        className="block h-full rounded-full bg-primary"
+                        style={{ width: `${(theme.score / maximum) * 100}%` }}
+                      />
+                    </span>
+                    <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                      {theme.score} · {theme.skillCount} skills · {theme.gapCount} gaps
+                    </span>
+                  </div>
+                </div>
+                <CollapsibleTrigger
+                  render={<Button variant="ghost" size="sm" />}
+                  aria-label={`${open ? "Collapse" : "Expand"} ${theme.label}`}
+                >
+                  <ChevronRightIcon
+                    data-icon="inline-end"
+                    className={cn("transition-transform", open && "rotate-90")}
+                  />
+                </CollapsibleTrigger>
+              </div>
+
+              <CollapsibleContent>
+                <ul className="border-t bg-muted/20 px-4 sm:px-5">
+                  {orderedSkills.slice(0, skillLimit).map((skill) => {
+                    const skillTarget = {
+                      kind: "skill" as const,
+                      key: skill.key,
+                      label: skill.skill,
+                    };
+                    return (
+                      <li
+                        key={skill.key}
+                        className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b py-3 last:border-b-0"
+                      >
+                        <Checkbox
+                          aria-label={`Select ${skill.skill}`}
+                          checked={selected.has(targetId(skillTarget))}
+                          onCheckedChange={() => onToggleSelect(skillTarget)}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="truncate text-sm font-medium">{skill.skill}</span>
+                            <Badge variant={skill.covered ? "secondary" : "destructive"}>
+                              {skill.covered ? "Covered" : "Gap"}
+                            </Badge>
+                            <StatusBadge state={stateOf("skill", skill.key)} />
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {skill.jobCount} {skill.jobCount === 1 ? "job" : "jobs"} · score {skill.score}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Open ${skill.skill} details`}
+                          onClick={() => onOpenSkill(skill)}
+                        >
+                          Details
+                          <ExternalLinkIcon data-icon="inline-end" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {orderedSkills.length > skillLimit && (
+                  <div className="border-t px-5 py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setSkillLimits((limits) => ({
+                          ...limits,
+                          [theme.id]: skillLimit + INITIAL_SKILLS,
+                        }))
+                      }
+                    >
+                      Show {Math.min(INITIAL_SKILLS, orderedSkills.length - skillLimit)} more skills
+                    </Button>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          );
+        })}
+      </div>
+
+      {themeRows.length > themeLimit && (
+        <div className="border-t px-5 py-3">
+          <Button variant="outline" size="sm" onClick={() => setThemeLimit(themeLimit + 12)}>
+            Show {Math.min(12, themeRows.length - themeLimit)} more themes
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
