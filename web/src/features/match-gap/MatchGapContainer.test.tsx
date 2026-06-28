@@ -88,6 +88,54 @@ describe("MatchGapContainer", () => {
     expect(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure" })).toBeChecked();
   });
 
+  it("focuses one theme and hides unrelated branches until returning to the overview", async () => {
+    const backendSkill = {
+      key: "python",
+      skill: "Python",
+      themeId: "backend",
+      covered: true,
+      members: { Python: 1 },
+      must: 1,
+      nice: 0,
+      tech: 0,
+      jobCount: 1,
+    };
+    server.use(
+      http.get("/api/match-gap", () =>
+        HttpResponse.json({
+          ...populated,
+          skills: [...populated.skills, backendSkill],
+          edges: [
+            ...populated.edges,
+            { jobId: 1, skill: "Python", skillKey: "python", source: "must" },
+          ],
+          themes: [
+            ...populated.themes,
+            {
+              id: "backend",
+              label: "Backend systems",
+              essentialScore: 3,
+              popularScore: 1,
+              jobCount: 1,
+              skillCount: 1,
+              gapCount: 0,
+            },
+          ],
+        }),
+      ),
+    );
+    wrap(<MatchGapContainer />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Focus Cloud / Infrastructure" }),
+    );
+    expect(screen.queryByRole("button", { name: "Focus Backend systems" })).not.toBeInTheDocument();
+    expect(screen.getByText(/showing 2 connected skills/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^All themes$/ }));
+    expect(screen.getByRole("button", { name: "Focus Backend systems" })).toBeInTheDocument();
+  });
+
   it("shows accessible no-jobs and request-error states", async () => {
     server.use(
       http.get("/api/match-gap", () =>
