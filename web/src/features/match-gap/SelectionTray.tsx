@@ -66,6 +66,11 @@ function TrayContents({
   generating,
   launchError,
 }: SelectionTrayProps) {
+  const launchableTargets = targets.filter((target) => {
+    const state = stateOf(target.kind, target.key);
+    return state !== "queued" && state !== "researching";
+  });
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
@@ -140,8 +145,8 @@ function TrayContents({
       <div className="border-t p-5">
         <Button
           className="w-full"
-          disabled={targets.length === 0 || generating}
-          onClick={() => onGenerateAll(targets)}
+          disabled={launchableTargets.length === 0 || generating}
+          onClick={() => onGenerateAll(launchableTargets)}
         >
           {generating ? <Spinner data-icon="inline-start" /> : <FlaskConicalIcon data-icon="inline-start" />}
           {generating ? "Starting…" : "Generate all"}

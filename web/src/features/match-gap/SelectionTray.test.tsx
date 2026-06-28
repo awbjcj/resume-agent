@@ -70,3 +70,37 @@ it("opens a titled mobile sheet from the selection action", async () => {
   await userEvent.click(within(sheet).getByRole("button", { name: "Close" }));
   expect(trigger).toHaveFocus();
 });
+
+it("does not launch targets that already have active runs", async () => {
+  const generateAll = vi.fn();
+  const { rerender } = render(
+    <SelectionTray
+      targets={targets}
+      stateOf={(_, key) => (key === "c++" ? "queued" : "none")}
+      onRemove={vi.fn()}
+      onClear={vi.fn()}
+      onGenerateAll={generateAll}
+      onRetry={vi.fn()}
+      generating={false}
+      launchError={null}
+    />,
+  );
+
+  const desktop = screen.getByTestId("desktop-selection-tray");
+  await userEvent.click(within(desktop).getByRole("button", { name: "Generate all" }));
+  expect(generateAll).toHaveBeenCalledWith([targets[0]]);
+
+  rerender(
+    <SelectionTray
+      targets={targets}
+      stateOf={() => "researching"}
+      onRemove={vi.fn()}
+      onClear={vi.fn()}
+      onGenerateAll={generateAll}
+      onRetry={vi.fn()}
+      generating={false}
+      launchError={null}
+    />,
+  );
+  expect(within(desktop).getByRole("button", { name: "Generate all" })).toBeDisabled();
+});
