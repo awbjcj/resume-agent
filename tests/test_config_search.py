@@ -1,11 +1,17 @@
 import pytest
 from pydantic import ValidationError
+from typing import Any, cast
 
 from resume_agent.config import Settings
 
 
+def _settings(**kwargs) -> Settings:
+    settings_type = cast(Any, Settings)
+    return settings_type(_env_file=None, **kwargs)
+
+
 def test_search_settings_defaults():
-    settings = Settings(_env_file=None)
+    settings = _settings()
 
     assert settings.search_mode == "auto"
     assert settings.advisor_model == ""
@@ -13,4 +19,4 @@ def test_search_settings_defaults():
 
 def test_search_mode_rejects_unknown_value():
     with pytest.raises(ValidationError):
-        Settings(search_mode="typo", _env_file=None)
+        _settings(search_mode="typo")
