@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import {
   sortSkillsWithin,
   targetId,
+  UNTHEMED_ID,
   type SkillRow,
   type SuggestionState,
   type SuggestionTarget,
@@ -104,6 +105,7 @@ export function RankedList({
                   aria-label={`Select ${theme.label} theme`}
                   checked={selected.has(targetId(themeTarget))}
                   onCheckedChange={() => onToggleSelect(themeTarget)}
+                  disabled={theme.id === UNTHEMED_ID}
                 />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

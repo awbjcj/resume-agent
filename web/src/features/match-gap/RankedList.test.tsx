@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
-import { targetId, type ThemeRow } from "./aggregate";
+import { targetId, UNTHEMED_ID, type ThemeRow } from "./aggregate";
 import { RankedList } from "./RankedList";
 
 const themes: ThemeRow[] = [
@@ -65,5 +65,22 @@ it("discloses skills with independent selection and detail controls", async () =
   await userEvent.click(screen.getByRole("checkbox", { name: /select django/i }));
   expect(onToggleSelect).toHaveBeenCalledWith(
     expect.objectContaining({ kind: "skill", key: "django" }),
+  );
+});
+
+it("does not allow selecting the synthetic unthemed group", () => {
+  render(
+    <RankedList
+      themeRows={[{ ...themes[0], id: UNTHEMED_ID, label: "Unthemed" }]}
+      stateOf={() => "none"}
+      selected={new Set()}
+      onToggleSelect={vi.fn()}
+      onOpenSkill={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("checkbox", { name: "Select Unthemed theme" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
   );
 });

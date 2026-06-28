@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   targetId,
+  UNTHEMED_ID,
   type SkillRow,
   type SuggestionState,
   type SuggestionTarget,
@@ -207,6 +208,7 @@ export function SkillMap({
                       aria-label={`Select ${node.label}`}
                       checked={selected.has(targetId(target))}
                       onCheckedChange={() => onToggleSelect(target)}
+                      disabled={node.kind === "theme" && node.entityKey === UNTHEMED_ID}
                       className="size-5 bg-background"
                     />
                   </span>
