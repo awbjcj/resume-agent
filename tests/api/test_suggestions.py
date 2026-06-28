@@ -60,7 +60,7 @@ def _wait_for_run(client, run_id):
         if record["state"] in ("done", "error"):
             return record
         time.sleep(0.02)
-    return record
+    raise AssertionError(f"run {run_id} did not finish in time")
 
 
 def test_get_returns_empty_envelope_for_valid_uncached_target(monkeypatch, tmp_path):

@@ -51,6 +51,8 @@ def test_refresh_clusters_run_completes(monkeypatch, tmp_path):
             if record["state"] in ("done", "error"):
                 break
             time.sleep(0.02)
+        else:
+            raise AssertionError("refresh-clusters run did not finish in time")
 
     assert record["state"] == "done"
     assert record["result"] == {"skills": 2, "themes": 2}
