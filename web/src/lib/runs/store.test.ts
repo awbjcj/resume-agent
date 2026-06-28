@@ -28,4 +28,16 @@ describe("run store", () => {
     useRunStore.getState().remove("r2");
     expect(useRunStore.getState().runs["r2"]).toBeUndefined();
   });
+
+  it("preserves launch metadata when progress updates merge", () => {
+    useRunStore.getState().upsert(
+      rec({ subject: { kind: "skill", key: "python" }, status: "queued" }),
+    );
+    useRunStore.getState().upsert(rec({ percent: 40, phase: "Researching" }));
+
+    expect(useRunStore.getState().runs.r1.subject).toEqual({
+      kind: "skill",
+      key: "python",
+    });
+  });
 });

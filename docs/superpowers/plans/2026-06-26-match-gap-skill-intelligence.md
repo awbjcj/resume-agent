@@ -2339,3 +2339,43 @@ boundary validation, and production UI states described above.
 **Type consistency:** `DemandGraph`/`SkillNode`/`DemandEdge`/`JobLite`/`ThemeNode` names match across Tasks 1/6/10. `SOURCE_WEIGHT` exists only in Task 10 because weighting is a client concern. `refresh_clusters(session, *, dedup, themer, path, reporter)` matches between service, route, and fakes. `useRefreshClusters().refresh` returns `Promise<boolean>` consumed by the button and container. Cluster-map path `data/profile/cluster_map.json` is consistent.
 
 One known seam to verify during execution (flagged in Task 8): whether `tests/api/conftest.py` swaps an inline executor for the RunManager — use it if present for deterministic run completion.
+
+---
+
+## Future Follow-up: Multi-theme skills (not yet built)
+
+**Motivation.** Theming is a *many-to-one classification*, not a clean partition.
+Plenty of tokens legitimately belong to more than one theme — a vector DB like
+`weaviate` is both *Data* and *AI/ML*, `python` is *Backend* and *Data*, `docker`
+is *DevOps* and *Cloud*. The current contract forces exactly one theme per skill.
+When the cheap themer model (correctly) puts such a token in two themes, the
+refresh used to abort with `ValueError: skill token appears in multiple themes`.
+That crash is now patched with a **keep-first repair** in `themes_to_pairs`
+(`canonicalize.py`) — the first theme to claim a token wins and later repeats are
+dropped — which keeps refresh robust but *discards a real signal*: the second
+(and further) theme membership is silently thrown away.
+
+This follow-up turns that discarded signal into a feature: let a skill belong to
+**several** themes.
+
+**Current state (single-theme):**
+- `ClusterMap.theme_of: dict[str, str]` — each terminal canonical token → one `theme_id` (`taxonomy/clusters.py`).
+- `themes_to_pairs` (`canonicalize.py`) and `_validated_themes` (`services/match_gap.py`) enforce an exact partition; `themes_to_pairs` now keep-first repairs duplicates instead of raising.
+- Read path `build_demand_graph` assigns each `SkillNode` to a single `ThemeNode`; `aggregate.ts` and the components render one theme per skill.
+
+**Proposed change (multi-theme):**
+- **Data model.** `ClusterMap.theme_of: dict[str, list[str]]` — terminal token → ordered list of `theme_id`s (primary first). Keep `theme_label` as-is.
+- **Validation contract.** Drop the "exactly one theme" rule in `themes_to_pairs`/`_validated_themes`: a token may appear in ≥1 theme. Still require full **coverage** (every canonical token in at least one theme), nonblank labels/members, and known tokens. Consider capping themes-per-skill (e.g. ≤2–3) to keep the dashboard legible, and dropping the keep-first skip in favour of recording each membership.
+- **Themer prompt** (`_THEME_INSTRUCTIONS`). Replace "include every input token exactly once" with "assign each skill to every theme where it is a *primary* fit — usually one, occasionally two; never list a theme where the skill is only tangentially related."
+- **Persistence.** `theme_of` values become arrays. Update `_canonicalize_theme_keys` and `merge_cluster_map` to **union** lists rather than overwrite, preserving the monotonic guarantee (a refresh must never *remove* an existing theme assignment a user has seen). `load_cluster_map` must accept the **legacy scalar form** and coerce `str → [str]` for backward compatibility with existing `data/profile/cluster_map.json`.
+- **Read path.** `build_demand_graph` emits a skill under each of its themes; `ThemeNode` skill-counts sum per theme, but any "total unique skills" metric must **dedupe** so a two-theme skill isn't double-counted. Decide whether source weighting (3/2/1) is counted fully in each theme or split across them — recommend counted fully in each (a skill genuinely *is* demand in both areas) with dedupe only on unique-skill totals.
+- **Schemas + contract.** `MatchGapOut.themeOf` (or equivalent) becomes `string[]` per skill; regenerate `contracts/openapi.json` + `contracts/ts/api.ts` via `bash scripts/gen_ts_client.sh` and update the drift gate.
+- **Frontend.** `aggregate.ts` groups a skill into each of its themes; components render it in each theme section; unique-skill counters dedupe.
+
+**Acceptance criteria:**
+- A token the themer places in two themes **persists both**; the refresh is monotonic (re-running never drops a previously assigned theme).
+- The dashboard shows such a skill under each of its themes; unique-skill totals are unchanged (no double-count).
+- `load_cluster_map` reads an existing single-theme `cluster_map.json` without error (scalar coerced to singleton list).
+- Backend offline suite + frontend vitest/MSW + OpenAPI contract gate all green.
+
+**Open decisions to settle before building:** themes-per-skill cap; weighting split vs. full-count-per-theme; whether to keep `themes_to_pairs`' keep-first path as a safety net for the cap, or remove it entirely once multi-theme is the contract.

@@ -5,6 +5,7 @@ import { cancelRun } from "./use-launch-run";
 import type { RunRecord } from "@/lib/runs/store";
 
 const STATUS_LABEL: Record<RunRecord["status"], string> = {
+  queued: "queued",
   running: "",
   cancelling: "cancelling",
   succeeded: "done",
@@ -13,6 +14,7 @@ const STATUS_LABEL: Record<RunRecord["status"], string> = {
 };
 
 function rightLabel(r: RunRecord): string {
+  if (r.status === "queued") return "queued";
   if (r.status === "succeeded") return "100% · done";
   if (r.status === "failed") return "failed";
   if (r.status === "cancelled") return `${Math.round(r.percent)}% · cancelled`;

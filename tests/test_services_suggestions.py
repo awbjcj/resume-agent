@@ -10,6 +10,7 @@ from resume_agent.services.suggestions import (
     generate_suggestion,
     resolve_suggestion_context,
     suggestion_fingerprint,
+    suggestion_statuses,
 )
 from resume_agent.suggestions.agents import (
     ProjectIdea,
@@ -62,26 +63,31 @@ def _graph():
             JobLite(2, "Datadog", "Platform", "mid"),
         ],
         skills=[
-            SkillNode("Kubernetes", "infra", False),
-            SkillNode("Terraform", "infra", False),
+            SkillNode(
+                "Kubernetes", "infra", False, "kubernetes", {"K8s": 1, "Kubernetes": 2}
+            ),
+            SkillNode("Terraform", "infra", False, "terraform", {"Terraform": 1}),
         ],
         edges=[
-            DemandEdge(1, "Kubernetes", "must"),
-            DemandEdge(2, "Kubernetes", "tech"),
-            DemandEdge(2, "Terraform", "must"),
+            DemandEdge(1, "Kubernetes", "must", "kubernetes"),
+            DemandEdge(2, "Kubernetes", "tech", "kubernetes"),
+            DemandEdge(2, "Terraform", "must", "terraform"),
         ],
         themes=[ThemeNode("infra", "Cloud / Infrastructure")],
     )
 
 
 def test_resolve_suggestion_context_uses_server_graph_for_skill_and_theme():
-    skill = resolve_suggestion_context(_graph(), kind="skill", key="Kubernetes")
+    skill = resolve_suggestion_context(_graph(), kind="skill", key="kubernetes")
+    legacy = resolve_suggestion_context(_graph(), kind="skill", key="K8s")
     theme = resolve_suggestion_context(_graph(), kind="theme", key="infra")
 
-    assert skill.members == ("Kubernetes",)
+    assert skill.key == "kubernetes"
+    assert skill.members == ("K8s", "Kubernetes")
     assert skill.demanding_job_ids == (1, 2)
+    assert legacy == skill
     assert theme.label == "Cloud / Infrastructure"
-    assert theme.members == ("Kubernetes", "Terraform")
+    assert theme.members == ("kubernetes", "terraform")
     assert theme.demanding_job_ids == (1, 2)
     assert theme.jobs_context == "Stripe — Backend; Datadog — Platform"
 
@@ -133,7 +139,7 @@ def test_generate_grounds_links_verifies_repos_and_upserts():
             return RepoMeta("foo/bar", "https://github.com/foo/bar", 9, "A repo")
         return None
 
-    context = resolve_suggestion_context(_graph(), kind="skill", key="Kubernetes")
+    context = resolve_suggestion_context(_graph(), kind="skill", key="kubernetes")
     engine = _engine()
     with Session(engine) as session:
         row = generate_suggestion(
@@ -168,7 +174,7 @@ def test_generate_grounds_links_verifies_repos_and_upserts():
         rows = session.exec(
             select(SkillSuggestion).where(
                 SkillSuggestion.kind == "skill",
-                SkillSuggestion.key == "Kubernetes",
+                SkillSuggestion.key == "kubernetes",
             )
         ).all()
 
@@ -178,7 +184,7 @@ def test_generate_grounds_links_verifies_repos_and_upserts():
 
 
 def test_generation_failure_preserves_last_good_cache():
-    context = resolve_suggestion_context(_graph(), kind="skill", key="Kubernetes")
+    context = resolve_suggestion_context(_graph(), kind="skill", key="kubernetes")
     engine = _engine()
     with Session(engine) as session:
         original = generate_suggestion(
@@ -204,3 +210,56 @@ def test_generation_failure_preserves_last_good_cache():
 
     assert cached is not None
     assert cached.payload_json["bridge"] == "Keep me"
+
+
+def test_generate_suggestion_reuses_and_canonicalizes_legacy_cache_row():
+    context = resolve_suggestion_context(_graph(), kind="skill", key="kubernetes")
+    engine = _engine()
+    with Session(engine) as session:
+        legacy = SkillSuggestion(kind="skill", key="K8s", payload_json={"bridge": "old"})
+        session.add(legacy)
+        session.commit()
+        legacy_id = legacy.id
+
+        generated = generate_suggestion(
+            session,
+            context=context,
+            search_agent=_Agent("Grounded prose"),
+            formatter=_Agent(SuggestionDraft(bridge="Updated")),
+            verify=lambda _owner, _name: None,
+            facts=_facts(),
+        )
+
+    assert generated.id == legacy_id
+    assert generated.key == "kubernetes"
+
+
+def test_suggestion_statuses_use_canonical_keys_and_prefer_canonical_rows():
+    graph = _graph()
+    context = resolve_suggestion_context(graph, kind="skill", key="kubernetes")
+    current = suggestion_fingerprint(context, {"docker"})
+    engine = _engine()
+    with Session(engine) as session:
+        session.add(
+            SkillSuggestion(
+                kind="skill",
+                key="K8s",
+                fingerprint="old",
+                payload_json={"bridge": "legacy"},
+            )
+        )
+        session.add(
+            SkillSuggestion(
+                kind="skill",
+                key="kubernetes",
+                fingerprint=current,
+                payload_json={"bridge": "canonical"},
+            )
+        )
+        session.commit()
+
+        statuses = suggestion_statuses(session, graph, {"docker"})
+
+    assert [(status.key, status.state) for status in statuses] == [
+        ("kubernetes", "ready")
+    ]

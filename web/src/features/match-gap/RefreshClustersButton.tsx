@@ -29,7 +29,10 @@ export function RefreshClustersButton({
           }
         }}
       >
-        <RefreshCw className={busy ? "animate-spin motion-reduce:animate-none" : ""} />
+        <RefreshCw
+          data-icon="inline-start"
+          className={busy ? "animate-spin motion-reduce:animate-none" : ""}
+        />
         {busy ? "Clustering…" : stale ? "Refresh stale clusters" : "Refresh clusters"}
       </Button>
       {failed && (

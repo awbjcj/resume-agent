@@ -10,7 +10,7 @@ export type PullRunResult = {
 export interface RunRecord {
   runId: string;
   kind: string;
-  status: "running" | "cancelling" | "succeeded" | "failed" | "cancelled";
+  status: "queued" | "running" | "cancelling" | "succeeded" | "failed" | "cancelled";
   percent: number;
   phase: string;
   current: number;
@@ -18,6 +18,7 @@ export interface RunRecord {
   etaText: string | null;
   error?: string;
   result?: PullRunResult | Record<string, unknown> | null;
+  subject?: { kind: "skill" | "theme"; key: string };
 }
 
 interface RunState {
@@ -28,7 +29,10 @@ interface RunState {
 
 export const useRunStore = create<RunState>((set) => ({
   runs: {},
-  upsert: (r) => set((s) => ({ runs: { ...s.runs, [r.runId]: r } })),
+  upsert: (r) =>
+    set((s) => ({
+      runs: { ...s.runs, [r.runId]: { ...s.runs[r.runId], ...r } },
+    })),
   remove: (id) =>
     set((s) => {
       const runs = { ...s.runs };

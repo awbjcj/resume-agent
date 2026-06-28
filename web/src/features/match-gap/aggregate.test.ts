@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { components } from "@/lib/api/schema";
-import { deriveView, type Filters } from "./aggregate";
+import {
+  deriveView,
+  sortSkillsWithin,
+  targetId,
+  type Filters,
+  type SkillRow,
+} from "./aggregate";
 
 type Payload = components["schemas"]["MatchGapOut"];
 
@@ -20,89 +26,126 @@ const payload: Payload = {
     { id: 2, company: "Datadog", title: "Platform", seniority: "mid" },
   ],
   skills: [
-    { skill: "Kubernetes", themeId: "infra", covered: false },
-    { skill: "Python", themeId: "lang", covered: true },
+    {
+      key: "kubernetes",
+      skill: "Kubernetes",
+      themeId: "infra",
+      covered: false,
+      members: { Kubernetes: 2, K8s: 1 },
+      must: 1,
+      nice: 0,
+      tech: 1,
+      jobCount: 2,
+    },
+    {
+      key: "python",
+      skill: "Python",
+      themeId: "language",
+      covered: true,
+      members: { Python: 1 },
+      must: 1,
+      nice: 0,
+      tech: 0,
+      jobCount: 1,
+    },
   ],
   edges: [
-    { jobId: 1, skill: "Kubernetes", source: "must" },
-    { jobId: 2, skill: "Kubernetes", source: "tech" },
-    { jobId: 1, skill: "Python", source: "must" },
+    { jobId: 1, skillKey: "kubernetes", skill: "Kubernetes", source: "must" },
+    { jobId: 2, skillKey: "kubernetes", skill: "Kubernetes", source: "tech" },
+    { jobId: 1, skillKey: "python", skill: "Python", source: "must" },
   ],
   themes: [
-    { id: "infra", label: "Cloud/Infra" },
-    { id: "lang", label: "Languages" },
+    {
+      id: "infra",
+      label: "Cloud / Infrastructure",
+      essentialScore: 4,
+      popularScore: 2,
+      jobCount: 2,
+      skillCount: 1,
+      gapCount: 1,
+    },
+    {
+      id: "language",
+      label: "Languages",
+      essentialScore: 3,
+      popularScore: 1,
+      jobCount: 1,
+      skillCount: 1,
+      gapCount: 0,
+    },
+  ],
+  suggestionStatuses: [
+    {
+      kind: "skill",
+      key: "kubernetes",
+      state: "ready",
+      generatedAt: "2026-06-27T12:00:00Z",
+    },
   ],
 };
 
 describe("deriveView", () => {
-  it("scores essential demand by source weight", () => {
+  it("joins edges by stable key and keeps member evidence", () => {
     const view = deriveView(payload, base);
-    const kubernetes = view.skills.find((skill) => skill.skill === "Kubernetes")!;
+    const kubernetes = view.skills.find((skill) => skill.key === "kubernetes")!;
 
     expect(kubernetes.score).toBe(4);
-    expect(kubernetes.jobCount).toBe(2);
-    expect(kubernetes.must).toBe(1);
-    expect(kubernetes.tech).toBe(1);
+    expect(kubernetes.members).toEqual({ Kubernetes: 2, K8s: 1 });
+    expect(view.persistedStateOf("skill", "kubernetes")).toBe("ready");
   });
 
-  it("scores popular demand by distinct job count", () => {
-    const view = deriveView(payload, { ...base, weighting: "popular" });
-
-    expect(view.skills.find((skill) => skill.skill === "Kubernetes")!.score).toBe(2);
-    expect(view.skills.find((skill) => skill.skill === "Python")!.score).toBe(1);
-  });
-
-  it("hides covered skills when gaps only is enabled", () => {
-    const view = deriveView(payload, { ...base, gapsOnly: true });
-
-    expect(view.skills.map((skill) => skill.skill)).toEqual(["Kubernetes"]);
-  });
-
-  it("filters by company and recomputes scores", () => {
+  it("recomputes theme scores and matching jobs after filtering", () => {
     const view = deriveView(payload, { ...base, company: "Datadog" });
 
-    expect(view.skills.map((skill) => skill.skill)).toEqual(["Kubernetes"]);
-    expect(view.skills[0].score).toBe(1);
+    expect(view.filteredJobCount).toBe(1);
+    expect(view.themeRows).toEqual([
+      expect.objectContaining({ id: "infra", score: 1, jobCount: 1, gapCount: 1 }),
+    ]);
   });
 
-  it("sorts skills by descending score", () => {
-    expect(deriveView(payload, base).skills[0].skill).toBe("Kubernetes");
+  it("recomputes themes after gaps-only removes covered skills", () => {
+    const view = deriveView(payload, { ...base, gapsOnly: true });
+
+    expect(view.skills.map((skill) => skill.key)).toEqual(["kubernetes"]);
+    expect(view.themeRows.map((theme) => theme.id)).toEqual(["infra"]);
   });
 
-  it("returns demanding jobs for a skill", () => {
-    const companies = deriveView(payload, base)
-      .jobsForSkill("Kubernetes")
-      .map((job) => job.company)
-      .sort();
+  it("returns filtered demanding jobs by stable skill key", () => {
+    const jobs = deriveView(payload, { ...base, company: "Datadog" }).jobsForSkill(
+      "kubernetes",
+    );
 
-    expect(companies).toEqual(["Datadog", "Stripe"]);
+    expect(jobs.map((job) => job.company)).toEqual(["Datadog"]);
   });
+});
 
-  it("returns the demanding job union for a theme", () => {
-    const jobs = deriveView(payload, base).jobsForTheme("infra");
+const row = (key: string, score: number): SkillRow => ({
+  key,
+  skill: key.toUpperCase(),
+  themeId: "theme",
+  covered: false,
+  score,
+  jobCount: 1,
+  must: 1,
+  nice: 0,
+  tech: 0,
+  members: {},
+});
 
-    expect(jobs.map((job) => job.id).sort()).toEqual([1, 2]);
-  });
+it("floats only ready skills above demand order", () => {
+  const skills = [row("highest", 9), row("running", 8), row("ready", 1)];
+  const state = (key: string) =>
+    key === "ready" ? "ready" : key === "running" ? "researching" : "none";
 
-  it("carries gap counts into company rollups", () => {
-    const stripe = deriveView(payload, base).byCompany.find((row) => row.key === "Stripe")!;
+  expect(sortSkillsWithin(skills, state).map((skill) => skill.key)).toEqual([
+    "ready",
+    "highest",
+    "running",
+  ]);
+});
 
-    expect(stripe.gapCount).toBe(1);
-  });
-
-  it("recomputes facet scores from each facet's edges", () => {
-    const view = deriveView(payload, base);
-    const stripe = view.byCompany.find((row) => row.key === "Stripe")!;
-    const datadog = view.byCompany.find((row) => row.key === "Datadog")!;
-
-    expect(stripe.topSkills.find((skill) => skill.skill === "Kubernetes")!.score).toBe(3);
-    expect(datadog.topSkills.find((skill) => skill.skill === "Kubernetes")!.score).toBe(1);
-  });
-
-  it("exposes sorted filter facets", () => {
-    const view = deriveView(payload, base);
-
-    expect(view.companies).toEqual(["Datadog", "Stripe"]);
-    expect(view.seniorities).toEqual(["mid", "senior"]);
-  });
+it("encodes typed target identity without delimiter collisions", () => {
+  expect(targetId({ kind: "skill", key: "c:sharp" })).not.toBe(
+    targetId({ kind: "theme", key: "skill:c:sharp" }),
+  );
 });

@@ -35,6 +35,9 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-gap: var(--gap);
+    --color-covered: var(--covered);
+    --color-ready: var(--ready);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -75,6 +78,9 @@
     --accent: #e6f7fa;
     --accent-foreground: #075f76;
     --destructive: #bd2d46;
+    --gap: #bd2d46;
+    --covered: #65717c;
+    --ready: #b06a00;
     --border: rgba(24, 32, 38, 0.12);
     --input: rgba(24, 32, 38, 0.14);
     --ring: #0a94a8;
@@ -109,6 +115,9 @@
     --accent: #17373c;
     --accent-foreground: #8eeaf2;
     --destructive: #ff6b82;
+    --gap: #ff6b82;
+    --covered: #a7b1bb;
+    --ready: #ffc15a;
     --border: rgba(238, 244, 247, 0.12);
     --input: rgba(238, 244, 247, 0.16);
     --ring: #5bd8e7;
@@ -149,6 +158,16 @@
   color: var(--sidebar-accent-foreground);
   font-weight: 650;
   box-shadow: inset 3px 0 0 var(--sidebar-primary);
+}
+
+.skill-map-grid {
+  background-color: color-mix(in oklab, var(--card), var(--background) 35%);
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--border), transparent 20%) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
 }
 
 /* ── Job detail modal: gradient-mesh header + animated focal elements ──────── */

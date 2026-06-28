@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+import resume_agent.tracking.canonicalize as canonicalize_module
 from resume_agent.tracking.canonicalize import (
     SkillClusters,
     build_skill_canonicalizer,
@@ -12,6 +15,45 @@ def test_clusters_to_mapping_uses_first_member_as_canonical():
         "kubernetes": "kubernetes",
         "k8s": "kubernetes",
         "python": "python",
+    }
+
+
+def test_clusters_to_mapping_projects_rewritten_canonical_onto_input():
+    # The model rewrote the canonical ("CI/CD" instead of the input "ci cd").
+    # The mapping value must stay within the authoritative input token set.
+    mapping = clusters_to_mapping(
+        [["CI/CD", "ci cd", "continuous integration"]],
+        {"ci cd", "continuous integration", "python"},
+    )
+
+    assert mapping == {
+        "ci cd": "ci cd",
+        "continuous integration": "ci cd",
+        "python": "python",
+    }
+
+
+def test_clusters_to_mapping_ignores_invented_tokens():
+    # A cluster member the model invented (not an input token) is dropped, not
+    # promoted to a canonical that would escape the input set.
+    mapping = clusters_to_mapping(
+        [["kubernetes", "k8s", "container orchestration"]],
+        {"kubernetes", "k8s"},
+    )
+
+    assert mapping == {"kubernetes": "kubernetes", "k8s": "kubernetes"}
+
+
+def test_clusters_to_mapping_flattens_overlapping_clusters_to_first_canonical():
+    mapping = clusters_to_mapping(
+        [["kubernetes", "k8s"], ["k8s", "kube"]],
+        {"kubernetes", "k8s", "kube"},
+    )
+
+    assert mapping == {
+        "kubernetes": "kubernetes",
+        "k8s": "kubernetes",
+        "kube": "kubernetes",
     }
 
 
@@ -41,7 +83,42 @@ def test_canonicalizer_collapses_synonyms_with_a_fake_agent():
     }
 
 
+def test_canonicalizer_keeps_values_within_input_when_model_rewrites():
+    # End-to-end: the model rewrites the canonical case and invents "py"; the
+    # alias values stay terminal input tokens, so _validated_aliases accepts them.
+    canon = build_skill_canonicalizer(agent=_FakeRunner([["Python", "python", "py"]]))
+
+    assert canon({"python"}) == {"python": "python"}
+
+
 def test_canonicalizer_short_circuits_on_empty():
     canon = build_skill_canonicalizer(agent=_FakeRunner([]))
 
     assert canon(set()) == {}
+
+
+def _capture_default_model(monkeypatch, factory):
+    captured = {}
+    settings = SimpleNamespace(cheap_model="cheap", mid_model="mid", premium_model="premium")
+    monkeypatch.setattr(canonicalize_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        canonicalize_module,
+        "build_model",
+        lambda model_id: captured.setdefault("model_id", model_id),
+    )
+    monkeypatch.setattr(
+        canonicalize_module, "Agent", lambda **kwargs: SimpleNamespace(**kwargs)
+    )
+    monkeypatch.setattr(canonicalize_module, "AgentRunner", lambda agent: agent)
+    monkeypatch.setattr(canonicalize_module, "use_json_mode_for", lambda model: False)
+
+    factory()
+    return captured["model_id"]
+
+
+def test_default_canonicalizer_uses_premium_model(monkeypatch):
+    assert _capture_default_model(monkeypatch, canonicalize_module._default_agent) == "premium"
+
+
+def test_default_themer_uses_mid_model(monkeypatch):
+    assert _capture_default_model(monkeypatch, canonicalize_module._default_themer_agent) == "mid"

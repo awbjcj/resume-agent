@@ -58,7 +58,7 @@ export function SuggestionPanel({
           Research verified repositories, learning resources, and a portfolio project on demand.
         </p>
         <Button className="mt-3" size="sm" disabled={generating} onClick={onGenerate}>
-          <Lightbulb />
+          <Lightbulb data-icon="inline-start" />
           {generating ? "Researching…" : "How to close this gap"}
         </Button>
       </div>

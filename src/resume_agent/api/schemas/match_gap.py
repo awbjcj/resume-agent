@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
+
+from pydantic import Field
 
 from resume_agent.api.schemas.base import CamelModel
 
@@ -18,17 +21,36 @@ class SkillNodeOut(CamelModel):
     skill: str
     theme_id: str | None = None
     covered: bool
+    key: str
+    members: dict[str, int]
+    must: int
+    nice: int
+    tech: int
+    job_count: int
 
 
 class DemandEdgeOut(CamelModel):
     job_id: int
     skill: str
     source: Literal["must", "nice", "tech"]
+    skill_key: str
 
 
 class ThemeOut(CamelModel):
     id: str
     label: str
+    essential_score: int
+    popular_score: int
+    job_count: int
+    skill_count: int
+    gap_count: int
+
+
+class SuggestionStatusOut(CamelModel):
+    kind: Literal["skill", "theme"]
+    key: str
+    state: Literal["ready", "stale"]
+    generated_at: datetime
 
 
 class MatchGapOut(CamelModel):
@@ -38,3 +60,4 @@ class MatchGapOut(CamelModel):
     skills: list[SkillNodeOut]
     edges: list[DemandEdgeOut]
     themes: list[ThemeOut]
+    suggestion_statuses: list[SuggestionStatusOut] = Field(default_factory=list)

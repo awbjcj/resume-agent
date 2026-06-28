@@ -15,8 +15,9 @@ from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
 from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.profile.store import load_facts
+from resume_agent.services.suggestions import suggestion_statuses
 from resume_agent.taxonomy.clusters import load_cluster_map
-from resume_agent.tracking.match_gap import build_demand_graph
+from resume_agent.tracking.match_gap import build_demand_graph, profile_skill_tokens
 
 router = APIRouter()
 
@@ -32,12 +33,20 @@ def _facts_or_empty() -> ProfileFacts:
 
 @router.get("/match-gap", response_model=MatchGapOut)
 def get_match_gap(session: Session = Depends(get_session)):
+    facts = _facts_or_empty()
     graph = build_demand_graph(
         session,
-        _facts_or_empty(),
+        facts,
         cluster_map=load_cluster_map(_CLUSTER_PATH),
     )
-    return MatchGapOut.model_validate(graph)
+    return MatchGapOut.model_validate(
+        {
+            **graph.__dict__,
+            "suggestion_statuses": suggestion_statuses(
+                session, graph, profile_skill_tokens(facts)
+            ),
+        }
+    )
 
 
 @router.post("/match-gap/refresh-clusters", response_model=RunOut, status_code=202)

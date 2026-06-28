@@ -147,5 +147,5 @@ def refresh_clusters(
 
         result = {"skills": len(canonical_tokens), "themes": len(themes)}
         if reporter is not None:
-            reporter.done(**result)
+            reporter.done(result=result)
         return result

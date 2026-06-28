@@ -23,6 +23,21 @@ describe("RunPanel", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "42");
   });
 
+  it("labels a run that is waiting for its worker lane", () => {
+    useRunStore.getState().upsert({
+      runId: "r-queued",
+      kind: "suggestion",
+      status: "queued",
+      percent: 0,
+      phase: "Waiting",
+      current: 0,
+      total: 0,
+      etaText: null,
+    });
+    render(<RunPanel />);
+    expect(screen.getByRole("progressbar", { name: /suggestion progress queued/i })).toBeInTheDocument();
+  });
+
   it("shows ETA, counts, and a cancel button for a running op", () => {
     useRunStore.getState().upsert({
       runId: "r1",

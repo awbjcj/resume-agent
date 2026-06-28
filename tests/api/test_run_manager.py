@@ -1,4 +1,5 @@
 from concurrent.futures import Executor, Future
+from threading import Event, Lock
 
 import pytest
 
@@ -177,3 +178,41 @@ def test_sweep_keeps_fresh_run_files(tmp_path):
     run_id = mgr.create("discover")
     assert mgr.sweep() == 0
     assert (tmp_path / f"{run_id}.json").exists()
+
+
+def test_suggestion_lane_is_bounded_without_blocking_default_runs(tmp_path):
+    release = Event()
+    first_started = Event()
+    second_started = Event()
+    default_finished = Event()
+    live = 0
+    maximum = 0
+    lock = Lock()
+
+    def suggestion_work(started):
+        def work(_reporter):
+            nonlocal live, maximum
+            with lock:
+                live += 1
+                maximum = max(maximum, live)
+            started.set()
+            release.wait(timeout=2)
+            with lock:
+                live -= 1
+            return {}
+
+        return work
+
+    mgr = RunManager(root=tmp_path, kind_workers={"suggestion": 1})
+    try:
+        mgr.submit("suggestion", suggestion_work(first_started))
+        assert first_started.wait(timeout=1)
+        mgr.submit("suggestion", suggestion_work(second_started))
+        mgr.submit("pull", lambda _reporter: default_finished.set() or {})
+
+        assert default_finished.wait(timeout=1)
+        assert not second_started.is_set()
+        assert maximum == 1
+    finally:
+        release.set()
+        mgr.shutdown()
