@@ -1,6 +1,6 @@
 import re
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 from sqlmodel import Session, select
@@ -63,6 +63,7 @@ class DemandEdge:
     job_id: int
     skill: str
     source: SkillSource
+    skill_key: str = ""
 
 
 @dataclass
@@ -70,12 +71,23 @@ class SkillNode:
     skill: str
     theme_id: str | None
     covered: bool
+    key: str = ""
+    members: dict[str, int] = field(default_factory=dict)
+    must: int = 0
+    nice: int = 0
+    tech: int = 0
+    job_count: int = 0
 
 
 @dataclass
 class ThemeNode:
     id: str
     label: str
+    essential_score: int = 0
+    popular_score: int = 0
+    job_count: int = 0
+    skill_count: int = 0
+    gap_count: int = 0
 
 
 @dataclass
@@ -106,6 +118,15 @@ class MatchGapReport:
     target_total: int
     gaps: list[GapRow]
     per_job: dict[int, list[str]]
+
+
+@dataclass
+class _SkillAccumulator:
+    member_jobs: dict[str, set[int]] = field(default_factory=dict)
+    source_jobs: dict[SkillSource, set[int]] = field(
+        default_factory=lambda: {"must": set(), "nice": set(), "tech": set()}
+    )
+    job_ids: set[int] = field(default_factory=set)
 
 
 def _target_jobs(session: Session) -> list[Job]:
@@ -162,9 +183,8 @@ def build_demand_graph(
     theme_label = cluster_map.theme_label if cluster_map else {}
     profile_canonical = {aliases.get(token, token) for token in profile_tokens}
     jobs: list[JobLite] = []
-    skill_nodes: dict[str, SkillNode] = {}
-    display_for: dict[str, str] = {}
-    edges: list[DemandEdge] = []
+    accumulators: dict[str, _SkillAccumulator] = {}
+    edge_keys: set[tuple[int, str, SkillSource]] = set()
 
     for job in target_jobs:
         if job.id is None:
@@ -180,40 +200,86 @@ def build_demand_graph(
             )
         )
 
-        emitted: set[tuple[str, SkillSource]] = set()
         for key, source in _SKILL_SOURCES:
             for raw_skill in _criteria_skill_values(job, key):
                 token = normalize_skill(raw_skill)
                 canonical = aliases.get(token, token)
-                edge_key = (canonical, source)
-                if not canonical or edge_key in emitted:
+                if not canonical:
                     continue
-                emitted.add(edge_key)
-                display_for.setdefault(canonical, raw_skill.strip())
-                display = display_for[canonical]
-                theme_id = theme_of.get(canonical)
-                skill_nodes.setdefault(
-                    canonical,
-                    SkillNode(
-                        skill=display,
-                        theme_id=theme_id,
-                        covered=canonical in profile_canonical,
-                    ),
-                )
-                edges.append(DemandEdge(job_id=job.id, skill=display, source=source))
+                phrasing = raw_skill.strip()
+                accumulator = accumulators.setdefault(canonical, _SkillAccumulator())
+                accumulator.member_jobs.setdefault(phrasing, set()).add(job.id)
+                accumulator.source_jobs[source].add(job.id)
+                accumulator.job_ids.add(job.id)
+                edge_keys.add((job.id, canonical, source))
 
-    used_themes = {
-        node.theme_id for node in skill_nodes.values() if node.theme_id is not None
-    }
+    display_by_key: dict[str, str] = {}
+    skill_nodes: list[SkillNode] = []
+    for canonical, accumulator in sorted(accumulators.items()):
+        members = {
+            phrasing: len(job_ids)
+            for phrasing, job_ids in sorted(
+                accumulator.member_jobs.items(), key=lambda item: (item[0].casefold(), item[0])
+            )
+        }
+        display = min(
+            members,
+            key=lambda phrasing: (-members[phrasing], phrasing.casefold(), phrasing),
+        )
+        display_by_key[canonical] = display
+        skill_nodes.append(
+            SkillNode(
+                skill=display,
+                theme_id=theme_of.get(canonical),
+                covered=canonical in profile_canonical,
+                key=canonical,
+                members=members,
+                must=len(accumulator.source_jobs["must"]),
+                nice=len(accumulator.source_jobs["nice"]),
+                tech=len(accumulator.source_jobs["tech"]),
+                job_count=len(accumulator.job_ids),
+            )
+        )
+
+    source_order = {source: index for index, source in enumerate(("must", "nice", "tech"))}
+    edges = [
+        DemandEdge(
+            job_id=job_id,
+            skill=display_by_key[skill_key],
+            source=source,
+            skill_key=skill_key,
+        )
+        for job_id, skill_key, source in sorted(
+            edge_keys,
+            key=lambda edge: (edge[0], source_order[edge[2]], edge[1]),
+        )
+    ]
+
+    nodes_by_theme: dict[str, list[SkillNode]] = {}
+    for node in skill_nodes:
+        if node.theme_id is not None:
+            nodes_by_theme.setdefault(node.theme_id, []).append(node)
     themes = [
-        ThemeNode(id=theme_id, label=theme_label.get(theme_id, theme_id))
-        for theme_id in sorted(used_themes)
+        ThemeNode(
+            id=theme_id,
+            label=theme_label.get(theme_id, theme_id),
+            essential_score=sum(
+                node.must * 3 + node.nice * 2 + node.tech for node in theme_nodes
+            ),
+            popular_score=sum(node.job_count for node in theme_nodes),
+            job_count=len(
+                set().union(*(accumulators[node.key].job_ids for node in theme_nodes))
+            ),
+            skill_count=len(theme_nodes),
+            gap_count=sum(not node.covered for node in theme_nodes),
+        )
+        for theme_id, theme_nodes in sorted(nodes_by_theme.items())
     ]
     return DemandGraph(
         target_total=len(jobs),
-        clusters_stale=any(node.theme_id is None for node in skill_nodes.values()),
+        clusters_stale=any(node.theme_id is None for node in skill_nodes),
         jobs=jobs,
-        skills=list(skill_nodes.values()),
+        skills=skill_nodes,
         edges=edges,
         themes=themes,
     )
