@@ -53,4 +53,14 @@ describe("watchRun", () => {
 
     expect(useRunStore.getState().runs.r1.status).toBe("cancelling");
   });
+
+  it("maps a pending backend record to queued", () => {
+    watchRun("r1", "suggestion");
+
+    FakeEventSource.current.onmessage?.({
+      data: JSON.stringify({ state: "pending", label: "Queued" }),
+    } as MessageEvent);
+
+    expect(useRunStore.getState().runs.r1.status).toBe("queued");
+  });
 });

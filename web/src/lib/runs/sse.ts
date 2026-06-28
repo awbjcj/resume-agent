@@ -40,7 +40,9 @@ export function watchRun(
             ? "cancelled"
             : state === "cancelling"
               ? "cancelling"
-            : "running";
+              : state === "pending"
+                ? "queued"
+                : "running";
     const run: RunRecord = {
       runId,
       kind,
