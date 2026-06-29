@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from resume_agent.tracking.match_gap import normalize_skill
+
+_NONALNUM = re.compile(r"[^a-z0-9]+")
 
 
 @dataclass
@@ -173,3 +177,66 @@ def merge_cluster_map(existing: ClusterMap, new: ClusterMap) -> ClusterMap:
         theme_of=merge_map(existing_themes, new_themes),
         theme_label=merge_map(existing.theme_label, new.theme_label),
     )
+
+
+def prune_cluster_map(cmap: ClusterMap, demanded_tokens: set[str]) -> ClusterMap:
+    """Remove entries no current target job needs while keeping live terminals."""
+    aliases = {
+        token: canonical
+        for token, canonical in cmap.aliases.items()
+        if token in demanded_tokens
+    }
+    canonicals = set(aliases.values())
+    for canonical in canonicals:
+        aliases.setdefault(canonical, canonical)
+    theme_of = {
+        canonical: theme_id
+        for canonical, theme_id in cmap.theme_of.items()
+        if canonical in canonicals
+    }
+    used_theme_ids = set(theme_of.values())
+    theme_label = {
+        theme_id: label
+        for theme_id, label in cmap.theme_label.items()
+        if theme_id in used_theme_ids
+    }
+    return ClusterMap(aliases=aliases, theme_of=theme_of, theme_label=theme_label)
+
+
+def slugify_theme(label: str) -> str:
+    """Convert a theme label to a deterministic lowercase identifier."""
+    return _NONALNUM.sub("-", label.lower()).strip("-")
+
+
+def allocate_theme_ids(
+    *,
+    existing_labels: dict[str, str],
+    proposed_labels: Collection[str],
+) -> dict[str, str]:
+    """Allocate deterministic IDs without overwriting stable existing labels."""
+    existing_by_label = {
+        normalize_skill(label): theme_id for theme_id, label in existing_labels.items()
+    }
+    proposed_by_key: dict[str, str] = {}
+    for label in proposed_labels:
+        label_key = normalize_skill(label)
+        if not label_key or not slugify_theme(label):
+            raise ValueError("theme label must contain an alphanumeric character")
+        proposed_by_key.setdefault(label_key, label.strip())
+    occupied = set(existing_labels)
+    allocated: dict[str, str] = {}
+    for label_key in sorted(proposed_by_key):
+        if label_key in existing_by_label:
+            allocated[label_key] = existing_by_label[label_key]
+            continue
+        base = slugify_theme(proposed_by_key[label_key])
+        if not base:
+            raise ValueError("theme label must contain an alphanumeric character")
+        theme_id = base
+        suffix = 2
+        while theme_id in occupied:
+            theme_id = f"{base}-{suffix}"
+            suffix += 1
+        occupied.add(theme_id)
+        allocated[label_key] = theme_id
+    return allocated

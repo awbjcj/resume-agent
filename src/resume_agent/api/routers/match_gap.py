@@ -59,20 +59,22 @@ def refresh_match_gap_clusters(
     def work(reporter):
         from resume_agent.services.match_gap import refresh_clusters
         from resume_agent.tracking.canonicalize import (
-            build_skill_canonicalizer,
-            build_skill_themer,
+            build_incremental_canonicalizer_agent,
+            build_incremental_themer_agent,
         )
 
         with open_session(engine) as session:
             return refresh_clusters(
                 session,
-                dedup=build_skill_canonicalizer(),
-                themer=build_skill_themer(),
+                canonicalizer=build_incremental_canonicalizer_agent(),
+                themer=build_incremental_themer_agent(),
                 path=_CLUSTER_PATH,
                 reporter=reporter,
             )
 
-    run_id = mgr.submit("refreshClusters", work)
+    run_id = mgr.submit(
+        "refreshClusters", work, singleton_key="refreshClusters"
+    )
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)

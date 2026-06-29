@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Any, Literal, Protocol
 
 from resume_agent.config import get_settings
@@ -170,10 +171,30 @@ def build_search_equipped(
     raise AssertionError(f"unhandled search strategy: {plan.strategy}")
 
 
-async def acall(agent: Runner, prompt: str, *, sem: asyncio.Semaphore) -> Any:
+def _observe(callback: Callable[[], None] | None) -> None:
+    if callback is None:
+        return
+    try:
+        callback()
+    except Exception:
+        pass
+
+
+async def acall(
+    agent: Runner,
+    prompt: str,
+    *,
+    sem: asyncio.Semaphore,
+    on_acquire: Callable[[], None] | None = None,
+    on_release: Callable[[], None] | None = None,
+) -> Any:
     """Run one agent call, holding a semaphore permit only for its duration."""
     async with sem:
-        return await agent.arun(prompt)
+        _observe(on_acquire)
+        try:
+            return await agent.arun(prompt)
+        finally:
+            _observe(on_release)
 
 
 def retry_kwargs() -> dict[str, Any]:
