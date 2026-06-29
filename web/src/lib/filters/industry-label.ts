@@ -1,4 +1,4 @@
-/** Format an extracted industry value without reinterpreting its meaning. */
+/** Make persisted canonical separators readable without changing the vocabulary. */
 export function industryLabel(value: string): string {
-  return value.replace(/_/g, " ");
+  return value.replaceAll("_", " ");
 }
