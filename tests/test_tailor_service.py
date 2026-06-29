@@ -17,19 +17,31 @@ class _Result:
 
 
 class _ContentAgent:
+    def __init__(self):
+        self.closed = False
+
     def run(self, prompt):
         return _Result(ResumeContent(contact=Contact(name="Ada")))
 
     async def arun(self, prompt):
         return self.run(prompt)
 
+    async def aclose(self):
+        self.closed = True
+
 
 class _FactCheck:
+    def __init__(self):
+        self.closed = False
+
     def run(self, prompt):
         return _Result(ReviewCritique(reviewer="fact-check", score=100, passed=True))
 
     async def arun(self, prompt):
         return self.run(prompt)
+
+    async def aclose(self):
+        self.closed = True
 
 
 def _session() -> Session:
@@ -49,6 +61,9 @@ def test_tailor_job_persists_versions_and_marks_tailored():
         score_threshold=50,
         reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
     )
+    tailor_agent = _ContentAgent()
+    reviewer = _FactCheck()
+    reviser_agent = _ContentAgent()
     with _session() as s:
         job = save_job(
             s,
@@ -64,9 +79,9 @@ def test_tailor_job_persists_versions_and_marks_tailored():
             job,
             ProfileFacts(contact=Contact(name="Ada")),
             config,  # type: ignore[call-arg]
-            tailor_agent=_ContentAgent(),
-            reviewer_agents={"fact-check": _FactCheck()},
-            reviser_agent=_ContentAgent(),
+            tailor_agent=tailor_agent,
+            reviewer_agents={"fact-check": reviewer},
+            reviser_agent=reviser_agent,
         )
 
         assert len(versions) == 1
@@ -78,6 +93,9 @@ def test_tailor_job_persists_versions_and_marks_tailored():
         stored = resume_versions_for_job(s, _require_id(job.id))
         assert len(stored) == 1
         assert job.status == JobStatus.tailored.value
+    assert tailor_agent.closed is True
+    assert reviewer.closed is True
+    assert reviser_agent.closed is True
 
 
 def test_tailor_jobs_reports_progress_and_returns_per_job(tmp_path):

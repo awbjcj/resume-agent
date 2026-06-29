@@ -84,6 +84,63 @@ def test_agent_runner_arun_delegates():
     assert out == "got hi"
 
 
+def test_agent_runner_closes_cached_sdk_client_inside_active_loop():
+    import asyncio
+    from dataclasses import dataclass
+
+    from resume_agent.llm_runner import AgentRunner
+
+    class _AsyncClient:
+        def __init__(self):
+            self.closed = False
+            self.loop_was_running = False
+
+        async def close(self):
+            self.loop_was_running = asyncio.get_running_loop().is_running()
+            self.closed = True
+
+    @dataclass
+    class _Model:
+        async_client: _AsyncClient | None
+
+    @dataclass
+    class _Agent:
+        model: _Model
+
+    client = _AsyncClient()
+    model = _Model(async_client=client)
+    agent = _Agent(model=model)
+
+    asyncio.run(AgentRunner(agent).aclose())
+
+    assert client.closed is True
+    assert client.loop_was_running is True
+    assert model.async_client is None
+
+
+def test_run_with_cleanup_closes_runner_when_operation_raises():
+    import asyncio
+
+    from resume_agent import llm_runner
+
+    class _Runner:
+        def __init__(self):
+            self.closed = False
+
+        async def aclose(self):
+            self.closed = True
+
+    runner = _Runner()
+
+    async def fail():
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        asyncio.run(llm_runner.run_with_cleanup(fail(), runner))
+
+    assert runner.closed is True
+
+
 def test_acall_respects_semaphore_limit():
     import asyncio
 

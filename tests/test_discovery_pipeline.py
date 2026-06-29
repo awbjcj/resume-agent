@@ -67,6 +67,9 @@ def _extract(**overrides) -> JobCriteriaExtract:
 class _ExtractAgent:
     """Returns denied criteria when the JD mentions 'nosponsor', else offered."""
 
+    def __init__(self):
+        self.closed = False
+
     def run(self, prompt):
         if "nosponsor" in prompt:
             return _Result(_extract(sponsorship_signal=SponsorshipSignal.denied))
@@ -75,17 +78,29 @@ class _ExtractAgent:
     async def arun(self, prompt):
         return self.run(prompt)
 
+    async def aclose(self):
+        self.closed = True
+
 
 class _FitAgent:
+    def __init__(self):
+        self.closed = False
+
     def run(self, prompt):
         return _Result(FitScore(score=90, rationale="great fit"))
 
     async def arun(self, prompt):
         return self.run(prompt)
 
+    async def aclose(self):
+        self.closed = True
+
 
 class _Judge:
     """Keeps titles containing 'engineer'; rejects others."""
+
+    def __init__(self):
+        self.closed = False
 
     def run(self, prompt):
         keep = "JOB TITLE:\nAI Engineer" in prompt
@@ -94,6 +109,9 @@ class _Judge:
 
     async def arun(self, prompt):
         return self.run(prompt)
+
+    async def aclose(self):
+        self.closed = True
 
 
 class _ReextractAgent:
@@ -269,7 +287,7 @@ def test_run_relevance_rejects_offtarget_keeps_match():
             s,
             Job(source="x", jd_text="drive a truck", title="CDL Driver", status=JobStatus.raw.value),
         )
-        rejected_count = run_relevance(s, cfg, _Judge())
+        rejected_count = run_relevance(s, cfg, judge)
         assert rejected_count == 1
         raw = jobs_by_status(s, JobStatus.raw.value)
         rejected = jobs_by_status(s, JobStatus.rejected.value)
@@ -277,6 +295,7 @@ def test_run_relevance_rejects_offtarget_keeps_match():
         assert [j.title for j in raw] == ["AI Engineer"]
         assert reject_reason is not None
         assert reject_reason.startswith("off-target role")
+    assert judge.closed is True
 
 
 def test_run_relevance_noop_when_no_target_and_no_titles():
@@ -361,11 +380,13 @@ def test_run_extract_runs_concurrently_and_isolates_failures(monkeypatch):
 def test_discover_extracts_filters_scores_and_shortlists():
     cfg = SearchConfig(sponsorship_required=True)
     facts = ProfileFacts(contact=Contact(name="Ada"))
+    extract_agent = _ExtractAgent()
+    fit_agent = _FitAgent()
     with _session() as s:
         add_job(s, source="manual", jd_text="good role, will sponsor")
         add_job(s, source="manual", jd_text="bad role, nosponsor here")
 
-        counts = discover(s, cfg, facts, _ExtractAgent(), _FitAgent())
+        counts = discover(s, cfg, facts, extract_agent, fit_agent)
 
         shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
         rejected = jobs_by_status(s, JobStatus.rejected.value)
@@ -377,6 +398,8 @@ def test_discover_extracts_filters_scores_and_shortlists():
         assert rejected[0].reject_reason == "sponsorship not available"
         assert counts[JobStatus.shortlisted.value] == 1
         assert counts[JobStatus.rejected.value] == 1
+    assert extract_agent.closed is True
+    assert fit_agent.closed is True
 
 
 def test_discover_reports_progress_done(tmp_path):

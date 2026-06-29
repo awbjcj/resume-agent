@@ -42,6 +42,7 @@ class _AsyncCanonicalizer:
     def __init__(self, respond=None):
         self.respond = respond or (lambda new, existing: [[token] for token in new])
         self.calls = 0
+        self.closed = False
 
     async def arun(self, prompt):
         self.calls += 1
@@ -54,6 +55,9 @@ class _AsyncCanonicalizer:
     def run(self, prompt):
         raise AssertionError("async path expected")
 
+    async def aclose(self):
+        self.closed = True
+
 
 class _AsyncThemer:
     def __init__(self, respond=None):
@@ -63,6 +67,7 @@ class _AsyncThemer:
             ]
         )
         self.calls = 0
+        self.closed = False
 
     async def arun(self, prompt):
         self.calls += 1
@@ -75,6 +80,9 @@ class _AsyncThemer:
     def run(self, prompt):
         raise AssertionError("async path expected")
 
+    async def aclose(self):
+        self.closed = True
+
 
 def test_slugify_theme_uses_lowercase_hyphenated_alphanumeric_runs():
     assert slugify_theme("  Cloud / Data & AI  ") == "cloud-data-ai"
@@ -84,12 +92,14 @@ def test_slugify_theme_uses_lowercase_hyphenated_alphanumeric_runs():
 def test_incremental_refresh_persists_success_and_returns_metrics(tmp_path):
     engine = _engine_with_target_skills("Python", "Rust")
     path = tmp_path / "clusters.json"
+    canonicalizer = _AsyncCanonicalizer()
+    themer = _AsyncThemer()
 
     with get_session(engine) as session:
         summary = refresh_clusters(
             session,
-            canonicalizer=_AsyncCanonicalizer(),
-            themer=_AsyncThemer(),
+            canonicalizer=canonicalizer,
+            themer=themer,
             path=path,
             batch_size=1,
             concurrency=2,
@@ -99,6 +109,8 @@ def test_incremental_refresh_persists_success_and_returns_metrics(tmp_path):
     assert summary["skills"] == 2
     assert summary["canonicalBatches"] == 2
     assert summary["failedCanonicalTokens"] == 0
+    assert canonicalizer.closed is True
+    assert themer.closed is True
 
 
 def test_existing_alias_and_theme_choices_win(tmp_path):
