@@ -137,15 +137,20 @@ def _normalize_job_industries(
     taxonomy = load_industry_taxonomy(taxonomy_path)
     jobs = list(session.exec(select(Job)).all())
     unresolved: dict[tuple[str, str], IndustryCandidate] = {}
+    company_additions: dict[str, str] = {}
 
     for job in jobs:
         candidate = _prepare_industry_fields(job, taxonomy)
         company = normalize_company(job.company)
         industry = normalize_industry(candidate)
-        if company and industry and canonical_industry(job.company, candidate, taxonomy) is None:
-            unresolved[(company, industry)] = IndustryCandidate(
-                company=company, industry=industry
-            )
+        if company and industry:
+            canonical = canonical_industry(job.company, candidate, taxonomy)
+            if canonical is None:
+                unresolved[(company, industry)] = IndustryCandidate(
+                    company=company, industry=industry
+                )
+            elif company not in taxonomy.companies:
+                company_additions.setdefault(company, canonical)
 
     additions: dict[tuple[str, str], str] = {}
     if unresolved and classifier is not None:
@@ -157,15 +162,16 @@ def _normalize_job_industries(
         except Exception:
             additions = {}
 
+    alias_additions: dict[str, str] = {}
     if additions:
-        alias_additions: dict[str, str] = {}
-        company_additions: dict[str, str] = {}
         for (company, candidate), canonical in additions.items():
             alias_additions[candidate] = canonical
             canonical_key = normalize_industry(canonical)
             if canonical_key:
                 alias_additions[canonical_key] = canonical
-            company_additions[company] = canonical
+            company_additions.setdefault(company, canonical)
+
+    if alias_additions or company_additions:
         taxonomy = merge_industry_taxonomy(
             taxonomy, aliases=alias_additions, companies=company_additions
         )
