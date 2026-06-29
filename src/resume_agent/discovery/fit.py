@@ -29,8 +29,6 @@ class FitLocation(BaseModel):
 class FitScore(ExtensibleModel):
     score: int = Field(ge=0, le=100)
     rationale: str
-    # New fields default to None so existing callers/faked agents keep working.
-    sic_major: str | None = None
     location: FitLocation | None = None
 
 
@@ -45,9 +43,6 @@ _INSTRUCTIONS = [
     "limited gaps, 50-74 partial match with material gaps, 25-49 weak match, and 0-24 fundamentally unrelated.",
     "Write a factual one- or two-sentence rationale naming the strongest evidence and the most "
     "important gap. Do not expose hidden reasoning or produce advice.",
-    "Classify the industry the job's customer/business domain serves into the single best 2-digit "
-    "SIC major-group code (for example fintech '60', healthcare '80', or software/business "
-    "services '73'). Return a two-character numeric string or null when unclear.",
     "Parse the job's work location, not the candidate's location. Prefer the JOB LOCATION section, "
     "using the description only to clarify it. Return location=null when no meaningful work location "
     "is supported; otherwise leave unsupported city, region, or country members null.",
@@ -60,7 +55,7 @@ def build_fit_agent(model_id: str | None = None) -> Runner:
     return AgentRunner(
         Agent(
             model=model,
-            description="Score evidence-based candidate fit and classify the job domain and location.",
+            description="Score evidence-based candidate fit and parse the job location.",
             instructions=_INSTRUCTIONS,
             output_schema=FitScore,
             use_json_mode=use_json_mode_for(model),
