@@ -45,14 +45,16 @@ export function FacetPopover({
 }: FacetPopoverProps) {
   const [query, setQuery] = useState("");
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const [sessionCounts, setSessionCounts] = useState(counts);
   const isControlled = open !== undefined;
   const resolvedOpen = isControlled ? open : uncontrolledOpen;
+  const visibleCounts = resolvedOpen ? sessionCounts : counts;
   const options = useMemo(
     () =>
-      Object.entries(counts)
+      Object.entries(visibleCounts)
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
         .map(([value]) => value),
-    [counts],
+    [visibleCounts],
   );
   const shown = options.filter((option) =>
     (getLabel ? getLabel(option) : option).toLowerCase().includes(query.toLowerCase()),
@@ -67,6 +69,7 @@ export function FacetPopover({
   }, [resolvedOpen]);
 
   const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) setSessionCounts(counts);
     if (!nextOpen) setQuery("");
     if (!isControlled) setUncontrolledOpen(nextOpen);
     onOpenChange?.(nextOpen);
@@ -143,7 +146,7 @@ export function FacetPopover({
                     <Checkbox checked={checked} readOnly aria-hidden tabIndex={-1} />
                     <span className="flex-1 truncate">{optionLabel}</span>
                     <span className="text-xs tabular-nums text-muted-foreground">
-                      {counts[option]}
+                      {visibleCounts[option]}
                     </span>
                   </CommandItem>
                 );
