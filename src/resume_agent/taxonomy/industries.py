@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from threading import Lock
 
 INDUSTRY_TAXONOMY_PATH = Path("data/industry_taxonomy.json")
 
@@ -25,6 +27,7 @@ _LEGAL_SUFFIXES = {
     "ltd",
     "plc",
 }
+_SAVE_LOCK = Lock()
 
 
 @dataclass(frozen=True)
@@ -129,10 +132,30 @@ def save_industry_taxonomy(
 ) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(f".{destination.name}.tmp")
-    payload = {"aliases": taxonomy.aliases, "companies": taxonomy.companies}
-    temporary.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    os.replace(temporary, destination)
+    with _SAVE_LOCK:
+        persisted = load_industry_taxonomy(destination)
+        merged = merge_industry_taxonomy(
+            persisted,
+            aliases=taxonomy.aliases,
+            companies=taxonomy.companies,
+        )
+        payload = {"aliases": merged.aliases, "companies": merged.companies}
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temporary = Path(handle.name)
+                handle.write(
+                    json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False)
+                    + "\n"
+                )
+            os.replace(temporary, destination)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
