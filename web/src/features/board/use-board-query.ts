@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
@@ -46,6 +46,7 @@ export function useBoardQuery<T>(
     initialPageParam: 1,
     getNextPageParam: (last) =>
       last.pagination.page < last.pagination.totalPages ? last.pagination.page + 1 : undefined,
+    placeholderData: keepPreviousData,
   });
 
   const pages = query.data?.pages ?? [];
