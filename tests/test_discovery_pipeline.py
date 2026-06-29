@@ -26,7 +26,11 @@ from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.discovery.fit import FitLocation, FitScore
 from resume_agent.tracking.repository import jobs_by_status, save_job
 from resume_agent.tracking.tables import Job, JobStatus
-from resume_agent.taxonomy.industries import IndustryTaxonomy, save_industry_taxonomy
+from resume_agent.taxonomy.industries import (
+    IndustryTaxonomy,
+    load_industry_taxonomy,
+    save_industry_taxonomy,
+)
 
 
 def _session() -> Session:
@@ -248,6 +252,39 @@ def test_run_extract_warm_taxonomy_makes_zero_classifier_calls_and_updates_all_s
         assert {_criteria(job)["industry"] for job in jobs} == {"Fintech"}
         assert all("sic_major" not in _criteria(job) for job in jobs)
         assert all("sic_label" not in _criteria(job) for job in jobs)
+    assert runner.prompts == []
+
+
+def test_run_extract_persists_company_mapping_when_existing_alias_resolves_candidate(
+    tmp_path,
+):
+    taxonomy_path = tmp_path / "industries.json"
+    save_industry_taxonomy(
+        IndustryTaxonomy(aliases={"financial technology": "Fintech"}),
+        taxonomy_path,
+    )
+    runner = _IndustryRunner(IndustryClassification(groups=[]))
+    with _session() as session:
+        save_job(
+            session,
+            Job(
+                source="x",
+                company="Stripe, Inc.",
+                jd_text="fintech role",
+                title="A",
+                status=JobStatus.raw.value,
+            ),
+        )
+
+        run_extract(
+            session,
+            _IndustryExtractAgent(),
+            industry_classifier=runner,
+            industry_taxonomy_path=taxonomy_path,
+        )
+
+    taxonomy = load_industry_taxonomy(taxonomy_path)
+    assert taxonomy.companies == {"stripe": "Fintech"}
     assert runner.prompts == []
 
 
