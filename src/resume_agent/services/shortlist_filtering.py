@@ -51,7 +51,7 @@ def _passes(row: ShortlistRow, state: FilterState) -> bool:
         (state.sponsorship, row.sponsorship_signal),
         (state.seniority, row.seniority),
         (state.employment_type, row.employment_type),
-        (state.industry, row.sic_major),
+        (state.industry, row.industry),
         (state.country, row.location_country),
         (state.region, row.location_region),
         (state.city, row.location_city),

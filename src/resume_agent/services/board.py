@@ -112,7 +112,7 @@ def _row_value(row: Any, key: str) -> str | None:
     if key == "employmentType":
         return getattr(row, "employment_type", None)
     if key == "industry":
-        return getattr(row, "sic_major", None) or getattr(row, "industry", None)
+        return getattr(row, "industry", None)
     if key == "country":
         return getattr(row, "location_country", None)
     if key == "region":
@@ -183,7 +183,10 @@ def _passes_filter(row: Any, f: BoardFilter) -> bool:
     )
     for key, raw_selected in set_filters:
         selected = _selected(raw_selected)
-        if selected and _row_value(row, key) not in selected:
+        value = _row_value(row, key)
+        if key == "industry" and value is None:
+            continue
+        if selected and value not in selected:
             return False
 
     selected_skills = {_normalize_token(v) for v in f.skills if v}

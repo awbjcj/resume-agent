@@ -101,12 +101,12 @@
       "expected": [1]
     },
     {
-      "name": "industry facet gates by SIC major",
-      "filterState": { "sort": "fit", "industry": ["73"] },
+      "name": "industry facet gates by extracted industry and keeps unknown neutral",
+      "filterState": { "sort": "fit", "industry": ["fintech"] },
       "rows": [
-        { "jobId": 1, "fitScore": 80, "sicMajor": "73" },
-        { "jobId": 2, "fitScore": 90, "sicMajor": "60" },
-        { "jobId": 3, "fitScore": 70, "sicMajor": null }
+        { "jobId": 1, "fitScore": 80, "industry": "fintech", "sicMajor": "73" },
+        { "jobId": 2, "fitScore": 90, "industry": "healthcare", "sicMajor": "80" },
+        { "jobId": 3, "fitScore": 70, "industry": null, "sicMajor": "60" }
       ],
       "expected": [1, 3]
     },
