@@ -50,7 +50,7 @@ def test_job_criteria_new_fields_roundtrip():
         seniority=Seniority.senior,
         employment_type=EmploymentType.full_time,
         tech_stack=["python", "aws"],
-        industry="fintech",
+        industry="Autonomous Driving",
         company_size="scaleup",
     )
     dumped = c.model_dump(mode="json")
@@ -58,5 +58,9 @@ def test_job_criteria_new_fields_roundtrip():
     assert restored.seniority == Seniority.senior
     assert restored.employment_type == EmploymentType.full_time
     assert restored.tech_stack == ["python", "aws"]
-    assert restored.industry == "fintech"
+    assert restored.industry == "Autonomous Driving"
     assert restored.company_size == "scaleup"
+
+
+def test_job_criteria_preserves_human_readable_industry():
+    assert JobCriteria(industry="Fintech").industry == "Fintech"
