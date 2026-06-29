@@ -7,7 +7,6 @@ from sqlmodel import Session, select
 
 from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.models.profile import ProfileFacts
-from resume_agent.taxonomy import sic as sic_tax
 from resume_agent.taxonomy.company_size import snap as snap_size
 from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_skills
 from resume_agent.tracking.match_gap import profile_skill_tokens
@@ -54,9 +53,6 @@ class ShortlistRow:
     company_size: str | None
     posted_at: datetime | None
     skills: list[SkillTag]
-    sic_major: str | None = None
-    sic_label: str | None = None
-    sic_division: str | None = None
     location_country: str | None = None
     location_region: str | None = None
     location_city: str | None = None
@@ -95,9 +91,6 @@ class JobDetailRow:
     company_size: str | None
     posted_at: datetime | None
     skills: list[SkillTag]
-    sic_major: str | None = None
-    sic_label: str | None = None
-    sic_division: str | None = None
     location_country: str | None = None
     location_region: str | None = None
     location_city: str | None = None
@@ -160,9 +153,7 @@ def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> li
     return tags
 
 
-def _shortlist_row(
-    job: Job, tokens: set[str], aliases: dict[str, str], sic_table: Any
-) -> ShortlistRow:
+def _shortlist_row(job: Job, tokens: set[str], aliases: dict[str, str]) -> ShortlistRow:
     """Project one ``Job`` into the full skill + meta facet row.
 
     Shared by the board list (``shortlist_rows``) and the single-job detail
@@ -173,8 +164,6 @@ def _shortlist_row(
     criteria = job.criteria_json or {}
     salary = criteria.get("salary_range") or {}
     loc = criteria.get("location_parts") or {}
-    code = sic_tax.coerce_code(criteria.get("sic_major"), sic_table)
-    division = sic_tax.division_for(code, sic_table)
     return ShortlistRow(
         job_id=job_id,
         company=job.company,
@@ -193,9 +182,6 @@ def _shortlist_row(
         company_size=snap_size(criteria.get("company_size")),
         posted_at=job.posted_at,
         skills=_skill_tags(criteria, tokens, aliases),
-        sic_major=code,
-        sic_label=sic_tax.display_label(code, sic_table),
-        sic_division=division[1] if division else None,
         location_country=loc.get("country"),
         location_region=loc.get("region"),
         location_city=loc.get("city"),
@@ -217,8 +203,7 @@ def shortlist_rows(
     ).all()
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
-    sic_table = sic_tax.load_sic_table()
-    return [_shortlist_row(job, tokens, aliases, sic_table) for job in jobs]
+    return [_shortlist_row(job, tokens, aliases) for job in jobs]
 
 
 def job_facets(
@@ -238,8 +223,7 @@ def job_facets(
         return None
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
-    sic_table = sic_tax.load_sic_table()
-    return _shortlist_row(job, tokens, aliases, sic_table)
+    return _shortlist_row(job, tokens, aliases)
 
 
 def job_detail_row(
@@ -254,8 +238,7 @@ def job_detail_row(
         return None
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
-    sic_table = sic_tax.load_sic_table()
-    facets = _shortlist_row(job, tokens, aliases, sic_table)
+    facets = _shortlist_row(job, tokens, aliases)
     jid = _require_job_id(job)
     return JobDetailRow(
         id=jid,
@@ -263,7 +246,11 @@ def job_detail_row(
         url=job.url,
         jd_text=clean_job_description_text(job.jd_text),
         status=job.status,
-        criteria_json=job.criteria_json,
+        criteria_json=(
+            {key: value for key, value in job.criteria_json.items() if key != "_industry_candidate"}
+            if job.criteria_json is not None
+            else None
+        ),
         archived_at=job.archived_at,
         created_at=job.created_at,
         has_progress=has_progress(session, jid),
@@ -286,9 +273,6 @@ def job_detail_row(
         company_size=facets.company_size,
         posted_at=facets.posted_at,
         skills=facets.skills,
-        sic_major=facets.sic_major,
-        sic_label=facets.sic_label,
-        sic_division=facets.sic_division,
         location_country=facets.location_country,
         location_region=facets.location_region,
         location_city=facets.location_city,
