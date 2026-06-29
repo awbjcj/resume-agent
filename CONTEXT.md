@@ -66,22 +66,22 @@ _Avoid_: error (an error aborts; a failure is isolated and recorded)
 
 **RawJob**:
 A single opening as a connector emits it, ready for ingest — source, url,
-company, title, location, jd_text, posted_at.
-_Avoid_: posting, listing, record
+company, title, location, jd*text, posted_at.
+\_Avoid*: posting, listing, record
 
 **Host identity**:
 A URL's ATS resolved by host and path alone, with no network — `identify_host`.
 `detect_ats` is host identity first, then an L2 HTML sniff for embedded ATSes.
-url_ingest uses host identity on a page it already holds, so the sniff never
+url*ingest uses host identity on a page it already holds, so the sniff never
 re-fetches it.
-_Avoid_: detection (reserve for the full `detect_ats`, sniff included)
+\_Avoid*: detection (reserve for the full `detect_ats`, sniff included)
 
 **Posting reader**:
 A `reader(html) -> ExtractedJob` for one ATS's single posting page, registered in
-url_ingest's `_READERS` by host identity. The single-posting counterpart to a
+url*ingest's `_READERS` by host identity. The single-posting counterpart to a
 Producer (which maps a board's whole list). LinkedIn has one but stays off the
 registry — it is a scraper target, not an ATS.
-_Avoid_: parser, scraper, extractor
+\_Avoid*: parser, scraper, extractor
 
 **RelevanceGate**:
 The title-and-JD filter applied to the harvested union; `title_relevance_gate`
@@ -163,7 +163,7 @@ _Avoid_: taxonomy cache, classification result
 ## Board & shortlist filtering
 
 **Board seam**:
-`services/board` — the single place board-data *policy* and *assembled reads*
+`services/board` — the single place board-data _policy_ and _assembled reads_
 live. Owns the mutations (`set_stage`, `set_archived`, `delete`,
 `upsert_application`) and the assembled detail read (`get_job_detail`). Raw list
 projections (`shortlist_rows`, `pipeline_rows`, `triage_rows`) stay in
