@@ -51,7 +51,6 @@ class JobCriteria(ExtensibleModel):
     must_have_skills: list[str] = Field(default_factory=list)
     nice_to_have_skills: list[str] = Field(default_factory=list)
 
-
 class SalaryRangeExtract(BaseModel):
     """LLM-facing salary schema: every field required, nullable for unknown.
 
@@ -86,7 +85,9 @@ class JobCriteriaExtract(BaseModel):
     seniority: Seniority | None
     employment_type: EmploymentType | None
     tech_stack: list[str]
-    industry: str | None
+    industry: str | None = Field(
+        description="Concise employer/customer business domain, not a job function, or null"
+    )
     company_size: str | None
     yoe_min: int | None
     salary_range: SalaryRangeExtract | None
