@@ -15,6 +15,7 @@ from resume_agent.cover_letter.agents import (
 )
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
+from resume_agent.discovery.industry import build_industry_classifier
 from resume_agent.discovery.relevance import build_relevance_agent
 from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
 from resume_agent.llm_runner import Runner
@@ -35,6 +36,7 @@ class DiscoveryBundle:
     fit: Runner
     relevance: Runner | None
     canonicalizer: Canonicalizer | None
+    industry_classifier: Runner
 
 
 @dataclass
@@ -58,6 +60,7 @@ def build_discovery_bundle() -> DiscoveryBundle:
         fit=build_fit_agent(),
         relevance=build_relevance_agent(),
         canonicalizer=build_skill_canonicalizer(),
+        industry_classifier=build_industry_classifier(),
     )
 
 
@@ -90,6 +93,7 @@ __all__ = [
     "build_url_extract_agent",
     # re-exported so tests can monkeypatch them on this module:
     "build_extract_agent", "build_fit_agent", "build_relevance_agent",
+    "build_industry_classifier",
     "build_tailor_agent", "build_reviser_agent", "build_revision_agent", "build_reviewer_agent",
     "build_cover_letter_agent", "build_cover_letter_reviser_agent",
     "build_cover_letter_revision_agent",

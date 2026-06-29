@@ -98,7 +98,10 @@ def discover_jobs(
     bundle = bundle or build_discovery_bundle()
     return discover(
         session, config, facts, bundle.extract, bundle.fit, bundle.relevance,
-        canonicalizer=bundle.canonicalizer, reporter=reporter, job_ids=job_ids,
+        canonicalizer=bundle.canonicalizer,
+        industry_classifier=bundle.industry_classifier,
+        reporter=reporter,
+        job_ids=job_ids,
     )
 
 
@@ -138,7 +141,9 @@ def reprocess_jobs(
     bundle = bundle or build_discovery_bundle()
     return reprocess(
         session, config, facts, bundle.extract, bundle.fit, scopes,
-        relevance_agent=bundle.relevance, canonicalizer=bundle.canonicalizer,
+        relevance_agent=bundle.relevance,
+        canonicalizer=bundle.canonicalizer,
+        industry_classifier=bundle.industry_classifier,
         reporter=reporter,
     )
 
