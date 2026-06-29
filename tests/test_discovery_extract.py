@@ -106,6 +106,23 @@ def test_extract_fills_salary_defaults_for_null_currency_and_period():
     assert out.salary_range.period == "year"
 
 
+def test_extract_preserves_fractional_hourly_salary():
+    extracted = _extract(
+        salary_range={
+            "minimum": 41.75,
+            "maximum": 66.75,
+            "currency": "USD",
+            "period": "hour",
+        }
+    )
+
+    out = extracted.to_criteria()
+
+    assert out.salary_range is not None
+    assert (out.salary_range.minimum, out.salary_range.maximum) == (41.75, 66.75)
+    assert out.salary_range.period == "hour"
+
+
 def test_extract_rejects_wrong_type():
     with pytest.raises(TypeError):
         extract_job_criteria("x", _FakeAgent("nope"))
