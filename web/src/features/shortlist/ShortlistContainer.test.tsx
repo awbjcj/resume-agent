@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { delay, http, HttpResponse } from "msw";
+import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
 import { server } from "@/test/server";
@@ -63,11 +63,13 @@ describe("ShortlistContainer", () => {
     expect(screen.getAllByText("81").length).toBeGreaterThan(0);
   });
 
-  it("keeps a facet open while filtered results load so multiple values can be selected", async () => {
+  it("keeps the open facet scope stable after filtered results finish loading", async () => {
     const user = userEvent.setup();
+    const requestedSources: Array<string | null> = [];
     server.use(
-      http.get("/api/shortlist", async ({ request }) => {
-        if (new URL(request.url).searchParams.has("source")) await delay(200);
+      http.get("/api/shortlist", ({ request }) => {
+        const source = new URL(request.url).searchParams.get("source");
+        requestedSources.push(source);
         return HttpResponse.json({
           data: [
             {
@@ -79,9 +81,9 @@ describe("ShortlistContainer", () => {
               skills: [],
             },
           ],
-          pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 },
-          facets: { source: { greenhouse: 1, lever: 1 } },
-          total: 1,
+          pagination: { page: 1, pageSize: 50, totalItems: source ? 1 : 2, totalPages: 1 },
+          facets: { source: source ? { greenhouse: 1 } : { greenhouse: 1, lever: 1 } },
+          total: source ? 1 : 2,
         });
       }),
     );
@@ -91,17 +93,11 @@ describe("ShortlistContainer", () => {
     await user.click(screen.getByRole("button", { name: "Source" }));
     await user.click(screen.getByRole("checkbox", { name: /greenhouse/i }));
 
+    expect((await screen.findAllByText("1 matching")).length).toBeGreaterThan(0);
     expect(screen.getByText("Filter by Source")).toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: /lever/i }));
     await waitFor(() =>
-      expect(screen.getByRole("checkbox", { name: /greenhouse/i })).toHaveAttribute(
-        "aria-checked",
-        "true",
-      ),
-    );
-    expect(screen.getByRole("checkbox", { name: /lever/i })).toHaveAttribute(
-      "aria-checked",
-      "true",
+      expect(requestedSources.at(-1)).toBe("greenhouse,lever"),
     );
   });
 });
