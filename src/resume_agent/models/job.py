@@ -29,8 +29,8 @@ class EmploymentType(str, Enum):
 
 
 class SalaryRange(ExtensibleModel):
-    minimum: int | None = None
-    maximum: int | None = None
+    minimum: float | None = None
+    maximum: float | None = None
     currency: str = "USD"
     period: str = "year"  # year | month | hour
 
@@ -62,8 +62,8 @@ class SalaryRangeExtract(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    minimum: int | None
-    maximum: int | None
+    minimum: float | None
+    maximum: float | None
     currency: str | None
     period: str | None
 
