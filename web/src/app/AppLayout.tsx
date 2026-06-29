@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 import { RunActions } from "@/features/runs/RunActions";
 import { RunPanel } from "@/features/runs/RunPanel";
+import { useRehydrateRuns } from "@/features/runs/use-rehydrate-runs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationsBell } from "@/features/notifications/NotificationsBell";
 
@@ -40,6 +41,7 @@ const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
 ];
 
 export function AppLayout() {
+  useRehydrateRuns();
   return (
     <SidebarProvider>
       <Sidebar className="border-r border-sidebar-border/80 bg-sidebar/95">
