@@ -2,7 +2,11 @@ from types import SimpleNamespace
 
 import resume_agent.tracking.canonicalize as canonicalize_module
 from resume_agent.tracking.canonicalize import (
+    IncrementalSkillThemes,
+    IncrementalThemeGroup,
     SkillClusters,
+    build_incremental_canonicalizer_agent,
+    build_incremental_themer_agent,
     build_skill_canonicalizer,
     clusters_to_mapping,
 )
@@ -85,7 +89,7 @@ def test_canonicalizer_collapses_synonyms_with_a_fake_agent():
 
 def test_canonicalizer_keeps_values_within_input_when_model_rewrites():
     # End-to-end: the model rewrites the canonical case and invents "py"; the
-    # alias values stay terminal input tokens, so _validated_aliases accepts them.
+    # Alias values stay terminal input tokens at the model-output seam.
     canon = build_skill_canonicalizer(agent=_FakeRunner([["Python", "python", "py"]]))
 
     assert canon({"python"}) == {"python": "python"}
@@ -122,3 +126,44 @@ def test_default_canonicalizer_uses_premium_model(monkeypatch):
 
 def test_default_themer_uses_mid_model(monkeypatch):
     assert _capture_default_model(monkeypatch, canonicalize_module._default_themer_agent) == "mid"
+
+
+def test_incremental_theme_schema_distinguishes_existing_id_from_new_label():
+    content = IncrementalSkillThemes(
+        themes=[
+            IncrementalThemeGroup(existing_theme_id="cloud", skills=["kubernetes"]),
+            IncrementalThemeGroup(new_label="Languages", skills=["python"]),
+        ]
+    )
+
+    assert content.themes[0].existing_theme_id == "cloud"
+    assert content.themes[1].new_label == "Languages"
+
+
+def test_incremental_builders_use_expected_models_and_retry_policy(monkeypatch):
+    captured: list[dict] = []
+    settings = SimpleNamespace(
+        cheap_model="cheap",
+        mid_model="mid",
+        premium_model="premium",
+        llm_retries=3,
+        llm_retry_delay=2,
+    )
+    monkeypatch.setattr(canonicalize_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(canonicalize_module, "build_model", lambda model_id: model_id)
+    monkeypatch.setattr(canonicalize_module, "use_json_mode_for", lambda model: False)
+    monkeypatch.setattr(canonicalize_module, "retry_kwargs", lambda: {"retries": 3})
+    monkeypatch.setattr(
+        canonicalize_module,
+        "Agent",
+        lambda **kwargs: captured.append(kwargs) or SimpleNamespace(**kwargs),
+    )
+    monkeypatch.setattr(canonicalize_module, "AgentRunner", lambda agent: agent)
+
+    build_incremental_canonicalizer_agent()
+    build_incremental_themer_agent()
+
+    assert [entry["model"] for entry in captured] == ["premium", "mid"]
+    assert captured[0]["output_schema"] is SkillClusters
+    assert captured[1]["output_schema"] is IncrementalSkillThemes
+    assert all(entry["retries"] == 3 for entry in captured)
