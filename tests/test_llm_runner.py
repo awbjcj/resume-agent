@@ -141,6 +141,32 @@ def test_run_with_cleanup_closes_runner_when_operation_raises():
     assert runner.closed is True
 
 
+def test_run_with_cleanup_preserves_result_and_closes_remaining_runners_after_cleanup_error():
+    import asyncio
+
+    from resume_agent import llm_runner
+
+    class _BrokenRunner:
+        async def aclose(self):
+            raise RuntimeError("close failed")
+
+    class _GoodRunner:
+        def __init__(self):
+            self.closed = False
+
+        async def aclose(self):
+            self.closed = True
+
+    async def succeed():
+        return "ok"
+
+    good = _GoodRunner()
+    result = asyncio.run(llm_runner.run_with_cleanup(succeed(), _BrokenRunner(), good))
+
+    assert result == "ok"
+    assert good.closed is True
+
+
 def test_acall_respects_semaphore_limit():
     import asyncio
 
