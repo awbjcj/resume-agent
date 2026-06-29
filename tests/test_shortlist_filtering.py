@@ -5,7 +5,6 @@ from resume_agent.services.shortlist_filtering import (
     apply_filters,
     available_cities,
     available_countries,
-    available_industries,
     available_skill_cloud,
     available_states,
     composite_score,
@@ -121,17 +120,6 @@ def test_available_skill_cloud_is_deduped_union():
 
 def test_empty_result_returns_empty_list():
     assert apply_filters([], FilterState(fit_min=90)) == []
-
-
-def test_available_industries_grouped_by_division_sorted():
-    rows = [_row(sic_major="73", sic_label="Business Services", sic_division="Services"),
-            _row(sic_major="60", sic_label="Depository Institutions",
-                 sic_division="Finance, Insurance & Real Estate")]
-    grouped = available_industries(rows)
-    divisions = [d for d, _ in grouped]
-    assert "Services" in divisions and "Finance, Insurance & Real Estate" in divisions
-    services = dict(grouped)["Services"]
-    assert ("73", "Business Services") in services
 
 
 def test_location_cascade_builders_narrow():

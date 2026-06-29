@@ -165,18 +165,6 @@ def available_skill_cloud(rows: list[ShortlistRow]) -> list[SkillTag]:
     return sorted(merged.values(), key=lambda tag: (not tag.covered, tag.name.lower()))
 
 
-def available_industries(rows: list[ShortlistRow]) -> list[tuple[str, list[tuple[str, str]]]]:
-    """Present SIC codes grouped by division: [(division_label, [(code, label), ...]), ...]."""
-    by_division: dict[str, set[tuple[str, str]]] = {}
-    for row in rows:
-        if row.sic_major and row.sic_division and row.sic_label:
-            by_division.setdefault(row.sic_division, set()).add((row.sic_major, row.sic_label))
-    return [
-        (division, sorted(codes))
-        for division, codes in sorted(by_division.items())
-    ]
-
-
 def available_countries(rows: list[ShortlistRow]) -> list[str]:
     return sorted({r.location_country for r in rows if r.location_country})
 
