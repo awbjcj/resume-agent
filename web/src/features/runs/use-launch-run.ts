@@ -2,8 +2,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api, unwrap } from "@/lib/api/client";
-import { watchRun } from "@/lib/runs/sse";
 import { useRunStore } from "@/lib/runs/store";
+import { trackRun } from "@/lib/runs/tracker";
 
 type RunOut = { runId: string; kind: string };
 
@@ -55,7 +55,7 @@ export function useLaunchRun() {
         total: 0,
         etaText: null,
       });
-      watchRun(run.runId, kind, (completed) => {
+      trackRun({ runId: run.runId, kind }, (completed) => {
         invalidate.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
         announceCompletion(completed);
       });

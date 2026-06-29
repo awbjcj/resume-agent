@@ -6,13 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RunRecord } from "@/lib/runs/store";
 
 const mocks = vi.hoisted(() => ({
-  watchRun: vi.fn(),
+  trackRun: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   toastInfo: vi.fn(),
 }));
 
-vi.mock("@/lib/runs/sse", () => ({ watchRun: mocks.watchRun }));
+vi.mock("@/lib/runs/tracker", () => ({ trackRun: mocks.trackRun }));
 vi.mock("sonner", () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError, info: mocks.toastInfo },
 }));
@@ -26,9 +26,8 @@ describe("useLaunchRun", () => {
     const qc = new QueryClient();
     const invalidate = vi.spyOn(qc, "invalidateQueries");
     let onDone: ((run: RunRecord) => void) | undefined;
-    mocks.watchRun.mockImplementation((_id, _kind, callback) => {
+    mocks.trackRun.mockImplementation((_seed, callback) => {
       onDone = callback;
-      return vi.fn();
     });
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={qc}>{children}</QueryClientProvider>
@@ -37,6 +36,10 @@ describe("useLaunchRun", () => {
 
     await act(() =>
       result.current.launch("tailor", async () => ({ runId: "r1", kind: "tailor" })),
+    );
+    expect(mocks.trackRun).toHaveBeenCalledWith(
+      { runId: "r1", kind: "tailor" },
+      expect.any(Function),
     );
     expect(onDone).toBeDefined();
 
