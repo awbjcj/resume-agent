@@ -14,6 +14,7 @@ so callables here are closures created by the run router with their own engine.
 from __future__ import annotations
 
 import json
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -21,6 +22,12 @@ from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
+from resume_agent.api.runs.models import (
+    ACTIVE_RUN_STATES,
+    TERMINAL_RUN_STATES,
+    RunSnapshot,
+    parse_run_snapshot,
+)
 from resume_agent.progress import (
     RUNS_ROOT,
     ProgressReporter,
@@ -52,10 +59,12 @@ class RunProgressReporter(ProgressReporter):
         kind: str,
         root: Path | str,
         *,
+        created_at: str | None = None,
         cancel_check: Callable[[], bool] | None = None,
     ) -> None:
         super().__init__(run_id, root=root)
         self.kind = kind
+        self.created_at = created_at or _now()
         self._cancel_check = cancel_check
 
     def _raise_if_cancelled(self) -> None:
@@ -81,6 +90,7 @@ class RunProgressReporter(ProgressReporter):
             phase_index=phase_index,
             phase_count=phase_count,
             kind=self.kind,
+            created_at=self.created_at,
             **extra,
         )
 
@@ -122,6 +132,8 @@ class RunManager:
         # defers the stop to the next checkpoint.
         self._cancel_requested: set[str] = set()
         self._futures: dict[str, Future] = {}
+        self._singleton_lock = threading.RLock()
+        self._active_singletons: dict[str, str] = {}
 
     def request_cancel(self, run_id: str) -> bool:
         """Flag a run for cooperative cancellation.
@@ -129,9 +141,11 @@ class RunManager:
         Returns False if the run is unknown or already terminal (nothing to
         cancel); True once flagged. The worker stops at its next checkpoint.
         """
-        record = self.get(run_id)
-        if record is None or record.get("state") in ("done", "error", "cancelled"):
+        record = self._read_record(run_id)
+        snapshot = parse_run_snapshot(run_id, record)
+        if snapshot is None or snapshot.state in TERMINAL_RUN_STATES:
             return False
+        assert record is not None
         self._cancel_requested.add(run_id)
         future = self._futures.get(run_id)
         if future is not None and future.cancel():
@@ -148,46 +162,125 @@ class RunManager:
 
     def create(self, kind: str) -> str:
         run_id = uuid.uuid4().hex
+        created_at = _now()
         # Seed a terminal-less "pending" record so GET works before work begins.
         self._write(run_id, {
             "process": run_id, "kind": kind, "state": "pending",
             "label": "Queued", "current": 0, "total": 0,
-            "started_at": _now(), "result": None, "error": None,
-            "updated_at": _now(),
+            "created_at": created_at, "started_at": created_at,
+            "result": None, "error": None, "updated_at": created_at,
         })
         return run_id
 
     def reporter(self, run_id: str, kind: str) -> RunProgressReporter:
+        record = self._read_record(run_id) or {}
         return RunProgressReporter(
-            run_id, kind, self.root, cancel_check=lambda: self.is_cancel_requested(run_id)
+            run_id,
+            kind,
+            self.root,
+            created_at=str(record.get("created_at") or record.get("started_at") or _now()),
+            cancel_check=lambda: self.is_cancel_requested(run_id),
         )
 
-    def submit(self, kind: str, fn: RunFn) -> str:
-        run_id = self.create(kind)
-        reporter = self.reporter(run_id, kind)
+    def submit(
+        self,
+        kind: str,
+        fn: RunFn,
+        *,
+        singleton_key: str | None = None,
+    ) -> str:
+        with self._singleton_lock:
+            if singleton_key is not None:
+                active_id = self._active_singletons.get(singleton_key)
+                if active_id is not None:
+                    snapshot = self.get(active_id)
+                    if snapshot is not None and snapshot.state in ACTIVE_RUN_STATES:
+                        return active_id
+                    self._active_singletons.pop(singleton_key, None)
 
-        def _runner() -> None:
+            run_id = self.create(kind)
+            reporter = self.reporter(run_id, kind)
+            if singleton_key is not None:
+                self._active_singletons[singleton_key] = run_id
+
+            def _runner() -> None:
+                try:
+                    result = fn(reporter)
+                    reporter.done(result=result)
+                except RunCancelled:  # cooperative stop — terminal but not a failure
+                    reporter.cancelled()
+                except Exception as exc:  # noqa: BLE001 — surface any failure as run error
+                    reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
+                except BaseException as exc:  # interpreter exit/interrupt: still stamp, then re-raise
+                    reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
+                    raise
+                finally:
+                    self._cancel_requested.discard(run_id)
+
+            executor = self._kind_executors.get(kind, self.executor)
             try:
-                result = fn(reporter)
-                reporter.done(result=result)
-            except RunCancelled:  # cooperative stop — terminal but not a failure
-                reporter.cancelled()
-            except Exception as exc:  # noqa: BLE001 — surface any failure as run error
-                reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
-            except BaseException as exc:  # interpreter exit/interrupt: still stamp, then re-raise
-                reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
+                future = executor.submit(_runner)
+            except BaseException as exc:
+                if singleton_key is not None:
+                    self._active_singletons.pop(singleton_key, None)
+                record = self._read_record(run_id)
+                if record is not None:
+                    record.update(
+                        state="error",
+                        label="Failed to start",
+                        error=f"{type(exc).__name__}: {exc}",
+                        updated_at=_now(),
+                    )
+                    self._write(run_id, record)
                 raise
-            finally:
-                self._cancel_requested.discard(run_id)
+            self._futures[run_id] = future
 
-        executor = self._kind_executors.get(kind, self.executor)
-        future = executor.submit(_runner)
-        self._futures[run_id] = future
-        future.add_done_callback(lambda _future: self._futures.pop(run_id, None))
+            def release(_future: Future) -> None:
+                with self._singleton_lock:
+                    self._futures.pop(run_id, None)
+                    if (
+                        singleton_key is not None
+                        and self._active_singletons.get(singleton_key) == run_id
+                    ):
+                        self._active_singletons.pop(singleton_key, None)
+
+            future.add_done_callback(release)
         return run_id
 
-    def get(self, run_id: str) -> dict | None:
+    def _read_record(self, run_id: str) -> dict | None:
         return read_progress(run_id, root=self.root)
+
+    def get(self, run_id: str) -> RunSnapshot | None:
+        return parse_run_snapshot(run_id, self._read_record(run_id))
+
+    def list_active(self) -> list[RunSnapshot]:
+        if not self.root.exists():
+            return []
+        snapshots = [
+            snapshot
+            for path in self.root.glob("*.json")
+            if (snapshot := self.get(path.stem)) is not None
+            and snapshot.state in ACTIVE_RUN_STATES
+        ]
+        return sorted(snapshots, key=lambda item: (item.created_at, item.run_id))
+
+    def recover_interrupted(self) -> int:
+        if not self.root.exists():
+            return 0
+        recovered = 0
+        for snapshot in self.list_active():
+            record = self._read_record(snapshot.run_id)
+            if record is None:
+                continue
+            record.update(
+                state="error",
+                label="Interrupted",
+                error="Backend restarted before this run completed",
+                updated_at=_now(),
+            )
+            self._write(snapshot.run_id, record)
+            recovered += 1
+        return recovered
 
     def clear(self, run_id: str) -> None:
         clear_progress(run_id, root=self.root)

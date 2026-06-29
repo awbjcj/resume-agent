@@ -8,10 +8,11 @@ honored.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from resume_agent.api.deps import get_run_manager
 from resume_agent.api.errors import ApiException
+from resume_agent.api.mappers import to_page
 from sse_starlette.sse import EventSourceResponse
 
 from resume_agent.api.runs.manager import RunManager
@@ -26,6 +27,7 @@ from resume_agent.api.schemas.runs import (
     RunOut,
     TailorParams,
 )
+from resume_agent.api.schemas.base import Page
 from resume_agent.db import get_session
 from resume_agent.services.cover_letters import write_cover_letters
 from resume_agent.services.discovery import (
@@ -36,6 +38,7 @@ from resume_agent.services.discovery import (
     reprocess_jobs,
 )
 from resume_agent.services.tailoring import tailor
+from resume_agent.services.pagination import paginate
 
 router = APIRouter()
 
@@ -59,7 +62,7 @@ def launch_discover(
     run_id = mgr.submit("discover", work)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/reprocess", response_model=RunOut, status_code=202)
@@ -78,7 +81,7 @@ def launch_reprocess(
     run_id = mgr.submit("reprocess", work)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/refresh", response_model=RunOut, status_code=202)
@@ -103,7 +106,7 @@ def launch_refresh(
     run_id = mgr.submit("refresh", work)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/pull", response_model=RunOut, status_code=202)
@@ -130,7 +133,7 @@ def launch_pull(
     run_id = mgr.submit("pull", work)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/tailor", response_model=RunOut, status_code=202)
@@ -162,7 +165,7 @@ def launch_tailor(
     run_id = mgr.submit("tailor", work)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/cover-letters", response_model=RunOut, status_code=202)
@@ -195,7 +198,7 @@ def launch_cover_letters(
     run_id = mgr.submit("coverLetter", work)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/gmail/sync", response_model=RunOut, status_code=202)
@@ -217,7 +220,7 @@ def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manage
     run_id = mgr.submit("gmailSync", work)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/jobs/from-url", response_model=RunOut, status_code=202)
@@ -247,7 +250,16 @@ def launch_add_from_url(
     run_id = mgr.submit("addJobUrl", work)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
+
+
+@router.get("/runs", response_model=Page[RunOut])
+def list_runs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, alias="pageSize", ge=1, le=200),
+    mgr: RunManager = Depends(get_run_manager),
+):
+    return to_page(paginate(mgr.list_active(), page=page, page_size=page_size), RunOut)
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)
@@ -255,7 +267,7 @@ def get_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
     record = mgr.get(run_id)
     if record is None:
         raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/runs/{run_id}/cancel", response_model=RunOut)
@@ -268,7 +280,7 @@ def cancel_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
     mgr.request_cancel(run_id)
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.get("/runs/{run_id}/events")

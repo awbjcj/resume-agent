@@ -102,7 +102,7 @@ def launch_generate(
     )
     record = mgr.get(run_id)
     assert record is not None
-    return record_to_run(run_id, record)
+    return record_to_run(record)
 
 
 @router.post("/suggestion-runs", response_model=SuggestionRunsOut, status_code=202)

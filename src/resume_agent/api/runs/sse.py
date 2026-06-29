@@ -6,23 +6,22 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 
+from resume_agent.api.runs.models import RunSnapshot
 from resume_agent.api.schemas.runs import RunOut
-from resume_agent.progress import progress_stats
 
 
-def record_to_run(run_id: str, record: dict) -> RunOut:
-    stats = progress_stats(record)
+def record_to_run(snapshot: RunSnapshot) -> RunOut:
     return RunOut(
-        run_id=run_id,
-        kind=str(record.get("kind") or ""),
-        state=stats.state,  # progress_stats passes "pending"/"running"/"done"/"error" through
-        label=stats.label,
-        percent=stats.pct,
-        current=stats.current,
-        total=stats.total,
-        eta_text=stats.eta_text,
-        result=record.get("result"),
-        error=stats.error,
+        run_id=snapshot.run_id,
+        kind=snapshot.kind,
+        state=snapshot.state,
+        label=snapshot.label,
+        percent=snapshot.percent,
+        current=snapshot.current,
+        total=snapshot.total,
+        eta_text=snapshot.eta_text,
+        result=snapshot.result,
+        error=snapshot.error,
     )
 
 
@@ -35,11 +34,11 @@ async def run_events(mgr, run_id: str, *, poll_interval: float = 0.5) -> AsyncIt
     """
     last: str | None = None
     while True:
-        record = mgr.get(run_id)
-        if record is None:
+        snapshot = mgr.get(run_id)
+        if snapshot is None:
             yield {"data": json.dumps({"state": "error", "error": "run not found", "percent": 0})}
             return
-        run = record_to_run(run_id, record)
+        run = record_to_run(snapshot)
         payload = run.model_dump(mode="json", by_alias=True)
         serialized = json.dumps(payload)
         if serialized != last:

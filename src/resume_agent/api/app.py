@@ -57,6 +57,7 @@ def create_app(
         engine = make_engine(resolved_db)
         init_db(engine)
         app.state.engine = engine
+        app.state.run_manager.recover_interrupted()
         app.state.run_manager.sweep()  # drop stale run records (unbounded otherwise)
         yield
         app.state.run_manager.shutdown()

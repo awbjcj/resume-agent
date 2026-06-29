@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import Field
 
+from resume_agent.api.runs.models import RunState
 from resume_agent.api.schemas.base import CamelModel
 
 
@@ -20,7 +21,7 @@ class AddJobTextRequest(CamelModel):
 class RunOut(CamelModel):
     run_id: str
     kind: str
-    state: str  # pending | running | done | error
+    state: RunState
     label: str
     percent: int
     current: int
