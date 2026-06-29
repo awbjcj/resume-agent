@@ -111,6 +111,24 @@ def test_classifier_collapses_trivial_variants_of_one_new_canonical():
     assert set(outcome.assignments.values()) == {"Autonomous-Driving"}
 
 
+def test_classifier_rejects_one_alias_assigned_to_multiple_canonicals():
+    first = _candidate("stripe", "fintech")
+    second = _candidate("adyen", "fintech")
+    runner = _Runner(
+        IndustryClassification(
+            groups=[
+                IndustryGroup(canonical="Fintech", candidates=[first]),
+                IndustryGroup(canonical="Banking", candidates=[second]),
+            ]
+        )
+    )
+
+    outcome = classify_industries([first, second], [], runner)
+
+    assert outcome.assignments == {}
+    assert outcome.unresolved == {("stripe", "fintech"), ("adyen", "fintech")}
+
+
 def test_classifier_rejects_non_structured_output_without_fallback():
     candidate = _candidate("stripe", "fintech")
 
