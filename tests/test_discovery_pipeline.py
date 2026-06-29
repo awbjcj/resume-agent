@@ -405,7 +405,7 @@ def test_run_score_reports_phase_three(tmp_path):
                 criteria_json={}),
         )
         run_score(
-            s, facts, _SicLocFitAgent(), aliases_path=tmp_path / "a.json",
+            s, facts, _LocationFitAgent(), aliases_path=tmp_path / "a.json",
             reporter=ProgressReporter("discover", tmp_path),
         )
     rec = read_progress("discover", tmp_path)
@@ -435,11 +435,11 @@ def test_discover_commits_once_per_stage(monkeypatch):
 
 
 
-class _SicLocFitAgent:
+class _LocationFitAgent:
     def run(self, prompt):
         return _Result(
             FitScore(
-                score=88, rationale="ok", sic_major="73",
+                score=88, rationale="ok",
                 location=FitLocation(city="Austin", region="TX", country="USA"),
             )
         )
@@ -448,7 +448,7 @@ class _SicLocFitAgent:
         return self.run(prompt)
 
 
-def test_run_score_writes_sic_and_location_into_criteria(tmp_path):
+def test_run_score_preserves_canonical_industry_and_writes_location(tmp_path):
     facts = ProfileFacts(contact=Contact(name="Ada"))
     with _session() as s:
         save_job(
@@ -456,15 +456,17 @@ def test_run_score_writes_sic_and_location_into_criteria(tmp_path):
             Job(
                 source="x", jd_text="jd", title="Eng",
                 status=JobStatus.filtered.value,
-                criteria_json={"industry": "fintech", "location": "Austin, TX, USA"},
+                criteria_json={
+                    "industry": "Autonomous Driving",
+                    "location": "Austin, TX, USA",
+                },
             ),
         )
-        run_score(s, facts, _SicLocFitAgent(), aliases_path=tmp_path / "a.json")
+        run_score(s, facts, _LocationFitAgent(), aliases_path=tmp_path / "a.json")
         job = jobs_by_status(s, JobStatus.shortlisted.value)[0]
         assert job.fit_score == 88
         assert job.criteria_json is not None
-        assert job.criteria_json["sic_major"] == "73"
-        assert job.criteria_json["industry"] == "fintech"  # preserved
+        assert job.criteria_json["industry"] == "Autonomous Driving"
         assert job.criteria_json["location_parts"]["region"] == "TX"
         assert job.criteria_json["location_parts"]["is_us"] is True
         assert job.criteria_json["location_parts"]["raw"] == "Austin, TX, USA"
@@ -486,7 +488,7 @@ def test_run_score_refreshes_aliases_when_canonicalizer_given(tmp_path):
                 criteria_json={"must_have_skills": ["k8s"]},
             ),
         )
-        run_score(s, facts, _SicLocFitAgent(), canonicalizer=canon, aliases_path=path)
+        run_score(s, facts, _LocationFitAgent(), canonicalizer=canon, aliases_path=path)
         assert json.loads(path.read_text("utf-8"))["k8s"] == "kubernetes"
 
 

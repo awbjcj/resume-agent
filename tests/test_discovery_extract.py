@@ -52,12 +52,12 @@ def _extract(**overrides):
     return JobCriteriaExtract.model_validate(base)
 
 
-def test_extract_maps_to_criteria_and_passes_text():
-    agent = _FakeAgent(_extract(industry="fintech"))
+def test_extract_maps_readable_industry_candidate_and_passes_text():
+    agent = _FakeAgent(_extract(industry="Fintech"))
     out = extract_job_criteria("jd text", agent)
     assert isinstance(out, JobCriteria)
     assert out.sponsorship_signal is SponsorshipSignal.offered
-    assert out.industry == "fintech"
+    assert out.industry == "Fintech"
     assert agent.received == "jd text"
 
 
@@ -72,7 +72,7 @@ def test_aextract_job_criteria_uses_arun_and_semaphore():
 
         async def arun(self, prompt):
             self.received = prompt
-            return _FakeResult(_extract(industry="fintech"))
+            return _FakeResult(_extract(industry="Autonomous Driving"))
 
     agent = _AsyncAgent()
 
@@ -81,8 +81,14 @@ def test_aextract_job_criteria_uses_arun_and_semaphore():
 
     out = asyncio.run(go())
     assert isinstance(out, JobCriteria)
-    assert out.industry == "fintech"
+    assert out.industry == "Autonomous Driving"
     assert agent.received == "jd text"
+
+
+def test_extract_preserves_readable_industry_for_incremental_classification():
+    out = _extract(industry="Financial Technology").to_criteria()
+
+    assert out.industry == "Financial Technology"
 
 
 def test_extract_fills_salary_defaults_for_null_currency_and_period():
