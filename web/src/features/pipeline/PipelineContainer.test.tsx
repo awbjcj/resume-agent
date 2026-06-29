@@ -177,7 +177,7 @@ describe("PipelineContainer", () => {
     expect(screen.queryByText("Approved role")).not.toBeInTheDocument();
   });
 
-  it("filters the pipeline by status through the server query", async () => {
+  it("filters the pipeline by multiple statuses through the server query", async () => {
     const requestedStatuses: Array<string | null> = [];
     server.use(
       http.get("/api/pipeline", ({ request }) => {
@@ -185,7 +185,7 @@ describe("PipelineContainer", () => {
         return HttpResponse.json({
           data: [],
           pagination: { page: 1, pageSize: 200, totalItems: 0, totalPages: 1 },
-          facets: { status: {} },
+          facets: { status: { tailored: 1, rendered: 1 } },
           total: 0,
         });
       }),
@@ -194,10 +194,11 @@ describe("PipelineContainer", () => {
 
     wrap(<PipelineContainer />);
     await screen.findByText("No jobs in the pipeline");
-    await user.click(screen.getByRole("combobox", { name: "Status" }));
-    await user.click(screen.getByRole("option", { name: "Tailored" }));
+    await user.click(screen.getByRole("button", { name: "Status" }));
+    await user.click(screen.getByRole("checkbox", { name: /tailored/i }));
+    await user.click(screen.getByRole("checkbox", { name: /rendered/i }));
 
-    await waitFor(() => expect(requestedStatuses.at(-1)).toBe("tailored"));
+    await waitFor(() => expect(requestedStatuses.at(-1)).toBe("tailored,rendered"));
   });
 
   it("applies min fit from a numeric input", async () => {

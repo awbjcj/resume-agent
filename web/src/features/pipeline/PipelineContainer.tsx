@@ -5,6 +5,7 @@ import { SearchIcon } from "lucide-react";
 import { BulkActionBar } from "@/components/BulkActionBar";
 import { BulkPreviewButton } from "@/components/BulkPreviewButton";
 import { EmptyState } from "@/components/EmptyState";
+import { FacetPopover } from "@/components/filters/FacetPopover";
 import { JobModal } from "@/components/JobModal";
 import { MetricRow } from "@/components/MetricRow";
 import { MinFitInput } from "@/components/MinFitInput";
@@ -79,7 +80,7 @@ export function PipelineContainer() {
     : pipelineDraftFromFilter(filter);
   const [targetStatus, setTargetStatus] = useState("approved");
   const [openStages, setOpenStages] = useState(initialOpenPipelineStages);
-  const { rows, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+  const { rows, facets, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useBoardQuery<PipelineItem>("pipeline", filter);
   const selection = useSelection();
   const { reconcile } = selection;
@@ -105,7 +106,11 @@ export function PipelineContainer() {
   const loadedIds = rows.map((row) => row.jobId);
   const bulkSelection = { mode: selection.mode, ids: selection.ids };
   const bulkArgs = { selection: bulkSelection, filter };
-  const selectedStatus = filter.status.size === 1 ? [...filter.status][0] : "all";
+  const statusCounts = Object.fromEntries(
+    PIPELINE_STAGE_ORDER.map((stage) => [stage, facets.status?.[stage] ?? 0]),
+  );
+  for (const [status, count] of Object.entries(facets.status ?? {})) statusCounts[status] = count;
+  for (const status of filter.status) statusCounts[status] ??= 0;
   const committedQ = draft.q.trim();
   const committedFitMin = normalizeFitInput(draft.fitMin);
   const hasFilterDraftChanges =
@@ -177,33 +182,17 @@ export function PipelineContainer() {
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <Label
-            htmlFor="pipe-status"
-            className="text-xs font-semibold uppercase tracking-[0.14em]"
-          >
+          <span className="text-xs font-semibold uppercase tracking-[0.14em]">
             Status
-          </Label>
-          <Select
-            value={selectedStatus}
-            onValueChange={(value) =>
-              setFilter({
-                ...filter,
-                status: !value || value === "all" ? new Set<string>() : new Set([value]),
-              })
-            }
-          >
-            <SelectTrigger id="pipe-status" className="h-10 w-full bg-card">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {PIPELINE_STAGE_ORDER.map((stage) => (
-                <SelectItem key={stage} value={stage}>
-                  {pipelineStageLabel(stage)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          </span>
+          <FacetPopover
+            label="Status"
+            counts={statusCounts}
+            selected={filter.status}
+            onChange={(status) => setFilter({ ...filter, status })}
+            getLabel={pipelineStageLabel}
+            presentation="field"
+          />
         </div>
         <MinFitInput
           id="pipe-fit"
