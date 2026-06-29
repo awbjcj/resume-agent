@@ -1,7 +1,8 @@
 import asyncio
 from dataclasses import dataclass
-from collections.abc import Callable
-from typing import Any, Literal, Protocol
+from collections.abc import Awaitable, Callable
+from inspect import isawaitable
+from typing import Any, Literal, Protocol, TypeVar, cast
 
 from resume_agent.config import get_settings
 
@@ -12,6 +13,10 @@ class Runner(Protocol):
     def run(self, prompt: str) -> Any: ...
 
     async def arun(self, prompt: str) -> Any: ...
+
+
+class _ModelWithAsyncClient(Protocol):
+    async_client: Any | None
 
 
 class AgentRunner:
@@ -25,6 +30,51 @@ class AgentRunner:
 
     async def arun(self, prompt: str) -> Any:
         return await self._agent.arun(prompt)
+
+    async def aclose(self) -> None:
+        """Close and detach the SDK's cached async client on its active loop."""
+        model = cast(_ModelWithAsyncClient | None, getattr(self._agent, "model", None))
+        if model is None:
+            return
+        client = getattr(model, "async_client", None)
+        if client is None:
+            return
+        try:
+            close = getattr(client, "close", None) or getattr(client, "aclose", None)
+            if close is not None:
+                result = close()
+                if isawaitable(result):
+                    await result
+        finally:
+            if getattr(model, "async_client", None) is client:
+                model.async_client = None
+
+
+async def aclose_runner(runner: Any) -> None:
+    """Close a runner when it exposes async lifecycle ownership."""
+    close = getattr(runner, "aclose", None)
+    if close is None:
+        return
+    result = close()
+    if isawaitable(result):
+        await result
+
+
+_T = TypeVar("_T")
+
+
+async def run_with_cleanup(operation: Awaitable[_T], *runners: Any) -> _T:
+    """Await an operation, then close its unique runners before loop shutdown."""
+    try:
+        return await operation
+    finally:
+        seen: set[int] = set()
+        for runner in runners:
+            identity = id(runner)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            await aclose_runner(runner)
 
 
 # Providers selectable via a ``provider:model`` prefix on any model id. A bare id
