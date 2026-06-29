@@ -129,6 +129,37 @@ The typed result of the Merge decision, carrying the writes the applier performs
 `Insert`, `Skip`, `UpgradeUrlOnly`, `Rebase`. The applier holds no policy.
 _Avoid_: outcome (reserve IngestOutcome for the inserted/upgraded/skipped tag)
 
+## Runs & skill classification
+
+**Run snapshot**:
+The validated in-memory view of one file-backed background run. Its id comes from
+the requested id/file stem; kind, state, counters, and timestamps must validate
+before the snapshot crosses the RunManager seam. Raw progress dictionaries stay
+inside the run substrate.
+_Avoid_: run record (that names the persistence shape), progress payload
+
+**Skill classification**:
+The incremental operation that maps newly demanded skill tokens to stable
+canonicals, reconciles new heads across batches, and assigns stable theme ids. It
+owns batching, model-output projection, retryable failures, progress, and metrics
+behind one module interface.
+_Avoid_: clustering pipeline (classification includes retry and theme identity),
+canonicalize service
+
+**Classification backlog**:
+Demanded work not yet present in the Cluster map: a token missing from `aliases`,
+or a demanded canonical missing from `theme_of`. Absence is intentional retry
+state; identity aliases and `Other` themes are successful classifications only
+when explicitly accepted, never failure placeholders.
+_Avoid_: delta (the alias delta is only one half of the backlog), failed cache
+
+**Cluster map**:
+The atomically persisted aliases, canonical-to-theme assignments, and stable theme
+labels used by the Match-gap demand graph. Existing terminal canonicals and theme
+ids are stable choices; incremental additions may point to them but do not rewrite
+them.
+_Avoid_: taxonomy cache, classification result
+
 ## Board & shortlist filtering
 
 **Board seam**:
