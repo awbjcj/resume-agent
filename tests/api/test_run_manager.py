@@ -1,9 +1,11 @@
-from concurrent.futures import Executor, Future
-from threading import Event, Lock
+from concurrent.futures import Executor, Future, ThreadPoolExecutor
+from datetime import datetime, timezone
+from threading import Barrier, Event, Lock
 
 import pytest
 
 from resume_agent.api.runs.manager import RunCancelled, RunManager, RunProgressReporter
+from resume_agent.api.runs.models import RunState, parse_run_snapshot
 from resume_agent.progress import ProgressReporter
 
 
@@ -30,13 +32,18 @@ class QueuedExecutor(Executor):
         return self.future
 
 
+class RejectingExecutor(Executor):
+    def submit(self, fn, /, *args, **kwargs):
+        raise RuntimeError("executor unavailable")
+
+
 def test_create_run_starts_pending(tmp_path):
     mgr = RunManager(root=tmp_path, executor=InlineExecutor())
     run_id = mgr.create("discover")
     rec = mgr.get(run_id)
     assert rec is not None
-    assert rec["kind"] == "discover"
-    assert rec["state"] in ("pending", "running", "done")
+    assert rec.kind == "discover"
+    assert rec.state in (RunState.pending, RunState.running, RunState.done)
 
 
 def test_submit_runs_fn_and_records_result(tmp_path):
@@ -50,8 +57,8 @@ def test_submit_runs_fn_and_records_result(tmp_path):
     run_id = mgr.submit("discover", work)
     rec = mgr.get(run_id)
     assert rec is not None
-    assert rec["state"] == "done"
-    assert rec["result"] == {"statusCounts": {"shortlisted": 3}}
+    assert rec.state is RunState.done
+    assert rec.result == {"statusCounts": {"shortlisted": 3}}
 
 
 def test_submit_records_error(tmp_path):
@@ -63,8 +70,8 @@ def test_submit_records_error(tmp_path):
     run_id = mgr.submit("pull", boom)
     rec = mgr.get(run_id)
     assert rec is not None
-    assert rec["state"] == "error"
-    assert "nope" in rec["error"]
+    assert rec.state is RunState.error
+    assert rec.error is not None and "nope" in rec.error
 
 
 def test_reporter_checkpoint_raises_when_cancel_requested(tmp_path):
@@ -88,10 +95,10 @@ def test_runner_records_cancelled_state(tmp_path):
     run_id = mgr.submit("pull", work)
     rec = mgr.get(run_id)
     assert rec is not None
-    assert rec["state"] == "cancelled"
-    assert rec.get("error") is None
+    assert rec.state is RunState.cancelled
+    assert rec.error is None
     # cooperative stop is not a failure and keeps partial progress
-    assert rec["current"] == 1
+    assert rec.current == 1
 
 
 def test_request_cancel_rejects_unknown_and_terminal_runs(tmp_path):
@@ -115,7 +122,7 @@ def test_request_cancel_immediately_cancels_queued_run(tmp_path):
     assert mgr.request_cancel(run_id) is True
     rec = mgr.get(run_id)
     assert rec is not None
-    assert rec["state"] == "cancelled"
+    assert rec.state is RunState.cancelled
     assert executor.future is not None and executor.future.cancelled()
 
 
@@ -129,8 +136,8 @@ def test_request_cancel_marks_running_run_as_cancelling(tmp_path):
     assert mgr.request_cancel(run_id) is True
     rec = mgr.get(run_id)
     assert rec is not None
-    assert rec["state"] == "cancelling"
-    assert rec["label"] == "Cancelling"
+    assert rec.state is RunState.cancelling
+    assert rec.label == "Cancelling"
 
 
 def test_reporter_done_honours_a_late_cancel_request(tmp_path):
@@ -216,3 +223,144 @@ def test_suggestion_lane_is_bounded_without_blocking_default_runs(tmp_path):
     finally:
         release.set()
         mgr.shutdown()
+
+
+def _run_record(**overrides):
+    record = {
+        "process": "stored-id",
+        "kind": "pull",
+        "state": "running",
+        "label": "Pulling",
+        "current": 1,
+        "total": 5,
+        "created_at": "2026-06-28T10:00:00+00:00",
+        "started_at": "2026-06-28T10:01:00+00:00",
+        "updated_at": "2026-06-28T10:01:01+00:00",
+        "result": None,
+        "error": None,
+    }
+    record.update(overrides)
+    return record
+
+
+def test_parse_run_snapshot_uses_requested_id_and_typed_state():
+    snapshot = parse_run_snapshot("file-id", _run_record())
+
+    assert snapshot is not None
+    assert snapshot.run_id == "file-id"
+    assert snapshot.state is RunState.running
+    assert snapshot.created_at == datetime(2026, 6, 28, 10, tzinfo=timezone.utc)
+    assert snapshot.phase_started_at == datetime(2026, 6, 28, 10, 1, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("state", "mystery"),
+        ("kind", ""),
+        ("current", -1),
+        ("current", True),
+        ("total", -1),
+        ("started_at", "not-a-date"),
+        ("updated_at", "2026-06-28T10:01:01"),
+    ],
+)
+def test_parse_run_snapshot_rejects_invalid_file_data(field, value):
+    assert parse_run_snapshot("file-id", _run_record(**{field: value})) is None
+
+
+def test_list_active_filters_invalid_and_sorts_by_creation_time_then_id(tmp_path):
+    import json
+
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    records = {
+        "bbb": _run_record(created_at="2026-06-28T10:00:00+00:00"),
+        "aaa": _run_record(created_at="2026-06-28T10:00:00+00:00", started_at="2026-06-28T11:00:00+00:00"),
+        "old": _run_record(created_at="2026-06-28T09:00:00+00:00", state="done"),
+        "bad": _run_record(state="unknown"),
+    }
+    for run_id, record in records.items():
+        (tmp_path / f"{run_id}.json").write_text(json.dumps(record), encoding="utf-8")
+
+    assert [snapshot.run_id for snapshot in mgr.list_active()] == ["aaa", "bbb"]
+
+
+def test_recover_interrupted_terminalizes_active_records_only(tmp_path):
+    import json
+
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    for run_id, state in (("pending", "pending"), ("running", "running"), ("done", "done")):
+        (tmp_path / f"{run_id}.json").write_text(
+            json.dumps(_run_record(state=state)), encoding="utf-8"
+        )
+
+    assert mgr.recover_interrupted() == 2
+    pending = mgr.get("pending")
+    running = mgr.get("running")
+    done = mgr.get("done")
+    assert pending is not None
+    assert running is not None
+    assert done is not None
+    assert pending.state is RunState.error
+    assert running.state is RunState.error
+    assert done.state is RunState.done
+    assert mgr.list_active() == []
+
+
+def test_submit_singleton_coalesces_racing_calls_and_releases_after_completion(tmp_path):
+    barrier = Barrier(3)
+    release = Event()
+    started = Event()
+    calls = 0
+    calls_lock = Lock()
+    mgr = RunManager(root=tmp_path)
+
+    def work(_reporter):
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+        started.set()
+        release.wait(timeout=2)
+        return {}
+
+    def submit():
+        barrier.wait()
+        return mgr.submit("refreshClusters", work, singleton_key="refreshClusters")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(submit)
+        second = pool.submit(submit)
+        barrier.wait()
+        assert started.wait(timeout=1)
+        first_id = first.result(timeout=1)
+        second_id = second.result(timeout=1)
+        assert first_id == second_id
+        assert calls == 1
+        release.set()
+
+    for future in list(mgr._futures.values()):
+        future.result(timeout=2)
+    next_id = mgr.submit("refreshClusters", lambda _reporter: {}, singleton_key="refreshClusters")
+    assert next_id != first_id
+    mgr.shutdown()
+
+
+def test_submit_singleton_does_not_deadlock_with_inline_executor(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+
+    first = mgr.submit("refreshClusters", lambda _reporter: {}, singleton_key="clusters")
+    second = mgr.submit("refreshClusters", lambda _reporter: {}, singleton_key="clusters")
+
+    assert first != second
+
+
+def test_submit_failure_leaves_a_terminal_record_not_a_ghost_active_run(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=RejectingExecutor())
+
+    with pytest.raises(RuntimeError, match="executor unavailable"):
+        mgr.submit("pull", lambda _reporter: {}, singleton_key="pull")
+
+    assert mgr.list_active() == []
+    snapshots = [mgr.get(path.stem) for path in tmp_path.glob("*.json")]
+    assert len(snapshots) == 1
+    assert snapshots[0] is not None and snapshots[0].state is RunState.error
