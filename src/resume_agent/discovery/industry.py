@@ -131,6 +131,20 @@ def classify_industries(
                 assignments.pop(key)
                 rejected.add(key)
 
+    canonicals_by_industry: dict[str, set[str]] = {}
+    for (_company, industry), canonical in assignments.items():
+        canonicals_by_industry.setdefault(industry, set()).add(canonical)
+    conflicting_industries = {
+        industry
+        for industry, canonicals in canonicals_by_industry.items()
+        if len(canonicals) > 1
+    }
+    if conflicting_industries:
+        for key in list(assignments):
+            if key[1] in conflicting_industries:
+                assignments.pop(key)
+                rejected.add(key)
+
     return IndustryClassificationOutcome(assignments, authoritative - assignments.keys())
 
 
