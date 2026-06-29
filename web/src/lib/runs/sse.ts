@@ -1,6 +1,24 @@
 import { withTokenParam } from "@/lib/api/client";
 import { useRunStore, type PullRunResult, type RunRecord } from "./store";
 
+/** Map a backend run state to the store projection. */
+export function stateToStatus(state: string): RunRecord["status"] {
+  switch (state) {
+    case "done":
+      return "succeeded";
+    case "error":
+      return "failed";
+    case "cancelled":
+      return "cancelled";
+    case "cancelling":
+      return "cancelling";
+    case "pending":
+      return "queued";
+    default:
+      return "running";
+  }
+}
+
 /**
  * Subscribe to a run's SSE stream. The backend (api/runs/sse.py) emits default
  * `message` events whose data is the RunOut JSON: { state, percent, label,
@@ -11,6 +29,7 @@ export function watchRun(
   runId: string,
   kind: string,
   onDone?: (run: RunRecord) => void,
+  onTransportError?: () => void,
 ): () => void {
   const source = new EventSource(withTokenParam(`/api/runs/${runId}/events`));
 
@@ -31,18 +50,7 @@ export function watchRun(
       return; // ignore keep-alive / non-JSON frames
     }
     const state = data.state ?? "running";
-    const status: RunRecord["status"] =
-      state === "done"
-        ? "succeeded"
-        : state === "error"
-          ? "failed"
-          : state === "cancelled"
-            ? "cancelled"
-            : state === "cancelling"
-              ? "cancelling"
-              : state === "pending"
-                ? "queued"
-                : "running";
+    const status = stateToStatus(state);
     const run: RunRecord = {
       runId,
       kind,
@@ -65,21 +73,8 @@ export function watchRun(
   };
 
   source.onerror = () => {
-    const run: RunRecord = {
-      runId,
-      kind,
-      status: "failed",
-      percent: 0,
-      phase: "",
-      current: 0,
-      total: 0,
-      etaText: null,
-      error: "stream error",
-      result: null,
-    };
-    useRunStore.getState().upsert(run);
     source.close();
-    onDone?.(run);
+    onTransportError?.();
   };
 
   return () => source.close();
