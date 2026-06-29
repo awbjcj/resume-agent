@@ -118,6 +118,34 @@ def test_acall_respects_semaphore_limit():
     assert all(r.ok for r in results)
 
 
+def test_acall_observes_permit_release_after_error():
+    import asyncio
+
+    from resume_agent.llm_runner import acall
+
+    events: list[str] = []
+
+    class _Agent:
+        def run(self, prompt):
+            return prompt
+
+        async def arun(self, prompt):
+            raise RuntimeError("boom")
+
+    async def go():
+        with pytest.raises(RuntimeError, match="boom"):
+            await acall(
+                _Agent(),
+                "prompt",
+                sem=asyncio.Semaphore(1),
+                on_acquire=lambda: events.append("acquire"),
+                on_release=lambda: events.append("release"),
+            )
+
+    asyncio.run(go())
+    assert events == ["acquire", "release"]
+
+
 def test_retry_kwargs_reads_settings(monkeypatch):
     monkeypatch.setenv("LLM_RETRIES", "5")
     monkeypatch.setenv("LLM_RETRY_DELAY", "3")
