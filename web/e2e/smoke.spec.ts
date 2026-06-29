@@ -13,16 +13,23 @@ test.beforeEach(async ({ page }) => {
             title: "Staff Engineer",
             location: "Remote",
             fitScore: 81,
+            industry: "Autonomous Driving",
             skills: [],
           },
         ],
         pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+        facets: { industry: { "Autonomous Driving": 1 } },
+        total: 1,
       },
     }),
   );
 });
 
 test("loads shortlist and opens a job drawer", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
   await page.route("**/api/jobs/1", (route) =>
     route.fulfill({
       json: {
@@ -36,6 +43,7 @@ test("loads shortlist and opens a job drawer", async ({ page }) => {
         status: "shortlisted",
         fitScore: 81,
         fitRationale: null,
+        industry: "Autonomous Driving",
         criteriaJson: null,
         postedAt: null,
         archivedAt: null,
@@ -49,8 +57,17 @@ test("loads shortlist and opens a job drawer", async ({ page }) => {
   );
   await page.goto("/");
   await expect(page.getByText("Staff Engineer")).toBeVisible();
+  await page.getByRole("button", { name: "Industry" }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Autonomous Driving" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByText("Staff Engineer").click();
   await expect(page.getByRole("heading", { name: /staff engineer/i })).toBeVisible();
+  await expect(
+    page.getByRole("dialog").getByText("Autonomous Driving"),
+  ).toBeVisible();
+  expect(consoleErrors).toEqual([]);
 });
 
 test("min-fit numeric input applies the server filter", async ({ page }) => {
