@@ -1,10 +1,13 @@
 import asyncio
+import logging
 from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
 from inspect import isawaitable
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from resume_agent.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class Runner(Protocol):
@@ -74,7 +77,10 @@ async def run_with_cleanup(operation: Awaitable[_T], *runners: Any) -> _T:
             if identity in seen:
                 continue
             seen.add(identity)
-            await aclose_runner(runner)
+            try:
+                await aclose_runner(runner)
+            except Exception:
+                logger.warning("Failed to close LLM runner", exc_info=True)
 
 
 # Providers selectable via a ``provider:model`` prefix on any model id. A bare id
