@@ -465,6 +465,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["list_runs_api_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -1092,6 +1109,12 @@ export interface components {
             /** State */
             state: string;
         };
+        /** Page[RunOut] */
+        Page_RunOut_: {
+            /** Data */
+            data: components["schemas"]["RunOut"][];
+            pagination: components["schemas"]["Pagination"];
+        };
         /** Pagination */
         Pagination: {
             /** Page */
@@ -1283,11 +1306,15 @@ export interface components {
             result?: unknown | null;
             /** Runid */
             runId: string;
-            /** State */
-            state: string;
+            state: components["schemas"]["RunState"];
             /** Total */
             total: number;
         };
+        /**
+         * RunState
+         * @enum {string}
+         */
+        RunState: "pending" | "running" | "cancelling" | "done" | "error" | "cancelled";
         /** SetEnabledIn */
         SetEnabledIn: {
             /** Enabled */
@@ -2568,6 +2595,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResumeVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_runs_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RunOut_"];
                 };
             };
             /** @description Validation Error */
