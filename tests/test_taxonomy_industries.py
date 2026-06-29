@@ -59,3 +59,31 @@ def test_taxonomy_merge_is_monotonic_and_persistence_is_idempotent(tmp_path):
 
     assert path.read_text("utf-8") == first
     assert json.loads(first)["aliases"]["fintech"] == "Fintech"
+
+
+def test_concurrent_taxonomy_saves_merge_monotonically(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    path = tmp_path / "industry_taxonomy.json"
+    barrier = Barrier(2)
+
+    def save(taxonomy: IndustryTaxonomy) -> None:
+        barrier.wait()
+        save_industry_taxonomy(taxonomy, path)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(save, IndustryTaxonomy(aliases={"fintech": "Fintech"})),
+            executor.submit(
+                save,
+                IndustryTaxonomy(aliases={"health tech": "Healthcare"}),
+            ),
+        ]
+        for future in futures:
+            future.result()
+
+    assert load_industry_taxonomy(path).aliases == {
+        "fintech": "Fintech",
+        "health tech": "Healthcare",
+    }
