@@ -66,7 +66,7 @@ def test_shortlist_row_flattens_metadata_and_tags_coverage():
                     "remote_policy": "remote",
                     "seniority": "senior",
                     "employment_type": "full_time",
-                    "industry": "fintech",
+                    "industry": "Fintech",
                     "company_size": "scaleup",
                     "must_have_skills": ["Python", "Go"],
                     "nice_to_have_skills": ["Docker"],
@@ -81,7 +81,7 @@ def test_shortlist_row_flattens_metadata_and_tags_coverage():
         assert row.remote_policy == "remote"
         assert row.seniority == "senior"
         assert row.employment_type == "full_time"
-        assert row.industry == "fintech"
+        assert row.industry == "Fintech"
         assert row.company_size == "scaleup"
         assert row.posted_at == datetime(2026, 6, 1)
         # Skill tags are keyed by canonical (normalized, lowercased) token.
@@ -351,3 +351,20 @@ def test_shortlist_row_exposes_industry_location_and_canonical_skills(tmp_path):
         assert row.company_size == "startup"
         names = {t.name for t in row.skills}
         assert {"python", "c++", "c", "kubernetes"} <= names  # split + canonicalized
+
+
+def test_shortlist_row_preserves_canonical_industry():
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="jd",
+                status=JobStatus.shortlisted.value,
+                criteria_json={"industry": "Fintech"},
+            ),
+        )
+
+        row = shortlist_rows(s)[0]
+
+        assert row.industry == "Fintech"
