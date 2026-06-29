@@ -107,3 +107,18 @@ def test_suggestion_batch_concurrency_has_bounded_range(monkeypatch):
     monkeypatch.setenv("SUGGESTION_BATCH_CONCURRENCY", "17")
     with pytest.raises(ValidationError):
         _settings(env_file=None)
+
+
+def test_cluster_batch_size_has_bounded_default(monkeypatch):
+    from pydantic import ValidationError
+
+    monkeypatch.delenv("CLUSTER_BATCH_SIZE", raising=False)
+    assert _settings(env_file=None).cluster_batch_size == 60
+
+    monkeypatch.setenv("CLUSTER_BATCH_SIZE", "0")
+    with pytest.raises(ValidationError):
+        _settings(env_file=None)
+
+    monkeypatch.setenv("CLUSTER_BATCH_SIZE", "501")
+    with pytest.raises(ValidationError):
+        _settings(env_file=None)
