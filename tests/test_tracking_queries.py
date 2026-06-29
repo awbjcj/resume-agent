@@ -5,7 +5,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from resume_agent.models.base import Source
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.tracking.repository import save_application, save_job, save_resume_version
-from resume_agent.tracking.queries import pipeline_rows, shortlist_rows
+from resume_agent.tracking.queries import job_detail_row, pipeline_rows, shortlist_rows
 from resume_agent.tracking.tables import Application, ApplicationStatus, Job, JobStatus, ResumeVersion
 
 
@@ -91,6 +91,26 @@ def test_shortlist_row_flattens_metadata_and_tags_coverage():
         assert names["go"].covered is False
         assert names["go"].required is True
         assert names["docker"].required is False
+
+
+def test_job_detail_hides_internal_industry_retry_candidate():
+    with _session() as session:
+        job = save_job(
+            session,
+            Job(
+                source="manual",
+                jd_text="a",
+                criteria_json={
+                    "industry": None,
+                    "_industry_candidate": "Financial Technology",
+                },
+            ),
+        )
+
+        row = job_detail_row(session, _require_id(job.id))
+
+        assert row is not None
+        assert row.criteria_json == {"industry": None}
 
 
 def test_shortlist_row_surfaces_tech_stack_as_nonrequired_deduped():

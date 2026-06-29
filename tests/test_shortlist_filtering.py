@@ -116,6 +116,18 @@ def test_empty_result_returns_empty_list():
     assert apply_filters([], FilterState(fit_min=90)) == []
 
 
+def test_industry_filter_matches_exact_canonical_name_and_keeps_unknown_neutral():
+    rows = [
+        _row(job_id=1, industry="Fintech"),
+        _row(job_id=2, industry="Autonomous Driving"),
+        _row(job_id=3, industry=None),
+    ]
+
+    out = apply_filters(rows, FilterState(industry={"Fintech"}))
+
+    assert [row.job_id for row in out] == [1, 3]
+
+
 def test_location_cascade_builders_narrow():
     rows = [
         _row(country="US", region="TX", city="Austin"),
