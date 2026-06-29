@@ -9,7 +9,7 @@ from pathlib import Path
 from sqlmodel import Session
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, run_with_cleanup
 from resume_agent.progress import ProgressReporter
 from resume_agent.taxonomy.classification import classify_incrementally
 from resume_agent.taxonomy.clusters import (
@@ -47,14 +47,18 @@ def refresh_clusters(
         demanded = collect_target_skill_tokens(session)
         existing = load_cluster_map(path)
         outcome = asyncio.run(
-            classify_incrementally(
-                demanded_tokens=demanded,
-                existing=existing,
-                canonicalizer=canonicalizer,
-                themer=themer,
-                batch_size=size,
-                concurrency=width,
-                reporter=reporter,
+            run_with_cleanup(
+                classify_incrementally(
+                    demanded_tokens=demanded,
+                    existing=existing,
+                    canonicalizer=canonicalizer,
+                    themer=themer,
+                    batch_size=size,
+                    concurrency=width,
+                    reporter=reporter,
+                ),
+                canonicalizer,
+                themer,
             )
         )
         final = prune_cluster_map(

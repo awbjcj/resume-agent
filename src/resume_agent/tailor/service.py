@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, run_with_cleanup
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.progress import ProgressReporter
@@ -51,16 +51,20 @@ def tailor_job(
         raise ValueError("Cannot tailor a job that has not been persisted")
     criteria = JobCriteria.model_validate(job.criteria_json or {})
     sem = asyncio.Semaphore(get_settings().llm_concurrency)
+    runners = (tailor_agent, *reviewer_agents.values(), reviser_agent)
     rounds = asyncio.run(
-        arun_tailor_review(
-            job.jd_text,
-            criteria,
-            profile_facts,
-            config,
-            tailor_agent,
-            reviewer_agents,
-            reviser_agent,
-            sem=sem,
+        run_with_cleanup(
+            arun_tailor_review(
+                job.jd_text,
+                criteria,
+                profile_facts,
+                config,
+                tailor_agent,
+                reviewer_agents,
+                reviser_agent,
+                sem=sem,
+            ),
+            *runners,
         )
     )
     return _persist_rounds(session, job, rounds)
@@ -90,21 +94,25 @@ def tailor_jobs(
         def _criteria(job: Job) -> JobCriteria:
             return JobCriteria.model_validate(job.criteria_json or {})
 
+        runners = (tailor_agent, *reviewer_agents.values(), reviser_agent)
         rounds_results = asyncio.run(
-            gather_isolated(
-                list(targets),
-                lambda job: arun_tailor_review(
-                    job.jd_text,
-                    _criteria(job),
-                    profile_facts,
-                    config,
-                    tailor_agent,
-                    reviewer_agents,
-                    reviser_agent,
-                    sem=sem,
+            run_with_cleanup(
+                gather_isolated(
+                    list(targets),
+                    lambda job: arun_tailor_review(
+                        job.jd_text,
+                        _criteria(job),
+                        profile_facts,
+                        config,
+                        tailor_agent,
+                        reviewer_agents,
+                        reviser_agent,
+                        sem=sem,
+                    ),
+                    on_complete=on_complete,
+                    checkpoint=reporter.checkpoint if reporter else None,
                 ),
-                on_complete=on_complete,
-                checkpoint=reporter.checkpoint if reporter else None,
+                *runners,
             )
         )
         for job, res in zip(targets, rounds_results):
