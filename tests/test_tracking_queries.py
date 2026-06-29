@@ -300,7 +300,7 @@ def test_archived_rows_lists_all_archived_any_status():
         assert {r.company for r in archived_rows(s)} == {"A", "B"}
 
 
-def test_shortlist_row_exposes_sic_location_and_canonical_skills(tmp_path):
+def test_shortlist_row_exposes_industry_location_and_canonical_skills(tmp_path):
     aliases = tmp_path / "aliases.json"
     aliases.write_text('{"k8s": "kubernetes"}', "utf-8")
     facts = ProfileFacts(contact=Contact(name="Ada"))
@@ -311,7 +311,7 @@ def test_shortlist_row_exposes_sic_location_and_canonical_skills(tmp_path):
                 source="x", jd_text="jd", title="Eng", company="C",
                 status=JobStatus.shortlisted.value, location="Austin, TX, USA",
                 criteria_json={
-                    "sic_major": "73",
+                    "industry": "Autonomous Driving",
                     "company_size": "Series A",
                     "must_have_skills": ["Python, C++ or C", "k8s"],
                     "location_parts": {
@@ -323,9 +323,7 @@ def test_shortlist_row_exposes_sic_location_and_canonical_skills(tmp_path):
         )
         rows = shortlist_rows(s, facts=facts, aliases_path=aliases)
         row = rows[0]
-        assert row.sic_major == "73"
-        assert row.sic_label == "Business Services"
-        assert row.sic_division == "Services"
+        assert row.industry == "Autonomous Driving"
         assert row.location_country == "US"
         assert row.location_region == "TX"
         assert row.location_city == "Austin"

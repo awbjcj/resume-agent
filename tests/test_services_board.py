@@ -91,40 +91,40 @@ def test_board_min_filters_only_drop_known_failing_values():
     }
 
 
-def test_board_industry_filter_uses_extracted_industry_not_sic_sector():
+def test_board_industry_filter_uses_exact_canonical_name():
     with _session() as session:
         _job(
             session,
             status=JobStatus.shortlisted.value,
             fit_score=70,
             company="Fintech role",
-            criteria_json={"industry": "fintech", "sic_major": "73"},
+            criteria_json={"industry": "Fintech"},
         )
         _job(
             session,
             status=JobStatus.shortlisted.value,
             fit_score=80,
-            company="Healthcare role",
-            criteria_json={"industry": "healthcare", "sic_major": "73"},
+            company="Driving role",
+            criteria_json={"industry": "Autonomous Driving"},
         )
         _job(
             session,
             status=JobStatus.shortlisted.value,
             fit_score=90,
             company="Unknown industry role",
-            criteria_json={"industry": None, "sic_major": "60"},
+            criteria_json={"industry": None},
         )
         result = board.list_board(
             session,
             "shortlist",
-            board_filter=board.BoardFilter(industry=("fintech",)),
+            board_filter=board.BoardFilter(industry=("Fintech",)),
         )
 
     assert [row.company for row in result.page.data] == [
         "Unknown industry role",
         "Fintech role",
     ]
-    assert result.facets["industry"] == {"fintech": 1}
+    assert result.facets["industry"] == {"Fintech": 1}
 
 
 def test_set_stage_changes_status():

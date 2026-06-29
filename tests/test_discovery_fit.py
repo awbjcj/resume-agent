@@ -75,17 +75,15 @@ def test_build_fit_agent_is_agent(monkeypatch):
 
 def test_fitscore_defaults_keep_existing_construction():
     fit = FitScore(score=90, rationale="great")
-    assert fit.sic_major is None
     assert fit.location is None
 
 
-def test_score_fit_returns_new_fields():
+def test_score_fit_returns_location():
     payload = FitScore(
-        score=80, rationale="ok", sic_major="73",
+        score=80, rationale="ok",
         location=FitLocation(city="Austin", region="TX", country="USA"),
     )
     fit = score_fit("x", _FakeAgent(payload))
-    assert fit.sic_major == "73"
     assert fit.location is not None
     assert fit.location.city == "Austin"
 

@@ -99,8 +99,5 @@ def test_shortlist_item_exposes_facet_fields():
         "locationCountry",
         "locationRegion",
         "locationCity",
-        "sicMajor",
-        "sicDivision",
-        "sicLabel",
     ):
         assert key in item
