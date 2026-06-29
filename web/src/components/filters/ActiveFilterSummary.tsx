@@ -1,7 +1,7 @@
 import { XIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { industryLabel } from "@/lib/filters/sic-labels";
+import { industryLabel } from "@/lib/filters/industry-label";
 import type { FilterState } from "@/lib/filters/types";
 
 const SET_KEYS: (keyof FilterState)[] = [
@@ -30,8 +30,7 @@ export function ActiveFilterSummary({
   onRemove: (key: keyof FilterState, value: string) => void;
   onClear: () => void;
 }) {
-  // Chips key removal off the raw wire value, but show a resolved label
-  // (industry SIC codes → names; underscores → spaces for the rest).
+  // Chips key removal off the raw wire value while displaying readable labels.
   const chips: { key: keyof FilterState; value: string; label: string }[] = [];
   for (const key of SET_KEYS) {
     for (const value of filter[key] as Set<string>) {

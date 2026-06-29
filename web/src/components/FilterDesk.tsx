@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { emptyFilterState, type FilterState, type Preset, type SortKey } from "@/lib/filters/types";
-import { industryLabel } from "@/lib/filters/sic-labels";
+import { industryLabel } from "@/lib/filters/industry-label";
 import type { Facets } from "@/features/board/use-board-query";
 
 import { ActiveFilterSummary } from "./filters/ActiveFilterSummary";
@@ -41,8 +41,7 @@ const EMPLOYMENT_TYPE = ["full_time", "contract", "internship", "part_time"];
 
 // Every facet renders as the same compact active-filter popover. `options`
 // seeds the canonical values for enumerated facets so they stay selectable even
-// at zero count; `getLabel` resolves wire values to display names (industry
-// codes → SIC labels).
+// at zero count; `getLabel` resolves wire values to readable display names.
 type FacetSpec = {
   key: (typeof SET_KEYS)[number];
   label: string;

@@ -116,21 +116,20 @@ describe("FilterDesk", () => {
     expect(screen.queryByText("Filter by Source")).not.toBeInTheDocument();
   });
 
-  it("renders the resolved industry name, not the SIC code", async () => {
+  it("renders the extracted industry label in active chips and the popover", async () => {
     render(
       <FilterDesk
-        filter={{ ...emptyFilterState(), industry: new Set(["07"]) }}
-        facets={{ industry: { "07": 3 } }}
+        filter={{ ...emptyFilterState(), industry: new Set(["fin_tech"]) }}
+        facets={{ industry: { fin_tech: 3 } }}
         total={3}
         onChange={() => {}}
       />,
     );
-    // Active chip shows the resolved label, never the raw code.
-    expect(screen.getByText("Agricultural Services")).toBeInTheDocument();
-    expect(screen.queryByText("07")).not.toBeInTheDocument();
+    expect(screen.getByText("fin tech")).toBeInTheDocument();
+    expect(screen.queryByText("fin_tech")).not.toBeInTheDocument();
     // ...and so does the popover list.
     await userEvent.click(screen.getByRole("button", { name: /industry/i }));
-    expect(await screen.findAllByText("Agricultural Services")).not.toHaveLength(0);
+    expect(await screen.findAllByText("fin tech")).not.toHaveLength(0);
   });
 
   it("shows active normalized skills in the popover", async () => {

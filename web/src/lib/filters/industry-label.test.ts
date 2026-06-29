@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { industryLabel } from "./sic-labels";
+import { industryLabel } from "./industry-label";
 
 describe("industryLabel", () => {
-  it("resolves a SIC major code to its label", () => {
-    expect(industryLabel("07")).toBe("Agricultural Services");
-    expect(industryLabel("35")).toBe("Industrial Machinery & Computer Equipment");
+  it("does not reinterpret extracted industry values as SIC codes", () => {
+    expect(industryLabel("07")).toBe("07");
+    expect(industryLabel("35")).toBe("35");
   });
 
   it("passes free-text industry values through, normalizing underscores", () => {
