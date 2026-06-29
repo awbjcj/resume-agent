@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
@@ -11,6 +11,7 @@ from resume_agent.discovery.extract import (  # noqa: F401
     extract_job_criteria,
 )
 from resume_agent.discovery.filter import apply_filters
+from resume_agent.discovery.industry import IndustryCandidate, classify_industries
 from resume_agent.discovery.fit import (  # noqa: F401
     FitScore,
     ascore_fit,
@@ -19,18 +20,27 @@ from resume_agent.discovery.fit import (  # noqa: F401
 )
 from resume_agent.discovery.relevance import ajudge_relevance, judge_relevance  # noqa: F401
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.llm_runner import run_with_cleanup
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.progress import ProgressReporter
-from resume_agent.taxonomy import sic
 from resume_agent.taxonomy.location import build_location
+from resume_agent.taxonomy.industries import (
+    INDUSTRY_TAXONOMY_PATH,
+    IndustryTaxonomy,
+    canonical_industry,
+    load_industry_taxonomy,
+    merge_industry_taxonomy,
+    normalize_company,
+    normalize_industry,
+    save_industry_taxonomy,
+)
 from resume_agent.taxonomy.skills import refresh_aliases, split_skills
 from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
 from resume_agent.tracking.repository import has_progress, jobs_by_status, status_counts
 from resume_agent.tracking.tables import Job, JobStatus
 
 SKILL_ALIASES_PATH = Path("data/skill_aliases.json")
-_SIC_TABLE = sic.load_sic_table()
 
 
 # The LLM-bound discover phases surfaced to progress consumers; the cheap,
@@ -51,6 +61,8 @@ def run_extract(
     agent: Runner,
     reporter: ProgressReporter | None = None,
     job_ids: set[int] | None = None,
+    industry_classifier: Runner | None = None,
+    industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
 ) -> None:
     jobs = _stage_jobs(session, JobStatus.raw.value, job_ids)
     if reporter:
@@ -61,10 +73,13 @@ def run_extract(
         sem = asyncio.Semaphore(get_settings().llm_concurrency)
         on_complete = (lambda n: reporter.step(n)) if reporter else None
         results = asyncio.run(
-            gather_isolated(
-                jobs,
-                lambda job: aextract_job_criteria(job.jd_text, agent, sem=sem),
-                on_complete=on_complete,
+            run_with_cleanup(
+                gather_isolated(
+                    jobs,
+                    lambda job: aextract_job_criteria(job.jd_text, agent, sem=sem),
+                    on_complete=on_complete,
+                ),
+                agent,
             )
         )
         for job, res in zip(jobs, results):
@@ -75,7 +90,90 @@ def run_extract(
             job.criteria_json = criteria.model_dump(mode="json")
             job.status = JobStatus.extracted.value
             session.add(job)
+    _normalize_job_industries(session, industry_classifier, industry_taxonomy_path)
     session.commit()
+
+
+_INDUSTRY_RETRY_KEY = "_industry_candidate"
+_STALE_SIC_KEYS = ("sic_major", "sic_label", "sic_division")
+
+
+def _industry_candidate(criteria: dict) -> str | None:
+    value = criteria.get(_INDUSTRY_RETRY_KEY)
+    if value is None:
+        value = criteria.get("industry")
+    if normalize_industry(value) is None:
+        return None
+    return str(value).strip()
+
+
+def _prepare_industry_fields(job: Job, taxonomy: IndustryTaxonomy) -> str | None:
+    if job.criteria_json is None:
+        return None
+    criteria = dict(job.criteria_json)
+    for key in _STALE_SIC_KEYS:
+        criteria.pop(key, None)
+
+    candidate = _industry_candidate(criteria)
+    canonical = canonical_industry(job.company, candidate, taxonomy)
+    if canonical is not None:
+        criteria["industry"] = canonical
+        criteria.pop(_INDUSTRY_RETRY_KEY, None)
+    elif candidate is not None:
+        criteria["industry"] = None
+        criteria[_INDUSTRY_RETRY_KEY] = candidate
+    else:
+        criteria["industry"] = None
+        criteria.pop(_INDUSTRY_RETRY_KEY, None)
+    job.criteria_json = criteria
+    return candidate
+
+
+def _normalize_job_industries(
+    session: Session,
+    classifier: Runner | None,
+    taxonomy_path: Path | str,
+) -> None:
+    taxonomy = load_industry_taxonomy(taxonomy_path)
+    jobs = list(session.exec(select(Job)).all())
+    unresolved: dict[tuple[str, str], IndustryCandidate] = {}
+
+    for job in jobs:
+        candidate = _prepare_industry_fields(job, taxonomy)
+        company = normalize_company(job.company)
+        industry = normalize_industry(candidate)
+        if company and industry and canonical_industry(job.company, candidate, taxonomy) is None:
+            unresolved[(company, industry)] = IndustryCandidate(
+                company=company, industry=industry
+            )
+
+    additions: dict[tuple[str, str], str] = {}
+    if unresolved and classifier is not None:
+        existing = sorted(set(taxonomy.aliases.values()) | set(taxonomy.companies.values()))
+        try:
+            additions = classify_industries(
+                list(unresolved.values()), existing, classifier
+            ).assignments
+        except Exception:
+            additions = {}
+
+    if additions:
+        alias_additions: dict[str, str] = {}
+        company_additions: dict[str, str] = {}
+        for (company, candidate), canonical in additions.items():
+            alias_additions[candidate] = canonical
+            canonical_key = normalize_industry(canonical)
+            if canonical_key:
+                alias_additions[canonical_key] = canonical
+            company_additions[company] = canonical
+        taxonomy = merge_industry_taxonomy(
+            taxonomy, aliases=alias_additions, companies=company_additions
+        )
+        save_industry_taxonomy(taxonomy, taxonomy_path)
+
+    for job in jobs:
+        _prepare_industry_fields(job, taxonomy)
+        session.add(job)
 
 
 def run_filter(
@@ -115,14 +213,17 @@ def run_score(
         sem = asyncio.Semaphore(get_settings().llm_concurrency)
         on_complete = (lambda n: reporter.step(n)) if reporter else None
         results = asyncio.run(
-            gather_isolated(
-                pairs,
-                lambda pair: ascore_fit(
-                    compose_fit_input(pair[0].jd_text, profile_facts, pair[1]),
-                    agent,
-                    sem=sem,
+            run_with_cleanup(
+                gather_isolated(
+                    pairs,
+                    lambda pair: ascore_fit(
+                        compose_fit_input(pair[0].jd_text, profile_facts, pair[1]),
+                        agent,
+                        sem=sem,
+                    ),
+                    on_complete=on_complete,
                 ),
-                on_complete=on_complete,
+                agent,
             )
         )
         for (job, location_text), res in zip(pairs, results):
@@ -150,7 +251,6 @@ def _job_location_text(job: Job) -> str | None:
 
 def _write_taxonomy_fields(job: Job, fit: FitScore, raw_location: str | None) -> None:
     criteria = dict(job.criteria_json or {})
-    criteria["sic_major"] = sic.coerce_code(fit.sic_major, _SIC_TABLE)
     if fit.location is not None:
         loc = build_location(
             fit.location.city, fit.location.region, fit.location.country, raw=raw_location
@@ -207,12 +307,15 @@ def run_relevance(
         sem = asyncio.Semaphore(get_settings().llm_concurrency)
         on_complete = (lambda n: reporter.step(skipped + n)) if reporter else None
         results = asyncio.run(
-            gather_isolated(
-                judged,
-                lambda job: ajudge_relevance(
-                    target, job.title, job.jd_text or "", agent, sem=sem
+            run_with_cleanup(
+                gather_isolated(
+                    judged,
+                    lambda job: ajudge_relevance(
+                        target, job.title, job.jd_text or "", agent, sem=sem
+                    ),
+                    on_complete=on_complete,
                 ),
-                on_complete=on_complete,
+                agent,
             )
         )
         for job, res in zip(judged, results):
@@ -240,12 +343,21 @@ def discover(
     fit_agent: Runner,
     relevance_agent: Runner | None = None,
     canonicalizer: Canonicalizer | None = None,
+    industry_classifier: Runner | None = None,
+    industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
     reporter: ProgressReporter | None = None,
     job_ids: set[int] | None = None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows (optionally only `job_ids`)."""
     run_relevance(session, config, relevance_agent, reporter=reporter, job_ids=job_ids)
-    run_extract(session, extract_agent, reporter=reporter, job_ids=job_ids)
+    run_extract(
+        session,
+        extract_agent,
+        reporter=reporter,
+        job_ids=job_ids,
+        industry_classifier=industry_classifier,
+        industry_taxonomy_path=industry_taxonomy_path,
+    )
     run_filter(session, config, job_ids=job_ids)
     run_score(
         session, profile_facts, fit_agent, canonicalizer=canonicalizer,
@@ -295,6 +407,8 @@ def reprocess(
     scopes: list[str],
     relevance_agent: Runner | None = None,
     canonicalizer: Canonicalizer | None = None,
+    industry_classifier: Runner | None = None,
+    industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
     reporter: ProgressReporter | None = None,
 ) -> dict[str, int]:
     """Reset in-scope, non-progressed jobs to a clean raw state and re-run the funnel."""
@@ -317,5 +431,9 @@ def reprocess(
     session.commit()
     return discover(
         session, config, profile_facts, extract_agent, fit_agent, relevance_agent,
-        canonicalizer=canonicalizer, reporter=reporter, job_ids=set(selected),
+        canonicalizer=canonicalizer,
+        industry_classifier=industry_classifier,
+        industry_taxonomy_path=industry_taxonomy_path,
+        reporter=reporter,
+        job_ids=set(selected),
     )
