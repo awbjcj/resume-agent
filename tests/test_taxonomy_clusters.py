@@ -6,8 +6,10 @@ import pytest
 from resume_agent.taxonomy import clusters
 from resume_agent.taxonomy.clusters import (
     ClusterMap,
+    allocate_theme_ids,
     load_cluster_map,
     merge_cluster_map,
+    prune_cluster_map,
     save_cluster_map,
 )
 
@@ -214,3 +216,41 @@ def test_merge_cluster_map_rejects_cycle_before_last_good_file_is_replaced(tmp_p
 
     assert path.read_text(encoding="utf-8") == last_good
     assert load_cluster_map(path) == existing
+
+
+def test_prune_keeps_terminal_required_by_a_demanded_alias():
+    pruned = prune_cluster_map(
+        ClusterMap(
+            aliases={"k8s": "kubernetes", "kubernetes": "kubernetes", "cobol": "cobol"},
+            theme_of={"kubernetes": "cloud", "cobol": "legacy"},
+            theme_label={"cloud": "Cloud", "legacy": "Legacy"},
+        ),
+        {"k8s"},
+    )
+
+    assert pruned == ClusterMap(
+        aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"},
+        theme_of={"kubernetes": "cloud"},
+        theme_label={"cloud": "Cloud"},
+    )
+
+
+def test_allocate_theme_ids_is_collision_safe_and_order_independent():
+    forward = allocate_theme_ids(existing_labels={"c": "C"}, proposed_labels=["C++", "C#"])
+    reverse = allocate_theme_ids(existing_labels={"c": "C"}, proposed_labels=["C#", "C++"])
+
+    assert forward == reverse
+    assert set(forward.values()) == {"c-2", "c-3"}
+
+
+def test_allocate_theme_ids_reuses_equal_normalized_labels():
+    allocated = allocate_theme_ids(
+        existing_labels={}, proposed_labels=["Cloud / Infra", " cloud-infra "]
+    )
+
+    assert allocated == {"cloud infra": "cloud-infra"}
+
+
+def test_allocate_theme_ids_rejects_empty_slug():
+    with pytest.raises(ValueError, match="theme label"):
+        allocate_theme_ids(existing_labels={}, proposed_labels=["---"])
