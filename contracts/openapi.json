@@ -1340,6 +1340,26 @@
         "title": "NotificationOut",
         "type": "object"
       },
+      "Page_RunOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/RunOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "Page[RunOut]",
+        "type": "object"
+      },
       "Pagination": {
         "properties": {
           "page": {
@@ -1939,8 +1959,7 @@
             "type": "string"
           },
           "state": {
-            "title": "State",
-            "type": "string"
+            "$ref": "#/components/schemas/RunState"
           },
           "total": {
             "title": "Total",
@@ -1958,6 +1977,18 @@
         ],
         "title": "RunOut",
         "type": "object"
+      },
+      "RunState": {
+        "enum": [
+          "pending",
+          "running",
+          "cancelling",
+          "done",
+          "error",
+          "cancelled"
+        ],
+        "title": "RunState",
+        "type": "string"
       },
       "SetEnabledIn": {
         "properties": {
