@@ -1,15 +1,19 @@
 from resume_agent.services import agents
 
 
-def test_discovery_bundle_has_three_agents(monkeypatch):
+def test_discovery_bundle_has_all_agents(monkeypatch):
     # Each builder is faked so no SDK/model is constructed (offline).
     monkeypatch.setattr(agents, "build_extract_agent", lambda: "extract")
     monkeypatch.setattr(agents, "build_fit_agent", lambda: "fit")
     monkeypatch.setattr(agents, "build_relevance_agent", lambda: "relevance")
+    monkeypatch.setattr(agents, "build_skill_canonicalizer", lambda: "skills")
+    monkeypatch.setattr(agents, "build_industry_classifier", lambda: "industry")
     bundle = agents.build_discovery_bundle()
     assert bundle.extract == "extract"
     assert bundle.fit == "fit"
     assert bundle.relevance == "relevance"
+    assert bundle.canonicalizer == "skills"
+    assert bundle.industry_classifier == "industry"
 
 
 def test_tailor_bundle_builds_one_reviewer_per_spec(monkeypatch):

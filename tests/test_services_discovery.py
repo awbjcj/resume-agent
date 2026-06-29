@@ -4,6 +4,7 @@ import pytest
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.services import discovery
+from resume_agent.services.agents import DiscoveryBundle
 from resume_agent.services.discovery import UrlFetchError
 
 
@@ -26,6 +27,27 @@ def test_add_job_from_text_inserts(tmp_path):
 def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
     seen = {}
 
+    class _RunnerStub:
+        def __init__(self, value):
+            self.value = value
+
+        def run(self, prompt: str):
+            return self.value
+
+        async def arun(self, prompt: str):
+            return self.value
+
+    def _canonicalizer(skills: set[str]) -> dict[str, str]:
+        return {"value": "c"}
+
+    bundle = DiscoveryBundle(
+        extract=_RunnerStub("e"),
+        fit=_RunnerStub("f"),
+        relevance=_RunnerStub("r"),
+        canonicalizer=_canonicalizer,
+        industry_classifier=_RunnerStub("i"),
+    )
+
     def fake_discover(
         session,
         config,
@@ -34,24 +56,27 @@ def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
         fit,
         relevance,
         canonicalizer=None,
+        industry_classifier=None,
         reporter=None,
         job_ids=None,
     ):
         seen["relevance"] = relevance
         seen["canonicalizer"] = canonicalizer
+        seen["industry_classifier"] = industry_classifier
         return {"raw": 0, "shortlisted": 2}
 
     monkeypatch.setattr(discovery, "discover", fake_discover)
     monkeypatch.setattr(discovery, "load_search_config", lambda p: object())
     monkeypatch.setattr(discovery, "load_facts", lambda p: object())
-    monkeypatch.setattr(
-        discovery, "build_discovery_bundle",
-        lambda: discovery.DiscoveryBundle(extract="e", fit="f", relevance="r", canonicalizer="c"),  # type: ignore[arg-type]
-    )
+    monkeypatch.setattr(discovery, "build_discovery_bundle", lambda: bundle)
     with _session() as session:
         counts = discovery.discover_jobs(session, search_path="x", facts_path="y")
     assert counts == {"raw": 0, "shortlisted": 2}
-    assert seen == {"relevance": "r", "canonicalizer": "c"}
+    assert seen == {
+        "relevance": bundle.relevance,
+        "canonicalizer": bundle.canonicalizer,
+        "industry_classifier": bundle.industry_classifier,
+    }
 
 
 def test_add_job_from_url_extracts_and_overrides(monkeypatch):
@@ -124,12 +149,28 @@ class _FitRunner:
         return self.run(prompt)
 
 
+class _IndustryRunner:
+    def run(self, prompt: str):
+        from resume_agent.discovery.industry import IndustryClassification
+
+        return _FakeResult(IndustryClassification(groups=[]))
+
+    async def arun(self, prompt: str):
+        return self.run(prompt)
+
+
 def _bundle():
     from resume_agent.services.agents import DiscoveryBundle
 
     extract = _ExtractRunner()
     fit = _FitRunner()
-    return DiscoveryBundle(extract=extract, fit=fit, relevance=None, canonicalizer=None)
+    return DiscoveryBundle(
+        extract=extract,
+        fit=fit,
+        relevance=None,
+        canonicalizer=None,
+        industry_classifier=_IndustryRunner(),
+    )
 
 
 def test_reprocess_jobs_rescores_shortlisted(tmp_path):

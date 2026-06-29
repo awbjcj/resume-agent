@@ -1,8 +1,14 @@
 import json
+from typing import Any
 
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from resume_agent.discovery.ingest import add_job
+from resume_agent.discovery.industry import (
+    IndustryCandidate,
+    IndustryClassification,
+    IndustryGroup,
+)
 from resume_agent.discovery.pipeline import (
     discover,
     reprocess,
@@ -20,6 +26,7 @@ from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.discovery.fit import FitLocation, FitScore
 from resume_agent.tracking.repository import jobs_by_status, save_job
 from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.taxonomy.industries import IndustryTaxonomy, save_industry_taxonomy
 
 
 def _session() -> Session:
@@ -31,6 +38,11 @@ def _session() -> Session:
 class _Result:
     def __init__(self, content):
         self.content = content
+
+
+def _criteria(job: Job) -> dict[str, Any]:
+    assert job.criteria_json is not None
+    return job.criteria_json
 
 
 def _extract(**overrides) -> JobCriteriaExtract:
@@ -97,8 +109,157 @@ class _ReextractAgent:
         return self.run(prompt)
 
 
+class _IndustryRunner:
+    def __init__(self, content):
+        self.content = content
+        self.prompts = []
+
+    def run(self, prompt):
+        self.prompts.append(json.loads(prompt))
+        return _Result(self.content)
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+class _IndustryExtractAgent:
+    def run(self, prompt):
+        industry = "Financial Technology" if "fintech" in prompt else "Self-Driving Cars"
+        return _Result(_extract(industry=industry))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+def test_run_extract_classifies_one_unseen_delta_and_persists_canonical_names(tmp_path):
+    runner = _IndustryRunner(
+        IndustryClassification(
+            groups=[
+                IndustryGroup(
+                    canonical="Fintech",
+                    candidates=[
+                        IndustryCandidate(
+                            company="stripe", industry="financial technology"
+                        )
+                    ],
+                ),
+                IndustryGroup(
+                    canonical="Autonomous Driving",
+                    candidates=[
+                        IndustryCandidate(company="waymo", industry="self driving cars")
+                    ],
+                ),
+            ]
+        )
+    )
+    taxonomy_path = tmp_path / "industries.json"
+    with _session() as session:
+        save_job(
+            session,
+            Job(
+                source="x", company="Stripe, Inc.", jd_text="fintech role", title="A",
+                status=JobStatus.raw.value,
+            ),
+        )
+        save_job(
+            session,
+            Job(
+                source="x", company="Waymo LLC", jd_text="cars role", title="B",
+                status=JobStatus.raw.value,
+            ),
+        )
+
+        run_extract(
+            session,
+            _IndustryExtractAgent(),
+            industry_classifier=runner,
+            industry_taxonomy_path=taxonomy_path,
+        )
+
+        jobs = jobs_by_status(session, JobStatus.extracted.value)
+        assert {job.company: _criteria(job)["industry"] for job in jobs} == {
+            "Stripe, Inc.": "Fintech",
+            "Waymo LLC": "Autonomous Driving",
+        }
+        assert all("_industry_candidate" not in _criteria(job) for job in jobs)
+    assert len(runner.prompts) == 1
+    assert len(runner.prompts[0]["candidates"]) == 2
+
+
+def test_run_extract_warm_taxonomy_makes_zero_classifier_calls_and_updates_all_statuses(
+    tmp_path,
+):
+    taxonomy_path = tmp_path / "industries.json"
+    save_industry_taxonomy(
+        IndustryTaxonomy(
+            aliases={"financial technology": "Fintech", "fintech": "Fintech"},
+            companies={"stripe": "Fintech"},
+        ),
+        taxonomy_path,
+    )
+    runner = _IndustryRunner(IndustryClassification(groups=[]))
+    with _session() as session:
+        save_job(
+            session,
+            Job(
+                source="x", company="Stripe", jd_text="old", title="Old",
+                status=JobStatus.tailored.value,
+                criteria_json={
+                    "industry": "Financial Technology",
+                    "sic_major": "73",
+                    "sic_label": "Software",
+                },
+            ),
+        )
+        save_job(
+            session,
+            Job(
+                source="x", company="Stripe, Inc.", jd_text="fintech role", title="New",
+                status=JobStatus.raw.value,
+            ),
+        )
+
+        run_extract(
+            session,
+            _IndustryExtractAgent(),
+            industry_classifier=runner,
+            industry_taxonomy_path=taxonomy_path,
+        )
+
+        jobs = session.exec(select(Job)).all()
+        assert {_criteria(job)["industry"] for job in jobs} == {"Fintech"}
+        assert all("sic_major" not in _criteria(job) for job in jobs)
+        assert all("sic_label" not in _criteria(job) for job in jobs)
+    assert runner.prompts == []
+
+
+def test_run_extract_keeps_failed_industry_candidate_internal_for_retry(tmp_path):
+    runner = _IndustryRunner(IndustryClassification(groups=[]))
+    with _session() as session:
+        save_job(
+            session,
+            Job(
+                source="x", company="Stripe", jd_text="fintech role", title="A",
+                status=JobStatus.raw.value,
+            ),
+        )
+
+        run_extract(
+            session,
+            _IndustryExtractAgent(),
+            industry_classifier=runner,
+            industry_taxonomy_path=tmp_path / "industries.json",
+        )
+
+        job = jobs_by_status(session, JobStatus.extracted.value)[0]
+        criteria = _criteria(job)
+        assert criteria["industry"] is None
+        assert criteria["_industry_candidate"] == "Financial Technology"
+
+
 def test_run_relevance_rejects_offtarget_keeps_match():
     cfg = SearchConfig(target_role="AI engineering roles")
+    judge = _Judge()
     with _session() as s:
         save_job(
             s,
