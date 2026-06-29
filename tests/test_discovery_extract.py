@@ -198,3 +198,11 @@ def test_instructions_require_atomic_skills_and_size_buckets():
     joined = " ".join(_INSTRUCTIONS).lower()
     assert "one skill" in joined or "single" in joined  # atomic-skills guidance
     assert "startup" in joined and "scaleup" in joined and "enterprise" in joined
+
+
+def test_instructions_require_human_readable_business_domain():
+    joined = " ".join(_INSTRUCTIONS).lower()
+    assert "human-readable" in joined
+    assert "business domain" in joined
+    assert "job function" in joined
+    assert "null" in joined

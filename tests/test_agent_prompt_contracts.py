@@ -76,6 +76,17 @@ def test_job_extractor_prompt_covers_every_domain_field():
         assert field in rendered
 
 
+def test_job_extractor_requests_readable_business_domain():
+    extraction = _text(EXTRACT_INSTRUCTIONS)
+
+    assert "human-readable" in extraction and "business domain" in extraction
+    assert "job function" in extraction
+
+
+def test_fit_prompt_does_not_duplicate_industry_classification():
+    assert "industry" not in _text(FIT_INSTRUCTIONS)
+
+
 def test_resume_writer_prompt_matches_provenance_reducer_contract():
     rendered = _text(_TAILOR_INSTRUCTIONS)
 
