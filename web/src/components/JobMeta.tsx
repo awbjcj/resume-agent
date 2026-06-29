@@ -2,6 +2,7 @@
 // surfacing the full per-job facet set.
 
 import { salaryLabel, recency } from "@/lib/format";
+import { industryLabel } from "@/lib/filters/industry-label";
 import type { JobDetail } from "@/features/job/use-job-detail";
 
 const SPONSORSHIP_TONE: Record<string, string> = {
@@ -40,8 +41,7 @@ export function JobMeta({ job }: { job: JobDetail }) {
         {job.sponsorshipSignal}
       </span>,
     ]);
-  if (job.industry) rows.push(["Industry", job.industry]);
-  if (job.sicLabel) rows.push(["Sector", job.sicLabel]);
+  if (job.industry) rows.push(["Industry", industryLabel(job.industry)]);
   if (job.companySize) rows.push(["Company size", job.companySize]);
   if (locationParts || job.location)
     rows.push(["Location", locationParts || job.location]);

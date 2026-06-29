@@ -116,20 +116,20 @@ describe("FilterDesk", () => {
     expect(screen.queryByText("Filter by Source")).not.toBeInTheDocument();
   });
 
-  it("renders the extracted industry label in active chips and the popover", async () => {
+  it("renders the readable canonical in active chips and the popover", async () => {
     render(
       <FilterDesk
-        filter={{ ...emptyFilterState(), industry: new Set(["fin_tech"]) }}
-        facets={{ industry: { fin_tech: 3 } }}
+        filter={{ ...emptyFilterState(), industry: new Set(["Autonomous_Driving"]) }}
+        facets={{ industry: { Autonomous_Driving: 3 } }}
         total={3}
         onChange={() => {}}
       />,
     );
-    expect(screen.getByText("fin tech")).toBeInTheDocument();
-    expect(screen.queryByText("fin_tech")).not.toBeInTheDocument();
+    const label = "Autonomous Driving";
+    expect(screen.getByText(label)).toBeInTheDocument();
     // ...and so does the popover list.
     await userEvent.click(screen.getByRole("button", { name: /industry/i }));
-    expect(await screen.findAllByText("fin tech")).not.toHaveLength(0);
+    expect(await screen.findAllByText(label)).not.toHaveLength(0);
   });
 
   it("shows active normalized skills in the popover", async () => {
