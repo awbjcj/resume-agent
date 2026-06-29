@@ -1055,39 +1055,6 @@
             ],
             "title": "Seniority"
           },
-          "sicDivision": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sicdivision"
-          },
-          "sicLabel": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Siclabel"
-          },
-          "sicMajor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sicmajor"
-          },
           "skills": {
             "items": {
               "$ref": "#/components/schemas/SkillTagOut"
@@ -2185,39 +2152,6 @@
               }
             ],
             "title": "Seniority"
-          },
-          "sicDivision": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sicdivision"
-          },
-          "sicLabel": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Siclabel"
-          },
-          "sicMajor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sicmajor"
           },
           "skills": {
             "items": {

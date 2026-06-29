@@ -1033,12 +1033,6 @@ export interface components {
             salaryMin?: number | null;
             /** Seniority */
             seniority?: string | null;
-            /** Sicdivision */
-            sicDivision?: string | null;
-            /** Siclabel */
-            sicLabel?: string | null;
-            /** Sicmajor */
-            sicMajor?: string | null;
             /** Skills */
             skills: components["schemas"]["SkillTagOut"][];
             /** Source */
@@ -1356,12 +1350,6 @@ export interface components {
             salaryMin: number | null;
             /** Seniority */
             seniority: string | null;
-            /** Sicdivision */
-            sicDivision?: string | null;
-            /** Siclabel */
-            sicLabel?: string | null;
-            /** Sicmajor */
-            sicMajor?: string | null;
             /** Skills */
             skills: components["schemas"]["SkillTagOut"][];
             /** Sponsorshipsignal */
