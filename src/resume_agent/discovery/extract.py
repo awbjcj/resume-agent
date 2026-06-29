@@ -37,8 +37,10 @@ _INSTRUCTIONS = [
     "Represent every skill as one single atomic term, never a sentence or a combined list. For "
     "example, 'Python, C++ or C' becomes three entries, and a pipeline requirement may become "
     "'Data Pipelines', 'Vector Databases', and 'RAG'.",
-    "Capture the industry or customer domain the role serves when stated or directly evident; do "
-    "not substitute the job function for the industry.",
+    "Set industry to one concise, recognizable human-readable business domain for the employer "
+    "or customer (for example, Fintech, Healthcare, or Autonomous Driving). Classify the business "
+    "served, not the job function, department, company name, or marketing slogan. Return null when "
+    "the posting does not support a domain.",
     "Set company size (company_size) to exactly startup, scaleup, or enterprise only when the posting "
     "supports that classification; otherwise null.",
     "Return every schema field. Use null for unknown scalar/object fields and [] for unknown list fields.",
