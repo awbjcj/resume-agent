@@ -63,4 +63,14 @@ describe("watchRun", () => {
 
     expect(useRunStore.getState().runs.r1.status).toBe("queued");
   });
+
+  it("reports a transport error without marking the backend run failed", () => {
+    const onTransportError = vi.fn();
+    watchRun("r1", "pull", undefined, onTransportError);
+
+    FakeEventSource.current.onerror?.();
+
+    expect(onTransportError).toHaveBeenCalledOnce();
+    expect(useRunStore.getState().runs.r1).toBeUndefined();
+  });
 });
