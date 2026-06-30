@@ -1,11 +1,11 @@
 # Agent Quality & Workflow — Phase 2: Output Quality (design)
 
-**Status:** approved (design); **implementation plan deliberately deferred** (see §6)
+**Status:** approved for implementation by explicit user request; experiments remain default-off until baseline evidence exists
 **Date:** 2026-06-30
 **Branch:** `feat/agent-quality-evals`
 **Scope:** Phase 2 of the four-phase effort. The **highest-risk** phase — its changes touch
-how content is written and judged, so they can threaten the fact-lock invariant. Design-only;
-the TDD plan is deferred until the gates in §6 are met.
+how content is written and judged, so they can threaten the fact-lock invariant. Default-off
+capabilities are authorized; §6 remains the evidence gate for adoption.
 
 ---
 
@@ -55,6 +55,9 @@ MatchPlan:
   never contains claim text. It cannot smuggle a fabricated claim into the resume because the
   writer still emits provenance and the existing provenance gate + fact-check reviewer run on
   the **written output** regardless of the plan.
+- Model output is untrusted: unknown fact ids are removed deterministically, empty support becomes
+  a gap, and a requirement marked as a gap cannot retain supporting ids. An enabled workflow with
+  no planner is a configuration error rather than a silent plan-off run.
 - **Config-flagged, default off**, so the harness can A/B plan-on vs plan-off.
 - **Adopt only if** it lifts `output_quality` / relevance **without** lowering
   `trap_recall` / `provenance_ok`.
@@ -63,8 +66,8 @@ MatchPlan:
 
 ### 3.2 Rubric-anchored reviewers  *(decision Q6)*
 
-Add explicit **score-band definitions** to `_COMMON_REVIEWER_INSTRUCTIONS` so all reviewers map
-to one scale, keeping each reviewer's dimension text:
+Add explicit **score-band definitions** behind a per-reviewer configuration switch so the
+eval-named weakest reviewer can be re-anchored first, keeping each reviewer's dimension text:
 
 ```
 90-100 : strong, ship-ready
@@ -73,7 +76,8 @@ to one scale, keeping each reviewer's dimension text:
 <60    : disqualifying
 ```
 
-- **Prompt-only.** No schema change, no new calls, fully A/B-able.
+- **Prompt-only at runtime.** The config contract gains an additive default-off boolean on each
+  reviewer; there are no new calls and the change is fully A/B-able.
 - **Targeted, not blanket.** Re-anchor the eval-named weakest reviewer (lowest
   `panel_agreement` / `trap_recall`) **first**; only broaden if the harness shows the others
   also miscalibrated. The weakest reviewer is only known after a real eval run, so this is
@@ -109,20 +113,23 @@ authority on every written output; match-plan is referential and default-off; ru
 changes are prompt/input-only and reversible; every change is gated on `trap_recall` /
 `provenance_ok` not regressing.
 
-## 6. Gating (when the implementation plan may be written)
+## 6. Evidence and adoption gate
 
-Deferred until:
+Production adoption claims remain deferred until:
 1. The Phase 0 eval harness is green in CI **and** a baseline eval run is recorded, and
 2. **Phase 1 is merged** — the read-side best-round safety net should exist before quality
    changes that perturb how rounds score, so a quality experiment can never surface a worse or
    gate-failing round.
 
-## 7. Open items for the implementation plan
+The user explicitly authorized the default-off capability work before a paid live baseline exists.
+No reviewer is re-anchored in the production config and match-plan remains off until the recorded
+eval gates are satisfied.
 
-- `MatchPlan` model location and schema; whether the plan is **persisted** (legibility for
-  the eval/convergence story) or transient.
-- Exact score-band wording (kept terse to avoid over-steering reviewers).
-- The weakest-reviewer **target** is only knowable after a real eval run — the plan must be
-  written against actual `panel_agreement` numbers, not guesses.
+## 7. Resolved implementation items
+
+- `MatchPlan` lives under `models/` and remains transient; the eval artifact records the effective
+  config and usage, while normalization makes the transient boundary safe.
+- Score-band wording is terse and enabled per reviewer. No target is selected without real
+  `panel_agreement` numbers.
 - Where the new tailor input documents the plan (prompt-injection framing must treat the plan
   as data, like all other inputs).

@@ -1,12 +1,10 @@
 # Agent Quality & Workflow — Phase 1: Loop Reliability (design)
 
-**Status:** approved (design); **implementation plan deliberately deferred** (see §6)
+**Status:** approved for implementation by explicit user request; live-baseline adoption claims remain gated (see §6)
 **Date:** 2026-06-30
 **Branch:** `feat/agent-quality-evals`
 **Scope:** Phase 1 of the four-phase effort to improve the tailoring/generation agents.
-Design-only. Per the roadmap's "decisions locked, plans deferred" rule, this spec locks
-the design but does **not** include a TDD implementation plan; that is written once the
-gating conditions in §6 are met.
+The implementation is authorized; §6 remains the evidence gate for improvement claims.
 
 ---
 
@@ -55,6 +53,8 @@ New selector `best_resume_version(session, job_id)`:
 
 - Among persisted `ResumeVersion`s for the job, pick the **highest `review_score` among rows
   with `fact_check_passed=True`**, tie-broken by latest `round` (then `id`).
+- A missing `review_score` ranks below every valid score (`0..100`), rather than being
+  conflated with score `0`.
 - If **no** round passed the gate, fall back to `latest_resume_version` **and** surface a
   *"no clean round"* signal so callers can flag the job as needing attention rather than
   silently shipping a gate-failing resume.
@@ -71,6 +71,10 @@ Computed **read-side** (no schema migration), consistent with §3.1: a job is *r
 the best gate-passing round is **not** the latest round (a later revision scored lower or broke
 the gate). Surface it on the JobDetail projection and in the eval report; Phase 0's
 `convergence` metric already measures rounds + improved/regressed per round.
+
+The eval harness must judge and report the same surfaced round selected by the read side, not
+unconditionally judge the final generated round. Otherwise Phase 1's stated verification is
+impossible and later experiments can be scored against a resume the product will not show.
 
 Phase 1 does **not act** on regression. Early-stop is a cost lever, deferred to Phase 3 where
 the harness can prove it saves cost without hurting quality.
@@ -98,18 +102,21 @@ the harness can prove it saves cost without hurting quality.
 Lowest of the four phases. Read-side only; the loop and persisted data are unchanged, so the
 change is fully reversible by pointing the projection back at `latest_resume_version`.
 
-## 6. Gating (when the implementation plan may be written)
+## 6. Evidence and adoption gate
 
-Deferred until **both**:
+Production adoption claims remain deferred until **both**:
 1. The Phase 0 eval harness is green in CI, and
 2. A baseline eval run is recorded — so "surfaced == best gate-passing" and the regression
    rate can be **verified** as an improvement against a baseline, not asserted.
 
-## 7. Open items for the implementation plan
+The user explicitly authorized implementation before a paid live baseline exists. This does not
+waive the evidence gate: no live improvement claim follows from offline tests alone.
 
-- Exact tie-break and the representation of the *"no clean round"* flag on the JobDetail
-  schema (camelCase wire contract via `CamelModel`).
-- Whether the render/export default (`latest_rendered_resume_version`) should also switch to
-  best-gate-passing, or stay "latest rendered."
-- Confirm every surfacing site (grep `latest_resume_version` callers); §3.1 names
-  `queries.py:297` but the plan must enumerate all of them.
+## 7. Resolved implementation items
+
+- Tie-break is score, then round, then id; `None` score ranks below `0`. The wire signal is
+  `needsAttention` and the selected id is `bestResumeVersionId`.
+- Render/export stays latest-rendered in this phase; changing an already-rendered artifact is a
+  separate behavior.
+- The pipeline critique projection switches to best; job detail exposes the selected id while
+  retaining all versions; the eval harness uses the same selection semantics.
