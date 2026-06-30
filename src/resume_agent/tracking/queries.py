@@ -12,10 +12,11 @@ from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_sk
 from resume_agent.tracking.match_gap import profile_skill_tokens
 from resume_agent.tracking.repository import (
     application_for_job,
+    best_resume_version,
     cover_letters_for_job,
     has_progress,
     latest_rendered_resume_version,
-    latest_resume_version,
+    pick_best,
     resume_versions_for_job,
 )
 from resume_agent.tracking.tables import Application, CoverLetter, Job, JobStatus, ResumeVersion
@@ -94,6 +95,10 @@ class JobDetailRow:
     location_country: str | None = None
     location_region: str | None = None
     location_city: str | None = None
+    best_resume_version_id: int | None = None
+    needs_attention: bool = False
+    regressed: bool = False
+    reject_reason: str | None = None
 
 
 @dataclass
@@ -108,6 +113,7 @@ class TriageRow:
     posted_at: datetime | None
     archived_at: datetime | None
     has_progress: bool
+    reject_reason: str | None = None
 
 
 @dataclass
@@ -126,6 +132,8 @@ class PipelineRow:
     remote_policy: str | None
     seniority: str | None
     has_progress: bool = False
+    needs_attention: bool = False
+    regressed: bool = False
 
 
 def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> list[SkillTag]:
@@ -240,6 +248,8 @@ def job_detail_row(
     aliases = load_aliases(aliases_path)
     facets = _shortlist_row(job, tokens, aliases)
     jid = _require_job_id(job)
+    versions = resume_versions_for_job(session, jid)
+    best = pick_best(versions)
     return JobDetailRow(
         id=jid,
         source=job.source,
@@ -255,7 +265,7 @@ def job_detail_row(
         created_at=job.created_at,
         has_progress=has_progress(session, jid),
         application=application_for_job(session, jid),
-        resume_versions=resume_versions_for_job(session, jid),
+        resume_versions=versions,
         cover_letters=cover_letters_for_job(session, jid),
         company=facets.company,
         title=facets.title,
@@ -276,6 +286,10 @@ def job_detail_row(
         location_country=facets.location_country,
         location_region=facets.location_region,
         location_city=facets.location_city,
+        best_resume_version_id=best.version.id if best.version else None,
+        needs_attention=best.no_clean_round,
+        regressed=best.regressed,
+        reject_reason=job.reject_reason,
     )
 
 
@@ -294,7 +308,8 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
         job_id = _require_job_id(job)
         criteria = job.criteria_json or {}
         salary = criteria.get("salary_range") or {}
-        version = latest_resume_version(session, job_id)
+        best = best_resume_version(session, job_id)
+        version = best.version
         rendered = latest_rendered_resume_version(session, job_id)
         application = application_for_job(session, job_id)
         rows.append(
@@ -315,6 +330,8 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 remote_policy=criteria.get("remote_policy"),
                 seniority=criteria.get("seniority"),
                 has_progress=has_progress(session, job_id),
+                needs_attention=best.no_clean_round,
+                regressed=best.regressed,
             )
         )
     return rows
@@ -352,6 +369,7 @@ def _triage_row(session: Session, job: Job) -> TriageRow:
         posted_at=job.posted_at,
         archived_at=job.archived_at,
         has_progress=has_progress(session, job_id),
+        reject_reason=job.reject_reason,
     )
 
 

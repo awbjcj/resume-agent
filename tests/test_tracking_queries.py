@@ -182,6 +182,112 @@ def test_pipeline_rows_include_pdf_and_application_status():
         assert row.fit_score == 90
 
 
+def test_pipeline_row_surfaces_best_gate_passing_round():
+    with _session() as session:
+        job = save_job(
+            session, Job(source="url", status=JobStatus.tailored.value)
+        )
+        job_id = _require_id(job.id)
+        save_resume_version(
+            session,
+            ResumeVersion(
+                job_id=job_id,
+                round=1,
+                review_score=90,
+                fact_check_passed=True,
+                critique_json=[{"reviewer": "ats-keyword", "score": 90, "passed": True}],
+            ),
+        )
+        save_resume_version(
+            session,
+            ResumeVersion(
+                job_id=job_id,
+                round=2,
+                review_score=70,
+                fact_check_passed=False,
+                critique_json=[{"reviewer": "fact-check", "score": 0, "passed": False}],
+            ),
+        )
+
+        row = next(r for r in pipeline_rows(session) if r.job_id == job_id)
+
+        assert row.critique_json == [
+            {"reviewer": "ats-keyword", "score": 90, "passed": True}
+        ]
+        assert row.regressed is True
+        assert row.needs_attention is False
+
+
+def test_pipeline_row_flags_no_clean_round():
+    with _session() as session:
+        job = save_job(
+            session, Job(source="url", status=JobStatus.tailored.value)
+        )
+        save_resume_version(
+            session,
+            ResumeVersion(
+                job_id=_require_id(job.id),
+                round=1,
+                review_score=50,
+                fact_check_passed=False,
+                critique_json=[],
+            ),
+        )
+
+        row = next(r for r in pipeline_rows(session) if r.job_id == job.id)
+
+        assert row.needs_attention is True
+
+
+def test_job_detail_marks_best_version_and_attention():
+    with _session() as session:
+        job = save_job(
+            session, Job(source="url", status=JobStatus.tailored.value)
+        )
+        v1 = save_resume_version(
+            session,
+            ResumeVersion(
+                job_id=_require_id(job.id),
+                round=1,
+                review_score=92,
+                fact_check_passed=True,
+                content_json={},
+            ),
+        )
+        save_resume_version(
+            session,
+            ResumeVersion(
+                job_id=_require_id(job.id),
+                round=2,
+                review_score=70,
+                fact_check_passed=False,
+                content_json={},
+            ),
+        )
+
+        row = job_detail_row(session, _require_id(job.id))
+
+        assert row is not None
+        assert row.best_resume_version_id == v1.id
+        assert row.regressed is True
+        assert row.needs_attention is False
+        assert len(row.resume_versions) == 2
+
+
+def test_job_detail_no_versions_has_no_best():
+    with _session() as session:
+        job = save_job(
+            session, Job(source="url", status=JobStatus.shortlisted.value)
+        )
+
+        row = job_detail_row(session, _require_id(job.id))
+
+        assert row is not None
+        assert row.best_resume_version_id is None
+        assert row.needs_attention is False
+        assert row.regressed is False
+
+
 def test_pipeline_rows_clean_legacy_source_chrome_tokens():
     with _session() as s:
         save_job(
@@ -301,6 +407,31 @@ def test_triage_rows_are_pre_shortlist_and_unarchived():
 
         companies = {r.company for r in triage_rows(s)}
         assert companies == {"Raw", "Rej"}
+
+
+def test_triage_and_detail_rows_surface_reject_reason():
+    from resume_agent.tracking.queries import triage_rows
+
+    with _session() as s:
+        rejected = save_job(
+            s,
+            Job(
+                source="m", jd_text="a", company="Rej", title="E",
+                status=JobStatus.rejected.value,
+                reject_reason="off-target role: not a backend posting",
+                reject_category="relevance",
+            ),
+        )
+        save_job(s, Job(source="m", jd_text="b", company="Raw", title="E",
+                        status=JobStatus.raw.value))
+
+        by_company = {r.company: r for r in triage_rows(s)}
+        assert by_company["Rej"].reject_reason == "off-target role: not a backend posting"
+        assert by_company["Raw"].reject_reason is None
+
+        detail = job_detail_row(s, _require_id(rejected.id))
+        assert detail is not None
+        assert detail.reject_reason == "off-target role: not a backend posting"
 
 
 def test_archived_rows_lists_all_archived_any_status():

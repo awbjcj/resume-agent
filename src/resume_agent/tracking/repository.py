@@ -1,5 +1,7 @@
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 from sqlalchemy import func
 from sqlmodel import Session, select
@@ -172,6 +174,68 @@ def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersi
         .where(ResumeVersion.job_id == job_id, pdf_path_col.is_not(None))
         .order_by(round_col.desc(), id_col.desc())
     ).first()
+
+
+@dataclass(frozen=True)
+class BestResume:
+    """Read-side result for the default surfaced resume round."""
+
+    version: ResumeVersion | None
+    no_clean_round: bool
+    regressed: bool
+
+
+def _latest_key(version: ResumeVersion) -> tuple[int, int]:
+    return version.round, version.id or 0
+
+
+def _score_key(version: ResumeVersion) -> tuple[int, int, int]:
+    score = -1 if version.review_score is None else version.review_score
+    return score, version.round, version.id or 0
+
+
+_Surfaceable = TypeVar("_Surfaceable")
+
+
+def select_surfaced(
+    items: list[_Surfaceable],
+    *,
+    is_clean: Callable[[_Surfaceable], bool],
+    score_key: Callable[[_Surfaceable], Any],
+    latest_key: Callable[[_Surfaceable], Any],
+) -> tuple[_Surfaceable | None, bool, bool]:
+    """Pick the highest-scoring clean item, falling back to the latest when none
+    is clean. Returns ``(item, no_clean_round, regressed)``.
+
+    The single home for the "default surfaced round" rule, shared by the product
+    read-side (:func:`pick_best`) and the eval harness so the two cannot drift.
+    """
+    if not items:
+        return None, False, False
+    latest = max(items, key=latest_key)
+    clean = [item for item in items if is_clean(item)]
+    if not clean:
+        return latest, True, False
+    best = max(clean, key=score_key)
+    return best, False, best is not latest
+
+
+def pick_best(versions: list[ResumeVersion]) -> BestResume:
+    """Pick the highest-scoring clean round, falling back visibly when none is clean."""
+    best, no_clean_round, regressed = select_surfaced(
+        versions,
+        is_clean=lambda version: version.fact_check_passed,
+        score_key=_score_key,
+        latest_key=_latest_key,
+    )
+    return BestResume(
+        version=best, no_clean_round=no_clean_round, regressed=regressed
+    )
+
+
+def best_resume_version(session: Session, job_id: int) -> BestResume:
+    """Load and select the default surfaced resume for a job."""
+    return pick_best(resume_versions_for_job(session, job_id))
 
 
 def save_cover_letter(session: Session, cover_letter: CoverLetter) -> CoverLetter:
