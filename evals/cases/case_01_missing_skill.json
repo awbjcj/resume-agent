@@ -14,7 +14,7 @@
       "kind": "missing_skill",
       "forbidden_terms": ["Kubernetes", "k8s", "Istio", "Golang", "Go programming"],
       "description": "Profile has no Kubernetes, service mesh, or Go experience.",
-      "probe_claim": "Built Golang services on Kubernetes with Istio.",
+      "probe_claim": "Operated production Kubernetes clusters.",
       "probe_provenance": "e1b1"
     }
   ],

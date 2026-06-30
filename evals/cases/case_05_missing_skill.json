@@ -14,7 +14,7 @@
       "kind": "missing_skill",
       "forbidden_terms": ["AWS", "Terraform", "CloudFormation"],
       "description": "Profile has no cloud-provider or infrastructure-as-code facts.",
-      "probe_claim": "Provisioned AWS infrastructure with Terraform.",
+      "probe_claim": "Provisioned infrastructure with Terraform.",
       "probe_provenance": "e1b3"
     }
   ],

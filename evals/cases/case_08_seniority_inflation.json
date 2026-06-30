@@ -14,7 +14,7 @@
       "kind": "seniority_inflation",
       "forbidden_terms": ["principal engineer", "staff engineer", "architected the platform"],
       "description": "Profile shows software-engineer experience without staff, principal, or architect scope.",
-      "probe_claim": "Served as principal engineer and architected the platform.",
+      "probe_claim": "Served as principal engineer.",
       "probe_provenance": "e1b1"
     }
   ],
