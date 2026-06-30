@@ -170,12 +170,18 @@ def use_json_mode_for(model: Any) -> bool:
     return not getattr(model, "supports_native_structured_outputs", False)
 
 
-def build_model(model_id: str, api_key: str | None = None) -> Any:
+def build_model(
+    model_id: str,
+    api_key: str | None = None,
+    *,
+    cache_system_prompt: bool = False,
+) -> Any:
     """Construct the agno model for a (possibly provider-prefixed) ``model_id``.
 
     Provider SDK modules are imported lazily, per branch: a Claude-only run never
     imports ``openai`` or ``google-genai``, and a missing optional SDK fails only
-    when that provider is actually selected.
+    when that provider is actually selected. ``cache_system_prompt`` is forwarded
+    only to Anthropic; other providers ignore it.
     """
     provider, model = split_provider(model_id)
     key = api_key or resolve_api_key(model_id) or None
@@ -193,7 +199,11 @@ def build_model(model_id: str, api_key: str | None = None) -> Any:
         return DeepSeek(id=model, api_key=key)
     from agno.models.anthropic import Claude
 
-    return Claude(id=model, api_key=key)
+    return Claude(
+        id=model,
+        api_key=key,
+        cache_system_prompt=cache_system_prompt,
+    )
 
 
 def build_search_equipped(

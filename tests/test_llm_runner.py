@@ -49,6 +49,23 @@ def test_build_model_anthropic_branch():
     assert model.api_key == "sk-test"
 
 
+def test_build_model_sets_cache_system_prompt_for_anthropic():
+    model = build_model(
+        "claude-test", api_key="sk-test", cache_system_prompt=True
+    )
+    assert model.cache_system_prompt is True
+
+
+def test_build_model_cache_defaults_off_and_other_providers_ignore_it():
+    assert build_model("claude-test", api_key="sk-test").cache_system_prompt is False
+    assert (
+        build_model(
+            "openai:gpt-test", api_key="sk-test", cache_system_prompt=True
+        ).id
+        == "gpt-test"
+    )
+
+
 def test_build_model_openai_branch():
     OpenAIChat = pytest.importorskip("agno.models.openai").OpenAIChat
     model = build_model("openai:gpt-5.4-mini", api_key="sk-test")
