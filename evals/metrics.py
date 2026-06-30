@@ -1,7 +1,10 @@
+from dataclasses import dataclass
+
 from evals.schema import Trap
 from evals.textscan import trap_terms_hit
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
+from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.provenance import check_provenance, referenced_ids
 from resume_agent.tailor.review_config import LengthBudget
 
@@ -34,3 +37,53 @@ def total_bullets(content: ResumeContent) -> int:
         + sum(len(project.bullets) for project in content.projects)
         + sum(len(volunteer.bullets) for volunteer in content.volunteer)
     )
+
+
+@dataclass
+class RoundRecord:
+    round_num: int
+    content: ResumeContent
+    aggregate_score: int | None
+    critiques: list[ReviewCritique]
+
+
+@dataclass
+class ProbeRecord:
+    trap_id: str
+    detected: bool | None
+    error: str | None = None
+
+
+def fact_check_trap_recall(probes: list[ProbeRecord]) -> float | None:
+    completed = [probe for probe in probes if probe.detected is not None]
+    if not completed:
+        return None
+    return sum(probe.detected is True for probe in completed) / len(completed)
+
+
+def correlation(
+    xs: list[float], ys: list[float], min_n: int = 5
+) -> float | None:
+    count = len(xs)
+    if count < min_n or count != len(ys):
+        return None
+    mean_x = sum(xs) / count
+    mean_y = sum(ys) / count
+    differences_x = [value - mean_x for value in xs]
+    differences_y = [value - mean_y for value in ys]
+    numerator = sum(
+        left * right for left, right in zip(differences_x, differences_y)
+    )
+    denominator = (
+        sum(value * value for value in differences_x)
+        * sum(value * value for value in differences_y)
+    ) ** 0.5
+    if denominator == 0:
+        return None
+    return numerator / denominator
+
+
+def convergence(rounds: list[RoundRecord]) -> tuple[int, bool]:
+    scores = [round_.aggregate_score for round_ in rounds if round_.aggregate_score is not None]
+    regressed = any(current < previous for previous, current in zip(scores, scores[1:]))
+    return len(rounds), regressed
