@@ -111,6 +111,16 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
 
                   <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
                     <TabsContent value="jd" className="mt-0">
+                      {job.status === "rejected" && job.rejectReason && (
+                        <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-900 dark:bg-rose-950/40">
+                          <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
+                            Rejected during discovery
+                          </span>
+                          <p className="mt-1.5 text-[15px] leading-7 text-rose-900 dark:text-rose-100">
+                            {job.rejectReason}
+                          </p>
+                        </div>
+                      )}
                       {job.fitRationale && (
                         <p className="mb-5 rounded-xl border bg-accent/40 p-5 text-[15px] leading-7">
                           {job.fitRationale}

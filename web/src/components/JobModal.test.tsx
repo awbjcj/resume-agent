@@ -46,6 +46,27 @@ describe("JobModal", () => {
     expect(screen.getByText("Build things.")).toBeInTheDocument();
   });
 
+  it("shows the rejection reason banner for a rejected job", async () => {
+    server.use(
+      http.get("/api/jobs/42", () =>
+        HttpResponse.json(
+          jobPayload({
+            status: "rejected",
+            fitRationale: null,
+            rejectReason: "off-target role: not a backend posting",
+          }),
+        ),
+      ),
+    );
+    wrap(<JobModal jobId={42} onClose={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByText(/rejected during discovery/i)).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText("off-target role: not a backend posting"),
+    ).toBeInTheDocument();
+  });
+
   it("groups skills into must-have / best-have with a coverage tally", async () => {
     server.use(
       http.get("/api/jobs/42", () =>
