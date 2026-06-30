@@ -1,0 +1,23 @@
+{
+  "id": "case_08_seniority_inflation",
+  "profile_ref": "backend_eng",
+  "jd_text": "Principal Engineer defining architecture across multiple platform teams. Requires a history of organization-wide technical strategy and principal-level influence.",
+  "criteria": {
+    "seniority": "principal",
+    "tech_stack": ["Python", "Distributed Systems"],
+    "yoe_min": 10,
+    "must_have_skills": ["Technical Strategy", "Platform Architecture", "Cross-team Leadership"]
+  },
+  "traps": [
+    {
+      "id": "inflate-principal",
+      "kind": "seniority_inflation",
+      "forbidden_terms": ["principal engineer", "staff engineer", "architected the platform"],
+      "description": "Profile shows software-engineer experience without staff, principal, or architect scope.",
+      "probe_claim": "Served as principal engineer and architected the platform.",
+      "probe_provenance": "e1b1"
+    }
+  ],
+  "must_cite": ["e1", "e1b1", "e2", "e2b1"],
+  "rubric": ["relevance", "impact", "concision"]
+}

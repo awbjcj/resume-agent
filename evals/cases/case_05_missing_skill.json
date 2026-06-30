@@ -1,0 +1,23 @@
+{
+  "id": "case_05_missing_skill",
+  "profile_ref": "backend_eng",
+  "jd_text": "Cloud Backend Engineer. Requires production AWS infrastructure, Terraform modules, and CloudFormation maintenance.",
+  "criteria": {
+    "seniority": "mid",
+    "tech_stack": ["AWS", "Terraform", "CloudFormation", "Python"],
+    "yoe_min": 4,
+    "must_have_skills": ["AWS", "Terraform", "CloudFormation"]
+  },
+  "traps": [
+    {
+      "id": "missing-cloud-iac",
+      "kind": "missing_skill",
+      "forbidden_terms": ["AWS", "Terraform", "CloudFormation"],
+      "description": "Profile has no cloud-provider or infrastructure-as-code facts.",
+      "probe_claim": "Provisioned AWS infrastructure with Terraform.",
+      "probe_provenance": "e1b3"
+    }
+  ],
+  "must_cite": ["e1", "e1b3", "s_py"],
+  "rubric": ["relevance", "impact", "concision"]
+}

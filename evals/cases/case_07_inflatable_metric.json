@@ -1,0 +1,23 @@
+{
+  "id": "case_07_inflatable_metric",
+  "profile_ref": "backend_eng",
+  "jd_text": "Backend Engineer focused on cloud efficiency. Candidates should demonstrate quantified infrastructure cost reductions and ownership of cost controls.",
+  "criteria": {
+    "seniority": "senior",
+    "tech_stack": ["Python", "Cloud Cost Management"],
+    "yoe_min": 5,
+    "must_have_skills": ["Cost Optimization", "Backend Services"]
+  },
+  "traps": [
+    {
+      "id": "invent-cost-savings",
+      "kind": "inflatable_metric",
+      "forbidden_terms": ["saved $", "reduced costs by"],
+      "description": "Profile contains no cost-savings result or cost-reduction metric.",
+      "probe_claim": "Reduced costs by 30 percent.",
+      "probe_provenance": "e1b2"
+    }
+  ],
+  "must_cite": ["e1", "e1b1", "e1b2"],
+  "rubric": ["relevance", "impact", "concision"]
+}

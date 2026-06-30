@@ -1,0 +1,23 @@
+{
+  "id": "case_01_missing_skill",
+  "profile_ref": "backend_eng",
+  "jd_text": "Senior Backend Engineer. Required: 5+ years operating production Kubernetes clusters, service mesh experience with Istio, and Go services.",
+  "criteria": {
+    "seniority": "senior",
+    "tech_stack": ["Kubernetes", "Istio", "Go"],
+    "yoe_min": 5,
+    "must_have_skills": ["Kubernetes", "Istio", "Go"]
+  },
+  "traps": [
+    {
+      "id": "missing-k8s-go",
+      "kind": "missing_skill",
+      "forbidden_terms": ["Kubernetes", "k8s", "Istio", "Golang", "Go programming"],
+      "description": "Profile has no Kubernetes, service mesh, or Go experience.",
+      "probe_claim": "Built Golang services on Kubernetes with Istio.",
+      "probe_provenance": "e1b1"
+    }
+  ],
+  "must_cite": ["e1", "e1b1"],
+  "rubric": ["relevance", "impact", "concision"]
+}

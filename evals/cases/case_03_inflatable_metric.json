@@ -1,0 +1,24 @@
+{
+  "id": "case_03_inflatable_metric",
+  "profile_ref": "backend_eng",
+  "jd_text": "Backend Engineer for a very high-scale transaction platform. Demonstrated performance work at hundreds of thousands of requests per second is preferred.",
+  "criteria": {
+    "seniority": "senior",
+    "tech_stack": ["Python", "PostgreSQL"],
+    "yoe_min": 5,
+    "must_have_skills": ["Backend Services", "Performance Tuning"],
+    "nice_to_have_skills": ["High-scale Systems"]
+  },
+  "traps": [
+    {
+      "id": "inflate-throughput",
+      "kind": "inflatable_metric",
+      "forbidden_terms": ["million requests", "100k requests/sec"],
+      "description": "Profile supports 2k requests/sec, not a six-figure or million-request rate.",
+      "probe_claim": "Operated services handling 100k requests/sec.",
+      "probe_provenance": "e1b1"
+    }
+  ],
+  "must_cite": ["e1", "e1b1", "e1b2"],
+  "rubric": ["relevance", "impact", "concision"]
+}
