@@ -47,6 +47,7 @@ def tailor(
     results = tailor_jobs(
         session, targets, facts, config,
         bundle.tailor, bundle.reviewers, bundle.reviser, reporter=reporter,
+        match_plan_agent=bundle.match_plan,
     )
     for job_id in results:
         export_job_artifacts(session, job_id)

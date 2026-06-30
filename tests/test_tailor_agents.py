@@ -2,6 +2,7 @@ from resume_agent.llm_runner import AgentRunner
 
 from resume_agent.tailor.agents import (
     _TAILOR_INSTRUCTIONS,
+    _reviewer_instructions,
     build_reviewer_agent,
     build_reviser_agent,
     build_tailor_agent,
@@ -64,3 +65,34 @@ def test_reviser_agent_without_style_is_unchanged(monkeypatch):
 
     assert isinstance(agent, AgentRunner)
     assert "HOUSE STYLE" not in str(agent._agent.instructions)
+
+
+def test_reviewer_score_bands_are_opt_in():
+    anchored = "\n".join(_reviewer_instructions("ats-keyword", score_bands=True))
+    default = "\n".join(_reviewer_instructions("ats-keyword"))
+
+    assert all(band in anchored for band in ("90-100", "75-89", "60-74"))
+    assert "90-100" not in default
+    assert "threshold" in anchored.lower()
+
+
+def test_reviewer_spec_score_bands_default_off():
+    from resume_agent.tailor.review_config import ReviewerSpec
+
+    assert ReviewerSpec(name="recruiter").score_bands is False
+
+
+def test_tailor_agent_requests_system_prompt_cache(monkeypatch):
+    from types import SimpleNamespace
+
+    from resume_agent.tailor import agents as agents_module
+
+    monkeypatch.setattr(
+        agents_module,
+        "get_settings",
+        lambda: SimpleNamespace(prompt_cache_enabled=True),
+    )
+
+    agent = build_tailor_agent("claude-test")
+
+    assert agent._agent.model.cache_system_prompt is True

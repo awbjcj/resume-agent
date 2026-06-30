@@ -1,3 +1,5 @@
+import pytest
+
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
 from resume_agent.models.review import Severity
@@ -203,3 +205,149 @@ def test_broken_provenance_short_circuits_panel():
     assert len(rounds) == 1
     assert rounds[0].verdict.gate_passed is False
     assert rounds[0].verdict.critiques[0].reviewer == "provenance"
+
+
+def test_match_plan_runs_only_when_enabled_and_is_normalized():
+    from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
+
+    class _CapturingTailor(_ContentAgent):
+        def __init__(self):
+            self.prompts = []
+
+        def run(self, prompt):
+            self.prompts.append(prompt)
+            return super().run(prompt)
+
+    class _Planner:
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, prompt):
+            self.calls += 1
+            return _Result(
+                MatchPlan(
+                    requirements=[
+                        MatchPlanRequirement(
+                            jd_requirement="Python",
+                            supporting_fact_ids=["missing"],
+                            emphasis="untrusted note",
+                        )
+                    ]
+                )
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    config = ReviewConfig(
+        max_rounds=1,
+        score_threshold=80,
+        match_plan_enabled=True,
+        reviewers=[ReviewerSpec(name="ats-keyword", weight=1)],
+    )
+    tailor_agent = _CapturingTailor()
+    planner = _Planner()
+
+    run_tailor_review(
+        "Backend",
+        JobCriteria(),
+        ProfileFacts(contact=Contact(name="Ada")),
+        config,
+        tailor_agent,
+        {"ats-keyword": _Good("ats-keyword")},
+        _ContentAgent(),
+        match_plan_agent=planner,
+    )
+
+    assert planner.calls == 1
+    assert "MATCH PLAN" in tailor_agent.prompts[0]
+    assert '"gap":true' in tailor_agent.prompts[0]
+    assert "missing" not in tailor_agent.prompts[0]
+
+
+def test_match_plan_enabled_requires_agent():
+    config = ReviewConfig(max_rounds=1, match_plan_enabled=True)
+    with pytest.raises(ValueError, match="requires a match-plan agent"):
+        run_tailor_review(
+            "Backend",
+            JobCriteria(),
+            ProfileFacts(contact=Contact(name="Ada")),
+            config,
+            _ContentAgent(),
+            {},
+            _ContentAgent(),
+        )
+
+
+def test_early_stop_halts_after_clean_score_regression():
+    class _Scores:
+        def __init__(self):
+            self.scores = iter([80, 70, 60])
+
+        def run(self, prompt):
+            score = next(self.scores)
+            return _Result(
+                ReviewCritique(
+                    reviewer="ats-keyword", score=score, passed=False
+                )
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    config = ReviewConfig(
+        max_rounds=3,
+        score_threshold=85,
+        early_stop_on_regression=True,
+        reviewers=[ReviewerSpec(name="ats-keyword", weight=1)],
+    )
+
+    rounds = run_tailor_review(
+        "jd",
+        JobCriteria(),
+        ProfileFacts(contact=Contact(name="Ada")),
+        config,
+        _ContentAgent(),
+        {"ats-keyword": _Scores()},
+        _ContentAgent(),
+    )
+
+    assert len(rounds) == 2
+
+
+def test_early_stop_does_not_halt_before_any_clean_round():
+    class _Gate:
+        def __init__(self):
+            self.passed = iter([False, False, True])
+
+        def run(self, prompt):
+            passed = next(self.passed)
+            return _Result(
+                ReviewCritique(
+                    reviewer="fact-check",
+                    score=100 if passed else 0,
+                    passed=passed,
+                )
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    config = ReviewConfig(
+        max_rounds=3,
+        score_threshold=101,
+        early_stop_on_regression=True,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+
+    rounds = run_tailor_review(
+        "jd",
+        JobCriteria(),
+        ProfileFacts(contact=Contact(name="Ada")),
+        config,
+        _ContentAgent(),
+        {"fact-check": _Gate()},
+        _ContentAgent(),
+    )
+
+    assert len(rounds) == 3

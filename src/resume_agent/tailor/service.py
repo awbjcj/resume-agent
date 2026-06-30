@@ -45,6 +45,7 @@ def tailor_job(
     tailor_agent: Runner,
     reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
+    match_plan_agent: Runner | None = None,
 ) -> list[ResumeVersion]:
     """Run the loop for one job and persist each round. Marks the job tailored."""
     if job.id is None:
@@ -52,6 +53,8 @@ def tailor_job(
     criteria = JobCriteria.model_validate(job.criteria_json or {})
     sem = asyncio.Semaphore(get_settings().llm_concurrency)
     runners = (tailor_agent, *reviewer_agents.values(), reviser_agent)
+    if match_plan_agent is not None:
+        runners = (*runners, match_plan_agent)
     rounds = asyncio.run(
         run_with_cleanup(
             arun_tailor_review(
@@ -62,6 +65,7 @@ def tailor_job(
                 tailor_agent,
                 reviewer_agents,
                 reviser_agent,
+                match_plan_agent,
                 sem=sem,
             ),
             *runners,
@@ -79,6 +83,7 @@ def tailor_jobs(
     reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
     reporter: ProgressReporter | None = None,
+    match_plan_agent: Runner | None = None,
 ) -> dict[int, list[ResumeVersion]]:
     """Tailor targets concurrently, then persist successful jobs serially."""
     for job in targets:
@@ -95,6 +100,8 @@ def tailor_jobs(
             return JobCriteria.model_validate(job.criteria_json or {})
 
         runners = (tailor_agent, *reviewer_agents.values(), reviser_agent)
+        if match_plan_agent is not None:
+            runners = (*runners, match_plan_agent)
         rounds_results = asyncio.run(
             run_with_cleanup(
                 gather_isolated(
@@ -107,6 +114,7 @@ def tailor_jobs(
                         tailor_agent,
                         reviewer_agents,
                         reviser_agent,
+                        match_plan_agent,
                         sem=sem,
                     ),
                     on_complete=on_complete,

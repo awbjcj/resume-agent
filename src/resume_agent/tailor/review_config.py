@@ -11,6 +11,7 @@ class ReviewerSpec(ExtensibleModel):
     gate: bool = False
     weight: int = 1
     model_tier: str = "mid"  # cheap | mid | premium
+    score_bands: bool = False
 
 
 class LengthBudget(ExtensibleModel):
@@ -25,6 +26,8 @@ class ReviewConfig(ExtensibleModel):
     max_rounds: int = Field(default=3, ge=1)
     score_threshold: int = 85
     reviewers: list[ReviewerSpec] = Field(default_factory=list)
+    match_plan_enabled: bool = False
+    early_stop_on_regression: bool = False
     length_budget: LengthBudget = Field(default_factory=LengthBudget)
     style_guide_path: str = "config/style_guide.md"
 

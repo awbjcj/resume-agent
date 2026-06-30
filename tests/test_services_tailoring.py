@@ -28,8 +28,12 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
     captured = {}
     exports = []
 
-    def fake_tailor_jobs(session, targets, facts, config, tailor, reviewers, reviser, reporter=None):
+    def fake_tailor_jobs(
+        session, targets, facts, config, tailor, reviewers, reviser, reporter=None,
+        match_plan_agent=None,
+    ):
         captured["targets"] = [j.id for j in targets]
+        captured["match_plan"] = match_plan_agent
         return {targets[0].id: ["v1"]}
 
     monkeypatch.setattr(tailoring, "tailor_jobs", fake_tailor_jobs)
@@ -46,6 +50,7 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
             reviser=_RunnerStub("r"),
             reviewers={},
             revision=_RunnerStub("revise"),
+            match_plan=_RunnerStub("plan"),
         ),
     )
     monkeypatch.setattr(
@@ -61,6 +66,7 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
         assert job.id is not None
         result = tailoring.tailor(session, job_ids=[job.id])
     assert captured["targets"] == [job.id]
+    assert captured["match_plan"] is not None
     assert result
     assert exports == [job.id]
 
