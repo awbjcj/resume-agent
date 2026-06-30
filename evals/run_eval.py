@@ -18,6 +18,7 @@ from resume_agent.tailor.agents import (
     build_tailor_agent,
     model_for_tier,
 )
+from resume_agent.tailor.match_plan import build_match_plan_agent
 from resume_agent.tailor.review_config import ReviewConfig, load_review_config
 from resume_agent.tailor.style_guide import load_style_guide
 
@@ -27,16 +28,27 @@ def build_eval_bundle(
 ) -> TailorBundle:
     if model_id is None:
         return build_tailor_bundle(config, style_guide=style_guide)
+    tailor_agent = build_tailor_agent(model_id, style_guide)
+    reviser_agent = build_reviser_agent(model_id, style_guide)
+    reviewers = {}
+    for spec in config.reviewers:
+        kwargs = {"style_guide": style_guide}
+        if spec.score_bands:
+            kwargs["score_bands"] = True
+        reviewers[spec.name] = build_reviewer_agent(
+            spec.name, model_id, **kwargs
+        )
+    revision_agent = build_revision_agent(model_id, style_guide)
     return TailorBundle(
-        tailor=build_tailor_agent(model_id, style_guide),
-        reviser=build_reviser_agent(model_id, style_guide),
-        reviewers={
-            spec.name: build_reviewer_agent(
-                spec.name, model_id, style_guide
-            )
-            for spec in config.reviewers
-        },
-        revision=build_revision_agent(model_id, style_guide),
+        tailor=tailor_agent,
+        reviser=reviser_agent,
+        reviewers=reviewers,
+        revision=revision_agent,
+        match_plan=(
+            build_match_plan_agent(model_id, style_guide)
+            if config.match_plan_enabled
+            else None
+        ),
     )
 
 
@@ -98,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
             },
         }
     )
+    if args.model is None and config.match_plan_enabled:
+        effective_models["match-plan"] = model_for_tier("premium")
     metadata = {
         "models": json.dumps(effective_models, sort_keys=True),
         "config sha256": config_hash,

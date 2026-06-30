@@ -41,6 +41,13 @@ def test_term_present_is_word_boundary():
     assert term_present("deployed on k8s", "K8s") is True
 
 
+def test_term_present_matches_terms_ending_in_non_word_char():
+    # A boundary assertion belongs only on a side whose edge is a word char;
+    # "saved $" must still match a real dollar amount like "saved $30,000".
+    assert term_present("reduced spend; saved $30,000 annually", "saved $") is True
+    assert term_present("saved $1M in cloud costs", "saved $") is True
+
+
 def test_trap_terms_hit_returns_present_forbidden_terms():
     traps = [
         Trap(

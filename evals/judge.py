@@ -4,6 +4,7 @@ import json
 from agno.agent import Agent
 from pydantic import BaseModel, Field
 
+from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
@@ -70,7 +71,10 @@ def judge_prompt_hash() -> str:
 
 
 def build_judge_agent(model_id: str | None = None) -> Runner:
-    model = build_model(model_id or model_for_tier("premium"))
+    model = build_model(
+        model_id or model_for_tier("premium"),
+        cache_system_prompt=get_settings().prompt_cache_enabled,
+    )
     return AgentRunner(
         Agent(
             model=model,

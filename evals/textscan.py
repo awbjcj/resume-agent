@@ -43,7 +43,14 @@ def resume_text(content: ResumeContent) -> str:
 def term_present(text: str, term: str) -> bool:
     haystack = unicodedata.normalize("NFKC", text).casefold()
     needle = unicodedata.normalize("NFKC", term).casefold()
-    return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
+    if not needle:
+        return False
+    # Only assert a word boundary on a side whose edge char is itself a word
+    # char; a term like "saved $" ends in a non-word char, and (?!\w) there
+    # would wrongly fail to match real text such as "saved $30,000".
+    left = r"(?<!\w)" if re.match(r"\w", needle[0]) else ""
+    right = r"(?!\w)" if re.match(r"\w", needle[-1]) else ""
+    return re.search(rf"{left}{re.escape(needle)}{right}", haystack) is not None
 
 
 def trap_terms_hit(content: ResumeContent, traps: list[Trap]) -> list[str]:

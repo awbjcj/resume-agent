@@ -174,3 +174,122 @@ def test_run_case_records_probe_failure_and_keeps_case_result():
     assert result.probes[0].error == "RuntimeError: probe provider failed"
     assert result.usage.calls == 4
     assert result.usage.failed_calls == 1
+
+
+def test_run_case_judges_the_surfaced_best_clean_round():
+    class _Draft:
+        def run(self, prompt):
+            return _Result(ResumeContent(contact=Contact(name="Ada"), summary="Best round"))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    class _Revision:
+        def run(self, prompt):
+            return _Result(ResumeContent(contact=Contact(name="Ada"), summary="Worse round"))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    class _NamedReviewer:
+        def __init__(self, name, scores):
+            self.name = name
+            self.scores = iter(scores)
+
+        def run(self, prompt):
+            score = next(self.scores)
+            return _Result(
+                ReviewCritique(
+                    reviewer=self.name,
+                    score=score,
+                    passed=self.name == "fact-check",
+                )
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    class _CapturingJudge(_Judge):
+        def __init__(self):
+            self.prompt = ""
+
+        def run(self, prompt):
+            self.prompt = prompt
+            return super().run(prompt)
+
+    case = EvalCase(
+        id="selection",
+        profile_ref="ada",
+        jd_text="Backend",
+        criteria=JobCriteria(),
+        traps=[],
+        must_cite=[],
+        rubric=["relevance"],
+    )
+    config = ReviewConfig(
+        max_rounds=2,
+        score_threshold=95,
+        reviewers=[
+            ReviewerSpec(name="fact-check", gate=True, weight=0),
+            ReviewerSpec(name="ats-keyword", weight=1),
+        ],
+    )
+    bundle = TailorBundle(
+        tailor=_Draft(),
+        reviser=_Revision(),
+        reviewers={
+            "fact-check": _NamedReviewer("fact-check", [100, 100]),
+            "ats-keyword": _NamedReviewer("ats-keyword", [90, 70]),
+        },
+        revision=_Revision(),
+    )
+    judge = _CapturingJudge()
+
+    result = run_case(case, ProfileFacts(contact=Contact(name="Ada")), config, bundle, judge)
+
+    assert result.surfaced_round_num == 1
+    assert result.regressed is True
+    assert result.needs_attention is False
+    assert "Best round" in judge.prompt
+    assert "Worse round" not in judge.prompt
+
+
+def test_run_case_invokes_match_plan_when_enabled():
+    from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
+
+    class _Planner:
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, prompt):
+            self.calls += 1
+            return _Result(
+                MatchPlan(
+                    requirements=[
+                        MatchPlanRequirement(
+                            jd_requirement="Backend",
+                            supporting_fact_ids=["b1"],
+                            emphasis="lead with API",
+                        )
+                    ]
+                )
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    planner = _Planner()
+    config = _config().model_copy(update={"match_plan_enabled": True})
+    base = _bundle(_Reviewer())
+    bundle = TailorBundle(
+        tailor=base.tailor,
+        reviser=base.reviser,
+        reviewers=base.reviewers,
+        revision=base.revision,
+        match_plan=planner,
+    )
+
+    result = run_case(_case(), _facts(), config, bundle, _Judge())
+
+    assert planner.calls == 1
+    assert result.usage.calls == 5

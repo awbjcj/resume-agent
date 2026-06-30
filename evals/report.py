@@ -4,6 +4,7 @@ from statistics import mean
 from pydantic import TypeAdapter
 
 from evals.metrics import (
+    RoundRecord,
     convergence,
     correlation,
     fact_check_trap_recall,
@@ -13,13 +14,25 @@ from evals.runner import CaseResult
 from resume_agent.tailor.review_config import ReviewConfig
 
 
+def _surfaced_record(result: CaseResult) -> RoundRecord:
+    if result.surfaced_round_num is None:
+        return result.rounds[-1]
+    for round_ in result.rounds:
+        if round_.round_num == result.surfaced_round_num:
+            return round_
+    raise ValueError(
+        f"case {result.case_id!r} surfaced unknown round "
+        f"{result.surfaced_round_num}"
+    )
+
+
 def _reviewer_score(result: CaseResult, name: str) -> int | None:
     if not result.rounds:
         return None
     return next(
         (
             critique.score
-            for critique in result.rounds[-1].critiques
+            for critique in _surfaced_record(result).critiques
             if critique.reviewer == name
         ),
         None,
@@ -39,12 +52,14 @@ def render_report(
         "## Per-case",
         "",
         "| case | quality | trap_ok | prov_ok | cite_ok | budget_ok | "
-        "bullets/target | rounds | regressed | calls | total_tokens | cost |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | "
-        "--- | --- |",
+        "bullets/target | rounds | surfaced_round | needs_attention | regressed | "
+        "calls | total_tokens | cost |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | "
+        "--- | --- | --- |",
     ]
     for result in results:
-        rounds_used, regressed = convergence(result.rounds)
+        rounds_used, _ = convergence(result.rounds)
+        surfaced = _surfaced_record(result)
         cost = (
             "unknown"
             if result.usage.cost is None
@@ -54,14 +69,18 @@ def render_report(
             f"| {result.case_id} | {result.final_quality} | "
             f"{result.trap_avoided} | {result.provenance_ok} | "
             f"{result.must_cite_covered} | {result.budget_ok} | "
-            f"{total_bullets(result.rounds[-1].content)}/"
+            f"{total_bullets(surfaced.content)}/"
             f"{config.length_budget.target_total_bullets} | "
-            f"{rounds_used} | {regressed} | {result.usage.calls} | "
+            f"{rounds_used} | {result.surfaced_round_num} | "
+            f"{result.needs_attention} | {result.regressed} | "
+            f"{result.usage.calls} | "
             f"{result.usage.total_tokens} | {cost} |"
         )
 
     mean_quality = round(mean(result.final_quality for result in results)) if results else 0
     total_tokens = sum(result.usage.total_tokens for result in results)
+    cache_read_tokens = sum(result.usage.cache_read_tokens for result in results)
+    cache_write_tokens = sum(result.usage.cache_write_tokens for result in results)
     known_cost = sum(result.usage.cost or 0.0 for result in results)
     unknown_costs = sum(result.usage.cost is None for result in results)
     probes = [probe for result in results for probe in result.probes]
@@ -75,6 +94,8 @@ def render_report(
         f"**Fact-check probe recall:** {shown_recall}",
         f"**Fact-check probe coverage:** {len(completed_probes)}/{len(probes)}",
         f"**Total tokens:** {total_tokens}",
+        f"**Cache read tokens:** {cache_read_tokens}",
+        f"**Cache write tokens:** {cache_write_tokens}",
         f"**Known provider cost:** ${known_cost:.4f} "
         f"({unknown_costs} unknown case(s))",
         "",
@@ -102,8 +123,11 @@ def render_report(
         )
         lines.append(f"- {spec.name}: panel_agreement = {shown}")
 
+    # panel_agreement is a Pearson correlation in [-1, 1]; the gate's recall is
+    # in [0, 1]. Rank both on a shared 0..1 "usefulness" axis so a fully-broken
+    # gate (recall 0) is not masked by a mildly anti-correlated panel reviewer.
     ranked = [
-        (reviewer_name, agreement)
+        (reviewer_name, (agreement + 1.0) / 2.0)
         for reviewer_name, agreement in agreements.items()
         if agreement is not None
     ]

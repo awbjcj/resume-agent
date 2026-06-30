@@ -1,8 +1,9 @@
 import json
+from dataclasses import replace
 
 from evals.judge import DimensionScore, JudgeVerdict
 from evals.metrics import ProbeRecord, RoundRecord
-from evals.report import render_artifact, render_report
+from evals.report import _reviewer_score, render_artifact, render_report
 from evals.runner import CaseResult
 from evals.usage import UsageTotals
 from resume_agent.models.job import JobCriteria
@@ -106,3 +107,38 @@ def test_render_artifact_preserves_complete_result_data():
     assert serialized["usage"]["total_tokens"] == 100
     assert artifact["metadata"] == {"git commit": "abc123"}
     assert artifact["failures"] == ["c2: RuntimeError: failed"]
+
+
+def test_report_shows_cache_token_aggregates_and_surface_state():
+    config = ReviewConfig(
+        reviewers=[ReviewerSpec(name="ats-keyword", weight=1)]
+    )
+    result = _result("c1", 90, 90)
+    result.usage = replace(
+        result.usage, cache_read_tokens=120, cache_write_tokens=30
+    )
+    result.surfaced_round_num = 1
+    result.needs_attention = True
+    result.regressed = True
+
+    markdown = render_report([result], config)
+
+    assert "**Cache read tokens:** 120" in markdown
+    assert "**Cache write tokens:** 30" in markdown
+    assert "surfaced_round" in markdown
+    assert "needs_attention" in markdown
+
+
+def test_reviewer_score_comes_from_surfaced_round():
+    result = _result("c1", 90, 90)
+    result.rounds.append(
+        RoundRecord(
+            2,
+            ResumeContent(contact=Contact(name="Ada"), summary="regressed"),
+            10,
+            [ReviewCritique(reviewer="ats-keyword", score=10, passed=False)],
+        )
+    )
+    result.surfaced_round_num = 1
+
+    assert _reviewer_score(result, "ats-keyword") == 90

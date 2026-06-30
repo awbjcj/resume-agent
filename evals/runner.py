@@ -21,7 +21,8 @@ from resume_agent.services.agents import TailorBundle
 from resume_agent.tailor.panel import compose_evidence_review_input, review_one
 from resume_agent.tailor.provenance import resolve_evidence
 from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.workflow import run_tailor_review
+from resume_agent.tailor.workflow import TailorRound, run_tailor_review
+from resume_agent.tracking.repository import select_surfaced
 
 
 @dataclass
@@ -40,6 +41,23 @@ class CaseResult:
     final_quality: int
     probes: list[ProbeRecord]
     usage: UsageTotals
+    surfaced_round_num: int | None = None
+    needs_attention: bool = False
+    regressed: bool = False
+
+
+def _surface_round(
+    tailor_rounds: list[TailorRound],
+) -> tuple[TailorRound, bool, bool]:
+    """Mirror the product read-side selector for non-persisted eval rounds."""
+    surfaced, no_clean_round, regressed = select_surfaced(
+        tailor_rounds,
+        is_clean=lambda round_: round_.verdict.gate_passed,
+        score_key=lambda round_: (round_.verdict.aggregate_score, round_.round_num),
+        latest_key=lambda round_: round_.round_num,
+    )
+    assert surfaced is not None  # run_case always supplies at least one round
+    return surfaced, no_clean_round, regressed
 
 
 def build_probe_resume(trap: Trap, profile: ProfileFacts) -> ResumeContent:
@@ -89,6 +107,11 @@ def run_case(
             for name, agent in bundle.reviewers.items()
         },
         revision=MeteredRunner(bundle.revision, usage),
+        match_plan=(
+            MeteredRunner(bundle.match_plan, usage)
+            if bundle.match_plan is not None
+            else None
+        ),
     )
     if live_criteria or case.criteria is None:
         if extract_agent is None:
@@ -107,6 +130,7 @@ def run_case(
         tailor_agent=metered_bundle.tailor,
         reviewer_agents=metered_bundle.reviewers,
         reviser_agent=metered_bundle.reviser,
+        match_plan_agent=metered_bundle.match_plan,
     )
     scored_reviewers = {
         spec.name
@@ -129,7 +153,8 @@ def run_case(
         )
         for round_ in tailor_rounds
     ]
-    final = rounds[-1].content
+    surfaced, needs_attention, regressed = _surface_round(tailor_rounds)
+    final = surfaced.content
 
     fact_check = metered_bundle.reviewers.get("fact-check")
     if case.traps and fact_check is None:
@@ -187,4 +212,7 @@ def run_case(
         final_quality=verdict.output_quality,
         probes=probes,
         usage=usage.snapshot(),
+        surfaced_round_num=surfaced.round_num,
+        needs_attention=needs_attention,
+        regressed=regressed,
     )
