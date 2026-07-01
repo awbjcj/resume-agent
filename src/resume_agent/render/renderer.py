@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 import typst
+from pypdf import PdfReader
 
 from resume_agent.models.resume import ResumeContent
 
@@ -26,17 +27,38 @@ def output_filename(
     return f"{'_'.join(parts)}.pdf"
 
 
+def _page_count(pdf_path: Path) -> int:
+    return len(PdfReader(str(pdf_path)).pages)
+
+
 def render_pdf(
     content: ResumeContent,
     output_path: str | Path,
     template_path: str | Path = "templates/resume.typ",
+    *,
+    fit_pages: int | None = 1,
+    min_zoom: float = 0.82,
+    zoom_step: float = 0.03,
 ) -> Path:
-    """Compile the Typst template with the resume JSON into a PDF file."""
+    """Compile the Typst template with the resume JSON into a PDF file.
+
+    When ``fit_pages`` is set, the template's ``zoom`` factor is swept down from
+    1.0 (recompiling each step) until the PDF fits within ``fit_pages`` pages or
+    ``min_zoom`` is reached — a readable floor past which we accept an overflow
+    rather than produce unreadably small text. Pass ``fit_pages=None`` to render
+    once at full size.
+    """
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    typst.compile(
-        str(template_path),
-        output=str(out),
-        sys_inputs={"data": content.model_dump_json()},
-    )
-    return out
+    data = content.model_dump_json()
+
+    zoom = 1.0
+    while True:
+        typst.compile(
+            str(template_path),
+            output=str(out),
+            sys_inputs={"data": data, "zoom": f"{zoom:.4f}"},
+        )
+        if fit_pages is None or _page_count(out) <= fit_pages or zoom <= min_zoom:
+            return out
+        zoom = round(zoom - zoom_step, 4)
