@@ -12,6 +12,7 @@ class ScrapedCard:
     location: str | None
     url: str | None
     posted_at: datetime | None = None
+    detail_html: str | None = None
 
 
 @dataclass
