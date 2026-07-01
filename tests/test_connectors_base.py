@@ -19,7 +19,7 @@ def test_connector_protocol_accepts_a_conforming_object():
     class _Fake:
         name = "fake"
 
-        def fetch(self, search, limit=None):
+        def fetch(self, search, limit=None, skip_seen=None):
             return FetchResult(jobs=[RawJob("fake", None, "Acme", "Eng", None, "jd")])
 
     fake: Connector = _Fake()

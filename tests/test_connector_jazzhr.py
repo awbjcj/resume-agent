@@ -16,6 +16,7 @@ def test_jazzhr_maps_listing_then_jsonld_detail():
     apply_detail(rows[0], {"html": (FIXTURES / "detail.html").read_text()})
 
     assert rows[0].company == "Utilidata"
+    assert rows[0].url is not None
     assert rows[0].url.endswith("Application-Engineer-Data-Center-Software")
     assert "Develop Python integration tooling" in rows[0].jd_text
 

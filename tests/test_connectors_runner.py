@@ -1,6 +1,6 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen
 from resume_agent.discovery.connectors.runner import run_pull
 from resume_agent.discovery.connectors.telemetry import read_runs
 from resume_agent.discovery.search_config import SearchConfig
@@ -189,7 +189,7 @@ class _SeenAwareConnector:
     name = "scrape"
 
     def __init__(self):
-        self.received = "unset"
+        self.received: SkipSeen | str | None = "unset"
 
     def fetch(self, search, limit=None, skip_seen=None):
         self.received = skip_seen

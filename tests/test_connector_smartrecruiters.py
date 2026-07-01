@@ -21,6 +21,7 @@ def test_smartrecruiters_maps_list_and_detail():
 
     assert rows[0].company == "SmartRecruiters Inc"
     assert rows[0].location == "United States, REMOTE, us"
+    assert rows[0].url is not None
     assert rows[0].url.startswith("https://jobs.smartrecruiters.com/")
     assert "Enterprise SaaS experience" in rows[0].jd_text
 

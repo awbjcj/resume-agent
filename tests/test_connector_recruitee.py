@@ -20,6 +20,7 @@ def test_recruitee_maps_public_offers_payload():
         offers_url("transperfect") == "https://transperfect.recruitee.com/api/offers/"
     )
     assert jobs[0].company == "TransPerfect"
+    assert jobs[0].url is not None
     assert jobs[0].url.endswith("/c/new")
     assert "SQL expertise" in jobs[0].jd_text
 

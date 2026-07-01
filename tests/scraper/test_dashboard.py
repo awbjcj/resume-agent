@@ -1,8 +1,14 @@
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from resume_agent.discovery.scraper.dashboard import DashboardScraper, MAX_EXTRACT_CHARS
 from resume_agent.discovery.scraper.recipe import Pagination, ScrapeRecipe
 from resume_agent.discovery.search_config import SearchConfig
+
+
+class _AgentResponse:
+    def __init__(self, content):
+        self.content = content
 
 
 class _Target:
@@ -36,13 +42,7 @@ class _FakeAgent:
     def run(self, prompt):
         self.calls += 1
         self.prompts.append(prompt)
-
-        class _Response:
-            pass
-
-        response = _Response()
-        response.content = self.content
-        return response
+        return _AgentResponse(self.content)
 
     async def arun(self, prompt):
         return self.run(prompt)
@@ -81,7 +81,7 @@ class _Scraper(DashboardScraper):
     def _next_page(self, recipe):
         return None
 
-    def _detail_html(self, card, recipe):
+    def _detail_html(self, card, recipe) -> str:
         self.detail_urls.append(card.url)
         return _DETAIL
 
@@ -190,13 +190,7 @@ class _SequenceAgent(_FakeAgent):
     def run(self, prompt):
         content = self.contents[min(self.calls, len(self.contents) - 1)]
         self.calls += 1
-
-        class _Response:
-            pass
-
-        response = _Response()
-        response.content = content
-        return response
+        return _AgentResponse(content)
 
 
 def test_guarded_relearn_recollects_pages_once_when_recipe_misses_jobs(tmp_path):
@@ -231,7 +225,7 @@ class _FakeExtract(_FakeAgent):
 
 
 class _EmptyDetailScraper(_Scraper):
-    def _detail_html(self, card, recipe):
+    def _detail_html(self, card, recipe) -> str:
         self.detail_urls.append(card.url)
         return "<main><p>Recovered JD body from raw page text.</p></main>"
 
@@ -335,7 +329,7 @@ class _TransientPaginationPage:
 
 def test_pagination_waits_for_cards_not_incidental_dom_changes():
     scraper = DashboardScraper([])
-    scraper._page = _TransientPaginationPage()
+    scraper._page = cast(Any, _TransientPaginationPage())
 
     html = scraper._next_page(_recipe())
 
@@ -359,7 +353,7 @@ def test_cards_without_a_deterministic_title_are_not_ingested(tmp_path):
 
 
 class _HugeDetailScraper(_Scraper):
-    def _detail_html(self, card, recipe):
+    def _detail_html(self, card, recipe) -> str:
         return "<main>" + ("description " * (MAX_EXTRACT_CHARS // 2)) + "</main>"
 
 

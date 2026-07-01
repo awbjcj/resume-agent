@@ -49,7 +49,7 @@ class _FakeAgent:
 
     def run(self, prompt):
         class _Response:
-            pass
+            content: object
 
         response = _Response()
         response.content = self.content

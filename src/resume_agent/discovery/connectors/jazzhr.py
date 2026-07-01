@@ -21,7 +21,8 @@ def parse_listing(html: str, token: str) -> list[RawJob]:
     rows = []
     seen_urls = set()
     for link in soup.select("a.job_title_link[href]"):
-        url = urljoin(base, link.get("href"))
+        href = link.get("href") or ""
+        url = urljoin(base, str(href))
         if url in seen_urls:
             continue
         seen_urls.add(url)

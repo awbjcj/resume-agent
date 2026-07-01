@@ -65,6 +65,7 @@ def test_pull_jobs_sets_relearn_on_dashboard_scrapers(monkeypatch):
 
     monkeypatch.setattr(discovery, "run_pull", fake_run_pull)
 
-    discovery.pull_jobs(session=None, relearn=True)
+    with _session() as session:
+        discovery.pull_jobs(session, relearn=True)
 
     assert observed["relearn"] is True

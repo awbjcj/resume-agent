@@ -101,6 +101,7 @@ def test_linkedin_fetch_skips_known_cards_before_detail_scrape():
             """
 
         def _detail_html(self, card):
+            assert card.url is not None
             scraped.append(card.url)
             return """
             <html><body>
