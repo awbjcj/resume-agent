@@ -92,7 +92,7 @@ The existing `Job` row is **mutated in place** (same id); user progress — stat
 
 | Tier | Sources |
 | --- | --- |
-| **Canonical** | `greenhouse`, `lever`, `ashby`, `workday`, `tesla`, `google`, `companies`, `url` |
+| **Canonical** | `greenhouse`, `lever`, `ashby`, `workday`, `tesla`, `google`, `companies`, `scrape`, `url` |
 | **Fallback** | `adzuna`, `remoteok`, `linkedin` |
 
 Equal-tier re-pulls are no-ops (first-seen-wins). Once a job's status has
@@ -178,6 +178,7 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/llm_runner.py` | `build_model` provider seam + `AgentRunner` adapter |
 | `src/resume_agent/discovery/connectors/detect.py` | ATS detection (singleton → L1 → L2) |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation |
+| `src/resume_agent/discovery/scraper/dashboard.py` | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/` |
 | `src/resume_agent/discovery/connectors/workday.py` | Workday CXS list → gate → detail |
 | `src/resume_agent/discovery/connectors/tesla.py` | Tesla bespoke JSON portal |
 | `src/resume_agent/discovery/connectors/google.py` | Google Careers JSON API |

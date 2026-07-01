@@ -244,6 +244,11 @@ def pull_cmd(
         DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
     ),
     limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
+    relearn: bool = typer.Option(
+        False,
+        "--relearn",
+        help="Force scrape connectors to learn fresh selector recipes this run.",
+    ),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run every enabled connector, dedupe into raw jobs, and report per-source counts."""
@@ -259,6 +264,7 @@ def pull_cmd(
             session, search_path=search, connectors_path=connectors_path,
             telemetry_path=CONNECTOR_RUNS_PATH, limit=limit,
             reporter=ProgressReporter("pull"),
+            relearn=relearn,
         )
     if not report.totals and not report.failures:
         typer.echo("No connectors enabled. Edit connectors.yaml (and .env) to enable some.")
