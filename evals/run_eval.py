@@ -32,11 +32,11 @@ def build_eval_bundle(
     reviser_agent = build_reviser_agent(model_id, style_guide)
     reviewers = {}
     for spec in config.reviewers:
-        kwargs = {"style_guide": style_guide}
-        if spec.score_bands:
-            kwargs["score_bands"] = True
         reviewers[spec.name] = build_reviewer_agent(
-            spec.name, model_id, **kwargs
+            spec.name,
+            model_id,
+            style_guide=style_guide,
+            score_bands=spec.score_bands,
         )
     revision_agent = build_revision_agent(model_id, style_guide)
     return TailorBundle(

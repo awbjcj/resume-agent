@@ -213,7 +213,7 @@ def test_build_eval_bundle_applies_model_override_to_every_lane(monkeypatch):
     monkeypatch.setattr(
         run_eval,
         "build_reviewer_agent",
-        lambda name, model_id, style_guide: calls.append(
+        lambda name, model_id, style_guide=None, score_bands=False: calls.append(
             (name, model_id, style_guide)
         )
         or name,

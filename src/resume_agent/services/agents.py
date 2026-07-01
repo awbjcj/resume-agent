@@ -69,11 +69,11 @@ def build_discovery_bundle() -> DiscoveryBundle:
 def build_tailor_bundle(config, style_guide: str | None = None) -> TailorBundle:
     reviewers = {}
     for spec in config.reviewers:
-        kwargs = {"style_guide": style_guide}
-        if getattr(spec, "score_bands", False):
-            kwargs["score_bands"] = True
         reviewers[spec.name] = build_reviewer_agent(
-            spec.name, model_for_tier(spec.model_tier), **kwargs
+            spec.name,
+            model_for_tier(spec.model_tier),
+            style_guide=style_guide,
+            score_bands=bool(getattr(spec, "score_bands", False)),
         )
     return TailorBundle(
         tailor=build_tailor_agent(style_guide=style_guide),
