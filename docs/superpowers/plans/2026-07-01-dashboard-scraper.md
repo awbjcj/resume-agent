@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Test command: `.venv/Scripts/python.exe -m pytest` (offline — browser + LLM faked). Lint: `ruff check`.
+- Test command: `.venv/Scripts/python.exe -m pytest` (offline — browser + LLM faked). Lint: `.venv/Scripts/python.exe -m ruff check .`.
 - **Depends on the skip-known plan** (`2026-07-01-skip-known-pull.md`) for the `skip_seen` predicate the connector accepts. If unmerged, `DashboardScraper.fetch` still takes `skip_seen=None` and simply skips the pruning line.
 - Recipes are cached JSON at `data/scraper_recipes/{host}.json`, keyed by normalized host; a `schema_version` mismatch or unreadable file is a cache-miss.
 - Learn on cache-miss; **guarded auto-relearn once per target per pull** when replay yields zero cards AND `has_job_like_content(html)` is True; `resume-agent pull --relearn` forces a fresh learn.
@@ -18,6 +18,44 @@
 - Routing = explicit opt-in `scrape:` config section + its own connector, disabled by default. No automatic fallback from `companies.urls`.
 - Source string = `"scrape"` (canonical tier). JD source text only — fact-lock untouched.
 - No browser launches in tests: the connector's `_learn_source`/`_open_results`/`_next_page`/`_detail_html` are overridable seams, stubbed in tests exactly as `LinkedInScraper` stubs `_search_html`/`_detail_html`.
+
+## Pre-implementation review corrections (binding)
+
+The task snippets below describe the intended slices, but these corrections supersede
+any conflicting snippet. They close bugs found by reviewing the plan against the current
+repository and current Agno, Playwright, and Pydantic documentation.
+
+- Recipe models reject unknown fields and validate non-empty selectors. `max_pages` is
+  bounded to `1..100`; link recipes require `url_sel`; non-infinite pagination requires
+  `control_sel`. This prevents an invalid LLM response from becoming a cached runtime bug.
+- Cache filenames are derived only from a normalized hostname, and writes use a temporary
+  file plus `Path.replace` so an interrupted write cannot leave a partially-written recipe.
+- `prune_html` implements its stated whitespace-collapse contract, not only tag removal.
+- Relative card links are resolved with `urljoin(target.url, card.url)` before gating,
+  deduplication, `skip_seen`, or detail navigation. Card identity includes location when a
+  URL is absent, so same-title inline postings in different locations do not collapse.
+- `detail_mode="inline"` is implemented by retaining the matched card fragment on
+  `ScrapedCard`; it never attempts to navigate a missing URL. Link mode continues to fetch
+  the detail page.
+- Browser replay uses an ephemeral `Browser` + `BrowserContext`, not the LinkedIn persistent
+  profile. Arbitrary company boards must not receive LinkedIn cookies, and concurrent use of
+  that profile must not break this connector.
+- Pagination handles all declared patterns. `next`, `numbered`, and `load_more` click the
+  learned control; `infinite` scrolls. Every advance must produce changed page content or the
+  crawl stops, preventing duplicate-page loops. Playwright locators provide actionability waits.
+- Guarded relearn recollects results and pagination with the replacement recipe. Reusing pages
+  collected with stale search/pagination selectors would not be a deterministic replay.
+- Candidate rows stay paired with their source card directly; no URL/title dictionary repair
+  step is used. The target `label` supplies the company for company-owned boards, and LLM
+  fallback fields fill only values that deterministic extraction did not provide.
+- Title gating and optional `skip_seen` happen before detail I/O. Full relevance gating happens
+  immediately after each detail, and replay stops once `limit` accepted jobs have been found;
+  the connector does not fetch every remaining detail only to truncate later.
+- Per-target and per-card failures are isolated and reported with stable keys. Browser cleanup
+  is best-effort and cannot mask an already-produced `FetchResult`.
+- The separate skip-known plan is not present in the current implementation. This plan keeps
+  `skip_seen=None` as a backward-compatible connector seam, but Task 8 adds only `relearn` to
+  the current `pull_jobs` signature and does not invent `skip_known`/`--refresh` here.
 
 ---
 
