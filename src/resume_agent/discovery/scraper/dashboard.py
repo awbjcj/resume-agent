@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Protocol, Sequence
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
@@ -41,6 +41,7 @@ from resume_agent.llm_runner import Runner
 _CONTENT_CHANGE_POLLS = 80
 _CONTENT_CHANGE_POLL_MS = 100
 _RESULT_WAIT_MS = 8_000
+MAX_EXTRACT_CHARS = 60_000
 
 
 class ScrapeTargetLike(Protocol):
@@ -124,9 +125,12 @@ class DashboardScraper:
                 page.wait_for_selector(wait_selector, timeout=_RESULT_WAIT_MS)
             except PlaywrightTimeoutError:
                 pass
+        self._pace(page)
+        return page.content()
+
+    def _pace(self, page: Page) -> None:
         if self.pace_seconds > 0:
             page.wait_for_timeout(round(self.pace_seconds * 1_000))
-        return page.content()
 
     def _learn_source(self, target: ScrapeTargetLike) -> str:
         return self._page_source(target.url)
@@ -151,17 +155,29 @@ class DashboardScraper:
             page.wait_for_selector(recipe.card_container, timeout=_RESULT_WAIT_MS)
         except PlaywrightTimeoutError:
             pass
-        if self.pace_seconds > 0:
-            page.wait_for_timeout(round(self.pace_seconds * 1_000))
+        self._pace(page)
         return page.content()
 
-    def _changed_content(self, before: str) -> str | None:
+    @staticmethod
+    def _card_signature(html: str, recipe: ScrapeRecipe) -> tuple[tuple[str | None, ...], ...]:
+        return tuple(
+            (card.url, card.title, card.location)
+            for card in parse_cards(html, recipe)
+            if card.title
+        )
+
+    def _changed_cards(
+        self,
+        before: tuple[tuple[str | None, ...], ...],
+        recipe: ScrapeRecipe,
+    ) -> str | None:
         page = self._page
         if page is None:
             return None
         for _ in range(_CONTENT_CHANGE_POLLS):
             after = page.content()
-            if after != before:
+            signature = self._card_signature(after, recipe)
+            if signature and signature != before:
                 return after
             page.wait_for_timeout(_CONTENT_CHANGE_POLL_MS)
         return None
@@ -170,7 +186,7 @@ class DashboardScraper:
         page = self._page
         if page is None:
             return None
-        before = page.content()
+        before = self._card_signature(page.content(), recipe)
         try:
             if recipe.pagination.pattern == "infinite":
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -179,7 +195,7 @@ class DashboardScraper:
                 if control.count() == 0:
                     return None
                 control.click()
-            return self._changed_content(before)
+            return self._changed_cards(before, recipe)
         except PlaywrightError:
             return None
 
@@ -225,15 +241,20 @@ class DashboardScraper:
         pages: list[str],
         base_url: str,
     ) -> list[ScrapedCard]:
-        seen: set[tuple[str | None, str | None, str | None]] = set()
+        seen: set[tuple[str | None, ...]] = set()
         cards: list[ScrapedCard] = []
         for html in pages:
             for parsed in parse_cards(html, recipe):
+                if not parsed.title:
+                    continue
+                resolved_url = urljoin(base_url, parsed.url) if parsed.url else None
+                if resolved_url and urlsplit(resolved_url).scheme not in {"http", "https"}:
+                    resolved_url = None
                 card = replace(
                     parsed,
-                    url=urljoin(base_url, parsed.url) if parsed.url else None,
+                    url=resolved_url,
                 )
-                identity = (card.url, card.title, card.location)
+                identity = (card.url,) if card.url else (None, card.title, card.location)
                 if identity in seen:
                     continue
                 seen.add(identity)
@@ -245,7 +266,8 @@ class DashboardScraper:
         parsed = parse_detail(html or "", recipe).strip()
         if parsed:
             return ExtractedJob(jd_text=parsed)
-        return extract_fields(html_to_text(html or ""), self._extractor())
+        fallback_text = html_to_text(html or "")[:MAX_EXTRACT_CHARS]
+        return extract_fields(fallback_text, self._extractor())
 
     def fetch(
         self,
@@ -272,6 +294,10 @@ class DashboardScraper:
                     continue
 
                 for card in cards:
+                    if recipe.detail_mode == "link" and card.url is None:
+                        key = card.title or target.url
+                        failures[key] = "Invalid or missing HTTP(S) detail URL"
+                        continue
                     row = RawJob(
                         source="scrape",
                         url=card.url,

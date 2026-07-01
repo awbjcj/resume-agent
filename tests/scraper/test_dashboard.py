@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from resume_agent.discovery.scraper.dashboard import DashboardScraper
+from resume_agent.discovery.scraper.dashboard import DashboardScraper, MAX_EXTRACT_CHARS
 from resume_agent.discovery.scraper.recipe import Pagination, ScrapeRecipe
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -31,9 +31,11 @@ class _FakeAgent:
     def __init__(self, content):
         self.calls = 0
         self.content = content
+        self.prompts = []
 
     def run(self, prompt):
         self.calls += 1
+        self.prompts.append(prompt)
 
         class _Response:
             pass
@@ -265,3 +267,111 @@ def test_deterministic_detail_does_not_call_llm_fallback(tmp_path):
     scraper.fetch(SearchConfig(), limit=1)
 
     assert extractor.calls == 0
+
+
+def test_non_http_card_link_is_rejected_before_detail_fetch(tmp_path):
+    html = """
+    <ul><li class='job'><a href='javascript:alert(1)'>Backend Engineer</a>
+    <span class='loc'>Remote</span></li></ul>
+    """
+    scraper = _Scraper(
+        list_html=html,
+        targets=[_Target("https://acme.com/careers")],
+        store_dir=tmp_path,
+        learn_agent=_FakeAgent(_recipe()),
+    )
+
+    result = scraper.fetch(SearchConfig())
+
+    assert result.jobs == []
+    assert scraper.detail_urls == []
+    assert any("HTTP" in reason for reason in result.failures.values())
+
+
+def test_card_deduplication_uses_url_before_mutable_card_fields():
+    first = """
+    <li class='job'><a href='/jobs/1'>Backend Engineer</a><span class='loc'>Remote</span></li>
+    """
+    updated = first.replace("Backend Engineer", "Senior Backend Engineer")
+
+    cards = DashboardScraper._cards(_recipe(), [first, updated], "https://acme.com/careers")
+
+    assert len(cards) == 1
+
+
+class _PaginationLocator:
+    def __init__(self, page):
+        self.page = page
+
+    @property
+    def first(self):
+        return self
+
+    def count(self):
+        return 1
+
+    def click(self):
+        self.page.state = "transient"
+
+
+class _TransientPaginationPage:
+    initial = "<li class='job'><a href='/jobs/1'>Backend Engineer</a></li>"
+    transient = initial + "<div class='spinner'>Loading</div>"
+    final = "<li class='job'><a href='/jobs/2'>Platform Engineer</a></li>"
+
+    def __init__(self):
+        self.state = "initial"
+
+    def content(self):
+        return getattr(self, self.state)
+
+    def locator(self, selector):
+        return _PaginationLocator(self)
+
+    def wait_for_timeout(self, milliseconds):
+        if self.state == "transient":
+            self.state = "final"
+
+
+def test_pagination_waits_for_cards_not_incidental_dom_changes():
+    scraper = DashboardScraper([])
+    scraper._page = _TransientPaginationPage()
+
+    html = scraper._next_page(_recipe())
+
+    assert html == _TransientPaginationPage.final
+
+
+def test_cards_without_a_deterministic_title_are_not_ingested(tmp_path):
+    html = """
+    <li class='job'><a href='/jobs/1'><span>Backend Engineer</span></a></li>
+    """
+    recipe = _recipe(title_sel=".missing")
+    scraper = _Scraper(
+        list_html=html,
+        targets=[_Target("https://acme.com/careers")],
+        store_dir=tmp_path,
+        learn_agent=_FakeAgent(recipe),
+    )
+
+    assert scraper.fetch(SearchConfig()).jobs == []
+    assert scraper.detail_urls == []
+
+
+class _HugeDetailScraper(_Scraper):
+    def _detail_html(self, card, recipe):
+        return "<main>" + ("description " * (MAX_EXTRACT_CHARS // 2)) + "</main>"
+
+
+def test_llm_fallback_input_is_bounded(tmp_path):
+    extractor = _FakeExtract()
+    scraper = _HugeDetailScraper(
+        targets=[_Target("https://acme.com/careers")],
+        store_dir=tmp_path,
+        learn_agent=_FakeAgent(_recipe()),
+        extract_agent=extractor,
+    )
+
+    scraper.fetch(SearchConfig(), limit=1)
+
+    assert len(extractor.prompts[0]) <= MAX_EXTRACT_CHARS
