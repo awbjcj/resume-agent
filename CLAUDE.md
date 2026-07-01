@@ -92,7 +92,7 @@ The existing `Job` row is **mutated in place** (same id); user progress — stat
 
 | Tier | Sources |
 | --- | --- |
-| **Canonical** | `greenhouse`, `lever`, `ashby`, `workday`, `tesla`, `google`, `companies`, `url` |
+| **Canonical** | `greenhouse`, `lever`, `ashby`, `workday`, `tesla`, `google`, `smartrecruiters`, `workable`, `recruitee`, `personio`, `breezy`, `jazzhr`, `bamboohr`, `companies`, `url`, `manual` |
 | **Fallback** | `adzuna`, `remoteok`, `linkedin` |
 
 Equal-tier re-pulls are no-ops (first-seen-wins). Once a job's status has
@@ -122,11 +122,14 @@ primary reason counts, then hard-deletes archived zero-progress jobs older than
    `careers.google.com` → `AtsTarget("google")`. No token; the host is the
    identity. Checked before L1/L2.
 2. **L1 URL pattern** — host + path directly reveals ATS and board token
-   (Greenhouse, Lever, Ashby, Workday triple from `{tenant}.{dc}.myworkdayjobs.com/{site}`).
+   (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee, Personio,
+   Breezy, JazzHR, BambooHR, and the Workday triple from
+   `{tenant}.{dc}.myworkdayjobs.com/{site}`).
 3. **L2 HTML sniff** — fetches the page, scans for embedded ATS markers
    (Greenhouse embed `?for=`, Lever/Ashby slugs, Workday full URL in HTML).
 
-`AtsTarget` fields: `ats`, `token` (Greenhouse/Lever/Ashby slug), `tenant` +
+`AtsTarget` fields: `ats`, `token` (single-slug ATS account), `country` (Personio
+host suffix), `tenant` +
 `datacenter` + `site` (Workday triple). Tesla/Google carry only `ats`.
 
 ---
@@ -135,13 +138,13 @@ primary reason counts, then hard-deletes archived zero-progress jobs older than
 
 `CompaniesConnector.fetch` delegates to the `harvest` seam: for each URL in
 `self.urls` it calls `detect_ats`, looks up the backend in `_BACKENDS`, and calls
-`backend(target, search, limit)`. Any URL that fails detection or whose backend
+`backend(target, search, limit, skip_seen)`. Any URL that fails detection or whose backend
 raises `httpx.HTTPError` / a parse error is recorded on the returned
 `FetchResult.failures` (url → reason) — it never aborts the run. The relevance
 gate `harvest` runs over the union is the backstop for backends that don't filter
 server-side.
 
-To add a new backend: write `fetch_<name>(target, search, limit) -> list[RawJob]`
+To add a new backend: write `fetch_<name>(target, search, limit, skip_seen=None) -> list[RawJob]`
 in a new module, add detection logic to `detect.py`, register in `_BACKENDS`.
 
 ---
@@ -168,6 +171,7 @@ aggressiveness determines how many detail fetches are issued.
 | `title_relevance_gate` | Before JD text is available (Workday list rows, Tesla listing state) |
 | `relevance_gate` | Full gate on title + JD; falls back to keyword search when no `role_anchors` are configured |
 | `primary_search_term` | Picks the strongest term to send as `searchText` to Workday / Google; falls back to `role_anchors` if `titles` and `keywords` are empty |
+| `primary_location` | Picks the first configured location for ATS endpoints such as Lever that accept a free-form location filter |
 
 ---
 

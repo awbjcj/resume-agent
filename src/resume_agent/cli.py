@@ -32,7 +32,11 @@ from resume_agent.services.prune import prune as run_prune
 from resume_agent.services.rendering import render_resume_version
 from resume_agent.services.tailoring import tailor
 from resume_agent.tracking.queries import application_job_pairs
-from resume_agent.tracking.repository import get_job, save_job, update_application_status
+from resume_agent.tracking.repository import (
+    get_job,
+    save_job,
+    update_application_status,
+)
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
 from resume_agent.tracking.match_gap import match_gap
 from resume_agent.tracking.tables import Job, JobStatus
@@ -56,7 +60,9 @@ def profile_build(
     sources: str = typer.Option(DEFAULT_SOURCES, help="Path to profile_sources.yaml."),
     out: str = typer.Option(DEFAULT_FACTS, help="Where to write facts.json."),
     refresh: bool = typer.Option(
-        False, "--refresh", help="Overwrite an existing facts.json (discards manual edits)."
+        False,
+        "--refresh",
+        help="Overwrite an existing facts.json (discards manual edits).",
     ),
 ) -> None:
     """Build facts.json from your resume + GitHub."""
@@ -68,7 +74,9 @@ def profile_build(
         raise typer.Exit(code=1)
 
     if Path(out).exists() and not refresh:
-        typer.echo(f"{out} already exists. Use --refresh to rebuild (this discards manual edits).")
+        typer.echo(
+            f"{out} already exists. Use --refresh to rebuild (this discards manual edits)."
+        )
         raise typer.Exit(code=1)
 
     cfg = load_yaml(sources)
@@ -106,13 +114,22 @@ def _read_piped_stdin() -> str | None:
 
 @app.command("addjob")
 def addjob(
-    url: str | None = typer.Option(None, help="Posting URL. With no JD source, the page is fetched and fields are auto-extracted."),
-    company: str | None = typer.Option(None, help="Company name (overrides extracted)."),
+    url: str | None = typer.Option(
+        None,
+        help="Posting URL. With no JD source, the page is fetched and fields are auto-extracted.",
+    ),
+    company: str | None = typer.Option(
+        None, help="Company name (overrides extracted)."
+    ),
     title: str | None = typer.Option(None, help="Job title (overrides extracted)."),
     location: str | None = typer.Option(None, help="Location (overrides extracted)."),
-    jd_file: str | None = typer.Option(None, help="Read the JD from this file instead of stdin/URL."),
+    jd_file: str | None = typer.Option(
+        None, help="Read the JD from this file instead of stdin/URL."
+    ),
     no_browser: bool = typer.Option(
-        False, "--no-browser", help="Force HTTP-only fetching (skip the Playwright fallback)."
+        False,
+        "--no-browser",
+        help="Force HTTP-only fetching (skip the Playwright fallback).",
     ),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
@@ -124,18 +141,28 @@ def addjob(
     engine = _engine(db_url)
     is_url_extract = bool(url) and not (jd_file or stdin_text is not None)
     if jd_file or stdin_text is not None:
-        jd_text = Path(jd_file).read_text(encoding="utf-8") if jd_file else stdin_text or ""
+        jd_text = (
+            Path(jd_file).read_text(encoding="utf-8") if jd_file else stdin_text or ""
+        )
         with get_session(engine) as session:
             job = add_job_from_text(
-                session, jd_text=jd_text, url=url,
-                company=company, title=title, location=location,
+                session,
+                jd_text=jd_text,
+                url=url,
+                company=company,
+                title=title,
+                location=location,
             )
     elif url:
         try:
             with get_session(engine) as session:
                 job = add_job_from_url(
-                    session, url=url, company=company, title=title,
-                    location=location, allow_browser=not no_browser,
+                    session,
+                    url=url,
+                    company=company,
+                    title=title,
+                    location=location,
+                    allow_browser=not no_browser,
                 )
         except UrlFetchError as exc:
             typer.echo(str(exc))
@@ -144,11 +171,17 @@ def addjob(
         jd_text = typer.get_text_stream("stdin").read()
         with get_session(engine) as session:
             job = add_job_from_text(
-                session, jd_text=jd_text, url=url,
-                company=company, title=title, location=location,
+                session,
+                jd_text=jd_text,
+                url=url,
+                company=company,
+                title=title,
+                location=location,
             )
     if is_url_extract and job is not None:
-        typer.echo(f"Extracted: {job.title or '?'} @ {job.company or '?'} ({job.location or '?'})")
+        typer.echo(
+            f"Extracted: {job.title or '?'} @ {job.company or '?'} ({job.location or '?'})"
+        )
     if job is None:
         typer.echo("Duplicate job (same URL or JD already present); not added.")
         raise typer.Exit(code=0)
@@ -165,7 +198,9 @@ def discover_cmd(
     engine = _engine(db_url)
     with get_session(engine) as session:
         counts = discover_jobs(
-            session, search_path=search, facts_path=facts,
+            session,
+            search_path=search,
+            facts_path=facts,
             reporter=ProgressReporter("discover"),
         )
     typer.echo(f"Discovery complete. Status counts: {counts}")
@@ -174,7 +209,8 @@ def discover_cmd(
 @app.command("reprocess")
 def reprocess_cmd(
     scope: list[str] = typer.Option(
-        ["shortlisted"], "--scope",
+        ["shortlisted"],
+        "--scope",
         help="Repeatable: shortlisted | rejected:relevance | rejected:filtered | all.",
     ),
     search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
@@ -185,7 +221,10 @@ def reprocess_cmd(
     engine = _engine(db_url)
     with get_session(engine) as session:
         counts = reprocess_jobs(
-            session, scopes=scope, search_path=search, facts_path=facts,
+            session,
+            scopes=scope,
+            search_path=search,
+            facts_path=facts,
             reporter=ProgressReporter("discover"),
         )
     typer.echo(f"Reprocess complete. Status counts: {counts}")
@@ -194,7 +233,9 @@ def reprocess_cmd(
 @app.command("refresh")
 def refresh_cmd(
     search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
-    connectors_path: str = typer.Option(DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."),
+    connectors_path: str = typer.Option(
+        DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
+    ),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
     limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
@@ -209,8 +250,12 @@ def refresh_cmd(
     engine = _engine(db_url)
     with get_session(engine) as session:
         report = refresh_jobs(
-            session, search_path=search, connectors_path=connectors_path,
-            telemetry_path=CONNECTOR_RUNS_PATH, facts_path=facts, limit=limit,
+            session,
+            search_path=search,
+            connectors_path=connectors_path,
+            telemetry_path=CONNECTOR_RUNS_PATH,
+            facts_path=facts,
+            limit=limit,
             reporter=ProgressReporter("refresh"),
         )
     typer.echo(
@@ -221,7 +266,9 @@ def refresh_cmd(
 @app.command("scrape")
 def scrape_cmd(
     search: str = typer.Option(DEFAULT_SEARCH, help="Path to search.yaml."),
-    limit: int | None = typer.Option(None, help="Cap the number of postings fetched this run."),
+    limit: int | None = typer.Option(
+        None, help="Cap the number of postings fetched this run."
+    ),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""
@@ -232,7 +279,9 @@ def scrape_cmd(
         result = connector.fetch(config, limit=limit)
         added = ingest_jobs(session, result.jobs)
     if result.failures:
-        joined = ", ".join(f"{url} ({reason})" for url, reason in result.failures.items())
+        joined = ", ".join(
+            f"{url} ({reason})" for url, reason in result.failures.items()
+        )
         typer.echo(f"Skipped {len(result.failures)} failed posting(s): {joined}")
     typer.echo(f"Scrape complete. Added {sum(added.values())} new job(s).")
 
@@ -244,6 +293,11 @@ def pull_cmd(
         DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
     ),
     limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
+    refresh: bool = typer.Option(
+        False,
+        "--refresh",
+        help="Re-fetch jobs already known instead of skipping their expensive detail work.",
+    ),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run every enabled connector, dedupe into raw jobs, and report per-source counts."""
@@ -256,12 +310,18 @@ def pull_cmd(
     engine = _engine(db_url)
     with get_session(engine) as session:
         report = pull_jobs(
-            session, search_path=search, connectors_path=connectors_path,
-            telemetry_path=CONNECTOR_RUNS_PATH, limit=limit,
+            session,
+            search_path=search,
+            connectors_path=connectors_path,
+            telemetry_path=CONNECTOR_RUNS_PATH,
+            limit=limit,
             reporter=ProgressReporter("pull"),
+            skip_known=not refresh,
         )
     if not report.totals and not report.failures:
-        typer.echo("No connectors enabled. Edit connectors.yaml (and .env) to enable some.")
+        typer.echo(
+            "No connectors enabled. Edit connectors.yaml (and .env) to enable some."
+        )
         raise typer.Exit(code=0)
     for name in sorted(report.totals):
         typer.echo(f"  {name:<12} +{report.totals.get(name, 0)}")
@@ -285,10 +345,14 @@ def sources_cmd() -> None:
 
 @app.command("match-gap")
 def match_gap_cmd(
-    job_id: int | None = typer.Option(None, help="Show gaps for one job instead of the aggregate."),
+    job_id: int | None = typer.Option(
+        None, help="Show gaps for one job instead of the aggregate."
+    ),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
     llm: bool = typer.Option(
-        False, "--llm", help="Add a cheap-LLM synonym pass, such as k8s matching Kubernetes."
+        False,
+        "--llm",
+        help="Add a cheap-LLM synonym pass, such as k8s matching Kubernetes.",
     ),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
@@ -300,13 +364,17 @@ def match_gap_cmd(
         report = match_gap(session, profile_facts, canonicalizer=canonicalizer)
 
     if report.target_total == 0:
-        typer.echo("No jobs past discovery yet. Run `discover` and shortlist/approve some first.")
+        typer.echo(
+            "No jobs past discovery yet. Run `discover` and shortlist/approve some first."
+        )
         raise typer.Exit(code=0)
 
     if job_id is not None:
         missing = report.per_job.get(job_id)
         if missing is None:
-            typer.echo(f"Job #{job_id} is not among your {report.target_total} target jobs.")
+            typer.echo(
+                f"Job #{job_id} is not among your {report.target_total} target jobs."
+            )
             raise typer.Exit(code=1)
         if not missing:
             typer.echo(f"Job #{job_id}: no skill gaps.")
@@ -321,7 +389,9 @@ def match_gap_cmd(
         raise typer.Exit(code=0)
     typer.echo(f"Skill gaps across {report.target_total} target jobs:")
     for gap in report.gaps:
-        typer.echo(f"  {gap.skill:<28} demanded by {gap.demand_count}/{gap.target_total}")
+        typer.echo(
+            f"  {gap.skill:<28} demanded by {gap.demand_count}/{gap.target_total}"
+        )
 
 
 DEFAULT_REVIEW = "config/review.yaml"
@@ -347,7 +417,9 @@ def approve(
 @app.command("tailor")
 def tailor_cmd(
     job_id: int | None = typer.Option(None, help="Tailor a single job by id."),
-    approved: bool = typer.Option(False, "--approved", help="Tailor all approved jobs."),
+    approved: bool = typer.Option(
+        False, "--approved", help="Tailor all approved jobs."
+    ),
     review: str = typer.Option(DEFAULT_REVIEW, help="Path to review.yaml."),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
@@ -363,8 +435,11 @@ def tailor_cmd(
             raise typer.Exit(code=1)
 
         results = tailor(
-            session, job_ids=[job_id] if job_id is not None else None,
-            approved=approved, review_path=review, facts_path=facts,
+            session,
+            job_ids=[job_id] if job_id is not None else None,
+            approved=approved,
+            review_path=review,
+            facts_path=facts,
             reporter=ProgressReporter("tailor"),
         )
         for jid, versions in results.items():
@@ -375,8 +450,12 @@ def tailor_cmd(
 
 @app.command("cover-letter")
 def cover_letter_cmd(
-    job_id: int | None = typer.Option(None, help="Write a cover letter for a single job by id."),
-    approved: bool = typer.Option(False, "--approved", help="Write cover letters for all approved jobs."),
+    job_id: int | None = typer.Option(
+        None, help="Write a cover letter for a single job by id."
+    ),
+    approved: bool = typer.Option(
+        False, "--approved", help="Write cover letters for all approved jobs."
+    ),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
@@ -391,8 +470,10 @@ def cover_letter_cmd(
             raise typer.Exit(code=1)
 
         results = write_cover_letters(
-            session, job_ids=[job_id] if job_id is not None else None,
-            approved=approved, facts_path=facts,
+            session,
+            job_ids=[job_id] if job_id is not None else None,
+            approved=approved,
+            facts_path=facts,
         )
         for r in results:
             typer.echo(
@@ -425,13 +506,17 @@ def export_cmd(
     job_id: int | None = typer.Argument(None, help="Job id to export."),
     all_jobs: bool = typer.Option(False, "--all", help="Export every job."),
     output: str = typer.Option("output", "--output", help="Base output directory."),
-    db_url: str | None = typer.Option(None, "--db-url", help="Override the database URL."),
+    db_url: str | None = typer.Option(
+        None, "--db-url", help="Override the database URL."
+    ),
 ) -> None:
     """Write per-job folders from the database-authoritative version store."""
     engine = _engine(db_url)
     with get_session(engine) as session:
         if all_jobs:
-            ids = [job.id for job in session.exec(select(Job)).all() if job.id is not None]
+            ids = [
+                job.id for job in session.exec(select(Job)).all() if job.id is not None
+            ]
         elif job_id is not None:
             ids = [job_id]
         else:
@@ -455,12 +540,22 @@ def setup_cmd() -> None:
 
 @app.command("prune")
 def prune(
-    db_url: str | None = typer.Option(None, "--db-url", help="Override the configured DB URL."),
-    config: str = typer.Option("config/prune.yaml", "--config", help="Path to prune.yaml."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show counts without writing."),
+    db_url: str | None = typer.Option(
+        None, "--db-url", help="Override the configured DB URL."
+    ),
+    config: str = typer.Option(
+        "config/prune.yaml", "--config", help="Path to prune.yaml."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show counts without writing."
+    ),
     fit: int | None = typer.Option(None, "--fit", help="Override fit_threshold."),
-    stale_days: int | None = typer.Option(None, "--stale-days", help="Override stale_days."),
-    retention_days: int | None = typer.Option(None, "--retention-days", help="Override retention_days."),
+    stale_days: int | None = typer.Option(
+        None, "--stale-days", help="Override stale_days."
+    ),
+    retention_days: int | None = typer.Option(
+        None, "--retention-days", help="Override retention_days."
+    ),
 ) -> None:
     """Archive junk jobs (rejected / low-fit / stale) and expire old archived ones."""
     with get_session(_engine(db_url)) as session:
@@ -511,7 +606,9 @@ def sync_status_cmd(
             )
         if apply:
             for proposal in proposals:
-                update_application_status(session, proposal.application_id, proposal.proposed_status)
+                update_application_status(
+                    session, proposal.application_id, proposal.proposed_status
+                )
             typer.echo(f"Applied {len(proposals)} transition(s).")
         else:
             typer.echo("Re-run with --apply to apply these transitions.")
@@ -519,7 +616,9 @@ def sync_status_cmd(
 
 @app.command("serve")
 def serve_cmd(
-    host: str = typer.Option("127.0.0.1", help="Bind host (use 0.0.0.0 to expose on LAN)."),
+    host: str = typer.Option(
+        "127.0.0.1", help="Bind host (use 0.0.0.0 to expose on LAN)."
+    ),
     port: int = typer.Option(8000, help="Bind port."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:

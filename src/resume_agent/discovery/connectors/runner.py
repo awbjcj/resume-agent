@@ -6,6 +6,7 @@ from sqlmodel import Session
 from resume_agent.discovery.connectors.base import Connector, FetchResult
 from resume_agent.discovery.connectors.telemetry import record_run
 from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
+from resume_agent.discovery.known_jobs import build_known_index, make_skip_seen
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.progress import ProgressReporter
 
@@ -32,7 +33,12 @@ def _run_note(
     skipped_count: int,
 ) -> str | None:
     """Non-fatal note: upgrades, duplicate skips, failed sub-sources, and filters."""
-    if not result.filtered and not result.failures and not upgraded_count and not skipped_count:
+    if (
+        not result.filtered
+        and not result.failures
+        and not upgraded_count
+        and not skipped_count
+    ):
         return None
     parts: list[str] = [f"+{added_count} added"]
     if upgraded_count:
@@ -42,7 +48,9 @@ def _run_note(
     if result.filtered:
         parts.append(f"filtered {result.filtered} off-target")
     if result.failures:
-        items = ", ".join(f"{name} ({reason})" for name, reason in result.failures.items())
+        items = ", ".join(
+            f"{name} ({reason})" for name, reason in result.failures.items()
+        )
         parts.append(f"failed {len(result.failures)} source(s): {items}")
     return "; ".join(parts)
 
@@ -64,6 +72,7 @@ def run_pull(
     limit: int | None = None,
     reporter: ProgressReporter | None = None,
     finish: bool = True,
+    skip_known: bool = True,
 ) -> PullReport:
     """Fetch + ingest each connector in order, isolating failures.
 
@@ -72,6 +81,7 @@ def run_pull(
     ``added`` count rather than a (fabricated) per-job percentage.
     """
     report = PullReport()
+    skip_seen = make_skip_seen(build_known_index(session)) if skip_known else None
     if reporter:
         reporter.begin(total=len(connectors), label="Starting", added=0)
     added_total = 0
@@ -79,11 +89,15 @@ def run_pull(
         if reporter:
             reporter.step(index - 1, label=f"Pulling {connector.name}")
         try:
-            result = connector.fetch(search, limit=limit)
+            result = connector.fetch(search, limit=limit, skip_seen=skip_seen)
             summary = ingest_jobs_with_outcomes(session, result.jobs)
             added_count = summary.added.get(connector.name, sum(summary.added.values()))
-            upgraded_count = summary.upgraded.get(connector.name, sum(summary.upgraded.values()))
-            skipped_count = summary.skipped.get(connector.name, sum(summary.skipped.values()))
+            upgraded_count = summary.upgraded.get(
+                connector.name, sum(summary.upgraded.values())
+            )
+            skipped_count = summary.skipped.get(
+                connector.name, sum(summary.skipped.values())
+            )
             report.totals[connector.name] = added_count
             report.upgraded[connector.name] = upgraded_count
             report.skipped[connector.name] = skipped_count
@@ -98,7 +112,12 @@ def run_pull(
                 error=_run_note(result, added_count, upgraded_count, skipped_count),
             )
         except Exception as exc:
-            record_run(telemetry_path, connector.name, added=0, error=f"{type(exc).__name__}: {exc}")
+            record_run(
+                telemetry_path,
+                connector.name,
+                added=0,
+                error=f"{type(exc).__name__}: {exc}",
+            )
         if reporter:
             reporter.step(index, added=added_total, result=_pull_result(report))
     if reporter and finish:

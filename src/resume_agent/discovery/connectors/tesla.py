@@ -2,14 +2,16 @@ from dataclasses import dataclass
 
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
 from resume_agent.discovery.connectors.text import html_to_markdown
 from resume_agent.discovery.search_config import SearchConfig
 
 _STATE_URL = "https://www.tesla.com/cua-api/apps/careers/state"  # confirm at build time
-_JOB_URL = "https://www.tesla.com/cua-api/apps/careers/job/{id}"  # confirm at build time
+_JOB_URL = (
+    "https://www.tesla.com/cua-api/apps/careers/job/{id}"  # confirm at build time
+)
 
 
 @dataclass
@@ -45,7 +47,12 @@ def apply_tesla_detail(row: TeslaRow, info: dict) -> None:
     row.url = info.get("url") or row.url
 
 
-def fetch_tesla(target: AtsTarget, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
+def fetch_tesla(
+    target: AtsTarget,
+    search: SearchConfig,
+    limit: int | None = None,
+    skip_seen: SkipSeen | None = None,
+) -> list[RawJob]:
     resp = httpx.get(_STATE_URL, timeout=30)
     resp.raise_for_status()
     return harvest_detailed(
@@ -54,4 +61,5 @@ def fetch_tesla(target: AtsTarget, search: SearchConfig, limit: int | None = Non
         apply_tesla_detail,
         search=search,
         limit=limit,
+        skip_seen=skip_seen,
     )

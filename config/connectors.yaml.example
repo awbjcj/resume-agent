@@ -36,6 +36,13 @@ linkedin:
 #   Workday     — <tenant>.<dc>.myworkdayjobs.com/<site>  (uses CXS JSON API)
 #   Tesla       — www.tesla.com/careers  (bespoke JSON portal)
 #   Google      — careers.google.com/...  (bespoke JSON API)
+#   SmartRecruiters — jobs.smartrecruiters.com/<company>/...
+#   Workable     — apply.workable.com/<account>/... or <account>.workable.com
+#   Recruitee    — <account>.recruitee.com
+#   Personio     — <account>.jobs.personio.com or .de
+#   Breezy       — <account>.breezy.hr
+#   JazzHR       — <account>.applytojob.com
+#   BambooHR     — <account>.bamboohr.com/careers
 #
 # When a URL does not directly reveal the ATS, the connector fetches the page
 # and scans it for embedded Greenhouse / Lever / Ashby / Workday markers.

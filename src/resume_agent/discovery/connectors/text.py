@@ -1,4 +1,5 @@
 import html
+import json
 import re
 
 from bs4 import BeautifulSoup
@@ -24,9 +25,7 @@ _MATERIAL_ICON_TOKENS = frozenset(
 _ESCAPED_ICON_TOKEN = re.compile(
     r"(?<!\S)\\_([a-z][a-z0-9]*(?:\\_[a-z0-9]+)*)\\_(?=\s|$|[,.])"
 )
-_PLAIN_ICON_TOKEN = re.compile(
-    r"(?<!\S)_([a-z][a-z0-9]*(?:_[a-z0-9]+)*)_(?=\s|$|[,.])"
-)
+_PLAIN_ICON_TOKEN = re.compile(r"(?<!\S)_([a-z][a-z0-9]*(?:_[a-z0-9]+)*)_(?=\s|$|[,.])")
 _ESCAPED_STRONG = re.compile(r"\\\*\\\*([^*\n]+?)\\\*\\\*")
 
 
@@ -43,10 +42,7 @@ def clean_job_description_text(text: str) -> str:
     cleaned = _PLAIN_ICON_TOKEN.sub(_drop_icon_token, cleaned)
     cleaned = _ESCAPED_STRONG.sub(r"\1", cleaned)
     cleaned = re.sub(r"[ \t]+([,.;:])", r"\1", cleaned)
-    lines = (
-        re.sub(r"[ \t]{2,}", " ", line).strip()
-        for line in cleaned.splitlines()
-    )
+    lines = (re.sub(r"[ \t]{2,}", " ", line).strip() for line in cleaned.splitlines())
     cleaned = "\n".join(lines)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
@@ -68,8 +64,39 @@ def html_to_markdown(raw: str) -> str:
     """
     if not raw:
         return ""
-    converted = _markdownify(html.unescape(raw), heading_style="ATX", bullets="-").strip()
+    converted = _markdownify(
+        html.unescape(raw), heading_style="ATX", bullets="-"
+    ).strip()
     return clean_job_description_text(converted)
+
+
+def jobposting_json_ld(raw_html: str) -> dict | None:
+    """Return the first JobPosting object from JSON-LD in a public posting page."""
+    soup = BeautifulSoup(raw_html, "html.parser")
+
+    def find(node):
+        if isinstance(node, list):
+            return next(
+                (match for item in node if (match := find(item)) is not None), None
+            )
+        if not isinstance(node, dict):
+            return None
+        types = node.get("@type")
+        if isinstance(types, str) and types.casefold() == "jobposting":
+            return node
+        if isinstance(types, list) and any(
+            str(item).casefold() == "jobposting" for item in types
+        ):
+            return node
+        return find(node.get("@graph"))
+
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            if match := find(json.loads(script.string or script.get_text())):
+                return match
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return None
 
 
 # Word-count floor + gain a replacement JD must clear to count as "materially
@@ -107,6 +134,13 @@ def primary_search_term(search: SearchConfig) -> str:
     return terms[0] if terms else ""
 
 
+def primary_location(search: SearchConfig) -> str:
+    """Return the first non-empty location for coarse server-side filtering."""
+    return next(
+        (location.strip() for location in search.locations if location.strip()), ""
+    )
+
+
 def filter_by_search(jobs: list[RawJob], search: SearchConfig) -> list[RawJob]:
     """Keep jobs whose title or JD text contains any configured term."""
     terms = _terms(search)
@@ -129,7 +163,11 @@ def _matches_any(haystack: str, terms: list[str]) -> bool:
     (``\\b`` never matches next to a non-word char like ``+``).
     """
     return any(
-        re.search(rf"(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])", haystack, re.IGNORECASE)
+        re.search(
+            rf"(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])",
+            haystack,
+            re.IGNORECASE,
+        )
         for term in terms
     )
 

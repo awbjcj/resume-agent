@@ -11,7 +11,7 @@ from typing import Callable, Iterable, TypeVar
 
 import httpx
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen
 from resume_agent.discovery.connectors.text import relevance_gate, title_relevance_gate
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -68,6 +68,7 @@ def harvest_detailed(
     *,
     search: SearchConfig,
     limit: int | None,
+    skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
     """The N+1 list-then-detail dance shared by Workday and Tesla.
 
@@ -81,6 +82,8 @@ def harvest_detailed(
     jobs: list[RawJob] = []
     for row in rows:
         if not title_relevance_gate([row], search):
+            continue
+        if skip_seen is not None and skip_seen(row):
             continue
         try:
             detail = fetch_detail(row)

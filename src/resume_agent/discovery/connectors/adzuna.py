@@ -5,11 +5,14 @@ import httpx
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import identify_host
 from resume_agent.discovery.connectors.harvest import gate_and_limit
-from resume_agent.discovery.connectors.text import html_to_markdown, is_materially_richer
+from resume_agent.discovery.connectors.text import (
+    html_to_markdown,
+    is_materially_richer,
+)
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.discovery.url_ingest.browser import render_pages
@@ -151,7 +154,9 @@ def enrich_adzuna_job(job: RawJob, page: PageContent | None) -> RawJob:
             company = extracted.company or company
             location = extracted.location or location
             jd_text = extracted.jd_text
-    jd_text = jd_text if jd_text and is_materially_richer(jd_text, job.jd_text) else None
+    jd_text = (
+        jd_text if jd_text and is_materially_richer(jd_text, job.jd_text) else None
+    )
     jd_text = jd_text or _best_detail_text(page.html, job.jd_text)
     if not jd_text:
         return job
@@ -211,8 +216,19 @@ class AdzunaConnector:
         self.country = country
         self.enrich_details = enrich_details
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
-        jobs, filtered = gate_and_limit(parse_adzuna(self._get_results(search)), search, limit)
+    def fetch(
+        self,
+        search: SearchConfig,
+        limit: int | None = None,
+        skip_seen: SkipSeen | None = None,
+    ) -> FetchResult:
+        jobs, filtered = gate_and_limit(
+            parse_adzuna(self._get_results(search)), search, None
+        )
+        if skip_seen is not None:
+            jobs = [job for job in jobs if not skip_seen(job)]
+        if limit is not None:
+            jobs = jobs[:limit]
         if not self.enrich_details:
             return FetchResult(jobs=jobs, filtered=filtered)
         enriched, failures = enrich_adzuna_jobs(jobs)
@@ -220,7 +236,9 @@ class AdzunaConnector:
 
     def _get_results(self, search: SearchConfig) -> dict:
         role_terms = [
-            term.strip() for term in [*search.role_anchors, *search.keywords] if term.strip()
+            term.strip()
+            for term in [*search.role_anchors, *search.keywords]
+            if term.strip()
         ]
         params: dict[str, str | int] = {
             "app_id": self.app_id,

@@ -1670,6 +1670,17 @@
             ],
             "title": "Limit"
           },
+          "refresh": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh"
+          },
           "sourceIds": {
             "anyOf": [
               {

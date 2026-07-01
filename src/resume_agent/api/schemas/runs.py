@@ -34,6 +34,7 @@ class RunOut(CamelModel):
 class PullParams(CamelModel):
     limit: int | None = None
     source_ids: list[str] | None = None
+    refresh: bool | None = None
 
 
 class DiscoverParams(CamelModel):

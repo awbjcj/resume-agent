@@ -3,6 +3,7 @@ from resume_agent.discovery.connectors.text import (
     clean_job_description_text,
     filter_by_search,
     html_to_text,
+    primary_location,
     primary_search_term,
     relevance_gate,
 )
@@ -97,6 +98,13 @@ def test_primary_search_term_falls_back_to_role_anchors():
 
 def test_primary_search_term_empty_when_no_terms():
     assert primary_search_term(SearchConfig()) == ""
+
+
+def test_primary_location_returns_first_nonempty_location():
+    config = SearchConfig(locations=[" ", " Austin, TX ", "Remote"])
+
+    assert primary_location(config) == "Austin, TX"
+    assert primary_location(SearchConfig()) == ""
 
 
 def test_html_to_markdown_preserves_lists_and_headings():

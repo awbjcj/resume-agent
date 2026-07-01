@@ -1219,6 +1219,8 @@ export interface components {
         PullParams: {
             /** Limit */
             limit?: number | null;
+            /** Refresh */
+            refresh?: boolean | null;
             /** Sourceids */
             sourceIds?: string[] | null;
         };

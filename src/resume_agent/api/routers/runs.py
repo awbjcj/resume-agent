@@ -76,7 +76,11 @@ def launch_reprocess(
 
     def work(reporter):
         with get_session(engine) as session:
-            return {"statusCounts": reprocess_jobs(session, scopes=scopes, reporter=reporter)}
+            return {
+                "statusCounts": reprocess_jobs(
+                    session, scopes=scopes, reporter=reporter
+                )
+            }
 
     run_id = mgr.submit("reprocess", work)
     record = mgr.get(run_id)
@@ -122,6 +126,7 @@ def launch_pull(
                 limit=params.limit,
                 source_ids=params.source_ids,
                 reporter=reporter,
+                skip_known=not bool(params.refresh),
             )
             return {
                 "totals": report.totals,

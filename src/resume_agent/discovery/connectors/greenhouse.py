@@ -1,6 +1,11 @@
 import httpx
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob, http_failure
+from resume_agent.discovery.connectors.base import (
+    FetchResult,
+    RawJob,
+    SkipSeen,
+    http_failure,
+)
 from resume_agent.discovery.connectors.config import GreenhouseBoard
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.harvest import harvest
@@ -48,10 +53,17 @@ class GreenhouseConnector:
     def __init__(self, boards: list[GreenhouseBoard]):
         self.boards = boards
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
+    def fetch(
+        self,
+        search: SearchConfig,
+        limit: int | None = None,
+        skip_seen: SkipSeen | None = None,
+    ) -> FetchResult:
         return harvest(
             self.boards,
-            lambda board: parse_greenhouse(self._get_board(board.token), board.display()),
+            lambda board: parse_greenhouse(
+                self._get_board(board.token), board.display()
+            ),
             search=search,
             limit=limit,
             key=lambda board: board.token,

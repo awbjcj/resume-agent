@@ -8,7 +8,7 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from resume_agent.config import get_settings
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen
 from resume_agent.discovery.scraper.geo import resolve_geo_id
 from resume_agent.discovery.scraper.models import ScrapedCard
 from resume_agent.discovery.scraper.parser import parse_job_detail, parse_search_cards
@@ -43,7 +43,13 @@ _EXP = {
     "director": "5",
     "executive": "6",
 }
-_JT = {"full_time": "F", "contract": "C", "part_time": "P", "temporary": "T", "internship": "I"}
+_JT = {
+    "full_time": "F",
+    "contract": "C",
+    "part_time": "P",
+    "temporary": "T",
+    "internship": "I",
+}
 _SALARY_BUCKETS = [
     (40_000, "1"),
     (60_000, "2"),
@@ -137,7 +143,11 @@ def _linkedin_filter_params(config: SearchConfig) -> dict[str, str]:
 
     if config.min_salary is not None:
         bucket = next(
-            (code for floor, code in reversed(_SALARY_BUCKETS) if config.min_salary >= floor),
+            (
+                code
+                for floor, code in reversed(_SALARY_BUCKETS)
+                if config.min_salary >= floor
+            ),
             None,
         )
         if bucket:
@@ -325,7 +335,12 @@ class LinkedInScraper:
         except PlaywrightTimeoutError:
             pass
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
+    def fetch(
+        self,
+        search: SearchConfig,
+        limit: int | None = None,
+        skip_seen: SkipSeen | None = None,
+    ) -> FetchResult:
         self._geo_cache = {}
         try:
             if limit is not None and limit <= 0:
@@ -350,7 +365,9 @@ class LinkedInScraper:
                 try:
                     detail_html = self._detail_html(card)
                 except PlaywrightError as exc:
-                    failures[card.url or card.job_id or "unknown"] = _playwright_failure_reason(exc)
+                    failures[card.url or card.job_id or "unknown"] = (
+                        _playwright_failure_reason(exc)
+                    )
                     continue
                 jd_text = parse_job_detail(detail_html).strip()
                 if not jd_text:
@@ -372,7 +389,10 @@ class LinkedInScraper:
 
     def _search_html(self, search: SearchConfig) -> str:
         return self._content_for_url(
-            _search_url(search, geo_resolver=lambda loc: resolve_geo_id(loc, cache=self._geo_cache)),
+            _search_url(
+                search,
+                geo_resolver=lambda loc: resolve_geo_id(loc, cache=self._geo_cache),
+            ),
             wait_selector=_CARDS_SELECTOR,
             scroll=True,
         )

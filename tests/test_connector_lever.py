@@ -5,10 +5,16 @@ from pathlib import Path
 import httpx
 
 from resume_agent.discovery.connectors.config import LeverBoard
-from resume_agent.discovery.connectors.lever import LeverConnector, parse_lever
+from resume_agent.discovery.connectors.lever import (
+    LeverConnector,
+    fetch_lever_board,
+    parse_lever,
+)
 from resume_agent.discovery.search_config import SearchConfig
 
-FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "lever" / "postings.json").read_text())
+FIXTURE = json.loads(
+    (Path(__file__).parent / "fixtures" / "lever" / "postings.json").read_text()
+)
 
 
 def test_parse_lever_maps_and_assembles_full_jd():
@@ -39,7 +45,7 @@ def test_parse_lever_posted_at_none_when_absent():
 
 
 class _FakeLever(LeverConnector):
-    def _get_board(self, token):
+    def _get_board(self, token, search):
         return FIXTURE
 
 
@@ -53,10 +59,11 @@ def test_connector_fetches_boards_and_filters_by_search():
 class _PartlyBrokenLever(LeverConnector):
     """First board 404s; the rest return the fixture payload."""
 
-    def _get_board(self, token):
+    def _get_board(self, token, search):
         if token == "dead":
             raise httpx.HTTPStatusError(
-                "404", request=httpx.Request("GET", "http://x"),
+                "404",
+                request=httpx.Request("GET", "http://x"),
                 response=httpx.Response(404),
             )
         return FIXTURE
@@ -81,11 +88,33 @@ def test_get_board_delegates_to_module_fetcher(monkeypatch):
 
     called = {}
 
-    def fake_fetch(token):
+    def fake_fetch(token, search=None):
         called["token"] = token
         return []
 
     monkeypatch.setattr(lever, "fetch_lever_board", fake_fetch)
     conn = lever.LeverConnector([LeverBoard(token="acme")])
-    assert conn._get_board("acme") == []
+    assert conn._get_board("acme", SearchConfig()) == []
     assert called["token"] == "acme"
+
+
+def test_fetch_lever_board_pushes_location(monkeypatch):
+    captured = {}
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return []
+
+    def fake_get(url, params=None, timeout=None):
+        captured["params"] = params
+        return Response()
+
+    import resume_agent.discovery.connectors.lever as lever
+
+    monkeypatch.setattr(lever.httpx, "get", fake_get)
+    fetch_lever_board("acme", SearchConfig(locations=["Remote"]))
+
+    assert captured["params"] == {"mode": "json", "location": "Remote"}

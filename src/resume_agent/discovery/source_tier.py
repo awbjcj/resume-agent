@@ -3,7 +3,24 @@
 Lower rank == higher priority. Calibration is a tier label, not a per-source number.
 """
 
-_CANONICAL = {"greenhouse", "lever", "ashby", "workday", "tesla", "google", "companies", "url", "manual"}
+_CANONICAL = {
+    "greenhouse",
+    "lever",
+    "ashby",
+    "workday",
+    "tesla",
+    "google",
+    "companies",
+    "url",
+    "manual",
+    "smartrecruiters",
+    "workable",
+    "recruitee",
+    "personio",
+    "breezy",
+    "jazzhr",
+    "bamboohr",
+}
 
 _DIRECT = 0
 _AGGREGATOR = 1

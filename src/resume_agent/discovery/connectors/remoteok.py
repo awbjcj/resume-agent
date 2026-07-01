@@ -1,6 +1,6 @@
 import httpx
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.harvest import gate_and_limit
 from resume_agent.discovery.connectors.text import html_to_markdown
@@ -34,7 +34,12 @@ class RemoteOKConnector:
 
     name = "remoteok"
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
+    def fetch(
+        self,
+        search: SearchConfig,
+        limit: int | None = None,
+        skip_seen: SkipSeen | None = None,
+    ) -> FetchResult:
         jobs, filtered = gate_and_limit(parse_remoteok(self._get_all()), search, limit)
         return FetchResult(jobs=jobs, filtered=filtered)
 
