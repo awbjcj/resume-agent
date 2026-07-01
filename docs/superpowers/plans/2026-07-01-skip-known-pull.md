@@ -18,6 +18,31 @@
 - Connectors stay DB-free: they accept a `skip_seen` closure, never a `Session`.
 - Default pull skips known jobs; `resume-agent pull --refresh` bypasses skip entirely.
 
+## Review corrections (2026-07-01)
+
+This section supersedes conflicting task snippets below.
+
+- Define `SkipSeen = Callable[[RawJob], bool]` in `connectors/base.py`, the
+  dependency-neutral interface module. `known_jobs.py` implements that contract;
+  connector modules must not import a DB-aware orchestration module merely for a
+  type alias.
+- `KnownJobsIndex` stores the best (lowest) source rank for each identity rather
+  than relying on database row order when multiple active rows share a key.
+- Normalize exact URLs by trimming surrounding whitespace before indexing and
+  lookup. Do not otherwise rewrite URLs because ingest currently uses exact URL
+  identity.
+- Adzuna must relevance-gate without applying `limit`, remove known rows, and only
+  then cap to `limit`; limiting before skip can return fewer unknown jobs even when
+  later candidates are available.
+- The HTTP pull contract needs the design-required bypass too: add
+  `refresh: bool = False` to `PullParams`, pass `skip_known=not params.refresh`,
+  test the route, and regenerate OpenAPI/TypeScript contracts.
+- Update every connector implementation and every runner-facing test double to
+  accept the additive `skip_seen: SkipSeen | None = None` keyword. Direct calls
+  that omit it remain backward compatible.
+- A skipped prefetch row never reaches ingest, so it is intentionally absent from
+  `PullReport.skipped`; that field continues to count ingest merge skips only.
+
 ---
 
 ### Task 1: `KnownJobsIndex` + `skip_seen` predicate
@@ -27,9 +52,8 @@
 - Test: `tests/test_known_jobs.py`
 
 **Interfaces:**
-- Consumes: `RawJob` (`discovery/connectors/base.py`), `source_rank` (`discovery/source_tier.py`), `compute_dedup_key` (`tracking/dedup.py`), `Job` (`tracking/tables.py`).
+- Consumes: `RawJob` and `SkipSeen` (`discovery/connectors/base.py`), `source_rank` (`discovery/source_tier.py`), `compute_dedup_key` (`tracking/dedup.py`), `Job` (`tracking/tables.py`).
 - Produces:
-  - `SkipSeen = Callable[[RawJob], bool]`
   - `KnownJobsIndex` with `.match(url, company, title, location) -> KnownJob | None`
   - `build_known_index(session: Session) -> KnownJobsIndex`
   - `make_skip_seen(index: KnownJobsIndex) -> SkipSeen`

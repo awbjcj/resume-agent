@@ -29,6 +29,46 @@
 - Build order: SmartRecruiters + Workable first (they also carry Thread B), then
   Recruitee + Personio, then Breezy + JazzHR + BambooHR.
 
+## Review corrections (2026-07-01)
+
+This section supersedes conflicting endpoint shapes and code snippets below. The
+original plan was written before its research steps were performed; implementation
+must follow the captured payloads and these verified contracts instead.
+
+- The existing text test module is `tests/test_connectors_text.py` (plural), not
+  `tests/test_connector_text.py`.
+- Workable's public endpoint is `GET /api/accounts/{account}?details=true`; its
+  array is `jobs`, and location fields are flat (`city`, `state`, `country`) with
+  an optional `locations` array. Detect `apply.workable.com/{account}` and legacy
+  `{account}.workable.com`; never interpret `apply.workable.com/j/{shortcode}` as
+  an account token because that URL does not contain one.
+- SmartRecruiters supports `q`, `country`, `region`, and `city`, not a generic
+  `location` parameter. Push only `q`: `SearchConfig.locations` contains free-form
+  strings and cannot be losslessly mapped to those structured facets.
+- Breezy's `/json` list does not contain a description. Treat Breezy as N+1:
+  parse list cards, then fetch each card URL and extract the `JobPosting` JSON-LD
+  before the full relevance gate. This also makes `skip_seen` useful before the
+  detail request.
+- JazzHR's proposed `/api/v1/jobs` and RSS endpoints return 404. Use the public
+  `/apply/jobs` HTML listing plus `/apply/jobs/details/{id}` detail pages, parsed
+  deterministically with BeautifulSoup/JSON-LD and fixture-tested. This remains
+  pure HTTP with no browser or LLM, and `skip_seen` runs before detail fetches.
+- BambooHR's verified detail payload is nested at
+  `result.jobOpening.description`; its canonical URL is
+  `result.jobOpening.jobOpeningShareUrl`.
+- Personio must use BeautifulSoup's `xml` parser, preserve the HTML stored in
+  each `<value>` element before passing it to `html_to_markdown`, and use
+  `<subcompany>` as the display company when present.
+- Recruitee descriptions and titles may be localized under `translations`; use
+  the top-level fields first and fall back to the first translation.
+- Server-side narrowing is an efficiency heuristic and cannot mathematically
+  guarantee an identical fetched set when a third-party search engine has
+  different synonym semantics. The local gate remains authoritative over every
+  row returned by the server; no connector may bypass it.
+- Each backend task needs a fetch-level test (mocked HTTP) in addition to parser
+  and detection tests, proving the fixture shape is actually wired through the
+  public connector seam and that N+1 backends skip detail calls when requested.
+
 ---
 
 ### Task 0: `primary_location` filter helper
@@ -475,7 +515,7 @@ def _text(node) -> str:
 
 
 def parse_personio(xml_text: str, company: str) -> list[RawJob]:
-    soup = BeautifulSoup(xml_text, "html.parser")  # lenient; tag names lowercased
+    soup = BeautifulSoup(xml_text, "xml")
     jobs: list[RawJob] = []
     for position in soup.find_all("position"):
         descriptions = position.find_all("value")
@@ -717,10 +757,8 @@ git commit -m "docs: document new ATS backends and rank them as canonical source
   `fetch_<name>(target, search, limit=None, skip_seen=None)` signature uniform across all
   backends and matches the `companies._BACKENDS` adapter shape from the skip-known plan;
   `primary_location(search) -> str` defined in Task 0 and consumed in Tasks 1/8.
-- **Placeholder scan:** the reverse-engineered backends (Tasks 2/3/5/6/7) intentionally
-  carry a capture-first step and best-known field mappings rather than fabricated JSON —
-  each has a concrete endpoint, host→token rule, and mapping table, and its parser is
-  written against a committed fixture. SmartRecruiters, Personio, and Lever are fully coded.
+- **Placeholder scan:** the review-correction section above replaces every unverified
+  endpoint/shape assumption. Each parser is written against a committed capture and each
+  fetch path has an offline HTTP-wiring test.
 - **Dependency note:** assumes the skip-known plan's `skip_seen` seam exists; if not,
   omit `skip_seen` from the new backends (see Global Constraints).
-```
