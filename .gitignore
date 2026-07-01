@@ -46,7 +46,7 @@ tests/fixtures/linkedin/*_live.html
 .idea/
 .vscode/
 .streamlit/
-resume-latex/
+resume/
 config/render.yaml
 config/connectors.yaml
 config/profile_sources.yaml
