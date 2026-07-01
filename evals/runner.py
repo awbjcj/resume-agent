@@ -161,6 +161,7 @@ def run_case(
         raise ValueError("trap probes require the configured fact-check reviewer")
     probes: list[ProbeRecord] = []
     for trap in case.traps:
+        assert fact_check is not None  # guaranteed above when case.traps is non-empty
         probe = build_probe_resume(trap, profile)
         try:
             critique = review_one(
