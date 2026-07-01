@@ -223,12 +223,8 @@ class AdzunaConnector:
         skip_seen: SkipSeen | None = None,
     ) -> FetchResult:
         jobs, filtered = gate_and_limit(
-            parse_adzuna(self._get_results(search)), search, None
+            parse_adzuna(self._get_results(search)), search, limit, skip_seen
         )
-        if skip_seen is not None:
-            jobs = [job for job in jobs if not skip_seen(job)]
-        if limit is not None:
-            jobs = jobs[:limit]
         if not self.enrich_details:
             return FetchResult(jobs=jobs, filtered=filtered)
         enriched, failures = enrich_adzuna_jobs(jobs)

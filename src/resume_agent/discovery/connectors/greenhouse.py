@@ -68,6 +68,7 @@ class GreenhouseConnector:
             limit=limit,
             key=lambda board: board.token,
             on_error=http_failure,
+            skip_seen=skip_seen,
         )
 
     def _get_board(self, token: str) -> dict:

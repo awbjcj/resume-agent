@@ -362,6 +362,17 @@ class LinkedInScraper:
             jobs: list[RawJob] = []
             failures: dict[str, str] = {}
             for card in cards:
+                if skip_seen is not None and skip_seen(
+                    RawJob(
+                        source=self.name,
+                        url=card.url,
+                        company=card.company,
+                        title=card.title,
+                        location=card.location,
+                        jd_text="",
+                    )
+                ):
+                    continue
                 try:
                     detail_html = self._detail_html(card)
                 except PlaywrightError as exc:

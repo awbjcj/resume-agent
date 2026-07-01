@@ -40,7 +40,9 @@ class RemoteOKConnector:
         limit: int | None = None,
         skip_seen: SkipSeen | None = None,
     ) -> FetchResult:
-        jobs, filtered = gate_and_limit(parse_remoteok(self._get_all()), search, limit)
+        jobs, filtered = gate_and_limit(
+            parse_remoteok(self._get_all()), search, limit, skip_seen
+        )
         return FetchResult(jobs=jobs, filtered=filtered)
 
     def _get_all(self) -> list:

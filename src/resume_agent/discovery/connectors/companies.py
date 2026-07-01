@@ -40,7 +40,9 @@ class UnsupportedAts(Exception):
 
 
 # Adapters: thin, late-bound wrappers so each backend stays monkeypatchable at the
-# module seam and shares one dispatch shape: (target, search, limit) -> RawJob[].
+# module seam and shares one dispatch shape:
+# (target, search, limit, skip_seen) -> RawJob[]. Single-shot backends ignore
+# skip_seen internally; CompaniesConnector.fetch drops known rows from the union.
 def _greenhouse(
     target: AtsTarget, search: SearchConfig, limit=None, skip_seen=None
 ) -> list[RawJob]:
@@ -105,7 +107,7 @@ def _bamboohr(target, search, limit=None, skip_seen=None):
     return fetch_bamboohr(target, search, limit, skip_seen=skip_seen)
 
 
-# ats -> adapter(target, search, limit) -> RawJob[]
+# ats -> adapter(target, search, limit, skip_seen) -> RawJob[]
 _BACKENDS = {
     "greenhouse": _greenhouse,
     "lever": _lever,
@@ -161,6 +163,7 @@ class CompaniesConnector:
             limit=limit,
             key=lambda url: url,
             on_error=_failure_reason,
+            skip_seen=skip_seen,
         )
 
     def _produce(
