@@ -979,6 +979,8 @@ export interface components {
             application: components["schemas"]["ApplicationOut"] | null;
             /** Archivedat */
             archivedAt: string | null;
+            /** Bestresumeversionid */
+            bestResumeVersionId?: number | null;
             /** Company */
             company: string | null;
             /** Companysize */
@@ -1019,8 +1021,20 @@ export interface components {
             locationCountry?: string | null;
             /** Locationregion */
             locationRegion?: string | null;
+            /**
+             * Needsattention
+             * @default false
+             */
+            needsAttention: boolean;
             /** Postedat */
             postedAt: string | null;
+            /**
+             * Regressed
+             * @default false
+             */
+            regressed: boolean;
+            /** Rejectreason */
+            rejectReason?: string | null;
             /** Remotepolicy */
             remotePolicy?: string | null;
             /** Resumeversions */
@@ -1138,8 +1152,18 @@ export interface components {
             jdText: string;
             /** Jobid */
             jobId: number;
+            /**
+             * Needsattention
+             * @default false
+             */
+            needsAttention: boolean;
             /** Pdfpath */
             pdfPath: string | null;
+            /**
+             * Regressed
+             * @default false
+             */
+            regressed: boolean;
             /** Remotepolicy */
             remotePolicy: string | null;
             /** Salarymax */
@@ -1578,6 +1602,8 @@ export interface components {
             location: string | null;
             /** Postedat */
             postedAt: string | null;
+            /** Rejectreason */
+            rejectReason?: string | null;
             /** Source */
             source: string;
             /** Status */

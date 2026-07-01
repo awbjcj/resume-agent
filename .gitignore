@@ -17,6 +17,8 @@ config/gmail_credentials.json
 output/
 data/
 data/gmail_token.json
+evals/reports/*
+!evals/reports/.gitkeep
 # The bundled SIC reference table is package data, not local state — keep it
 # tracked despite the broad data/ ignore above (it is loaded at import time and
 # force-included into the wheel).

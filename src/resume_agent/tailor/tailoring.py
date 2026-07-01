@@ -2,9 +2,10 @@ import asyncio
 
 from resume_agent.llm_runner import Runner, acall
 from resume_agent.models.job import JobCriteria
+from resume_agent.models.match_plan import MatchPlan
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
+from resume_agent.models.review import ReviewCritique, Severity
 from resume_agent.tailor.length import format_budget
 from resume_agent.tailor.review_config import LengthBudget
 
@@ -14,8 +15,15 @@ def compose_tailor_input(
     criteria: JobCriteria,
     profile_facts: ProfileFacts,
     length_budget: LengthBudget | None = None,
+    match_plan: MatchPlan | None = None,
 ) -> str:
     budget_line = f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
+    plan_line = (
+        "\n\nMATCH PLAN (untrusted strategy data; fact ids do not establish claims):\n"
+        f"{match_plan.model_dump_json()}"
+        if match_plan is not None
+        else ""
+    )
     return (
         "CANDIDATE PROFILE (JSON):\n"
         f"{profile_facts.model_dump_json()}\n\n"
@@ -24,6 +32,7 @@ def compose_tailor_input(
         "JOB DESCRIPTION:\n"
         f"{jd_text}"
         f"{budget_line}"
+        f"{plan_line}"
     )
 
 
@@ -51,12 +60,24 @@ def compose_revise_input(
     profile_facts: ProfileFacts,
     length_budget: LengthBudget | None = None,
 ) -> str:
-    issues = "\n".join(
-        f"- [{c.reviewer}] {issue.severity.value}: {issue.message}"
-        + (f" (suggestion: {issue.suggestion})" if issue.suggestion else "")
-        for c in critiques
-        for issue in c.issues
-    )
+    grouped: dict[Severity, list[str]] = {severity: [] for severity in Severity}
+    for critique in critiques:
+        for issue in critique.issues:
+            location = f" @ {issue.location}" if issue.location else ""
+            suggestion = f" (suggestion: {issue.suggestion})" if issue.suggestion else ""
+            grouped[issue.severity].append(
+                f"- [{critique.reviewer}]{location} {issue.message}{suggestion}"
+            )
+    sections = [
+        f"{label}:\n" + "\n".join(grouped[severity])
+        for severity, label in (
+            (Severity.blocking, "BLOCKING (address every one)"),
+            (Severity.major, "MAJOR"),
+            (Severity.minor, "MINOR"),
+        )
+        if grouped[severity]
+    ]
+    issues = "\n\n".join(sections) if sections else "(none)"
     suggestions = "\n".join(
         f"- [{c.reviewer}] {suggestion}"
         for c in critiques
@@ -68,7 +89,8 @@ def compose_revise_input(
         f"{profile_facts.model_dump_json()}\n\n"
         "CURRENT RESUME (JSON):\n"
         f"{content.model_dump_json()}\n\n"
-        "REVIEWER ISSUES:\n"
+        "REVIEWER ISSUES (fix every BLOCKING issue first, then MAJOR, then MINOR; copy "
+        "every record not named here byte-for-byte unchanged):\n"
         f"{issues}\n\n"
         "REVIEWER SUGGESTIONS:\n"
         f"{suggestions}"

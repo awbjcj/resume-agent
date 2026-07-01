@@ -52,6 +52,8 @@ class PipelineItem(CamelModel):
     remote_policy: str | None
     seniority: str | None
     has_progress: bool
+    needs_attention: bool = False
+    regressed: bool = False
 
 
 class TriageItem(CamelModel):
@@ -65,6 +67,7 @@ class TriageItem(CamelModel):
     posted_at: datetime | None
     archived_at: datetime | None
     has_progress: bool
+    reject_reason: str | None = None
 
 
 class ResumeVersionOut(CamelModel):
@@ -138,6 +141,10 @@ class JobDetail(CamelModel):
     location_country: str | None = None
     location_region: str | None = None
     location_city: str | None = None
+    best_resume_version_id: int | None = None
+    needs_attention: bool = False
+    regressed: bool = False
+    reject_reason: str | None = None
 
 
 class JobPatch(CamelModel):

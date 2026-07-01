@@ -3,9 +3,11 @@ from sqlmodel import Session, SQLModel, create_engine
 from resume_agent.tracking.repository import (
     application_for_job,
     applications_by_status,
+    best_resume_version,
     get_application,
     latest_resume_version,
     latest_rendered_resume_version,
+    pick_best,
     save_application,
     save_resume_version,
     update_application_status,
@@ -88,3 +90,66 @@ def test_latest_rendered_resume_version_picks_highest_round_with_pdf():
         assert latest is not None
         assert latest.round == 3
         assert latest.pdf_path == "three.pdf"
+
+
+def _rv(round_num: int, score: int | None, passed: bool, version_id: int | None) -> ResumeVersion:
+    return ResumeVersion(
+        id=version_id,
+        job_id=7,
+        round=round_num,
+        review_score=score,
+        fact_check_passed=passed,
+    )
+
+
+def test_pick_best_prefers_highest_scoring_gate_passing_round():
+    best = pick_best([_rv(1, 90, True, 1), _rv(2, 82, True, 2)])
+    assert best.version is not None and best.version.id == 1
+    assert best.no_clean_round is False
+    assert best.regressed is True
+
+
+def test_pick_best_tie_breaks_by_latest_round_then_id():
+    first = pick_best([_rv(1, 88, True, 1), _rv(2, 88, True, 2)]).version
+    second = pick_best([_rv(2, 88, True, 1), _rv(2, 88, True, 2)]).version
+    assert first is not None and first.id == 2
+    assert second is not None and second.id == 2
+
+
+def test_pick_best_ranks_missing_score_below_zero():
+    best = pick_best([_rv(2, None, True, 2), _rv(1, 0, True, 1)])
+    assert best.version is not None and best.version.id == 1
+
+
+def test_pick_best_detects_regression_for_unpersisted_rows():
+    best = pick_best([_rv(1, 90, True, None), _rv(2, 80, True, None)])
+    assert best.version is not None and best.version.round == 1
+    assert best.regressed is True
+
+
+def test_pick_best_falls_back_to_latest_when_no_gate_passes():
+    best = pick_best([_rv(1, 70, False, 1), _rv(2, 60, False, 2)])
+    assert best.version is not None and best.version.id == 2
+    assert best.no_clean_round is True
+    assert best.regressed is False
+
+
+def test_pick_best_empty():
+    best = pick_best([])
+    assert best.version is None
+    assert best.no_clean_round is False
+    assert best.regressed is False
+
+
+def test_best_resume_version_reads_persisted_rows():
+    with _session() as s:
+        save_resume_version(
+            s, ResumeVersion(job_id=7, round=1, review_score=90, fact_check_passed=True)
+        )
+        save_resume_version(
+            s, ResumeVersion(job_id=7, round=2, review_score=80, fact_check_passed=False)
+        )
+        best = best_resume_version(s, 7)
+        assert best.version is not None and best.version.round == 1
+        assert best.no_clean_round is False and best.regressed is True
+        assert best_resume_version(s, 999).version is None

@@ -39,6 +39,11 @@ export function TriageCard({
           <StatusBadge status={row.status} />
           <span className="text-xs font-medium text-muted-foreground">{row.source}</span>
         </div>
+        {row.status === "rejected" && row.rejectReason && (
+          <span className="mt-2.5 block text-sm leading-snug text-rose-700 dark:text-rose-300">
+            {row.rejectReason}
+          </span>
+        )}
       </button>
       <FitMeter score={row.fitScore} />
     </Card>

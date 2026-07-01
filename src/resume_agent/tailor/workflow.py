@@ -7,6 +7,12 @@ from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.tailor.panel import arun_panel, run_panel
+from resume_agent.tailor.match_plan import (
+    amatch_plan,
+    compose_match_plan_input,
+    match_plan,
+    normalize_match_plan,
+)
 from resume_agent.tailor.provenance import provenance_critique
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.tailoring import (
@@ -26,6 +32,20 @@ class TailorRound(ExtensibleModel):
     verdict: PanelVerdict
 
 
+def _has_regressed(rounds: list[TailorRound]) -> bool:
+    current = rounds[-1]
+    prior_clean = [round_ for round_ in rounds[:-1] if round_.verdict.gate_passed]
+    if not prior_clean:
+        return False
+    best_prior_score = max(
+        round_.verdict.aggregate_score for round_ in prior_clean
+    )
+    return (
+        not current.verdict.gate_passed
+        or current.verdict.aggregate_score < best_prior_score
+    )
+
+
 def run_tailor_review(
     jd_text: str,
     criteria: JobCriteria,
@@ -34,10 +54,25 @@ def run_tailor_review(
     tailor_agent: Runner,
     reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
+    match_plan_agent: Runner | None = None,
 ) -> list[TailorRound]:
     """Draft, then gate/review/revise until the round passes or max_rounds is hit."""
+    plan = None
+    if config.match_plan_enabled:
+        if match_plan_agent is None:
+            raise ValueError("match_plan_enabled requires a match-plan agent")
+        plan = normalize_match_plan(
+            match_plan(
+                compose_match_plan_input(jd_text, criteria, profile_facts),
+                match_plan_agent,
+            ),
+            profile_facts,
+        )
     content = tailor(
-        compose_tailor_input(jd_text, criteria, profile_facts, config.length_budget), tailor_agent
+        compose_tailor_input(
+            jd_text, criteria, profile_facts, config.length_budget, plan
+        ),
+        tailor_agent,
     )
     rounds: list[TailorRound] = []
     for round_num in range(1, config.max_rounds + 1):
@@ -54,6 +89,8 @@ def run_tailor_review(
         rounds.append(TailorRound(round_num=round_num, content=content, verdict=verdict))
         if verdict.passed or round_num == config.max_rounds:
             break
+        if config.early_stop_on_regression and _has_regressed(rounds):
+            break
         content = revise(
             compose_revise_input(content, verdict.critiques, profile_facts, config.length_budget),
             reviser_agent,
@@ -69,12 +106,27 @@ async def arun_tailor_review(
     tailor_agent: Runner,
     reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
+    match_plan_agent: Runner | None = None,
     *,
     sem: asyncio.Semaphore,
 ) -> list[TailorRound]:
     """Async twin of run_tailor_review; DB writes happen after callers gather."""
+    plan = None
+    if config.match_plan_enabled:
+        if match_plan_agent is None:
+            raise ValueError("match_plan_enabled requires a match-plan agent")
+        plan = normalize_match_plan(
+            await amatch_plan(
+                compose_match_plan_input(jd_text, criteria, profile_facts),
+                match_plan_agent,
+                sem=sem,
+            ),
+            profile_facts,
+        )
     content = await atailor(
-        compose_tailor_input(jd_text, criteria, profile_facts, config.length_budget),
+        compose_tailor_input(
+            jd_text, criteria, profile_facts, config.length_budget, plan
+        ),
         tailor_agent,
         sem=sem,
     )
@@ -92,6 +144,8 @@ async def arun_tailor_review(
 
         rounds.append(TailorRound(round_num=round_num, content=content, verdict=verdict))
         if verdict.passed or round_num == config.max_rounds:
+            break
+        if config.early_stop_on_regression and _has_regressed(rounds):
             break
         content = await arevise(
             compose_revise_input(content, verdict.critiques, profile_facts, config.length_budget),

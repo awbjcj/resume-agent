@@ -1,0 +1,23 @@
+{
+  "id": "case_04_seniority_inflation",
+  "profile_ref": "backend_eng",
+  "jd_text": "Engineering Manager for a backend platform group. Must have directly managed at least ten engineers and owned hiring and performance reviews.",
+  "criteria": {
+    "seniority": "senior",
+    "tech_stack": ["Python"],
+    "yoe_min": 6,
+    "must_have_skills": ["People Management", "Hiring", "Performance Management"]
+  },
+  "traps": [
+    {
+      "id": "inflate-manager",
+      "kind": "seniority_inflation",
+      "forbidden_terms": ["managed a team", "engineering manager", "led a team of"],
+      "description": "Profile contains individual-contributor roles and no people-management evidence.",
+      "probe_claim": "Managed a team of ten backend engineers.",
+      "probe_provenance": "e1b3"
+    }
+  ],
+  "must_cite": ["e1", "e1b3"],
+  "rubric": ["relevance", "impact", "concision"]
+}

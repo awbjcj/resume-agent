@@ -834,6 +834,17 @@
             ],
             "title": "Archivedat"
           },
+          "bestResumeVersionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bestresumeversionid"
+          },
           "company": {
             "anyOf": [
               {
@@ -981,6 +992,11 @@
             ],
             "title": "Locationregion"
           },
+          "needsAttention": {
+            "default": false,
+            "title": "Needsattention",
+            "type": "boolean"
+          },
           "postedAt": {
             "anyOf": [
               {
@@ -992,6 +1008,22 @@
               }
             ],
             "title": "Postedat"
+          },
+          "regressed": {
+            "default": false,
+            "title": "Regressed",
+            "type": "boolean"
+          },
+          "rejectReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejectreason"
           },
           "remotePolicy": {
             "anyOf": [
@@ -1417,6 +1449,11 @@
             "title": "Jobid",
             "type": "integer"
           },
+          "needsAttention": {
+            "default": false,
+            "title": "Needsattention",
+            "type": "boolean"
+          },
           "pdfPath": {
             "anyOf": [
               {
@@ -1427,6 +1464,11 @@
               }
             ],
             "title": "Pdfpath"
+          },
+          "regressed": {
+            "default": false,
+            "title": "Regressed",
+            "type": "boolean"
           },
           "remotePolicy": {
             "anyOf": [
@@ -2826,6 +2868,17 @@
               }
             ],
             "title": "Postedat"
+          },
+          "rejectReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejectreason"
           },
           "source": {
             "title": "Source",

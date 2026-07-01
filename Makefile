@@ -9,7 +9,7 @@ WEB_HOST ?= localhost
 WEB_PORT ?= 5173
 PYTEST_ARGS ?= tests/api -v
 
-.PHONY: help setup setup-browser api web dev test test-api test-py test-web lint lint-py lint-web build build-web preview verify openapi client kill-port
+.PHONY: help setup setup-browser api web dev test test-api test-py test-web lint lint-py lint-web build build-web preview verify eval openapi client kill-port
 
 help:
 	@echo "Common targets:"
@@ -22,6 +22,7 @@ help:
 	@echo "  make lint           Run Python and frontend linters"
 	@echo "  make build          Build the frontend"
 	@echo "  make verify         Run lint, tests, and frontend build"
+	@echo "  make eval           Run the live resume-quality evals (needs an API key)"
 	@echo ""
 	@echo "  make kill-port      Free PORT if an orphaned dev server is holding it"
 	@echo ""
@@ -63,7 +64,7 @@ test-web:
 lint: lint-py lint-web
 
 lint-py:
-	$(UV) run ruff check src tests
+	$(UV) run ruff check src tests evals
 
 lint-web:
 	$(NPM) --prefix web run lint
@@ -77,6 +78,9 @@ preview:
 	cd web && $(NPX) vite preview --host $(WEB_HOST) --port $(WEB_PORT)
 
 verify: lint test build
+
+eval:
+	$(UV) run python -m evals.run_eval
 
 openapi:
 	$(UV) run python scripts/export_openapi.py

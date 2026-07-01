@@ -1,0 +1,61 @@
+{
+  "contact": {
+    "name": "Jordan Rivera",
+    "email": "jordan@example.com"
+  },
+  "summary": "Backend engineer with 6 years building Python REST services.",
+  "experience": [
+    {
+      "id": "e1",
+      "company": "Acme Payments",
+      "title": "Software Engineer",
+      "start": "2021",
+      "end": "2025",
+      "bullets": [
+        {
+          "id": "e1b1",
+          "text": "Built and operated Python FastAPI services handling 2k requests/sec."
+        },
+        {
+          "id": "e1b2",
+          "text": "Designed PostgreSQL schemas and tuned slow queries."
+        },
+        {
+          "id": "e1b3",
+          "text": "Added CI with GitHub Actions and pytest coverage gates."
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "company": "Bluefin Labs",
+      "title": "Junior Developer",
+      "start": "2019",
+      "end": "2021",
+      "bullets": [
+        {
+          "id": "e2b1",
+          "text": "Maintained a Django monolith and wrote integration tests."
+        }
+      ]
+    }
+  ],
+  "skills": {
+    "languages": [
+      {"id": "s_py", "name": "Python"},
+      {"id": "s_sql", "name": "SQL"}
+    ],
+    "frameworks": [
+      {"id": "s_fastapi", "name": "FastAPI"},
+      {"id": "s_django", "name": "Django"}
+    ]
+  },
+  "education": [
+    {
+      "id": "ed1",
+      "institution": "State University",
+      "degree": "BS Computer Science",
+      "end": "2019"
+    }
+  ]
+}

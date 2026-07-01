@@ -82,6 +82,35 @@ def test_bearer_enforced_on_guarded_route():
         assert ok.status_code == 200
 
 
+def test_triage_item_exposes_reject_reason():
+    client = _client()
+    with client:
+        _seed(
+            client.app,
+            status=JobStatus.rejected.value,
+            company="Rej",
+            reject_reason="salary below minimum",
+            reject_category="filtered",
+        )
+        body = client.get("/api/triage").json()
+    item = next(r for r in body["data"] if r["company"] == "Rej")
+    assert item["rejectReason"] == "salary below minimum"
+
+
+def test_job_detail_exposes_reject_reason():
+    client = _client()
+    with client:
+        job_id = _seed(
+            client.app,
+            status=JobStatus.rejected.value,
+            company="Rej",
+            reject_reason="off-target role: not a match",
+            reject_category="relevance",
+        )
+        body = client.get(f"/api/jobs/{job_id}").json()
+    assert body["rejectReason"] == "off-target role: not a match"
+
+
 def test_shortlist_item_exposes_facet_fields():
     client = _client()
     with client:

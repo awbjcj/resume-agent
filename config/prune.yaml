@@ -1,0 +1,12 @@
+# config/prune.yaml — auto-prune and retention policy.
+# Copy to config/prune.yaml to override. Missing file = these defaults.
+
+# A job is archived (reversible) if it matches ANY enabled rule below AND has no
+# user progress (no application/resume version/cover letter, status not advanced).
+fit_threshold: 40        # archive scored jobs with fit_score below this
+stale_days: 60           # archive jobs whose posting is older than this many days
+retention_days: 30       # hard-delete archived zero-progress jobs after this many days
+
+enable_rejected: true    # archive jobs the discovery filter already rejected
+enable_low_fit: true     # archive jobs below fit_threshold
+enable_stale: true       # archive jobs older than stale_days
