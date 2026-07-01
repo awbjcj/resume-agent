@@ -57,6 +57,10 @@ class DashboardScraper:
     """Replay learned selectors over explicitly configured company job boards."""
 
     name = "scrape"
+    # Opt in to pre-fetch pruning: each posting detail costs a browser navigation
+    # (and possibly an LLM extract), so the runner supplies a ``skip_seen`` gate
+    # that drops cards already held from a same-or-higher-priority source.
+    prunes_seen = True
 
     def __init__(
         self,
@@ -222,18 +226,26 @@ class DashboardScraper:
         self,
         target: ScrapeTargetLike,
         search: SearchConfig,
-    ) -> tuple[ScrapeRecipe, list[str]]:
+    ) -> tuple[ScrapeRecipe, list[ScrapedCard]]:
         host = host_key(target.url)
         recipe = None if self.relearn else load_recipe(host, self.store_dir)
         if recipe is None:
             recipe = learn_recipe(prune_html(self._learn_source(target)), self._learner())
             save_recipe(host, recipe, self.store_dir)
         pages = self._collect_pages(target, search, recipe)
-        if not self._cards(recipe, pages, target.url) and has_job_like_content(pages[0]):
-            recipe = learn_recipe(prune_html(pages[0]), self._learner())
-            save_recipe(host, recipe, self.store_dir)
-            pages = self._collect_pages(target, search, recipe)
-        return recipe, pages
+        cards = self._cards(recipe, pages, target.url)
+        if not cards and has_job_like_content(pages[0]):
+            # A cached recipe can miss because the board changed OR because this
+            # search legitimately matched nothing; only adopt (and persist) the
+            # relearned recipe when it actually yields cards, so a zero-result
+            # search never clobbers a still-working recipe on disk.
+            new_recipe = learn_recipe(prune_html(pages[0]), self._learner())
+            new_pages = self._collect_pages(target, search, new_recipe)
+            new_cards = self._cards(new_recipe, new_pages, target.url)
+            if new_cards:
+                save_recipe(host, new_recipe, self.store_dir)
+                recipe, cards = new_recipe, new_cards
+        return recipe, cards
 
     @staticmethod
     def _cards(
@@ -287,8 +299,7 @@ class DashboardScraper:
                 if limit is not None and len(jobs) >= limit:
                     break
                 try:
-                    recipe, pages = self._recipe_for(target, search)
-                    cards = self._cards(recipe, pages, target.url)
+                    recipe, cards = self._recipe_for(target, search)
                 except Exception as exc:  # noqa: BLE001 - isolate configured targets
                     failures[target.url] = f"{type(exc).__name__}: {exc}"
                     continue

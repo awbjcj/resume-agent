@@ -1,13 +1,16 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from sqlmodel import Session
 
-from resume_agent.discovery.connectors.base import Connector, FetchResult
+from resume_agent.discovery.connectors.base import Connector, FetchResult, RawJob
 from resume_agent.discovery.connectors.telemetry import record_run
 from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.discovery.source_tier import source_rank
 from resume_agent.progress import ProgressReporter
+from resume_agent.tracking.repository import find_existing
 
 
 @dataclass
@@ -47,6 +50,30 @@ def _run_note(
     return "; ".join(parts)
 
 
+def _skip_seen(session: Session) -> Callable[[RawJob], bool]:
+    """Gate that skips a card already stored from a same-or-higher-priority source.
+
+    Keyed on the exact posting URL so an aggregator copy of the same job (lower
+    priority, and typically matched only by dedup_key) is still fetched and
+    upgraded — preserving the source-priority "upgrade, not drop" invariant.
+    """
+
+    def seen(row: RawJob) -> bool:
+        if not row.url:
+            return False
+        existing = find_existing(session, row.url, "", None, None)
+        return existing is not None and source_rank(existing.source) <= source_rank(row.source)
+
+    return seen
+
+
+def _fetch(connector: Connector, search: SearchConfig, limit: int | None, skip_seen) -> FetchResult:
+    """Fetch, handing the ``skip_seen`` gate only to connectors that opt in."""
+    if getattr(connector, "prunes_seen", False):
+        return connector.fetch(search, limit=limit, skip_seen=skip_seen)  # type: ignore[call-arg]
+    return connector.fetch(search, limit=limit)
+
+
 def _pull_result(report: PullReport) -> dict[str, object]:
     return {
         "totals": report.totals,
@@ -75,11 +102,12 @@ def run_pull(
     if reporter:
         reporter.begin(total=len(connectors), label="Starting", added=0)
     added_total = 0
+    skip_seen = _skip_seen(session)
     for index, connector in enumerate(connectors, 1):
         if reporter:
             reporter.step(index - 1, label=f"Pulling {connector.name}")
         try:
-            result = connector.fetch(search, limit=limit)
+            result = _fetch(connector, search, limit, skip_seen)
             summary = ingest_jobs_with_outcomes(session, result.jobs)
             added_count = summary.added.get(connector.name, sum(summary.added.values()))
             upgraded_count = summary.upgraded.get(connector.name, sum(summary.upgraded.values()))
