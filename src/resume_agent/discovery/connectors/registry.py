@@ -8,6 +8,8 @@ from resume_agent.discovery.connectors.lever import LeverConnector
 from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
 from resume_agent.discovery.connectors.sources import company_url_id
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
+from resume_agent.discovery.scraper.dashboard import DashboardScraper
+from resume_agent.discovery.scraper.recipe_store import host_key
 
 
 def build_connectors(config: ConnectorsConfig, settings: Settings) -> list[Connector]:
@@ -28,6 +30,11 @@ def build_connectors(config: ConnectorsConfig, settings: Settings) -> list[Conne
         urls = [entry.url for entry in config.companies.urls if entry.enabled]
         if urls:
             connectors.append(CompaniesConnector(urls))
+
+    if config.scrape.enabled:
+        targets = [target for target in config.scrape.targets if target.enabled]
+        if targets:
+            connectors.append(DashboardScraper(targets))
 
     if config.remoteok.enabled:
         connectors.append(RemoteOKConnector())
@@ -80,6 +87,12 @@ def build_source_connectors(
             source_id = company_url_id(entry.url)
             if picked(source_id, entry.enabled):
                 connectors.append(_named(CompaniesConnector([entry.url]), source_id))
+
+    if config.scrape.enabled:
+        for target in config.scrape.targets:
+            source_id = f"scrape:{host_key(target.url)}"
+            if picked(source_id, target.enabled):
+                connectors.append(_named(DashboardScraper([target]), source_id))
 
     if picked("remoteok", config.remoteok.enabled):
         connectors.append(_named(RemoteOKConnector(), "remoteok"))

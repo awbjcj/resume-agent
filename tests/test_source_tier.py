@@ -18,3 +18,7 @@ def test_unknown_source_defaults_to_aggregator_tier():
 
 def test_manual_source_is_direct_tier():
     assert source_rank("manual") < source_rank("adzuna")
+
+
+def test_scrape_source_is_canonical():
+    assert source_rank("scrape") == 0
