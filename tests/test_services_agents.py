@@ -2,6 +2,14 @@ from resume_agent.services import agents
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
 
 
+class _DummyRunner:
+    def run(self, prompt):
+        raise NotImplementedError
+
+    async def arun(self, prompt):
+        raise NotImplementedError
+
+
 def test_discovery_bundle_has_all_agents(monkeypatch):
     # Each builder is faked so no SDK/model is constructed (offline).
     monkeypatch.setattr(agents, "build_extract_agent", lambda: "extract")
@@ -108,5 +116,7 @@ def test_tailor_bundle_threads_score_band_opt_in(monkeypatch):
 
 
 def test_tailor_bundle_match_plan_defaults_none():
-    bundle = agents.TailorBundle(tailor=1, reviser=2, reviewers={}, revision=3)
+    bundle = agents.TailorBundle(
+        tailor=_DummyRunner(), reviser=_DummyRunner(), reviewers={}, revision=_DummyRunner()
+    )
     assert bundle.match_plan is None

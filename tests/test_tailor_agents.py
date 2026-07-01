@@ -95,4 +95,5 @@ def test_tailor_agent_requests_system_prompt_cache(monkeypatch):
 
     agent = build_tailor_agent("claude-test")
 
+    assert isinstance(agent, AgentRunner)
     assert agent._agent.model.cache_system_prompt is True
