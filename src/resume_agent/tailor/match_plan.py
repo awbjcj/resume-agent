@@ -48,15 +48,13 @@ def normalize_match_plan(plan: MatchPlan, profile_facts: ProfileFacts) -> MatchP
     valid_ids = set(index_facts(profile_facts))
     requirements = []
     for requirement in plan.requirements:
-        supporting_ids = []
-        if not requirement.gap:
-            supporting_ids = list(
-                dict.fromkeys(
-                    fact_id
-                    for fact_id in requirement.supporting_fact_ids
-                    if fact_id in valid_ids
-                )
+        supporting_ids = list(
+            dict.fromkeys(
+                fact_id
+                for fact_id in requirement.supporting_fact_ids
+                if fact_id in valid_ids
             )
+        )
         requirements.append(
             requirement.model_copy(
                 update={
