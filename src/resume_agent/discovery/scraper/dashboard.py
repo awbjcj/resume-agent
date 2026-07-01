@@ -57,10 +57,10 @@ class DashboardScraper:
     """Replay learned selectors over explicitly configured company job boards."""
 
     name = "scrape"
-    # Opt in to pre-fetch pruning: each posting detail costs a browser navigation
-    # (and possibly an LLM extract), so the runner supplies a ``skip_seen`` gate
-    # that drops cards already held from a same-or-higher-priority source.
-    prunes_seen = True
+    # Each posting detail costs a browser navigation (and possibly an LLM
+    # extract), so ``fetch`` honours the runner-supplied ``skip_seen`` gate to
+    # drop cards already held from a same-or-higher-priority source before doing
+    # that detail work.
 
     def __init__(
         self,

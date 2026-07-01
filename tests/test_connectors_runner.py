@@ -184,10 +184,9 @@ def test_run_pull_attributes_mixed_added_and_upgraded_to_connector(tmp_path):
 
 
 class _SeenAwareConnector:
-    """Opt-in connector that captures the ``skip_seen`` gate the runner hands it."""
+    """Connector that captures the ``skip_seen`` gate the runner hands it."""
 
     name = "scrape"
-    prunes_seen = True
 
     def __init__(self):
         self.received = "unset"
@@ -197,13 +196,13 @@ class _SeenAwareConnector:
         return FetchResult(jobs=[])
 
 
-def test_run_pull_hands_skip_seen_only_to_opt_in_connectors(tmp_path):
-    opt_in = _SeenAwareConnector()
+def test_run_pull_hands_skip_seen_gate_to_connectors(tmp_path):
+    capturing = _SeenAwareConnector()
     with _session() as s:
-        run_pull(s, [opt_in, _Good()], SearchConfig(), tmp_path / "runs.json")
-    # The opt-in connector got a callable gate; the plain _Good connector (which
-    # takes no skip_seen kwarg) was still fetched without error.
-    assert callable(opt_in.received)
+        run_pull(s, [capturing, _Good()], SearchConfig(), tmp_path / "runs.json")
+    # run_pull hands every connector the same callable skip_seen gate; a second
+    # connector in the batch is still fetched without error.
+    assert callable(capturing.received)
 
 
 def test_skip_seen_prunes_canonical_url_but_spares_aggregator(tmp_path):
