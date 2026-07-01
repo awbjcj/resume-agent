@@ -39,10 +39,16 @@ class _SyncDelegate:
     def run(self, prompt):
         return next(self._results)
 
+    async def arun(self, prompt):
+        raise NotImplementedError
+
 
 class _AsyncDelegate:
     def __init__(self, result):
         self._result = result
+
+    def run(self, prompt):
+        raise NotImplementedError
 
     async def arun(self, prompt):
         return self._result
@@ -147,6 +153,9 @@ def test_raising_delegate_counts_failure_and_reraises_same_error():
     class _RaisingDelegate:
         def run(self, prompt):
             raise error
+
+        async def arun(self, prompt):
+            raise NotImplementedError
 
     error = RuntimeError("provider failed")
     collector = UsageCollector()
