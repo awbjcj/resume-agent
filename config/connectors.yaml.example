@@ -58,3 +58,14 @@ companies:
     - https://generalmotors.wd5.myworkdayjobs.com/Careers_GM   # Workday
     - https://www.tesla.com/careers                            # Tesla (singleton)
     - https://careers.google.com/jobs/results/                 # Google (singleton)
+
+# Opt-in browser scraper for company-owned boards with no supported ATS.
+# It opens an isolated visible browser, learns one selector recipe per host,
+# and caches recipes under data/scraper_recipes/. Always set label so jobs
+# carry a stable company name.
+scrape:
+  enabled: false
+  targets:
+    - url: https://careers.example.com/jobs
+      enabled: true
+      label: Example Co

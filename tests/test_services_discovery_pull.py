@@ -1,6 +1,9 @@
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.services import discovery
+from resume_agent.discovery.connectors.runner import PullReport
+from resume_agent.discovery.scraper.dashboard import DashboardScraper
+from resume_agent.discovery.search_config import SearchConfig
 
 
 def _session():
@@ -44,3 +47,24 @@ def test_pull_jobs_forwards_skip_known(monkeypatch):
         discovery.pull_jobs(session, skip_known=False)
 
     assert captured["skip_known"] is False
+
+
+def test_pull_jobs_sets_relearn_on_dashboard_scrapers(monkeypatch):
+    scraper = DashboardScraper([])
+    observed = {}
+
+    monkeypatch.setattr(discovery, "load_search_config", lambda path: SearchConfig())
+    monkeypatch.setattr(discovery, "load_connectors_config", lambda path: object())
+    monkeypatch.setattr(
+        discovery, "build_source_connectors", lambda *args, **kwargs: [scraper]
+    )
+
+    def fake_run_pull(session, connectors, search, telemetry_path, **kwargs):
+        observed["relearn"] = connectors[0].relearn
+        return PullReport()
+
+    monkeypatch.setattr(discovery, "run_pull", fake_run_pull)
+
+    discovery.pull_jobs(session=None, relearn=True)
+
+    assert observed["relearn"] is True

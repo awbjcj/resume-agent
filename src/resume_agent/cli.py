@@ -298,6 +298,11 @@ def pull_cmd(
         "--refresh",
         help="Re-fetch jobs already known instead of skipping their expensive detail work.",
     ),
+    relearn: bool = typer.Option(
+        False,
+        "--relearn",
+        help="Force scrape connectors to learn fresh selector recipes this run.",
+    ),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run every enabled connector, dedupe into raw jobs, and report per-source counts."""
@@ -317,6 +322,7 @@ def pull_cmd(
             limit=limit,
             reporter=ProgressReporter("pull"),
             skip_known=not refresh,
+            relearn=relearn,
         )
     if not report.totals and not report.failures:
         typer.echo(

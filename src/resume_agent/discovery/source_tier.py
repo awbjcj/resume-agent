@@ -20,6 +20,7 @@ _CANONICAL = {
     "breezy",
     "jazzhr",
     "bamboohr",
+    "scrape",
 }
 
 _DIRECT = 0

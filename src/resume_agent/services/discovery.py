@@ -20,6 +20,7 @@ from resume_agent.discovery.connectors.runner import PullReport, run_pull
 from resume_agent.discovery.ingest import add_job
 from resume_agent.discovery.pipeline import discover, reprocess
 from resume_agent.discovery.search_config import load_search_config
+from resume_agent.discovery.scraper.dashboard import DashboardScraper
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
@@ -136,6 +137,7 @@ def pull_jobs(
     reporter: ProgressReporter | None = None,
     finish: bool = True,
     skip_known: bool = True,
+    relearn: bool = False,
 ) -> PullReport:
     """Run selected or all enabled pullable source connectors and ingest results."""
     search_config = load_search_config(search_path)
@@ -143,6 +145,10 @@ def pull_jobs(
     connectors = build_source_connectors(
         connectors_config, get_settings(), source_ids=source_ids
     )
+    if relearn:
+        for connector in connectors:
+            if isinstance(connector, DashboardScraper):
+                connector.relearn = True
     return run_pull(
         session,
         connectors,

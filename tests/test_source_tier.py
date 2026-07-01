@@ -41,3 +41,7 @@ def test_expanded_ats_sources_are_direct_tier():
     )
 
     assert all(source_rank(source) < source_rank("adzuna") for source in sources)
+
+
+def test_scrape_source_is_canonical():
+    assert source_rank("scrape") == 0

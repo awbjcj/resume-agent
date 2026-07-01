@@ -183,6 +183,54 @@ def test_run_pull_attributes_mixed_added_and_upgraded_to_connector(tmp_path):
     assert "+1 added" in note and "1 upgraded" in note
 
 
+class _SeenAwareConnector:
+    """Opt-in connector that captures the ``skip_seen`` gate the runner hands it."""
+
+    name = "scrape"
+    prunes_seen = True
+
+    def __init__(self):
+        self.received = "unset"
+
+    def fetch(self, search, limit=None, skip_seen=None):
+        self.received = skip_seen
+        return FetchResult(jobs=[])
+
+
+def test_run_pull_hands_skip_seen_only_to_opt_in_connectors(tmp_path):
+    opt_in = _SeenAwareConnector()
+    with _session() as s:
+        run_pull(s, [opt_in, _Good()], SearchConfig(), tmp_path / "runs.json")
+    # The opt-in connector got a callable gate; the plain _Good connector (which
+    # takes no skip_seen kwarg) was still fetched without error.
+    assert callable(opt_in.received)
+
+
+def test_skip_seen_prunes_canonical_url_but_spares_aggregator(tmp_path):
+    with _session() as s:
+        save_job(
+            s,
+            Job(source="scrape", jd_text="jd", url="https://co/1", company="Acme",
+                title="Backend Engineer", status=JobStatus.raw.value),
+        )
+        save_job(
+            s,
+            Job(source="adzuna", jd_text="thin", url="https://agg/1", company="Beta",
+                title="AI Engineer", status=JobStatus.raw.value),
+        )
+        captor = _SeenAwareConnector()
+        run_pull(s, [captor], SearchConfig(), tmp_path / "runs.json")
+        seen = captor.received
+
+        # Already held from a canonical source -> prune before the costly detail fetch.
+        assert seen(RawJob("scrape", "https://co/1", None, "Backend Engineer", None, "")) is True
+        # Held only as a lower-priority aggregator copy -> must still be fetched to upgrade it.
+        assert seen(RawJob("scrape", "https://agg/1", None, "AI Engineer", None, "")) is False
+        # Unknown URL and URL-less cards are never pruned.
+        assert seen(RawJob("scrape", "https://co/2", None, "X", None, "")) is False
+        assert seen(RawJob("scrape", None, None, "X", None, "")) is False
+
+
 def test_run_pull_reports_upgraded_and_skipped(tmp_path):
     job = RawJob(
         source="greenhouse",
