@@ -110,8 +110,10 @@ def test_pick_best_prefers_highest_scoring_gate_passing_round():
 
 
 def test_pick_best_tie_breaks_by_latest_round_then_id():
-    assert pick_best([_rv(1, 88, True, 1), _rv(2, 88, True, 2)]).version.id == 2
-    assert pick_best([_rv(2, 88, True, 1), _rv(2, 88, True, 2)]).version.id == 2
+    first = pick_best([_rv(1, 88, True, 1), _rv(2, 88, True, 2)]).version
+    second = pick_best([_rv(2, 88, True, 1), _rv(2, 88, True, 2)]).version
+    assert first is not None and first.id == 2
+    assert second is not None and second.id == 2
 
 
 def test_pick_best_ranks_missing_score_below_zero():
