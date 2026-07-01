@@ -220,6 +220,7 @@ def test_skip_seen_prunes_canonical_url_but_spares_aggregator(tmp_path):
         captor = _SeenAwareConnector()
         run_pull(s, [captor], SearchConfig(), tmp_path / "runs.json")
         seen = captor.received
+        assert callable(seen)
 
         # Already held from a canonical source -> prune before the costly detail fetch.
         assert seen(RawJob("scrape", "https://co/1", None, "Backend Engineer", None, "")) is True
