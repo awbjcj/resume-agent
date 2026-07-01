@@ -41,6 +41,7 @@ class UsageCollector:
     def observe(self, result: Any) -> None:
         metrics = getattr(result, "metrics", None)
         if metrics is None:
+            self._cost_complete = False
             return
         self._metrics_calls += 1
         self._input_tokens += getattr(metrics, "input_tokens", 0) or 0
