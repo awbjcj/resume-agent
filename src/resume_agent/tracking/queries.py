@@ -15,7 +15,6 @@ from resume_agent.tracking.repository import (
     best_resume_version,
     cover_letters_for_job,
     has_progress,
-    latest_rendered_resume_version,
     pick_best,
     resume_versions_for_job,
 )
@@ -310,7 +309,6 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
         salary = criteria.get("salary_range") or {}
         best = best_resume_version(session, job_id)
         version = best.version
-        rendered = latest_rendered_resume_version(session, job_id)
         application = application_for_job(session, job_id)
         rows.append(
             PipelineRow(
@@ -323,7 +321,10 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 # None means "never tailored" (no version); [] means a version
                 # exists but reviewers raised nothing. The board reads them apart.
                 critique_json=(version.critique_json or []) if version else None,
-                pdf_path=rendered.pdf_path if rendered else None,
+                # The surfaced version's own PDF, not any job's latest-rendered
+                # round — otherwise a clean older round can pair with a PDF
+                # from an unrelated (regressed) later round.
+                pdf_path=version.pdf_path if version else None,
                 application_status=application.status if application else None,
                 salary_min=salary.get("minimum"),
                 salary_max=salary.get("maximum"),

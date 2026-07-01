@@ -52,6 +52,19 @@ def build_eval_bundle(
     )
 
 
+def resolve_config_path(path: Path) -> Path:
+    """Fall back to the tracked `.example` config when `path` doesn't exist.
+
+    `config/review.yaml` is gitignored (product setup renders it from the
+    example on first run), so a clean checkout has no file at the CLI
+    default unless the `.example` fallback kicks in.
+    """
+    if path.exists():
+        return path
+    example = path.with_name(path.name + ".example")
+    return example if example.exists() else path
+
+
 def build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run the live resume-quality eval tier."
@@ -69,6 +82,7 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_argparser().parse_args(argv)
+    args.config = resolve_config_path(args.config)
     config = load_review_config(args.config)
     cases = load_cases(args.cases)
     if args.limit is not None:

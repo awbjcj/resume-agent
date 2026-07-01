@@ -79,7 +79,7 @@ def test_normalize_match_plan_removes_unknown_ids_and_repairs_gaps():
             MatchPlanRequirement(
                 jd_requirement="Go",
                 supporting_fact_ids=["e1b1"],
-                emphasis="gap wins",
+                emphasis="valid support overrides a stale gap flag",
                 gap=True,
             ),
         ]
@@ -91,8 +91,8 @@ def test_normalize_match_plan_removes_unknown_ids_and_repairs_gaps():
     assert normalized.requirements[0].gap is False
     assert normalized.requirements[1].supporting_fact_ids == []
     assert normalized.requirements[1].gap is True
-    assert normalized.requirements[2].supporting_fact_ids == []
-    assert normalized.requirements[2].gap is True
+    assert normalized.requirements[2].supporting_fact_ids == ["e1b1"]
+    assert normalized.requirements[2].gap is False
 
 
 def test_build_match_plan_agent_is_runnable(monkeypatch):

@@ -11,14 +11,14 @@ Cuts cost/latency per tailored resume *only after* quality is stable (Phases 1�
 
 ## 1. Background
 
-- **No prompt caching exists.** Agents are built as `Claude(id=, api_key=)` with no
-  `cache_control` (`llm_runner.py:194`). "Cache-aware prompt ordering" is therefore not
-  *re-ordering* an existing cache — it requires **enabling** Anthropic prompt caching first,
-  which depends on what agno 2.6.x exposes for cache markers.
-- **No cost/usage capture exists.** `acall` returns the agent result; nobody reads token usage
-  (`llm_runner.py:251`). Phase 0 explicitly **deferred** this (RunOutput metrics shape
-  unconfirmed). So Phase 3's evaluation basis — "did this cut cost without hurting quality?" —
-  does not exist yet.
+- **Prompt caching now exists (system prompt only).** `build_model` forwards a
+  `cache_system_prompt` flag, gated by `Settings.prompt_cache_enabled`, into the Anthropic model
+  constructor. JD/profile *user* content is still sent uncached on every call — only the stable
+  system-prompt prefix is cached.
+- **Cost/usage capture now exists in the eval harness.** `evals/usage.py`'s `UsageCollector` /
+  `MeteredRunner` wrap eval agent calls and read token usage + cost off the agent result;
+  `evals/report.py` surfaces it per case and in aggregate. Provider cost can still come back
+  `None` (reported as unknown) when a call's result lacks usage metrics.
 - The panel runs **all 5 reviewers every round**; the stable prefix (instructions, JD,
   profile/evidence) is re-sent uncached on every call.
 
