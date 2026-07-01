@@ -18,7 +18,9 @@ class InlineExecutor(Executor):
 
 def _client(tmp_path):
     return TestClient(
-        create_app(db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path)
+        create_app(
+            db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path
+        )
     )
 
 
@@ -91,3 +93,21 @@ def test_refresh_endpoint_launches_run(monkeypatch, tmp_path):
         resp = client.post("/api/refresh", json={"limit": None})
     assert resp.status_code == 202
     assert resp.json()["kind"] == "refresh"
+
+
+def test_pull_refresh_disables_skip_known(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_pull_jobs(session, **kwargs):
+        from resume_agent.discovery.connectors.runner import PullReport
+
+        captured.update(kwargs)
+        return PullReport()
+
+    monkeypatch.setattr(runs_router, "pull_jobs", fake_pull_jobs)
+    client = _client(tmp_path)
+    with client:
+        response = client.post("/api/pull", json={"refresh": True})
+
+    assert response.status_code == 202
+    assert captured["skip_known"] is False

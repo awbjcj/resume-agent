@@ -11,7 +11,7 @@ from typing import Callable, Iterable, TypeVar
 
 import httpx
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob
+from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen
 from resume_agent.discovery.connectors.text import relevance_gate, title_relevance_gate
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -23,12 +23,22 @@ T = TypeVar("T", bound=RawJob)
 
 
 def gate_and_limit(
-    jobs: list[RawJob], search: SearchConfig, limit: int | None
+    jobs: list[RawJob],
+    search: SearchConfig,
+    limit: int | None,
+    skip_seen: SkipSeen | None = None,
 ) -> tuple[list[RawJob], int]:
-    """Relevance-gate the jobs, report how many were dropped, then cap to ``limit``."""
+    """Relevance-gate the jobs, report how many were dropped, drop already-known
+    rows, then cap to ``limit``.
+
+    ``skip_seen`` runs after the relevance gate (so ``filtered`` still counts only
+    relevance drops) and before the limit slice (so the cap fills with unseen rows).
+    """
     before = len(jobs)
     gated = relevance_gate(jobs, search)
     filtered = before - len(gated)
+    if skip_seen is not None:
+        gated = [job for job in gated if not skip_seen(job)]
     return (gated[:limit] if limit is not None else gated), filtered
 
 
@@ -40,12 +50,15 @@ def harvest(
     limit: int | None,
     key: Callable[[U], str],
     on_error: Callable[[Exception], str | None],
+    skip_seen: SkipSeen | None = None,
 ) -> FetchResult:
     """Fan out over ``units``, isolating each unit's failure, then gate and cap.
 
     ``produce`` turns one unit into RawJobs. When it raises, ``on_error`` decides:
     a returned string records ``failures[key(unit)] = reason`` and continues; ``None``
-    re-raises (the connector does not tolerate this failure).
+    re-raises (the connector does not tolerate this failure). ``skip_seen`` drops
+    already-known rows from the union — the backstop for backends whose final
+    identity (canonical url/company) is only known after their own detail fetch.
     """
     jobs: list[RawJob] = []
     failures: dict[str, str] = {}
@@ -57,7 +70,7 @@ def harvest(
             if reason is None:
                 raise
             failures[key(unit)] = reason
-    jobs, filtered = gate_and_limit(jobs, search, limit)
+    jobs, filtered = gate_and_limit(jobs, search, limit, skip_seen)
     return FetchResult(jobs=jobs, failures=failures, filtered=filtered)
 
 
@@ -68,6 +81,7 @@ def harvest_detailed(
     *,
     search: SearchConfig,
     limit: int | None,
+    skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
     """The N+1 list-then-detail dance shared by Workday and Tesla.
 
@@ -76,11 +90,15 @@ def harvest_detailed(
     ``None`` when the row has no detail to fetch) and may raise ``httpx.HTTPError``
     — one stale detail endpoint skips its row, never the whole batch.
     ``apply_detail`` fills the JD (and any sharper url/location) before the full
-    relevance gate runs on the now-complete row.
+    relevance gate runs on the now-complete row; if it raises on a malformed
+    payload (e.g. a detail page missing its JobPosting JSON-LD) that row is
+    skipped too, never the whole batch.
     """
     jobs: list[RawJob] = []
     for row in rows:
         if not title_relevance_gate([row], search):
+            continue
+        if skip_seen is not None and skip_seen(row):
             continue
         try:
             detail = fetch_detail(row)
@@ -88,7 +106,10 @@ def harvest_detailed(
             continue
         if detail is None:
             continue
-        apply_detail(row, detail)
+        try:
+            apply_detail(row, detail)
+        except (ValueError, KeyError):
+            continue
         if relevance_gate([row], search):
             jobs.append(row)
             if limit is not None and len(jobs) >= limit:

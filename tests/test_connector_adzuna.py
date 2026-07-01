@@ -12,7 +12,9 @@ from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.discovery.url_ingest.models import PageContent
 
-FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "adzuna" / "search.json").read_text())
+FIXTURE = json.loads(
+    (Path(__file__).parent / "fixtures" / "adzuna" / "search.json").read_text()
+)
 
 
 def test_parse_adzuna_maps_nested_company_and_location():
@@ -57,6 +59,40 @@ def test_connector_filters_by_search():
     result = connector.fetch(SearchConfig(keywords=["kubernetes"]))
     assert {j.title for j in result.jobs} == {"Platform Engineer"}
     assert connector.name == "adzuna"
+
+
+def test_connector_skips_known_before_enrichment_and_then_applies_limit(monkeypatch):
+    payload = {
+        "results": [
+            {
+                "redirect_url": f"https://a/{index}",
+                "title": "Backend Engineer",
+                "company": {"display_name": f"Company {index}"},
+                "location": {"display_name": "Remote"},
+                "description": "Python backend services",
+            }
+            for index in range(3)
+        ]
+    }
+    connector = AdzunaConnector("id", "key")
+    monkeypatch.setattr(connector, "_get_results", lambda search: payload)
+    rendered = []
+
+    def fake_enrich(jobs):
+        rendered.extend(job.url for job in jobs)
+        return jobs, {}
+
+    import resume_agent.discovery.connectors.adzuna as mod
+
+    monkeypatch.setattr(mod, "enrich_adzuna_jobs", fake_enrich)
+    result = connector.fetch(
+        SearchConfig(role_anchors=["engineer"]),
+        limit=2,
+        skip_seen=lambda row: row.url == "https://a/0",
+    )
+
+    assert rendered == ["https://a/1", "https://a/2"]
+    assert [job.url for job in result.jobs] == rendered
 
 
 def test_adzuna_builds_targeted_params():
@@ -126,7 +162,9 @@ def test_enrich_adzuna_job_replaces_snippet_from_jobposting_json_ld():
       </script>
     </head><body>shell</body></html>
     """
-    page = PageContent(html=html, final_url="https://company.example/jobs/1", rendered=True)
+    page = PageContent(
+        html=html, final_url="https://company.example/jobs/1", rendered=True
+    )
 
     enriched = enrich_adzuna_job(_raw(), page)
 
@@ -146,7 +184,9 @@ def test_enrich_adzuna_job_keeps_markdown_structure_from_dom():
       </div>
     </body></html>
     """
-    page = PageContent(html=html, final_url="https://company.example/jobs/1", rendered=True)
+    page = PageContent(
+        html=html, final_url="https://company.example/jobs/1", rendered=True
+    )
 
     enriched = enrich_adzuna_job(_raw(), page)
 
@@ -165,7 +205,9 @@ def test_enrich_adzuna_job_strips_logo_images():
       </div>
     </body></html>
     """
-    page = PageContent(html=html, final_url="https://company.example/jobs/1", rendered=True)
+    page = PageContent(
+        html=html, final_url="https://company.example/jobs/1", rendered=True
+    )
 
     enriched = enrich_adzuna_job(_raw(), page)
 
@@ -195,7 +237,10 @@ def test_enrich_jobs_batch_renders_once_and_enriches(monkeypatch):
     import resume_agent.discovery.connectors.adzuna as mod
 
     monkeypatch.setattr(mod, "render_pages", fake_render_pages)
-    jobs = [_raw(url="https://www.adzuna.com/jobs/1"), _raw(url="https://www.adzuna.com/jobs/2")]
+    jobs = [
+        _raw(url="https://www.adzuna.com/jobs/1"),
+        _raw(url="https://www.adzuna.com/jobs/2"),
+    ]
 
     enriched, failures = enrich_adzuna_jobs(jobs)
 

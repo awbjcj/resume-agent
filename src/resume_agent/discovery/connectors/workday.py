@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
@@ -10,7 +10,9 @@ from resume_agent.discovery.connectors.text import html_to_markdown, primary_sea
 from resume_agent.discovery.search_config import SearchConfig
 
 _PAGE = 20  # cxs page size
-_MAX_OFFSET = 1000  # safety ceiling: <=51 pages (~1020 rows) even if a tenant ignores searchText
+_MAX_OFFSET = (
+    1000  # safety ceiling: <=51 pages (~1020 rows) even if a tenant ignores searchText
+)
 
 
 @dataclass
@@ -99,7 +101,12 @@ def _fetch_detail(target: AtsTarget, row: WorkdayRow) -> dict | None:
     return resp.json()
 
 
-def fetch_workday(target: AtsTarget, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
+def fetch_workday(
+    target: AtsTarget,
+    search: SearchConfig,
+    limit: int | None = None,
+    skip_seen: SkipSeen | None = None,
+) -> list[RawJob]:
     """List (request-shaped) -> gate on title/location -> detail-fetch survivors only."""
     return harvest_detailed(
         _list_pages(target, search),
@@ -107,4 +114,5 @@ def fetch_workday(target: AtsTarget, search: SearchConfig, limit: int | None = N
         apply_detail,
         search=search,
         limit=limit,
+        skip_seen=skip_seen,
     )

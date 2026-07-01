@@ -12,7 +12,22 @@ _L1_HOSTS: list[tuple[str, str]] = [
     ("job-boards.greenhouse.io", "greenhouse"),
     ("jobs.lever.co", "lever"),
     ("jobs.ashbyhq.com", "ashby"),
+    ("jobs.smartrecruiters.com", "smartrecruiters"),
+    ("careers.smartrecruiters.com", "smartrecruiters"),
+    ("apply.workable.com", "workable"),
 ]
+
+_SUBDOMAIN_HOSTS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.workable\.com$", re.I), "workable"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.recruitee\.com$", re.I), "recruitee"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.breezy\.hr$", re.I), "breezy"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.applytojob\.com$", re.I), "jazzhr"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.bamboohr\.com$", re.I), "bamboohr"),
+]
+
+_PERSONIO_HOST = re.compile(
+    r"^(?P<token>[a-z0-9-]+)\.jobs\.personio\.(?P<country>com|de)$", re.I
+)
 
 _L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
     (
@@ -31,8 +46,14 @@ _L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
             re.IGNORECASE,
         ),
     ),
-    ("lever", re.compile(rf"jobs\.lever\.co/{_TOKEN}(?=$|[/?#\"'<>\s])", re.IGNORECASE)),
-    ("ashby", re.compile(rf"jobs\.ashbyhq\.com/{_TOKEN}(?=$|[/?#\"'<>\s])", re.IGNORECASE)),
+    (
+        "lever",
+        re.compile(rf"jobs\.lever\.co/{_TOKEN}(?=$|[/?#\"'<>\s])", re.IGNORECASE),
+    ),
+    (
+        "ashby",
+        re.compile(rf"jobs\.ashbyhq\.com/{_TOKEN}(?=$|[/?#\"'<>\s])", re.IGNORECASE),
+    ),
     (
         "ashby",
         re.compile(
@@ -42,7 +63,9 @@ _L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
     ),
 ]
 
-_WORKDAY_HOST = re.compile(r"([a-z0-9-]+)\.([a-z0-9-]+)\.myworkdayjobs\.com", re.IGNORECASE)
+_WORKDAY_HOST = re.compile(
+    r"([a-z0-9-]+)\.([a-z0-9-]+)\.myworkdayjobs\.com", re.IGNORECASE
+)
 _WORKDAY_URL = re.compile(
     r"(?:(?:https?:)?//)?"
     r"(?P<host>[a-z0-9-]+\.[a-z0-9-]+\.myworkdayjobs\.com)"
@@ -55,10 +78,11 @@ _LOCALE_SEGMENT = re.compile(r"^[a-z]{2}(?:[-_][a-z]{2})?$", re.IGNORECASE)
 @dataclass(frozen=True)
 class AtsTarget:
     ats: str
-    token: str = ""        # board slug for greenhouse/lever/ashby
-    tenant: str = ""       # workday tenant (e.g. "generalmotors")
-    datacenter: str = ""   # workday data center (e.g. "wd5")
-    site: str = ""         # workday site path segment (e.g. "Careers_GM")
+    token: str = ""  # board slug for greenhouse/lever/ashby
+    tenant: str = ""  # workday tenant (e.g. "generalmotors")
+    datacenter: str = ""  # workday data center (e.g. "wd5")
+    site: str = ""  # workday site path segment (e.g. "Careers_GM")
+    country: str = "com"  # Personio careers host suffix
 
 
 def _first_path_segment(path: str) -> str | None:
@@ -70,7 +94,11 @@ def _workday_site_segment(path: str) -> str | None:
     segments = [segment for segment in path.split("/") if segment]
     while segments and _LOCALE_SEGMENT.fullmatch(segments[0]):
         segments.pop(0)
-    if len(segments) >= 4 and segments[0].lower() == "wday" and segments[1].lower() == "cxs":
+    if (
+        len(segments) >= 4
+        and segments[0].lower() == "wday"
+        and segments[1].lower() == "cxs"
+    ):
         return segments[3]
     if segments and segments[0].lower() != "wday":
         return segments[0]
@@ -106,9 +134,15 @@ def _singleton(url: str) -> AtsTarget | None:
     path = urlsplit(url).path.lower()
     for known_host, ats in _SINGLETON_HOSTS:
         if host == known_host:
-            if ats == "tesla" and not (path == "/careers" or path.startswith("/careers/")):
+            if ats == "tesla" and not (
+                path == "/careers" or path.startswith("/careers/")
+            ):
                 continue
-            if ats == "google" and host == "www.google.com" and not path.startswith("/about/careers/"):
+            if (
+                ats == "google"
+                and host == "www.google.com"
+                and not path.startswith("/about/careers/")
+            ):
                 continue
             return AtsTarget(ats)
     return None
@@ -124,7 +158,20 @@ def _l1(url: str) -> AtsTarget | None:
                 # Embed URLs carry the real board slug in ?for=, not the path.
                 for_values = parse_qs(parts.query).get("for")
                 token = for_values[0] if for_values else None
+            if ats == "workable" and token == "j":
+                return None
             return AtsTarget(ats, token) if token else None
+
+    personio = _PERSONIO_HOST.fullmatch(host)
+    if personio:
+        return AtsTarget(
+            "personio",
+            token=personio.group("token"),
+            country=personio.group("country").lower(),
+        )
+    for pattern, ats in _SUBDOMAIN_HOSTS:
+        if match := pattern.fullmatch(host):
+            return AtsTarget(ats, token=match.group("token"))
 
     # Workday host with a usable site path -> a fetchable target; non-workday hosts and
     # workday hosts lacking a site path both yield None, so detect_ats falls to the L2 sniff.

@@ -23,7 +23,11 @@ from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
-from resume_agent.services.agents import DiscoveryBundle, build_discovery_bundle, build_url_extract_agent
+from resume_agent.services.agents import (
+    DiscoveryBundle,
+    build_discovery_bundle,
+    build_url_extract_agent,
+)
 from resume_agent.tracking.tables import Job
 
 DEFAULT_SEARCH = "config/search.yaml"
@@ -51,8 +55,13 @@ def add_job_from_text(
 ) -> Job | None:
     """Add a manually-supplied job. Returns None when deduped away."""
     return add_job(
-        session, source="manual", jd_text=jd_text, url=url,
-        company=company, title=title, location=location,
+        session,
+        source="manual",
+        jd_text=jd_text,
+        url=url,
+        company=company,
+        title=title,
+        location=location,
     )
 
 
@@ -71,14 +80,20 @@ def add_job_from_url(
 ) -> Job | None:
     """Fetch a posting URL, auto-extract fields, and add it. Returns None when deduped."""
     try:
-        raw = job_from_url(url, agent=build_url_extract_agent(), allow_browser=allow_browser)
+        raw = job_from_url(
+            url, agent=build_url_extract_agent(), allow_browser=allow_browser
+        )
     except (httpx.HTTPError, PlaywrightError) as exc:
         raise UrlFetchError(f"Couldn't fetch {url}: {exc}") from exc
     if raw is None:
         raise UrlFetchError("Couldn't extract a job description from that URL.")
     return add_job(
-        session, source="url", jd_text=raw.jd_text, url=url,
-        company=company or raw.company, title=title or raw.title,
+        session,
+        source="url",
+        jd_text=raw.jd_text,
+        url=url,
+        company=company or raw.company,
+        title=title or raw.title,
         location=location or raw.location,
     )
 
@@ -97,7 +112,12 @@ def discover_jobs(
     facts = load_facts(facts_path)
     bundle = bundle or build_discovery_bundle()
     return discover(
-        session, config, facts, bundle.extract, bundle.fit, bundle.relevance,
+        session,
+        config,
+        facts,
+        bundle.extract,
+        bundle.fit,
+        bundle.relevance,
         canonicalizer=bundle.canonicalizer,
         industry_classifier=bundle.industry_classifier,
         reporter=reporter,
@@ -115,14 +135,23 @@ def pull_jobs(
     source_ids: list[str] | None = None,
     reporter: ProgressReporter | None = None,
     finish: bool = True,
+    skip_known: bool = True,
 ) -> PullReport:
     """Run selected or all enabled pullable source connectors and ingest results."""
     search_config = load_search_config(search_path)
     connectors_config = load_connectors_config(connectors_path)
-    connectors = build_source_connectors(connectors_config, get_settings(), source_ids=source_ids)
+    connectors = build_source_connectors(
+        connectors_config, get_settings(), source_ids=source_ids
+    )
     return run_pull(
-        session, connectors, search_config, telemetry_path,
-        limit=limit, reporter=reporter, finish=finish,
+        session,
+        connectors,
+        search_config,
+        telemetry_path,
+        limit=limit,
+        reporter=reporter,
+        finish=finish,
+        skip_known=skip_known,
     )
 
 
@@ -140,7 +169,12 @@ def reprocess_jobs(
     facts = load_facts(facts_path)
     bundle = bundle or build_discovery_bundle()
     return reprocess(
-        session, config, facts, bundle.extract, bundle.fit, scopes,
+        session,
+        config,
+        facts,
+        bundle.extract,
+        bundle.fit,
+        scopes,
         relevance_agent=bundle.relevance,
         canonicalizer=bundle.canonicalizer,
         industry_classifier=bundle.industry_classifier,
@@ -161,12 +195,21 @@ def refresh_jobs(
 ) -> RefreshReport:
     """Pull from every connector, then discover the newly-added raw jobs, in one pass."""
     pull_report = pull_jobs(
-        session, search_path=search_path, connectors_path=connectors_path,
-        telemetry_path=telemetry_path, limit=limit, reporter=reporter, finish=False,
+        session,
+        search_path=search_path,
+        connectors_path=connectors_path,
+        telemetry_path=telemetry_path,
+        limit=limit,
+        reporter=reporter,
+        finish=False,
     )
     counts = discover_jobs(
-        session, search_path=search_path, facts_path=facts_path,
-        bundle=bundle, reporter=reporter, job_ids=set(pull_report.changed_raw_job_ids),
+        session,
+        search_path=search_path,
+        facts_path=facts_path,
+        bundle=bundle,
+        reporter=reporter,
+        job_ids=set(pull_report.changed_raw_job_ids),
     )
     return RefreshReport(
         pulled=sum(pull_report.totals.values()),

@@ -76,6 +76,48 @@ def test_linkedin_fetch_isolates_failed_detail_navigation():
     }
 
 
+def test_linkedin_fetch_skips_known_cards_before_detail_scrape():
+    # skip_seen must short-circuit before _detail_html — the visible-browser
+    # detail render is the whole cost the known-job skip exists to avoid.
+    scraped: list[str] = []
+
+    class _RecordingScraper(LinkedInScraper):
+        def _search_html(self, search):
+            return """
+            <html><body>
+              <div class="base-card" data-entity-urn="urn:li:jobPosting:3700000001">
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000001/"></a>
+                <h3 class="base-search-card__title">Known Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme Corp</h4>
+                <span class="job-search-card__location">Remote, United States</span>
+              </div>
+              <div class="base-card" data-entity-urn="urn:li:jobPosting:3700000002">
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000002/"></a>
+                <h3 class="base-search-card__title">New Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme Corp</h4>
+                <span class="job-search-card__location">Remote, United States</span>
+              </div>
+            </body></html>
+            """
+
+        def _detail_html(self, card):
+            scraped.append(card.url)
+            return """
+            <html><body>
+              <div class="show-more-less-html__markup">Build useful systems.</div>
+            </body></html>
+            """
+
+    result = _RecordingScraper().fetch(
+        SearchConfig(),
+        skip_seen=lambda row: row.url
+        == "https://www.linkedin.com/jobs/view/3700000001/",
+    )
+
+    assert scraped == ["https://www.linkedin.com/jobs/view/3700000002/"]
+    assert [job.title for job in result.jobs] == ["New Engineer"]
+
+
 def test_playwright_failure_reason_handles_empty_message():
     # An exception with no message must not IndexError on splitlines()[0].
     assert _playwright_failure_reason(PlaywrightError("")) == "Error"

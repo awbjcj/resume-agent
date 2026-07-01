@@ -9,11 +9,17 @@ from resume_agent.discovery.search_config import SearchConfig
 _GH = {
     "jobs": [
         {"title": "AI Engineer", "absolute_url": "u1", "content": "build llm systems"},
-        {"title": "Class A CDL Driver", "absolute_url": "u2", "content": "drive a truck"},
+        {
+            "title": "Class A CDL Driver",
+            "absolute_url": "u2",
+            "content": "drive a truck",
+        },
     ]
 }
 
-_LEVER = [{"text": "AI Engineer", "hostedUrl": "u3", "description": "build python systems"}]
+_LEVER = [
+    {"text": "AI Engineer", "hostedUrl": "u3", "description": "build python systems"}
+]
 
 _ASHBY = {
     "jobs": [
@@ -55,11 +61,13 @@ def test_fetches_detected_lever(monkeypatch):
     _patch(
         monkeypatch,
         detect=lambda url: AtsTarget("lever", "acme"),
-        lever=lambda token: _LEVER,
+        lever=lambda token, search=None: _LEVER,
     )
     conn = CompaniesConnector(["https://jobs.lever.co/acme"])
     result = conn.fetch(SearchConfig(keywords=["python"]))
-    assert [(j.source, j.title, j.url) for j in result.jobs] == [("lever", "AI Engineer", "u3")]
+    assert [(j.source, j.title, j.url) for j in result.jobs] == [
+        ("lever", "AI Engineer", "u3")
+    ]
 
 
 def test_fetches_detected_ashby(monkeypatch):
@@ -70,7 +78,9 @@ def test_fetches_detected_ashby(monkeypatch):
     )
     conn = CompaniesConnector(["https://jobs.ashbyhq.com/acme"])
     result = conn.fetch(SearchConfig(keywords=["retrieval"]))
-    assert [(j.source, j.title, j.url) for j in result.jobs] == [("ashby", "AI Engineer", "u4")]
+    assert [(j.source, j.title, j.url) for j in result.jobs] == [
+        ("ashby", "AI Engineer", "u4")
+    ]
 
 
 def test_undetectable_url_recorded_and_isolated(monkeypatch):
@@ -88,7 +98,7 @@ def test_undetectable_url_recorded_and_isolated(monkeypatch):
 def test_companies_dispatches_workday(monkeypatch):
     calls = {}
 
-    def fake_workday(target, search, limit=None):
+    def fake_workday(target, search, limit=None, skip_seen=None):
         calls["target"] = target
         return [RawJob("workday", "u", "acme", "Software Engineer", "Austin", "jd")]
 
@@ -96,7 +106,9 @@ def test_companies_dispatches_workday(monkeypatch):
     monkeypatch.setattr(
         companies,
         "detect_ats",
-        lambda url: AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers"),
+        lambda url: AtsTarget(
+            "workday", tenant="acme", datacenter="wd5", site="Careers"
+        ),
     )
     conn = CompaniesConnector(["https://acme.wd5.myworkdayjobs.com/Careers"])
     result = conn.fetch(SearchConfig())
@@ -117,7 +129,7 @@ def test_companies_isolates_parser_error(monkeypatch):
 
 def test_companies_unsupported_ats_recorded(monkeypatch):
     monkeypatch.setattr(
-        companies, "detect_ats", lambda url: AtsTarget("smartrecruiters", "x")
+        companies, "detect_ats", lambda url: AtsTarget("futureats", "x")
     )
     conn = CompaniesConnector(["https://careers.x.com"])
     result = conn.fetch(SearchConfig())
@@ -128,7 +140,9 @@ def test_companies_unsupported_ats_recorded(monkeypatch):
 def test_http_error_on_one_board_is_isolated(monkeypatch):
     def gh(token):
         raise httpx.HTTPStatusError(
-            "404", request=httpx.Request("GET", "http://x"), response=httpx.Response(404)
+            "404",
+            request=httpx.Request("GET", "http://x"),
+            response=httpx.Response(404),
         )
 
     _patch(monkeypatch, detect=lambda url: AtsTarget("greenhouse", "dead"), gh=gh)
@@ -147,3 +161,23 @@ def test_limit_caps_results(monkeypatch):
     conn = CompaniesConnector(["https://careers.acme.com"])
     result = conn.fetch(SearchConfig(keywords=["a"]), limit=1)
     assert len(result.jobs) == 1
+
+
+def test_companies_forwards_skip_seen_to_backend(monkeypatch):
+    captured = {}
+
+    def backend(target, search, limit=None, skip_seen=None):
+        captured["skip_seen"] = skip_seen
+        return []
+
+    monkeypatch.setattr(companies, "detect_ats", lambda url: AtsTarget("workday"))
+    monkeypatch.setitem(companies._BACKENDS, "workday", backend)
+
+    def marker(row):
+        return False
+
+    CompaniesConnector(["https://example.test/jobs"]).fetch(
+        SearchConfig(), skip_seen=marker
+    )
+
+    assert captured["skip_seen"] is marker

@@ -1,6 +1,6 @@
 import httpx
 
-from resume_agent.discovery.connectors.base import RawJob
+from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
@@ -29,7 +29,12 @@ def parse_jobs(page: dict) -> list[RawJob]:
     return jobs
 
 
-def fetch_google(target: AtsTarget, search: SearchConfig, limit: int | None = None) -> list[RawJob]:
+def fetch_google(
+    target: AtsTarget,
+    search: SearchConfig,
+    limit: int | None = None,
+    skip_seen: SkipSeen | None = None,
+) -> list[RawJob]:
     jobs: list[RawJob] = []
     query = primary_search_term(search)  # invariant across pages
     for page_num in range(1, _MAX_PAGES + 1):

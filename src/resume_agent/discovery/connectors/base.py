@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from collections.abc import Callable
 from typing import Protocol
 
 import httpx
@@ -39,6 +40,9 @@ class RawJob:
     posted_at: datetime | None = None
 
 
+SkipSeen = Callable[[RawJob], bool]
+
+
 @dataclass
 class FetchResult:
     """What a connector's ``fetch`` returns: the kept jobs, the units that failed
@@ -58,4 +62,9 @@ class Connector(Protocol):
 
     name: str
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult: ...
+    def fetch(
+        self,
+        search: SearchConfig,
+        limit: int | None = None,
+        skip_seen: SkipSeen | None = None,
+    ) -> FetchResult: ...

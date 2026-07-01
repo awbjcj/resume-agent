@@ -1,18 +1,27 @@
 import httpx
 
-from resume_agent.discovery.connectors.base import FetchResult, RawJob, http_failure
+from resume_agent.discovery.connectors.base import (
+    FetchResult,
+    RawJob,
+    SkipSeen,
+    http_failure,
+)
 from resume_agent.discovery.connectors.config import LeverBoard
 from resume_agent.discovery.connectors.dates import parse_epoch_millis
 from resume_agent.discovery.connectors.harvest import harvest
-from resume_agent.discovery.connectors.text import html_to_markdown
+from resume_agent.discovery.connectors.text import html_to_markdown, primary_location
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://api.lever.co/v0/postings"
 
 
-def fetch_lever_board(token: str) -> list:
+def fetch_lever_board(token: str, search: SearchConfig | None = None) -> list:
     """GET a Lever board's postings array in JSON mode."""
-    resp = httpx.get(f"{_BASE}/{token}", params={"mode": "json"}, timeout=30)
+    params = {"mode": "json"}
+    location = primary_location(search) if search is not None else ""
+    if location:
+        params["location"] = location
+    resp = httpx.get(f"{_BASE}/{token}", params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
@@ -66,15 +75,23 @@ class LeverConnector:
     def __init__(self, boards: list[LeverBoard]):
         self.boards = boards
 
-    def fetch(self, search: SearchConfig, limit: int | None = None) -> FetchResult:
+    def fetch(
+        self,
+        search: SearchConfig,
+        limit: int | None = None,
+        skip_seen: SkipSeen | None = None,
+    ) -> FetchResult:
         return harvest(
             self.boards,
-            lambda board: parse_lever(self._get_board(board.token), board.display()),
+            lambda board: parse_lever(
+                self._get_board(board.token, search), board.display()
+            ),
             search=search,
             limit=limit,
             key=lambda board: board.token,
             on_error=http_failure,
+            skip_seen=skip_seen,
         )
 
-    def _get_board(self, token: str) -> list:
-        return fetch_lever_board(token)
+    def _get_board(self, token: str, search: SearchConfig) -> list:
+        return fetch_lever_board(token, search)

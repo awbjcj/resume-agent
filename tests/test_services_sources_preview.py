@@ -15,7 +15,9 @@ def test_preview_undetectable_is_not_ok(monkeypatch):
 
 
 def test_preview_counts_roles_from_test_fetch(monkeypatch):
-    monkeypatch.setattr(svc, "detect_ats", lambda url: AtsTarget("greenhouse", "cohere"))
+    monkeypatch.setattr(
+        svc, "detect_ats", lambda url: AtsTarget("greenhouse", "cohere")
+    )
 
     class FakeConnector:
         name = "greenhouse:cohere"
@@ -35,8 +37,11 @@ def test_preview_counts_roles_from_test_fetch(monkeypatch):
             )
 
     monkeypatch.setattr(svc, "_preview_connector", lambda target, url: FakeConnector())
+    monkeypatch.setattr(svc, "load_search_config", lambda path: object())
 
-    preview = svc.preview_source("https://job-boards.greenhouse.io/cohere", label="Cohere")
+    preview = svc.preview_source(
+        "https://job-boards.greenhouse.io/cohere", label="Cohere"
+    )
 
     assert preview.ok is True
     assert preview.kind == "greenhouse"
@@ -53,7 +58,9 @@ def test_add_source_requires_successful_preview(tmp_path, monkeypatch):
     monkeypatch.setattr(
         svc,
         "preview_source",
-        lambda url, label=None: svc.SourcePreview(ok=False, url=url, error="preview failed"),
+        lambda url, label=None: svc.SourcePreview(
+            ok=False, url=url, error="preview failed"
+        ),
     )
 
     with pytest.raises(svc.SourceError, match="preview failed"):
