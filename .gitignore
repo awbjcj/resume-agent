@@ -7,6 +7,8 @@ __pycache__/
 # uv
 .uv/
 
+.agents/
+
 # Secrets & local config
 .env
 .env.*
@@ -53,3 +55,4 @@ config/profile_sources.yaml
 config/review.yaml
 config/search.yaml
 config/style_guide.md
+skills-lock.json
