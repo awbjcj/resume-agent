@@ -1629,6 +1629,19 @@ def test_apply_inferred_is_idempotent():
     assert once.skills["soft"][0].id == twice.skills["soft"][0].id  # stable id
 
 
+def test_inferred_id_changes_when_evidence_changes():
+    facts, first_id = _facts()
+    second = Bullet(text="Coached an intern")
+    facts.experience[0].bullets.append(second)
+    a, _ = apply_inferred(
+        facts, [InferredSkill(name="Mentorship", category="soft", evidence_fact_ids=[first_id])]
+    )
+    b, _ = apply_inferred(
+        facts, [InferredSkill(name="Mentorship", category="soft", evidence_fact_ids=[second.id])]
+    )
+    assert a.skills["soft"][0].id != b.skills["soft"][0].id
+
+
 def test_infer_skills_type_checks():
     facts, bullet_id = _facts()
     agent = _FakeAgent(
@@ -1749,12 +1762,15 @@ def apply_inferred(
             continue
         if any(fact_id not in index for fact_id in candidate.evidence_fact_ids):
             continue
-        first_evidence = index[candidate.evidence_fact_ids[0]]
+        evidence_ids = list(dict.fromkeys(candidate.evidence_fact_ids))
+        first_evidence = index[evidence_ids[0]]
         skill = Skill(
-            id=deterministic_id("inferred", candidate.category, token),
+            id=deterministic_id(
+                "inferred", candidate.category, token, *sorted(evidence_ids)
+            ),
             name=candidate.name,
             inferred=True,
-            evidence_fact_ids=list(dict.fromkeys(candidate.evidence_fact_ids)),
+            evidence_fact_ids=evidence_ids,
             category=candidate.category,
             source=first_evidence.source,
         )
