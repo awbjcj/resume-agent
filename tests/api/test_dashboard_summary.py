@@ -34,6 +34,7 @@ def _seed(engine):
         job("approved")
         rendered = job("rendered")
         session.commit()
+        assert rendered.id is not None
         session.add(Application(job_id=rendered.id, status="submitted"))
         session.commit()
 
@@ -55,6 +56,7 @@ def test_applied_excludes_archived_jobs(client):
         )
         session.add(archived_rendered)
         session.commit()
+        assert archived_rendered.id is not None
         session.add(Application(job_id=archived_rendered.id, status="submitted"))
         session.commit()
 
