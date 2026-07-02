@@ -3011,6 +3011,21 @@ class _InferenceByEvidence:
 def test_build_corpus_profile_requires_sources(tmp_path):
     with pytest.raises(ValueError, match="no sources"):
         build_corpus_profile(tmp_path / "empty", github_username="")
+
+
+def test_build_aborts_when_primary_has_no_fragment(tmp_path):
+    profile_dir = tmp_path / "profile"
+    primary = tmp_path / "resume.txt"
+    secondary = tmp_path / "notes.txt"
+    primary.write_text("resume", encoding="utf-8")
+    secondary.write_text("notes", encoding="utf-8")
+    add_source(profile_dir, primary, primary=True)
+    add_source(profile_dir, secondary)
+    with pytest.raises(ValueError, match="primary"):
+        build_corpus_profile(
+            profile_dir, github_username="",
+            extractor_agent=_SequenceAgent([RuntimeError("boom"), ProfileFacts(contact=Contact(name="Ada"))]),
+        )
 ```
 
 Note `_InferenceByEvidence` must be defined before its first use in the module — place both helper classes above the tests.
@@ -3052,6 +3067,12 @@ def build_corpus_profile(
 
     report = BuildReport(doc_status=result.status)
     ordered = sorted(manifest.docs, key=lambda d: not d.primary)  # primary first
+    primary = ordered[0]
+    if primary.id not in result.fragments:
+        raise ValueError(
+            f"primary source {primary.id} has no usable fragment: "
+            f"{result.status.get(primary.id, 'unknown failure')}"
+        )
     fragments = [
         (doc, result.fragments[doc.id]) for doc in ordered if doc.id in result.fragments
     ]
