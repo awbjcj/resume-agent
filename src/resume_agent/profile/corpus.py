@@ -149,7 +149,7 @@ def remove_source(
         return None
     manifest.docs = [candidate for candidate in manifest.docs if candidate.id != doc.id]
     if doc.primary and manifest.docs:
-        min(manifest.docs, key=lambda item: (item.added_at, item.id)).primary = True
+        manifest.docs[0].primary = True
     save_manifest(manifest, profile_dir)
 
     fragments = Path(profile_dir) / FRAGMENTS_DIRNAME
