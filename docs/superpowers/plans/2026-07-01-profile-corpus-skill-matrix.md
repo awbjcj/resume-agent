@@ -347,10 +347,11 @@ git commit -m "feat: read .md and .pptx profile documents"
 - Produces (all later tasks use these exact names):
   - `SourceDoc(ExtensibleModel)`: `id: str`, `filename: str`, `sha256: str`, `added_at: str`, `primary: bool = False`
   - `SourceManifest(ExtensibleModel)`: `docs: list[SourceDoc]`
-  - `load_manifest(profile_dir: str | Path) -> SourceManifest` (missing/corrupt → empty)
+  - `load_manifest(profile_dir: str | Path) -> SourceManifest` (missing → empty;
+    malformed/invalid-primary manifest → `ValueError`)
   - `save_manifest(manifest: SourceManifest, profile_dir: str | Path) -> None` (atomic)
-  - `add_source(profile_dir, file_path, primary: bool = False) -> SourceDoc` (copies file into `sources/`, idempotent by sha256)
-  - `remove_source(profile_dir, ident: str, purge: bool = False) -> SourceDoc | None` (ident matches id or filename; deletes fragment files)
+  - `add_source(profile_dir, file_path, primary: bool = False) -> SourceDoc` (copies file into `sources/`, idempotent by sha256; first source is automatically primary)
+  - `remove_source(profile_dir, ident: str, purge: bool = False) -> SourceDoc | None` (ident matches id or filename; deletes fragment files; promotes the oldest remainder when removing the primary)
   - `migrate_legacy(profile_dir, resume_path: str | None) -> SourceDoc | None`
   - `sources_dir(profile_dir) -> Path`, `doc_path(profile_dir, doc) -> Path`
 
@@ -394,6 +395,12 @@ def test_add_source_same_content_is_noop(tmp_path):
     assert len(load_manifest(profile_dir).docs) == 1
 
 
+def test_first_source_is_automatically_primary(tmp_path):
+    profile_dir = tmp_path / "profile"
+    add_source(profile_dir, _make_doc(tmp_path))
+    assert load_manifest(profile_dir).docs[0].primary is True
+
+
 def test_add_second_primary_demotes_first(tmp_path):
     profile_dir = tmp_path / "profile"
     add_source(profile_dir, _make_doc(tmp_path, "a.txt", "A"), primary=True)
@@ -428,6 +435,23 @@ def test_remove_source_purge_deletes_copy(tmp_path):
     assert not doc_path(profile_dir, doc).exists()
 
 
+def test_remove_primary_promotes_oldest_remaining(tmp_path):
+    profile_dir = tmp_path / "profile"
+    first = add_source(profile_dir, _make_doc(tmp_path, "a.txt", "A"))
+    second = add_source(profile_dir, _make_doc(tmp_path, "b.txt", "B"))
+    remove_source(profile_dir, first.id)
+    assert load_manifest(profile_dir).docs == [second.model_copy(update={"primary": True})]
+
+
+def test_corrupt_manifest_fails_loudly(tmp_path):
+    profile_dir = tmp_path / "profile"
+    profile_dir.mkdir()
+    (profile_dir / "sources.json").write_text("{broken", encoding="utf-8")
+    import pytest
+    with pytest.raises(ValueError, match="manifest"):
+        load_manifest(profile_dir)
+
+
 def test_manifest_round_trip_is_atomic_file(tmp_path):
     profile_dir = tmp_path / "profile"
     add_source(profile_dir, _make_doc(tmp_path))
@@ -459,9 +483,10 @@ Create `src/resume_agent/profile/corpus.py`:
 """Source-document registry: which user documents feed the fact-lock profile."""
 
 import hashlib
-import json
+import os
 import re
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -488,6 +513,12 @@ class SourceDoc(ExtensibleModel):
 class SourceManifest(ExtensibleModel):
     docs: list[SourceDoc] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def exactly_one_primary_when_nonempty(self) -> "SourceManifest":
+        if self.docs and sum(doc.primary for doc in self.docs) != 1:
+            raise ValueError("a non-empty source manifest must have exactly one primary")
+        return self
+
 
 def sources_dir(profile_dir: str | Path) -> Path:
     return Path(profile_dir) / SOURCES_DIRNAME
@@ -503,18 +534,31 @@ def _manifest_path(profile_dir: str | Path) -> Path:
 
 def load_manifest(profile_dir: str | Path) -> SourceManifest:
     path = _manifest_path(profile_dir)
+    if not path.exists():
+        return SourceManifest()
     try:
         return SourceManifest.model_validate_json(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return SourceManifest()
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"invalid source manifest: {path}") from exc
 
 
 def save_manifest(manifest: SourceManifest, profile_dir: str | Path) -> None:
     path = _manifest_path(profile_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.tmp")
-    tmp.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
-    tmp.replace(path)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=path.parent,
+            prefix=f".{path.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(manifest.model_dump_json(indent=2) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _doc_id(filename: str, sha256: str) -> str:
@@ -544,6 +588,7 @@ def add_source(
             existing.primary = True
         return existing
 
+    primary = primary or not manifest.docs
     doc = SourceDoc(
         id=_doc_id(src.name, sha),
         filename=src.name,
@@ -557,7 +602,8 @@ def add_source(
     if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() != sha:
         doc.filename = f"{doc.id}{suffix}"  # name collision, different content
         target = target_dir / doc.filename
-    shutil.copyfile(src, target)
+    if src.resolve() != target.resolve():
+        shutil.copyfile(src, target)
 
     if primary:
         for other in manifest.docs:
@@ -575,6 +621,9 @@ def remove_source(
     if doc is None:
         return None
     manifest.docs = [d for d in manifest.docs if d.id != doc.id]
+    if doc.primary and manifest.docs:
+        promoted = min(manifest.docs, key=lambda d: (d.added_at, d.id))
+        promoted.primary = True
     save_manifest(manifest, profile_dir)
     fragments = Path(profile_dir) / FRAGMENTS_DIRNAME
     for stale in (fragments / f"{doc.id}.json", fragments / f"{doc.id}.meta.json"):
@@ -593,7 +642,7 @@ def migrate_legacy(profile_dir: str | Path, resume_path: str | None) -> SourceDo
     return add_source(profile_dir, resume_path, primary=True)
 ```
 
-(No `json` import is needed — manifest serialization goes through Pydantic.)
+Import `model_validator` alongside `Field`.
 
 - [ ] **Step 4: Run the full suite and commit**
 
