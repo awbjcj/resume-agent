@@ -4,7 +4,7 @@
 
 **Goal:** Storage-agnostic config/secrets/documents/setup-status/profile-build/dashboard-summary HTTP contract over the existing YAML files, so the web app can manage every config.
 
-**Architecture:** A `ConfigStore` seam (`services/config_store.py`) maps config *domains* to YAML/text files behind typed `CamelModel` schemas; routers depend on the seam, never on paths. Secrets and model ids ride the existing `setup/env_writer` merge logic with a settings-refresh hook. Documents get a manifest-backed store under `data/profile/documents/`. Profile build becomes a Run via the existing `RunManager`.
+**Architecture:** A `ConfigStore` seam (`services/config_store.py`) maps config _domains_ to YAML/text files behind typed `CamelModel` schemas; routers depend on the seam, never on paths. Secrets and model ids ride the existing `setup/env_writer` merge logic with a settings-refresh hook. Documents get a manifest-backed store under `data/profile/documents/`. Profile build becomes a Run via the existing `RunManager`.
 
 **Tech Stack:** FastAPI, Pydantic v2 (`CamelModel`), SQLModel, pytest (offline), existing `RunManager`/`ProgressReporter`.
 
@@ -14,7 +14,7 @@
 
 - Wire format is camelCase via `CamelModel` (`api/schemas/base.py`); Python and YAML stay snake_case.
 - Errors use the `ApiException` envelope (`api/errors.py`); validation failures are 422, user-fixable input 400.
-- No file paths on the wire (render's `template_path`/`output_dir` are config *values* — allowed).
+- No file paths on the wire (render's `template_path`/`output_dir` are config _values_ — allowed).
 - Secrets never round-trip: GET returns `{key, isSet, hint}` only (hint = last 4 chars, `null` when shorter than 8).
 - All writes atomic: tmp file + `os.replace` (pattern of `services/sources._save`).
 - Tests run offline: no network, no API key; run with `.venv/Scripts/python.exe -m pytest`.
@@ -27,11 +27,13 @@
 ### Task 1: Config document schemas + ConfigStore seam
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/config.py`
 - Create: `src/resume_agent/services/config_store.py`
 - Test: `tests/api/test_config_store.py`
 
 **Interfaces:**
+
 - Consumes: `CamelModel` (`resume_agent.api.schemas.base`), `SearchConfig` (`resume_agent.discovery.search_config`) for the parity test.
 - Produces: `ConfigStore` protocol with `get(domain: str) -> CamelModel` and `put(domain: str, model: CamelModel) -> CamelModel`; `YamlConfigStore(config_dir: Path | str = "config")`; `DOMAIN_SCHEMAS: dict[str, type[CamelModel]]` with keys `search`, `review`, `prune`, `render`, `style_guide`, `profile`. Schema classes: `SearchConfigDoc`, `ReviewConfigDoc` (with `ReviewerEntry`, `LengthBudget`), `PruneConfigDoc`, `RenderConfigDoc`, `StyleGuideDoc`, `ProfileConfigDoc`.
 
@@ -305,11 +307,13 @@ git commit -m "feat(api): ConfigStore seam with typed per-domain config document
 ### Task 2: Config router (`/api/config/{domain}` GET/PUT for YAML domains)
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/config.py`
 - Modify: `src/resume_agent/api/app.py` (register router; add `config_dir` state)
 - Test: `tests/api/test_config_router.py`
 
 **Interfaces:**
+
 - Consumes: `YamlConfigStore`, `DOMAIN_SCHEMAS`, doc schemas from Task 1; `require_token` guard pattern from `app.py`.
 - Produces: routes `GET/PUT /api/config/search|review|prune|render|style-guide|profile` (URL uses hyphen for `style-guide`; domain key stays `style_guide`). Dependency `get_config_store(request) -> ConfigStore` reading `request.app.state.config_store`.
 
@@ -467,6 +471,7 @@ def put_profile_config(body: ProfileConfigDoc, request: Request):
 ```
 
 In `src/resume_agent/api/app.py`:
+
 1. Add parameter `config_dir: Path | str | None = None` to `create_app`.
 2. After `app.state.db_url = resolved_db`, add:
 
@@ -476,7 +481,7 @@ from resume_agent.services.config_store import YamlConfigStore  # top of file
 app.state.config_store = YamlConfigStore(config_dir=config_dir or "config")
 ```
 
-3. Register (with the other guarded routers):
+1. Register (with the other guarded routers):
 
 ```python
 from resume_agent.api.routers import config as config_router  # top of file
@@ -507,6 +512,7 @@ git commit -m "feat(api): typed GET/PUT /api/config/{domain} resources"
 ### Task 3: Env-backed config: secrets (write-only) + models domain
 
 **Files:**
+
 - Create: `src/resume_agent/services/env_config.py`
 - Create: `src/resume_agent/api/schemas/secrets.py`
 - Create: `src/resume_agent/api/routers/secrets.py`
@@ -514,6 +520,7 @@ git commit -m "feat(api): typed GET/PUT /api/config/{domain} resources"
 - Test: `tests/api/test_secrets_router.py`
 
 **Interfaces:**
+
 - Consumes: `parse_env`, `merge_env`, `format_env` (`resume_agent.setup.env_writer`); `get_settings` cache.
 - Produces: `read_env(env_path) -> dict[str, str]`; `write_env_updates(updates: dict[str, str], env_path) -> None` (atomic merge-write + `get_settings.cache_clear()`); routes `GET /api/secrets`, `PUT /api/secrets`, `GET/PUT /api/config/models`. `SECRET_FIELDS: dict[str, str]` (schema field -> env var). Schemas: `SecretStatus {key, is_set, hint}`, `SecretsUpdate` (all-optional str-or-null fields), `ModelsConfigDoc {cheap_model, mid_model, premium_model}`.
 
@@ -751,6 +758,7 @@ def put_models(body: ModelsConfigDoc, request: Request):
 ```
 
 In `src/resume_agent/api/app.py`:
+
 1. Add `env_path: Path | str | None = None` parameter; set `app.state.env_path = Path(env_path) if env_path is not None else Path(".env")`.
 2. Change the settings override so refreshes propagate (was a frozen closure):
 
@@ -766,10 +774,10 @@ app.dependency_overrides[get_settings_dep] = lambda: app.state.settings
 exists near the top of `create_app` — just make sure it happens before the
 override line and delete any duplicate.)
 
-3. When refreshing settings after an env write, the db_url/api_token resolved at
-startup must survive. In `put_secrets`/`put_models` this is handled by
-re-applying the app's resolved values — add this helper to `app.py` and use it
-in the router instead of assigning raw:
+1. When refreshing settings after an env write, the db_url/api_token resolved at
+   startup must survive. In `put_secrets`/`put_models` this is handled by
+   re-applying the app's resolved values — add this helper to `app.py` and use it
+   in the router instead of assigning raw:
 
 ```python
 def refresh_app_settings(app, fresh):
@@ -809,7 +817,7 @@ from resume_agent.api.deps import refresh_app_settings
     refresh_app_settings(request.app, fresh)
 ```
 
-4. Register the router: `app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)`.
+1. Register the router: `app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -830,6 +838,7 @@ git commit -m "feat(api): write-only /api/secrets + env-backed /api/config/model
 ### Task 4: Profile document store + upload endpoints
 
 **Files:**
+
 - Create: `src/resume_agent/services/profile_documents.py`
 - Create: `src/resume_agent/api/schemas/profile.py`
 - Create: `src/resume_agent/api/routers/profile.py` (documents part; build lands in Task 5)
@@ -838,6 +847,7 @@ git commit -m "feat(api): write-only /api/secrets + env-backed /api/config/model
 - Test: `tests/api/test_profile_documents.py`
 
 **Interfaces:**
+
 - Produces: `DocumentStore(root: Path)` with `add(filename: str, content: bytes, doc_type: str) -> DocumentRecord`, `list() -> list[DocumentRecord]`, `delete(doc_id: str) -> bool`, `latest_resume_path() -> Path | None`; `DocumentRecord` dataclass `(id, filename, doc_type, size_bytes, uploaded_at)`; `DocumentError(str)` for user-fixable rejects. Routes `GET/POST /api/profile/documents`, `DELETE /api/profile/documents/{doc_id}`. `ALLOWED_SUFFIXES = {".pdf", ".docx", ".txt", ".md"}`, `MAX_SIZE_BYTES = 15 * 1024 * 1024`. Store lives at `request.app.state.document_store`, root `data/profile/documents`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1116,12 +1126,14 @@ git commit -m "feat(api): profile document store with typed multipart upload"
 ### Task 5: Profile build as a Run
 
 **Files:**
+
 - Create: `src/resume_agent/services/profile_build.py`
 - Modify: `src/resume_agent/api/routers/profile.py` (add `POST /profile/build`)
 - Modify: `CLAUDE.md` (API layer section: remove "profile build" from the deferred list)
 - Test: `tests/api/test_profile_build_run.py`
 
 **Interfaces:**
+
 - Consumes: `build_profile(resume_path, github_username, extractor_agent=None, github_client=None)` (`resume_agent.profile.build`), `save_facts` / `validate_profile` (`resume_agent.profile.store` / `.validate`), `DocumentStore.latest_resume_path()`, `ConfigStore.get("profile")`, `RunManager.submit` pattern from `api/routers/runs.py`, `RunOut` + `record_to_run`.
 - Produces: `run_profile_build(reporter, *, document_store, config_store, settings, facts_out="data/profile/facts.json") -> dict` and route `POST /api/profile/build` (202, `RunOut`, singleton_key `"profile-build"`).
 
@@ -1296,12 +1308,14 @@ git commit -m "feat(api): profile build exposed as a run (202 + SSE)"
 ### Task 6: Setup status endpoint
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/setup.py`
 - Create: `src/resume_agent/api/routers/setup.py`
 - Modify: `src/resume_agent/api/app.py` (register)
 - Test: `tests/api/test_setup_status.py`
 
 **Interfaces:**
+
 - Consumes: `read_env` + `SECRET_FIELDS` (Task 3), `DocumentStore` (Task 4), `ConfigStore` (Task 1), `list_sources` (`resume_agent.services.sources`), `app.state.data_dir`.
 - Produces: `GET /api/setup/status` returning `SetupStatusOut`:
 
@@ -1514,6 +1528,7 @@ git commit -m "feat(api): GET /api/setup/status readiness aggregate"
 ### Task 7: Dashboard summary endpoint
 
 **Files:**
+
 - Create: `src/resume_agent/services/dashboard.py`
 - Create: `src/resume_agent/api/schemas/dashboard.py`
 - Create: `src/resume_agent/api/routers/dashboard.py`
@@ -1521,6 +1536,7 @@ git commit -m "feat(api): GET /api/setup/status readiness aggregate"
 - Test: `tests/api/test_dashboard_summary.py`
 
 **Interfaces:**
+
 - Consumes: `Job`, `JobStatus`, `Application` (`resume_agent.tracking.tables`); `get_session` dep.
 - Produces: `GET /api/dashboard/summary` returning `DashboardSummaryOut`:
 
@@ -1701,6 +1717,7 @@ git commit -m "feat(api): GET /api/dashboard/summary funnel + queue counts"
 ### Task 8: CLI/TUI compatibility check for temp-path plumbing
 
 **Files:**
+
 - Modify: `tests/api/conftest.py` (only if needed — see step 1)
 - Test: existing suite
 
@@ -1750,6 +1767,7 @@ git commit -m "test(api): isolate config/env/data paths in API tests"
 ### Task 9: OpenAPI contract + generated TS client refresh
 
 **Files:**
+
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (generated)
 - Test: `tests/api/test_openapi_contract.py` (existing drift gate)
 
