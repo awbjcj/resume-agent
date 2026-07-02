@@ -207,6 +207,7 @@ git commit -m "feat: skill inference metadata + fact source_ref"
 **Files:**
 - Modify: `src/resume_agent/profile/resume_reader.py`
 - Modify: `pyproject.toml` (add `python-pptx`)
+- Modify: `uv.lock` (lock the new runtime dependency)
 - Test: `tests/test_profile_resume_reader.py` (append)
 
 **Interfaces:**
@@ -216,8 +217,8 @@ git commit -m "feat: skill inference metadata + fact source_ref"
 
 Add `"python-pptx>=1.0"` to the `dependencies` list in `pyproject.toml`, then:
 
-Run: `.venv/Scripts/python.exe -m pip install -e .`
-Expected: installs python-pptx.
+Run: `uv lock && uv sync`
+Expected: `uv.lock` records `python-pptx` and the environment installs it.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -329,7 +330,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/profile/resume_reader.py pyproject.toml tests/test_profile_resume_reader.py
+git add src/resume_agent/profile/resume_reader.py pyproject.toml uv.lock tests/test_profile_resume_reader.py
 git commit -m "feat: read .md and .pptx profile documents"
 ```
 
