@@ -45,8 +45,12 @@ def test_read_pptx_slides_and_notes(tmp_path):
 
     prs = Presentation()
     slide = prs.slides.add_slide(prs.slide_layouts[5])
-    slide.shapes.title.text = "Migration Case Study"
-    slide.notes_slide.notes_text_frame.text = "Led a team of four"
+    title = slide.shapes.title
+    assert title is not None
+    title.text = "Migration Case Study"
+    notes_text_frame = slide.notes_slide.notes_text_frame
+    assert notes_text_frame is not None
+    notes_text_frame.text = "Led a team of four"
     path = tmp_path / "deck.pptx"
     prs.save(str(path))
 
