@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, select
 
 from resume_agent.tracking.queries import _TRIAGE_STATUSES
 from resume_agent.tracking.tables import Application, Job, JobStatus
@@ -43,7 +43,7 @@ def summarize_dashboard(session: Session) -> DashboardSummary:
     applied = session.exec(
         select(func.count())
         .select_from(Application)
-        .join(Job, Application.job_id == Job.id)
+        .join(Job, col(Application.job_id) == Job.id)
         .where(Application.status != "ready", Job.archived_at == None)  # noqa: E711
     ).one()
     return DashboardSummary(status_counts=counts, queues=queues, applied=applied)
