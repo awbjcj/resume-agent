@@ -85,6 +85,12 @@ Every bullet on a tailored resume must trace back to a fact in
 **hard gate** (not scored) — any unsupported claim fails the round. Agents
 rewrite and reframe; they never invent.
 
+Inferred skills (`Skill.inferred=true`) are evidence pointers: each carries
+`evidence_fact_ids` resolving to literal facts. They may appear as
+skills-section tokens (hard skills) and guide match-plan emphasis, but never
+justify bullet or summary claims. Adjacent-tier matches (same ClusterMap theme,
+not same canonical token) are never claimable as the JD's own term.
+
 ### Source priority — upgrade, not drop
 When two sources see the same job, the canonical source wins over an aggregator.
 The existing `Job` row is **mutated in place** (same id); user progress — status,
@@ -180,6 +186,8 @@ aggressiveness determines how many detail fetches are issued.
 | Path | Role |
 | --- | --- |
 | `src/resume_agent/llm_runner.py` | `build_model` provider seam + `AgentRunner` adapter |
+| `src/resume_agent/profile/corpus.py` | Source registry: manifest + add/remove + legacy migration |
+| `src/resume_agent/profile/matrix.py` | Derived skill matrix + overrides (ban/alias/forbid/category) |
 | `src/resume_agent/discovery/connectors/detect.py` | ATS detection (singleton → L1 → L2) |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation |
 | `src/resume_agent/discovery/scraper/dashboard.py` | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/` |
@@ -197,6 +205,9 @@ aggressiveness determines how many detail fetches are issued.
 
 ## Known design notes
 
+- **Profile rebuilds regenerate inferred skills.** `profile build` strips and re-derives
+  all `inferred=true` skills; durable corrections belong in `data/profile/overrides.yaml`,
+  not hand-edits to facts.json.
 - **`dedup_key` drops location.** `compute_dedup_key` is `normalize(company)|normalize_title(title)`.
   Multi-location same-title Workday reqs (e.g. "Software Engineer" in Austin vs. Detroit at GM)
   collapse to one job. Flagged as a follow-up micro-spec — fix is adding location to the key or a
