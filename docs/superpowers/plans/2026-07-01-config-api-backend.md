@@ -1260,13 +1260,18 @@ from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.services import profile_build
+from resume_agent.services.env_config import read_env
 from fastapi import Depends
 
 
 @router.post("/profile/build", response_model=RunOut, status_code=202)
 def launch_profile_build(request: Request, mgr: RunManager = Depends(get_run_manager)):
-    settings = request.app.state.settings
-    if not settings.anthropic_api_key:
+    # Read the key from the injected env_path — NOT app.state.settings, which
+    # create_app seeds from the global get_settings() (the real .env / OS env)
+    # and never re-reads env_path at startup. Using env_path keeps this gate
+    # consistent with GET /api/setup/status (Task 6) and makes the offline
+    # test deterministic regardless of the developer's real ANTHROPIC_API_KEY.
+    if not read_env(request.app.state.env_path).get("ANTHROPIC_API_KEY"):
         raise ApiException(400, "SETUP_INCOMPLETE",
                            "ANTHROPIC_API_KEY is not set — add it in Settings > API Keys")
     resume_path = _docs(request).latest_resume_path()
