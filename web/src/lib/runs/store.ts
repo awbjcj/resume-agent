@@ -19,6 +19,8 @@ export interface RunRecord {
   error?: string;
   result?: PullRunResult | Record<string, unknown> | null;
   subject?: { kind: "skill" | "theme"; key: string };
+  /** Epoch ms of the last upsert for this run — client-side only. */
+  updatedAt?: number;
 }
 
 interface RunState {
@@ -31,7 +33,7 @@ export const useRunStore = create<RunState>((set) => ({
   runs: {},
   upsert: (r) =>
     set((s) => ({
-      runs: { ...s.runs, [r.runId]: { ...s.runs[r.runId], ...r } },
+      runs: { ...s.runs, [r.runId]: { ...s.runs[r.runId], ...r, updatedAt: Date.now() } },
     })),
   remove: (id) =>
     set((s) => {

@@ -40,4 +40,11 @@ describe("run store", () => {
       key: "python",
     });
   });
+
+  it("stamps updatedAt on every upsert", () => {
+    useRunStore.getState().upsert(rec());
+    const record = useRunStore.getState().runs.r1;
+    expect(typeof record.updatedAt).toBe("number");
+    expect(record.updatedAt).toBeGreaterThan(0);
+  });
 });
