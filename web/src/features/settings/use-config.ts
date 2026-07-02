@@ -19,7 +19,7 @@ type GetBody<P extends ConfigPath> =
 export function useConfig<P extends ConfigPath>(path: P) {
   return useQuery({
     queryKey: ["config", path],
-    queryFn: () => unwrap(api.GET(path)) as Promise<GetBody<P>>,
+    queryFn: () => unwrap(api.GET(path, {} as never)) as Promise<GetBody<P>>,
   });
 }
 
@@ -27,7 +27,7 @@ export function useSaveConfig<P extends ConfigPath>(path: P) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: GetBody<P>) =>
-      unwrap(api.PUT(path, { body: body as never })) as Promise<GetBody<P>>,
+      unwrap(api.PUT(path, { body } as never)) as Promise<GetBody<P>>,
     onSuccess: (saved) => {
       qc.setQueryData(["config", path], saved);
       toast.success("Saved");
