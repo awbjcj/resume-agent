@@ -162,6 +162,7 @@ def test_tailor_loads_bound_skill_artifacts_once(tmp_path, monkeypatch):
         session.add(job)
         session.commit()
         session.refresh(job)
+        assert job.id is not None
         tailoring.tailor(session, job_ids=[job.id], facts_path=str(facts_path))
 
     assert captured["skill_matrix"] is not None
