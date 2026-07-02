@@ -23,6 +23,7 @@ from resume_agent.models.job import (
     SponsorshipSignal,
 )
 from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.profile.matrix import MatrixRow, SkillMatrix
 from resume_agent.discovery.fit import FitLocation, FitScore
 from resume_agent.tracking.repository import jobs_by_status, save_job
 from resume_agent.tracking.tables import Job, JobStatus
@@ -31,6 +32,7 @@ from resume_agent.taxonomy.industries import (
     load_industry_taxonomy,
     save_industry_taxonomy,
 )
+from resume_agent.taxonomy.clusters import ClusterMap
 
 
 def _session() -> Session:
@@ -472,6 +474,48 @@ def test_run_score_reports_phase_three(tmp_path):
     assert rec is not None
     assert rec["phase_index"] == 3 and rec["phase_count"] == 3
     assert rec["current"] == 1 and rec["total"] == 1
+
+
+def test_run_score_builds_context_from_each_jobs_criteria(tmp_path):
+    class _CapturingFitAgent:
+        def __init__(self):
+            self.prompts = []
+
+        def run(self, prompt):
+            self.prompts.append(prompt)
+            return _Result(FitScore(score=80, rationale="adjacent"))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    agent = _CapturingFitAgent()
+    matrix = SkillMatrix(
+        rows=[MatrixRow(key="flask", display="Flask", strength=2.0)]
+    )
+    cluster_map = ClusterMap(
+        theme_of={"flask": "web", "fastapi": "web"}
+    )
+    with _session() as session:
+        save_job(
+            session,
+            Job(
+                source="x",
+                jd_text="jd",
+                status=JobStatus.filtered.value,
+                criteria_json={"must_have_skills": ["FastAPI"]},
+            ),
+        )
+        run_score(
+            session,
+            ProfileFacts(contact=Contact(name="Ada")),
+            agent,
+            aliases_path=tmp_path / "aliases.json",
+            matrix=matrix,
+            cluster_map=cluster_map,
+        )
+    assert len(agent.prompts) == 1
+    assert "SKILL MATCH CONTEXT (JSON):" in agent.prompts[0]
+    assert '"coverage":"adjacent"' in agent.prompts[0]
 
 
 def test_discover_commits_once_per_stage(monkeypatch):

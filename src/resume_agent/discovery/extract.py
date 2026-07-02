@@ -34,6 +34,9 @@ _INSTRUCTIONS = [
     "protocols, and tools.",
     "Keep must_have_skills and nice_to_have_skills distinct. Treat requirements and minimum "
     "qualifications as must-have; treat preferred, bonus, or nice-to-have qualifications as nice-to-have.",
+    "Capture interpersonal and behavioral requirements such as leadership, mentorship, stakeholder "
+    "communication, cross-team collaboration, and ownership as skills too, using the posting's own "
+    "wording and the same required-versus-preferred rule.",
     "Represent every skill as one single atomic term, never a sentence or a combined list. For "
     "example, 'Python, C++ or C' becomes three entries, and a pipeline requirement may become "
     "'Data Pipelines', 'Vector Databases', and 'RAG'.",

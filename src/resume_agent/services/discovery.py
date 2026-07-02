@@ -8,6 +8,7 @@ an optional ProgressReporter passed straight through.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 from playwright.sync_api import Error as PlaywrightError
@@ -23,6 +24,7 @@ from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.profile.store import load_facts
+from resume_agent.profile.matrix import effective_cluster_map, load_matrix, load_overrides
 from resume_agent.progress import ProgressReporter
 from resume_agent.services.agents import (
     DiscoveryBundle,
@@ -30,6 +32,7 @@ from resume_agent.services.agents import (
     build_url_extract_agent,
 )
 from resume_agent.tracking.tables import Job
+from resume_agent.taxonomy.clusters import load_cluster_map
 
 DEFAULT_SEARCH = "config/search.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
@@ -43,6 +46,18 @@ class RefreshReport:
     totals: dict[str, int]
     status_counts: dict[str, int]
     failures: dict[str, dict[str, str]]
+
+
+def _skill_artifacts(facts_path: str, facts):
+    profile_dir = Path(facts_path).parent
+    overrides = load_overrides(profile_dir / "overrides.yaml")
+    cluster_map = effective_cluster_map(
+        load_cluster_map(profile_dir / "cluster_map.json"), overrides
+    )
+    matrix = load_matrix(
+        profile_dir / "matrix.json", facts=facts, cluster_map=cluster_map
+    )
+    return matrix, cluster_map
 
 
 def add_job_from_text(
@@ -111,6 +126,7 @@ def discover_jobs(
     """Run the full discovery funnel; return final status counts."""
     config = load_search_config(search_path)
     facts = load_facts(facts_path)
+    matrix, cluster_map = _skill_artifacts(facts_path, facts)
     bundle = bundle or build_discovery_bundle()
     return discover(
         session,
@@ -123,6 +139,8 @@ def discover_jobs(
         industry_classifier=bundle.industry_classifier,
         reporter=reporter,
         job_ids=job_ids,
+        matrix=matrix,
+        cluster_map=cluster_map,
     )
 
 
@@ -173,6 +191,7 @@ def reprocess_jobs(
     """Re-run the full funnel over the chosen scopes; returns final status counts."""
     config = load_search_config(search_path)
     facts = load_facts(facts_path)
+    matrix, cluster_map = _skill_artifacts(facts_path, facts)
     bundle = bundle or build_discovery_bundle()
     return reprocess(
         session,
@@ -185,6 +204,8 @@ def reprocess_jobs(
         canonicalizer=bundle.canonicalizer,
         industry_classifier=bundle.industry_classifier,
         reporter=reporter,
+        matrix=matrix,
+        cluster_map=cluster_map,
     )
 
 

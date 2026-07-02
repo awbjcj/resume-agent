@@ -223,3 +223,8 @@ def test_instructions_require_human_readable_business_domain():
     assert "business domain" in joined
     assert "job function" in joined
     assert "null" in joined
+
+
+def test_extract_instructions_capture_soft_skills():
+    joined = " ".join(_INSTRUCTIONS).lower()
+    assert "interpersonal" in joined or "soft" in joined

@@ -23,8 +23,10 @@ from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.llm_runner import run_with_cleanup
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
+from resume_agent.profile.matrix import SkillMatrix, build_skill_match_context
 from resume_agent.progress import ProgressReporter
 from resume_agent.taxonomy.location import build_location
+from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.industries import (
     INDUSTRY_TAXONOMY_PATH,
     IndustryTaxonomy,
@@ -209,6 +211,8 @@ def run_score(
     aliases_path: Path | str = SKILL_ALIASES_PATH,
     reporter: ProgressReporter | None = None,
     job_ids: set[int] | None = None,
+    matrix: SkillMatrix | None = None,
+    cluster_map: ClusterMap | None = None,
 ) -> None:
     jobs = _stage_jobs(session, JobStatus.filtered.value, job_ids)
     if reporter:
@@ -218,12 +222,24 @@ def run_score(
         pairs = list(zip(jobs, locations))
         sem = asyncio.Semaphore(get_settings().llm_concurrency)
         on_complete = (lambda n: reporter.step(n)) if reporter else None
+
+        def _skill_context(job: Job):
+            if matrix is None or cluster_map is None:
+                return None
+            criteria = JobCriteria.model_validate(job.criteria_json or {})
+            return build_skill_match_context(criteria, matrix, cluster_map)
+
         results = asyncio.run(
             run_with_cleanup(
                 gather_isolated(
                     pairs,
                     lambda pair: ascore_fit(
-                        compose_fit_input(pair[0].jd_text, profile_facts, pair[1]),
+                        compose_fit_input(
+                            pair[0].jd_text,
+                            profile_facts,
+                            pair[1],
+                            skill_context=_skill_context(pair[0]),
+                        ),
                         agent,
                         sem=sem,
                     ),
@@ -353,6 +369,8 @@ def discover(
     industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
     reporter: ProgressReporter | None = None,
     job_ids: set[int] | None = None,
+    matrix: SkillMatrix | None = None,
+    cluster_map: ClusterMap | None = None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows (optionally only `job_ids`)."""
     run_relevance(session, config, relevance_agent, reporter=reporter, job_ids=job_ids)
@@ -368,6 +386,7 @@ def discover(
     run_score(
         session, profile_facts, fit_agent, canonicalizer=canonicalizer,
         reporter=reporter, job_ids=job_ids,
+        matrix=matrix, cluster_map=cluster_map,
     )
     if reporter:
         reporter.done()
@@ -416,6 +435,8 @@ def reprocess(
     industry_classifier: Runner | None = None,
     industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
     reporter: ProgressReporter | None = None,
+    matrix: SkillMatrix | None = None,
+    cluster_map: ClusterMap | None = None,
 ) -> dict[str, int]:
     """Reset in-scope, non-progressed jobs to a clean raw state and re-run the funnel."""
     selected: dict[int, Job] = {}
@@ -442,4 +463,6 @@ def reprocess(
         industry_taxonomy_path=industry_taxonomy_path,
         reporter=reporter,
         job_ids=set(selected),
+        matrix=matrix,
+        cluster_map=cluster_map,
     )

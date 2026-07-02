@@ -59,6 +59,8 @@ def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
         industry_classifier=None,
         reporter=None,
         job_ids=None,
+        matrix=None,
+        cluster_map=None,
     ):
         seen["relevance"] = relevance
         seen["canonicalizer"] = canonicalizer

@@ -11,6 +11,7 @@ from resume_agent.discovery.fit import (
     score_fit,
 )
 from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
 
 
 class _FakeResult:
@@ -34,6 +35,28 @@ def test_compose_includes_profile_and_jd():
     text = compose_fit_input("Backend role", facts)
     assert "Ada Lovelace" in text
     assert "Backend role" in text
+    assert "SKILL MATCH CONTEXT" not in text
+
+
+def test_compose_fit_input_appends_deterministic_skill_context():
+    context = SkillMatchContext(
+        matches=[
+            SkillMatch(
+                requirement="FastAPI",
+                source="must",
+                coverage="adjacent",
+                row=MatrixRow(key="flask", display="Flask", strength=2.0),
+            )
+        ]
+    )
+    text = compose_fit_input(
+        "JD",
+        ProfileFacts(contact=Contact(name="Ada")),
+        "Remote",
+        skill_context=context,
+    )
+    assert "SKILL MATCH CONTEXT (JSON):" in text
+    assert '"coverage":"adjacent"' in text
 
 
 def test_score_fit_returns_fitscore():
