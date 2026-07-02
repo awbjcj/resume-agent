@@ -70,6 +70,26 @@ describe("DeskHealth", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows ready when complete via a non-Anthropic LLM key", async () => {
+    // Backend completeness is provider-agnostic (any_llm_key); the checklist
+    // must not perpetually flag a working non-Anthropic setup as broken.
+    server.use(
+      http.get("/api/setup/status", () =>
+        HttpResponse.json({
+          secrets: { anthropicKey: false, anyLlmKey: true },
+          profile: { documentCount: 1, hasResume: true, factsBuiltAt: "2026-07-01T00:00:00Z", githubUsername: null },
+          search: { configured: true },
+          sources: { enabledCount: 2 },
+          complete: true,
+        }),
+      ),
+    );
+    renderHealth();
+    await waitFor(() =>
+      expect(screen.getByText(/desk is ready/i)).toBeInTheDocument(),
+    );
+  });
+
   it("renders nothing when the status endpoint errors", async () => {
     server.use(
       http.get("*/api/setup/status", () =>
