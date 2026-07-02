@@ -34,9 +34,9 @@ has no structured place for them to come from.
 | Merge/dedup | **Deterministic entity keys + union; cheap LLM collapses near-duplicate bullets; primary document wins scalar conflicts; conflicts reported.** |
 | Matrix | **Derived index** (`data/profile/matrix.json`), regenerated from facts, never hand-edited. Consumed by match-plan, match-gap coverage, and fit scoring. |
 | Match tiers | **Two-tier.** Equivalent (shared canonical alias space) = covered; same theme = adjacent (partial credit, transferability framing); else gap. |
-| Soft skills | **Category-tagged, shown via bullets.** No new `JobCriteria` field; JD-criteria prompt strengthened; match-plan selects demonstrating bullets and echoes JD vocabulary in the summary — no "Soft skills:" label list. |
+| Soft skills | **Category-tagged, shown via literal evidence.** No new `JobCriteria` field; JD-criteria prompt strengthened; match-plan selects demonstrating bullets. It must not add an inferred soft-skill label to the skills section or turn it into an unsupported summary claim. |
 | Surface | **CLI first** (`profile add/remove/sources/build`); web Profile page is a phase-2 spec. |
-| Curation | **Automatic + overrides file** (`data/profile/overrides.yaml`), applied last in matrix generation; no mandatory review gate. |
+| Curation | **Automatic + overrides file** (`data/profile/overrides.yaml`), applied through one effective canonical map shared by matrix generation and every matching consumer; no mandatory review gate. |
 | Inferred hard skills | **Renderable.** An evidence-backed inferred hard skill may appear in the rendered skills section; the fact-check gate accepts an inferred skill whose `evidence_fact_ids` resolve. Soft skills stay out of the skills section. |
 
 ## 3. Fact-lock statement (invariant preserved)
@@ -58,9 +58,17 @@ Fact-lock survives unchanged in spirit and gains one clarification:
 
 - `data/profile/sources/` holds a copy of every ingested document.
 - `data/profile/sources.json` manifest — one entry per doc:
-  `{id, filename, sha256, added_at, primary: bool}`. Exactly one `primary`
-  (the canonical resume; wins scalar conflicts in merge).
+  `{id, filename, sha256, added_at, primary: bool}`. A non-empty manifest has
+  exactly one `primary` (the canonical resume; wins scalar conflicts in merge).
+  The first added source is promoted automatically. Removing the primary
+  promotes the oldest remaining source deterministically; setting a new primary
+  demotes the old one in the same manifest write. A malformed manifest is a
+  hard error, not an empty corpus, so corruption cannot silently orphan sources.
 - Atomic writes (same tmp-then-replace pattern as `save_cluster_map`).
+- Stored source copies are content-tracked inputs. Before every cache decision, the
+  builder hashes the stored bytes and compares that hash with the manifest. A
+  mismatch is reported and re-extracted using the observed hash (with the
+  manifest repaired atomically) rather than accepting a stale fragment.
 
 **Migration.** `config/profile_sources.yaml` keeps `github_username`.
 On `profile build`, if the manifest is empty and `resume_path` is set, the
@@ -92,8 +100,11 @@ Unsupported suffix → same `ValueError` style as today.
   the input may be a deck/notes document, not only a resume, and that
   `contact` may legitimately be sparse (a fragment's `contact.name` may be
   empty; merge fills it from the primary).
-- Per-doc failures do not abort the build: a failed fragment keeps its previous
-  cached version (if any) and is reported.
+- Per-doc failures do not normally abort the build: a failed fragment keeps its
+  previous cached version (if any) and is reported. A primary source with no
+  usable current or cached fragment aborts the build; silently letting a
+  secondary document become the scalar-conflict winner would violate the
+  primary invariant.
 
 ## 6. Model changes (`models/base.py`, `models/profile.py`)
 
@@ -122,6 +133,11 @@ facts therefore keep ids across rebuilds, so provenance links in existing
 `ResumeVersion` rows survive. Merged entities keep the primary fragment's
 entity id; absorbed bullets keep their own ids.
 
+An inferred skill id also includes its sorted, deduplicated evidence ids. If
+the evidence changes, the inferred fact is a different fact; an old
+`ResumeVersion` must not appear to retain provenance while its backing evidence
+silently changes.
+
 ## 7. Inference pass (`profile/inference.py`)
 
 Runs after merge, over the merged literal facts:
@@ -146,14 +162,20 @@ Runs after merge, over the merged literal facts:
 Order: fragments (primary first) → entity merge → bullet dedup → literal
 `facts.json` → inference pass → final `facts.json` → matrix.
 
-- **Entity keys.** Experience: `normalize(company)` + title-token overlap or
-  date-range overlap. Project: `_norm(name)` (as today). Education:
+- **Entity keys.** Experience: same normalized company **and** either (a) same
+  normalized title with overlapping/unknown date ranges or (b) title-token
+  overlap >= 0.5 with overlapping date ranges. Two known, disjoint ranges never
+  merge, even when title and company repeat. Project: `_norm(name)` (as today). Education:
   `normalize(institution)` + degree. Certification/publication/award: name.
 - **Union.** Bullets, `tech`, honors, highlights union across fragments; a
   cheap-tier LLM pass flags near-duplicate bullet pairs (reworded same
   accomplishment) and the shorter one is dropped. LLM failure → keep both
   (safe, verbose).
-- **Scalar conflicts.** Primary doc wins; non-primary fills nulls only.
+- **Scalar conflicts.** Primary doc wins; non-primary fills nulls only. This is
+  applied to contact fields, summary, experience (including `current`), project,
+  education, certification, publication, award, language, and volunteer
+  scalars. Collection fields are unioned. Duplicate entities are merged field
+  by field rather than dropping the secondary record wholesale.
   Every overridden conflict (e.g. differing dates) is collected into the build
   report — never silently swallowed.
 - GitHub ingestion is untouched: `merge_facts`'s project-enrich runs after the
@@ -167,13 +189,15 @@ hand-edited:
 ```jsonc
 {
   "generated_at": "...",
+  "facts_sha256": "...",
+  "canonical_map_sha256": "...",
   "rows": [
     {
       "key": "kubernetes",            // canonical token (shared alias space)
       "display": "Kubernetes",
       "aliases": ["k8s"],
       "category": "hard",             // hard | soft | domain
-      "inferred": false,
+      "inferred": false,             // true only when every contributing skill is inferred
       "evidence_fact_ids": ["..."],   // skills: own id + evidence ids; plus bullets/tech mentioning it
       "strength": 7.2,                // evidence count × recency decay
       "last_used": "2026-03"
@@ -184,7 +208,10 @@ hand-edited:
 
 - `strength = Σ evidence-fact weight × recency`, where recency decays by the
   owning experience/project `end` date (current role = 1.0). Exact curve is an
-  implementation detail; must be deterministic.
+  implementation detail; must be deterministic. One occurrence is counted
+  once (a matching bullet and its owner are not two independent pieces of
+  evidence). An undated project is `last_used=null`, not `current`. Explicit
+  `evidence_fact_ids` are resolved back to their owners for recency.
 - **Overrides** (`data/profile/overrides.yaml`) apply last:
 
 ```yaml
@@ -199,38 +226,55 @@ category: {ownership: soft}     # recategorize
 - `refresh_clusters` (`services/match_gap.py`) currently canonicalizes and
   themes **demand** tokens only, then prunes the map to demanded tokens.
   Change: the token universe becomes
-  `collect_target_skill_tokens(session) ∪ profile_skill_tokens(facts)`, and
-  **the prune keep-set includes profile tokens** — otherwise profile aliases
-  would be garbage-collected on every refresh.
+  `collect_target_skill_tokens(session) ∪ profile_skill_tokens(facts) ∪
+  override_tokens(overrides)`, and **the prune keep-set includes all three** —
+  otherwise profile aliases or forced/forbidden override heads would be
+  garbage-collected on every refresh.
 - Tiers, given canonical map `A` and theme map `T`:
   - **covered**: `A(jd_token) ∈ A(profile_tokens)`
   - **adjacent**: not covered and `T(A(jd_token))` equals the theme of some
     covered profile token
   - **gap**: neither
-- Overrides' `alias`/`forbid_alias` are applied to the loaded `ClusterMap`
-  before matching (forbid splits a merged pair back to distinct tokens).
+- One `effective_cluster_map(cluster_map, overrides)` function is used by matrix
+  generation, match-gap, fit, and tailoring. `forbid_alias` is applied after
+  forced aliases and wins on conflict; it splits both tokens into distinct
+  self-canonicals even when they previously shared a third canonical.
 
 ## 11. Consumers
 
-- **`tailor/match_plan.py`** — `compose_match_plan_input` gains a
-  `SKILL MATRIX` section (rows relevant to the JD: covered + adjacent, with
-  evidence ids and strengths). New instructions: prefer high-strength evidence;
+- **`tailor/match_plan.py`** — `compose_match_plan_input` gains a deterministic
+  `SKILL MATCH CONTEXT` section (only rows relevant to the JD, each annotated
+  with the JD requirement and `covered`/`adjacent`; include evidence ids and
+  strengths). New instructions: prefer high-strength evidence;
   for **adjacent** requirements, select transferable evidence and note the
   framing, never claim the JD token; for **soft** requirements, satisfy by
-  selecting bullets that demonstrate the trait and echoing JD vocabulary in
-  the summary.
+  selecting literal bullets that demonstrate the trait. Summary wording remains
+  subject to the ordinary fact-lock and may not be justified by an inferred
+  soft-skill pointer.
 - **`tracking/match_gap.py`** — `SkillNode.covered: bool` becomes
   `coverage: Literal["covered", "adjacent", "gap"]` (API schema + dashboard
   follow; `covered` kept as a derived bool during transition). Gap report
   excludes covered, keeps adjacent flagged separately.
-- **`discovery/fit.py`** — `compose_fit_input` includes the compact matrix
-  (canonical skills + categories + strengths) instead of only raw profile
-  skills; instructions updated to award partial credit for adjacent skills.
-  The "never infer an unlisted skill" instruction stays — the matrix *is* the
-  list now.
-- **Fact-check reviewer (`review.yaml` path)** — gains the §3 rule: a
-  skills-section token passes if it matches a literal skill **or** an inferred
-  skill whose evidence ids resolve.
+- **`discovery/fit.py`** — `compose_fit_input` includes the same deterministic,
+  per-job skill-match context instead of asking the LLM to guess adjacency from
+  an unannotated matrix. Instructions award partial credit only to rows marked
+  adjacent.
+  The "never infer an unlisted skill" instruction stays — the bound matrix is
+  the candidate-skill source behind that context.
+- **Fact-lock gate + reviewer (`review.yaml` path)** — the deterministic gate
+  rejects an inferred skill unless it is cited from the skills section, has
+  `category="hard"`, has at least one evidence id, and every evidence id
+  resolves to a non-inferred fact. The reviewer then checks whether that
+  evidence semantically demonstrates the skill. Inferred ids are never valid
+  provenance for bullets, experience/project records, or summary claims.
+
+`facts.json`, the effective canonical map, and `matrix.json` are one artifact
+set. The matrix stores hashes of both the canonical serialized facts and the
+effective ClusterMap used to build it. Consumers derive the matrix path from the
+selected facts path and ignore/rebuild a matrix when either hash differs; a
+custom `--facts` path must never consume the default profile's matrix. A
+successful cluster refresh regenerates the matrix so newly learned canonical
+heads cannot leave matrix keys stale.
 
 ## 12. Demand side (soft-skill capture)
 
@@ -259,11 +303,14 @@ legacy path and GitHub username.
   fixtures (created by a test helper, checked in as bytes or built in-test).
 - Faked agents for: fragment extraction, bullet dedup, inference,
   canonicalizer/themer (existing fakes reused).
-- Deterministic tests: manifest round-trip; hash-based cache skip/invalidate;
+- Deterministic tests: manifest round-trip + corruption failure + primary promotion;
+  observed-byte hash cache skip/invalidate;
   entity-key merge incl. conflict report; stable-id preservation across
   rebuild; inference id-validation drop; matrix strength determinism;
-  overrides (ban/alias/forbid/category); tri-state coverage incl. the prune
-  keep-set regression (profile aliases survive `refresh_clusters`).
+  overrides (ban/alias/forbid/category); facts/canonical-map matrix hash mismatch;
+  tri-state coverage incl. the prune keep-set regression (profile and override
+  aliases survive `refresh_clusters`); deterministic rejection of invalid inferred
+  provenance.
 - Contract: `match_gap` API schema change regenerates `contracts/openapi.json`
   (drift gate `tests/api/test_openapi_contract.py`).
 
@@ -286,6 +333,7 @@ legacy path and GitHub username.
 | `src/resume_agent/profile/merge.py` | Entity-key merge, bullet dedup, conflict report. |
 | `src/resume_agent/profile/matrix.py` | NEW — matrix generation + overrides. |
 | `src/resume_agent/profile/build.py` | Orchestrate corpus pipeline; legacy migration. |
+| `src/resume_agent/profile/store.py` | Atomic facts persistence for the bound facts/matrix artifact set. |
 | `src/resume_agent/models/base.py` | `FactItem.source_ref`. |
 | `src/resume_agent/models/profile.py` | `Skill.inferred/evidence_fact_ids/category`. |
 | `src/resume_agent/services/match_gap.py` | Token universe + prune keep-set. |
@@ -295,4 +343,6 @@ legacy path and GitHub username.
 | `src/resume_agent/discovery/pipeline.py` | Criteria prompt: soft-skill capture. |
 | `src/resume_agent/cli.py` | `profile add/remove/sources`; build report. |
 | `src/resume_agent/api/schemas/*` + `contracts/` | Coverage tri-state projection. |
+| `web/src/features/match-gap/*` | Render/filter adjacent separately from covered and true gaps. |
 | `pyproject.toml` | `python-pptx`. |
+| `uv.lock` | Lock `python-pptx`. |

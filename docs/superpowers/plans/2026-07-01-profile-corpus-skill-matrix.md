@@ -18,9 +18,76 @@
 - Fact-lock: literal claims are extraction-only; inferred skills must carry resolvable `evidence_fact_ids`; adjacent-tier matches are never claimable as the JD's token.
 - Wire format is camelCase via `CamelModel`; any API schema change requires `bash scripts/gen_ts_client.sh` and keeps `tests/api/test_openapi_contract.py` green.
 - Atomic file writes for persisted artifacts (tmp + `os.replace`, mirroring `save_cluster_map`).
+- A non-empty source manifest has exactly one primary. Missing manifests load as empty;
+  malformed manifests fail loudly. The first source is auto-primary and removing the
+  primary promotes the oldest remaining source.
+- `facts.json`, the effective canonical map, and `matrix.json` are a bound artifact set.
+  `SkillMatrix` carries hashes of the facts and effective map used to build it; consumers
+  derive the matrix path from the selected facts path and reject either mismatch.
 - New file paths: sources `data/profile/sources/`, manifest `data/profile/sources.json`, fragments `data/profile/fragments/`, matrix `data/profile/matrix.json`, overrides `data/profile/overrides.yaml`.
 - Commit messages end with:
   `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`
+
+Every commit example below is shorthand: append a second `-m` containing that trailer.
+
+## Correctness Amendments (normative)
+
+These corrections override any older code excerpt below that conflicts with them. They
+were added during implementation-plan review because the original excerpts could pass
+their narrow unit tests while violating the design invariants.
+
+1. **Model invariant (Task 1).** `Skill` validation rejects `inferred=true` unless
+   `category` is set and `evidence_fact_ids` is non-empty. Add negative model tests.
+2. **Registry and cache safety (Tasks 3 and 5).** Use the same unique temporary-file,
+   flush, `fsync`, `os.replace`, and cleanup pattern as `save_cluster_map`; a fixed
+   `<name>.tmp` is not concurrency-safe. Hash the stored source bytes before deciding
+   whether a fragment is cached. If they differ from the manifest, atomically repair
+   the manifest and extract against the observed hash. Never treat corrupt JSON as an
+   empty manifest. Validate exactly one primary on load/save; first add auto-promotes,
+   and primary removal deterministically promotes the oldest remaining document.
+3. **Stable ids (Tasks 4 and 7).** Remove the unused project `parent` assignment so
+   lint passes. Inferred ids are derived from category, normalized name, and sorted
+   deduplicated evidence ids; changed evidence must produce a changed inferred fact id.
+4. **Merge completeness (Task 6).** Experience identity and generic entity union must
+   follow the full rules below. Known disjoint employment ranges never merge. Merge all
+   duplicate entity types field-by-field: primary scalars win, secondary values fill
+   blanks, collections union, and every unequal non-empty scalar is reported. Include
+   contact, summary, `Experience.current`, project, education, certification,
+   publication, award, language, and volunteer fields. Validate that the first tuple is
+   the sole primary instead of trusting caller order.
+5. **Matrix semantics (Task 8).** `inferred` means inferred-only, not "any contributor
+   was inferred." Do not double-count a bullet and its owner as separate evidence.
+   Resolve explicit evidence ids to their owning role/project for recency. An undated
+   project has unknown `last_used`, never `current`. Include `facts_sha256` and
+   `canonical_map_sha256` fields and validate both in
+   `load_matrix(path, facts=..., cluster_map=...)`. Cluster refresh regenerates the
+   matrix. Implement one
+   `effective_cluster_map(cluster_map, overrides)` helper; forced aliases apply first
+   and `forbid_alias` wins last, even when both tokens currently map to a third head.
+6. **Canonical matching (Tasks 9 and 10).** Pass the effective map—not the raw map—to
+   matrix, demand graph, CLI match-gap, fit, and tailoring. Update all callers of
+   `match_gap`, not only its signature. Use `Literal["covered", "adjacent", "gap"]`
+   in the domain model. `ThemeNode.gap_count` counts only true gaps; add
+   `adjacent_count`. Update the React Match-gap UI and tests so adjacent is not rendered
+   as a gap. Regenerating TypeScript while retaining the boolean-only UI is incomplete.
+7. **Deterministic per-job context (Tasks 11 and 12).** Do not send the entire raw matrix
+   and ask an LLM to guess which skills are adjacent. Add a pure helper that takes the
+   job criteria, matrix, and effective cluster map and emits only relevant rows annotated
+   with the JD requirement and deterministic coverage tier. Both match-plan and fit use
+   this context. Load matrix/map/overrides once per service call, derive their paths from
+   `facts_path`, and ignore a matrix whose facts or canonical-map hash does not match.
+8. **Fact-lock enforcement (Task 13).** Expanding reviewer evidence is necessary but
+   insufficient. Extend the deterministic provenance gate to reject inferred provenance
+   outside `ResumeContent.skills`, reject inferred soft/domain skills in the rendered
+   skills section, and reject empty, missing, or inferred-to-inferred evidence. Add tests
+   for every rejection. Summary text has no provenance field, so inferred soft skills
+   may guide bullet selection but may not justify new summary wording.
+9. **Build and CLI consistency (Tasks 14 and 15).** Abort when the primary has no usable
+   fragment; never let a secondary silently become primary. Write facts and matrix into
+   the same selected profile directory and bind them by hash. Validate API keys with
+   `resolve_api_key` for each actual cheap/mid model instead of checking only
+   `anthropic_api_key`, since tiers may use different providers. `profile sources` must
+   show fragment status as promised by the design.
 
 ---
 
@@ -2702,7 +2769,7 @@ git commit -m "docs: fact-lock inference rules + corpus hot paths"
 
 ## Self-Review Notes (already applied)
 
-- Spec §5 fragment cache, §6 ids/model, §7 inference, §8 merge, §9 matrix, §10 canonical space + prune keep-set, §11 consumers (match-plan, match-gap tri-state, fit, fact-check), §12 demand-side prompt, §13 CLI, §14 tests, §16 file list — each maps to Tasks 1–16. Web UI, embeddings, criteria re-extraction: out of scope per spec §15.
+- Spec §5 fragment cache, §6 ids/model, §7 inference, §8 merge, §9 matrix, §10 canonical space + prune keep-set, §11 consumers (match-plan, match-gap tri-state, fit, fact-check), §12 demand-side prompt, §13 CLI, §14 tests, §16 file list — each maps to Tasks 1–16. The existing Match-gap UI is in scope only for tri-state correctness; a corpus upload/matrix-management UI, embeddings, and criteria re-extraction remain out of scope per spec §15.
 - Types cross-checked: `SkillMatrix`/`MatrixRow` names identical in Tasks 8/11/12; `SourceDoc`/`load_manifest` identical in Tasks 3/5/14/15; `InferredSkill(s)` identical in 7/14; `extra_tokens` in 9 only.
 - Deliberate deviations from today's code, called out: `validate_profile` dropped from the corpus CLI path (single-raw-text assumption no longer holds); `read_resume_text` kept as alias so `build_profile` (legacy) is untouched.
 - Tests that must be adapted to existing fixtures (marked inline): Task 9 (`test_services_match_gap.py` fakes), Task 10 (`_add_target_job` helper), Task 13 (`_resume_content_citing`), Task 15 (CliRunner conventions). The implementing agent reads those files first and follows their patterns.
