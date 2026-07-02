@@ -96,8 +96,13 @@ def test_unknown_domain_raises_key_error(store):
 
 
 def test_search_doc_covers_search_config_fields():
-    """Drift gate: every declared SearchConfig field exists on SearchConfigDoc."""
-    assert set(SearchConfig.model_fields) <= set(SearchConfigDoc.model_fields)
+    """Drift gate: every SearchConfig field exists on SearchConfigDoc.
+
+    ``schema_version`` is inherited from ``ExtensibleModel`` (base-model
+    bookkeeping, not a search field) and is deliberately absent from the wire
+    doc, so exclude it from the comparison — otherwise the subset check fails.
+    """
+    assert set(SearchConfig.model_fields) - {"schema_version"} <= set(SearchConfigDoc.model_fields)
 
 
 def test_domain_registry_contents():
