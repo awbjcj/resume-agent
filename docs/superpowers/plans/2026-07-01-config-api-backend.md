@@ -696,7 +696,7 @@ class SecretsUpdate(CamelModel):
 
 class ModelsConfigDoc(CamelModel):
     cheap_model: str = "claude-haiku-4-5-20251001"
-    mid_model: str = "claude-sonnet-4-6"
+    mid_model: str = "claude-sonnet-5"
     premium_model: str = "claude-opus-4-8"
 ```
 
