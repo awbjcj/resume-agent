@@ -52,6 +52,11 @@ const PruningSettingsPage = lazy(() =>
     default: m.PruningSettingsPage,
   })),
 );
+const StyleGuideSettingsPage = lazy(() =>
+  import("@/features/settings/pages/StyleGuideSettingsPage").then((m) => ({
+    default: m.StyleGuideSettingsPage,
+  })),
+);
 
 const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}</Suspense>;
 
@@ -76,6 +81,7 @@ export const router = createBrowserRouter([
           { path: "review", element: page(<ReviewSettingsPage />) },
           { path: "rendering", element: page(<RenderingSettingsPage />) },
           { path: "pruning", element: page(<PruningSettingsPage />) },
+          { path: "style-guide", element: page(<StyleGuideSettingsPage />) },
         ],
       },
     ],
