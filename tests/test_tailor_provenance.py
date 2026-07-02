@@ -1,3 +1,5 @@
+from typing import Literal
+
 from resume_agent.models.profile import (
     Bullet,
     Contact,
@@ -104,7 +106,9 @@ def test_resolve_evidence_returns_only_referenced_facts():
 
 
 def _facts_with_inferred_skill(
-    *, category="hard", evidence_fact_ids=None
+    *,
+    category: Literal["hard", "soft", "domain"] = "hard",
+    evidence_fact_ids=None,
 ) -> tuple[ProfileFacts, Skill]:
     bullet = Bullet(id="proof", text="Deployed services on Kubernetes")
     skill = Skill(
