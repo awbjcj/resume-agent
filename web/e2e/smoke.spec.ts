@@ -3,6 +3,17 @@ import { test, expect } from "@playwright/test";
 // Hermetic smoke: intercept the API so no backend is required.
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/notifications", (route) => route.fulfill({ json: [] }));
+  // SetupGate (wraps the whole app shell) fetches this on every page load.
+  await page.route("**/api/setup/status", (route) =>
+    route.fulfill({
+      json: {
+        secrets: { anthropicKey: true, anyLlmKey: true },
+        profile: { documentCount: 1, hasResume: true, factsBuiltAt: "2026-06-01T00:00:00Z", githubUsername: null },
+        search: { configured: true },
+        sources: { enabledCount: 1 },
+        complete: true,
+      },
+    }));
   await page.route("**/api/shortlist*", (route) =>
     route.fulfill({
       json: {
