@@ -155,10 +155,6 @@ def test_profile_build_prints_report(tmp_path, monkeypatch):
         inferred_added=["Mentorship"],
         warnings=["inference warning"],
     )
-    monkeypatch.setattr(
-        "resume_agent.profile.build.build_corpus_profile",
-        lambda dir_, github_username, **kwargs: (facts, report),
-    )
     _configure_build(monkeypatch, facts)
     monkeypatch.setattr(
         "resume_agent.profile.build.build_corpus_profile",
