@@ -1215,6 +1215,13 @@ def test_dedup_agent_failure_keeps_all_bullets():
     assert isinstance(report, MergeReport)
 ```
 
+Add regression tests required by Correctness Amendment 4: repeated company/title with
+known disjoint date ranges stays as two experiences; `current` conflicts are reported;
+secondary contact fields fill primary blanks without replacing populated primary fields;
+duplicate projects merge description/role/dates/tech/highlights with conflicts; and
+duplicate education/certification/publication/award/language/volunteer records merge
+their collections and fill blank scalars instead of dropping the secondary record.
+
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_profile_merge.py -v`
@@ -1222,7 +1229,11 @@ Expected: existing tests PASS, new tests FAIL (imports missing).
 
 - [ ] **Step 3: Implement**
 
-Append to `src/resume_agent/profile/merge.py` (keep the existing `merge_facts`, `_norm`, `_enrich` untouched; add imports at top: `from pydantic import Field`, `from agno.agent import Agent`, `from resume_agent.config import get_settings`, `from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for`, `from resume_agent.models.base import ExtensibleModel`, `from resume_agent.models.profile import Bullet, Education, Experience`, `from resume_agent.profile.corpus import SourceDoc`, `from resume_agent.tracking.match_gap import normalize_skill`):
+Extend `src/resume_agent/profile/merge.py` while preserving the existing GitHub
+`merge_facts` behavior. Add the agent/model/report imports shown below plus the profile
+entity classes required by the field-by-field merge. The excerpt is the dedup scaffold;
+implement the complete entity merge required by Correctness Amendment 4 rather than
+copying only the narrow helpers.
 
 ```python
 class MergeReport(ExtensibleModel):
@@ -1259,22 +1270,48 @@ def build_bullet_dedup_agent(model_id: str | None = None) -> Runner:
     )
 
 
-_SCALAR_FIELDS = ("title", "employment_type", "location", "start", "end")
+_SCALAR_FIELDS = ("title", "employment_type", "location", "start", "end", "current")
 
 
-def _exp_key(exp: Experience) -> tuple[str, str]:
-    return (_norm(exp.company), _norm(exp.title))
+_YEAR = re.compile(r"(?:19|20)\d{2}")
+
+
+def _year(value: str | None) -> int | None:
+    match = _YEAR.search(value or "")
+    return int(match.group()) if match else None
+
+
+def _year_range(exp: Experience) -> tuple[int, int] | None:
+    start = _year(exp.start)
+    end = 9999 if exp.current else _year(exp.end)
+    return (start, end) if start is not None and end is not None else None
+
+
+# Return False for known disjoint ranges, True for known overlap, and None when
+# comparison is impossible. end=None is open-ended only when current=True.
+def _date_ranges_overlap(a: Experience, b: Experience) -> bool | None:
+    a_range, b_range = _year_range(a), _year_range(b)
+    if a_range is None or b_range is None:
+        return None
+    return a_range[0] <= b_range[1] and b_range[0] <= a_range[1]
 
 
 def _same_experience(a: Experience, b: Experience) -> bool:
     if _norm(a.company) != _norm(b.company):
         return False
+    overlap = _date_ranges_overlap(a, b)  # True / False / None (unknown)
+    if overlap is False:
+        return False
     if _norm(a.title) == _norm(b.title):
-        return True
+        return True  # dates overlap or at least one boundary is unknown
     a_tokens = set(normalize_skill(a.title).split())
     b_tokens = set(normalize_skill(b.title).split())
     union = a_tokens | b_tokens
-    return bool(union) and len(a_tokens & b_tokens) / len(union) >= 0.5
+    return (
+        overlap is True
+        and bool(union)
+        and len(a_tokens & b_tokens) / len(union) >= 0.5
+    )
 
 
 def _merge_experience(base: Experience, other: Experience, doc: SourceDoc, report: MergeReport) -> None:
@@ -1318,6 +1355,63 @@ def _dedup_bullets(bullets: list[Bullet], agent: Runner, report: MergeReport) ->
     return [b for i, b in enumerate(bullets) if i not in drop]
 
 
+def _merge_record(
+    base: ExtensibleModel,
+    other: ExtensibleModel,
+    *,
+    scalar_fields: tuple[str, ...],
+    collection_fields: tuple[str, ...] = (),
+    label: str,
+    doc: SourceDoc,
+    report: MergeReport,
+) -> None:
+    for field_name in scalar_fields:
+        base_value, other_value = getattr(base, field_name), getattr(other, field_name)
+        if base_value in (None, "") and other_value not in (None, ""):
+            setattr(base, field_name, other_value)
+        elif other_value not in (None, "") and base_value != other_value:
+            report.conflicts.append(
+                f"{label}: {field_name} {base_value!r} kept over "
+                f"{other_value!r} from {doc.filename}"
+            )
+    for field_name in collection_fields:
+        target = getattr(base, field_name)
+        for value in getattr(other, field_name):
+            if value not in target:
+                target.append(value)
+
+
+def _merge_entity_list(
+    target: list,
+    extra: list,
+    *,
+    key,
+    scalar_fields: tuple[str, ...],
+    collection_fields: tuple[str, ...] = (),
+    label,
+    doc: SourceDoc,
+    report: MergeReport,
+) -> None:
+    by_key = {key(item): item for item in target}
+    for item in extra:
+        item_key = key(item)
+        twin = by_key.get(item_key)
+        if twin is None:
+            copied = item.model_copy(deep=True)
+            target.append(copied)
+            by_key[item_key] = copied
+            continue
+        _merge_record(
+            twin,
+            item,
+            scalar_fields=scalar_fields,
+            collection_fields=collection_fields,
+            label=label(twin),
+            doc=doc,
+            report=report,
+        )
+
+
 def merge_fragments(
     fragments: list[tuple[SourceDoc, ProfileFacts]],
     dedup_agent: Runner | None = None,
@@ -1325,55 +1419,106 @@ def merge_fragments(
     """Compose per-document fragments; the first fragment must be the primary."""
     if not fragments:
         raise ValueError("merge_fragments requires at least one fragment")
+    if not fragments[0][0].primary or sum(doc.primary for doc, _ in fragments) != 1:
+        raise ValueError("merge_fragments requires exactly one primary, first")
     report = MergeReport()
     merged = fragments[0][1].model_copy(deep=True)
 
     for doc, fragment in fragments[1:]:
-        if not merged.contact.name and fragment.contact.name:
-            merged.contact = fragment.contact.model_copy(deep=True)
+        _merge_record(
+            merged.contact,
+            fragment.contact,
+            scalar_fields=(
+                "name", "headline", "email", "phone", "location",
+                "willing_to_relocate", "work_authorization",
+            ),
+            collection_fields=("links",),
+            label="contact",
+            doc=doc,
+            report=report,
+        )
+        if not merged.summary and fragment.summary:
+            merged.summary = fragment.summary
+        elif fragment.summary and merged.summary != fragment.summary:
+            report.conflicts.append(
+                f"summary: {merged.summary!r} kept over {fragment.summary!r} "
+                f"from {doc.filename}"
+            )
+        merged.interests.extend(i for i in fragment.interests if i not in merged.interests)
         for exp in fragment.experience:
             twin = next((e for e in merged.experience if _same_experience(e, exp)), None)
             if twin is None:
                 merged.experience.append(exp.model_copy(deep=True))
             else:
                 _merge_experience(twin, exp, doc, report)
-        by_name = {_norm(p.name): p for p in merged.projects}
-        for proj in fragment.projects:
-            twin_proj = by_name.get(_norm(proj.name))
-            if twin_proj is None:
-                merged.projects.append(proj.model_copy(deep=True))
-            else:
-                _enrich(twin_proj, proj)
-                twin_proj.highlights.extend(
-                    h for h in proj.highlights if h not in twin_proj.highlights
-                )
-                twin_proj.tech.extend(t for t in proj.tech if t not in twin_proj.tech)
-        _extend_unique(merged.education, fragment.education, lambda e: (_norm(e.institution), _norm(e.degree or "")))
-        _extend_unique(merged.certifications, fragment.certifications, lambda c: _norm(c.name))
-        _extend_unique(merged.publications, fragment.publications, lambda p: _norm(p.title))
-        _extend_unique(merged.awards, fragment.awards, lambda a: _norm(a.name))
-        _extend_unique(merged.languages, fragment.languages, lambda l: _norm(l.language))
-        _extend_unique(merged.volunteer, fragment.volunteer, lambda v: (_norm(v.organization), _norm(v.role or "")))
+        _merge_entity_list(
+            merged.projects, fragment.projects, key=lambda p: _norm(p.name),
+            scalar_fields=("description", "role", "url", "repo_url", "start", "end",
+                           "stars", "forks", "primary_language", "homepage_url",
+                           "last_updated", "is_fork"),
+            collection_fields=("tech", "highlights", "languages", "topics"),
+            label=lambda p: f"project {p.name}", doc=doc, report=report,
+        )
+        _merge_entity_list(
+            merged.education, fragment.education,
+            key=lambda e: (_norm(e.institution), _norm(e.degree or "")),
+            scalar_fields=("field", "start", "end", "gpa"),
+            collection_fields=("honors", "relevant_coursework", "activities"),
+            label=lambda e: f"education {e.institution}/{e.degree or ''}",
+            doc=doc, report=report,
+        )
+        _merge_entity_list(
+            merged.certifications, fragment.certifications, key=lambda c: _norm(c.name),
+            scalar_fields=("issuer", "date", "credential_id", "url"),
+            label=lambda c: f"certification {c.name}", doc=doc, report=report,
+        )
+        _merge_entity_list(
+            merged.publications, fragment.publications, key=lambda p: _norm(p.title),
+            scalar_fields=("venue", "date", "url"), collection_fields=("authors",),
+            label=lambda p: f"publication {p.title}", doc=doc, report=report,
+        )
+        _merge_entity_list(
+            merged.awards, fragment.awards, key=lambda a: _norm(a.name),
+            scalar_fields=("issuer", "date", "description"),
+            label=lambda a: f"award {a.name}", doc=doc, report=report,
+        )
+        _merge_entity_list(
+            merged.languages, fragment.languages, key=lambda item: _norm(item.language),
+            scalar_fields=("proficiency",), label=lambda item: f"language {item.language}",
+            doc=doc, report=report,
+        )
+        _merge_entity_list(
+            merged.volunteer, fragment.volunteer,
+            key=lambda v: (_norm(v.organization), _norm(v.role or "")),
+            scalar_fields=("start", "end", "description"),
+            label=lambda v: f"volunteer {v.organization}/{v.role or ''}",
+            doc=doc, report=report,
+        )
         for category, skills in fragment.skills.items():
             bucket = merged.skills.setdefault(category, [])
-            known = {normalize_skill(s.name) for lst in merged.skills.values() for s in lst}
             for skill in skills:
-                if normalize_skill(skill.name) not in known:
-                    known.add(normalize_skill(skill.name))
+                twin_skill = next(
+                    (
+                        item
+                        for existing in merged.skills.values()
+                        for item in existing
+                        if normalize_skill(item.name) == normalize_skill(skill.name)
+                    ),
+                    None,
+                )
+                if twin_skill is None:
                     bucket.append(skill.model_copy(deep=True))
+                else:
+                    _merge_record(
+                        twin_skill, skill, scalar_fields=("context", "category"),
+                        collection_fields=("aliases", "evidence_fact_ids"),
+                        label=f"skill {twin_skill.name}", doc=doc, report=report,
+                    )
 
     if dedup_agent is not None:
         for exp in merged.experience:
             exp.bullets = _dedup_bullets(exp.bullets, dedup_agent, report)
     return merged, report
-
-
-def _extend_unique(target: list, extra: list, key) -> None:
-    seen = {key(item) for item in target}
-    for item in extra:
-        if key(item) not in seen:
-            seen.add(key(item))
-            target.append(item.model_copy(deep=True))
 ```
 
 - [ ] **Step 4: Run the suite and commit**
