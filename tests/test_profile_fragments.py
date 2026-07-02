@@ -134,3 +134,14 @@ def test_cache_status_detects_changed_source_and_temp_files_are_cleaned(tmp_path
     assert not list((profile_dir / "fragments").glob("*.tmp"))
     (profile_dir / "sources" / doc.filename).write_text("changed", encoding="utf-8")
     assert fragment_cache_status(profile_dir, doc) == "source-changed"
+
+
+def test_cache_status_is_stale_when_cached_source_disappears(tmp_path):
+    profile_dir = _setup(tmp_path)
+    manifest = load_manifest(profile_dir)
+    doc = manifest.docs[0]
+    extract_fragments(
+        profile_dir, manifest, _FakeAgent(ProfileFacts(contact=Contact(name="Ada")))
+    )
+    (profile_dir / "sources" / doc.filename).unlink()
+    assert fragment_cache_status(profile_dir, doc) == "stale"
