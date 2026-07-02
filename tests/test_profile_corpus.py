@@ -82,6 +82,37 @@ def test_remove_primary_promotes_oldest_remaining(tmp_path):
     assert load_manifest(profile_dir).docs == [second.model_copy(update={"primary": True})]
 
 
+def test_remove_primary_uses_manifest_order_when_timestamps_tie(tmp_path):
+    profile_dir = tmp_path / "profile"
+    manifest = SourceManifest(
+        docs=[
+            SourceDoc(
+                id="primary",
+                filename="primary.txt",
+                sha256="0" * 64,
+                added_at="2026-07-01T00:00:00+00:00",
+                primary=True,
+            ),
+            SourceDoc(
+                id="z-second",
+                filename="second.txt",
+                sha256="1" * 64,
+                added_at="2026-07-01T00:00:00+00:00",
+            ),
+            SourceDoc(
+                id="a-third",
+                filename="third.txt",
+                sha256="2" * 64,
+                added_at="2026-07-01T00:00:00+00:00",
+            ),
+        ]
+    )
+    save_manifest(manifest, profile_dir)
+    remove_source(profile_dir, "primary")
+    assert load_manifest(profile_dir).docs[0].id == "z-second"
+    assert load_manifest(profile_dir).docs[0].primary is True
+
+
 def test_corrupt_manifest_fails_loudly(tmp_path):
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()
