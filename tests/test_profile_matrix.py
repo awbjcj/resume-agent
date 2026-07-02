@@ -149,6 +149,29 @@ def test_undated_project_has_unknown_last_used():
     assert matrix.rows[0].last_used is None
 
 
+def test_explicit_bullet_and_owner_evidence_count_as_one_signal():
+    bullet = Bullet(text="Mentored engineers")
+    experience = Experience(
+        company="Acme", title="Engineer", current=True, bullets=[bullet]
+    )
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[experience],
+        skills={
+            "soft": [
+                Skill(
+                    name="Mentorship",
+                    inferred=True,
+                    category="soft",
+                    evidence_fact_ids=[experience.id, bullet.id],
+                )
+            ]
+        },
+    )
+    matrix = build_matrix(facts, ClusterMap.empty(), Overrides())
+    assert matrix.rows[0].strength == 1.0
+
+
 def test_build_skill_match_context_covers_alias_adjacent_gap_and_compounds():
     matrix = SkillMatrix(
         rows=[
