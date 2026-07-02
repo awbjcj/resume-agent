@@ -57,6 +57,11 @@ const StyleGuideSettingsPage = lazy(() =>
     default: m.StyleGuideSettingsPage,
   })),
 );
+const ProfileSettingsPage = lazy(() =>
+  import("@/features/settings/pages/ProfileSettingsPage").then((m) => ({
+    default: m.ProfileSettingsPage,
+  })),
+);
 
 const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}</Suspense>;
 
@@ -76,6 +81,7 @@ export const router = createBrowserRouter([
         element: page(<SettingsLayout />),
         children: [
           { index: true, element: <Navigate to="/settings/profile" replace /> },
+          { path: "profile", element: page(<ProfileSettingsPage />) },
           { path: "search", element: page(<SearchSettingsPage />) },
           { path: "keys", element: page(<KeysSettingsPage />) },
           { path: "review", element: page(<ReviewSettingsPage />) },

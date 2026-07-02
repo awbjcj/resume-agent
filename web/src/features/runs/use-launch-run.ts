@@ -104,4 +104,5 @@ export const launchers = {
     unwrap(api.POST("/api/reprocess", { body: { scopes } })),
   refresh: (opts: PullOptions = {}) =>
     unwrap(api.POST("/api/refresh", { body: { limit: opts.limit ?? null } })),
+  profileBuild: () => unwrap(api.POST("/api/profile/build", {} as never)),
 };
