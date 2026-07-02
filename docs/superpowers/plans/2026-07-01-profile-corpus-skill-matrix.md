@@ -94,11 +94,13 @@ their narrow unit tests while violating the design invariants.
 ### Task 1: Model fields — `Skill` inference metadata + `FactItem.source_ref`
 
 **Files:**
+
 - Modify: `src/resume_agent/models/base.py` (FactItem)
 - Modify: `src/resume_agent/models/profile.py` (Skill)
 - Test: `tests/test_models_profile.py` (append)
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: `FactItem.source_ref: str | None = None`; `Skill.inferred: bool = False`, `Skill.evidence_fact_ids: list[str]`, `Skill.category: Literal["hard","soft","domain"] | None = None`. All later tasks rely on these exact names.
 
@@ -205,12 +207,14 @@ git commit -m "feat: skill inference metadata + fact source_ref"
 ### Task 2: Document readers — `.md` and `.pptx`
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/resume_reader.py`
 - Modify: `pyproject.toml` (add `python-pptx`)
 - Modify: `uv.lock` (lock the new runtime dependency)
 - Test: `tests/test_profile_resume_reader.py` (append)
 
 **Interfaces:**
+
 - Produces: `read_document_text(path: str | Path) -> str` supporting `.pdf/.docx/.txt/.md/.pptx`; `read_resume_text` stays as an alias (existing callers unchanged); `SUPPORTED_SUFFIXES: frozenset[str]`.
 
 - [ ] **Step 1: Install the dependency**
@@ -339,10 +343,12 @@ git commit -m "feat: read .md and .pptx profile documents"
 ### Task 3: Corpus registry — manifest, add/remove, legacy migration
 
 **Files:**
+
 - Create: `src/resume_agent/profile/corpus.py`
 - Test: `tests/test_profile_corpus.py`
 
 **Interfaces:**
+
 - Consumes: `SUPPORTED_SUFFIXES` from Task 2; `ExtensibleModel`.
 - Produces (all later tasks use these exact names):
   - `SourceDoc(ExtensibleModel)`: `id: str`, `filename: str`, `sha256: str`, `added_at: str`, `primary: bool = False`
@@ -659,10 +665,12 @@ git commit -m "feat: profile source registry (manifest, add/remove, legacy migra
 ### Task 4: Deterministic fact ids
 
 **Files:**
+
 - Create: `src/resume_agent/profile/ids.py`
 - Test: `tests/test_profile_ids.py`
 
 **Interfaces:**
+
 - Consumes: `ProfileFacts` and its fact lists.
 - Produces:
   - `deterministic_id(*parts: str) -> str` — `sha1("|".join(parts))[:12]`
@@ -812,11 +820,13 @@ git commit -m "feat: deterministic content-derived fact ids"
 ### Task 5: Fragment extraction with content-hash cache
 
 **Files:**
+
 - Create: `src/resume_agent/profile/fragments.py`
 - Modify: `src/resume_agent/profile/extractor.py` (PROMPT_VERSION + corpus instruction)
 - Test: `tests/test_profile_fragments.py`
 
 **Interfaces:**
+
 - Consumes: `SourceDoc`, `SourceManifest`, `doc_path` (Task 3); `read_document_text` (Task 2); `assign_fact_ids` (Task 4); `extract_profile_facts` + `Runner` (existing).
 - Produces:
   - `PROMPT_VERSION: int` in `extractor.py` (starts at `2`)
@@ -1085,10 +1095,12 @@ git commit -m "feat: cached per-document profile fragment extraction"
 ### Task 6: Merge v2 — entity keys, primary-wins conflicts, bullet dedup
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/merge.py`
 - Test: `tests/test_profile_merge.py` (append)
 
 **Interfaces:**
+
 - Consumes: `SourceDoc` (Task 3); fragments dict (Task 5); `Runner`.
 - Produces:
   - `MergeReport(ExtensibleModel)`: `conflicts: list[str]`, `dropped_bullets: list[str]`
@@ -1536,10 +1548,12 @@ git commit -m "feat: cross-document fragment merge with primary-wins conflicts"
 ### Task 7: Evidence-linked skill inference
 
 **Files:**
+
 - Create: `src/resume_agent/profile/inference.py`
 - Test: `tests/test_profile_inference.py`
 
 **Interfaces:**
+
 - Consumes: `index_facts` (`tailor/provenance.py`), `normalize_skill`, `deterministic_id` (Task 4), `Skill` fields (Task 1).
 - Produces:
   - `InferredSkill(ExtensibleModel)`: `name: str`, `category: Literal["hard","soft","domain"]`, `evidence_fact_ids: list[str]`, `rationale: str | None = None`
@@ -1795,10 +1809,12 @@ git commit -m "feat: evidence-linked skill inference pass"
 ### Task 8: Skill matrix + overrides
 
 **Files:**
+
 - Create: `src/resume_agent/profile/matrix.py`
 - Test: `tests/test_profile_matrix.py`
 
 **Interfaces:**
+
 - Consumes: `ClusterMap` (`taxonomy/clusters.py`), `normalize_skill`, `ProfileFacts` (with Task 1 fields).
 - Produces:
   - `DEFAULT_MATRIX_PATH = "data/profile/matrix.json"`, `DEFAULT_OVERRIDES_PATH = "data/profile/overrides.yaml"`
@@ -2322,12 +2338,14 @@ git commit -m "feat: derived skill matrix with overrides"
 ### Task 9: Shared canonical space — profile tokens join `refresh_clusters`
 
 **Files:**
+
 - Modify: `src/resume_agent/services/match_gap.py` (`refresh_clusters`)
 - Modify: `src/resume_agent/api/routers/match_gap.py` (refresh endpoint caller, line ~67)
 - Rebuild: `data/profile/matrix.json` after a successful production refresh
 - Test: `tests/test_services_match_gap.py` (append)
 
 **Interfaces:**
+
 - Produces: `refresh_clusters(..., extra_tokens: frozenset[str] | set[str] = frozenset())` — extra tokens join both the classification universe and the prune keep-set. The API refresh endpoint passes `profile_skill_tokens(load_facts(...)) | override_tokens(load_overrides(...))` (override tokens still apply when facts are missing) and, after success, regenerates the matrix from the same facts plus the newly saved map and overrides.
 
 - [ ] **Step 1: Write the failing test**
@@ -2424,6 +2442,7 @@ git commit -m "feat: profile tokens join cluster canonical space and prune keep-
 ### Task 10: Tri-state coverage (covered / adjacent / gap)
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/match_gap.py` (`SkillNode`, `build_demand_graph`, `GapRow`, `match_gap`)
 - Modify: `src/resume_agent/api/schemas/match_gap.py` (`SkillNodeOut`)
 - Modify: `src/resume_agent/api/routers/match_gap.py` (load overrides and pass the effective map)
@@ -2434,6 +2453,7 @@ git commit -m "feat: profile tokens join cluster canonical space and prune keep-
 - Regenerate: `contracts/openapi.json` + `contracts/ts/api.ts` + `web/src/lib/api/schema.ts`
 
 **Interfaces:**
+
 - Produces: `SkillNode.coverage: Literal["covered","adjacent","gap"]` with `covered: bool` kept in sync (True only for `"covered"`); `SkillNodeOut.coverage: Literal["covered","adjacent","gap"]` added alongside the existing `covered` bool; `GapRow.adjacent: bool = False`; `ThemeNode.adjacent_count: int`; `match_gap(..., cluster_map: ClusterMap | None = None)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2587,12 +2607,14 @@ git commit -m "feat: tri-state skill coverage (covered/adjacent/gap)"
 ### Task 11: Match-plan consumes deterministic per-job skill context
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/match_plan.py` (`compose_match_plan_input`, `_MATCH_PLAN_INSTRUCTIONS`)
 - Modify: `src/resume_agent/tailor/workflow.py` (`run_tailor_review`, `arun_tailor_review` — thread `skill_context`)
 - Modify: `src/resume_agent/tailor/service.py` (load the bound artifacts once; build/pass per-job context)
 - Test: `tests/test_tailor_match_plan.py` or wherever `compose_match_plan_input` is currently tested (`rg -l "compose_match_plan_input" tests/`)
 
 **Interfaces:**
+
 - Produces: `compose_match_plan_input(jd_text, criteria, profile_facts, skill_context: SkillMatchContext | None = None) -> str` — appends a `SKILL MATCH CONTEXT (JSON)` section when present; `run_tailor_review`/`arun_tailor_review` gain keyword `skill_context: SkillMatchContext | None = None`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2696,6 +2718,7 @@ git commit -m "feat: match plan consumes deterministic skill context"
 ### Task 12: Fit scoring consumes deterministic skill context + demand-side soft-skill capture
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/fit.py` (`compose_fit_input`, `_INSTRUCTIONS`)
 - Modify: `src/resume_agent/discovery/pipeline.py` (`run_score` — build/pass context from each job's extracted criteria)
 - Modify: `src/resume_agent/services/discovery.py` (`discover_jobs` — load bound matrix/map/overrides once)
@@ -2703,6 +2726,7 @@ git commit -m "feat: match plan consumes deterministic skill context"
 - Test: `tests/test_discovery_fit.py` (or the file found by `rg -l "compose_fit_input" tests/`), `tests/test_discovery_extract.py` (or equivalent)
 
 **Interfaces:**
+
 - Produces: `compose_fit_input(jd_text, profile_facts, location=None, skill_context: SkillMatchContext | None = None) -> str`; `run_score(..., matrix: SkillMatrix | None = None, cluster_map: ClusterMap | None = None)` builds a `SkillMatchContext` from each job's `criteria_json`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2813,11 +2837,13 @@ git commit -m "feat: fit scoring consumes skill context; capture soft skills"
 ### Task 13: Fact-check gate accepts evidence-backed inferred skills
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/provenance.py` (`resolve_evidence`)
 - Modify: `src/resume_agent/tailor/agents.py` (`REVIEWER_INSTRUCTIONS["fact-check"]`)
 - Test: `tests/test_tailor_provenance.py` (append; find via `rg -l "resolve_evidence" tests/`)
 
 **Interfaces:**
+
 - Produces: `resolve_evidence` additionally includes, for every cited skill fact that has `evidence_fact_ids`, those evidence facts — so the fact-check reviewer can see what backs an inferred skill.
 - Extends `ProvenanceReport` with `invalid: list[str]` and makes
   `check_provenance` usage-aware: inferred provenance is valid only for a
@@ -2906,10 +2932,12 @@ git commit -m "feat: fact-check gate sees inferred-skill evidence"
 ### Task 14: Corpus build orchestration
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/build.py`
 - Test: `tests/test_profile_build.py` (append)
 
 **Interfaces:**
+
 - Consumes: everything from Tasks 3–8.
 - Produces:
   - `BuildReport(ExtensibleModel)`: `doc_status: dict[str, str]`, `conflicts: list[str]`, `dropped_bullets: list[str]`, `inferred_added: list[str]`, `warnings: list[str]`
@@ -3115,11 +3143,13 @@ git commit -m "feat: corpus build orchestration with build report"
 ### Task 15: CLI — `profile add/remove/sources`, corpus `build`, matrix generation
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py` (`profile_app` commands)
 - Modify: `src/resume_agent/profile/store.py` (`save_facts` becomes atomic)
 - Test: `tests/test_cli_profile.py` (append; follow that file's existing Typer `CliRunner` + monkeypatch conventions — read it first)
 
 **Interfaces:**
+
 - Produces CLI commands:
   - `resume-agent profile add <file> [--primary] [--dir data/profile]`
   - `resume-agent profile remove <ident> [--purge] [--dir data/profile]`
@@ -3342,6 +3372,7 @@ git commit -m "feat: profile corpus CLI (add/remove/sources, corpus build + matr
 ### Task 16: Documentation — CLAUDE.md invariants
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 
 - [ ] **Step 1: Update CLAUDE.md**
