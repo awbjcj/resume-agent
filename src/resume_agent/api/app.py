@@ -17,6 +17,7 @@ from resume_agent.api.routers import analytics as analytics_router
 from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import config as config_router
 from resume_agent.api.routers import cover_letters as cover_letters_router
+from resume_agent.api.routers import dashboard as dashboard_router
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
 from resume_agent.api.routers import notifications as notifications_router
@@ -127,6 +128,7 @@ def create_app(
     app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)
     app.include_router(profile_router.router, prefix="/api", dependencies=guarded)
     app.include_router(setup_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(dashboard_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so
     # they take precedence; the catch-all is excluded from the OpenAPI schema so
