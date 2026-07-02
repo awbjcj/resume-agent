@@ -1803,12 +1803,18 @@ git commit -m "feat: evidence-linked skill inference pass"
 - Produces:
   - `DEFAULT_MATRIX_PATH = "data/profile/matrix.json"`, `DEFAULT_OVERRIDES_PATH = "data/profile/overrides.yaml"`
   - `MatrixRow(ExtensibleModel)`: `key: str`, `display: str`, `aliases: list[str]`, `category: Literal["hard","soft","domain"] | None`, `inferred: bool`, `evidence_fact_ids: list[str]`, `strength: float`, `last_used: str | None`
-  - `SkillMatrix(ExtensibleModel)`: `generated_at: str`, `rows: list[MatrixRow]`
+  - `SkillMatrix(ExtensibleModel)`: `generated_at: str`, `facts_sha256: str`, `canonical_map_sha256: str`, `rows: list[MatrixRow]`
+  - `SkillMatch(ExtensibleModel)`: `requirement: str`, `source: Literal["must","nice","tech"]`, `coverage: Literal["covered","adjacent","gap"]`, `row: MatrixRow | None`
+  - `SkillMatchContext(ExtensibleModel)`: `matches: list[SkillMatch]`
   - `Overrides(ExtensibleModel)`: `ban: list[str]`, `alias: dict[str, str]`, `forbid_alias: list[list[str]]`, `category: dict[str, str]`
   - `load_overrides(path) -> Overrides` (missing → empty)
-  - `apply_overrides_to_aliases(aliases: dict[str, str], overrides: Overrides) -> dict[str, str]`
+  - `effective_cluster_map(cluster_map: ClusterMap, overrides: Overrides) -> ClusterMap`
+  - `override_tokens(overrides: Overrides) -> set[str]` — normalized alias keys/heads, forbid-pair tokens, and category keys that must survive classification/pruning
   - `build_matrix(facts: ProfileFacts, cluster_map: ClusterMap, overrides: Overrides, today: date | None = None) -> SkillMatrix`
-  - `save_matrix(matrix, path)`, `load_matrix(path) -> SkillMatrix | None`
+  - `facts_sha256(facts: ProfileFacts) -> str`
+  - `canonical_map_sha256(cluster_map: ClusterMap) -> str`
+  - `build_skill_match_context(criteria: JobCriteria, matrix: SkillMatrix, cluster_map: ClusterMap) -> SkillMatchContext` — deterministic; direct canonical row = covered, same-theme row = adjacent, otherwise gap
+  - `save_matrix(matrix, path)`, `load_matrix(path, facts: ProfileFacts | None = None, cluster_map: ClusterMap | None = None) -> SkillMatrix | None` (returns `None` on either hash mismatch)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1820,8 +1826,8 @@ from datetime import date
 from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Skill
 from resume_agent.profile.matrix import (
     Overrides,
-    apply_overrides_to_aliases,
     build_matrix,
+    effective_cluster_map,
     load_matrix,
     load_overrides,
     save_matrix,
@@ -1877,12 +1883,16 @@ def test_overrides_ban_and_category():
     assert next(r for r in matrix.rows if r.key == "kubernetes").category == "hard"
 
 
-def test_apply_overrides_to_aliases_force_and_forbid():
-    aliases = {"golang": "golang", "java": "kotlin"}
+def test_effective_cluster_map_force_and_forbid():
+    cluster_map = ClusterMap(
+        aliases={"golang": "golang", "java": "jvm", "kotlin": "jvm"},
+        theme_of={"golang": "languages", "jvm": "languages"},
+    )
     overrides = Overrides(alias={"golang": "go"}, forbid_alias=[["java", "kotlin"]])
-    fixed = apply_overrides_to_aliases(aliases, overrides)
-    assert fixed["golang"] == "go"
-    assert fixed["java"] == "java"  # forbidden merge split back
+    fixed = effective_cluster_map(cluster_map, overrides)
+    assert fixed.aliases["golang"] == "go"
+    assert fixed.aliases["java"] == "java"
+    assert fixed.aliases["kotlin"] == "kotlin"
 
 
 def test_matrix_deterministic_and_round_trips(tmp_path):
@@ -1897,10 +1907,25 @@ def test_matrix_deterministic_and_round_trips(tmp_path):
     assert load_matrix(tmp_path / "missing.json") is None
 
 
+def test_load_matrix_rejects_different_facts(tmp_path):
+    original = _facts()
+    path = tmp_path / "matrix.json"
+    save_matrix(build_matrix(original, ClusterMap.empty(), Overrides()), path)
+    changed = original.model_copy(deep=True)
+    changed.skills["Platforms"][0].name = "Nomad"
+    assert load_matrix(path, facts=changed) is None
+    changed_map = ClusterMap(aliases={"k8s": "kubernetes"})
+    assert load_matrix(path, facts=original, cluster_map=changed_map) is None
+
+
 def test_load_overrides_missing_is_empty(tmp_path):
     overrides = load_overrides(tmp_path / "overrides.yaml")
     assert overrides.ban == [] and overrides.alias == {}
 ```
+
+Add a table-driven `build_skill_match_context` test covering equivalent aliases,
+same-theme adjacency, true gaps, strongest-adjacent tie-breaking, compound criteria via
+`split_skills`, and forced/forbidden overrides through the effective map.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -1914,6 +1939,11 @@ Create `src/resume_agent/profile/matrix.py`:
 ```python
 """Derived skill/experience matrix: canonical skills × evidence × strength."""
 
+import hashlib
+import json
+import os
+import re
+import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -1922,8 +1952,10 @@ import yaml
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
+from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.skills import split_skills
 from resume_agent.tracking.match_gap import normalize_skill
 
 DEFAULT_MATRIX_PATH = "data/profile/matrix.json"
@@ -1943,7 +1975,20 @@ class MatrixRow(ExtensibleModel):
 
 class SkillMatrix(ExtensibleModel):
     generated_at: str = ""
+    facts_sha256: str = ""
+    canonical_map_sha256: str = ""
     rows: list[MatrixRow] = Field(default_factory=list)
+
+
+class SkillMatch(ExtensibleModel):
+    requirement: str
+    source: Literal["must", "nice", "tech"]
+    coverage: Literal["covered", "adjacent", "gap"]
+    row: MatrixRow | None = None
+
+
+class SkillMatchContext(ExtensibleModel):
+    matches: list[SkillMatch] = Field(default_factory=list)
 
 
 class Overrides(ExtensibleModel):
@@ -1961,42 +2006,163 @@ def load_overrides(path: str | Path) -> Overrides:
     return Overrides.model_validate(data)
 
 
-def apply_overrides_to_aliases(
-    aliases: dict[str, str], overrides: Overrides
-) -> dict[str, str]:
-    fixed = dict(aliases)
+def effective_cluster_map(cluster_map: ClusterMap, overrides: Overrides) -> ClusterMap:
+    """Return one normalized map used by every matching consumer.
+
+    Forced aliases are flattened first. Forbidden pairs are then split into
+    distinct self-canonicals even if both previously targeted a third head;
+    copy the former head's theme to both split tokens.
+    """
+    fixed = {
+        normalized_token: normalized_head
+        for token, head in cluster_map.aliases.items()
+        if (normalized_token := normalize_skill(token))
+        and (normalized_head := normalize_skill(head))
+    }
+    for token, head in overrides.alias.items():
+        normalized_token, normalized_head = normalize_skill(token), normalize_skill(head)
+        if normalized_token and normalized_head:
+            fixed[normalized_token] = normalized_head
+
+    def flatten(aliases: dict[str, str]) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for start in set(aliases) | set(aliases.values()):
+            token, seen = start, set()
+            while token in aliases and aliases[token] != token:
+                if token in seen:
+                    raise ValueError(f"alias cycle detected at {token!r}")
+                seen.add(token)
+                token = aliases[token]
+            out[start] = token
+        return out
+
+    fixed = flatten(fixed)
+    theme_of = {
+        fixed.get(token, token): theme
+        for token, theme in cluster_map.theme_of.items()
+    }
     for pair in overrides.forbid_alias:
         if len(pair) != 2:
             continue
-        a, b = (normalize_skill(p) for p in pair)
-        for token in (a, b):
-            if fixed.get(token) in (a, b) and fixed.get(token) != token:
-                fixed[token] = token
-    for token, canonical in overrides.alias.items():
-        fixed[normalize_skill(token)] = normalize_skill(canonical)
-    return fixed
+        a, b = (normalize_skill(token) for token in pair)
+        if not a or not b or a == b:
+            continue
+        old_a, old_b = fixed.get(a, a), fixed.get(b, b)
+        a_theme = theme_of.get(old_a)
+        b_theme = theme_of.get(old_b)
+        fixed[a], fixed[b] = a, b  # forbid wins over forced and learned aliases
+        if a_theme is not None:
+            theme_of[a] = a_theme
+        if b_theme is not None:
+            theme_of[b] = b_theme
+    return ClusterMap(
+        aliases=fixed,
+        theme_of=theme_of,
+        theme_label=dict(cluster_map.theme_label),
+    )
+
+
+def facts_sha256(facts: ProfileFacts) -> str:
+    payload = json.dumps(
+        facts.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def override_tokens(overrides: Overrides) -> set[str]:
+    raw = [
+        *overrides.alias.keys(),
+        *overrides.alias.values(),
+        *overrides.category.keys(),
+        *(token for pair in overrides.forbid_alias for token in pair),
+    ]
+    return {token for value in raw if (token := normalize_skill(value))}
+
+
+def canonical_map_sha256(cluster_map: ClusterMap) -> str:
+    payload = json.dumps(
+        {
+            "aliases": cluster_map.aliases,
+            "theme_of": cluster_map.theme_of,
+            "theme_label": cluster_map.theme_label,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def build_skill_match_context(
+    criteria: JobCriteria,
+    matrix: SkillMatrix,
+    cluster_map: ClusterMap,
+) -> SkillMatchContext:
+    by_key = {row.key: row for row in matrix.rows}
+    matches: list[SkillMatch] = []
+    for field_name, source in (
+        ("must_have_skills", "must"),
+        ("nice_to_have_skills", "nice"),
+        ("tech_stack", "tech"),
+    ):
+        for requirement in split_skills(getattr(criteria, field_name)):
+            token = normalize_skill(requirement)
+            canonical = cluster_map.aliases.get(token, token)
+            row = by_key.get(canonical)
+            coverage: Literal["covered", "adjacent", "gap"] = "gap"
+            if row is not None:
+                coverage = "covered"
+            else:
+                theme = cluster_map.theme_of.get(canonical)
+                candidates = [
+                    candidate
+                    for candidate in matrix.rows
+                    if theme is not None
+                    and cluster_map.theme_of.get(candidate.key) == theme
+                ]
+                if candidates:
+                    # Keep prompts compact and deterministic: strongest adjacent evidence wins.
+                    row = min(candidates, key=lambda item: (-item.strength, item.key))
+                    coverage = "adjacent"
+            matches.append(
+                SkillMatch(
+                    requirement=requirement,
+                    source=source,
+                    coverage=coverage,
+                    row=row,
+                )
+            )
+    return SkillMatchContext(matches=matches)
+
+
+_YEAR_IN_DATE = re.compile(r"(?:19|20)\d{2}")
+
+
+def _date_year(value: str | None) -> int | None:
+    match = _YEAR_IN_DATE.search(value or "")
+    return int(match.group()) if match else None
 
 
 def _recency(last_used: str | None, today: date) -> float:
     if last_used in (None, "current"):
         return 1.0
-    try:
-        year = int(str(last_used)[:4])
-    except ValueError:
+    year = _date_year(last_used)
+    if year is None:
         return 1.0
     return max(0.25, 1.0 - 0.15 * max(0, today.year - year))
 
 
 def _owner_end(owner) -> str | None:
-    if getattr(owner, "current", False) or getattr(owner, "end", None) is None:
+    if getattr(owner, "current", False):
         return "current"
-    return str(owner.end)
+    end = getattr(owner, "end", None)
+    return str(end) if end is not None else None
 
 
 def _later(a: str | None, b: str | None) -> str | None:
     if a == "current" or b == "current":
         return "current"
-    return max((v for v in (a, b) if v is not None), default=None)
+    values = [value for value in (a, b) if value is not None]
+    return max(values, key=lambda value: (_date_year(value) or -1, value), default=None)
 
 
 def build_matrix(
@@ -2006,10 +2172,17 @@ def build_matrix(
     today: date | None = None,
 ) -> SkillMatrix:
     today = today or datetime.now(timezone.utc).date()
-    aliases = apply_overrides_to_aliases(cluster_map.aliases, overrides)
+    effective = effective_cluster_map(cluster_map, overrides)
+    aliases = effective.aliases
     banned = {normalize_skill(token) for token in overrides.ban}
+    category_overrides = {
+        normalize_skill(token): category
+        for token, category in overrides.category.items()
+    }
 
     rows: dict[str, MatrixRow] = {}
+    literal_keys: set[str] = set()
+    strength_ids: dict[str, set[str]] = {}
     # Pass 1: one row per profile skill (canonicalized), carrying its own metadata.
     for skills in facts.skills.values():
         for skill in skills:
@@ -2018,10 +2191,16 @@ def build_matrix(
             if not key or key in banned or token in banned:
                 continue
             row = rows.setdefault(key, MatrixRow(key=key, display=skill.name))
+            if not skill.inferred:
+                literal_keys.add(key)
+                strength_ids.setdefault(key, set()).add(skill.id)
+            else:
+                strength_ids.setdefault(key, set()).update(skill.evidence_fact_ids)
             row.aliases = sorted(
-                set(row.aliases) | {a for a in skill.aliases if normalize_skill(a) != key}
+                set(row.aliases)
+                | {a for a in skill.aliases if normalize_skill(a) != key}
+                | {token for token, head in aliases.items() if head == key and token != key}
             )
-            row.inferred = row.inferred or skill.inferred
             if skill.category is not None:
                 row.category = skill.category
             row.evidence_fact_ids = list(
@@ -2030,33 +2209,62 @@ def build_matrix(
 
     # Pass 2: bullets/tech that mention a skill are evidence and set recency.
     owners = [*facts.experience, *facts.projects]
+    owner_by_fact_id = {
+        fact_id: owner
+        for owner in owners
+        for fact_id in [
+            owner.id,
+            *(bullet.id for bullet in getattr(owner, "bullets", [])),
+        ]
+    }
     for row in rows.values():
+        row.inferred = row.key not in literal_keys
         needles = {row.key, normalize_skill(row.display), *map(normalize_skill, row.aliases)}
         needles.discard("")
         for owner in owners:
-            owner_end = _owner_end(owner)
             tech = {normalize_skill(t) for t in getattr(owner, "tech", [])}
-            hit = bool(needles & tech)
+            tech_hit = bool(needles & tech)
+            bullet_hits = []
             for bullet in getattr(owner, "bullets", []):
                 text = normalize_skill(bullet.text)
                 if any(f" {needle} " in f" {text} " for needle in needles):
                     if bullet.id not in row.evidence_fact_ids:
                         row.evidence_fact_ids.append(bullet.id)
-                    hit = True
-            if hit:
+                    bullet_hits.append(bullet.id)
+            if bullet_hits:
+                strength_ids[row.key].update(bullet_hits)
+            elif tech_hit:
                 if owner.id not in row.evidence_fact_ids:
                     row.evidence_fact_ids.append(owner.id)
-                row.last_used = _later(row.last_used, owner_end)
+                strength_ids[row.key].add(owner.id)
+
+        for fact_id in strength_ids[row.key]:
+            owner = owner_by_fact_id.get(fact_id)
+            if owner is not None:
+                row.last_used = _later(row.last_used, _owner_end(owner))
 
     for row in rows.values():
-        override_category = overrides.category.get(row.key)
+        override_category = category_overrides.get(row.key)
         if override_category in ("hard", "soft", "domain"):
             row.category = override_category  # type: ignore[assignment]
-        row.strength = round(len(row.evidence_fact_ids) * _recency(row.last_used, today), 2)
+        row.strength = round(
+            sum(
+                _recency(
+                    _owner_end(owner_by_fact_id[fact_id])
+                    if fact_id in owner_by_fact_id
+                    else None,
+                    today,
+                )
+                for fact_id in strength_ids[row.key]
+            ),
+            2,
+        )
 
     ordered = sorted(rows.values(), key=lambda r: (-r.strength, r.key))
     return SkillMatrix(
         generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        facts_sha256=facts_sha256(facts),
+        canonical_map_sha256=canonical_map_sha256(effective),
         rows=ordered,
     )
 
@@ -2064,16 +2272,39 @@ def build_matrix(
 def save_matrix(matrix: SkillMatrix, path: str | Path) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(f"{p.name}.tmp")
-    tmp.write_text(matrix.model_dump_json(indent=2), encoding="utf-8")
-    tmp.replace(p)
-
-
-def load_matrix(path: str | Path) -> SkillMatrix | None:
+    temporary: Path | None = None
     try:
-        return SkillMatrix.model_validate_json(Path(path).read_text(encoding="utf-8"))
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=p.parent,
+            prefix=f".{p.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(matrix.model_dump_json(indent=2) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, p)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def load_matrix(
+    path: str | Path,
+    facts: ProfileFacts | None = None,
+    cluster_map: ClusterMap | None = None,
+) -> SkillMatrix | None:
+    try:
+        matrix = SkillMatrix.model_validate_json(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
+    if facts is not None and matrix.facts_sha256 != facts_sha256(facts):
+        return None
+    if (
+        cluster_map is not None
+        and matrix.canonical_map_sha256 != canonical_map_sha256(cluster_map)
+    ):
+        return None
+    return matrix
 ```
 
 - [ ] **Step 4: Run the suite and commit**
