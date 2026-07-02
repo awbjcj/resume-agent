@@ -17,6 +17,13 @@ SECRET_FIELDS: dict[str, str] = {
     "linkedin_password": "LINKEDIN_PASSWORD",
 }
 
+# Any one of these satisfies "an LLM key is configured" — profile build and
+# tailoring pick a provider via Settings.mid_model (see llm_runner.split_provider),
+# so the gate isn't specific to Anthropic.
+LLM_KEY_ENV_VARS: tuple[str, ...] = (
+    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY",
+)
+
 
 class SecretStatus(CamelModel):
     key: str  # camelCase field name, e.g. "anthropicApiKey"

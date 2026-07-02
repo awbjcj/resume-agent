@@ -55,7 +55,12 @@ def get_models(request: Request):
 
 @router.put("/config/models", response_model=ModelsConfigDoc)
 def put_models(body: ModelsConfigDoc, request: Request):
-    updates = {var: getattr(body, f) for f, var in _MODEL_ENV.items()}
+    # Fields omitted from the request body still arrive with their class
+    # default (Pydantic fills them in), so only fields the client actually
+    # sent are written — otherwise an omitted field would silently overwrite
+    # a previously-configured value with the schema default.
+    provided = body.model_dump(exclude_unset=True)
+    updates = {_MODEL_ENV[f]: v for f, v in provided.items()}
     fresh = write_env_updates(updates, request.app.state.env_path)
     refresh_app_settings(request.app, fresh)
-    return body
+    return get_models(request)

@@ -30,7 +30,10 @@ def write_env_updates(
     """Merge-write managed keys (empty string = clear) and return fresh Settings."""
     p = Path(env_path)
     merged = merge_env(read_env(p), updates)
-    merged = {k: v for k, v in merged.items() if v != ""}
+    # "empty string = clear" is a per-key contract for the keys in `updates`,
+    # not a blanket sweep — a pre-existing unrelated empty-valued key must survive.
+    merged = {k: v for k, v in merged.items() if not (k in updates and v == "")}
+    p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(p.suffix + ".tmp")
     tmp.write_text(format_env(merged), encoding="utf-8")
     os.replace(tmp, p)

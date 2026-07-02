@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
+from resume_agent.api.schemas.secrets import LLM_KEY_ENV_VARS
 from resume_agent.api.schemas.setup import (
     ProfileStatus,
     SearchStatus,
@@ -18,15 +19,13 @@ from resume_agent.services.sources import list_sources
 
 router = APIRouter()
 
-_LLM_KEYS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY")
-
 
 @router.get("/setup/status", response_model=SetupStatusOut)
 def get_setup_status(request: Request):
     env = read_env(request.app.state.env_path)
     secrets = SecretsStatus(
         anthropic_key=bool(env.get("ANTHROPIC_API_KEY")),
-        any_llm_key=any(env.get(k) for k in _LLM_KEYS),
+        any_llm_key=any(env.get(k) for k in LLM_KEY_ENV_VARS),
     )
 
     docs = request.app.state.document_store.list()

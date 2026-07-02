@@ -37,6 +37,31 @@ def test_build_without_key_is_400(tmp_path):
         assert resp.status_code == 400
 
 
+def test_build_with_non_anthropic_key_launches_run(tmp_path, monkeypatch):
+    """profile build uses Settings.mid_model, which may be a non-Anthropic
+    provider (see llm_runner.split_provider) — any configured LLM key, not
+    specifically ANTHROPIC_API_KEY, must satisfy the precondition."""
+    env = tmp_path / ".env"
+    env.write_text("OPENAI_API_KEY=sk-oai-test-abcd1234\nMID_MODEL=openai:gpt-4.1\n",
+                    encoding="utf-8")
+    app = create_app(db_url="sqlite://", config_dir=tmp_path / "config",
+                     env_path=env, data_dir=tmp_path / "data")
+    with TestClient(app) as client:
+        client.post(
+            "/api/profile/documents",
+            files={"file": ("resume.txt", io.BytesIO(b"experience"), "text/plain")},
+            data={"docType": "resume"},
+        )
+        from resume_agent.services import profile_build
+
+        monkeypatch.setattr(
+            profile_build, "run_profile_build",
+            lambda reporter, **kwargs: {"experiences": 1, "projects": 0, "warnings": []},
+        )
+        resp = client.post("/api/profile/build")
+        assert resp.status_code == 202
+
+
 def test_build_launches_run(client, monkeypatch):
     client.post(
         "/api/profile/documents",

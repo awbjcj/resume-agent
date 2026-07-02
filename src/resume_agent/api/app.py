@@ -30,7 +30,7 @@ from resume_agent.api.routers import setup as setup_router
 from resume_agent.api.routers import sources as sources_router
 from resume_agent.api.routers import suggestions as suggestions_router
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.config import get_settings
+from resume_agent.config import Settings, get_settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.progress import RUNS_ROOT
 from resume_agent.services.config_store import YamlConfigStore
@@ -55,7 +55,11 @@ def create_app(
     env_path: Path | str | None = None,
     data_dir: Path | str | None = None,
 ) -> FastAPI:
-    settings = get_settings()
+    # A caller-supplied env_path is a distinct settings source (test isolation,
+    # or a non-default deployment layout) — read it directly rather than the
+    # process-wide get_settings() cache, which is pinned to cwd-relative ".env"
+    # and would otherwise leak that file's values into this app instance.
+    settings = Settings(_env_file=Path(env_path)) if env_path is not None else get_settings()  # type: ignore[call-arg]
     resolved_db = db_url or settings.db_url
     resolved_token = settings.api_token if api_token is None else api_token
     resolved_settings = settings.model_copy(

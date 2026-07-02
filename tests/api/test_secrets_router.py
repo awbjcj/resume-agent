@@ -59,6 +59,30 @@ def test_models_config_readable_round_trip(client):
     assert client.get("/api/config/models").json()["midModel"] == "claude-sonnet-5"
 
 
+def test_put_secret_does_not_clear_unrelated_empty_valued_key(client, env_file):
+    env_file.write_text(
+        'ANTHROPIC_API_KEY=sk-ant-test-abcd1234\nUNMANAGED=keepme\nSOME_FLAG=\n',
+        encoding="utf-8",
+    )
+    resp = client.put("/api/secrets", json={"openaiApiKey": "sk-oai-xyz98765"})
+    assert resp.status_code == 200
+    assert "SOME_FLAG=" in env_file.read_text(encoding="utf-8")
+
+
+def test_put_models_partial_update_preserves_other_fields(client):
+    client.put("/api/config/models", json={
+        "cheapModel": "custom-cheap-non-default",
+        "midModel": "openai:gpt-4.1",
+        "premiumModel": "custom-premium-non-default",
+    })
+    put = client.put("/api/config/models", json={"midModel": "gemini:custom"})
+    assert put.status_code == 200
+    body = client.get("/api/config/models").json()
+    assert body["midModel"] == "gemini:custom"
+    assert body["cheapModel"] == "custom-cheap-non-default"  # untouched by the partial PUT
+    assert body["premiumModel"] == "custom-premium-non-default"  # untouched by the partial PUT
+
+
 def test_put_secret_refreshes_app_settings(client):
     client.put("/api/secrets", json={"anthropicApiKey": "sk-ant-new-key-5678"})
     # settings served to routes must see the new value without an app restart

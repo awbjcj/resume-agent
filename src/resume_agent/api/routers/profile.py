@@ -10,6 +10,7 @@ from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.profile import DocumentOut
 from resume_agent.api.schemas.runs import RunOut
+from resume_agent.api.schemas.secrets import LLM_KEY_ENV_VARS
 from resume_agent.services import profile_build
 from resume_agent.services.env_config import read_env
 from resume_agent.services.profile_documents import DocumentError, DocumentStore
@@ -52,10 +53,13 @@ def launch_profile_build(request: Request, mgr: RunManager = Depends(get_run_man
     # create_app seeds from the global get_settings() (the real .env / OS env)
     # and never re-reads env_path at startup. Using env_path keeps this gate
     # consistent with GET /api/setup/status and makes the offline test
-    # deterministic regardless of the developer's real ANTHROPIC_API_KEY.
-    if not read_env(request.app.state.env_path).get("ANTHROPIC_API_KEY"):
+    # deterministic regardless of the developer's real env. Any configured LLM
+    # key satisfies this — profile build uses Settings.mid_model, which may
+    # select a non-Anthropic provider (see llm_runner.split_provider).
+    env = read_env(request.app.state.env_path)
+    if not any(env.get(k) for k in LLM_KEY_ENV_VARS):
         raise ApiException(400, "SETUP_INCOMPLETE",
-                           "ANTHROPIC_API_KEY is not set — add it in Settings > API Keys")
+                           "No LLM API key is set — add one in Settings > API Keys")
     resume_path = _docs(request).latest_resume_path()
     if resume_path is None:
         raise ApiException(400, "SETUP_INCOMPLETE",

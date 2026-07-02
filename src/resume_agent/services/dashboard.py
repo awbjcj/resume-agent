@@ -41,6 +41,9 @@ def summarize_dashboard(session: Session) -> DashboardSummary:
         for name, statuses in QUEUE_STATUSES.items()
     }
     applied = session.exec(
-        select(func.count()).select_from(Application).where(Application.status != "ready")
+        select(func.count())
+        .select_from(Application)
+        .join(Job, Application.job_id == Job.id)
+        .where(Application.status != "ready", Job.archived_at == None)  # noqa: E711
     ).one()
     return DashboardSummary(status_counts=counts, queues=queues, applied=applied)
