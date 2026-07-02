@@ -3116,6 +3116,7 @@ git commit -m "feat: corpus build orchestration with build report"
 
 **Files:**
 - Modify: `src/resume_agent/cli.py` (`profile_app` commands)
+- Modify: `src/resume_agent/profile/store.py` (`save_facts` becomes atomic)
 - Test: `tests/test_cli_profile.py` (append; follow that file's existing Typer `CliRunner` + monkeypatch conventions — read it first)
 
 **Interfaces:**
@@ -3123,7 +3124,7 @@ git commit -m "feat: corpus build orchestration with build report"
   - `resume-agent profile add <file> [--primary] [--dir data/profile]`
   - `resume-agent profile remove <ident> [--purge] [--dir data/profile]`
   - `resume-agent profile sources [--dir data/profile]`
-  - `resume-agent profile build` — now: legacy migration → `build_corpus_profile` → `validate_profile` → `save_facts` → matrix regeneration (`build_matrix` from `load_cluster_map("data/profile/cluster_map.json")` + `load_overrides`) → report printout. Keeps `--sources/--out/--refresh` options.
+  - `resume-agent profile build` — now: legacy migration → `build_corpus_profile` → atomic `save_facts` → matrix regeneration from the profile directory's cluster map + overrides → report printout. Keeps `--sources/--out/--refresh` options; `--out` must be `<dir>/facts.json` so consumers cannot cross profile artifact sets.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3169,12 +3170,15 @@ def test_profile_build_uses_corpus_and_writes_matrix(tmp_path, runner, monkeypat
     def fake_build_corpus_profile(dir_, github_username, **kwargs):
         return facts, report
 
-    monkeypatch.setattr("resume_agent.cli.build_corpus_profile", fake_build_corpus_profile)
-    monkeypatch.setattr(  # skip the API-key guard the same way existing build tests do
-        "resume_agent.cli.get_settings",
-        lambda: type("S", (), {"anthropic_api_key": "sk-test"})(),
+    monkeypatch.setattr(
+        "resume_agent.profile.build.build_corpus_profile", fake_build_corpus_profile
     )
-    out = tmp_path / "facts.json"
+    monkeypatch.setattr(
+        "resume_agent.cli.get_settings",
+        lambda: type("S", (), {"cheap_model": "cheap", "mid_model": "mid"})(),
+    )
+    monkeypatch.setattr("resume_agent.cli.resolve_api_key", lambda _model: "sk-test")
+    out = profile_dir / "facts.json"
     result = runner.invoke(
         app,
         ["profile", "build", "--dir", str(profile_dir), "--out", str(out),
@@ -3182,12 +3186,13 @@ def test_profile_build_uses_corpus_and_writes_matrix(tmp_path, runner, monkeypat
     )
     assert result.exit_code == 0, result.output
     assert out.exists()
-    assert (profile_dir / "matrix.json").exists()
+    assert out.with_name("matrix.json").exists()
     assert "CONFLICT" in result.output
     assert "inferred: Mentorship" in result.output
 ```
 
-Two adaptations the implementer must make while writing this test: (a) `build_corpus_profile` is imported inside the command function in the plan's Task 15 code — monkeypatching `resume_agent.profile.build.build_corpus_profile` is then the working target (patch where it's defined, since the import is local); (b) if `tests/test_cli_profile.py` already has an API-key/settings fixture, reuse it instead of the inline `get_settings` monkeypatch.
+If `tests/test_cli_profile.py` already has settings/API-key fixtures, reuse them instead
+of the inline monkeypatches.
 
 - [ ] **Step 2: Run to verify they fail**
 
@@ -3200,7 +3205,6 @@ In `cli.py`, add constants + commands:
 
 ```python
 DEFAULT_PROFILE_DIR = "data/profile"
-DEFAULT_CLUSTER_MAP = "data/profile/cluster_map.json"
 
 
 @profile_app.command("add")
@@ -3236,6 +3240,7 @@ def profile_remove(
 def profile_sources(dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir")) -> None:
     """List registered source documents."""
     from resume_agent.profile.corpus import load_manifest
+    from resume_agent.profile.fragments import fragment_cache_status
 
     manifest = load_manifest(dir)
     if not manifest.docs:
@@ -3243,7 +3248,11 @@ def profile_sources(dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir")) -> No
         return
     for doc in manifest.docs:
         flags = " primary" if doc.primary else ""
-        typer.echo(f"{doc.id}  {doc.filename}  sha:{doc.sha256[:8]}  added:{doc.added_at}{flags}")
+        status = fragment_cache_status(dir, doc)
+        typer.echo(
+            f"{doc.id}  {doc.filename}  sha:{doc.sha256[:8]}  "
+            f"added:{doc.added_at}  fragment:{status}{flags}"
+        )
 ```
 
 Rewrite `profile_build` to the corpus path (keeping its options and API-key guard):
@@ -3261,7 +3270,6 @@ def profile_build(
     from resume_agent.profile.corpus import migrate_legacy
     from resume_agent.profile.inference import build_inference_agent
     from resume_agent.profile.matrix import (
-        DEFAULT_OVERRIDES_PATH,
         build_matrix,
         load_overrides,
         save_matrix,
@@ -3269,8 +3277,14 @@ def profile_build(
     from resume_agent.profile.merge import build_bullet_dedup_agent
     from resume_agent.taxonomy.clusters import load_cluster_map
 
-    if not get_settings().anthropic_api_key:
-        typer.echo("ANTHROPIC_API_KEY is not set. Add it to .env:\n  ANTHROPIC_API_KEY=sk-ant-...")
+    settings = get_settings()
+    required_models = {settings.cheap_model, settings.mid_model}
+    missing_models = sorted(model for model in required_models if not resolve_api_key(model))
+    if missing_models:
+        typer.echo(f"Missing API key for configured model(s): {', '.join(missing_models)}")
+        raise typer.Exit(code=1)
+    if Path(out).resolve() != (Path(dir) / "facts.json").resolve():
+        typer.echo("--out must be <dir>/facts.json so facts and matrix stay bound")
         raise typer.Exit(code=1)
     if Path(out).exists() and not refresh:
         typer.echo(f"{out} already exists. Use --refresh to rebuild (this discards manual edits).")
@@ -3289,9 +3303,11 @@ def profile_build(
     )
     path = save_facts(facts, out)
     matrix = build_matrix(
-        facts, load_cluster_map(DEFAULT_CLUSTER_MAP), load_overrides(DEFAULT_OVERRIDES_PATH)
+        facts,
+        load_cluster_map(Path(dir) / "cluster_map.json"),
+        load_overrides(Path(dir) / "overrides.yaml"),
     )
-    save_matrix(matrix, str(Path(dir) / "matrix.json"))
+    save_matrix(matrix, Path(out).with_name("matrix.json"))
 
     typer.echo(f"Wrote {len(facts.experience)} experiences and {len(facts.projects)} projects to {path}")
     typer.echo(f"Matrix: {len(matrix.rows)} skills")
@@ -3305,7 +3321,11 @@ def profile_build(
         typer.echo(f"  WARNING: {warning}")
 ```
 
-Notes: `validate_profile(facts, raw_text)` needs raw text from a single resume; with a corpus there is no single raw text — drop the call from the corpus path (its coverage warnings were resume-vs-facts diffing; the build report supersedes it). Keep `build_profile`/`validate_profile` untouched for library users.
+Notes: `validate_profile(facts, raw_text)` needs raw text from a single resume; with a corpus there is no single raw text — drop the call from the corpus path (its coverage warnings were resume-vs-facts diffing; the build report supersedes it). Keep `build_profile`/`validate_profile` untouched for library users. Import `resolve_api_key`; do not use a provider-specific settings guard. Add `fragment_cache_status` in Task 5 and import it in `profile_sources`.
+
+Rewrite `save_facts` using the same unique temp-file, flush, `fsync`, `os.replace`,
+and cleanup pattern as `save_cluster_map`. Add failure-cleanup and round-trip tests in
+`tests/test_profile_store.py`.
 
 - [ ] **Step 4: Run the full suite, lint, and commit**
 
@@ -3313,7 +3333,7 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/cli.py tests/test_cli_profile.py
+git add src/resume_agent/cli.py src/resume_agent/profile/store.py tests/test_cli_profile.py tests/test_profile_store.py
 git commit -m "feat: profile corpus CLI (add/remove/sources, corpus build + matrix)"
 ```
 
