@@ -17,9 +17,12 @@ type HealthItem = {
 export const HEALTH_ITEMS: HealthItem[] = [
   {
     key: "key",
-    label: "Anthropic API key",
+    label: "LLM API key",
     to: "/settings/keys",
-    ok: (s) => s.secrets.anthropicKey,
+    // Readiness is provider-agnostic (anyLlmKey), matching the backend's
+    // any_llm_key gate — a working OpenAI/Gemini/DeepSeek setup must not be
+    // perpetually flagged as missing an Anthropic key.
+    ok: (s) => s.secrets.anyLlmKey,
   },
   {
     key: "resume",
