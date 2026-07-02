@@ -45,14 +45,14 @@ def _read_pptx(p: Path) -> str:
     prs = Presentation(str(p))
     slides: list[str] = []
     for slide in prs.slides:
-        parts = [
-            shape.text_frame.text
-            for shape in slide.shapes
-            if shape.has_text_frame and shape.text_frame.text.strip()
-        ]
+        parts: list[str] = []
+        for shape in slide.shapes:
+            text_frame = getattr(shape, "text_frame", None)
+            if text_frame is not None and text_frame.text.strip():
+                parts.append(text_frame.text)
         if slide.has_notes_slide:
-            notes = slide.notes_slide.notes_text_frame.text
-            if notes.strip():
-                parts.append(notes)
+            notes_text_frame = slide.notes_slide.notes_text_frame
+            if notes_text_frame is not None and notes_text_frame.text.strip():
+                parts.append(notes_text_frame.text)
         slides.append("\n".join(parts))
     return "\n\n".join(slides)
