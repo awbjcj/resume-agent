@@ -1,0 +1,152 @@
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import type { paths } from "@/lib/api/schema";
+import { SaveBar } from "../SaveBar";
+import { useConfig, useSaveConfig } from "../use-config";
+import { useDraft } from "../use-draft";
+
+type ReviewDoc = paths["/api/config/review"]["get"]["responses"][200]["content"]["application/json"];
+type ReviewerEntry = NonNullable<ReviewDoc["reviewers"]>[number];
+
+const MODEL_TIERS = ["cheap", "mid", "premium"];
+
+const DEFAULT_LENGTH_BUDGET = { maxExperiences: 4, maxBulletsPerRole: 5, targetTotalBullets: 20 };
+
+export function ReviewSettingsPage() {
+  const { data } = useConfig("/api/config/review");
+  const save = useSaveConfig("/api/config/review");
+  const { draft, setDraft, dirty, reset } = useDraft(data as ReviewDoc | undefined);
+
+  if (!draft) return <Skeleton className="h-64 w-full" />;
+  const reviewers = draft.reviewers ?? [];
+
+  const setReviewer = (index: number, patch: Partial<ReviewerEntry>) => {
+    const next = reviewers.map((r, i) => (i === index ? { ...r, ...patch } : r));
+    setDraft({ ...draft, reviewers: next });
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-lg font-semibold">Review panel</h1>
+        <p className="text-sm text-muted-foreground">
+          How tailored resumes get scored before they're offered up for approval.
+        </p>
+      </header>
+      <Alert>
+        <AlertDescription>
+          Defaults are sensible — change reviewer weights only if you know why.
+        </AlertDescription>
+      </Alert>
+      <FieldGroup>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="maxRounds">Max rounds</FieldLabel>
+            <Input id="maxRounds" type="number" value={draft.maxRounds}
+              onChange={(e) => setDraft({ ...draft, maxRounds: Number(e.target.value || 0) })} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="scoreThreshold">Score threshold</FieldLabel>
+            <Input id="scoreThreshold" type="number" value={draft.scoreThreshold}
+              onChange={(e) => setDraft({ ...draft, scoreThreshold: Number(e.target.value || 0) })} />
+          </Field>
+        </div>
+      </FieldGroup>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Reviewer</TableHead>
+            <TableHead>Gate</TableHead>
+            <TableHead>Weight</TableHead>
+            <TableHead>Model tier</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {reviewers.map((r, i) => (
+            <TableRow key={r.name}>
+              <TableCell>
+                <div className="font-medium">{r.name}</div>
+                {r.name === "fact-check" && (
+                  <div className="text-xs text-muted-foreground">
+                    Blocking — unsupported claims fail the round
+                  </div>
+                )}
+              </TableCell>
+              <TableCell>
+                <Switch aria-label={`${r.name} gate`} checked={r.gate}
+                  onCheckedChange={(v: boolean) => setReviewer(i, { gate: v })} />
+              </TableCell>
+              <TableCell>
+                <Input type="number" aria-label={`${r.name} weight`} className="w-20"
+                  value={r.weight} onChange={(e) => setReviewer(i, { weight: Number(e.target.value || 0) })} />
+              </TableCell>
+              <TableCell>
+                <Select value={r.modelTier}
+                  onValueChange={(v) => v && setReviewer(i, { modelTier: v })}>
+                  <SelectTrigger aria-label={`${r.name} model tier`} className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {MODEL_TIERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <FieldSet>
+        <FieldLegend>Length budget</FieldLegend>
+        <Field>
+          <div className="flex items-center gap-3">
+            <Switch id="length-budget-enabled" checked={draft.lengthBudget != null}
+              onCheckedChange={(v: boolean) =>
+                setDraft({ ...draft, lengthBudget: v ? DEFAULT_LENGTH_BUDGET : null })} />
+            <FieldLabel htmlFor="length-budget-enabled">Enforce a length budget</FieldLabel>
+          </div>
+        </Field>
+        {draft.lengthBudget && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="maxExperiences">Max experiences</FieldLabel>
+              <Input id="maxExperiences" type="number" value={draft.lengthBudget.maxExperiences}
+                onChange={(e) => setDraft({
+                  ...draft,
+                  lengthBudget: { ...draft.lengthBudget!, maxExperiences: Number(e.target.value || 0) },
+                })} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="maxBulletsPerRole">Max bullets per role</FieldLabel>
+              <Input id="maxBulletsPerRole" type="number" value={draft.lengthBudget.maxBulletsPerRole}
+                onChange={(e) => setDraft({
+                  ...draft,
+                  lengthBudget: { ...draft.lengthBudget!, maxBulletsPerRole: Number(e.target.value || 0) },
+                })} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="targetTotalBullets">Target total bullets</FieldLabel>
+              <Input id="targetTotalBullets" type="number" value={draft.lengthBudget.targetTotalBullets}
+                onChange={(e) => setDraft({
+                  ...draft,
+                  lengthBudget: { ...draft.lengthBudget!, targetTotalBullets: Number(e.target.value || 0) },
+                })} />
+            </Field>
+          </div>
+        )}
+      </FieldSet>
+      <SaveBar dirty={dirty} saving={save.isPending}
+        onSave={() => save.mutate(draft)} onDiscard={reset} />
+    </div>
+  );
+}

@@ -37,6 +37,21 @@ const KeysSettingsPage = lazy(() =>
     default: m.KeysSettingsPage,
   })),
 );
+const ReviewSettingsPage = lazy(() =>
+  import("@/features/settings/pages/ReviewSettingsPage").then((m) => ({
+    default: m.ReviewSettingsPage,
+  })),
+);
+const RenderingSettingsPage = lazy(() =>
+  import("@/features/settings/pages/RenderingSettingsPage").then((m) => ({
+    default: m.RenderingSettingsPage,
+  })),
+);
+const PruningSettingsPage = lazy(() =>
+  import("@/features/settings/pages/PruningSettingsPage").then((m) => ({
+    default: m.PruningSettingsPage,
+  })),
+);
 
 const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}</Suspense>;
 
@@ -58,6 +73,9 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/settings/profile" replace /> },
           { path: "search", element: page(<SearchSettingsPage />) },
           { path: "keys", element: page(<KeysSettingsPage />) },
+          { path: "review", element: page(<ReviewSettingsPage />) },
+          { path: "rendering", element: page(<RenderingSettingsPage />) },
+          { path: "pruning", element: page(<PruningSettingsPage />) },
         ],
       },
     ],
