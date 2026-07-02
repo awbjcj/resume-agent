@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { useActiveRun } from "@/features/runs/use-active-run";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
-import { useRunStore } from "@/lib/runs/store";
 import type { paths } from "@/lib/api/schema";
 import { DocumentManager } from "../forms/DocumentManager";
 import { SaveBar } from "../SaveBar";
@@ -26,9 +26,7 @@ export function ProfileSettingsPage() {
   const { draft, setDraft, dirty, reset } = useDraft(data as ProfileDoc | undefined);
   const setupStatus = useSetupStatus();
   const { launch } = useLaunchRun();
-  const building = Object.values(useRunStore((s) => s.runs)).some(
-    (r) => r.kind === "profile-build" && r.status === "running",
-  );
+  const building = useActiveRun("profile-build")?.status === "running";
 
   if (!draft) return <Skeleton className="h-64 w-full" />;
 

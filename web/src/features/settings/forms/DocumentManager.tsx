@@ -81,7 +81,7 @@ export function DocumentManager() {
                   <ConfirmDialog
                     trigger={
                       <Button variant="ghost" size="sm" aria-label={`Delete ${doc.filename}`}>
-                        <Trash2 aria-hidden="true" />
+                        <Trash2 data-icon="inline-start" aria-hidden="true" />
                       </Button>
                     }
                     title={`Delete ${doc.filename}?`}

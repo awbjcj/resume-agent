@@ -6,15 +6,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { useSetupStatus } from "@/features/settings/use-setup-status";
+import { useActiveRun } from "@/features/runs/use-active-run";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
-import { useRunStore } from "@/lib/runs/store";
 import { STEPS } from "./SetupWizard";
 
 export function FinishStep() {
   const { data: status } = useSetupStatus();
   const { launch } = useLaunchRun();
   const navigate = useNavigate();
-  const run = Object.values(useRunStore((s) => s.runs)).find((r) => r.kind === "profile-build");
+  const run = useActiveRun("profile-build");
   const building = run?.status === "running";
   const built = run?.status === "succeeded";
   const buildResult = run?.result as { experiences?: number; projects?: number } | null | undefined;

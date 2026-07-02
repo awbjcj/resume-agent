@@ -7,6 +7,11 @@ import { useState } from "react";
  * changes" — it re-runs the component before paint instead of committing an
  * extra render. Comparison is by value (JSON), not reference, so a refetch
  * that resolves to the same content never clobbers an in-progress edit.
+ *
+ * `T` must be JSON-serializable (plain objects/arrays/strings/numbers/
+ * booleans) — dirty-checking and reseed detection both compare via
+ * JSON.stringify, so a Date, Map, Set, or function-valued field will compare
+ * incorrectly or silently drop data.
  */
 export function useDraft<T>(data: T | undefined) {
   const [draft, setDraft] = useState<T | null>(null);
