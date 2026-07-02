@@ -131,6 +131,16 @@ def test_inferred_skill_round_trips():
     assert loaded.category == "soft"
 
 
+def test_inferred_skill_requires_category_and_evidence():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        Skill(name="Mentorship", inferred=True, category="soft")
+    with pytest.raises(ValidationError):
+        Skill(name="Mentorship", inferred=True, evidence_fact_ids=["fact-1"])
+
+
 def test_legacy_facts_json_still_loads():
     legacy = {
         "contact": {"name": "Ada"},
@@ -159,7 +169,8 @@ class FactItem(ExtensibleModel):
     source_ref: str | None = None  # corpus doc id; None for github/manual/legacy
 ```
 
-In `src/resume_agent/models/profile.py`, add `from typing import Literal` and extend `Skill`:
+In `src/resume_agent/models/profile.py`, add `from typing import Literal`, import
+`model_validator`, and extend `Skill`:
 
 ```python
 class Skill(FactItem):
@@ -169,6 +180,12 @@ class Skill(FactItem):
     inferred: bool = False
     evidence_fact_ids: list[str] = Field(default_factory=list)
     category: Literal["hard", "soft", "domain"] | None = None
+
+    @model_validator(mode="after")
+    def inferred_has_evidence(self) -> "Skill":
+        if self.inferred and (self.category is None or not self.evidence_fact_ids):
+            raise ValueError("an inferred skill requires category and evidence_fact_ids")
+        return self
 ```
 
 - [ ] **Step 4: Run the full suite**
