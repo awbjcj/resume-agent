@@ -27,6 +27,7 @@ def test_skill_node_out_camelizes_stable_identity_and_counts():
         "skill": "Kubernetes",
         "themeId": "t1",
         "covered": False,
+        "coverage": "gap",
         "key": "kubernetes",
         "members": {"K8s": 1, "Kubernetes": 2},
         "must": 2,
@@ -64,6 +65,7 @@ def test_theme_and_suggestion_status_out_use_named_fields():
         "jobCount": 2,
         "skillCount": 2,
         "gapCount": 1,
+        "adjacentCount": 0,
     }
     assert status.model_dump(by_alias=True)["generatedAt"] == generated_at
 
@@ -88,3 +90,18 @@ def test_match_gap_out_shape():
         "suggestionStatuses",
     }
     assert dumped["suggestionStatuses"] == []
+
+
+def test_skill_node_out_serializes_adjacent_coverage():
+    node = SkillNodeOut(
+        skill="FastAPI",
+        coverage="adjacent",
+        covered=False,
+        key="fastapi",
+        members={"FastAPI": 1},
+        must=1,
+        nice=0,
+        tech=0,
+        job_count=1,
+    )
+    assert node.model_dump(by_alias=True)["coverage"] == "adjacent"

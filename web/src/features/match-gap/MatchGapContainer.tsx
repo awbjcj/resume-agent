@@ -120,7 +120,8 @@ export function MatchGapContainer() {
             items={[
               ["Filtered jobs", String(view.filteredJobCount)],
               ["Distinct skills", String(view.skills.length)],
-              ["Open gaps", String(view.skills.filter((skill) => !skill.covered).length)],
+              ["Open gaps", String(view.skills.filter((skill) => skill.coverage === "gap").length)],
+              ["Adjacent", String(view.skills.filter((skill) => skill.coverage === "adjacent").length)],
             ]}
           />
 

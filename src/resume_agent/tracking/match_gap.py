@@ -77,6 +77,14 @@ class SkillNode:
     nice: int = 0
     tech: int = 0
     job_count: int = 0
+    coverage: Literal["covered", "adjacent", "gap"] = "gap"
+
+    def __post_init__(self) -> None:
+        if self.covered or self.coverage == "covered":
+            self.covered = True
+            self.coverage = "covered"
+        else:
+            self.covered = False
 
 
 @dataclass
@@ -88,6 +96,7 @@ class ThemeNode:
     job_count: int = 0
     skill_count: int = 0
     gap_count: int = 0
+    adjacent_count: int = 0
 
 
 @dataclass
@@ -107,6 +116,7 @@ class GapRow:
     skill: str
     demand_count: int
     target_total: int
+    adjacent: bool = False
 
     @property
     def demand_share(self) -> int:
@@ -182,6 +192,9 @@ def build_demand_graph(
     theme_of = cluster_map.theme_of if cluster_map else {}
     theme_label = cluster_map.theme_label if cluster_map else {}
     profile_canonical = {aliases.get(token, token) for token in profile_tokens}
+    covered_themes = {
+        theme_of[token] for token in profile_canonical if token in theme_of
+    }
     jobs: list[JobLite] = []
     accumulators: dict[str, _SkillAccumulator] = {}
     edge_keys: set[tuple[int, str, SkillSource]] = set()
@@ -227,17 +240,24 @@ def build_demand_graph(
             key=lambda phrasing: (-members[phrasing], phrasing.casefold(), phrasing),
         )
         display_by_key[canonical] = display
+        if canonical in profile_canonical:
+            coverage: Literal["covered", "adjacent", "gap"] = "covered"
+        elif theme_of.get(canonical) in covered_themes:
+            coverage = "adjacent"
+        else:
+            coverage = "gap"
         skill_nodes.append(
             SkillNode(
                 skill=display,
                 theme_id=theme_of.get(canonical),
-                covered=canonical in profile_canonical,
+                covered=coverage == "covered",
                 key=canonical,
                 members=members,
                 must=len(accumulator.source_jobs["must"]),
                 nice=len(accumulator.source_jobs["nice"]),
                 tech=len(accumulator.source_jobs["tech"]),
                 job_count=len(accumulator.job_ids),
+                coverage=coverage,
             )
         )
 
@@ -271,7 +291,8 @@ def build_demand_graph(
                 set().union(*(accumulators[node.key].job_ids for node in theme_nodes))
             ),
             skill_count=len(theme_nodes),
-            gap_count=sum(not node.covered for node in theme_nodes),
+            gap_count=sum(node.coverage == "gap" for node in theme_nodes),
+            adjacent_count=sum(node.coverage == "adjacent" for node in theme_nodes),
         )
         for theme_id, theme_nodes in sorted(nodes_by_theme.items())
     ]
@@ -289,6 +310,8 @@ def match_gap(
     session: Session,
     facts: ProfileFacts,
     canonicalizer: Canonicalizer | None = None,
+    *,
+    cluster_map: "ClusterMap | None" = None,
 ) -> MatchGapReport:
     """Skills demanded by target jobs that the profile does not cover."""
     job_reqs: list[tuple[int, list[tuple[str, str]]]] = []
@@ -308,8 +331,26 @@ def match_gap(
     profile_tokens = profile_skill_tokens(facts)
     all_tokens |= profile_tokens
 
-    canonical = canonicalizer(all_tokens) if canonicalizer else {token: token for token in all_tokens}
+    if cluster_map is not None:
+        canonical = {
+            token: cluster_map.aliases.get(token, token) for token in all_tokens
+        }
+    else:
+        canonical = (
+            canonicalizer(all_tokens)
+            if canonicalizer
+            else {token: token for token in all_tokens}
+        )
     profile_canonical = {canonical.get(token, token) for token in profile_tokens}
+    covered_themes = (
+        {
+            cluster_map.theme_of[token]
+            for token in profile_canonical
+            if token in cluster_map.theme_of
+        }
+        if cluster_map is not None
+        else set()
+    )
 
     per_job: dict[int, list[str]] = {}
     demand: dict[str, int] = {}
@@ -330,7 +371,15 @@ def match_gap(
 
     target_total = len(job_reqs)
     gaps = [
-        GapRow(skill=display_for[token], demand_count=count, target_total=target_total)
+        GapRow(
+            skill=display_for[token],
+            demand_count=count,
+            target_total=target_total,
+            adjacent=(
+                cluster_map is not None
+                and cluster_map.theme_of.get(token) in covered_themes
+            ),
+        )
         for token, count in demand.items()
     ]
     gaps.sort(key=lambda gap: (-gap.demand_count, gap.skill.lower()))

@@ -17,12 +17,14 @@ const themes: ThemeRow[] = [
     jobCount: 3,
     skillCount: 1,
     gapCount: 1,
+    adjacentCount: 0,
     skills: [
       {
         key: "python",
         skill: "Python",
         themeId: "backend",
         covered: false,
+        coverage: "gap",
         score: 9,
         jobCount: 3,
         must: 3,
@@ -39,6 +41,7 @@ const themes: ThemeRow[] = [
     jobCount: 1,
     skillCount: 0,
     gapCount: 0,
+    adjacentCount: 0,
     skills: [],
   },
 ];

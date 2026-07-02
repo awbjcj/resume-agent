@@ -13,12 +13,14 @@ const themeRows: ThemeRow[] = [
     jobCount: 3,
     skillCount: 1,
     gapCount: 1,
+    adjacentCount: 0,
     skills: [
       {
         key: "python",
         skill: "Python",
         themeId: "backend",
         covered: false,
+        coverage: "gap",
         score: 9,
         jobCount: 3,
         must: 3,
@@ -46,6 +48,7 @@ it("focuses a theme and exposes real skill controls", async () => {
   await userEvent.click(screen.getByRole("button", { name: /focus backend/i }));
   expect(screen.getByRole("button", { name: /open python details/i })).toBeInTheDocument();
   expect(screen.getByText("Ready")).toBeInTheDocument();
+  expect(screen.getByText("Adjacent")).toBeInTheDocument();
 
   await userEvent.click(screen.getByRole("checkbox", { name: /select python/i }));
   expect(onToggleSelect).toHaveBeenCalledWith(

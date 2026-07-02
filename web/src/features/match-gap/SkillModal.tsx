@@ -59,8 +59,23 @@ export function SkillModal({
             <DialogHeader className="border-b bg-accent/35 px-6 py-5 pr-14 sm:px-8 sm:py-6">
               <div className="flex flex-wrap items-center gap-2">
                 {themeLabel && <Badge variant="outline">{themeLabel}</Badge>}
-                <Badge variant={skill.covered ? "secondary" : "destructive"}>
-                  {skill.covered ? "Covered" : "Gap"}
+                <Badge
+                  variant={
+                    skill.coverage === "covered"
+                      ? "secondary"
+                      : skill.coverage === "gap"
+                        ? "destructive"
+                        : "outline"
+                  }
+                  className={
+                    skill.coverage === "adjacent" ? "border-adjacent text-adjacent" : undefined
+                  }
+                >
+                  {skill.coverage === "covered"
+                    ? "Covered"
+                    : skill.coverage === "adjacent"
+                      ? "Adjacent"
+                      : "Gap"}
                 </Badge>
                 <Badge variant="outline">{stateLabel(state)}</Badge>
               </div>

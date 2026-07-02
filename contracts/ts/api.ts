@@ -1385,6 +1385,12 @@ export interface components {
         };
         /** SkillNodeOut */
         SkillNodeOut: {
+            /**
+             * Coverage
+             * @default gap
+             * @enum {string}
+             */
+            coverage: "covered" | "adjacent" | "gap";
             /** Covered */
             covered: boolean;
             /** Jobcount */
@@ -1573,6 +1579,11 @@ export interface components {
         };
         /** ThemeOut */
         ThemeOut: {
+            /**
+             * Adjacentcount
+             * @default 0
+             */
+            adjacentCount: number;
             /** Essentialscore */
             essentialScore: number;
             /** Gapcount */

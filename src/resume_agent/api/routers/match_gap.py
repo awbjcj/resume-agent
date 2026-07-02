@@ -16,6 +16,7 @@ from resume_agent.db import get_session as open_session
 from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.profile.matrix import (
     build_matrix,
+    effective_cluster_map,
     load_overrides,
     override_tokens,
     save_matrix,
@@ -40,10 +41,15 @@ def _facts_or_empty() -> ProfileFacts:
 @router.get("/match-gap", response_model=MatchGapOut)
 def get_match_gap(session: Session = Depends(get_session)):
     facts = _facts_or_empty()
+    profile_dir = Path(_FACTS_PATH).parent
+    cluster_map = effective_cluster_map(
+        load_cluster_map(_CLUSTER_PATH),
+        load_overrides(profile_dir / "overrides.yaml"),
+    )
     graph = build_demand_graph(
         session,
         facts,
-        cluster_map=load_cluster_map(_CLUSTER_PATH),
+        cluster_map=cluster_map,
     )
     return MatchGapOut.model_validate(
         {

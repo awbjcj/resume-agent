@@ -393,7 +393,8 @@ def test_build_demand_graph_theme_aggregates_have_named_weightings():
                 popular_score=3,
                 job_count=2,
                 skill_count=2,
-                gap_count=1,
+                gap_count=0,
+                adjacent_count=1,
             )
         ]
 

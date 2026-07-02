@@ -13,12 +13,14 @@ const themes: ThemeRow[] = [
     jobCount: 3,
     skillCount: 2,
     gapCount: 1,
+    adjacentCount: 1,
     skills: [
       {
         key: "python",
         skill: "Python",
         themeId: "backend",
         covered: false,
+        coverage: "adjacent",
         score: 9,
         jobCount: 3,
         must: 3,
@@ -31,6 +33,7 @@ const themes: ThemeRow[] = [
         skill: "Django",
         themeId: "backend",
         covered: true,
+        coverage: "covered",
         score: 3,
         jobCount: 1,
         must: 1,
@@ -57,6 +60,7 @@ it("discloses skills with independent selection and detail controls", async () =
 
   await userEvent.click(screen.getByRole("button", { name: /expand backend/i }));
   expect(screen.getByText("Ready")).toBeInTheDocument();
+  expect(screen.getByText("Adjacent")).toBeInTheDocument();
   expect(screen.getByRole("checkbox", { name: /select python/i })).toBeChecked();
 
   await userEvent.click(screen.getByRole("button", { name: /open python details/i }));

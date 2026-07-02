@@ -120,7 +120,7 @@ export function RankedList({
                       />
                     </span>
                     <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                      {theme.score} · {theme.skillCount} skills · {theme.gapCount} gaps
+                      {theme.score} · {theme.skillCount} skills · {theme.gapCount} gaps · {theme.adjacentCount} adjacent
                     </span>
                   </div>
                 </div>
@@ -156,8 +156,24 @@ export function RankedList({
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="truncate text-sm font-medium">{skill.skill}</span>
-                            <Badge variant={skill.covered ? "secondary" : "destructive"}>
-                              {skill.covered ? "Covered" : "Gap"}
+                            <Badge
+                              variant={
+                                skill.coverage === "covered"
+                                  ? "secondary"
+                                  : skill.coverage === "gap"
+                                    ? "destructive"
+                                    : "outline"
+                              }
+                              className={cn(
+                                skill.coverage === "adjacent" &&
+                                  "border-adjacent text-adjacent",
+                              )}
+                            >
+                              {skill.coverage === "covered"
+                                ? "Covered"
+                                : skill.coverage === "adjacent"
+                                  ? "Adjacent"
+                                  : "Gap"}
                             </Badge>
                             <StatusBadge state={stateOf("skill", skill.key)} />
                           </div>

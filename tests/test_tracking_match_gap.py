@@ -1,7 +1,9 @@
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
+from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.tracking.match_gap import (
+    build_demand_graph,
     GapRow,
     MatchGapReport,
     match_gap,
@@ -151,3 +153,55 @@ def test_match_gap_excludes_archived_targets():
 
 def test_gap_row_demand_share():
     assert GapRow(skill="X", demand_count=2, target_total=3).demand_share == 67
+
+
+def test_demand_graph_marks_same_theme_as_adjacent():
+    with _session() as session:
+        _job(session, JobStatus.shortlisted.value, ["FastAPI"])
+        facts = _facts({"Frameworks": [Skill(name="Flask")]})
+        cluster_map = ClusterMap(
+            aliases={"flask": "flask", "fastapi": "fastapi"},
+            theme_of={"flask": "web", "fastapi": "web"},
+            theme_label={"web": "Web Frameworks"},
+        )
+        graph = build_demand_graph(session, facts, cluster_map)
+    node = next(item for item in graph.skills if item.key == "fastapi")
+    assert node.coverage == "adjacent"
+    assert node.covered is False
+    assert graph.themes[0].gap_count == 0
+    assert graph.themes[0].adjacent_count == 1
+
+
+def test_demand_graph_distinguishes_covered_and_true_gap():
+    with _session() as session:
+        _job(session, JobStatus.shortlisted.value, ["Python", "Rust"])
+        graph = build_demand_graph(
+            session,
+            _facts({"Languages": [Skill(name="Python")]}),
+            ClusterMap.empty(),
+        )
+    by_key = {node.key: node for node in graph.skills}
+    assert by_key["python"].coverage == "covered"
+    assert by_key["python"].covered is True
+    assert by_key["rust"].coverage == "gap"
+
+
+def test_match_gap_flags_adjacent_and_cluster_map_precedes_callable():
+    with _session() as session:
+        _job(session, JobStatus.shortlisted.value, ["FastAPI"])
+        facts = _facts({"Frameworks": [Skill(name="Flask")]})
+        cluster_map = ClusterMap(
+            theme_of={"flask": "web", "fastapi": "web"},
+            theme_label={"web": "Web"},
+        )
+
+        def wrong_canonicalizer(tokens):
+            return {token: "same" for token in tokens}
+
+        report = match_gap(
+            session,
+            facts,
+            canonicalizer=wrong_canonicalizer,
+            cluster_map=cluster_map,
+        )
+    assert [(gap.skill, gap.adjacent) for gap in report.gaps] == [("FastAPI", True)]

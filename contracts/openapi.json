@@ -2260,6 +2260,16 @@
       },
       "SkillNodeOut": {
         "properties": {
+          "coverage": {
+            "default": "gap",
+            "enum": [
+              "covered",
+              "adjacent",
+              "gap"
+            ],
+            "title": "Coverage",
+            "type": "string"
+          },
           "covered": {
             "title": "Covered",
             "type": "boolean"
@@ -2772,6 +2782,11 @@
       },
       "ThemeOut": {
         "properties": {
+          "adjacentCount": {
+            "default": 0,
+            "title": "Adjacentcount",
+            "type": "integer"
+          },
           "essentialScore": {
             "title": "Essentialscore",
             "type": "integer"

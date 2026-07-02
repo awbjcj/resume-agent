@@ -231,7 +231,10 @@ export function SkillMap({
                     className={cn(
                       "max-w-50 whitespace-normal rounded-full px-3 py-2 text-center text-xs leading-tight shadow-sm",
                       node.kind === "skill" &&
-                        (node.covered ? "border-covered" : "border-gap"),
+                        node.coverage === "covered" && "border-covered",
+                      node.kind === "skill" &&
+                        node.coverage === "adjacent" && "border-adjacent",
+                      node.kind === "skill" && node.coverage === "gap" && "border-gap",
                       ready && "ring-2 ring-ready ring-offset-2 ring-offset-background",
                     )}
                     style={{ minWidth: node.radius * 2, minHeight: node.radius * 2 }}
@@ -256,6 +259,7 @@ export function SkillMap({
         </span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-primary" />Theme</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-gap" />Gap</span>
+        <span><i className="mr-1 inline-block size-2 rounded-full bg-adjacent" />Adjacent</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-covered" />Covered</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-ready" />Advice ready</span>
       </footer>

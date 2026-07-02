@@ -82,7 +82,8 @@ def test_match_gap_projects_jobs_skills_edges_and_themes(monkeypatch, tmp_path):
             {
                 "skill": "K8s",
                 "themeId": "infra",
-                "covered": False,
+                    "covered": False,
+                    "coverage": "gap",
                 "key": "kubernetes",
                 "members": {"K8s": 1, "Kubernetes": 1},
                 "must": 1,
@@ -113,8 +114,9 @@ def test_match_gap_projects_jobs_skills_edges_and_themes(monkeypatch, tmp_path):
                 "popularScore": 1,
                 "jobCount": 1,
                 "skillCount": 1,
-                "gapCount": 1,
-            }
+                    "gapCount": 1,
+                    "adjacentCount": 0,
+                }
         ],
         "suggestionStatuses": [],
     }

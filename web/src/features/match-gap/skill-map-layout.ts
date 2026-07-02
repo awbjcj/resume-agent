@@ -10,6 +10,7 @@ export interface MapNode {
   height: number;
   score: number;
   covered?: boolean;
+  coverage?: SkillRow["coverage"];
   themeId?: string;
   skill?: SkillRow;
   x: number;
@@ -87,6 +88,7 @@ export function buildGraph(themeRows: ThemeRow[], focusedThemeId: string | null)
           radius: skillRadius,
           score: skill.score,
           covered: skill.covered,
+          coverage: skill.coverage,
           themeId: theme.id,
           skill,
         }),

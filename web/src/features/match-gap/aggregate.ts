@@ -35,6 +35,7 @@ export interface SkillRow {
   skill: string;
   themeId: string | null;
   covered: boolean;
+  coverage: "covered" | "adjacent" | "gap";
   score: number;
   jobCount: number;
   must: number;
@@ -50,6 +51,7 @@ export interface ThemeRow {
   jobCount: number;
   skillCount: number;
   gapCount: number;
+  adjacentCount: number;
   skills: SkillRow[];
 }
 
@@ -123,13 +125,15 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
   const skills = payload.skills
     .flatMap((node): SkillRow[] => {
       const counts = countsBySkill.get(node.key);
-      if (!counts || (filters.gapsOnly && node.covered)) return [];
+      const coverage = node.coverage ?? (node.covered ? "covered" : "gap");
+      if (!counts || (filters.gapsOnly && coverage !== "gap")) return [];
       return [
         {
           key: node.key,
           skill: node.skill,
           themeId: node.themeId ?? null,
           covered: node.covered,
+          coverage,
           score:
             filters.weighting === "popular"
               ? counts.jobs.size
@@ -162,12 +166,14 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
       jobCount: 0,
       skillCount: 0,
       gapCount: 0,
+      adjacentCount: 0,
       skills: [],
       jobs: new Set<number>(),
     };
     group.score += skill.score;
     group.skillCount += 1;
-    group.gapCount += Number(!skill.covered);
+    group.gapCount += Number(skill.coverage === "gap");
+    group.adjacentCount += Number(skill.coverage === "adjacent");
     group.skills.push(skill);
     for (const jobId of jobsBySkill.get(skill.key) ?? []) group.jobs.add(jobId);
     group.jobCount = group.jobs.size;
@@ -181,6 +187,7 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
       jobCount: theme.jobCount,
       skillCount: theme.skillCount,
       gapCount: theme.gapCount,
+      adjacentCount: theme.adjacentCount,
       skills: theme.skills,
     }))
     .sort(

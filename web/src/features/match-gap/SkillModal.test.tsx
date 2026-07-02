@@ -12,6 +12,7 @@ const skill: SkillRow = {
   skill: "Python",
   themeId: "backend",
   covered: false,
+  coverage: "adjacent",
   score: 9,
   jobCount: 3,
   must: 2,
@@ -42,6 +43,7 @@ it("shows evidence and loads suggestions by stable key", async () => {
   );
 
   expect(screen.getByRole("heading", { name: "Python" })).toBeInTheDocument();
+  expect(screen.getByText("Adjacent")).toBeInTheDocument();
   expect(screen.getByText("python3")).toBeInTheDocument();
   expect(screen.getByText("2 jobs", { exact: false })).toBeInTheDocument();
   await waitFor(() => expect(requestedKey).toBe("python"));

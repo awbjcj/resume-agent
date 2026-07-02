@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from resume_agent.api.schemas.base import CamelModel
 
@@ -21,12 +21,22 @@ class SkillNodeOut(CamelModel):
     skill: str
     theme_id: str | None = None
     covered: bool
+    coverage: Literal["covered", "adjacent", "gap"] = "gap"
     key: str
     members: dict[str, int]
     must: int
     nice: int
     tech: int
     job_count: int
+
+    @model_validator(mode="after")
+    def sync_legacy_covered(self) -> "SkillNodeOut":
+        if self.covered or self.coverage == "covered":
+            self.covered = True
+            self.coverage = "covered"
+        else:
+            self.covered = False
+        return self
 
 
 class DemandEdgeOut(CamelModel):
@@ -44,6 +54,7 @@ class ThemeOut(CamelModel):
     job_count: int
     skill_count: int
     gap_count: int
+    adjacent_count: int = 0
 
 
 class SuggestionStatusOut(CamelModel):

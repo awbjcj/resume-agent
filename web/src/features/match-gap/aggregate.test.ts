@@ -31,6 +31,7 @@ const payload: Payload = {
       skill: "Kubernetes",
       themeId: "infra",
       covered: false,
+      coverage: "gap",
       members: { Kubernetes: 2, K8s: 1 },
       must: 1,
       nice: 0,
@@ -42,6 +43,7 @@ const payload: Payload = {
       skill: "Python",
       themeId: "language",
       covered: true,
+      coverage: "covered",
       members: { Python: 1 },
       must: 1,
       nice: 0,
@@ -63,6 +65,7 @@ const payload: Payload = {
       jobCount: 2,
       skillCount: 1,
       gapCount: 1,
+      adjacentCount: 0,
     },
     {
       id: "language",
@@ -72,6 +75,7 @@ const payload: Payload = {
       jobCount: 1,
       skillCount: 1,
       gapCount: 0,
+      adjacentCount: 0,
     },
   ],
   suggestionStatuses: [
@@ -110,6 +114,27 @@ describe("deriveView", () => {
     expect(view.themeRows.map((theme) => theme.id)).toEqual(["infra"]);
   });
 
+  it("does not count or filter adjacent skills as true gaps", () => {
+    const adjacentPayload: Payload = {
+      ...payload,
+      skills: payload.skills.map((skill) =>
+        skill.key === "kubernetes"
+          ? { ...skill, coverage: "adjacent" as const, covered: false }
+          : skill,
+      ),
+    };
+    const all = deriveView(adjacentPayload, base);
+    const gapsOnly = deriveView(adjacentPayload, { ...base, gapsOnly: true });
+
+    expect(all.skills.find((skill) => skill.key === "kubernetes")?.coverage).toBe(
+      "adjacent",
+    );
+    expect(all.themeRows.find((theme) => theme.id === "infra")).toEqual(
+      expect.objectContaining({ gapCount: 0, adjacentCount: 1 }),
+    );
+    expect(gapsOnly.skills).toEqual([]);
+  });
+
   it("returns filtered demanding jobs by stable skill key", () => {
     const jobs = deriveView(payload, { ...base, company: "Datadog" }).jobsForSkill(
       "kubernetes",
@@ -124,6 +149,7 @@ const row = (key: string, score: number): SkillRow => ({
   skill: key.toUpperCase(),
   themeId: "theme",
   covered: false,
+  coverage: "gap",
   score,
   jobCount: 1,
   must: 1,
