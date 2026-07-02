@@ -11,7 +11,9 @@ def _settings(*, env_file: str | None) -> Settings:
 
 def test_settings_reads_env_file(tmp_path):
     env = tmp_path / ".env"
-    env.write_text("ANTHROPIC_API_KEY=sk-test\nGITHUB_TOKEN=ghp-test\n", encoding="utf-8")
+    env.write_text(
+        "ANTHROPIC_API_KEY=sk-test\nGITHUB_TOKEN=ghp-test\n", encoding="utf-8"
+    )
     settings = _settings(env_file=str(env))
     assert settings.anthropic_api_key == "sk-test"
     assert settings.github_token == "ghp-test"
@@ -37,7 +39,10 @@ def test_settings_have_provider_key_defaults(monkeypatch):
 
 def test_load_yaml_parses_mapping(tmp_path):
     f = tmp_path / "search.yaml"
-    f.write_text("keywords:\n  - python\n  - backend\nsponsorship_required: true\n", encoding="utf-8")
+    f.write_text(
+        "keywords:\n  - python\n  - backend\nsponsorship_required: true\n",
+        encoding="utf-8",
+    )
     data = load_yaml(f)
     assert data["keywords"] == ["python", "backend"]
     assert data["sponsorship_required"] is True
@@ -57,7 +62,7 @@ def test_settings_has_cheap_model_default():
 
 def test_settings_has_model_tier_defaults():
     settings = _settings(env_file=None)
-    assert settings.mid_model == "claude-sonnet-4-6"
+    assert settings.mid_model == "claude-sonnet-5"
     assert settings.premium_model == "claude-opus-4-8"
 
 
