@@ -23,6 +23,7 @@ from resume_agent.api.routers import notifications as notifications_router
 from resume_agent.api.routers import prune as prune_router
 from resume_agent.api.routers import resumes
 from resume_agent.api.routers import runs as runs_router
+from resume_agent.api.routers import secrets as secrets_router
 from resume_agent.api.routers import sources as sources_router
 from resume_agent.api.routers import suggestions as suggestions_router
 from resume_agent.api.runs.manager import RunManager
@@ -47,6 +48,7 @@ def create_app(
     run_executor: Executor | None = None,
     runs_root: Path | str | None = None,
     config_dir: Path | str | None = None,
+    env_path: Path | str | None = None,
 ) -> FastAPI:
     settings = get_settings()
     resolved_db = db_url or settings.db_url
@@ -69,6 +71,7 @@ def create_app(
     app.state.settings = resolved_settings
     app.state.db_url = resolved_db
     app.state.config_store = YamlConfigStore(config_dir=config_dir or "config")
+    app.state.env_path = Path(env_path) if env_path is not None else Path(".env")
     manager_root = runs_root if runs_root is not None else RUNS_ROOT
     # The in-memory test adapter uses one StaticPool connection shared by every
     # thread, so concurrent sessions cannot safely transact on it. File-backed
@@ -87,7 +90,7 @@ def create_app(
             else None
         ),
     )
-    app.dependency_overrides[get_settings_dep] = lambda: resolved_settings
+    app.dependency_overrides[get_settings_dep] = lambda: app.state.settings
 
     origins = [o.strip() for o in resolved_settings.cors_origins.split(",") if o.strip()]
     # Auth is a static bearer token in the Authorization header (not cookies), so
@@ -115,6 +118,7 @@ def create_app(
     app.include_router(suggestions_router.router, prefix="/api", dependencies=guarded)
     app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)
     app.include_router(config_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so
     # they take precedence; the catch-all is excluded from the OpenAPI schema so

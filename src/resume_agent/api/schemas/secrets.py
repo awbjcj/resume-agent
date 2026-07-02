@@ -1,0 +1,45 @@
+"""Write-only secrets contract + readable model-tier config."""
+
+from __future__ import annotations
+
+from resume_agent.api.schemas.base import CamelModel
+
+# schema field name -> .env variable. One place; GET, PUT, and setup-status use it.
+SECRET_FIELDS: dict[str, str] = {
+    "anthropic_api_key": "ANTHROPIC_API_KEY",
+    "openai_api_key": "OPENAI_API_KEY",
+    "gemini_api_key": "GEMINI_API_KEY",
+    "deepseek_api_key": "DEEPSEEK_API_KEY",
+    "github_token": "GITHUB_TOKEN",
+    "adzuna_app_id": "ADZUNA_APP_ID",
+    "adzuna_app_key": "ADZUNA_APP_KEY",
+    "linkedin_email": "LINKEDIN_EMAIL",
+    "linkedin_password": "LINKEDIN_PASSWORD",
+}
+
+
+class SecretStatus(CamelModel):
+    key: str  # camelCase field name, e.g. "anthropicApiKey"
+    is_set: bool
+    hint: str | None = None  # last 4 chars, only when len(value) >= 8
+
+
+class SecretsUpdate(CamelModel):
+    """All-optional; only fields present in the request body are written.
+    An explicit null clears the key."""
+
+    anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
+    gemini_api_key: str | None = None
+    deepseek_api_key: str | None = None
+    github_token: str | None = None
+    adzuna_app_id: str | None = None
+    adzuna_app_key: str | None = None
+    linkedin_email: str | None = None
+    linkedin_password: str | None = None
+
+
+class ModelsConfigDoc(CamelModel):
+    cheap_model: str = "claude-haiku-4-5-20251001"
+    mid_model: str = "claude-sonnet-5"
+    premium_model: str = "claude-opus-4-8"

@@ -49,3 +49,11 @@ def require_token(
 
 def get_run_manager(request: Request):
     return request.app.state.run_manager
+
+
+def refresh_app_settings(app, fresh: Settings) -> None:
+    """Env-derived settings changed; keep startup-resolved db_url/api_token."""
+    app.state.settings = fresh.model_copy(update={
+        "db_url": app.state.db_url,
+        "api_token": app.state.settings.api_token,
+    })

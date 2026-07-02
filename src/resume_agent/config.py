@@ -26,9 +26,11 @@ class Settings(BaseSettings):
     linkedin_user_data_dir: str = ".linkedin_profile"
     db_url: str = "sqlite:///data/resume_agent.db"
     cheap_model: str = "claude-haiku-4-5-20251001"
-    mid_model: str = "claude-sonnet-4-6"
+    mid_model: str = "claude-sonnet-5"
     premium_model: str = "claude-opus-4-8"
-    api_token: str = ""  # when non-empty, the API requires Authorization: Bearer <token>
+    api_token: str = (
+        ""  # when non-empty, the API requires Authorization: Bearer <token>
+    )
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
     # Concurrency + retry for LLM fan-out (discovery + tailor).
     llm_concurrency: int = Field(default=8, ge=1)
@@ -53,5 +55,7 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
     with p.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"Expected a mapping at the top of {p}, got {type(data).__name__}")
+        raise ValueError(
+            f"Expected a mapping at the top of {p}, got {type(data).__name__}"
+        )
     return data
