@@ -26,3 +26,9 @@ export function initialOpenPipelineStages() {
 export function pipelineStageLabel(stage: string) {
   return stage.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
+
+export function openStagesFromParam(stage: string | null): Set<string> {
+  return stage && (PIPELINE_STAGE_ORDER as readonly string[]).includes(stage)
+    ? new Set([stage])
+    : initialOpenPipelineStages();
+}

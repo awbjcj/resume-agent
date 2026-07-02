@@ -32,7 +32,7 @@ import { emptyFilterState } from "@/lib/filters/types";
 
 import { PipelineStageSection } from "./PipelineStageSection";
 import {
-  initialOpenPipelineStages,
+  openStagesFromParam,
   orderPipelineStages,
   PIPELINE_STAGE_ORDER,
   pipelineStageLabel,
@@ -79,14 +79,16 @@ export function PipelineContainer() {
     ? filterDraft
     : pipelineDraftFromFilter(filter);
   const [targetStatus, setTargetStatus] = useState("approved");
-  const [openStages, setOpenStages] = useState(initialOpenPipelineStages);
+  const [params, setParams] = useSearchParams();
+  const [openStages, setOpenStages] = useState(() =>
+    openStagesFromParam(params.get("stage")),
+  );
   const { rows, facets, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useBoardQuery<PipelineItem>("pipeline", filter);
   const selection = useSelection();
   const { reconcile } = selection;
   const bulk = useBulkAction("pipeline");
   const runs = useBulkRun();
-  const [params, setParams] = useSearchParams();
 
   useEffect(() => {
     reconcile(rows.map((row) => row.jobId), total);
