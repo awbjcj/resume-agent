@@ -2324,10 +2324,11 @@ git commit -m "feat: derived skill matrix with overrides"
 **Files:**
 - Modify: `src/resume_agent/services/match_gap.py` (`refresh_clusters`)
 - Modify: `src/resume_agent/api/routers/match_gap.py` (refresh endpoint caller, line ~67)
+- Rebuild: `data/profile/matrix.json` after a successful production refresh
 - Test: `tests/test_services_match_gap.py` (append)
 
 **Interfaces:**
-- Produces: `refresh_clusters(..., extra_tokens: frozenset[str] | set[str] = frozenset())` — extra tokens join both the classification universe and the prune keep-set. The API refresh endpoint passes `profile_skill_tokens(load_facts(...))` (empty set when facts.json is missing).
+- Produces: `refresh_clusters(..., extra_tokens: frozenset[str] | set[str] = frozenset())` — extra tokens join both the classification universe and the prune keep-set. The API refresh endpoint passes `profile_skill_tokens(load_facts(...)) | override_tokens(load_overrides(...))` (override tokens still apply when facts are missing) and, after success, regenerates the matrix from the same facts plus the newly saved map and overrides.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2353,6 +2354,9 @@ def test_refresh_keeps_profile_alias_tokens(tmp_path, session):
     kept = load_cluster_map(path)
     assert kept.aliases.get("k8s") == "kubernetes"
 ```
+
+Add the same regression for an override-only canonical head (for example `golang: go`):
+both tokens must remain classified and survive pruning even when no job demands them.
 
 Adapt fake names to the file's existing helpers (`rg "_Fake" tests/test_services_match_gap.py`).
 
@@ -2397,6 +2401,13 @@ In `src/resume_agent/api/routers/match_gap.py`, at the `refresh_clusters(` call 
 ```
 
 with `from resume_agent.tracking.match_gap import profile_skill_tokens` and the router's existing facts-path constant (add `_FACTS_PATH = "data/profile/facts.json"` if the router does not already load facts — check the file; it loads facts for reports, reuse that path/constant). Pass `extra_tokens=profile_tokens`.
+
+Inside the refresh worker, load facts once before classification. After
+`refresh_clusters` succeeds, call `build_matrix(facts, load_cluster_map(_CLUSTER_PATH),
+load_overrides(profile_dir / "overrides.yaml"))` and atomically save beside facts. Add
+`matrixRegenerated: bool` to the run result. If facts are absent, classify demand tokens
+as today and report `False`; if facts exist but matrix regeneration fails, fail the run
+rather than publishing a canonical map that leaves a stale matrix accepted.
 
 - [ ] **Step 4: Run the suite and commit**
 
