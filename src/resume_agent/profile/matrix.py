@@ -161,11 +161,12 @@ def build_skill_match_context(
 ) -> SkillMatchContext:
     rows_by_key = {row.key: row for row in matrix.rows}
     matches: list[SkillMatch] = []
-    for field_name, source in (
+    field_sources: tuple[tuple[str, Literal["must", "nice", "tech"]], ...] = (
         ("must_have_skills", "must"),
         ("nice_to_have_skills", "nice"),
         ("tech_stack", "tech"),
-    ):
+    )
+    for field_name, source in field_sources:
         for requirement in split_skills(getattr(criteria, field_name)):
             token = normalize_skill(requirement)
             canonical = cluster_map.aliases.get(token, token)
