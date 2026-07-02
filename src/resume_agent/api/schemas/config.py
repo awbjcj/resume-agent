@@ -1,0 +1,92 @@
+"""Typed config documents — the wire contract for /api/config/{domain}.
+
+Each Doc mirrors one YAML file's shape (snake_case on disk, camelCase on the
+wire via CamelModel). Field defaults ARE the file defaults: a missing file
+serves these values, and the TUI/CLI keep reading the same YAML.
+"""
+
+from __future__ import annotations
+
+from pydantic import Field
+
+from resume_agent.api.schemas.base import CamelModel
+
+
+class SearchConfigDoc(CamelModel):
+    keywords: list[str] = Field(default_factory=list)
+    titles: list[str] = Field(default_factory=list)
+    locations: list[str] = Field(default_factory=list)
+    remote_policy: str | None = None
+    min_salary: int | None = None
+    yoe_min: int | None = None
+    yoe_max: int | None = None
+    sponsorship_required: bool = False
+    role_anchors: list[str] = Field(default_factory=list)
+    exclude_terms: list[str] = Field(default_factory=list)
+    target_role: str | None = None
+    distance: int | None = None
+    max_days_old: int | None = None
+    experience_levels: list[str] = Field(default_factory=list)
+    employment_types: list[str] = Field(default_factory=list)
+
+
+class ReviewerEntry(CamelModel):
+    name: str
+    gate: bool = False
+    weight: int = 1
+    model_tier: str = "mid"
+
+
+class LengthBudget(CamelModel):
+    max_experiences: int = 4
+    max_bullets_per_role: int = 5
+    target_total_bullets: int = 20
+
+
+def _default_reviewers() -> list[ReviewerEntry]:
+    return [
+        ReviewerEntry(name="fact-check", gate=True, weight=0, model_tier="premium"),
+        ReviewerEntry(name="ats-keyword", gate=False, weight=1, model_tier="mid"),
+        ReviewerEntry(name="recruiter", gate=False, weight=1, model_tier="mid"),
+        ReviewerEntry(name="hiring-manager", gate=False, weight=1, model_tier="premium"),
+        ReviewerEntry(name="concision", gate=False, weight=1, model_tier="mid"),
+    ]
+
+
+class ReviewConfigDoc(CamelModel):
+    max_rounds: int = 3
+    score_threshold: int = 85
+    reviewers: list[ReviewerEntry] = Field(default_factory=_default_reviewers)
+    length_budget: LengthBudget | None = None
+
+
+class PruneConfigDoc(CamelModel):
+    fit_threshold: int = 40
+    stale_days: int = 60
+    retention_days: int = 30
+    enable_rejected: bool = True
+    enable_low_fit: bool = True
+    enable_stale: bool = True
+
+
+class RenderConfigDoc(CamelModel):
+    template_path: str = "templates/resume.typ"
+    output_dir: str = "output"
+
+
+class StyleGuideDoc(CamelModel):
+    content: str = ""
+
+
+class ProfileConfigDoc(CamelModel):
+    github_username: str | None = None
+
+
+DOMAIN_SCHEMAS: dict[str, type[CamelModel]] = {
+    "search": SearchConfigDoc,
+    "review": ReviewConfigDoc,
+    "prune": PruneConfigDoc,
+    "render": RenderConfigDoc,
+    "style_guide": StyleGuideDoc,
+    "profile": ProfileConfigDoc,
+}
