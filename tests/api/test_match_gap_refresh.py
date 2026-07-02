@@ -9,6 +9,9 @@ import resume_agent.api.routers.match_gap as router_mod
 import resume_agent.tracking.canonicalize as canonicalize
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
+from resume_agent.models.profile import Contact, ProfileFacts, Skill
+from resume_agent.profile.matrix import load_matrix
+from resume_agent.profile.store import save_facts
 from resume_agent.tracking.canonicalize import (
     IncrementalSkillThemes,
     IncrementalThemeGroup,
@@ -81,6 +84,7 @@ def test_refresh_clusters_run_completes(monkeypatch, tmp_path):
     monkeypatch.setattr(
         canonicalize, "build_incremental_themer_agent", _AsyncThemer
     )
+    monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(tmp_path / "cluster_map.json"))
 
     app = create_app(db_url="sqlite://")
@@ -93,6 +97,7 @@ def test_refresh_clusters_run_completes(monkeypatch, tmp_path):
     assert record["state"] == "done"
     assert record["result"]["skills"] == 2
     assert record["result"]["failedCanonicalTokens"] == 0
+    assert record["result"]["matrixRegenerated"] is False
 
 
 def test_refresh_cluster_launches_are_coalesced_while_active(monkeypatch, tmp_path):
@@ -106,6 +111,7 @@ def test_refresh_cluster_launches_are_coalesced_while_active(monkeypatch, tmp_pa
     monkeypatch.setattr(
         canonicalize, "build_incremental_themer_agent", _AsyncThemer
     )
+    monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(tmp_path / "cluster_map.json"))
 
     app = create_app(db_url="sqlite://")
@@ -119,3 +125,29 @@ def test_refresh_cluster_launches_are_coalesced_while_active(monkeypatch, tmp_pa
         third = client.post("/api/match-gap/refresh-clusters").json()["runId"]
 
     assert third != first
+
+
+def test_refresh_regenerates_matrix_from_bound_facts(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        canonicalize, "build_incremental_canonicalizer_agent", _AsyncCanonicalizer
+    )
+    monkeypatch.setattr(canonicalize, "build_incremental_themer_agent", _AsyncThemer)
+    facts_path = tmp_path / "facts.json"
+    cluster_path = tmp_path / "cluster_map.json"
+    monkeypatch.setattr(router_mod, "_FACTS_PATH", str(facts_path))
+    monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(cluster_path))
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"Platforms": [Skill(name="Kubernetes", aliases=["k8s"])]},
+    )
+    save_facts(facts, facts_path)
+
+    app = create_app(db_url="sqlite://")
+    with TestClient(app) as client:
+        _seed_job(app)
+        response = client.post("/api/match-gap/refresh-clusters")
+        record = _wait_for_terminal(client, response.json()["runId"])
+
+    assert record["state"] == "done"
+    assert record["result"]["matrixRegenerated"] is True
+    assert load_matrix(tmp_path / "matrix.json") is not None

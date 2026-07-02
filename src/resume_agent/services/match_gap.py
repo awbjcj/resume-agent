@@ -33,6 +33,7 @@ def refresh_clusters(
     reporter: ProgressReporter | None = None,
     batch_size: int | None = None,
     concurrency: int | None = None,
+    extra_tokens: frozenset[str] | set[str] = frozenset(),
 ) -> dict[str, object]:
     """Classify the current backlog, apply successes, prune, and save once."""
     settings = get_settings()
@@ -44,7 +45,7 @@ def refresh_clusters(
         raise ValueError("concurrency must be at least 1")
 
     with _REFRESH_LOCK:
-        demanded = collect_target_skill_tokens(session)
+        demanded = collect_target_skill_tokens(session) | set(extra_tokens)
         existing = load_cluster_map(path)
         outcome = asyncio.run(
             run_with_cleanup(

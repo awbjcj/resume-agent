@@ -239,3 +239,42 @@ def test_refresh_clusters_serializes_concurrent_calls(tmp_path, monkeypatch):
         second.result(timeout=2)
 
     assert second_entered.is_set()
+
+
+def test_refresh_keeps_profile_alias_tokens_without_job_demand(tmp_path):
+    engine = _engine_with_target_skills()
+    path = tmp_path / "cluster_map.json"
+    save_cluster_map(
+        ClusterMap(aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"}),
+        path,
+    )
+    with get_session(engine) as session:
+        refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(),
+            path=path,
+            extra_tokens={"kubernetes", "k8s"},
+        )
+    kept = load_cluster_map(path)
+    assert kept.aliases["k8s"] == "kubernetes"
+    assert kept.aliases["kubernetes"] == "kubernetes"
+
+
+def test_refresh_keeps_override_only_alias_head_without_job_demand(tmp_path):
+    engine = _engine_with_target_skills()
+    path = tmp_path / "cluster_map.json"
+    save_cluster_map(
+        ClusterMap(aliases={"golang": "go", "go": "go"}),
+        path,
+    )
+    with get_session(engine) as session:
+        refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(),
+            path=path,
+            extra_tokens={"golang", "go"},
+        )
+    kept = load_cluster_map(path)
+    assert kept.aliases == {"go": "go", "golang": "go"}

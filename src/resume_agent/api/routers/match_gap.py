@@ -14,6 +14,12 @@ from resume_agent.api.schemas.match_gap import MatchGapOut
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
 from resume_agent.models.profile import Contact, ProfileFacts
+from resume_agent.profile.matrix import (
+    build_matrix,
+    load_overrides,
+    override_tokens,
+    save_matrix,
+)
 from resume_agent.profile.store import load_facts
 from resume_agent.services.suggestions import suggestion_statuses
 from resume_agent.taxonomy.clusters import load_cluster_map
@@ -63,14 +69,37 @@ def refresh_match_gap_clusters(
             build_incremental_themer_agent,
         )
 
+        facts_path = Path(_FACTS_PATH)
+        overrides = load_overrides(facts_path.with_name("overrides.yaml"))
+        extra_tokens = override_tokens(overrides)
+        try:
+            facts = load_facts(facts_path)
+        except (OSError, ValueError):
+            facts = None
+        if facts is not None:
+            extra_tokens |= profile_skill_tokens(facts)
+
         with open_session(engine) as session:
-            return refresh_clusters(
+            result = refresh_clusters(
                 session,
                 canonicalizer=build_incremental_canonicalizer_agent(),
                 themer=build_incremental_themer_agent(),
                 path=_CLUSTER_PATH,
                 reporter=reporter,
+                extra_tokens=extra_tokens,
             )
+        if facts is None:
+            result["matrixRegenerated"] = False
+            return result
+
+        matrix = build_matrix(
+            facts,
+            load_cluster_map(_CLUSTER_PATH),
+            overrides,
+        )
+        save_matrix(matrix, facts_path.with_name("matrix.json"))
+        result["matrixRegenerated"] = True
+        return result
 
     run_id = mgr.submit(
         "refreshClusters", work, singleton_key="refreshClusters"
