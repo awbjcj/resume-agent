@@ -820,9 +820,10 @@ git commit -m "feat: deterministic content-derived fact ids"
 - Consumes: `SourceDoc`, `SourceManifest`, `doc_path` (Task 3); `read_document_text` (Task 2); `assign_fact_ids` (Task 4); `extract_profile_facts` + `Runner` (existing).
 - Produces:
   - `PROMPT_VERSION: int` in `extractor.py` (starts at `2`)
-  - `FragmentResult`: dataclass `{fragments: dict[str, ProfileFacts], status: dict[str, str]}` — status values: `"cached"`, `"extracted"`, or `"failed: <reason>"` (failed docs with a cached fragment keep it and report `"stale: <reason>"`).
+  - `FragmentResult`: dataclass `{fragments: dict[str, ProfileFacts], status: dict[str, str]}` — status values: `"cached"`, `"extracted"`, `"source-changed"`, or `"failed: <reason>"` (failed docs with a cached fragment keep it and report `"stale: <reason>"`).
   - `extract_fragments(profile_dir, manifest: SourceManifest, agent: Runner) -> FragmentResult`
   - `load_fragment(profile_dir, doc_id) -> ProfileFacts | None`
+  - `fragment_cache_status(profile_dir, doc: SourceDoc) -> Literal["cached","stale","source-changed","missing"]`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -901,8 +902,6 @@ def test_failure_keeps_previous_fragment(tmp_path):
     # Change the doc content so the cache is stale, then fail extraction.
     doc = manifest.docs[0]
     (profile_dir / "sources" / doc.filename).write_text("Ada v2", encoding="utf-8")
-    doc.sha256 = "0" * 64  # simulate manifest knowing about new content
-
     result = extract_fragments(profile_dir, manifest, _FakeAgent(None, fail=True))
     assert result.status[doc_id].startswith("stale: ")
     assert result.fragments[doc_id].contact.name == "Ada"  # kept previous
@@ -935,7 +934,8 @@ and append one instruction string to `_INSTRUCTIONS`:
 
 ```python
     "The document may be a resume, project write-up, slide deck, or notes. Contact details may "
-    "legitimately be absent; leave contact fields null or empty rather than inventing them.",
+    "legitimately be absent; use an empty string for required contact.name and null/empty values "
+    "for the other contact fields rather than inventing them.",
 ```
 
 Create `src/resume_agent/profile/fragments.py`:
@@ -943,13 +943,22 @@ Create `src/resume_agent/profile/fragments.py`:
 ```python
 """Per-document extraction fragments, cached by content hash + prompt version."""
 
+import hashlib
 import json
+import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from resume_agent.llm_runner import Runner
 from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.corpus import FRAGMENTS_DIRNAME, SourceManifest, doc_path
+from resume_agent.profile.corpus import (
+    FRAGMENTS_DIRNAME,
+    SourceDoc,
+    SourceManifest,
+    doc_path,
+    save_manifest,
+)
 from resume_agent.profile.extractor import PROMPT_VERSION, extract_profile_facts
 from resume_agent.profile.ids import assign_fact_ids
 from resume_agent.profile.resume_reader import read_document_text
@@ -985,12 +994,28 @@ def _meta_matches(meta_path: Path, sha256: str) -> bool:
 def _save(profile_dir: str | Path, doc_id: str, facts: ProfileFacts, sha256: str) -> None:
     frag_path, meta_path = _paths(profile_dir, doc_id)
     frag_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = frag_path.with_name(f"{frag_path.name}.tmp")
-    tmp.write_text(facts.model_dump_json(indent=2), encoding="utf-8")
-    tmp.replace(frag_path)
-    meta_path.write_text(
-        json.dumps({"sha256": sha256, "prompt_version": PROMPT_VERSION}), encoding="utf-8"
+    _atomic_write(frag_path, facts.model_dump_json(indent=2) + "\n")
+    _atomic_write(
+        meta_path,
+        json.dumps({"sha256": sha256, "prompt_version": PROMPT_VERSION}) + "\n",
     )
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=path.parent,
+            prefix=f".{path.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def extract_fragments(
@@ -998,16 +1023,32 @@ def extract_fragments(
 ) -> FragmentResult:
     """Extract every registered doc, reusing cached fragments when unchanged."""
     result = FragmentResult()
+    manifest_changed = False
     for doc in manifest.docs:
-        frag_path, meta_path = _paths(profile_dir, doc.id)
-        if _meta_matches(meta_path, doc.sha256):
+        _, meta_path = _paths(profile_dir, doc.id)
+        source_path = doc_path(profile_dir, doc)
+        try:
+            observed_sha = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        except OSError as exc:
+            previous = load_fragment(profile_dir, doc.id)
+            if previous is not None:
+                result.fragments[doc.id] = previous
+                result.status[doc.id] = f"stale: {exc}"
+            else:
+                result.status[doc.id] = f"failed: {exc}"
+            continue
+        source_changed = observed_sha != doc.sha256
+        if source_changed:
+            doc.sha256 = observed_sha
+            manifest_changed = True
+        if _meta_matches(meta_path, observed_sha):
             cached = load_fragment(profile_dir, doc.id)
             if cached is not None:
                 result.fragments[doc.id] = cached
                 result.status[doc.id] = "cached"
                 continue
         try:
-            text = read_document_text(doc_path(profile_dir, doc))
+            text = read_document_text(source_path)
             facts = assign_fact_ids(extract_profile_facts(text, agent), doc.id)
         except Exception as exc:  # per-doc isolation mirrors FetchResult.failures
             previous = load_fragment(profile_dir, doc.id)
@@ -1017,11 +1058,17 @@ def extract_fragments(
             else:
                 result.status[doc.id] = f"failed: {exc}"
             continue
-        _save(profile_dir, doc.id, facts, doc.sha256)
+        _save(profile_dir, doc.id, facts, observed_sha)
         result.fragments[doc.id] = facts
-        result.status[doc.id] = "extracted"
+        result.status[doc.id] = "source-changed" if source_changed else "extracted"
+    if manifest_changed:
+        save_manifest(manifest, profile_dir)
     return result
 ```
+
+Implement `fragment_cache_status` with the same observed-byte hash check, but without
+mutating the manifest. Make both fragment and metadata writes atomic via unique sibling
+temporary files. Add tests for stored-copy edits, malformed metadata, and temp cleanup.
 
 - [ ] **Step 4: Run the suite and commit**
 
