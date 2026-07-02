@@ -383,7 +383,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { ActionQueue, QUEUE_CARDS } from "./ActionQueue";
-import { SUMMARY } from "./use-dashboard-summary.test";
+import { SUMMARY } from "./fixtures";
 
 const renderQueue = (summary = SUMMARY) =>
   render(
@@ -1057,7 +1057,7 @@ import { describe, expect, it } from "vitest";
 import { server } from "@/test/server";
 import { withQueryClient } from "@/test/utils";
 import { DashboardPage, heroTitle } from "./DashboardPage";
-import { SUMMARY } from "./use-dashboard-summary.test";
+import { SUMMARY } from "./fixtures";
 
 const READY_STATUS = {
   secrets: { anthropicKey: true, anyLlmKey: true },
