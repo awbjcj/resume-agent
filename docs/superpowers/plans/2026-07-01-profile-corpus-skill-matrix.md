@@ -2602,34 +2602,38 @@ In the test file that covers `compose_match_plan_input` (find via `rg -l "compos
 ```python
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.matrix import MatrixRow, SkillMatrix
+from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
 from resume_agent.tailor.match_plan import compose_match_plan_input
 
 
-def test_compose_without_matrix_unchanged():
+def test_compose_without_skill_context_unchanged():
     text = compose_match_plan_input(
         "JD", JobCriteria(), ProfileFacts(contact=Contact(name="Ada"))
     )
-    assert "SKILL MATRIX" not in text
+    assert "SKILL MATCH CONTEXT" not in text
 
 
-def test_compose_with_matrix_appends_section():
-    matrix = SkillMatrix(
-        generated_at="now",
-        rows=[MatrixRow(key="python", display="Python", strength=3.0)],
+def test_compose_with_skill_context_appends_annotated_section():
+    context = SkillMatchContext(
+        matches=[SkillMatch(
+            requirement="Python", source="must", coverage="covered",
+            row=MatrixRow(key="python", display="Python", strength=3.0),
+        )],
     )
     text = compose_match_plan_input(
-        "JD", JobCriteria(), ProfileFacts(contact=Contact(name="Ada")), matrix=matrix
+        "JD", JobCriteria(), ProfileFacts(contact=Contact(name="Ada")),
+        skill_context=context,
     )
-    assert "SKILL MATRIX (JSON):" in text
+    assert "SKILL MATCH CONTEXT (JSON):" in text
+    assert '"coverage":"covered"' in text
     assert '"python"' in text
-    assert text.index("SKILL MATRIX") < text.index("JOB DESCRIPTION")
+    assert text.index("SKILL MATCH CONTEXT") < text.index("JOB DESCRIPTION")
 ```
 
 - [ ] **Step 2: Run to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_tailor_match_plan.py -v`
-Expected: FAIL — unexpected `matrix` kwarg.
+Expected: FAIL — unexpected `skill_context` kwarg.
 
 - [ ] **Step 3: Implement**
 
@@ -2640,59 +2644,66 @@ def compose_match_plan_input(
     jd_text: str,
     criteria: JobCriteria,
     profile_facts: ProfileFacts,
-    matrix: "SkillMatrix | None" = None,
+    skill_context: "SkillMatchContext | None" = None,
 ) -> str:
     sections = [
         f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}",
         f"JOB CRITERIA (JSON):\n{criteria.model_dump_json()}",
     ]
-    if matrix is not None and matrix.rows:
-        sections.append(f"SKILL MATRIX (JSON):\n{matrix.model_dump_json()}")
+    if skill_context is not None and skill_context.matches:
+        sections.append(
+            f"SKILL MATCH CONTEXT (JSON):\n{skill_context.model_dump_json()}"
+        )
     sections.append(f"JOB DESCRIPTION:\n{jd_text}")
     return "\n\n".join(sections)
 ```
 
-(import under `TYPE_CHECKING` or directly: `from resume_agent.profile.matrix import SkillMatrix` — direct import is fine, no cycle: `profile.matrix` does not import `tailor`.)
+(Import `SkillMatchContext` from `profile.matrix`.)
 
 Append two instruction strings to `_MATCH_PLAN_INSTRUCTIONS`:
 
 ```python
-    "When a SKILL MATRIX section is present, use it as the index into the candidate's skills: "
+    "When a SKILL MATCH CONTEXT section is present, use its deterministic coverage tiers: "
     "prefer facts with higher strength and more recent last_used as supporting evidence.",
-    "A matrix skill marked inferred is selectable evidence but its wording must come from the "
-    "cited facts. For a requirement the candidate covers only via a related (adjacent) skill, "
+    "An inferred matrix skill may guide hard-skill selection, but all surrounding claim wording "
+    "must remain supported by the cited literal facts. For a requirement the candidate covers "
+    "only via a related (adjacent) skill, "
     "select transferable evidence and note the transferability framing; never present the job's "
-    "own term as a candidate skill. Satisfy soft-skill requirements by selecting bullets that "
-    "demonstrate the trait and noting summary emphasis, not by adding skill labels.",
+    "own term as a candidate skill. Satisfy soft-skill requirements by selecting literal bullets "
+    "that demonstrate the trait, not by adding skill labels or unsupported summary wording.",
 ```
 
-`workflow.py`: add keyword `matrix: "SkillMatrix | None" = None` to both `run_tailor_review` and `arun_tailor_review` signatures (after `match_plan_agent`), and pass `matrix=matrix` into both `compose_match_plan_input(...)` calls (lines 66 and 120).
+`workflow.py`: add keyword `skill_context: "SkillMatchContext | None" = None` to both `run_tailor_review` and `arun_tailor_review` signatures (after `match_plan_agent`), and pass it into both `compose_match_plan_input(...)` calls.
 
-`tailor/service.py`: at the top add `from resume_agent.profile.matrix import DEFAULT_MATRIX_PATH, load_matrix`; before the fan-out that calls `arun_tailor_review` (both call sites, ~lines 60 and 109), load once per run: `matrix = load_matrix(DEFAULT_MATRIX_PATH)` and pass `matrix=matrix`. (Read the surrounding function to place the load outside any per-job lambda.)
+`tailor/service.py`: derive matrix/cluster/override paths from `facts_path`, load them once,
+construct the effective map, validate the matrix with
+`load_matrix(path, facts, effective_map)`, and build one `SkillMatchContext` per
+job from its `JobCriteria`. Pass that context to `arun_tailor_review`. A missing or
+mismatched matrix yields `None`, never the default profile's matrix.
 
 - [ ] **Step 4: Run the suite and commit**
 
 Run: `.venv/Scripts/python.exe -m pytest && ruff check`
-Expected: PASS (matrix defaults to None everywhere, existing tests unaffected).
+Expected: PASS (`skill_context` defaults to None everywhere, existing tests unaffected).
 
 ```bash
 git add src/resume_agent/tailor/match_plan.py src/resume_agent/tailor/workflow.py src/resume_agent/tailor/service.py tests/
-git commit -m "feat: match plan consumes the skill matrix"
+git commit -m "feat: match plan consumes deterministic skill context"
 ```
 
 ---
 
-### Task 12: Fit scoring consumes the matrix + demand-side soft-skill capture
+### Task 12: Fit scoring consumes deterministic skill context + demand-side soft-skill capture
 
 **Files:**
 - Modify: `src/resume_agent/discovery/fit.py` (`compose_fit_input`, `_INSTRUCTIONS`)
-- Modify: `src/resume_agent/discovery/pipeline.py` (`run_score` + its caller at line ~368 — thread `matrix`)
-- Modify: `src/resume_agent/services/discovery.py` (`discover_jobs` — load the matrix; find the exact call chain with `rg -n "run_score|run_discover" src/resume_agent`)
+- Modify: `src/resume_agent/discovery/pipeline.py` (`run_score` — build/pass context from each job's extracted criteria)
+- Modify: `src/resume_agent/services/discovery.py` (`discover_jobs` — load bound matrix/map/overrides once)
 - Modify: `src/resume_agent/discovery/extract.py` (`_INSTRUCTIONS` — soft-skill capture)
 - Test: `tests/test_discovery_fit.py` (or the file found by `rg -l "compose_fit_input" tests/`), `tests/test_discovery_extract.py` (or equivalent)
 
 **Interfaces:**
-- Produces: `compose_fit_input(jd_text, profile_facts, location=None, matrix: SkillMatrix | None = None) -> str`; `run_score(..., matrix: SkillMatrix | None = None)`.
+- Produces: `compose_fit_input(jd_text, profile_facts, location=None, skill_context: SkillMatchContext | None = None) -> str`; `run_score(..., matrix: SkillMatrix | None = None, cluster_map: ClusterMap | None = None)` builds a `SkillMatchContext` from each job's `criteria_json`.
 
 - [ ] **Step 1: Write the failing tests**
 
