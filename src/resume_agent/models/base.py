@@ -86,3 +86,4 @@ class FactItem(ExtensibleModel):
 
     id: str = Field(default_factory=new_id)
     source: Source = Source.resume
+    source_ref: str | None = None

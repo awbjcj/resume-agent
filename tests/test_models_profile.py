@@ -8,6 +8,8 @@ from resume_agent.models.profile import (
     Skill,
 )
 from resume_agent.models.base import Source
+import pytest
+from pydantic import ValidationError
 
 
 def make_minimal_profile() -> ProfileFacts:
@@ -67,3 +69,41 @@ def test_profile_round_trips_through_json():
     restored = ProfileFacts.model_validate_json(p.model_dump_json())
     assert restored.contact.name == "Ada Lovelace"
     assert restored.schema_version == 1
+
+
+def test_skill_inference_fields_default_off():
+    skill = Skill(name="Python")
+    assert skill.inferred is False
+    assert skill.evidence_fact_ids == []
+    assert skill.category is None
+    assert skill.source_ref is None
+
+
+def test_inferred_skill_round_trips():
+    skill = Skill(
+        name="Mentorship",
+        inferred=True,
+        evidence_fact_ids=["abc123def456"],
+        category="soft",
+    )
+    loaded = Skill.model_validate_json(skill.model_dump_json())
+    assert loaded.inferred is True
+    assert loaded.evidence_fact_ids == ["abc123def456"]
+    assert loaded.category == "soft"
+
+
+def test_inferred_skill_requires_category_and_evidence():
+    with pytest.raises(ValidationError):
+        Skill(name="Mentorship", inferred=True, category="soft")
+    with pytest.raises(ValidationError):
+        Skill(name="Mentorship", inferred=True, evidence_fact_ids=["fact-1"])
+
+
+def test_legacy_facts_json_still_loads():
+    legacy = {
+        "contact": {"name": "Ada"},
+        "skills": {"Languages": [{"name": "Python"}]},
+    }
+    facts = ProfileFacts.model_validate(legacy)
+    skill = facts.skills["Languages"][0]
+    assert skill.inferred is False and skill.source_ref is None

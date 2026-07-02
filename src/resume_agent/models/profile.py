@@ -1,4 +1,6 @@
-from pydantic import Field
+from typing import Literal
+
+from pydantic import Field, model_validator
 
 from resume_agent.models.base import ExtensibleModel, FactItem, Source
 
@@ -27,6 +29,15 @@ class Skill(FactItem):
     name: str
     aliases: list[str] = Field(default_factory=list)
     context: str | None = None
+    inferred: bool = False
+    evidence_fact_ids: list[str] = Field(default_factory=list)
+    category: Literal["hard", "soft", "domain"] | None = None
+
+    @model_validator(mode="after")
+    def inferred_has_evidence(self) -> "Skill":
+        if self.inferred and (self.category is None or not self.evidence_fact_ids):
+            raise ValueError("an inferred skill requires category and evidence_fact_ids")
+        return self
 
 
 class Experience(FactItem):
