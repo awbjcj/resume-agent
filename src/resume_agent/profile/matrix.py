@@ -321,6 +321,13 @@ def build_matrix(
                     row.evidence_fact_ids.append(owner.id)
                 strength_ids[row.key].add(owner.id)
 
+        for owner in owners:
+            bullet_ids = {
+                bullet.id for bullet in getattr(owner, "bullets", [])
+            }
+            if owner.id in strength_ids[row.key] and strength_ids[row.key] & bullet_ids:
+                strength_ids[row.key].discard(owner.id)
+
         for fact_id in strength_ids[row.key]:
             owner = owner_by_fact_id.get(fact_id)
             if owner is not None:
