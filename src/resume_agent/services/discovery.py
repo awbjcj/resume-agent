@@ -23,16 +23,22 @@ from resume_agent.discovery.pipeline import discover, reprocess
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
 from resume_agent.discovery.url_ingest.service import job_from_url
+from resume_agent.models.profile import ProfileFacts
+from resume_agent.profile.matrix import (
+    SkillMatrix,
+    effective_cluster_map,
+    load_matrix,
+    load_overrides,
+)
 from resume_agent.profile.store import load_facts
-from resume_agent.profile.matrix import effective_cluster_map, load_matrix, load_overrides
 from resume_agent.progress import ProgressReporter
 from resume_agent.services.agents import (
     DiscoveryBundle,
     build_discovery_bundle,
     build_url_extract_agent,
 )
+from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
 from resume_agent.tracking.tables import Job
-from resume_agent.taxonomy.clusters import load_cluster_map
 
 DEFAULT_SEARCH = "config/search.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
@@ -48,7 +54,9 @@ class RefreshReport:
     failures: dict[str, dict[str, str]]
 
 
-def _skill_artifacts(facts_path: str, facts):
+def _skill_artifacts(
+    facts_path: str, facts: ProfileFacts
+) -> tuple[SkillMatrix | None, ClusterMap]:
     profile_dir = Path(facts_path).parent
     overrides = load_overrides(profile_dir / "overrides.yaml")
     cluster_map = effective_cluster_map(
