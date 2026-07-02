@@ -2426,12 +2426,15 @@ git commit -m "feat: profile tokens join cluster canonical space and prune keep-
 **Files:**
 - Modify: `src/resume_agent/tracking/match_gap.py` (`SkillNode`, `build_demand_graph`, `GapRow`, `match_gap`)
 - Modify: `src/resume_agent/api/schemas/match_gap.py` (`SkillNodeOut`)
+- Modify: `src/resume_agent/api/routers/match_gap.py` (load overrides and pass the effective map)
+- Modify: `src/resume_agent/cli.py` (`match-gap` uses the effective persisted map by default)
 - Modify: the mapper that builds `SkillNodeOut` (find with `rg -n "SkillNodeOut|covered=" src/resume_agent/api`)
+- Modify: `web/src/features/match-gap/{aggregate.ts,RankedList.tsx,SkillMap.tsx,SkillModal.tsx,MatchGapContainer.tsx}` and their tests (render/filter adjacent separately)
 - Test: `tests/test_tracking_match_gap.py`, `tests/api/test_schemas_match_gap.py` (append)
-- Regenerate: `contracts/openapi.json` + `contracts/ts/api.ts`
+- Regenerate: `contracts/openapi.json` + `contracts/ts/api.ts` + `web/src/lib/api/schema.ts`
 
 **Interfaces:**
-- Produces: `SkillNode.coverage: str` (`"covered" | "adjacent" | "gap"`) with `covered: bool` kept in sync (True only for `"covered"`); `SkillNodeOut.coverage: Literal["covered","adjacent","gap"]` added alongside the existing `covered` bool; `GapRow.adjacent: bool = False`; `match_gap(..., cluster_map: ClusterMap | None = None)`.
+- Produces: `SkillNode.coverage: Literal["covered","adjacent","gap"]` with `covered: bool` kept in sync (True only for `"covered"`); `SkillNodeOut.coverage: Literal["covered","adjacent","gap"]` added alongside the existing `covered` bool; `GapRow.adjacent: bool = False`; `ThemeNode.adjacent_count: int`; `match_gap(..., cluster_map: ClusterMap | None = None)`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2485,7 +2488,8 @@ Expected: FAIL — no `coverage` attribute / unexpected `cluster_map` kwarg.
 
 - [ ] **Step 3: Implement in `tracking/match_gap.py`**
 
-`SkillNode` gains a field (after `covered`): `coverage: str = "gap"`.
+`SkillNode` gains a field (after `covered`):
+`coverage: Literal["covered", "adjacent", "gap"] = "gap"`.
 
 In `build_demand_graph`, after `profile_canonical` is computed, add:
 
@@ -2508,7 +2512,10 @@ and where the `SkillNode` is constructed, compute:
 
 then pass `covered=coverage == "covered", coverage=coverage`.
 
-`GapRow` gains `adjacent: bool = False`. `match_gap` gains keyword `cluster_map: "ClusterMap | None" = None`; when provided, its `aliases` are preferred over the `canonicalizer` result for canonicalization (`canonical = {t: cluster_map.aliases.get(t, t) for t in all_tokens}` when `cluster_map` is not None and `canonicalizer` is None), and after computing `demand`, mark:
+Set theme `gap_count=sum(node.coverage == "gap" for node in theme_nodes)` and
+`adjacent_count=sum(node.coverage == "adjacent" for node in theme_nodes)`.
+
+`GapRow` gains `adjacent: bool = False`. `match_gap` gains keyword `cluster_map: "ClusterMap | None" = None`; when provided, it always takes precedence over the legacy `canonicalizer` (`canonical = {t: cluster_map.aliases.get(t, t) for t in all_tokens}`); use the callable only when the map is absent. After computing `demand`, mark:
 
 ```python
     covered_themes = (
@@ -2516,7 +2523,7 @@ then pass `covered=coverage == "covered", coverage=coverage`.
         if cluster_map
         else set()
     )
-    ...
+    # Existing per-job demand accumulation remains here.
     gaps = [
         GapRow(
             skill=display_for[token],
@@ -2536,6 +2543,12 @@ In `src/resume_agent/api/schemas/match_gap.py` add to `SkillNodeOut` (keep `cove
     coverage: Literal["covered", "adjacent", "gap"] = "gap"
 ```
 
+Update the API graph and CLI report callers to load `overrides.yaml`, construct the
+effective map, and pass it. The CLI's `--llm` canonicalizer is fallback behavior only
+when no usable persisted map exists; it must not bypass explicit alias/forbid overrides.
+
+Add `adjacent_count: int = 0` to `ThemeOut` and regenerate the contract.
+
 (with `from typing import Literal`). The mapper building `SkillNodeOut` from `SkillNode` uses `model_validate`/field projection — confirm the new field flows (it will if the mapper is `SkillNodeOut.model_validate(node)`; otherwise add `coverage=node.coverage`).
 
 Append to `tests/api/test_schemas_match_gap.py`:
@@ -2552,7 +2565,12 @@ def test_skill_node_out_serializes_coverage():
 Regenerate contracts:
 
 Run: `bash scripts/gen_ts_client.sh`
-Expected: `contracts/openapi.json` and `contracts/ts/api.ts` updated; `tests/api/test_openapi_contract.py` passes.
+Expected: `contracts/openapi.json`, `contracts/ts/api.ts`, and the SPA copy
+`web/src/lib/api/schema.ts` updated; `tests/api/test_openapi_contract.py` passes.
+
+Update the React aggregation, gap-only filter, badges, map legend/style, and counts to
+use `coverage`. Keep `covered` only as a compatibility field; adjacent must display as
+"Adjacent" and must not increment the true-gap count.
 
 - [ ] **Step 5: Run the suite and commit**
 
@@ -2560,24 +2578,22 @@ Run: `.venv/Scripts/python.exe -m pytest && ruff check`
 Expected: PASS.
 
 ```bash
-git add src/resume_agent/tracking/match_gap.py src/resume_agent/api/schemas/match_gap.py contracts/ tests/
+git add src/resume_agent/tracking/match_gap.py src/resume_agent/api/schemas/match_gap.py src/resume_agent/api/routers/match_gap.py src/resume_agent/cli.py contracts/ web/src/lib/api/schema.ts web/src/features/match-gap tests/
 git commit -m "feat: tri-state skill coverage (covered/adjacent/gap)"
 ```
 
-(The React dashboard keeps rendering from the `covered` bool — visual adjacent treatment is deliberately out of scope per spec §11.)
-
 ---
 
-### Task 11: Match-plan consumes the matrix
+### Task 11: Match-plan consumes deterministic per-job skill context
 
 **Files:**
 - Modify: `src/resume_agent/tailor/match_plan.py` (`compose_match_plan_input`, `_MATCH_PLAN_INSTRUCTIONS`)
-- Modify: `src/resume_agent/tailor/workflow.py` (`run_tailor_review`, `arun_tailor_review` — thread `matrix`)
-- Modify: `src/resume_agent/tailor/service.py` (the two `arun_tailor_review(` call sites at ~lines 60 and 109 — load and pass the matrix)
+- Modify: `src/resume_agent/tailor/workflow.py` (`run_tailor_review`, `arun_tailor_review` — thread `skill_context`)
+- Modify: `src/resume_agent/tailor/service.py` (load the bound artifacts once; build/pass per-job context)
 - Test: `tests/test_tailor_match_plan.py` or wherever `compose_match_plan_input` is currently tested (`rg -l "compose_match_plan_input" tests/`)
 
 **Interfaces:**
-- Produces: `compose_match_plan_input(jd_text, criteria, profile_facts, matrix: SkillMatrix | None = None) -> str` — appends a `SKILL MATRIX (JSON)` section when `matrix` is non-None and has rows; `run_tailor_review`/`arun_tailor_review` gain keyword `matrix: SkillMatrix | None = None`.
+- Produces: `compose_match_plan_input(jd_text, criteria, profile_facts, skill_context: SkillMatchContext | None = None) -> str` — appends a `SKILL MATCH CONTEXT (JSON)` section when present; `run_tailor_review`/`arun_tailor_review` gain keyword `skill_context: SkillMatchContext | None = None`.
 
 - [ ] **Step 1: Write the failing tests**
 
