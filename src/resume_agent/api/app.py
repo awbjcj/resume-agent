@@ -15,6 +15,7 @@ from resume_agent.api.deps import get_settings_dep, require_token
 from resume_agent.api.errors import ApiException, install_error_handlers
 from resume_agent.api.routers import analytics as analytics_router
 from resume_agent.api.routers import boards, health
+from resume_agent.api.routers import config as config_router
 from resume_agent.api.routers import cover_letters as cover_letters_router
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
@@ -28,6 +29,7 @@ from resume_agent.api.runs.manager import RunManager
 from resume_agent.config import get_settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.progress import RUNS_ROOT
+from resume_agent.services.config_store import YamlConfigStore
 
 
 def spa_dist_dir() -> Path:
@@ -44,6 +46,7 @@ def create_app(
     api_token: str | None = None,
     run_executor: Executor | None = None,
     runs_root: Path | str | None = None,
+    config_dir: Path | str | None = None,
 ) -> FastAPI:
     settings = get_settings()
     resolved_db = db_url or settings.db_url
@@ -65,6 +68,7 @@ def create_app(
     app = FastAPI(title="Resume Agent API", version="0.1.0", lifespan=lifespan)
     app.state.settings = resolved_settings
     app.state.db_url = resolved_db
+    app.state.config_store = YamlConfigStore(config_dir=config_dir or "config")
     manager_root = runs_root if runs_root is not None else RUNS_ROOT
     # The in-memory test adapter uses one StaticPool connection shared by every
     # thread, so concurrent sessions cannot safely transact on it. File-backed
@@ -110,6 +114,7 @@ def create_app(
     app.include_router(match_gap_router.router, prefix="/api", dependencies=guarded)
     app.include_router(suggestions_router.router, prefix="/api", dependencies=guarded)
     app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(config_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so
     # they take precedence; the catch-all is excluded from the OpenAPI schema so
