@@ -5,6 +5,7 @@ import {
   Inbox,
   Kanban,
   Radar,
+  Settings,
   Sparkles,
   Target,
   type LucideIcon,
@@ -83,6 +84,23 @@ export function AppLayout() {
                     />
                   </SidebarMenuItem>
                 ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup className="px-3">
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className="h-10 rounded-lg px-3 text-[0.95rem]"
+                    render={
+                      <NavLink to="/settings">
+                        <Settings className="size-4" aria-hidden="true" />
+                        <span>Settings</span>
+                      </NavLink>
+                    }
+                  />
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { AppLayout } from "./AppLayout";
 import { BoardSkeleton } from "@/components/skeletons";
@@ -24,6 +24,9 @@ const MatchGapPage = lazy(() =>
 const SourcesPage = lazy(() =>
   import("@/features/sources/SourcesPage").then((m) => ({ default: m.SourcesPage })),
 );
+const SettingsLayout = lazy(() =>
+  import("@/features/settings/SettingsLayout").then((m) => ({ default: m.SettingsLayout })),
+);
 
 const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}</Suspense>;
 
@@ -38,6 +41,11 @@ export const router = createBrowserRouter([
       { path: "analytics", element: page(<AnalyticsPage />) },
       { path: "match-gap", element: page(<MatchGapPage />) },
       { path: "sources", element: page(<SourcesPage />) },
+      {
+        path: "settings",
+        element: page(<SettingsLayout />),
+        children: [{ index: true, element: <Navigate to="/settings/profile" replace /> }],
+      },
     ],
   },
 ]);
