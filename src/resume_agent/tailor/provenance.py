@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts
+from resume_agent.models.profile import ProfileFacts, Skill
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
 
@@ -15,6 +15,7 @@ class ProvenanceReport(ExtensibleModel):
 
     ok: bool
     missing: list[str] = Field(default_factory=list)
+    invalid: list[str] = Field(default_factory=list)
 
 
 def index_facts(facts: ProfileFacts) -> dict[str, Any]:
@@ -41,31 +42,72 @@ def index_facts(facts: ProfileFacts) -> dict[str, Any]:
     return index
 
 
+ProvenanceUse = Literal["skill", "bullet", "entity"]
+
+
+def _referenced_uses(content: ResumeContent) -> list[tuple[str, ProvenanceUse]]:
+    uses: list[tuple[str, ProvenanceUse]] = []
+    for exp in content.experience:
+        uses.append((exp.provenance, "entity"))
+        uses.extend((bullet.provenance, "bullet") for bullet in exp.bullets)
+    for proj in content.projects:
+        uses.append((proj.provenance, "entity"))
+        uses.extend((bullet.provenance, "bullet") for bullet in proj.bullets)
+    for skills in content.skills.values():
+        uses.extend((skill.provenance, "skill") for skill in skills)
+    uses.extend((publication.provenance, "entity") for publication in content.publications)
+    uses.extend(
+        (certification.provenance, "entity")
+        for certification in content.certifications
+    )
+    uses.extend((award.provenance, "entity") for award in content.awards)
+    for vol in content.volunteer:
+        uses.append((vol.provenance, "entity"))
+        uses.extend((bullet.provenance, "bullet") for bullet in vol.bullets)
+    return uses
+
+
 def referenced_ids(content: ResumeContent) -> set[str]:
     """Every provenance id the resume claims to draw from."""
-    ids: set[str] = set()
-    for exp in content.experience:
-        ids.add(exp.provenance)
-        ids.update(b.provenance for b in exp.bullets)
-    for proj in content.projects:
-        ids.add(proj.provenance)
-        ids.update(b.provenance for b in proj.bullets)
-    for skills in content.skills.values():
-        ids.update(s.provenance for s in skills)
-    ids.update(p.provenance for p in content.publications)
-    ids.update(c.provenance for c in content.certifications)
-    ids.update(a.provenance for a in content.awards)
-    for vol in content.volunteer:
-        ids.add(vol.provenance)
-        ids.update(b.provenance for b in vol.bullets)
-    return ids
+    return {fact_id for fact_id, _usage in _referenced_uses(content)}
 
 
 def check_provenance(content: ResumeContent, facts: ProfileFacts) -> ProvenanceReport:
-    """Fail fast in plain code: every referenced id must resolve to a real fact."""
-    valid = set(index_facts(facts))
-    missing = sorted(i for i in referenced_ids(content) if i not in valid)
-    return ProvenanceReport(ok=not missing, missing=missing)
+    """Validate existence and the restricted use of inferred skill pointers."""
+    index = index_facts(facts)
+    missing = sorted(fact_id for fact_id in referenced_ids(content) if fact_id not in index)
+    invalid: set[str] = set()
+    for fact_id, usage in _referenced_uses(content):
+        fact = index.get(fact_id)
+        if fact is None or not getattr(fact, "inferred", False):
+            continue
+        if usage != "skill":
+            invalid.add(
+                f"{fact_id}: inferred provenance is only valid for a skills-section entry"
+            )
+            continue
+        if getattr(fact, "category", None) != "hard":
+            invalid.add(f"{fact_id}: inferred soft/domain skills cannot be rendered")
+        evidence_ids = getattr(fact, "evidence_fact_ids", []) or []
+        if not evidence_ids:
+            invalid.add(f"{fact_id}: inferred skill has no evidence_fact_ids")
+            continue
+        for evidence_id in evidence_ids:
+            evidence = index.get(evidence_id)
+            if evidence is None:
+                invalid.add(
+                    f"{fact_id}: inferred skill evidence not found: {evidence_id}"
+                )
+            elif getattr(evidence, "inferred", False):
+                invalid.add(
+                    f"{fact_id}: inferred skill evidence must be literal: {evidence_id}"
+                )
+    ordered_invalid = sorted(invalid)
+    return ProvenanceReport(
+        ok=not missing and not ordered_invalid,
+        missing=missing,
+        invalid=ordered_invalid,
+    )
 
 
 def provenance_critique(content: ResumeContent, facts: ProfileFacts) -> ReviewCritique:
@@ -85,15 +127,31 @@ def provenance_critique(content: ResumeContent, facts: ProfileFacts) -> ReviewCr
                 message=f"provenance id not found in profile facts: {missing_id}",
             )
             for missing_id in report.missing
+        ]
+        + [
+            ReviewIssue(
+                severity=Severity.blocking,
+                message=f"invalid provenance: {invalid}",
+            )
+            for invalid in report.invalid
         ],
     )
 
 
 def resolve_evidence(content: ResumeContent, facts: ProfileFacts) -> dict[str, Any]:
-    """Return only the profile facts cited by the resume's provenance ids."""
+    """Return cited facts plus literal evidence backing cited inferred skills."""
     index = index_facts(facts)
+    expanded = set(referenced_ids(content))
+    for fact_id in tuple(expanded):
+        fact = index.get(fact_id)
+        if isinstance(fact, Skill):
+            expanded.update(
+                evidence_id
+                for evidence_id in fact.evidence_fact_ids
+                if evidence_id in index
+            )
     return {
         fact_id: index[fact_id].model_dump(mode="json")
-        for fact_id in sorted(referenced_ids(content))
+        for fact_id in sorted(expanded)
         if fact_id in index
     }

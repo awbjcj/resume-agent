@@ -101,3 +101,93 @@ def test_resolve_evidence_returns_only_referenced_facts():
     assert set(evidence) == {"e1", "b1", "p1", "s1"}
     assert evidence["b1"]["text"] == "Built X"
     assert "s2" not in evidence
+
+
+def _facts_with_inferred_skill(
+    *, category="hard", evidence_fact_ids=None
+) -> tuple[ProfileFacts, Skill]:
+    bullet = Bullet(id="proof", text="Deployed services on Kubernetes")
+    skill = Skill(
+        id="inferred",
+        name="Kubernetes",
+        inferred=True,
+        category=category,
+        evidence_fact_ids=[bullet.id] if evidence_fact_ids is None else evidence_fact_ids,
+    )
+    return (
+        ProfileFacts(
+            contact=Contact(name="Ada"),
+            experience=[
+                Experience(
+                    id="e1", company="Acme", title="Engineer", bullets=[bullet]
+                )
+            ],
+            projects=[Project(id="p1", name="Looms")],
+            skills={category: [skill]},
+        ),
+        skill,
+    )
+
+
+def test_resolve_evidence_expands_inferred_skill_evidence():
+    facts, skill = _facts_with_inferred_skill()
+    content = _content(bullet_prov="proof", skill_prov=skill.id)
+    evidence = resolve_evidence(content, facts)
+    assert skill.id in evidence
+    assert "proof" in evidence
+
+
+def test_valid_inferred_hard_skill_is_allowed_only_in_skills_section():
+    facts, skill = _facts_with_inferred_skill()
+    assert provenance_critique(
+        _content(bullet_prov="proof", skill_prov=skill.id), facts
+    ).passed is True
+    assert (
+        provenance_critique(_content(bullet_prov=skill.id, skill_prov=skill.id), facts).passed
+        is False
+    )
+
+
+def test_inferred_soft_or_domain_skill_is_rejected_from_skills_section():
+    for category in ("soft", "domain"):
+        facts, skill = _facts_with_inferred_skill(category=category)
+        assert provenance_critique(
+            _content(bullet_prov="proof", skill_prov=skill.id), facts
+        ).passed is False
+
+
+def test_inferred_skill_with_empty_or_missing_evidence_is_rejected():
+    facts, _ = _facts_with_inferred_skill()
+    empty = Skill.model_construct(
+        id="empty",
+        name="Kubernetes",
+        inferred=True,
+        category="hard",
+        evidence_fact_ids=[],
+    )
+    facts.skills = {"hard": [empty]}
+    assert provenance_critique(
+        _content(bullet_prov="proof", skill_prov=empty.id), facts
+    ).passed is False
+
+    missing_facts, missing = _facts_with_inferred_skill(
+        evidence_fact_ids=["does-not-exist"]
+    )
+    assert provenance_critique(
+        _content(bullet_prov="proof", skill_prov=missing.id), missing_facts
+    ).passed is False
+
+
+def test_inferred_to_inferred_evidence_is_rejected():
+    facts, backing = _facts_with_inferred_skill()
+    derived = Skill(
+        id="derived",
+        name="Cloud Native",
+        inferred=True,
+        category="hard",
+        evidence_fact_ids=[backing.id],
+    )
+    facts.skills["hard"].append(derived)
+    assert provenance_critique(
+        _content(bullet_prov="proof", skill_prov=derived.id), facts
+    ).passed is False

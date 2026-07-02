@@ -86,6 +86,9 @@ REVIEWER_INSTRUCTIONS: dict[str, list[str]] = {
         "and suggest deletion or a faithful evidence-backed correction.",
         "Set passed=false and score below 100 when any blocking issue exists. Set passed=true and "
         "score=100 only when every claim is supported.",
+        "A skills-section entry may cite an inferred skill (inferred=true). It passes when its "
+        "evidence_fact_ids facts in SUPPORTING FACTS genuinely demonstrate the skill. Inferred "
+        "skills justify only hard-skill list entries, never bullet or summary claims.",
     ],
     "ats-keyword": [
         "Assess whether the resume visibly covers the job's important role terms, must-have skills, "
