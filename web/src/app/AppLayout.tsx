@@ -4,7 +4,6 @@ import {
   Briefcase,
   Inbox,
   Kanban,
-  Radar,
   Settings,
   Sparkles,
   Target,
@@ -38,7 +37,6 @@ const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
   { to: "/triage", label: "Triage", icon: Inbox },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/match-gap", label: "Match-gap", icon: Target },
-  { to: "/sources", label: "Sources", icon: Radar },
 ];
 
 export function AppLayout() {

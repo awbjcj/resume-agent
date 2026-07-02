@@ -166,7 +166,7 @@ function SourceSection({
   );
 }
 
-export function SourcesPage() {
+export function SourcesManager() {
   const { data = [], isLoading } = useSources();
   const { launch } = useLaunchRun();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -191,12 +191,6 @@ export function SourcesPage() {
 
   return (
     <div>
-      <PageHeader
-        kicker="Sources"
-        title="Recurring job sources"
-        sub="Manage the boards, careers pages, and feeds that supply the pull pipeline."
-      />
-
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <AddSourceDialog />
         <Button
@@ -248,6 +242,19 @@ export function SourcesPage() {
           <LatestPullResult sources={data} />
         </div>
       )}
+    </div>
+  );
+}
+
+export function SourcesPage() {
+  return (
+    <div>
+      <PageHeader
+        kicker="Sources"
+        title="Recurring job sources"
+        sub="Manage the boards, careers pages, and feeds that supply the pull pipeline."
+      />
+      <SourcesManager />
     </div>
   );
 }
