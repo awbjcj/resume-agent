@@ -1,6 +1,26 @@
 from resume_agent.models.base import Source
-from resume_agent.models.profile import Contact, GitHubProfile, ProfileFacts, Project
-from resume_agent.profile.merge import merge_facts
+from resume_agent.models.profile import (
+    Award,
+    Bullet,
+    Certification,
+    Contact,
+    Education,
+    Experience,
+    GitHubProfile,
+    Language,
+    ProfileFacts,
+    Project,
+    Publication,
+    Skill,
+    Volunteer,
+)
+from resume_agent.profile.corpus import SourceDoc
+from resume_agent.profile.merge import (
+    BulletDupGroups,
+    MergeReport,
+    merge_facts,
+    merge_fragments,
+)
 
 
 def test_merge_appends_github_projects_and_sets_profile():
@@ -54,3 +74,229 @@ def test_merge_keeps_distinct_github_project():
     gh = [Project(name="totally-different", source=Source.github)]
     merged = merge_facts(resume_facts, github_projects=gh)
     assert [p.name for p in merged.projects] == ["from-resume", "totally-different"]
+
+
+def _doc(doc_id, primary=False):
+    return SourceDoc(
+        id=doc_id,
+        filename=f"{doc_id}.txt",
+        sha256="0" * 64,
+        added_at="2026-07-01T00:00:00+00:00",
+        primary=primary,
+    )
+
+
+def _exp(company="Acme", title="Engineer", start=None, end=None, current=False, bullets=(), tech=()):
+    return Experience(
+        company=company,
+        title=title,
+        start=start,
+        end=end,
+        current=current,
+        bullets=[Bullet(text=text) for text in bullets],
+        tech=list(tech),
+    )
+
+
+class _FakeResult:
+    def __init__(self, content):
+        self.content = content
+
+
+class _FakeDedupAgent:
+    def __init__(self, groups):
+        self._groups = groups
+
+    def run(self, prompt):
+        return _FakeResult(BulletDupGroups(groups=self._groups))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+def test_same_experience_across_docs_unions_bullets_and_tech():
+    primary = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[_exp(start="2020", bullets=["Shipped v1"], tech=["Python"])],
+    )
+    deck = ProfileFacts(
+        contact=Contact(name=""),
+        experience=[_exp(start="2021", bullets=["Led migration"], tech=["Go"])],
+    )
+    merged, report = merge_fragments(
+        [(_doc("resume", primary=True), primary), (_doc("deck"), deck)]
+    )
+    assert len(merged.experience) == 1
+    assert sorted(item.text for item in merged.experience[0].bullets) == [
+        "Led migration",
+        "Shipped v1",
+    ]
+    assert sorted(merged.experience[0].tech) == ["Go", "Python"]
+    assert merged.experience[0].start == "2020"
+    assert any("start" in conflict for conflict in report.conflicts)
+
+
+def test_known_disjoint_experience_ranges_do_not_merge():
+    primary = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[_exp(start="2018", end="2019")],
+    )
+    later = ProfileFacts(
+        contact=Contact(name=""),
+        experience=[_exp(start="2022", end="2023")],
+    )
+    merged, _ = merge_fragments(
+        [(_doc("resume", primary=True), primary), (_doc("later"), later)]
+    )
+    assert len(merged.experience) == 2
+
+
+def test_contact_fill_and_current_conflict_follow_primary_wins():
+    primary = ProfileFacts(
+        contact=Contact(name="Ada", email=None, location="Boston"),
+        experience=[_exp(start="2020", end="2024", current=False)],
+    )
+    secondary = ProfileFacts(
+        contact=Contact(name="Ada L.", email="ada@example.com", location="NYC"),
+        experience=[_exp(start="2020", current=True)],
+    )
+    merged, report = merge_fragments(
+        [(_doc("resume", primary=True), primary), (_doc("deck"), secondary)]
+    )
+    assert merged.contact.name == "Ada"
+    assert merged.contact.email == "ada@example.com"
+    assert merged.contact.location == "Boston"
+    assert merged.experience[0].current is False
+    assert any("contact: name" in conflict for conflict in report.conflicts)
+    assert any("current" in conflict for conflict in report.conflicts)
+
+
+def test_duplicate_projects_merge_all_fields_and_report_conflicts():
+    primary = ProfileFacts(
+        contact=Contact(name="Ada"),
+        projects=[Project(name="Compiler", description="Primary", tech=["Python"])],
+    )
+    secondary = ProfileFacts(
+        contact=Contact(name=""),
+        projects=[
+            Project(
+                name="compiler",
+                description="Secondary",
+                role="Lead",
+                start="2024",
+                tech=["Rust"],
+                highlights=["Published"],
+            )
+        ],
+    )
+    merged, report = merge_fragments(
+        [(_doc("resume", primary=True), primary), (_doc("deck"), secondary)]
+    )
+    project = merged.projects[0]
+    assert project.description == "Primary"
+    assert project.role == "Lead"
+    assert project.start == "2024"
+    assert project.tech == ["Python", "Rust"]
+    assert project.highlights == ["Published"]
+    assert any("project Compiler: description" in conflict for conflict in report.conflicts)
+
+
+def test_duplicate_other_entities_merge_scalars_and_collections():
+    primary = ProfileFacts(
+        contact=Contact(name="Ada"),
+        education=[Education(institution="MIT", degree="BS", honors=["A"])],
+        certifications=[Certification(name="AWS")],
+        publications=[Publication(title="Paper", authors=["Ada"])],
+        awards=[Award(name="Prize")],
+        languages=[Language(language="English")],
+        volunteer=[Volunteer(organization="Code Club", role="Mentor")],
+    )
+    secondary = ProfileFacts(
+        contact=Contact(name=""),
+        education=[
+            Education(
+                institution="mit",
+                degree="BS",
+                field="CS",
+                honors=["B"],
+                activities=["Robotics"],
+            )
+        ],
+        certifications=[Certification(name="aws", issuer="Amazon")],
+        publications=[Publication(title="paper", venue="Journal", authors=["Grace"])],
+        awards=[Award(name="prize", issuer="ACM")],
+        languages=[Language(language="english", proficiency="Native")],
+        volunteer=[
+            Volunteer(
+                organization="code club", role="Mentor", description="Taught Python"
+            )
+        ],
+    )
+    merged, _ = merge_fragments(
+        [(_doc("resume", primary=True), primary), (_doc("deck"), secondary)]
+    )
+    assert merged.education[0].field == "CS"
+    assert merged.education[0].honors == ["A", "B"]
+    assert merged.education[0].activities == ["Robotics"]
+    assert merged.certifications[0].issuer == "Amazon"
+    assert merged.publications[0].authors == ["Ada", "Grace"]
+    assert merged.awards[0].issuer == "ACM"
+    assert merged.languages[0].proficiency == "Native"
+    assert merged.volunteer[0].description == "Taught Python"
+
+
+def test_skills_union_by_normalized_name():
+    primary = ProfileFacts(
+        contact=Contact(name="Ada"), skills={"Languages": [Skill(name="Python")]}
+    )
+    secondary = ProfileFacts(
+        contact=Contact(name=""),
+        skills={"Languages": [Skill(name="python"), Skill(name="Go")]},
+    )
+    merged, _ = merge_fragments(
+        [(_doc("resume", primary=True), primary), (_doc("deck"), secondary)]
+    )
+    assert [skill.name for skill in merged.skills["Languages"]] == ["Python", "Go"]
+
+
+def test_dedup_agent_drops_shorter_near_duplicate():
+    primary = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[
+            _exp(bullets=["Shipped v1 of the payments platform", "Shipped v1"])
+        ],
+    )
+    merged, report = merge_fragments(
+        [(_doc("resume", primary=True), primary)],
+        dedup_agent=_FakeDedupAgent([[0, 1]]),
+    )
+    assert [item.text for item in merged.experience[0].bullets] == [
+        "Shipped v1 of the payments platform"
+    ]
+    assert report.dropped_bullets == ["Shipped v1"]
+
+
+def test_dedup_agent_failure_keeps_all_bullets():
+    class _Boom:
+        def run(self, prompt):
+            raise RuntimeError("boom")
+
+        async def arun(self, prompt):
+            raise RuntimeError("boom")
+
+    primary = ProfileFacts(
+        contact=Contact(name="Ada"), experience=[_exp(bullets=["A", "B"])]
+    )
+    merged, report = merge_fragments(
+        [(_doc("resume", primary=True), primary)], dedup_agent=_Boom()
+    )
+    assert len(merged.experience[0].bullets) == 2
+    assert isinstance(report, MergeReport)
+
+
+def test_merge_fragments_requires_exactly_one_primary_first():
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    import pytest
+
+    with pytest.raises(ValueError, match="primary"):
+        merge_fragments([(_doc("secondary"), facts)])
