@@ -7,6 +7,9 @@ import { SetupGate } from "@/features/setup/SetupGate";
 
 // Route-level code-splitting: each page (and its heavy deps, e.g. recharts in
 // Analytics) becomes its own chunk, keeping the initial bundle small.
+const DashboardPage = lazy(() =>
+  import("@/features/dashboard/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
 const ShortlistPage = lazy(() =>
   import("@/features/shortlist/ShortlistPage").then((m) => ({ default: m.ShortlistPage })),
 );
@@ -92,7 +95,8 @@ export const router = createBrowserRouter([
     path: "/",
     element: <SetupGate><AppLayout /></SetupGate>,
     children: [
-      { index: true, element: page(<ShortlistPage />) },
+      { index: true, element: page(<DashboardPage />) },
+      { path: "shortlist", element: page(<ShortlistPage />) },
       { path: "pipeline", element: page(<PipelinePage />) },
       { path: "triage", element: page(<TriagePage />) },
       { path: "analytics", element: page(<AnalyticsPage />) },

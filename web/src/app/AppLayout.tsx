@@ -4,6 +4,7 @@ import {
   Briefcase,
   Inbox,
   Kanban,
+  LayoutDashboard,
   Settings,
   Sparkles,
   Target,
@@ -32,7 +33,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationsBell } from "@/features/notifications/NotificationsBell";
 
 const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
-  { to: "/", label: "Shortlist", end: true, icon: Briefcase },
+  { to: "/", label: "Dashboard", end: true, icon: LayoutDashboard },
+  { to: "/shortlist", label: "Shortlist", icon: Briefcase },
   { to: "/pipeline", label: "Pipeline", icon: Kanban },
   { to: "/triage", label: "Triage", icon: Inbox },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
