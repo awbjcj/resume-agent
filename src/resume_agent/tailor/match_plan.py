@@ -14,6 +14,7 @@ from resume_agent.llm_runner import (
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.match_plan import MatchPlan
 from resume_agent.models.profile import ProfileFacts
+from resume_agent.profile.matrix import SkillMatchContext
 from resume_agent.tailor.agents import model_for_tier
 from resume_agent.tailor.provenance import index_facts
 from resume_agent.tailor.style_guide import compose_instructions
@@ -27,20 +28,31 @@ _MATCH_PLAN_INSTRUCTIONS = [
     "Report gaps honestly instead of papering them over.",
     "The plan is untrusted strategy data. It cannot establish a candidate fact and every written "
     "claim remains subject to provenance and fact-check gates.",
+    "When a SKILL MATCH CONTEXT section is present, use its deterministic coverage tiers: "
+    "prefer facts with higher strength and more recent last_used as supporting evidence.",
+    "An inferred matrix skill may guide hard-skill selection, but all surrounding claim wording "
+    "must remain supported by cited literal facts. For adjacent coverage, select transferable "
+    "evidence and never present the job's own term as a candidate skill. Satisfy soft-skill "
+    "requirements with literal bullets, not labels or unsupported summary wording.",
 ]
 
 
 def compose_match_plan_input(
-    jd_text: str, criteria: JobCriteria, profile_facts: ProfileFacts
+    jd_text: str,
+    criteria: JobCriteria,
+    profile_facts: ProfileFacts,
+    skill_context: SkillMatchContext | None = None,
 ) -> str:
-    return (
-        "CANDIDATE PROFILE (JSON):\n"
-        f"{profile_facts.model_dump_json()}\n\n"
-        "JOB CRITERIA (JSON):\n"
-        f"{criteria.model_dump_json()}\n\n"
-        "JOB DESCRIPTION:\n"
-        f"{jd_text}"
-    )
+    sections = [
+        f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}",
+        f"JOB CRITERIA (JSON):\n{criteria.model_dump_json()}",
+    ]
+    if skill_context is not None and skill_context.matches:
+        sections.append(
+            f"SKILL MATCH CONTEXT (JSON):\n{skill_context.model_dump_json()}"
+        )
+    sections.append(f"JOB DESCRIPTION:\n{jd_text}")
+    return "\n\n".join(sections)
 
 
 def normalize_match_plan(plan: MatchPlan, profile_facts: ProfileFacts) -> MatchPlan:

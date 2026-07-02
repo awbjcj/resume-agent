@@ -6,6 +6,7 @@ from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
+from resume_agent.profile.matrix import SkillMatchContext
 from resume_agent.tailor.panel import arun_panel, run_panel
 from resume_agent.tailor.match_plan import (
     amatch_plan,
@@ -55,6 +56,7 @@ def run_tailor_review(
     reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
     match_plan_agent: Runner | None = None,
+    skill_context: SkillMatchContext | None = None,
 ) -> list[TailorRound]:
     """Draft, then gate/review/revise until the round passes or max_rounds is hit."""
     plan = None
@@ -63,7 +65,9 @@ def run_tailor_review(
             raise ValueError("match_plan_enabled requires a match-plan agent")
         plan = normalize_match_plan(
             match_plan(
-                compose_match_plan_input(jd_text, criteria, profile_facts),
+                compose_match_plan_input(
+                    jd_text, criteria, profile_facts, skill_context=skill_context
+                ),
                 match_plan_agent,
             ),
             profile_facts,
@@ -107,6 +111,7 @@ async def arun_tailor_review(
     reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
     match_plan_agent: Runner | None = None,
+    skill_context: SkillMatchContext | None = None,
     *,
     sem: asyncio.Semaphore,
 ) -> list[TailorRound]:
@@ -117,7 +122,9 @@ async def arun_tailor_review(
             raise ValueError("match_plan_enabled requires a match-plan agent")
         plan = normalize_match_plan(
             await amatch_plan(
-                compose_match_plan_input(jd_text, criteria, profile_facts),
+                compose_match_plan_input(
+                    jd_text, criteria, profile_facts, skill_context=skill_context
+                ),
                 match_plan_agent,
                 sem=sem,
             ),

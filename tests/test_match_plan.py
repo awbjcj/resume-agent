@@ -3,6 +3,7 @@ import asyncio
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
 from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
 from resume_agent.tailor.match_plan import (
     amatch_plan,
     build_match_plan_agent,
@@ -55,6 +56,30 @@ def test_compose_match_plan_input_has_jd_criteria_and_profile():
     )
     assert "Backend role" in text and "Python" in text
     assert "CANDIDATE PROFILE" in text
+    assert "SKILL MATCH CONTEXT" not in text
+
+
+def test_compose_match_plan_input_appends_deterministic_skill_context():
+    context = SkillMatchContext(
+        matches=[
+            SkillMatch(
+                requirement="Python",
+                source="must",
+                coverage="covered",
+                row=MatrixRow(key="python", display="Python", strength=3.0),
+            )
+        ]
+    )
+    text = compose_match_plan_input(
+        "JD",
+        JobCriteria(),
+        ProfileFacts(contact=Contact(name="Ada")),
+        skill_context=context,
+    )
+    assert "SKILL MATCH CONTEXT (JSON):" in text
+    assert '"coverage":"covered"' in text
+    assert '"python"' in text
+    assert text.index("SKILL MATCH CONTEXT") < text.index("JOB DESCRIPTION")
 
 
 def test_match_plan_sync_and_async_return_structured_plan():

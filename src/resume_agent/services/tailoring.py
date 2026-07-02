@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from sqlmodel import Session
 
+from resume_agent.profile.matrix import effective_cluster_map, load_matrix, load_overrides
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
@@ -13,6 +16,7 @@ from resume_agent.tailor.service import tailor_jobs
 from resume_agent.tailor.style_guide import load_style_guide
 from resume_agent.tracking.repository import get_job, jobs_by_status
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_agent.taxonomy.clusters import load_cluster_map
 
 DEFAULT_REVIEW = "config/review.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
@@ -42,12 +46,22 @@ def tailor(
         return {}
     config = load_review_config(review_path)
     facts = load_facts(facts_path)
+    profile_dir = Path(facts_path).parent
+    overrides = load_overrides(profile_dir / "overrides.yaml")
+    cluster_map = effective_cluster_map(
+        load_cluster_map(profile_dir / "cluster_map.json"), overrides
+    )
+    skill_matrix = load_matrix(
+        profile_dir / "matrix.json", facts=facts, cluster_map=cluster_map
+    )
     style_guide = load_style_guide(config.style_guide_path)
     bundle = build_tailor_bundle(config, style_guide=style_guide)
     results = tailor_jobs(
         session, targets, facts, config,
         bundle.tailor, bundle.reviewers, bundle.reviser, reporter=reporter,
         match_plan_agent=bundle.match_plan,
+        skill_matrix=skill_matrix,
+        cluster_map=cluster_map,
     )
     for job_id in results:
         export_job_artifacts(session, job_id)

@@ -8,11 +8,17 @@ from resume_agent.config import get_settings
 from resume_agent.llm_runner import Runner, run_with_cleanup
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
+from resume_agent.profile.matrix import (
+    SkillMatchContext,
+    SkillMatrix,
+    build_skill_match_context,
+)
 from resume_agent.progress import ProgressReporter
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.workflow import TailorRound, arun_tailor_review
 from resume_agent.tracking.repository import save_job, save_resume_version
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_agent.taxonomy.clusters import ClusterMap
 
 
 def _persist_rounds(
@@ -46,6 +52,7 @@ def tailor_job(
     reviewer_agents: Mapping[str, Runner],
     reviser_agent: Runner,
     match_plan_agent: Runner | None = None,
+    skill_context: SkillMatchContext | None = None,
 ) -> list[ResumeVersion]:
     """Run the loop for one job and persist each round. Marks the job tailored."""
     if job.id is None:
@@ -66,6 +73,7 @@ def tailor_job(
                 reviewer_agents,
                 reviser_agent,
                 match_plan_agent,
+                skill_context=skill_context,
                 sem=sem,
             ),
             *runners,
@@ -84,6 +92,8 @@ def tailor_jobs(
     reviser_agent: Runner,
     reporter: ProgressReporter | None = None,
     match_plan_agent: Runner | None = None,
+    skill_matrix: SkillMatrix | None = None,
+    cluster_map: ClusterMap | None = None,
 ) -> dict[int, list[ResumeVersion]]:
     """Tailor targets concurrently, then persist successful jobs serially."""
     for job in targets:
@@ -99,6 +109,26 @@ def tailor_jobs(
         def _criteria(job: Job) -> JobCriteria:
             return JobCriteria.model_validate(job.criteria_json or {})
 
+        def _skill_context(criteria: JobCriteria) -> SkillMatchContext | None:
+            if skill_matrix is None or cluster_map is None:
+                return None
+            return build_skill_match_context(criteria, skill_matrix, cluster_map)
+
+        async def _run_job(job: Job) -> list[TailorRound]:
+            criteria = _criteria(job)
+            return await arun_tailor_review(
+                job.jd_text,
+                criteria,
+                profile_facts,
+                config,
+                tailor_agent,
+                reviewer_agents,
+                reviser_agent,
+                match_plan_agent,
+                skill_context=_skill_context(criteria),
+                sem=sem,
+            )
+
         runners = (tailor_agent, *reviewer_agents.values(), reviser_agent)
         if match_plan_agent is not None:
             runners = (*runners, match_plan_agent)
@@ -106,17 +136,7 @@ def tailor_jobs(
             run_with_cleanup(
                 gather_isolated(
                     list(targets),
-                    lambda job: arun_tailor_review(
-                        job.jd_text,
-                        _criteria(job),
-                        profile_facts,
-                        config,
-                        tailor_agent,
-                        reviewer_agents,
-                        reviser_agent,
-                        match_plan_agent,
-                        sem=sem,
-                    ),
+                    _run_job,
                     on_complete=on_complete,
                     checkpoint=reporter.checkpoint if reporter else None,
                 ),

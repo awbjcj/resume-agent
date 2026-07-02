@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 from resume_agent.db import get_session, init_db, make_engine
+from resume_agent.models.profile import Contact, ProfileFacts, Skill
+from resume_agent.profile.matrix import Overrides, build_matrix, save_matrix
+from resume_agent.profile.store import save_facts
 from resume_agent.services import rendering, tailoring
+from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 
 
@@ -31,9 +35,12 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
     def fake_tailor_jobs(
         session, targets, facts, config, tailor, reviewers, reviser, reporter=None,
         match_plan_agent=None,
+        skill_matrix=None,
+        cluster_map=None,
     ):
         captured["targets"] = [j.id for j in targets]
         captured["match_plan"] = match_plan_agent
+        captured["skill_matrix"] = skill_matrix
         return {targets[0].id: ["v1"]}
 
     monkeypatch.setattr(tailoring, "tailor_jobs", fake_tailor_jobs)
@@ -109,6 +116,56 @@ def test_tailor_can_fail_loudly_when_a_target_produces_no_resume(monkeypatch):
                 job_ids=[job.id for job in jobs if job.id is not None],
                 fail_on_partial=True,
             )
+
+
+def test_tailor_loads_bound_skill_artifacts_once(tmp_path, monkeypatch):
+    profile_dir = tmp_path / "profile"
+    facts_path = profile_dir / "facts.json"
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"Platforms": [Skill(name="Kubernetes")]},
+    )
+    cluster_map = ClusterMap(aliases={"k8s": "kubernetes"})
+    save_facts(facts, facts_path)
+    save_cluster_map(cluster_map, profile_dir / "cluster_map.json")
+    save_matrix(
+        build_matrix(facts, cluster_map, Overrides()), profile_dir / "matrix.json"
+    )
+    captured = {}
+
+    def fake_tailor_jobs(*args, **kwargs):
+        captured.update(kwargs)
+        return {args[1][0].id: ["v1"]}
+
+    monkeypatch.setattr(tailoring, "tailor_jobs", fake_tailor_jobs)
+    monkeypatch.setattr(
+        tailoring,
+        "load_review_config",
+        lambda path: type("C", (), {"style_guide_path": None, "reviewers": []})(),
+    )
+    monkeypatch.setattr(tailoring, "load_style_guide", lambda path: None)
+    monkeypatch.setattr(
+        tailoring,
+        "build_tailor_bundle",
+        lambda config, style_guide=None: tailoring.TailorBundle(
+            tailor=_RunnerStub("t"),
+            reviser=_RunnerStub("r"),
+            reviewers={},
+            revision=_RunnerStub("revise"),
+            match_plan=_RunnerStub("plan"),
+        ),
+    )
+    monkeypatch.setattr(tailoring, "export_job_artifacts", lambda *args: None)
+
+    with _session() as session:
+        job = Job(source="manual", jd_text="x", status=JobStatus.approved.value)
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        tailoring.tailor(session, job_ids=[job.id], facts_path=str(facts_path))
+
+    assert captured["skill_matrix"] is not None
+    assert captured["cluster_map"].aliases["k8s"] == "kubernetes"
 
 
 def test_render_resume_version_returns_path(monkeypatch, tmp_path):
