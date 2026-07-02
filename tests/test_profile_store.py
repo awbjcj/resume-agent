@@ -45,11 +45,11 @@ def test_save_facts_atomically_replaces_and_cleans_failed_temp(tmp_path, monkeyp
     assert replacements[0][1] == path
 
     before = set(path.parent.iterdir())
-    monkeypatch.setattr(
-        store.os,
-        "replace",
-        lambda source, destination: (_ for _ in ()).throw(OSError("replace failed")),
-    )
+
+    def fail_replace(_source, _destination):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(store.os, "replace", fail_replace)
     with pytest.raises(OSError, match="replace failed"):
         save_facts(facts, path)
     assert set(path.parent.iterdir()) == before
