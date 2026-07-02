@@ -29,8 +29,10 @@ export function DashboardPage() {
   if (isPending || !summary) return <BoardSkeleton />;
 
   const waiting = Object.values(summary.queues).reduce((a, b) => a + b, 0);
-  const totalJobs = Object.values(summary.statusCounts).reduce(
-    (a, b) => a + b,
+  // rejected is terminal-negative and never appears on the rail/queues (see
+  // StageRail), so it must not count toward "the funnel has jobs in it".
+  const totalJobs = Object.entries(summary.statusCounts).reduce(
+    (sum, [status, count]) => (status === "rejected" ? sum : sum + count),
     0,
   );
   const eyebrow = `Operations · ${new Date().toLocaleDateString(undefined, {

@@ -90,4 +90,30 @@ describe("DashboardPage", () => {
       "/settings/sources",
     );
   });
+
+  it("still shows the empty state when every job has been rejected", async () => {
+    // rejected doesn't appear on the rail/queues, so a naive "sum every
+    // statusCount" emptiness check would wrongly treat this as populated.
+    server.use(
+      http.get("/api/dashboard/summary", () =>
+        HttpResponse.json({
+          statusCounts: {
+            raw: 0, extracted: 0, filtered: 0, rejected: 5,
+            shortlisted: 0, approved: 0, tailored: 0, rendered: 0,
+          },
+          queues: { triage: 0, approve: 0, tailor: 0, apply: 0 },
+          applied: 0,
+        }),
+      ),
+      http.get("/api/setup/status", () =>
+        HttpResponse.json({ ...READY_STATUS, complete: false, sources: { enabledCount: 0 } }),
+      ),
+    );
+    renderPage();
+    await waitFor(() =>
+      expect(
+        screen.getByText("Add sources and run your first pull"),
+      ).toBeInTheDocument(),
+    );
+  });
 });
