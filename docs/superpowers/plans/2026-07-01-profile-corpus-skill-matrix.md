@@ -2819,15 +2819,19 @@ git commit -m "feat: fit scoring consumes skill context; capture soft skills"
 
 **Interfaces:**
 - Produces: `resolve_evidence` additionally includes, for every cited skill fact that has `evidence_fact_ids`, those evidence facts — so the fact-check reviewer can see what backs an inferred skill.
+- Extends `ProvenanceReport` with `invalid: list[str]` and makes
+  `check_provenance` usage-aware: inferred provenance is valid only for a
+  `TailoredSkill`, only when the source `Skill.category == "hard"`, and only when
+  every non-empty evidence id resolves to a non-inferred fact.
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 def test_resolve_evidence_expands_inferred_skill_evidence():
-    bullet = Bullet(text="Mentored 3 junior engineers")
+    bullet = Bullet(text="Deployed services on Kubernetes")
     exp = Experience(company="Acme", title="Engineer", bullets=[bullet])
     skill = Skill(
-        name="Mentorship", inferred=True, category="soft", evidence_fact_ids=[bullet.id]
+        name="Kubernetes", inferred=True, category="hard", evidence_fact_ids=[bullet.id]
     )
     facts = ProfileFacts(
         contact=Contact(name="Ada"), experience=[exp], skills={"soft": [skill]}
@@ -2839,6 +2843,11 @@ def test_resolve_evidence_expands_inferred_skill_evidence():
 ```
 
 (Adapt `_resume_content_citing` to the file's existing helper for building a minimal `ResumeContent` with a skills entry whose `provenance` is the given id.)
+
+Add separate deterministic-gate tests for: an inferred soft skill cited from the
+skills section; empty evidence; a missing evidence id; evidence pointing to another
+inferred skill; and an otherwise-valid inferred hard skill cited as bullet provenance.
+Each must assert `provenance_critique(...).passed is False`.
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -2875,6 +2884,12 @@ In `tailor/agents.py`, append to `REVIEWER_INSTRUCTIONS["fact-check"]`:
         "evidence_fact_ids facts, included in SUPPORTING FACTS, genuinely demonstrate the skill. "
         "Inferred skills justify only skill-list entries, never bullet or summary claims.",
 ```
+
+Also replace the id-only provenance traversal with a usage-aware traversal (for
+example, `(fact_id, "skill" | "bullet" | "entity")`). Preserve the existing
+missing-id behavior, and populate `ProvenanceReport.invalid` for the four invariant
+violations above. `provenance_critique` emits blocking issues for both missing and
+invalid entries. Do not delegate these structural checks to the LLM reviewer.
 
 - [ ] **Step 4: Run the suite and commit**
 
