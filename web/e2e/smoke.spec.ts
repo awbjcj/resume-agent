@@ -66,7 +66,7 @@ test("loads shortlist and opens a job drawer", async ({ page }) => {
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/shortlist");
   await expect(page.getByText("Staff Engineer")).toBeVisible();
   await page.getByRole("button", { name: "Industry" }).click();
   await expect(
@@ -82,7 +82,7 @@ test("loads shortlist and opens a job drawer", async ({ page }) => {
 });
 
 test("min-fit numeric input applies the server filter", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/shortlist");
   const minFit = page.getByRole("spinbutton", { name: "Min fit" });
 
   await minFit.fill("65");
