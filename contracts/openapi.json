@@ -365,6 +365,25 @@
         "title": "BoardPage[TriageItem]",
         "type": "object"
       },
+      "Body_upload_document_api_profile_documents_post": {
+        "properties": {
+          "docType": {
+            "title": "Doctype",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "docType"
+        ],
+        "title": "Body_upload_document_api_profile_documents_post",
+        "type": "object"
+      },
       "BulkRequest": {
         "properties": {
           "action": {
@@ -759,6 +778,35 @@
         "title": "CoverLetterParams",
         "type": "object"
       },
+      "DashboardSummaryOut": {
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "integer"
+          },
+          "queues": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Queues",
+            "type": "object"
+          },
+          "statusCounts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Statuscounts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "statusCounts",
+          "queues",
+          "applied"
+        ],
+        "title": "DashboardSummaryOut",
+        "type": "object"
+      },
       "DemandEdgeOut": {
         "properties": {
           "jobId": {
@@ -795,6 +843,39 @@
       "DiscoverParams": {
         "properties": {},
         "title": "DiscoverParams",
+        "type": "object"
+      },
+      "DocumentOut": {
+        "properties": {
+          "docType": {
+            "title": "Doctype",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "title": "Sizebytes",
+            "type": "integer"
+          },
+          "uploadedAt": {
+            "title": "Uploadedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "docType",
+          "sizeBytes",
+          "uploadedAt"
+        ],
+        "title": "DocumentOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1233,6 +1314,27 @@
         "title": "JobPatch",
         "type": "object"
       },
+      "LengthBudget": {
+        "properties": {
+          "maxBulletsPerRole": {
+            "default": 5,
+            "title": "Maxbulletsperrole",
+            "type": "integer"
+          },
+          "maxExperiences": {
+            "default": 4,
+            "title": "Maxexperiences",
+            "type": "integer"
+          },
+          "targetTotalBullets": {
+            "default": 20,
+            "title": "Targettotalbullets",
+            "type": "integer"
+          }
+        },
+        "title": "LengthBudget",
+        "type": "object"
+      },
       "MatchGapOut": {
         "properties": {
           "clustersStale": {
@@ -1288,6 +1390,27 @@
           "themes"
         ],
         "title": "MatchGapOut",
+        "type": "object"
+      },
+      "ModelsConfigDoc": {
+        "properties": {
+          "cheapModel": {
+            "default": "claude-haiku-4-5-20251001",
+            "title": "Cheapmodel",
+            "type": "string"
+          },
+          "midModel": {
+            "default": "claude-sonnet-5",
+            "title": "Midmodel",
+            "type": "string"
+          },
+          "premiumModel": {
+            "default": "claude-opus-4-8",
+            "title": "Premiummodel",
+            "type": "string"
+          }
+        },
+        "title": "ModelsConfigDoc",
         "type": "object"
       },
       "NotificationOut": {
@@ -1549,6 +1672,63 @@
         "title": "PipelineItem",
         "type": "object"
       },
+      "ProfileConfigDoc": {
+        "properties": {
+          "githubUsername": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Githubusername"
+          }
+        },
+        "title": "ProfileConfigDoc",
+        "type": "object"
+      },
+      "ProfileStatus": {
+        "properties": {
+          "documentCount": {
+            "title": "Documentcount",
+            "type": "integer"
+          },
+          "factsBuiltAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Factsbuiltat"
+          },
+          "githubUsername": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Githubusername"
+          },
+          "hasResume": {
+            "title": "Hasresume",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "documentCount",
+          "hasResume"
+        ],
+        "title": "ProfileStatus",
+        "type": "object"
+      },
       "ProjectOut": {
         "properties": {
           "skillsDemonstrated": {
@@ -1573,6 +1753,42 @@
           "skillsDemonstrated"
         ],
         "title": "ProjectOut",
+        "type": "object"
+      },
+      "PruneConfigDoc": {
+        "properties": {
+          "enableLowFit": {
+            "default": true,
+            "title": "Enablelowfit",
+            "type": "boolean"
+          },
+          "enableRejected": {
+            "default": true,
+            "title": "Enablerejected",
+            "type": "boolean"
+          },
+          "enableStale": {
+            "default": true,
+            "title": "Enablestale",
+            "type": "boolean"
+          },
+          "fitThreshold": {
+            "default": 40,
+            "title": "Fitthreshold",
+            "type": "integer"
+          },
+          "retentionDays": {
+            "default": 30,
+            "title": "Retentiondays",
+            "type": "integer"
+          },
+          "staleDays": {
+            "default": 60,
+            "title": "Staledays",
+            "type": "integer"
+          }
+        },
+        "title": "PruneConfigDoc",
         "type": "object"
       },
       "PruneOverrides": {
@@ -1714,6 +1930,22 @@
           }
         },
         "title": "RefreshParams",
+        "type": "object"
+      },
+      "RenderConfigDoc": {
+        "properties": {
+          "outputDir": {
+            "default": "output",
+            "title": "Outputdir",
+            "type": "string"
+          },
+          "templatePath": {
+            "default": "templates/resume.typ",
+            "title": "Templatepath",
+            "type": "string"
+          }
+        },
+        "title": "RenderConfigDoc",
         "type": "object"
       },
       "RepoOut": {
@@ -1907,6 +2139,67 @@
         "title": "ResumeVersionOut",
         "type": "object"
       },
+      "ReviewConfigDoc": {
+        "properties": {
+          "lengthBudget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LengthBudget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxRounds": {
+            "default": 3,
+            "title": "Maxrounds",
+            "type": "integer"
+          },
+          "reviewers": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewerEntry"
+            },
+            "title": "Reviewers",
+            "type": "array"
+          },
+          "scoreThreshold": {
+            "default": 85,
+            "title": "Scorethreshold",
+            "type": "integer"
+          }
+        },
+        "title": "ReviewConfigDoc",
+        "type": "object"
+      },
+      "ReviewerEntry": {
+        "properties": {
+          "gate": {
+            "default": false,
+            "title": "Gate",
+            "type": "boolean"
+          },
+          "modelTier": {
+            "default": "mid",
+            "title": "Modeltier",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "weight": {
+            "default": 1,
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ReviewerEntry",
+        "type": "object"
+      },
       "ReviseRequest": {
         "properties": {
           "instruction": {
@@ -2010,6 +2303,309 @@
         "title": "RunState",
         "type": "string"
       },
+      "SearchConfigDoc": {
+        "properties": {
+          "distance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance"
+          },
+          "employmentTypes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Employmenttypes",
+            "type": "array"
+          },
+          "excludeTerms": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excludeterms",
+            "type": "array"
+          },
+          "experienceLevels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Experiencelevels",
+            "type": "array"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords",
+            "type": "array"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Locations",
+            "type": "array"
+          },
+          "maxDaysOld": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxdaysold"
+          },
+          "minSalary": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minsalary"
+          },
+          "remotePolicy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remotepolicy"
+          },
+          "roleAnchors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roleanchors",
+            "type": "array"
+          },
+          "sponsorshipRequired": {
+            "default": false,
+            "title": "Sponsorshiprequired",
+            "type": "boolean"
+          },
+          "targetRole": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetrole"
+          },
+          "titles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Titles",
+            "type": "array"
+          },
+          "yoeMax": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yoemax"
+          },
+          "yoeMin": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yoemin"
+          }
+        },
+        "title": "SearchConfigDoc",
+        "type": "object"
+      },
+      "SearchStatus": {
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured"
+        ],
+        "title": "SearchStatus",
+        "type": "object"
+      },
+      "SecretStatus": {
+        "properties": {
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "isSet": {
+            "title": "Isset",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "isSet"
+        ],
+        "title": "SecretStatus",
+        "type": "object"
+      },
+      "SecretsStatus": {
+        "properties": {
+          "anthropicKey": {
+            "title": "Anthropickey",
+            "type": "boolean"
+          },
+          "anyLlmKey": {
+            "title": "Anyllmkey",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "anthropicKey",
+          "anyLlmKey"
+        ],
+        "title": "SecretsStatus",
+        "type": "object"
+      },
+      "SecretsUpdate": {
+        "description": "All-optional; only fields present in the request body are written.\nAn explicit null clears the key.",
+        "properties": {
+          "adzunaAppId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adzunaappid"
+          },
+          "adzunaAppKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adzunaappkey"
+          },
+          "anthropicApiKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anthropicapikey"
+          },
+          "deepseekApiKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deepseekapikey"
+          },
+          "geminiApiKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geminiapikey"
+          },
+          "githubToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Githubtoken"
+          },
+          "linkedinEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedinemail"
+          },
+          "linkedinPassword": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedinpassword"
+          },
+          "openaiApiKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openaiapikey"
+          }
+        },
+        "title": "SecretsUpdate",
+        "type": "object"
+      },
       "SetEnabledIn": {
         "properties": {
           "enabled": {
@@ -2021,6 +2617,35 @@
           "enabled"
         ],
         "title": "SetEnabledIn",
+        "type": "object"
+      },
+      "SetupStatusOut": {
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileStatus"
+          },
+          "search": {
+            "$ref": "#/components/schemas/SearchStatus"
+          },
+          "secrets": {
+            "$ref": "#/components/schemas/SecretsStatus"
+          },
+          "sources": {
+            "$ref": "#/components/schemas/SourcesStatus"
+          }
+        },
+        "required": [
+          "secrets",
+          "profile",
+          "search",
+          "sources",
+          "complete"
+        ],
+        "title": "SetupStatusOut",
         "type": "object"
       },
       "ShortlistItem": {
@@ -2491,6 +3116,30 @@
           "url"
         ],
         "title": "SourcePreviewOut",
+        "type": "object"
+      },
+      "SourcesStatus": {
+        "properties": {
+          "enabledCount": {
+            "title": "Enabledcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabledCount"
+        ],
+        "title": "SourcesStatus",
+        "type": "object"
+      },
+      "StyleGuideDoc": {
+        "properties": {
+          "content": {
+            "default": "",
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "title": "StyleGuideDoc",
         "type": "object"
       },
       "SuggestionEnvelope": {
@@ -3035,6 +3684,706 @@
         "summary": "Get Analytics"
       }
     },
+    "/api/config/models": {
+      "get": {
+        "operationId": "get_models_api_config_models_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Models"
+      },
+      "put": {
+        "operationId": "put_models_api_config_models_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelsConfigDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Models"
+      }
+    },
+    "/api/config/profile": {
+      "get": {
+        "operationId": "get_profile_config_api_config_profile_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile Config"
+      },
+      "put": {
+        "operationId": "put_profile_config_api_config_profile_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileConfigDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Profile Config"
+      }
+    },
+    "/api/config/prune": {
+      "get": {
+        "operationId": "get_prune_api_config_prune_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PruneConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Prune"
+      },
+      "put": {
+        "operationId": "put_prune_api_config_prune_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PruneConfigDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PruneConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Prune"
+      }
+    },
+    "/api/config/render": {
+      "get": {
+        "operationId": "get_render_api_config_render_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Render"
+      },
+      "put": {
+        "operationId": "put_render_api_config_render_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderConfigDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Render"
+      }
+    },
+    "/api/config/review": {
+      "get": {
+        "operationId": "get_review_api_config_review_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Review"
+      },
+      "put": {
+        "operationId": "put_review_api_config_review_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewConfigDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Review"
+      }
+    },
+    "/api/config/search": {
+      "get": {
+        "operationId": "get_search_api_config_search_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Search"
+      },
+      "put": {
+        "operationId": "put_search_api_config_search_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchConfigDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchConfigDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Search"
+      }
+    },
+    "/api/config/style-guide": {
+      "get": {
+        "operationId": "get_style_guide_api_config_style_guide_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StyleGuideDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Style Guide"
+      },
+      "put": {
+        "operationId": "put_style_guide_api_config_style_guide_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StyleGuideDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StyleGuideDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Style Guide"
+      }
+    },
     "/api/cover-letters": {
       "post": {
         "operationId": "launch_cover_letters_api_cover_letters_post",
@@ -3207,6 +4556,52 @@
           }
         },
         "summary": "Revise Cover Letter Endpoint"
+      }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "operationId": "get_dashboard_summary_api_dashboard_summary_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Dashboard Summary"
       }
     },
     "/api/discover": {
@@ -4468,6 +5863,204 @@
         "summary": "Get Pipeline"
       }
     },
+    "/api/profile/build": {
+      "post": {
+        "operationId": "launch_profile_build_api_profile_build_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Profile Build"
+      }
+    },
+    "/api/profile/documents": {
+      "get": {
+        "operationId": "list_documents_api_profile_documents_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentOut"
+                  },
+                  "title": "Response List Documents Api Profile Documents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Documents"
+      },
+      "post": {
+        "operationId": "upload_document_api_profile_documents_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document_api_profile_documents_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Document"
+      }
+    },
+    "/api/profile/documents/{doc_id}": {
+      "delete": {
+        "operationId": "delete_document_api_profile_documents__doc_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "title": "Doc Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Document"
+      }
+    },
     "/api/prune": {
       "post": {
         "operationId": "prune_api_prune_post",
@@ -5110,6 +6703,160 @@
           }
         },
         "summary": "Stream Run"
+      }
+    },
+    "/api/secrets": {
+      "get": {
+        "operationId": "get_secrets_api_secrets_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SecretStatus"
+                  },
+                  "title": "Response Get Secrets Api Secrets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Secrets"
+      },
+      "put": {
+        "operationId": "put_secrets_api_secrets_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecretsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SecretStatus"
+                  },
+                  "title": "Response Put Secrets Api Secrets Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Secrets"
+      }
+    },
+    "/api/setup/status": {
+      "get": {
+        "operationId": "get_setup_status_api_setup_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Setup Status"
       }
     },
     "/api/shortlist": {
