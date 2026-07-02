@@ -776,7 +776,7 @@ def assign_fact_ids(facts: ProfileFacts, doc_id: str) -> ProfileFacts:
         for bullet in exp.bullets:
             ids.assign(bullet, "bullet", parent, bullet.text)
     for proj in out.projects:
-        parent = ids.assign(proj, "proj", proj.name)
+        ids.assign(proj, "proj", proj.name)
     for edu in out.education:
         ids.assign(edu, "edu", edu.institution, edu.degree)
     for category, skills in out.skills.items():
