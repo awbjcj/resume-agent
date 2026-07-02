@@ -2712,20 +2712,25 @@ In the fit test file:
 ```python
 from resume_agent.discovery.fit import compose_fit_input
 from resume_agent.models.profile import Contact, ProfileFacts
-from resume_agent.profile.matrix import MatrixRow, SkillMatrix
+from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
 
 
-def test_fit_input_without_matrix_unchanged():
+def test_fit_input_without_context_unchanged():
     text = compose_fit_input("JD", ProfileFacts(contact=Contact(name="Ada")), "Remote")
-    assert "SKILL MATRIX" not in text
+    assert "SKILL MATCH CONTEXT" not in text
 
 
-def test_fit_input_with_matrix_appends_section():
-    matrix = SkillMatrix(rows=[MatrixRow(key="python", display="Python", strength=2.0)])
+def test_fit_input_with_context_appends_section():
+    context = SkillMatchContext(matches=[SkillMatch(
+        requirement="FastAPI", source="must", coverage="adjacent",
+        row=MatrixRow(key="flask", display="Flask", strength=2.0),
+    )])
     text = compose_fit_input(
-        "JD", ProfileFacts(contact=Contact(name="Ada")), "Remote", matrix=matrix
+        "JD", ProfileFacts(contact=Contact(name="Ada")), "Remote",
+        skill_context=context,
     )
-    assert "SKILL MATRIX (JSON):" in text
+    assert "SKILL MATCH CONTEXT (JSON):" in text
+    assert '"coverage":"adjacent"' in text
 ```
 
 In the extract test file, assert the prompt change is present (cheap guard that the instruction survives refactors):
@@ -2753,28 +2758,36 @@ def compose_fit_input(
     jd_text: str,
     profile_facts: ProfileFacts,
     location: str | None = None,
-    matrix: "SkillMatrix | None" = None,
+    skill_context: "SkillMatchContext | None" = None,
 ) -> str:
     sections = [f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}"]
-    if matrix is not None and matrix.rows:
-        sections.append(f"SKILL MATRIX (JSON):\n{matrix.model_dump_json()}")
+    if skill_context is not None and skill_context.matches:
+        sections.append(
+            f"SKILL MATCH CONTEXT (JSON):\n{skill_context.model_dump_json()}"
+        )
     sections.append(f"JOB LOCATION: {location or 'unknown'}")
     sections.append(f"JOB DESCRIPTION:\n{jd_text}")
     return "\n\n".join(sections)
 ```
 
-(`from resume_agent.profile.matrix import SkillMatrix` — no import cycle.)
+(`from resume_agent.profile.matrix import SkillMatchContext` — no import cycle.)
 
 Append one instruction to `fit.py`'s `_INSTRUCTIONS`:
 
 ```python
-    "When a SKILL MATRIX section is present it is the authoritative candidate skill list, "
-    "including evidence-linked inferred skills. Award partial credit when a required skill is "
-    "closely related to a listed one (same family or theme), weighting it below a direct match "
-    "and saying so in the rationale.",
+    "When a SKILL MATCH CONTEXT section is present, use its deterministic tiers. Award full "
+    "skill credit only to covered rows, lower partial credit to adjacent rows, and no skill "
+    "credit to gaps; state adjacent transferability explicitly in the rationale.",
 ```
 
-`pipeline.py`: `run_score` gains keyword `matrix: "SkillMatrix | None" = None` and passes `matrix=matrix` in the `compose_fit_input(pair[0].jd_text, profile_facts, pair[1], matrix=matrix)` call (line ~226). The pipeline function containing the `run_score(` call at line ~368 gains the same keyword and forwards it. In `services/discovery.py`, `discover_jobs` loads `matrix = load_matrix(DEFAULT_MATRIX_PATH)` (import from `resume_agent.profile.matrix`) and passes it down the chain it uses to reach `run_score`.
+`pipeline.py`: `run_score` accepts the validated matrix and effective cluster map. For
+each job, validate `criteria_json` as `JobCriteria`, call `build_skill_match_context`, and
+pass that per-job context to `compose_fit_input`. Thread both artifacts through `discover`.
+In `services/discovery.py`, derive artifact paths from `facts_path`, load facts first,
+apply overrides to the cluster map, validate
+`load_matrix(matrix_path, facts, effective_map)`, and pass
+both down. Missing/mismatched artifacts degrade to no context; they never fall back to a
+different profile directory.
 
 `extract.py`: append one instruction to `_INSTRUCTIONS`:
 
@@ -2792,7 +2805,7 @@ Expected: PASS.
 
 ```bash
 git add src/resume_agent/discovery/fit.py src/resume_agent/discovery/pipeline.py src/resume_agent/services/discovery.py src/resume_agent/discovery/extract.py tests/
-git commit -m "feat: fit scoring consumes matrix; JD extraction captures soft skills"
+git commit -m "feat: fit scoring consumes skill context; capture soft skills"
 ```
 
 ---
