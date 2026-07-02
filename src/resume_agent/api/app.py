@@ -25,6 +25,7 @@ from resume_agent.api.routers import prune as prune_router
 from resume_agent.api.routers import resumes
 from resume_agent.api.routers import runs as runs_router
 from resume_agent.api.routers import secrets as secrets_router
+from resume_agent.api.routers import setup as setup_router
 from resume_agent.api.routers import sources as sources_router
 from resume_agent.api.routers import suggestions as suggestions_router
 from resume_agent.api.runs.manager import RunManager
@@ -125,6 +126,7 @@ def create_app(
     app.include_router(config_router.router, prefix="/api", dependencies=guarded)
     app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)
     app.include_router(profile_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(setup_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so
     # they take precedence; the catch-all is excluded from the OpenAPI schema so
