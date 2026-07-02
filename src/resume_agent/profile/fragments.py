@@ -92,7 +92,7 @@ def fragment_cache_status(profile_dir: str | Path, doc: SourceDoc) -> CacheStatu
     try:
         observed_sha = hashlib.sha256(doc_path(profile_dir, doc).read_bytes()).hexdigest()
     except OSError:
-        return "missing"
+        return "stale" if fragment_path.exists() else "missing"
     if observed_sha != doc.sha256:
         return "source-changed"
     if _meta_matches(meta_path, observed_sha) and load_fragment(profile_dir, doc.id):
