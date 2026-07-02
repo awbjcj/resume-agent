@@ -22,7 +22,7 @@ class _Assigner:
         self.doc_id = doc_id
         self._seen: dict[str, int] = {}
 
-    def assign(self, item: FactItem, *parts: str) -> str:
+    def assign(self, item: FactItem, *parts: str | None) -> str:
         base = "|".join((self.doc_id, *(_key(part) or "-" for part in parts)))
         count = self._seen.get(base, 0)
         self._seen[base] = count + 1
