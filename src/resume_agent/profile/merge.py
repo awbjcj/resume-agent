@@ -490,7 +490,8 @@ def apply_synthesis_fragments(
             for token in stub.tech:
                 if token not in target.tech:
                     target.tech.append(token)
-            touched.add(target.id)
+            if appended:
+                touched.add(target.id)
             anchor_decisions.append(
                 f"{doc.id}: +{appended} bullets on {target.company}/{target.title}"
             )

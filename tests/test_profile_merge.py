@@ -19,6 +19,7 @@ from resume_agent.profile.merge import (
     BulletDupGroups,
     MergeReport,
     apply_synthesis_fragments,
+    dedup_experience_bullets,
     merge_facts,
     merge_fragments,
 )
@@ -374,3 +375,64 @@ def test_synthesized_scalars_never_win():
     fragment.experience[0].location = "Austin"
     apply_synthesis_fragments(merged, [(_deck_doc(), fragment)], MergeReport())
     assert merged.experience[0].location == "Detroit"
+
+
+def _synth_fragment_all_dupes(anchor_id="exp1"):
+    """A synthesis fragment whose stub bullets are all exact duplicates already
+    present on the anchor target, so applying it appends zero new bullets."""
+    return ProfileFacts(
+        contact=Contact(name=""),
+        experience=[Experience(
+            id=anchor_id, company="Acme", title="Engineer", synthesized=True,
+            bullets=[Bullet(id="sb1", text="Shipped the billing rewrite", synthesized=True)],
+        )],
+    )
+
+
+def test_touched_only_includes_experiences_that_gained_bullets():
+    merged = _merged()
+    report = MergeReport()
+    decisions, touched = apply_synthesis_fragments(
+        merged, [(_deck_doc(), _synth_fragment_all_dupes())], report
+    )
+    assert len(merged.experience[0].bullets) == 1  # no new bullets appended
+    assert touched == set()
+    assert any("+0 bullets" in line for line in decisions)
+
+
+class _RecordingDedupAgent:
+    """Fake dedup agent that records which experience's bullet listing it saw."""
+
+    def __init__(self):
+        self.seen_prompts: list[str] = []
+
+    def run(self, prompt):
+        self.seen_prompts.append(prompt)
+        return _FakeResult(BulletDupGroups(groups=[]))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+def test_dedup_experience_bullets_only_ids_skips_untouched_experiences():
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[
+            Experience(
+                id="exp-touched", company="Acme", title="Engineer",
+                bullets=[Bullet(text="Shipped v1"), Bullet(text="Shipped v1 again")],
+            ),
+            Experience(
+                id="exp-untouched", company="Globex", title="Analyst",
+                bullets=[Bullet(text="Analyzed reports"), Bullet(text="Analyzed more reports")],
+            ),
+        ],
+    )
+    agent = _RecordingDedupAgent()
+    report = MergeReport()
+
+    dedup_experience_bullets(facts, agent, report, only_ids={"exp-touched"})
+
+    assert len(agent.seen_prompts) == 1
+    assert "Shipped v1" in agent.seen_prompts[0]
+    assert "Analyzed reports" not in agent.seen_prompts[0]
