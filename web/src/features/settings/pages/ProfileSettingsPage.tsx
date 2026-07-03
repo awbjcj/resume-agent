@@ -4,10 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { SourceManager } from "@/features/profile-sources/SourceManager";
 import { useActiveRun } from "@/features/runs/use-active-run";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
 import type { paths } from "@/lib/api/schema";
-import { DocumentManager } from "../forms/DocumentManager";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import { useDraft } from "../use-draft";
@@ -38,7 +38,7 @@ export function ProfileSettingsPage() {
           The resume and other source documents the profile is built from.
         </p>
       </header>
-      <DocumentManager />
+      <SourceManager />
       <Separator />
       <Field>
         <FieldLabel htmlFor="githubUsername">GitHub username</FieldLabel>
