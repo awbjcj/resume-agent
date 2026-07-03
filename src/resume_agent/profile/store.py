@@ -31,6 +31,20 @@ def save_facts(facts: ProfileFacts, path: str | Path) -> Path:
     return destination
 
 
+_FACTS_CACHE: dict[Path, tuple[int, int, ProfileFacts]] = {}
+
+
 def load_facts(path: str | Path) -> ProfileFacts:
-    """Read ProfileFacts from a JSON file."""
-    return ProfileFacts.model_validate_json(Path(path).read_text(encoding="utf-8"))
+    """Read ProfileFacts from a JSON file, cached on (mtime_ns, size).
+
+    The returned model is shared across callers — treat it as read-only.
+    save_facts() replaces the file atomically, which bumps the key.
+    """
+    resolved = Path(path).resolve()
+    stat = resolved.stat()
+    cached = _FACTS_CACHE.get(resolved)
+    if cached is not None and (cached[0], cached[1]) == (stat.st_mtime_ns, stat.st_size):
+        return cached[2]
+    facts = ProfileFacts.model_validate_json(resolved.read_text(encoding="utf-8"))
+    _FACTS_CACHE[resolved] = (stat.st_mtime_ns, stat.st_size, facts)
+    return facts

@@ -53,12 +53,27 @@ def split_skills(items: list[str]) -> list[str]:
     return out
 
 
+_ALIAS_CACHE: dict[Path, tuple[int, int, dict[str, str]]] = {}
+
+
 def load_aliases(path: str | Path) -> dict[str, str]:
-    """Load the token->canonical map; missing file -> empty (identity)."""
+    """Load the token->canonical map; missing file -> empty (identity).
+
+    Cached on (mtime_ns, size); the returned dict is shared — treat it as
+    read-only (merge_aliases already copies before mutating).
+    """
     p = Path(path)
-    if not p.exists():
+    try:
+        stat = p.stat()
+    except OSError:
         return {}
-    return json.loads(p.read_text("utf-8"))
+    resolved = p.resolve()
+    cached = _ALIAS_CACHE.get(resolved)
+    if cached is not None and (cached[0], cached[1]) == (stat.st_mtime_ns, stat.st_size):
+        return cached[2]
+    data = json.loads(p.read_text("utf-8"))
+    _ALIAS_CACHE[resolved] = (stat.st_mtime_ns, stat.st_size, data)
+    return data
 
 
 def canonical_skill(name: str, aliases: dict[str, str]) -> str:
