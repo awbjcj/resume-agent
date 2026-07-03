@@ -88,10 +88,15 @@ def test_patch_synthesis_primary_rejected(client):
 
 def test_delete_source(client):
     c, _ = client
-    _upload(c)
-    doc_id = _upload(c, name="notes.md").json()["id"]
+    primary_id = _upload(c).json()["id"]
+    doc_id = _upload(c, name="notes.md", content=b"Cut latency 30%").json()["id"]
+    assert doc_id != primary_id
+
     assert c.delete(f"/api/profile/sources/{doc_id}").status_code == 204
     assert c.delete(f"/api/profile/sources/{doc_id}").status_code == 404
+
+    remaining = c.get("/api/profile/sources").json()
+    assert [s["id"] for s in remaining] == [primary_id]
 
 
 def test_skeleton_lists_anchor_candidates(client):
