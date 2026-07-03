@@ -12,11 +12,14 @@ from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_sk
 from resume_agent.tracking.match_gap import profile_skill_tokens
 from resume_agent.tracking.repository import (
     application_for_job,
-    best_resume_version,
+    applications_by_job,
     cover_letters_for_job,
     has_progress,
+    job_has_progress,
     pick_best,
+    progressed_job_ids,
     resume_versions_for_job,
+    versions_by_job,
 )
 from resume_agent.tracking.tables import Application, CoverLetter, Job, JobStatus, ResumeVersion
 
@@ -302,14 +305,17 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
         .where(archived_col.is_(None))
         .order_by(status_col, company_col, title_col)
     ).all()
+    versions = versions_by_job(session)
+    applications = applications_by_job(session)
+    progressed = progressed_job_ids(session)
     rows = []
     for job in jobs:
         job_id = _require_job_id(job)
         criteria = job.criteria_json or {}
         salary = criteria.get("salary_range") or {}
-        best = best_resume_version(session, job_id)
+        best = pick_best(versions.get(job_id, []))
         version = best.version
-        application = application_for_job(session, job_id)
+        application = applications.get(job_id)
         rows.append(
             PipelineRow(
                 job_id=job_id,
@@ -330,7 +336,7 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 salary_max=salary.get("maximum"),
                 remote_policy=criteria.get("remote_policy"),
                 seniority=criteria.get("seniority"),
-                has_progress=has_progress(session, job_id),
+                has_progress=job_has_progress(job, progressed),
                 needs_attention=best.no_clean_round,
                 regressed=best.regressed,
             )
@@ -357,7 +363,7 @@ _TRIAGE_STATUSES = (
 )
 
 
-def _triage_row(session: Session, job: Job) -> TriageRow:
+def _triage_row(job: Job, progressed: set[int]) -> TriageRow:
     job_id = _require_job_id(job)
     return TriageRow(
         job_id=job_id,
@@ -369,7 +375,7 @@ def _triage_row(session: Session, job: Job) -> TriageRow:
         fit_score=job.fit_score,
         posted_at=job.posted_at,
         archived_at=job.archived_at,
-        has_progress=has_progress(session, job_id),
+        has_progress=job_has_progress(job, progressed),
         reject_reason=job.reject_reason,
     )
 
@@ -382,7 +388,8 @@ def triage_rows(session: Session) -> list[TriageRow]:
         .where(status_col.in_(_TRIAGE_STATUSES), archived_col.is_(None))
         .order_by(cast(Any, Job.fit_score).asc().nullsfirst())
     ).all()
-    return [_triage_row(session, job) for job in jobs]
+    progressed = progressed_job_ids(session)
+    return [_triage_row(job, progressed) for job in jobs]
 
 
 def archived_rows(session: Session) -> list[TriageRow]:
@@ -390,4 +397,5 @@ def archived_rows(session: Session) -> list[TriageRow]:
     jobs = session.exec(
         select(Job).where(archived_col.is_not(None)).order_by(archived_col.desc())
     ).all()
-    return [_triage_row(session, job) for job in jobs]
+    progressed = progressed_job_ids(session)
+    return [_triage_row(job, progressed) for job in jobs]

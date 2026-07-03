@@ -343,7 +343,7 @@ def has_progress(session: Session, job_id: int) -> bool:
     return False
 
 
-def _progressed_job_ids(session: Session) -> set[int]:
+def progressed_job_ids(session: Session) -> set[int]:
     """Job ids owning any child row, resolved in one query per child table.
 
     Mirrors has_progress()'s child-existence check, but batched so a whole-table
@@ -355,8 +355,30 @@ def _progressed_job_ids(session: Session) -> set[int]:
     return progressed
 
 
+def versions_by_job(session: Session) -> dict[int, list[ResumeVersion]]:
+    """Every resume version grouped by job_id — one query for whole-board reads."""
+    grouped: dict[int, list[ResumeVersion]] = {}
+    for version in session.exec(select(ResumeVersion)).all():
+        grouped.setdefault(version.job_id, []).append(version)
+    return grouped
+
+
+def applications_by_job(session: Session) -> dict[int, Application]:
+    """Lowest-id application per job — the batched mirror of application_for_job()."""
+    id_col = cast(Any, Application.id)
+    grouped: dict[int, Application] = {}
+    for application in session.exec(select(Application).order_by(id_col)).all():
+        grouped.setdefault(application.job_id, application)
+    return grouped
+
+
+def job_has_progress(job: Job, progressed: set[int]) -> bool:
+    """Batched counterpart of has_progress(): same rule, zero per-job queries."""
+    return job.status in _PROGRESS_STATUSES or (job.id is not None and job.id in progressed)
+
+
 def _prune_rows(session: Session) -> list[PruneRow]:
-    progressed = _progressed_job_ids(session)
+    progressed = progressed_job_ids(session)
     return [
         PruneRow(
             job_id=job.id,

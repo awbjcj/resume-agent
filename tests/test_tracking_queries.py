@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine
 
+from resume_agent.db import init_db, make_engine
 from resume_agent.models.base import Source
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.tracking.repository import save_application, save_job, save_resume_version
-from resume_agent.tracking.queries import job_detail_row, pipeline_rows, shortlist_rows
+from resume_agent.tracking.queries import job_detail_row, pipeline_rows, shortlist_rows, triage_rows
 from resume_agent.tracking.tables import Application, ApplicationStatus, Job, JobStatus, ResumeVersion
 
 
@@ -391,7 +393,6 @@ def test_pipeline_rows_include_lean_metadata_fields():
 
 
 def test_triage_rows_are_pre_shortlist_and_unarchived():
-    from resume_agent.tracking.queries import triage_rows
     from resume_agent.tracking.repository import archive_job
 
     with _session() as s:
@@ -410,8 +411,6 @@ def test_triage_rows_are_pre_shortlist_and_unarchived():
 
 
 def test_triage_and_detail_rows_surface_reject_reason():
-    from resume_agent.tracking.queries import triage_rows
-
     with _session() as s:
         rejected = save_job(
             s,
@@ -499,3 +498,53 @@ def test_shortlist_row_preserves_canonical_industry():
         row = shortlist_rows(s)[0]
 
         assert row.industry == "Fintech"
+
+
+def _seeded_engine(job_count: int):
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    with Session(engine) as session:
+        for i in range(job_count):
+            job = Job(
+                source="greenhouse",
+                company=f"Co{i}",
+                title=f"Role {i}",
+                jd_text=f"jd {i}",
+                status=JobStatus.tailored.value if i % 2 else JobStatus.raw.value,
+            )
+            session.add(job)
+            session.commit()
+            session.refresh(job)
+            if i % 2:
+                session.add(ResumeVersion(job_id=job.id, round=1, fact_check_passed=True))
+                session.add(Application(job_id=job.id, status="ready"))
+                session.commit()
+    return engine
+
+
+def _select_count(engine, fn) -> int:
+    counts = {"n": 0}
+
+    def _tally(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            counts["n"] += 1
+
+    event.listen(engine, "before_cursor_execute", _tally)
+    try:
+        with Session(engine) as session:
+            fn(session)
+    finally:
+        event.remove(engine, "before_cursor_execute", _tally)
+    return counts["n"]
+
+
+def test_pipeline_rows_query_count_is_constant():
+    small = _select_count(_seeded_engine(2), pipeline_rows)
+    large = _select_count(_seeded_engine(12), pipeline_rows)
+    assert small == large  # no per-job queries
+
+
+def test_triage_rows_query_count_is_constant():
+    small = _select_count(_seeded_engine(2), triage_rows)
+    large = _select_count(_seeded_engine(12), triage_rows)
+    assert small == large
