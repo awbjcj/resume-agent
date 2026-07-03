@@ -6,6 +6,7 @@ from typing import Any, TypeVar, cast
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from resume_agent.tracking.dedup import compute_content_fingerprint
 from resume_agent.tracking.prune import (
     PruneReport,
     PruneRow,
@@ -65,9 +66,14 @@ def find_existing(
         if by_url is not None:
             return by_url
     if jd_text:
-        by_jd = session.exec(
-            select(Job).where(Job.jd_text == jd_text, archived_col.is_(None))
-        ).first()
+        # Equal jd_text implies equal content_fingerprint (a pure function of
+        # jd_text), so the indexed fingerprint column narrows the scan without
+        # changing which row matches; jd_text equality stays the real predicate.
+        fingerprint = compute_content_fingerprint(jd_text)
+        conditions = [Job.jd_text == jd_text, archived_col.is_(None)]
+        if fingerprint:
+            conditions.insert(0, Job.content_fingerprint == fingerprint)
+        by_jd = session.exec(select(Job).where(*conditions)).first()
         if by_jd is not None:
             return by_jd
     if dedup_key:

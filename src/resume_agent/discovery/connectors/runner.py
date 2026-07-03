@@ -112,6 +112,7 @@ def run_pull(
                 error=_run_note(result, added_count, upgraded_count, skipped_count),
             )
         except Exception as exc:
+            session.rollback()
             record_run(
                 telemetry_path,
                 connector.name,

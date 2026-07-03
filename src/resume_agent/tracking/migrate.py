@@ -96,6 +96,15 @@ def ensure_content_fingerprint_column(engine: Engine) -> None:
                 )
 
 
+def ensure_url_index(engine: Engine) -> None:
+    """Idempotently index jobs.url (find_existing's first dedupe probe)."""
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+        if not cols:
+            return
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_jobs_url ON jobs (url)"))
+
+
 def _table_columns(engine: Engine, table: str) -> list[str]:
     with engine.begin() as conn:
         return [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))]

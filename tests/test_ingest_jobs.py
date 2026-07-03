@@ -115,3 +115,37 @@ def test_cross_run_upgrade_not_counted_as_new_add():
         assert rows[0].source == "workday"
         assert rows[0].url == "http://wd/1"
         assert rows[0].jd_text == "full canonical jd"
+
+
+def test_ingest_batch_commits_once():
+    raws = [
+        RawJob(
+            source="greenhouse", url=None, company="Acme", title=f"Engineer {i}",
+            location=None, jd_text=f"jd {i}",
+        )
+        for i in range(3)
+    ]
+    with _session() as session:
+        commits = []
+        original_commit = session.commit
+
+        def counting_commit():
+            commits.append(1)
+            original_commit()
+
+        session.commit = counting_commit  # type: ignore[method-assign]
+        counts = ingest_jobs_with_outcomes(session, raws)
+        session.commit = original_commit  # type: ignore[method-assign]
+        assert counts.added == {"greenhouse": 3}
+        assert len(commits) == 1
+
+
+def test_ingest_dedupes_within_uncommitted_batch():
+    raw = RawJob(
+        source="greenhouse", url=None, company="Acme", title="Engineer",
+        location=None, jd_text="same jd",
+    )
+    with _session() as session:
+        counts = ingest_jobs_with_outcomes(session, [raw, raw])
+        assert counts.added == {"greenhouse": 1}
+        assert counts.skipped == {"greenhouse": 1}

@@ -82,3 +82,13 @@ def test_ensure_archived_at_column_is_idempotent():
     with engine.begin() as conn:
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
     assert cols.count("archived_at") == 1
+
+
+def test_url_index_created(tmp_path):
+    from resume_agent.db import init_db, make_engine
+
+    engine = make_engine(f"sqlite:///{tmp_path / 'idx.db'}")
+    init_db(engine)
+    with engine.begin() as conn:
+        names = [row[1] for row in conn.execute(text("PRAGMA index_list(jobs)"))]
+    assert "ix_jobs_url" in names

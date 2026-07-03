@@ -39,7 +39,7 @@ class Job(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     source: str
-    url: str | None = None
+    url: str | None = Field(default=None, index=True)
     company: str | None = None
     title: str | None = None
     location: str | None = None

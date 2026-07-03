@@ -14,6 +14,7 @@ from resume_agent.tracking.migrate import (
     ensure_posted_at_column,
     ensure_reject_category_column,
     ensure_resume_version_revision_columns,
+    ensure_url_index,
 )
 
 # Import tables so their metadata is registered before create_all().
@@ -61,6 +62,7 @@ def init_db(engine: Engine) -> None:
     ensure_resume_version_revision_columns(engine)
     ensure_cover_letter_revision_columns(engine)
     ensure_application_cover_letter_id_column(engine)
+    ensure_url_index(engine)
 
 
 def get_session(engine: Engine) -> Session:

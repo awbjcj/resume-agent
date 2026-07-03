@@ -1,5 +1,6 @@
 from sqlmodel import Session, SQLModel, create_engine
 
+from resume_agent.tracking.dedup import compute_content_fingerprint
 from resume_agent.tracking.repository import (
     find_existing,
     jobs_by_status,
@@ -52,7 +53,15 @@ def test_save_and_query_by_status():
 
 def test_find_existing_by_url_then_jd_text():
     with _session() as s:
-        save_job(s, Job(source="manual", jd_text="hello", url="http://x/1"))
+        save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="hello",
+                url="http://x/1",
+                content_fingerprint=compute_content_fingerprint("hello"),
+            ),
+        )
         assert find_existing(s, "http://x/1", "different") is not None  # url match
         assert find_existing(s, None, "hello") is not None             # jd_text match
         assert find_existing(s, "http://x/2", "nope") is None

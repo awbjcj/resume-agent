@@ -17,7 +17,7 @@ from resume_agent.discovery.merge import (
     UpgradeUrlOnly,
     decide,
 )
-from resume_agent.tracking.repository import find_existing, save_job
+from resume_agent.tracking.repository import find_existing
 from resume_agent.tracking.tables import Job, JobStatus
 
 
@@ -35,6 +35,18 @@ class IngestCounts:
     changed_raw_job_ids: list[int]
 
 
+def _persist(session: Session, job: Job, commit: bool) -> Job:
+    session.add(job)
+    if commit:
+        session.commit()
+        session.refresh(job)
+    else:
+        # flush() assigns the id and makes the row visible to find_existing
+        # for later items in the same batch, without ending the transaction.
+        session.flush()
+    return job
+
+
 def save_or_upgrade(
     session: Session,
     *,
@@ -45,6 +57,7 @@ def save_or_upgrade(
     title: str | None = None,
     location: str | None = None,
     posted_at: datetime | None = None,
+    commit: bool = True,
 ) -> tuple[Job | None, IngestOutcome]:
     """Insert a new job, upgrade an existing one from a higher-tier source, or skip."""
     incoming = IncomingJob.clean(
@@ -63,7 +76,7 @@ def save_or_upgrade(
         incoming.dedup_key,
         incoming.content_fingerprint,
     )
-    return _apply(session, existing, incoming, decide(existing, incoming))
+    return _apply(session, existing, incoming, decide(existing, incoming), commit)
 
 
 def _apply(
@@ -71,6 +84,7 @@ def _apply(
     existing: Job | None,
     incoming: IncomingJob,
     action: MergeAction,
+    commit: bool,
 ) -> tuple[Job | None, IngestOutcome]:
     """Carry out the pure merge decision against the database."""
     if isinstance(action, Skip):
@@ -88,7 +102,7 @@ def _apply(
             content_fingerprint=incoming.content_fingerprint,
             status=JobStatus.raw.value,
         )
-        return save_job(session, job), IngestOutcome.inserted
+        return _persist(session, job, commit), IngestOutcome.inserted
     # The remaining actions mutate the matched row in place.
     assert existing is not None
     if isinstance(action, UpgradeUrlOnly):
@@ -97,7 +111,7 @@ def _apply(
     elif isinstance(action, (Rebase, RefreshText)):
         for field, value in action.updates.items():
             setattr(existing, field, value)
-    return save_job(session, existing), IngestOutcome.upgraded
+    return _persist(session, existing, commit), IngestOutcome.upgraded
 
 
 def add_job(
@@ -144,6 +158,7 @@ def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> I
             title=raw.title,
             location=raw.location,
             posted_at=raw.posted_at,
+            commit=False,
         )
         if outcome is IngestOutcome.inserted:
             added[raw.source] += 1
@@ -162,6 +177,7 @@ def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> I
                 changed_raw_job_ids.append(job.id)
         elif outcome is IngestOutcome.skipped:
             skipped[raw.source] += 1
+    session.commit()
     return IngestCounts(
         added=dict(added),
         upgraded=dict(upgraded),
