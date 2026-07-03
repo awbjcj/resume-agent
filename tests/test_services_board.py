@@ -141,3 +141,13 @@ def test_delete_refuses_job_with_progress():
         job = _job(session, status=JobStatus.rendered.value)  # rendered == has_progress
         assert job.id is not None
         assert board.delete(session, job.id) is False
+
+
+def test_facet_specs_match_board_filter_fields():
+    import dataclasses
+
+    filter_fields = {f.name for f in dataclasses.fields(board.BoardFilter)}
+    keys = [spec.key for spec in board.FACET_SPECS]
+    assert len(set(keys)) == len(keys)
+    for spec in board.FACET_SPECS:
+        assert spec.filter_attr in filter_fields, spec.key

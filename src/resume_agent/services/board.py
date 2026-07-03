@@ -86,6 +86,35 @@ class BulkResult:
     reasons: dict[str, int]
 
 
+@dataclass(frozen=True)
+class FacetSpec:
+    """One facet: its wire key, the row attribute it reads, and the BoardFilter
+    field that selects on it. The single statement of the facet vocabulary —
+    _row_value, _passes_filter, and board_facets all derive from this table."""
+
+    key: str          # camelCase wire key (facet payload + filter query param)
+    row_attr: str     # attribute on the row DTO
+    filter_attr: str  # field name on BoardFilter
+    skip_unset_rows: bool = False  # rows without the value pass the filter
+
+
+FACET_SPECS: tuple[FacetSpec, ...] = (
+    FacetSpec("source", "source", "source"),
+    FacetSpec("status", "status", "status"),
+    FacetSpec("remote", "remote_policy", "remote"),
+    FacetSpec("sponsorship", "sponsorship_signal", "sponsorship"),
+    FacetSpec("seniority", "seniority", "seniority"),
+    FacetSpec("employmentType", "employment_type", "employment_type"),
+    FacetSpec("industry", "industry", "industry", skip_unset_rows=True),
+    FacetSpec("country", "location_country", "country"),
+    FacetSpec("region", "location_region", "region"),
+    FacetSpec("city", "location_city", "city"),
+    FacetSpec("companySize", "company_size", "company_size"),
+)
+
+_FACETS_BY_KEY = {spec.key: spec for spec in FACET_SPECS}
+
+
 _PUNCT = re.compile(r"[^a-z0-9+#. ]+")
 _WS = re.compile(r"\s+")
 
@@ -99,29 +128,10 @@ def _selected(values: Sequence[str]) -> set[str]:
 
 
 def _row_value(row: Any, key: str) -> str | None:
-    if key == "source":
-        return getattr(row, "source", None)
-    if key == "status":
-        return getattr(row, "status", None)
-    if key == "remote":
-        return getattr(row, "remote_policy", None)
-    if key == "sponsorship":
-        return getattr(row, "sponsorship_signal", None)
-    if key == "seniority":
-        return getattr(row, "seniority", None)
-    if key == "employmentType":
-        return getattr(row, "employment_type", None)
-    if key == "industry":
-        return getattr(row, "industry", None)
-    if key == "country":
-        return getattr(row, "location_country", None)
-    if key == "region":
-        return getattr(row, "location_region", None)
-    if key == "city":
-        return getattr(row, "location_city", None)
-    if key == "companySize":
-        return getattr(row, "company_size", None)
-    return None
+    spec = _FACETS_BY_KEY.get(key)
+    if spec is None:
+        return None
+    return getattr(row, spec.row_attr, None)
 
 
 def _row_text(row: Any) -> str:
@@ -168,23 +178,10 @@ def _passes_filter(row: Any, f: BoardFilter) -> bool:
         if _aware(posted_at) > cutoff:
             return False
 
-    set_filters = (
-        ("source", f.source),
-        ("status", f.status),
-        ("remote", f.remote),
-        ("sponsorship", f.sponsorship),
-        ("seniority", f.seniority),
-        ("employmentType", f.employment_type),
-        ("industry", f.industry),
-        ("country", f.country),
-        ("region", f.region),
-        ("city", f.city),
-        ("companySize", f.company_size),
-    )
-    for key, raw_selected in set_filters:
-        selected = _selected(raw_selected)
-        value = _row_value(row, key)
-        if key == "industry" and value is None:
+    for spec in FACET_SPECS:
+        selected = _selected(getattr(f, spec.filter_attr))
+        value = getattr(row, spec.row_attr, None)
+        if spec.skip_unset_rows and value is None:
             continue
         if selected and value not in selected:
             return False
@@ -243,22 +240,10 @@ def _count_skills(rows: list[Any]) -> dict[str, int]:
 
 def board_facets(rows: list[Any]) -> Facets:
     facets: Facets = {}
-    for key in (
-        "source",
-        "status",
-        "remote",
-        "sponsorship",
-        "seniority",
-        "employmentType",
-        "industry",
-        "country",
-        "region",
-        "city",
-        "companySize",
-    ):
-        counts = _count_values(rows, key)
+    for spec in FACET_SPECS:
+        counts = _count_values(rows, spec.key)
         if counts:
-            facets[key] = counts
+            facets[spec.key] = counts
     skills = _count_skills(rows)
     if skills:
         facets["skills"] = skills
