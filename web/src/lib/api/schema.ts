@@ -541,6 +541,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile/skeleton": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Skeleton */
+        get: operations["get_skeleton_api_profile_skeleton_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sources */
+        get: operations["list_sources_api_profile_sources_get"];
+        put?: never;
+        /** Upload Source */
+        post: operations["upload_source_api_profile_sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/sources/{doc_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Source */
+        delete: operations["delete_source_api_profile_sources__doc_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Source */
+        patch: operations["patch_source_api_profile_sources__doc_id__patch"];
+        trace?: never;
+    };
     "/api/prune": {
         parameters: {
             query?: never;
@@ -1046,6 +1099,20 @@ export interface components {
             docType: string;
             /** File */
             file: string;
+        };
+        /** Body_upload_source_api_profile_sources_post */
+        Body_upload_source_api_profile_sources_post: {
+            /** Anchor */
+            anchor?: string | null;
+            /** File */
+            file: string;
+            /** Mode */
+            mode?: string | null;
+            /**
+             * Primary
+             * @default false
+             */
+            primary: boolean;
         };
         /** BulkRequest */
         BulkRequest: {
@@ -1871,6 +1938,15 @@ export interface components {
             /** Title */
             title: string | null;
         };
+        /** SkeletonEntryOut */
+        SkeletonEntryOut: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+        };
         /** SkillNodeOut */
         SkillNodeOut: {
             /**
@@ -1909,22 +1985,14 @@ export interface components {
             /** Required */
             required: boolean;
         };
-        /** SourceOut */
-        SourceOut: {
-            /** Detail */
-            detail: string;
-            /** Displayname */
-            displayName: string;
-            /** Enabled */
-            enabled: boolean;
-            /** Id */
-            id: string;
-            /** Kind */
-            kind: string;
-            /** Pullable */
-            pullable: boolean;
-            /** Type */
-            type: string;
+        /** SourcePatch */
+        SourcePatch: {
+            /** Anchor */
+            anchor?: string | null;
+            /** Mode */
+            mode?: string | null;
+            /** Primary */
+            primary?: boolean | null;
         };
         /** SourcePreviewIn */
         SourcePreviewIn: {
@@ -2136,6 +2204,40 @@ export interface components {
             /** Message */
             msg: string;
             /** Error Type */
+            type: string;
+        };
+        /** SourceOut */
+        resume_agent__api__schemas__profile__SourceOut: {
+            /** Addedat */
+            addedAt: string;
+            /** Anchor */
+            anchor?: string | null;
+            /** Filename */
+            filename: string;
+            /** Fragmentstatus */
+            fragmentStatus: string;
+            /** Id */
+            id: string;
+            /** Mode */
+            mode: string;
+            /** Primary */
+            primary: boolean;
+        };
+        /** SourceOut */
+        resume_agent__api__schemas__sources__SourceOut: {
+            /** Detail */
+            detail: string;
+            /** Displayname */
+            displayName: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Pullable */
+            pullable: boolean;
+            /** Type */
             type: string;
         };
     };
@@ -3514,6 +3616,173 @@ export interface operations {
             };
         };
     };
+    get_skeleton_api_profile_skeleton_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkeletonEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_profile_sources_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_source_api_profile_sources_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_source_api_profile_sources_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_api_profile_sources__doc_id__delete: {
+        parameters: {
+            query?: {
+                purge?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_source_api_profile_sources__doc_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourcePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     prune_api_prune_post: {
         parameters: {
             query?: never;
@@ -4056,7 +4325,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceOut"][];
+                    "application/json": components["schemas"]["resume_agent__api__schemas__sources__SourceOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4091,7 +4360,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceOut"];
+                    "application/json": components["schemas"]["resume_agent__api__schemas__sources__SourceOut"];
                 };
             };
             /** @description Validation Error */
@@ -4194,7 +4463,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceOut"];
+                    "application/json": components["schemas"]["resume_agent__api__schemas__sources__SourceOut"];
                 };
             };
             /** @description Validation Error */
