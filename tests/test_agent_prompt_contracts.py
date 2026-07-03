@@ -12,6 +12,10 @@ from resume_agent.discovery.url_ingest.llm import (
     _INSTRUCTIONS as URL_EXTRACT_INSTRUCTIONS,
 )
 from resume_agent.profile.extractor import _INSTRUCTIONS as PROFILE_INSTRUCTIONS
+from resume_agent.profile.synthesis import (
+    _ENTAILMENT_INSTRUCTIONS,
+    _SYNTHESIS_INSTRUCTIONS,
+)
 from resume_agent.suggestions.agents import (
     _FORMAT_INSTRUCTIONS as SUGGESTION_FORMAT_INSTRUCTIONS,
     _SEARCH_INSTRUCTIONS as SUGGESTION_SEARCH_INSTRUCTIONS,
@@ -39,6 +43,8 @@ def test_untrusted_data_prompts_define_an_instruction_boundary():
         RELEVANCE_INSTRUCTIONS,
         URL_EXTRACT_INSTRUCTIONS,
         PROFILE_INSTRUCTIONS,
+        _SYNTHESIS_INSTRUCTIONS,
+        _ENTAILMENT_INSTRUCTIONS,
         _TAILOR_INSTRUCTIONS,
         RESUME_REVISER_INSTRUCTIONS,
         COVER_DRAFT_INSTRUCTIONS,
