@@ -190,6 +190,7 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/llm_runner.py` | `build_model` provider seam + `AgentRunner` adapter |
 | `src/resume_agent/profile/corpus.py` | Source registry: manifest + add/remove + legacy migration |
 | `src/resume_agent/profile/matrix.py` | Derived skill matrix + overrides (ban/alias/forbid/category) |
+| `src/resume_agent/profile/synthesis.py` | Verified synthesis: deck → excerpt-backed facts (synthesize → verify → one repair round) |
 | `src/resume_agent/discovery/connectors/detect.py` | ATS detection (singleton → L1 → L2) |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation |
 | `src/resume_agent/discovery/scraper/dashboard.py` | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/` |
@@ -210,6 +211,10 @@ aggressiveness determines how many detail fetches are issued.
 - **Profile rebuilds regenerate inferred skills.** `profile build` strips and re-derives
   all `inferred=true` skills; durable corrections belong in `data/profile/overrides.yaml`,
   not hand-edits to facts.json.
+- **Synthesis ingest is text-only.** markitdown converts slide text frames, tables, and
+  speaker notes; images/diagrams are skipped, and an LLM image description is never
+  verification evidence (it would punch a hole in fact-lock). Put key numbers in slide
+  text or speaker notes so they are extractable.
 - **`dedup_key` drops location.** `compute_dedup_key` is `normalize(company)|normalize_title(title)`.
   Multi-location same-title Workday reqs (e.g. "Software Engineer" in Austin vs. Detroit at GM)
   collapse to one job. Flagged as a follow-up micro-spec — fix is adding location to the key or a

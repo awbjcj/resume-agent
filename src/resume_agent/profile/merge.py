@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 from agno.agent import Agent
 from pydantic import Field
@@ -12,8 +13,16 @@ from resume_agent.llm_runner import (
     use_json_mode_for,
 )
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import Bullet, Experience, GitHubProfile, ProfileFacts, Project
+from resume_agent.models.profile import (
+    Bullet,
+    Experience,
+    GitHubProfile,
+    ProfileFacts,
+    Project,
+    Skill,
+)
 from resume_agent.profile.corpus import SourceDoc
+from resume_agent.profile.ids import deterministic_id
 from resume_agent.tracking.match_gap import normalize_skill
 
 
@@ -386,34 +395,118 @@ def merge_fragments(
             doc=doc,
             report=report,
         )
-        for category, skills in fragment.skills.items():
-            bucket = merged.skills.setdefault(category, [])
-            for skill in skills:
-                twin = next(
-                    (
-                        existing
-                        for existing_skills in merged.skills.values()
-                        for existing in existing_skills
-                        if normalize_skill(existing.name) == normalize_skill(skill.name)
-                    ),
-                    None,
-                )
-                if twin is None:
-                    bucket.append(skill.model_copy(deep=True))
-                else:
-                    _merge_record(
-                        twin,
-                        skill,
-                        scalar_fields=("context", "category", "inferred"),
-                        collection_fields=("aliases", "evidence_fact_ids"),
-                        label=f"skill {twin.name}",
-                        doc=doc,
-                        report=report,
-                    )
+        _merge_skills(merged, fragment.skills, doc, report)
 
     if dedup_agent is not None:
-        for experience in merged.experience:
-            experience.bullets = _dedup_bullets(
-                experience.bullets, dedup_agent, report
-            )
+        dedup_experience_bullets(merged, dedup_agent, report)
     return merged, report
+
+
+def _merge_skills(
+    merged: ProfileFacts,
+    skills_by_category: dict[str, list[Skill]],
+    doc: SourceDoc,
+    report: MergeReport,
+) -> None:
+    for category, skills in skills_by_category.items():
+        bucket = merged.skills.setdefault(category, [])
+        for skill in skills:
+            twin = next(
+                (
+                    existing
+                    for existing_skills in merged.skills.values()
+                    for existing in existing_skills
+                    if normalize_skill(existing.name) == normalize_skill(skill.name)
+                ),
+                None,
+            )
+            if twin is None:
+                bucket.append(skill.model_copy(deep=True))
+            else:
+                _merge_record(
+                    twin,
+                    skill,
+                    scalar_fields=("context", "category", "inferred"),
+                    collection_fields=("aliases", "evidence_fact_ids"),
+                    label=f"skill {twin.name}",
+                    doc=doc,
+                    report=report,
+                )
+
+
+def dedup_experience_bullets(
+    facts: ProfileFacts,
+    agent: Runner,
+    report: MergeReport,
+    only_ids: set[str] | None = None,
+) -> None:
+    for experience in facts.experience:
+        if only_ids is not None and experience.id not in only_ids:
+            continue
+        experience.bullets = _dedup_bullets(experience.bullets, agent, report)
+
+
+def apply_synthesis_fragments(
+    merged: ProfileFacts,
+    fragments: list[tuple[SourceDoc, ProfileFacts]],
+    report: MergeReport,
+) -> tuple[list[str], set[str]]:
+    """Attach synthesized fragments onto literal-merged facts.
+
+    Anchored Experience stubs match by fact id (decks rarely restate
+    company+title, so entity keys cannot anchor them); a stale anchor falls
+    back to a Project. Synthesized entries never win scalar conflicts — they
+    only contribute bullets, tech, skills, and projects.
+    """
+    anchor_decisions: list[str] = []
+    touched: set[str] = set()
+    for doc, fragment in fragments:
+        by_id = {experience.id: experience for experience in merged.experience}
+        for stub in fragment.experience:
+            target = by_id.get(stub.id)
+            if target is None:
+                merged.projects.append(
+                    Project(
+                        id=deterministic_id(doc.id, "synth-fallback", stub.id),
+                        name=stub.title or Path(doc.filename).stem,
+                        highlights=[bullet.text for bullet in stub.bullets],
+                        tech=list(stub.tech),
+                        source_ref=doc.id,
+                        synthesized=True,
+                    )
+                )
+                anchor_decisions.append(
+                    f"{doc.id}: anchor {stub.id} not found — kept as a project"
+                )
+                continue
+            seen = {normalize_skill(bullet.text) for bullet in target.bullets}
+            appended = 0
+            for bullet in stub.bullets:
+                key = normalize_skill(bullet.text)
+                if key not in seen:
+                    seen.add(key)
+                    target.bullets.append(bullet.model_copy(deep=True))
+                    appended += 1
+            for token in stub.tech:
+                if token not in target.tech:
+                    target.tech.append(token)
+            touched.add(target.id)
+            anchor_decisions.append(
+                f"{doc.id}: +{appended} bullets on {target.company}/{target.title}"
+            )
+        _merge_entity_list(
+            merged.projects,
+            fragment.projects,
+            key=lambda project: _norm(project.name),
+            scalar_fields=(
+                "description", "role", "url", "repo_url", "start", "end",
+                "stars", "forks", "primary_language", "homepage_url",
+                "last_updated", "is_fork",
+            ),
+            collection_fields=("tech", "highlights", "languages", "topics"),
+            label=lambda project: f"project {project.name}",
+            doc=doc,
+            report=report,
+        )
+        _merge_skills(merged, fragment.skills, doc, report)
+    return anchor_decisions, touched

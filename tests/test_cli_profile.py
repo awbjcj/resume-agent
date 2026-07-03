@@ -35,6 +35,12 @@ def _configure_build(monkeypatch, facts):
     monkeypatch.setattr(
         "resume_agent.profile.inference.build_inference_agent", lambda: object()
     )
+    monkeypatch.setattr(
+        "resume_agent.profile.synthesis.build_synthesis_agent", lambda: object()
+    )
+    monkeypatch.setattr(
+        "resume_agent.profile.synthesis.build_entailment_agent", lambda: object()
+    )
 
 
 def test_profile_build_writes_facts(tmp_path, monkeypatch):

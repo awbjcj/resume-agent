@@ -18,6 +18,7 @@ from resume_agent.profile.corpus import SourceDoc
 from resume_agent.profile.merge import (
     BulletDupGroups,
     MergeReport,
+    apply_synthesis_fragments,
     merge_facts,
     merge_fragments,
 )
@@ -300,3 +301,76 @@ def test_merge_fragments_requires_exactly_one_primary_first():
 
     with pytest.raises(ValueError, match="primary"):
         merge_fragments([(_doc("secondary"), facts)])
+
+
+def _deck_doc():
+    return SourceDoc(id="deck-1", filename="deck.pptx", sha256="0" * 64,
+                     added_at="2026-07-03T00:00:00+00:00", mode="synthesis")
+
+
+def _merged():
+    return ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[Experience(
+            id="exp1", company="Acme", title="Engineer",
+            bullets=[Bullet(id="b1", text="Shipped the billing rewrite")],
+            tech=["Python"],
+        )],
+    )
+
+
+def _synth_fragment(anchor_id="exp1"):
+    return ProfileFacts(
+        contact=Contact(name=""),
+        experience=[Experience(
+            id=anchor_id, company="Acme", title="Engineer", synthesized=True,
+            bullets=[
+                Bullet(id="sb1", text="Cut p99 latency 30%", synthesized=True),
+                Bullet(id="sb2", text="Shipped the billing rewrite", synthesized=True),
+            ],
+            tech=["Kubernetes", "Python"],
+        )],
+        skills={"hard": [Skill(id="sk1", name="Kubernetes", category="hard",
+                               synthesized=True)]},
+        projects=[Project(id="sp1", name="Side tool", synthesized=True,
+                          highlights=["Built a CLI"])],
+    )
+
+
+def test_anchored_bullets_append_by_id_with_exact_dedup():
+    merged = _merged()
+    report = MergeReport()
+    decisions, touched = apply_synthesis_fragments(
+        merged, [(_deck_doc(), _synth_fragment())], report
+    )
+    target = merged.experience[0]
+    texts = [bullet.text for bullet in target.bullets]
+    assert "Cut p99 latency 30%" in texts
+    assert texts.count("Shipped the billing rewrite") == 1  # exact dup skipped
+    assert "Kubernetes" in target.tech and target.tech.count("Python") == 1
+    assert touched == {"exp1"}
+    assert any("exp1" in line or "Acme" in line for line in decisions)
+    assert merged.skills["hard"][0].name == "Kubernetes"
+    assert any(project.name == "Side tool" for project in merged.projects)
+
+
+def test_unresolvable_anchor_falls_back_to_project():
+    merged = _merged()
+    report = MergeReport()
+    decisions, touched = apply_synthesis_fragments(
+        merged, [(_deck_doc(), _synth_fragment(anchor_id="ghost"))], report
+    )
+    assert touched == set()
+    assert len(merged.experience[0].bullets) == 1  # untouched
+    fallback = next(p for p in merged.projects if p.synthesized and p.name != "Side tool")
+    assert "Cut p99 latency 30%" in fallback.highlights
+    assert any("not found" in line for line in decisions)
+
+
+def test_synthesized_scalars_never_win():
+    merged = _merged()
+    merged.experience[0].location = "Detroit"
+    fragment = _synth_fragment()
+    fragment.experience[0].location = "Austin"
+    apply_synthesis_fragments(merged, [(_deck_doc(), fragment)], MergeReport())
+    assert merged.experience[0].location == "Detroit"

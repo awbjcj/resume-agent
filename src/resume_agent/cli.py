@@ -137,6 +137,7 @@ def profile_build(
     from resume_agent.profile.inference import build_inference_agent
     from resume_agent.profile.matrix import build_matrix, load_overrides, save_matrix
     from resume_agent.profile.merge import build_bullet_dedup_agent
+    from resume_agent.profile.synthesis import build_entailment_agent, build_synthesis_agent
     from resume_agent.taxonomy.clusters import load_cluster_map
 
     settings = get_settings()
@@ -170,6 +171,8 @@ def profile_build(
         github_username=cast(str | None, cfg.get("github_username")),
         dedup_agent=build_bullet_dedup_agent(),
         inference_agent=build_inference_agent(),
+        synthesis_agent=build_synthesis_agent(),
+        entailment_agent=build_entailment_agent(),
     )
     path = save_facts(facts, out)
     matrix = build_matrix(
@@ -188,6 +191,10 @@ def profile_build(
         typer.echo(f"  CONFLICT: {conflict}")
     for name in report.inferred_added:
         typer.echo(f"  inferred: {name}")
+    for line in report.anchor_decisions:
+        typer.echo(f"  anchor: {line}")
+    for line in report.verification_drops:
+        typer.echo(f"  DROPPED: {line}")
     for warning in report.warnings:
         typer.echo(f"  WARNING: {warning}")
 

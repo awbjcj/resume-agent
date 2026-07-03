@@ -1,9 +1,18 @@
+import json
+
 import pytest
 
 from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
 from resume_agent.profile.build import build_corpus_profile, build_profile
 from resume_agent.profile.corpus import add_source
 from resume_agent.profile.inference import InferredSkill, InferredSkills
+from resume_agent.profile.synthesis import (
+    ClaimVerdict,
+    ClaimVerdicts,
+    SynthesizedClaim,
+    SynthesizedEntry,
+    SynthesizedFragment,
+)
 
 
 class _FakeResult:
@@ -177,3 +186,79 @@ def test_build_aborts_when_primary_has_no_fragment(tmp_path):
                 [RuntimeError("boom"), ProfileFacts(contact=Contact(name="Ada"))]
             ),
         )
+
+
+class _Extractor:
+    def run(self, prompt):
+        return _FakeResult(ProfileFacts(
+            contact=Contact(name="Ada"),
+            experience=[Experience(company="Acme", title="Engineer")],
+        ))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+class _SkeletonAwareSynthesis:
+    """Reads the anchor id out of the skeleton section of its own prompt."""
+
+    def run(self, prompt):
+        skeleton_json = prompt.split("PROFILE SKELETON (anchor candidates):\n")[1]
+        skeleton = json.loads(skeleton_json.split("\n\nDOCUMENT:\n")[0])
+        anchor = next(r["id"] for r in skeleton if r["kind"] == "experience")
+        return _FakeResult(SynthesizedFragment(entries=[SynthesizedEntry(
+            kind="experience_bullets", anchor_id=anchor,
+            claims=[SynthesizedClaim(text="Cut latency 30%",
+                                     support=["Cut latency 30%"])],
+        )]))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+class _ApproveAll:
+    def run(self, prompt):
+        claims = json.loads(prompt)
+        return _FakeResult(ClaimVerdicts(verdicts=[
+            ClaimVerdict(index=c["index"], verdict="supported") for c in claims
+        ]))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+def test_corpus_build_applies_synthesis_docs(tmp_path):
+    profile_dir = tmp_path / "profile"
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada Lovelace — Engineer at Acme", encoding="utf-8")
+    add_source(profile_dir, resume, primary=True)
+    deck = tmp_path / "deck.md"
+    deck.write_text("Cut latency 30% on the Acme billing system.", encoding="utf-8")
+    add_source(profile_dir, deck, mode="synthesis")
+
+    facts, report = build_corpus_profile(
+        profile_dir,
+        github_username=None,
+        extractor_agent=_Extractor(),
+        synthesis_agent=_SkeletonAwareSynthesis(),
+        entailment_agent=_ApproveAll(),
+    )
+    acme = next(e for e in facts.experience if e.company == "Acme")
+    assert any(b.text == "Cut latency 30%" and b.synthesized for b in acme.bullets)
+    assert report.anchor_decisions
+    assert report.verification_drops == []
+
+
+def test_corpus_build_skips_synthesis_without_agents(tmp_path):
+    profile_dir = tmp_path / "profile"
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada", encoding="utf-8")
+    add_source(profile_dir, resume, primary=True)
+    deck = tmp_path / "deck.md"
+    deck.write_text("Cut latency 30%.", encoding="utf-8")
+    add_source(profile_dir, deck, mode="synthesis")
+
+    facts, report = build_corpus_profile(
+        profile_dir, github_username=None, extractor_agent=_Extractor()
+    )
+    assert any("synthesis skipped" in w for w in report.warnings)
