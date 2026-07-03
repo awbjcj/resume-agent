@@ -4,14 +4,15 @@
 
 **Goal:** Expose the existing resume-tailoring workflow (currently driven by a Typer CLI and a Streamlit dashboard) through a FastAPI HTTP server, so a future independent React/shadcn frontend can consume it — without rewriting the domain logic.
 
-**Architecture:** A new `src/resume_agent/api/` package is a *third thin adapter* over the domain code, sitting alongside the CLI and Streamlit. First (Phase 0) we extract the orchestration logic currently inlined in `cli.py` (agent-building + config/facts loading + the read-model filter/sort/paginate) into a reusable `src/resume_agent/services/` use-case layer; the CLI is refactored to call it, and its existing tests are the safety net proving behavior is preserved. Then the API is built on top. Minutes-long operations (`pull`/`discover`/`tailor`/`cover-letter`/add-job-from-URL) run in a background thread and report progress through a `run_id`-keyed extension of the existing `ProgressReporter` JSON store; clients watch via Server-Sent Events with a polling fallback. The Pydantic schemas are the single source of truth — FastAPI emits OpenAPI, from which a TypeScript client is generated and committed under `contracts/`.
+**Architecture:** A new `src/resume_agent/api/` package is a _third thin adapter_ over the domain code, sitting alongside the CLI and Streamlit. First (Phase 0) we extract the orchestration logic currently inlined in `cli.py` (agent-building + config/facts loading + the read-model filter/sort/paginate) into a reusable `src/resume_agent/services/` use-case layer; the CLI is refactored to call it, and its existing tests are the safety net proving behavior is preserved. Then the API is built on top. Minutes-long operations (`pull`/`discover`/`tailor`/`cover-letter`/add-job-from-URL) run in a background thread and report progress through a `run_id`-keyed extension of the existing `ProgressReporter` JSON store; clients watch via Server-Sent Events with a polling fallback. The Pydantic schemas are the single source of truth — FastAPI emits OpenAPI, from which a TypeScript client is generated and committed under `contracts/`.
 
 **Tech Stack:** Python 3.13, FastAPI, Uvicorn, sse-starlette, Pydantic v2 (camelCase alias generator), SQLModel/SQLite (unchanged), pytest. Contract codegen via `openapi-typescript` (Node, used only at codegen time).
 
 **Locked decisions (from design interview):**
+
 - **Single-user, local-first.** SQLite, `.env` keys, local-filesystem PDFs all stay. No auth by default; an optional static bearer token via env (off unless set). CORS allowlist for localhost dev origins.
 - **Restructure services first**, then add the API as an adapter. CLI + Streamlit keep working throughout.
-- **Long ops = Run resource + SSE**, backed by a `run_id`-keyed `ProgressReporter`; blocking LLM work runs in a threadpool with its *own* DB session (never the request session).
+- **Long ops = Run resource + SSE**, backed by a `run_id`-keyed `ProgressReporter`; blocking LLM work runs in a threadpool with its _own_ DB session (never the request session).
 - **FastAPI; Pydantic is the contract**, TS client generated from OpenAPI and committed.
 - **Core pipeline scope only.** In: ingest (add-job/pull), discover, shortlist, approve/stage/archive/restore/delete, tailor, render, cover-letter, pipeline board + application updates, triage + prune. **Deferred** (out of scope, follow-up plan): Gmail `sync-status`, analytics, match-gap, `profile build`, LinkedIn `scrape`.
 - **Contract artifact only, no React app.** `contracts/openapi.json` + `contracts/ts/` committed in this repo.
@@ -23,6 +24,7 @@
 ## File Structure
 
 **New — application-service layer (Phase 0):**
+
 - `src/resume_agent/services/__init__.py` — package marker.
 - `src/resume_agent/services/agents.py` — central agent-bundle builders (moved out of `cli.py`).
 - `src/resume_agent/services/discovery.py` — `discover_jobs`, `pull_jobs`, `add_job_from_text`, `add_job_from_url`.
@@ -33,6 +35,7 @@
 - `src/resume_agent/services/pagination.py` — pure `paginate(items, page, page_size)` helper.
 
 **New — API layer (Phases 1-4):**
+
 - `src/resume_agent/api/__init__.py`
 - `src/resume_agent/api/app.py` — `create_app(...)` factory: lifespan (`init_db`), CORS, error handlers, router registration, `RunManager` wiring.
 - `src/resume_agent/api/deps.py` — `get_session`, `get_settings_dep`, `require_token`, `get_run_manager`.
@@ -52,11 +55,13 @@
 - `src/resume_agent/api/routers/runs.py` — `POST /api/discover|pull|tailor|cover-letters|jobs/from-url`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events`.
 
 **New — contract tooling (Phase 5):**
+
 - `scripts/export_openapi.py` — dump `create_app().openapi()` to `contracts/openapi.json`.
 - `scripts/gen_ts_client.sh` — run `openapi-typescript`.
 - `contracts/openapi.json`, `contracts/ts/api.ts` — committed artifacts.
 
 **Modified:**
+
 - `src/resume_agent/cli.py` — commands call `services/*`; add `serve` command.
 - `src/resume_agent/config.py` — `Settings` gains `api_token`, `cors_origins`.
 - `src/resume_agent/progress.py` — `ProgressReporter` accepts arbitrary `process` keys + a `RUNS_ROOT`; record gains `kind`/`result` via `**extra` (already supported).
@@ -73,6 +78,7 @@
 ## Task 1: Centralize agent-bundle builders
 
 **Files:**
+
 - Create: `src/resume_agent/services/__init__.py`
 - Create: `src/resume_agent/services/agents.py`
 - Test: `tests/test_services_agents.py`
@@ -234,6 +240,7 @@ git commit -m "feat(services): central agent-bundle builders"
 ## Task 2: Discovery/ingest use-cases
 
 **Files:**
+
 - Create: `src/resume_agent/services/discovery.py`
 - Test: `tests/test_services_discovery.py`
 
@@ -418,6 +425,7 @@ git commit -m "feat(services): discovery + ingest use-cases"
 ## Task 3: Tailoring, cover-letter, and rendering use-cases
 
 **Files:**
+
 - Create: `src/resume_agent/services/tailoring.py`
 - Create: `src/resume_agent/services/cover_letters.py`
 - Create: `src/resume_agent/services/rendering.py`
@@ -658,6 +666,7 @@ git commit -m "feat(services): tailoring, cover-letter, rendering use-cases"
 ## Task 4: Board read-models (filter/sort/paginate) + mutations
 
 **Files:**
+
 - Create: `src/resume_agent/services/pagination.py`
 - Create: `src/resume_agent/services/board.py`
 - Test: `tests/test_services_board.py`
@@ -907,6 +916,7 @@ git commit -m "feat(services): board read-models + mutations"
 ## Task 5: Refactor the CLI onto the service layer
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py` (commands: `addjob`, `discover_cmd`, `pull_cmd`, `tailor_cmd`, `cover_letter_cmd`, `render_cmd`; remove the inline `build_reviewer_agents` helper)
 - Test: existing `tests/test_cli_*.py` remain the regression net. Some current tests monkeypatch `cli.py` implementation details that move into `services/*`; update those monkeypatch targets to the service module or service entrypoint while keeping the command invocations and behavioral assertions unchanged.
 
@@ -1012,6 +1022,7 @@ git commit -m "refactor(cli): route commands through the services layer"
 ## Task 6: Add deps + Settings fields + CamelModel/Page/error schemas
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py:16-29` (add fields)
 - Modify: `pyproject.toml:7-30` (add deps)
 - Create: `src/resume_agent/api/__init__.py`
@@ -1217,6 +1228,7 @@ git commit -m "feat(api): foundation — deps, settings, CamelModel + error enve
 ## Task 7: Dependencies (session, settings, auth) + app factory + health endpoint
 
 **Files:**
+
 - Create: `src/resume_agent/api/deps.py`
 - Create: `src/resume_agent/api/routers/__init__.py`
 - Create: `src/resume_agent/api/routers/health.py`
@@ -1402,6 +1414,7 @@ git commit -m "feat(api): app factory, deps, health endpoint"
 ## Task 8: Board list endpoints (shortlist / pipeline / triage)
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/jobs.py` (board item schemas)
 - Create: `src/resume_agent/api/mappers.py`
 - Create: `src/resume_agent/api/routers/boards.py`
@@ -1718,6 +1731,7 @@ git commit -m "feat(api): shortlist/pipeline/triage list endpoints"
 ## Task 9: Job detail + resume-version PDF download
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/jobs.py` (detail only this task; mutations added in Task 10)
 - Create: `src/resume_agent/api/routers/resumes.py`
 - Modify: `src/resume_agent/api/app.py` (include both routers, guarded)
@@ -1914,6 +1928,7 @@ git commit -m "feat(api): job detail + resume PDF download"
 ## Task 10: Job mutations (PATCH status/archived, DELETE) + application upsert + manual add
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/jobs.py` (add PATCH, DELETE, PUT application, POST manual add)
 - Test: `tests/api/test_job_mutations.py`
 
@@ -2092,6 +2107,7 @@ git commit -m "feat(api): job mutations, application upsert, manual add"
 ## Task 11: Prune endpoint + synchronous render endpoint
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/prune.py`
 - Modify: `src/resume_agent/api/routers/resumes.py` (add POST render)
 - Modify: `src/resume_agent/api/app.py` (include prune router, guarded)
@@ -2229,6 +2245,7 @@ git commit -m "feat(api): prune + synchronous render endpoints"
 ## Task 12: RunManager (run_id-keyed progress + background executor)
 
 **Files:**
+
 - Create: `src/resume_agent/api/runs/__init__.py`
 - Create: `src/resume_agent/api/runs/manager.py`
 - Modify: `src/resume_agent/api/schemas/runs.py` (add `RunOut` + param schemas)
@@ -2485,6 +2502,7 @@ git commit -m "feat(api): run manager — run_id-keyed background work"
 ## Task 13: Run launch endpoints + GET run
 
 **Files:**
+
 - Create: `src/resume_agent/api/runs/sse.py` (record→RunOut mapper used here and by SSE)
 - Create: `src/resume_agent/api/routers/runs.py`
 - Modify: `src/resume_agent/api/app.py` (construct `RunManager`, store on `app.state`, include router guarded, accept `run_executor`)
@@ -2790,6 +2808,7 @@ git commit -m "feat(api): run launch endpoints + GET run"
 ## Task 14: SSE progress stream
 
 **Files:**
+
 - Modify: `src/resume_agent/api/runs/sse.py` (add async event generator)
 - Modify: `src/resume_agent/api/routers/runs.py` (add `GET /runs/{id}/events`)
 - Test: `tests/api/test_runs_sse.py`
@@ -2913,6 +2932,7 @@ git commit -m "feat(api): SSE progress stream for runs"
 ## Task 15: OpenAPI export script + committed schema + drift test
 
 **Files:**
+
 - Create: `scripts/export_openapi.py`
 - Create: `contracts/openapi.json` (generated, committed)
 - Test: `tests/api/test_openapi_contract.py`
@@ -2996,6 +3016,7 @@ git commit -m "feat(contracts): export + commit OpenAPI schema with drift test"
 ## Task 16: Generate + commit the TypeScript client
 
 **Files:**
+
 - Create: `scripts/gen_ts_client.sh`
 - Create: `contracts/ts/api.ts` (generated, committed)
 - Create: `contracts/README.md`
@@ -3026,7 +3047,7 @@ Expected: ≥ 1 (proves camelCase propagated to TS — the contract is frontend-
 
 - [ ] **Step 4: Write the contracts README**
 
-```markdown
+````markdown
 # contracts/
 
 Published API contract for the future React/shadcn frontend.
@@ -3039,19 +3060,21 @@ Published API contract for the future React/shadcn frontend.
 ```bash
 bash scripts/gen_ts_client.sh   # exports openapi.json + regenerates ts/api.ts
 ```
+````
 
 The Python Pydantic models are the single source of truth. `tests/api/test_openapi_contract.py`
 fails if `openapi.json` drifts from the live app — regenerate and commit.
 
 The frontend imports these types directly; no API client is hand-written.
-```
+
+````
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add scripts/gen_ts_client.sh contracts/ts/api.ts contracts/README.md
 git commit -m "feat(contracts): generate + commit TypeScript client"
-```
+````
 
 ---
 
@@ -3060,6 +3083,7 @@ git commit -m "feat(contracts): generate + commit TypeScript client"
 ## Task 17: `resume-agent serve` command + README/CLAUDE.md
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py` (add `serve` command)
 - Modify: `README.md`, `CLAUDE.md`
 - Test: `tests/test_cli_serve.py`
@@ -3134,6 +3158,7 @@ git commit -m "feat(api): serve command + docs"
 ## Self-Review
 
 **Spec coverage** (against locked decisions):
+
 - Single-user/local-first, optional bearer, CORS → Task 6 (Settings), Task 7 (`require_token`, CORS), Task 8 (guard enforcement test). ✓
 - Restructure services first → Phase 0 (Tasks 1-5), CLI tests as the net. ✓
 - Run + SSE, run_id-keyed ProgressReporter, threadpool + own session → Tasks 12-14. ✓
@@ -3145,6 +3170,7 @@ git commit -m "feat(api): serve command + docs"
 - Contract artifact only, no React app → no `../ui` app task; artifact in this repo. ✓
 
 **Type/name consistency checks:**
+
 - `services.pagination.Page` (dataclass) vs `api.schemas.base.Page` (Pydantic, with `Pagination`) are distinct types; `mappers.to_page` converts one to the other. Consistent and intentional. ✓
 - `RunOut` fields (`run_id`, `kind`, `state`, `percent`, `eta_text`, `result`, `error`) match `record_to_run` projection and `progress_stats` outputs (`pct`→`percent`, `eta_text`, `state`, `error`). ✓
 - `ProgressReporter.done(**extra)` carries `kind`/`result`/`error` → consumed by `record_to_run` via `record.get("kind"/"result")`. ✓

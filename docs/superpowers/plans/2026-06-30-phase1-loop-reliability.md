@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Surface the *best fact-lock-passing* tailored round as the default resume, and never silently surface a gate-failing round — a purely read-side change that closes a latent fact-lock safety bug.
+**Goal:** Surface the _best fact-lock-passing_ tailored round as the default resume, and never silently surface a gate-failing round — a purely read-side change that closes a latent fact-lock safety bug.
 
 **Architecture:** A new pure selector `pick_best` ranks the already-persisted `ResumeVersion` rows; `best_resume_version` loads rows and applies it. The two read projections that surface "the resume" (`pipeline_rows`, `job_detail_row`) switch from `latest_resume_version` to the new selector and carry two new flags (`needs_attention`, `regressed`) out to the camelCase wire contract. The tailoring loop, the persistence path, and every row already written are untouched.
 
@@ -32,10 +32,12 @@
 ### Task 1: `pick_best` selector + `best_resume_version`
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py` (add after `latest_rendered_resume_version`, ~line 175)
 - Test: `tests/test_applications_repository.py` (append)
 
 **Interfaces:**
+
 - Consumes: `ResumeVersion` (`tracking/tables.py`); `resume_versions_for_job` (already in `repository.py`)
 - Produces:
   - `BestResume` frozen dataclass: `version: ResumeVersion | None`, `no_clean_round: bool`, `regressed: bool`
@@ -174,10 +176,12 @@ git commit -m "Adds best_resume_version read-side selector"
 ### Task 2: Surface best-round + flags on the pipeline board
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/queries.py` (`PipelineRow` dataclass ~line 113; `pipeline_rows` ~line 282; imports ~line 13)
 - Test: `tests/test_tracking_queries.py` (append)
 
 **Interfaces:**
+
 - Consumes: `best_resume_version`, `BestResume` (Task 1)
 - Produces: `PipelineRow` gains `needs_attention: bool = False` and `regressed: bool = False`; `pipeline_rows` sources `critique_json` from `best_resume_version(...).version` instead of `latest_resume_version`
 
@@ -313,10 +317,12 @@ git commit -m "Surfaces best gate-passing round on the pipeline board"
 ### Task 3: Carry best-round + flags into the job detail projection
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/queries.py` (`JobDetailRow` dataclass ~line 62; `job_detail_row` ~line 229)
 - Test: `tests/test_tracking_queries.py` (append)
 
 **Interfaces:**
+
 - Consumes: `best_resume_version` (Task 1)
 - Produces: `JobDetailRow` gains `best_resume_version_id: int | None = None`, `needs_attention: bool = False`, `regressed: bool = False`. `resume_versions` (all rows) is unchanged — the detail modal still shows every round; these fields tell the client which round is the default and whether the job needs attention.
 
@@ -402,11 +408,13 @@ git commit -m "Marks best resume version and attention on job detail"
 ### Task 4: Extend the wire contract + regenerate the typed client
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/jobs.py` (`PipelineItem` ~line 40; `JobDetail` ~line 107)
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`
 - Test: `tests/api/test_openapi_contract.py` (drift gate — already exists)
 
 **Interfaces:**
+
 - Consumes: the `PipelineRow` / `JobDetailRow` fields added in Tasks 2–3
 - Produces: camelCase wire fields `needsAttention`, `regressed` on the pipeline item; `bestResumeVersionId`, `needsAttention`, `regressed` on the job detail. Projection stays `model_validate(row)` (snake_case attr → camelCase alias via `CamelModel`).
 
@@ -512,6 +520,7 @@ git commit -m "Exposes best-version and attention flags on the jobs API contract
 ## Self-Review
 
 **Spec coverage (`2026-06-30-phase1-loop-reliability-design.md`):**
+
 - §3.1 `best_resume_version` (best gate-passing, tie-break latest round/id, fallback + "no clean round") — Task 1. ✓
 - §3.1 "becomes the default surfaced by the projection (`queries.py:297`)" — Task 2 (`pipeline_rows`, the actual `latest_resume_version` caller) + Task 3 (`job_detail_row`). ✓
 - §3.2 regression marker, detect + report only, read-side, no migration — `regressed` flag (Tasks 1–4); the loop is not changed. ✓
@@ -524,5 +533,6 @@ git commit -m "Exposes best-version and attention flags on the jobs API contract
 **Type consistency:** `BestResume(version, no_clean_round, regressed)` flows Task 1 → `pipeline_rows` (`needs_attention=no_clean_round`, `regressed`) → `PipelineRow`/`PipelineItem`; `job_detail_row` maps to `best_resume_version_id`/`needs_attention`/`regressed` on `JobDetailRow`/`JobDetail`. camelCase aliases (`needsAttention`, `bestResumeVersionId`) are produced by `CamelModel`. ✓
 
 ## Notes for the implementer
+
 - This phase has **no** LLM calls and touches **no** file under `src/resume_agent/tailor/`. If a step seems to need a loop change, stop — that is out of scope.
-- Verify against the recorded Phase 0 baseline: after this lands, no eval case should surface a `fact_check_passed=False` resume as its default, and the report's regression rate is unchanged (Phase 1 *reports*, it does not *reduce*).
+- Verify against the recorded Phase 0 baseline: after this lands, no eval case should surface a `fact_check_passed=False` resume as its default, and the report's regression rate is unchanged (Phase 1 _reports_, it does not _reduce_).

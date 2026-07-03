@@ -16,7 +16,7 @@
 
 ## Architecture notes (the two lenses)
 
-**Deepening:** `unsupported_provenance(content, fact_ids)` is the deep gate — a tiny signature concentrating *all* anti-fabrication logic for cover letters in one pure function (the **interface is the test surface**; the adversarial "fabricated claim is blocked" test lives here). `collect_fact_ids` is the single place that knows the shape of `ProfileFacts` ids, shared by gate and service.
+**Deepening:** `unsupported_provenance(content, fact_ids)` is the deep gate — a tiny signature concentrating _all_ anti-fabrication logic for cover letters in one pure function (the **interface is the test surface**; the adversarial "fabricated claim is blocked" test lives here). `collect_fact_ids` is the single place that knows the shape of `ProfileFacts` ids, shared by gate and service.
 
 **Restraint (karpathy):** the review is the **deterministic provenance gate only** — no 5-agent panel (cover letters are lower-stakes than the resume; the spec said "light review"). No new `RenderConfig`; cover letters get their own template constant rather than overloading the resume render config. The revise loop is capped at a small `max_rounds` (default 2) — enough to fix a fabrication, not an open-ended spend.
 
@@ -51,12 +51,14 @@ tests/test_cli_cover_letter.py                  # CREATE
 ## Task 1: `CoverLetterContent` model
 
 **Files:**
+
 - Create: `src/resume_agent/models/cover_letter.py`
 - Test: `tests/test_cover_letter_models.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cover_letter_models.py`:
+
 ```python
 from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
 from resume_agent.models.profile import Contact
@@ -84,6 +86,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.co
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/models/cover_letter.py`:
+
 ```python
 from pydantic import Field
 
@@ -125,14 +128,16 @@ git commit -m "feat(cover-letter): CoverLetterContent model" -m "Co-Authored-By:
 ## Task 2: `CoverLetter` table + repository
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py`, `src/resume_agent/tracking/repository.py`
 - Test: `tests/test_cover_letter_table.py`
 
-> A *new table* is created automatically by `SQLModel.metadata.create_all` on the next `init_db` — no migration needed (unlike Plan 1's new *column*).
+> A _new table_ is created automatically by `SQLModel.metadata.create_all` on the next `init_db` — no migration needed (unlike Plan 1's new _column_).
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cover_letter_table.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -167,6 +172,7 @@ Expected: FAIL — `ImportError: cannot import name 'CoverLetter' from 'resume_a
 - [ ] **Step 3: Add the table**
 
 In `src/resume_agent/tracking/tables.py`, add after the `Application` class:
+
 ```python
 class CoverLetter(SQLModel, table=True):
     __tablename__ = cast(Any, "cover_letters")
@@ -184,10 +190,13 @@ class CoverLetter(SQLModel, table=True):
 - [ ] **Step 4: Add repository functions**
 
 In `src/resume_agent/tracking/repository.py`, update the import line to include `CoverLetter`:
+
 ```python
 from resume_agent.tracking.tables import Application, ApplicationStatus, CoverLetter, Job, ResumeVersion, utcnow
 ```
+
 Add at the end of the file:
+
 ```python
 def save_cover_letter(session: Session, cover_letter: CoverLetter) -> CoverLetter:
     session.add(cover_letter)
@@ -217,12 +226,14 @@ git commit -m "feat(cover-letter): cover_letters table + repository" -m "Co-Auth
 ## Task 3: deterministic provenance gate
 
 **Files:**
+
 - Create: `src/resume_agent/cover_letter/__init__.py`, `src/resume_agent/cover_letter/provenance.py`
 - Test: `tests/test_cover_letter_provenance.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cover_letter_provenance.py`:
+
 ```python
 from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
 from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
@@ -268,11 +279,13 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cover_let
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/cover_letter/__init__.py`:
+
 ```python
 """Fact-locked cover-letter generation: draft → deterministic provenance gate → render."""
 ```
 
 Create `src/resume_agent/cover_letter/provenance.py`:
+
 ```python
 from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.models.profile import ProfileFacts
@@ -328,12 +341,14 @@ git commit -m "feat(cover-letter): deterministic provenance gate" -m "Co-Authore
 ## Task 4: draft/reviser agents + pure composition
 
 **Files:**
+
 - Create: `src/resume_agent/cover_letter/agents.py`, `src/resume_agent/cover_letter/drafting.py`
 - Test: `tests/test_cover_letter_drafting.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cover_letter_drafting.py`:
+
 ```python
 from resume_agent.cover_letter.drafting import (
     compose_cover_letter_input,
@@ -392,6 +407,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cover_let
 - [ ] **Step 3: Implement the agents**
 
 Create `src/resume_agent/cover_letter/agents.py`:
+
 ```python
 from agno.agent import Agent
 from agno.models.anthropic import Claude
@@ -439,6 +455,7 @@ def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
 - [ ] **Step 4: Implement the composition**
 
 Create `src/resume_agent/cover_letter/drafting.py`:
+
 ```python
 from resume_agent.llm_runner import Runner
 from resume_agent.models.cover_letter import CoverLetterContent
@@ -503,12 +520,14 @@ git commit -m "feat(cover-letter): draft/reviser agents + composition" -m "Co-Au
 ## Task 5: `generate_cover_letter` service (gate + revise loop + persist)
 
 **Files:**
+
 - Create: `src/resume_agent/cover_letter/service.py`
 - Test: `tests/test_cover_letter_service.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cover_letter_service.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -577,6 +596,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cover_let
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/cover_letter/service.py`:
+
 ```python
 from sqlmodel import Session
 
@@ -645,12 +665,14 @@ git commit -m "feat(cover-letter): generate_cover_letter gate+revise loop" -m "C
 ## Task 6: Typst template + render
 
 **Files:**
+
 - Create: `templates/cover_letter.typ`, `src/resume_agent/cover_letter/render.py`
 - Test: `tests/test_cover_letter_render.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cover_letter_render.py`:
+
 ```python
 from pathlib import Path
 
@@ -702,6 +724,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cover_let
 - [ ] **Step 3: Create the template**
 
 Create `templates/cover_letter.typ`:
+
 ```typst
 // Cover letter. Data arrives as a JSON string in `sys.inputs.data`.
 #let data = json(bytes(sys.inputs.data))
@@ -739,6 +762,7 @@ Create `templates/cover_letter.typ`:
 - [ ] **Step 4: Implement the render module**
 
 Create `src/resume_agent/cover_letter/render.py`:
+
 ```python
 from pathlib import Path
 from typing import Callable
@@ -809,12 +833,14 @@ git commit -m "feat(cover-letter): Typst template + render" -m "Co-Authored-By: 
 ## Task 7: `cover-letter` CLI command
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_cover_letter.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_cover_letter.py`:
+
 ```python
 from pathlib import Path
 
@@ -862,6 +888,7 @@ Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute '
 - [ ] **Step 3: Add imports**
 
 In `src/resume_agent/cli.py`, add near the tailor imports:
+
 ```python
 from resume_agent.cover_letter.agents import build_cover_letter_agent, build_cover_letter_reviser_agent
 from resume_agent.cover_letter.render import render_cover_letter
@@ -871,6 +898,7 @@ from resume_agent.cover_letter.service import generate_cover_letter
 - [ ] **Step 4: Add the command**
 
 Add after `tailor_cmd` in `src/resume_agent/cli.py`:
+
 ```python
 @app.command("cover-letter")
 def cover_letter_cmd(
@@ -935,7 +963,7 @@ git commit -m "feat(cover-letter): cover-letter CLI command" -m "Co-Authored-By:
 
 **Type consistency:** `CoverLetterContent`/`CoverLetterParagraph` fields are constructed identically across Tasks 1/3/4/5/6. `collect_fact_ids(facts) -> set[str]` + `unsupported_provenance(content, ids) -> list[str]` match service usage. `draft_cover_letter`/`revise_cover_letter(input, agent) -> CoverLetterContent` match the service. `generate_cover_letter(session, job, facts, draft_agent, reviser_agent, max_rounds=2)` and `render_cover_letter(session, id, ...)` match the CLI calls (patched in the CLI test). `save_cover_letter`/`get_cover_letter` defined in Task 2, used in Tasks 5/6.
 
-**Note:** the gate is intentionally deterministic (provenance existence), not an LLM faithfulness judge — faithfulness of *wording* to the cited fact can be added later as an optional cheap-LLM reviewer, exactly like the resume `fact-check` agent. Flagged, not built (YAGNI).
+**Note:** the gate is intentionally deterministic (provenance existence), not an LLM faithfulness judge — faithfulness of _wording_ to the cited fact can be added later as an optional cheap-LLM reviewer, exactly like the resume `fact-check` agent. Flagged, not built (YAGNI).
 
 ---
 

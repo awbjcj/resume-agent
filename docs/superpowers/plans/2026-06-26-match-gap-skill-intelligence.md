@@ -66,28 +66,30 @@ differs from the global score and an axe check of the populated dashboard.
 
 ## File Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/resume_agent/tracking/match_gap.py` | **Add** demand-graph dataclasses + `build_demand_graph()` + `collect_target_skill_tokens()` + `_skills_by_source()`. Reuse existing `_target_jobs`, `profile_skill_tokens`, `normalize_skill`. Legacy `match_gap` stays. |
-| `src/resume_agent/taxonomy/clusters.py` | **New.** `ClusterMap` dataclass + `load_cluster_map` / `save_cluster_map` / `merge_cluster_map`. |
-| `src/resume_agent/tracking/canonicalize.py` | **Add** `build_skill_themer()` (thematic-grouping agent) next to the existing `build_skill_canonicalizer()`. |
-| `src/resume_agent/services/match_gap.py` | **New.** `refresh_clusters()` use-case: collect tokens → dedup → theme → persist. |
-| `src/resume_agent/api/schemas/match_gap.py` | **Rewrite.** `JobLiteOut`, `SkillNodeOut`, `DemandEdgeOut`, `ThemeOut`, `MatchGapOut`. |
-| `src/resume_agent/api/routers/match_gap.py` | **Rewrite GET** (rich projection) + **add POST** `/match-gap/refresh-clusters` Run endpoint. |
-| `web/src/features/match-gap/aggregate.ts` | **New.** Pure `deriveView(payload, filters)` — all weighting/filtering/rollups. |
-| `web/src/features/match-gap/use-match-gap.ts` | **Rewrite.** Richer type + `useRefreshClusters()` hook. |
-| `web/src/features/match-gap/Filters.tsx`, `WordCloud.tsx`, `RankedList.tsx`, `SkillDrawer.tsx`, `StatTables.tsx`, `RefreshClustersButton.tsx` | **New** presentational components. |
-| `web/src/features/match-gap/MatchGapContainer.tsx` | **Rewrite** to wire payload → `deriveView` → components. |
+| Path                                                                                                                                          | Responsibility                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/resume_agent/tracking/match_gap.py`                                                                                                      | **Add** demand-graph dataclasses + `build_demand_graph()` + `collect_target_skill_tokens()` + `_skills_by_source()`. Reuse existing `_target_jobs`, `profile_skill_tokens`, `normalize_skill`. Legacy `match_gap` stays. |
+| `src/resume_agent/taxonomy/clusters.py`                                                                                                       | **New.** `ClusterMap` dataclass + `load_cluster_map` / `save_cluster_map` / `merge_cluster_map`.                                                                                                                         |
+| `src/resume_agent/tracking/canonicalize.py`                                                                                                   | **Add** `build_skill_themer()` (thematic-grouping agent) next to the existing `build_skill_canonicalizer()`.                                                                                                             |
+| `src/resume_agent/services/match_gap.py`                                                                                                      | **New.** `refresh_clusters()` use-case: collect tokens → dedup → theme → persist.                                                                                                                                        |
+| `src/resume_agent/api/schemas/match_gap.py`                                                                                                   | **Rewrite.** `JobLiteOut`, `SkillNodeOut`, `DemandEdgeOut`, `ThemeOut`, `MatchGapOut`.                                                                                                                                   |
+| `src/resume_agent/api/routers/match_gap.py`                                                                                                   | **Rewrite GET** (rich projection) + **add POST** `/match-gap/refresh-clusters` Run endpoint.                                                                                                                             |
+| `web/src/features/match-gap/aggregate.ts`                                                                                                     | **New.** Pure `deriveView(payload, filters)` — all weighting/filtering/rollups.                                                                                                                                          |
+| `web/src/features/match-gap/use-match-gap.ts`                                                                                                 | **Rewrite.** Richer type + `useRefreshClusters()` hook.                                                                                                                                                                  |
+| `web/src/features/match-gap/Filters.tsx`, `WordCloud.tsx`, `RankedList.tsx`, `SkillDrawer.tsx`, `StatTables.tsx`, `RefreshClustersButton.tsx` | **New** presentational components.                                                                                                                                                                                       |
+| `web/src/features/match-gap/MatchGapContainer.tsx`                                                                                            | **Rewrite** to wire payload → `deriveView` → components.                                                                                                                                                                 |
 
 ---
 
 ## Task 1: Demand-graph core (`build_demand_graph`)
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/match_gap.py`
 - Test: `tests/test_demand_graph.py` (new)
 
 **Interfaces:**
+
 - Consumes: existing `_target_jobs(session)`, `profile_skill_tokens(facts)`, `normalize_skill(str)`.
 - Produces:
   - `@dataclass JobLite(id:int, company:str|None, title:str|None, seniority:str|None)`
@@ -365,10 +367,12 @@ git commit -m "feat: add demand-graph core for match-gap dashboard"
 ## Task 2: Cluster-map persistence (`taxonomy/clusters.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/taxonomy/clusters.py`
 - Test: `tests/test_taxonomy_clusters.py` (new)
 
 **Interfaces:**
+
 - Produces:
   - `@dataclass ClusterMap(aliases:dict[str,str], theme_of:dict[str,str], theme_label:dict[str,str])` with `@classmethod empty()`
   - `load_cluster_map(path) -> ClusterMap` (missing file → `empty()`)
@@ -532,10 +536,12 @@ git commit -m "feat: add persisted skill cluster map"
 ## Task 3: Apply the cluster map in `build_demand_graph` (fold into Task 2)
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/match_gap.py` (only the forward-ref import; the body already reads `cluster_map`)
 - Test: `tests/test_demand_graph.py` (add cases)
 
 **Interfaces:**
+
 - Consumes: `ClusterMap` (Task 2), `build_demand_graph` (Task 1).
 - Produces: no new symbols — verifies dedup/theming/staleness behavior end-to-end.
 
@@ -625,10 +631,12 @@ git commit -m "test: cover cluster-map dedup/theming in demand graph"
 ## Task 4: Theming agent (`build_skill_themer`)
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/canonicalize.py`
 - Test: `tests/test_skill_themer.py` (new)
 
 **Interfaces:**
+
 - Consumes: existing `AgentRunner`, `build_model`, `use_json_mode_for`, `ExtensibleModel`, `Runner`.
 - Produces:
   - `Themer = Callable[[set[str]], list[tuple[str, list[str]]]]` (label, member canonical tokens)
@@ -792,10 +800,12 @@ git commit -m "feat: add skill theming agent"
 ## Task 5: Refresh service (`services/match_gap.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/services/match_gap.py`
 - Test: `tests/test_services_match_gap.py` (new)
 
 **Interfaces:**
+
 - Consumes: `collect_target_skill_tokens` (Task 1), `ClusterMap`/`load_cluster_map`/`save_cluster_map`/`merge_cluster_map` (Task 2), `Canonicalizer` (existing in `tracking/match_gap.py`), `Themer` (Task 4).
 - Produces:
   - `slugify_theme(label:str) -> str`
@@ -993,10 +1003,12 @@ git commit -m "feat: add refresh_clusters service"
 ## Task 6: API schemas (rich `MatchGapOut`)
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/match_gap.py` (full rewrite)
 - Test: `tests/api/test_schemas_match_gap.py` (rewrite)
 
 **Interfaces:**
+
 - Consumes: `CamelModel` (`api/schemas/base.py`); the Task-1 dataclasses for `model_validate` projection.
 - Produces (all `CamelModel`):
   - `JobLiteOut(id:int, company:str|None, title:str|None, seniority:str|None)`
@@ -1105,10 +1117,12 @@ git commit -m "feat: rich match-gap demand-graph schemas"
 ## Task 7: GET `/match-gap` rich projection
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/match_gap.py` (rewrite the GET)
 - Test: `tests/api/test_match_gap.py` (rewrite the existing assertion + add a populated case)
 
 **Interfaces:**
+
 - Consumes: `build_demand_graph` (Task 1), `load_cluster_map` (Task 2), the Task-6 schemas, `load_facts` (existing).
 - Produces: GET returns `MatchGapOut`; helper `_facts_or_empty()` and module constants `_FACTS_PATH`, `_CLUSTER_PATH`.
 
@@ -1238,10 +1252,12 @@ git commit -m "feat: rich match-gap GET + refresh-clusters route"
 ## Task 8: Refresh-clusters Run endpoint test
 
 **Files:**
+
 - Test: `tests/api/test_match_gap_refresh.py` (new)
 - Modify: none (endpoint landed in Task 7)
 
 **Interfaces:**
+
 - Consumes: the POST route from Task 7; monkeypatches `build_skill_canonicalizer` / `build_skill_themer` on `resume_agent.tracking.canonicalize` to fakes (the route imports them inside `work`, so patch the source module).
 
 - [ ] **Step 1: Write the failing test**
@@ -1316,6 +1332,7 @@ git commit -m "test: refresh-clusters run endpoint end-to-end"
 ## Task 9: Regenerate OpenAPI + TS contract
 
 **Files:**
+
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_openapi_contract.py` (existing drift gate)
 
@@ -1346,10 +1363,12 @@ git commit -m "chore: regenerate contract for match-gap demand graph"
 ## Task 10: Frontend pure aggregation (`aggregate.ts`)
 
 **Files:**
+
 - Create: `web/src/features/match-gap/aggregate.ts`
 - Test: `web/src/features/match-gap/aggregate.test.ts` (new)
 
 **Interfaces:**
+
 - Consumes: `components["schemas"]["MatchGapOut"]` from `@/lib/api/schema`.
 - Produces:
   - `interface Filters { company: string | null; seniority: string | null; gapsOnly: boolean; weighting: "essential" | "popular" }`
@@ -1370,7 +1389,12 @@ import type { components } from "@/lib/api/schema";
 
 type Payload = components["schemas"]["MatchGapOut"];
 
-const base: Filters = { company: null, seniority: null, gapsOnly: false, weighting: "essential" };
+const base: Filters = {
+  company: null,
+  seniority: null,
+  gapsOnly: false,
+  weighting: "essential",
+};
 
 const payload: Payload = {
   targetTotal: 2,
@@ -1429,9 +1453,12 @@ describe("deriveView", () => {
 
   it("jobsForSkill returns the demanding jobs", () => {
     const v = deriveView(payload, base);
-    expect(v.jobsForSkill("Kubernetes").map((j) => j.company).sort()).toEqual([
-      "Datadog", "Stripe",
-    ]);
+    expect(
+      v
+        .jobsForSkill("Kubernetes")
+        .map((j) => j.company)
+        .sort(),
+    ).toEqual(["Datadog", "Stripe"]);
   });
 
   it("byCompany rollup carries gap counts", () => {
@@ -1444,8 +1471,12 @@ describe("deriveView", () => {
     const v = deriveView(payload, base);
     const stripe = v.byCompany.find((r) => r.key === "Stripe")!;
     const datadog = v.byCompany.find((r) => r.key === "Datadog")!;
-    expect(stripe.topSkills.find((s) => s.skill === "Kubernetes")!.score).toBe(3);
-    expect(datadog.topSkills.find((s) => s.skill === "Kubernetes")!.score).toBe(1);
+    expect(stripe.topSkills.find((s) => s.skill === "Kubernetes")!.score).toBe(
+      3,
+    );
+    expect(datadog.topSkills.find((s) => s.skill === "Kubernetes")!.score).toBe(
+      1,
+    );
   });
 
   it("exposes filter facets", () => {
@@ -1528,8 +1559,18 @@ function summarize(
   type Acc = { must: number; nice: number; tech: number; jobs: Set<number> };
   const acc = new Map<string, Acc>();
   for (const edge of edges) {
-    if (edge.source !== "must" && edge.source !== "nice" && edge.source !== "tech") continue;
-    const row = acc.get(edge.skill) ?? { must: 0, nice: 0, tech: 0, jobs: new Set() };
+    if (
+      edge.source !== "must" &&
+      edge.source !== "nice" &&
+      edge.source !== "tech"
+    )
+      continue;
+    const row = acc.get(edge.skill) ?? {
+      must: 0,
+      nice: 0,
+      tech: 0,
+      jobs: new Set(),
+    };
     row[edge.source] += 1;
     row.jobs.add(edge.jobId);
     acc.set(edge.skill, row);
@@ -1539,9 +1580,12 @@ function summarize(
     skill,
     themeId: themeOf.get(skill) ?? null,
     covered: coveredOf.get(skill) ?? false,
-    score: filters.weighting === "popular"
-      ? row.jobs.size
-      : row.must * SOURCE_WEIGHT.must + row.nice * SOURCE_WEIGHT.nice + row.tech * SOURCE_WEIGHT.tech,
+    score:
+      filters.weighting === "popular"
+        ? row.jobs.size
+        : row.must * SOURCE_WEIGHT.must +
+          row.nice * SOURCE_WEIGHT.nice +
+          row.tech * SOURCE_WEIGHT.tech,
     jobCount: row.jobs.size,
     must: row.must,
     nice: row.nice,
@@ -1572,7 +1616,9 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
   const themeMap = new Map<string, ThemeGroup>();
   for (const s of skills) {
     const id = s.themeId ?? "__none__";
-    const label = s.themeId ? themeLabel.get(s.themeId) ?? s.themeId : "Unthemed";
+    const label = s.themeId
+      ? (themeLabel.get(s.themeId) ?? s.themeId)
+      : "Unthemed";
     const g = themeMap.get(id) ?? { id, label, score: 0, skills: [] };
     g.skills.push(s);
     g.score += s.score;
@@ -1591,7 +1637,9 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
       .map((id) => jobById.get(id))
       .filter((j): j is JobLite => !!j);
 
-  const rollup = (facet: (j: JobLite) => string | null | undefined): StatRow[] => {
+  const rollup = (
+    facet: (j: JobLite) => string | null | undefined,
+  ): StatRow[] => {
     const byKey = new Map<string, Edge[]>();
     for (const e of edges) {
       const job = jobById.get(e.jobId);
@@ -1609,7 +1657,9 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
         const rows = summarize(facetEdges, coveredOf, themeOf, filters);
         return {
           key,
-          topSkills: rows.slice(0, 5).map((r) => ({ skill: r.skill, score: r.score })),
+          topSkills: rows
+            .slice(0, 5)
+            .map((r) => ({ skill: r.skill, score: r.score })),
           gapCount: rows.filter((r) => !r.covered).length,
         };
       })
@@ -1618,10 +1668,18 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
 
   const jobsForTheme = (themeId: string): JobLite[] => {
     const memberSkills = new Set(
-      payload.skills.filter((skill) => skill.themeId === themeId).map((skill) => skill.skill),
+      payload.skills
+        .filter((skill) => skill.themeId === themeId)
+        .map((skill) => skill.skill),
     );
-    const ids = new Set(edges.filter((edge) => memberSkills.has(edge.skill)).map((edge) => edge.jobId));
-    return [...ids].map((id) => jobById.get(id)).filter((job): job is JobLite => !!job);
+    const ids = new Set(
+      edges
+        .filter((edge) => memberSkills.has(edge.skill))
+        .map((edge) => edge.jobId),
+    );
+    return [...ids]
+      .map((id) => jobById.get(id))
+      .filter((job): job is JobLite => !!job);
   };
 
   return {
@@ -1658,10 +1716,12 @@ git commit -m "feat: pure demand-graph aggregation for match-gap"
 ## Task 11: Data hook + refresh hook (`use-match-gap.ts`)
 
 **Files:**
+
 - Modify: `web/src/features/match-gap/use-match-gap.ts`
 - Test: none new (covered by container test in Task 13; this is thin glue over existing tested infra)
 
 **Interfaces:**
+
 - Consumes: `api`/`unwrap` (`@/lib/api/client`), `useLaunchRun` (`@/features/runs/use-launch-run`).
 - Produces: `useMatchGap()` (typed to new `MatchGapOut`), `useRefreshClusters()` returning `{ refresh: () => Promise<boolean> }`.
 
@@ -1680,7 +1740,8 @@ export type MatchGap = components["schemas"]["MatchGapOut"];
 export function useMatchGap() {
   return useQuery({
     queryKey: ["match-gap"],
-    queryFn: (): Promise<MatchGap> => unwrap(api.GET("/api/match-gap", {})) as Promise<MatchGap>,
+    queryFn: (): Promise<MatchGap> =>
+      unwrap(api.GET("/api/match-gap", {})) as Promise<MatchGap>,
   });
 }
 
@@ -1713,10 +1774,12 @@ git commit -m "feat: match-gap data + refresh-clusters hooks"
 ## Task 12: Presentational components
 
 **Files:**
+
 - Create: `web/src/features/match-gap/Filters.tsx`, `WordCloud.tsx`, `RankedList.tsx`, `SkillDrawer.tsx`, `StatTables.tsx`, `RefreshClustersButton.tsx`
 - Test: `web/src/features/match-gap/WordCloud.test.tsx`, `web/src/features/match-gap/SkillDrawer.test.tsx` (new)
 
 **Interfaces:**
+
 - Consumes: `SkillRow`, `ThemeGroup`, `StatRow`, `Filters` from `./aggregate`; `JobLite` shape from schema; shadcn `select`/`switch`/`toggle-group`/`sheet`/`button`/`table`.
 - Produces:
   - `WordCloud({ skills, onSelect })` — buttons sized by score bucket, colored by coverage.
@@ -1737,8 +1800,26 @@ import { WordCloud } from "./WordCloud";
 import type { SkillRow } from "./aggregate";
 
 const rows: SkillRow[] = [
-  { skill: "Kubernetes", themeId: "infra", covered: false, score: 9, jobCount: 9, must: 3, nice: 0, tech: 0 },
-  { skill: "Python", themeId: "lang", covered: true, score: 2, jobCount: 2, must: 0, nice: 1, tech: 0 },
+  {
+    skill: "Kubernetes",
+    themeId: "infra",
+    covered: false,
+    score: 9,
+    jobCount: 9,
+    must: 3,
+    nice: 0,
+    tech: 0,
+  },
+  {
+    skill: "Python",
+    themeId: "lang",
+    covered: true,
+    score: 2,
+    jobCount: 2,
+    must: 0,
+    nice: 1,
+    tech: 0,
+  },
 ];
 
 describe("WordCloud", () => {
@@ -1752,8 +1833,14 @@ describe("WordCloud", () => {
 
   it("marks gap vs covered via data attribute", () => {
     render(<WordCloud skills={rows} onSelect={() => {}} />);
-    expect(screen.getByRole("button", { name: /Kubernetes/ })).toHaveAttribute("data-covered", "false");
-    expect(screen.getByRole("button", { name: /Python/ })).toHaveAttribute("data-covered", "true");
+    expect(screen.getByRole("button", { name: /Kubernetes/ })).toHaveAttribute(
+      "data-covered",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: /Python/ })).toHaveAttribute(
+      "data-covered",
+      "true",
+    );
   });
 });
 ```
@@ -1905,23 +1992,39 @@ export function Filters({
     <div className="flex flex-wrap items-center gap-3">
       <Select
         value={value.company ?? ALL}
-        onValueChange={(v) => onChange({ ...value, company: v === ALL ? null : v })}
+        onValueChange={(v) =>
+          onChange({ ...value, company: v === ALL ? null : v })
+        }
       >
-        <SelectTrigger aria-label="Filter by company" className="w-44"><SelectValue placeholder="Company" /></SelectTrigger>
+        <SelectTrigger aria-label="Filter by company" className="w-44">
+          <SelectValue placeholder="Company" />
+        </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>All companies</SelectItem>
-          {companies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          {companies.map((c) => (
+            <SelectItem key={c} value={c}>
+              {c}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
       <Select
         value={value.seniority ?? ALL}
-        onValueChange={(v) => onChange({ ...value, seniority: v === ALL ? null : v })}
+        onValueChange={(v) =>
+          onChange({ ...value, seniority: v === ALL ? null : v })
+        }
       >
-        <SelectTrigger aria-label="Filter by seniority" className="w-40"><SelectValue placeholder="Seniority" /></SelectTrigger>
+        <SelectTrigger aria-label="Filter by seniority" className="w-40">
+          <SelectValue placeholder="Seniority" />
+        </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>All levels</SelectItem>
-          {seniorities.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          {seniorities.map((s) => (
+            <SelectItem key={s} value={s}>
+              {s}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
@@ -1938,7 +2041,9 @@ export function Filters({
         type="single"
         aria-label="Demand weighting"
         value={value.weighting}
-        onValueChange={(v) => v && onChange({ ...value, weighting: v as FiltersValue["weighting"] })}
+        onValueChange={(v) =>
+          v && onChange({ ...value, weighting: v as FiltersValue["weighting"] })
+        }
       >
         <ToggleGroupItem value="essential">Essential</ToggleGroupItem>
         <ToggleGroupItem value="popular">Popular</ToggleGroupItem>
@@ -1958,7 +2063,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-type Job = { id: number; company: string | null; title: string | null; seniority: string | null };
+type Job = {
+  id: number;
+  company: string | null;
+  title: string | null;
+  seniority: string | null;
+};
 
 export function SkillDrawer({
   skill,
@@ -1974,22 +2084,27 @@ export function SkillDrawer({
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{skill}</SheetTitle>
-          <SheetDescription>{jobs.length} target job(s) demand this skill</SheetDescription>
+          <SheetDescription>
+            {jobs.length} target job(s) demand this skill
+          </SheetDescription>
         </SheetHeader>
         {jobs.length === 0 ? (
           <p role="status" className="mt-4 text-sm text-muted-foreground">
             No target jobs match the current filters.
           </p>
-        ) : <ul className="mt-4 space-y-2">
-          {jobs.map((j) => (
-            <li key={j.id} className="rounded border p-2 text-sm">
-              <div className="font-medium">{j.company}</div>
-              <div className="text-muted-foreground">
-                {j.title}{j.seniority ? ` · ${j.seniority}` : ""}
-              </div>
-            </li>
-          ))}
-        </ul>}
+        ) : (
+          <ul className="mt-4 space-y-2">
+            {jobs.map((j) => (
+              <li key={j.id} className="rounded border p-2 text-sm">
+                <div className="font-medium">{j.company}</div>
+                <div className="text-muted-foreground">
+                  {j.title}
+                  {j.seniority ? ` · ${j.seniority}` : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </SheetContent>
     </Sheet>
   );
@@ -2013,7 +2128,9 @@ function Table({ title, rows }: { title: string; rows: StatRow[] }) {
             <span className="truncate text-muted-foreground">
               {r.topSkills.map((s) => s.skill).join(", ")}
             </span>
-            <span className="shrink-0 tabular-nums text-xs">{r.gapCount} gaps</span>
+            <span className="shrink-0 tabular-nums text-xs">
+              {r.gapCount} gaps
+            </span>
           </li>
         ))}
       </ul>
@@ -2064,7 +2181,11 @@ export function RefreshClustersButton({
         }
       }}
     >
-      {busy ? "Clustering…" : stale ? "Refresh clusters (stale)" : "Refresh clusters"}
+      {busy
+        ? "Clustering…"
+        : stale
+          ? "Refresh clusters (stale)"
+          : "Refresh clusters"}
     </Button>
   );
 }
@@ -2089,10 +2210,12 @@ git commit -m "feat: match-gap dashboard presentational components"
 ## Task 13: Container wiring + integration test
 
 **Files:**
+
 - Modify: `web/src/features/match-gap/MatchGapContainer.tsx` (full rewrite)
 - Test: `web/src/features/match-gap/MatchGapContainer.test.tsx` (rewrite)
 
 **Interfaces:**
+
 - Consumes: `useMatchGap` (Task 11), `deriveView`/`Filters` type (Task 10), all Task-12 components, existing `PageHeader`, `MetricRow`, `EmptyState`, `BoardSkeleton`.
 - Produces: the wired dashboard. Local React state holds `Filters` + a discriminated skill/theme selection.
 
@@ -2159,12 +2282,19 @@ describe("MatchGapContainer", () => {
     server.use(
       http.get("/api/match-gap", () =>
         HttpResponse.json({
-          targetTotal: 0, clustersStale: false, jobs: [], skills: [], edges: [], themes: [],
+          targetTotal: 0,
+          clustersStale: false,
+          jobs: [],
+          skills: [],
+          edges: [],
+          themes: [],
         }),
       ),
     );
     wrap(<MatchGapContainer />);
-    await waitFor(() => expect(screen.getByText(/no target jobs yet/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/no target jobs yet/i)).toBeInTheDocument(),
+    );
   });
 });
 ```
@@ -2207,7 +2337,10 @@ export function MatchGapContainer() {
   const [filters, setFilters] = useState<FiltersValue>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const view = useMemo(() => (data ? deriveView(data, filters) : null), [data, filters]);
+  const view = useMemo(
+    () => (data ? deriveView(data, filters) : null),
+    [data, filters],
+  );
 
   if (isLoading) return <BoardSkeleton />;
 
@@ -2247,7 +2380,10 @@ export function MatchGapContainer() {
               companies={view.companies}
               seniorities={view.seniorities}
             />
-            <RefreshClustersButton stale={data.clustersStale} onRefresh={refresh} />
+            <RefreshClustersButton
+              stale={data.clustersStale}
+              onRefresh={refresh}
+            />
           </div>
 
           <MetricRow
@@ -2264,10 +2400,10 @@ export function MatchGapContainer() {
               body="Clear a filter or show covered skills to restore results."
             />
           ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <WordCloud skills={view.skills} onSelect={setSelected} />
-            <RankedList skills={view.skills} onSelect={setSelected} />
-          </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <WordCloud skills={view.skills} onSelect={setSelected} />
+              <RankedList skills={view.skills} onSelect={setSelected} />
+            </div>
           )}
 
           <StatTables byCompany={view.byCompany} byPosition={view.byPosition} />
@@ -2318,6 +2454,7 @@ Expected: all green.
 ## Self-Review
 
 **Spec coverage:**
+
 - §2.1 demand graph GET → Tasks 1, 6, 7. ✔
 - §2.2 all-three-sources weighted (3/2/1, client-applied) → Task 1 (edges by source), Task 10 (`SOURCE_WEIGHT`, Essential/Popular). ✔
 - §2.3 cluster-map persistence (aliases + themeOf + themeLabel, monotonic) → Task 2. ✔
@@ -2344,35 +2481,38 @@ One known seam to verify during execution (flagged in Task 8): whether `tests/ap
 
 ## Future Follow-up: Multi-theme skills (not yet built)
 
-**Motivation.** Theming is a *many-to-one classification*, not a clean partition.
+**Motivation.** Theming is a _many-to-one classification_, not a clean partition.
 Plenty of tokens legitimately belong to more than one theme — a vector DB like
-`weaviate` is both *Data* and *AI/ML*, `python` is *Backend* and *Data*, `docker`
-is *DevOps* and *Cloud*. The current contract forces exactly one theme per skill.
+`weaviate` is both _Data_ and _AI/ML_, `python` is _Backend_ and _Data_, `docker`
+is _DevOps_ and _Cloud_. The current contract forces exactly one theme per skill.
 When the cheap themer model (correctly) puts such a token in two themes, the
 refresh used to abort with `ValueError: skill token appears in multiple themes`.
 That crash is now patched with a **keep-first repair** in `themes_to_pairs`
 (`canonicalize.py`) — the first theme to claim a token wins and later repeats are
-dropped — which keeps refresh robust but *discards a real signal*: the second
+dropped — which keeps refresh robust but _discards a real signal_: the second
 (and further) theme membership is silently thrown away.
 
 This follow-up turns that discarded signal into a feature: let a skill belong to
 **several** themes.
 
 **Current state (single-theme):**
+
 - `ClusterMap.theme_of: dict[str, str]` — each terminal canonical token → one `theme_id` (`taxonomy/clusters.py`).
 - `themes_to_pairs` (`canonicalize.py`) and `_validated_themes` (`services/match_gap.py`) enforce an exact partition; `themes_to_pairs` now keep-first repairs duplicates instead of raising.
 - Read path `build_demand_graph` assigns each `SkillNode` to a single `ThemeNode`; `aggregate.ts` and the components render one theme per skill.
 
 **Proposed change (multi-theme):**
+
 - **Data model.** `ClusterMap.theme_of: dict[str, list[str]]` — terminal token → ordered list of `theme_id`s (primary first). Keep `theme_label` as-is.
 - **Validation contract.** Drop the "exactly one theme" rule in `themes_to_pairs`/`_validated_themes`: a token may appear in ≥1 theme. Still require full **coverage** (every canonical token in at least one theme), nonblank labels/members, and known tokens. Consider capping themes-per-skill (e.g. ≤2–3) to keep the dashboard legible, and dropping the keep-first skip in favour of recording each membership.
-- **Themer prompt** (`_THEME_INSTRUCTIONS`). Replace "include every input token exactly once" with "assign each skill to every theme where it is a *primary* fit — usually one, occasionally two; never list a theme where the skill is only tangentially related."
-- **Persistence.** `theme_of` values become arrays. Update `_canonicalize_theme_keys` and `merge_cluster_map` to **union** lists rather than overwrite, preserving the monotonic guarantee (a refresh must never *remove* an existing theme assignment a user has seen). `load_cluster_map` must accept the **legacy scalar form** and coerce `str → [str]` for backward compatibility with existing `data/profile/cluster_map.json`.
-- **Read path.** `build_demand_graph` emits a skill under each of its themes; `ThemeNode` skill-counts sum per theme, but any "total unique skills" metric must **dedupe** so a two-theme skill isn't double-counted. Decide whether source weighting (3/2/1) is counted fully in each theme or split across them — recommend counted fully in each (a skill genuinely *is* demand in both areas) with dedupe only on unique-skill totals.
+- **Themer prompt** (`_THEME_INSTRUCTIONS`). Replace "include every input token exactly once" with "assign each skill to every theme where it is a _primary_ fit — usually one, occasionally two; never list a theme where the skill is only tangentially related."
+- **Persistence.** `theme_of` values become arrays. Update `_canonicalize_theme_keys` and `merge_cluster_map` to **union** lists rather than overwrite, preserving the monotonic guarantee (a refresh must never _remove_ an existing theme assignment a user has seen). `load_cluster_map` must accept the **legacy scalar form** and coerce `str → [str]` for backward compatibility with existing `data/profile/cluster_map.json`.
+- **Read path.** `build_demand_graph` emits a skill under each of its themes; `ThemeNode` skill-counts sum per theme, but any "total unique skills" metric must **dedupe** so a two-theme skill isn't double-counted. Decide whether source weighting (3/2/1) is counted fully in each theme or split across them — recommend counted fully in each (a skill genuinely _is_ demand in both areas) with dedupe only on unique-skill totals.
 - **Schemas + contract.** `MatchGapOut.themeOf` (or equivalent) becomes `string[]` per skill; regenerate `contracts/openapi.json` + `contracts/ts/api.ts` via `bash scripts/gen_ts_client.sh` and update the drift gate.
 - **Frontend.** `aggregate.ts` groups a skill into each of its themes; components render it in each theme section; unique-skill counters dedupe.
 
 **Acceptance criteria:**
+
 - A token the themer places in two themes **persists both**; the refresh is monotonic (re-running never drops a previously assigned theme).
 - The dashboard shows such a skill under each of its themes; unique-skill totals are unchanged (no double-count).
 - `load_cluster_map` reads an existing single-theme `cluster_map.json` without error (scalar coerced to singleton list).

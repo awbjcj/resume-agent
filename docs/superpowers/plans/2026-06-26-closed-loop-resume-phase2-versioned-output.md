@@ -21,10 +21,12 @@
 ### Task 1: Slug, path, and filename helpers
 
 **Files:**
+
 - Create: `src/resume_agent/render/export.py`
 - Test: `tests/test_render_export.py`
 
 **Interfaces:**
+
 - Consumes: `Job`, `ResumeVersion`, `CoverLetter` (`resume_agent.tracking.tables`), existing `_slug` idea from `renderer.py`.
 - Produces: `job_slug(job: Job) -> str`; `job_dir(base: str | Path, job: Job) -> Path`; `resume_pdf_name(v: ResumeVersion) -> str`; `resume_json_name(v: ResumeVersion) -> str`; `cover_letter_pdf_name(cl: CoverLetter) -> str`; `cover_letter_json_name(cl: CoverLetter) -> str`.
 
@@ -123,10 +125,12 @@ git commit -m "feat: per-job folder path and version-keyed filename helpers"
 ### Task 2: Manifest builder (pure)
 
 **Files:**
+
 - Modify: `src/resume_agent/render/export.py`
 - Test: `tests/test_render_export.py`
 
 **Interfaces:**
+
 - Consumes: `Job`, `list[ResumeVersion]`, `list[CoverLetter]`, `Application | None`.
 - Produces: `build_manifest(job, versions, cover_letters, application) -> dict` — a JSON-serializable dict with `job` meta, a `resumeVersions` list (id, round, origin, instruction, parentVersionId, factCheckPassed, reviewScore, createdAt, file), a `coverLetters` list, and `applied` `{resumeVersionId, coverLetterId}`.
 
@@ -218,10 +222,12 @@ git commit -m "feat: manifest builder for per-job export"
 ### Task 3: `cover_letters_for_job` repository helper
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py` (near `resume_versions_for_job:107`)
 - Test: `tests/test_tracking_repository.py` (append; create if absent)
 
 **Interfaces:**
+
 - Produces: `cover_letters_for_job(session, job_id: int) -> list[CoverLetter]`.
 
 - [ ] **Step 1: Write the failing test**
@@ -278,10 +284,12 @@ git commit -m "feat: cover_letters_for_job repository helper"
 ### Task 4: `export_job_artifacts` projection
 
 **Files:**
+
 - Modify: `src/resume_agent/render/export.py`
 - Test: `tests/test_render_export.py`
 
 **Interfaces:**
+
 - Consumes: `get_job`, `resume_versions_for_job`, `cover_letters_for_job` (Task 3), `application_for_job`.
 - Produces: `export_job_artifacts(session, job_id: int, base: str | Path = "output") -> Path | None` — writes `content.json` per version/cover-letter + `manifest.json` into `job_dir`, returns the dir (or `None` if job missing). Idempotent.
 
@@ -385,11 +393,13 @@ git commit -m "feat: idempotent export_job_artifacts projection"
 ### Task 5: Render PDFs into the per-job folder
 
 **Files:**
+
 - Modify: `src/resume_agent/render/service.py:15-40` (`render_version`)
 - Modify: `src/resume_agent/cover_letter/render.py:32-56` (`render_cover_letter`)
 - Test: `tests/test_render_service.py` (append; mirror existing render tests)
 
 **Interfaces:**
+
 - Consumes: `job_dir`, `resume_pdf_name`, `cover_letter_pdf_name`, `export_job_artifacts`.
 - Produces: unchanged signatures; `render_version` now writes to `job_dir(config.output_dir, job)/resume_pdf_name(version)` and calls `export_job_artifacts` afterward. `render_cover_letter` writes to `job_dir(output_dir, job)/cover_letter_pdf_name(cover)`.
 
@@ -438,6 +448,7 @@ In `src/resume_agent/render/service.py`, replace the filename/out_path block (li
 ```python
 from resume_agent.render.export import export_job_artifacts, job_dir, resume_pdf_name
 ```
+
 ```python
     out_dir = job_dir(config.output_dir, job) if job else Path(config.output_dir)
     out_path = out_dir / resume_pdf_name(version)
@@ -462,6 +473,7 @@ In `src/resume_agent/cover_letter/render.py`, replace the filename/out_path bloc
 ```python
 from resume_agent.render.export import cover_letter_pdf_name, export_job_artifacts, job_dir
 ```
+
 ```python
     out_dir = job_dir(output_dir, job) if job else Path(output_dir)
     out_path = out_dir / cover_letter_pdf_name(cover)
@@ -492,12 +504,14 @@ git commit -m "feat: render PDFs into per-job folders and export manifest"
 ### Task 6: Export after tailor and revise
 
 **Files:**
+
 - Modify: `src/resume_agent/services/tailoring.py:29-48` (`tailor`)
 - Modify: `src/resume_agent/services/revision.py` (Phase 1) — call export after persisting
 - Modify: `src/resume_agent/services/cover_letters.py` + `src/resume_agent/services/cover_letter_revision.py` (Phase 1) — call export
 - Test: `tests/test_services_tailoring_export.py`
 
 **Interfaces:**
+
 - Consumes: `export_job_artifacts`.
 - Produces: after `tailor`, `revise_resume_version`, `write_cover_letters`, and `revise_cover_letter_version` persist their rows, the affected job's folder is refreshed.
 
@@ -542,6 +556,7 @@ In `src/resume_agent/services/tailoring.py`, import and call export over the res
 ```python
 from resume_agent.render.export import export_job_artifacts
 ```
+
 At the end of `tailor`, replace `return tailor_jobs(...)` with:
 
 ```python
@@ -557,12 +572,14 @@ At the end of `tailor`, replace `return tailor_jobs(...)` with:
 - [ ] **Step 4: Call export in the revision + cover-letter services**
 
 In `services/revision.py` (Phase 1), before returning `child`:
+
 ```python
     saved = save_resume_version(session, child)
     from resume_agent.render.export import export_job_artifacts
     export_job_artifacts(session, saved.job_id)
     return saved
 ```
+
 In `services/cover_letter_revision.py`, likewise after `save_cover_letter`. In `services/cover_letters.py` `write_cover_letters`, call `export_job_artifacts(session, job.id)` after each `render_cover_letter` (render already exports, so this is belt-and-suspenders for the no-render path — acceptable, idempotent).
 
 - [ ] **Step 5: Run tests to verify they pass**
@@ -582,10 +599,12 @@ git commit -m "feat: refresh per-job export after tailor and revise"
 ### Task 7: `resume-agent export` CLI command
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py` (add `export` command near other commands)
 - Test: `tests/test_cli_export.py`
 
 **Interfaces:**
+
 - Consumes: `export_job_artifacts`, `get_job`, a "list all job ids" query.
 - Produces: `resume-agent export [JOB_ID] [--all] [--output DIR]` — exports one job, or every job with `--all`.
 
@@ -689,6 +708,7 @@ git add -A && git commit -m "chore: phase-2 export verification"
 ## Self-Review
 
 **Spec coverage (Phase 2):**
+
 - Per-job folder layout `output/{company}-{title}-{jobId}/` → Task 1 (`job_dir`/`job_slug`). ✓
 - Version-keyed `resume-v{n}-{origin}.pdf` / `cover-letter-v{n}.pdf` + `content.json` snapshots → Tasks 1, 4. ✓
 - `manifest.json` with instruction/fact-check/timestamp/origin + applied marker → Task 2. ✓

@@ -36,12 +36,14 @@ tests/test_dashboard_analytics.py         # CREATE
 ## Task 1: analytics aggregates (pure)
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/analytics.py`
 - Test: `tests/test_tracking_analytics.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tracking_analytics.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -104,6 +106,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/tracking/analytics.py`:
+
 ```python
 from dataclasses import dataclass
 from typing import Callable
@@ -212,6 +215,7 @@ git commit -m "feat(analytics): source + fit-band conversion stats" -m "Co-Autho
 ## Task 2: dashboard analytics page
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/app.py`
 - Test: `tests/test_dashboard_analytics.py`
 
@@ -220,6 +224,7 @@ git commit -m "feat(analytics): source + fit-band conversion stats" -m "Co-Autho
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_dashboard_analytics.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -258,10 +263,13 @@ Expected: FAIL — `ImportError: cannot import name 'analytics_table_rows' from 
 - [ ] **Step 3: Add the row-builder + page**
 
 In `src/resume_agent/dashboard/app.py`, add the import near the other tracking imports:
+
 ```python
 from resume_agent.tracking.analytics import fit_band_stats, source_stats
 ```
+
 Add these functions before `def _engine():`:
+
 ```python
 def analytics_table_rows(session, by: str = "source") -> list[dict]:
     """Pure table rows for the analytics page (testable without Streamlit)."""
@@ -310,6 +318,7 @@ def render_analytics_page(session) -> None:
 - [ ] **Step 4: Wire the page into the radio**
 
 In `src/resume_agent/dashboard/app.py`, inside `main()`, replace the page radio and routing:
+
 ```python
         page = st.radio("View", ["Shortlist", "Pipeline board", "Analytics"], label_visibility="collapsed")
 
@@ -348,7 +357,7 @@ git commit -m "feat(analytics): dashboard analytics page (source + fit-band)" -m
 
 **Type consistency:** `CohortStat(label, applications, responses, interviews, offers)` with derived `*_rate` properties is used identically in Tasks 1/2. `source_stats(session)`/`fit_band_stats(session) -> list[CohortStat]` match the page + row-builder. `analytics_table_rows(session, by)` keys ("Apps", "Responses", "Interviews", "Offers", "Interview %", "Offer %" + label header) match the Task 2 assertion exactly.
 
-**Note:** rates are a share of *submitted* applications (`status != ready`), so a `ready` row never dilutes the denominator — asserted in Task 1's adzuna case.
+**Note:** rates are a share of _submitted_ applications (`status != ready`), so a `ready` row never dilutes the denominator — asserted in Task 1's adzuna case.
 
 ---
 

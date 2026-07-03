@@ -11,10 +11,12 @@
 **Reference spec:** `docs/superpowers/specs/2026-06-22-react-dashboard-design.md`
 
 **Conventions for every task below:**
+
 - Backend tests: `.venv/Scripts/python.exe -m pytest <path> -v`; lint: `ruff check`.
 - Web tests: `cd web && npm run test -- --run <path>`.
 - Commit after each task with the message shown. Work on the current branch `feat/migrate-to-api-backend`.
 - Commit message footer (append to EVERY commit):
+
   ```
   Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
   Claude-Session: https://claude.ai/code/session_01X5xupHcqViNoSABNeMwcQC
@@ -27,6 +29,7 @@
 ### Task 0.1: Widen `ShortlistItem` schema with facet fields
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/jobs.py:17-34`
 - Test: `tests/api/test_boards.py`
 
@@ -85,6 +88,7 @@ git commit -m "feat(api): widen ShortlistItem with location + sic facet fields"
 ### Task 0.2: Analytics schemas
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/analytics.py`
 - Test: `tests/api/test_schemas_analytics.py`
 
@@ -169,6 +173,7 @@ git commit -m "feat(api): add analytics cohort schemas"
 ### Task 0.3: Analytics router
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/analytics.py`
 - Modify: `src/resume_agent/api/app.py:14-18,71-75`
 - Test: `tests/api/test_analytics.py`
@@ -248,6 +253,7 @@ git commit -m "feat(api): add GET /api/analytics router"
 ### Task 0.4: Match-gap schemas
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/match_gap.py`
 - Test: `tests/api/test_schemas_match_gap.py`
 
@@ -326,6 +332,7 @@ git commit -m "feat(api): add match-gap schemas"
 ### Task 0.5: Match-gap router
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/match_gap.py`
 - Modify: `src/resume_agent/api/app.py`
 - Test: `tests/api/test_match_gap.py`
@@ -390,6 +397,7 @@ Register in `src/resume_agent/api/app.py`:
 ```python
 from resume_agent.api.routers import match_gap as match_gap_router
 ```
+
 ```python
     app.include_router(match_gap_router.router, prefix="/api", dependencies=guarded)
 ```
@@ -411,6 +419,7 @@ git commit -m "feat(api): add GET /api/match-gap router"
 ### Task 0.6: Serve the built SPA from FastAPI
 
 **Files:**
+
 - Modify: `src/resume_agent/api/app.py`
 - Test: `tests/api/test_static_spa.py`
 
@@ -507,6 +516,7 @@ git commit -m "feat(api): serve built SPA from web/dist with SPA fallback"
 ### Task 0.7: Regenerate the OpenAPI contract + TS client
 
 **Files:**
+
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`
 - Test: `tests/api/test_openapi_contract.py` (existing drift gate)
 
@@ -543,6 +553,7 @@ git commit -m "chore(contracts): regenerate after analytics/match-gap + shortlis
 - [ ] **Step 1: Scaffold**
 
 Run:
+
 ```bash
 cd D:/Fun/resume-agent
 npm create vite@latest web -- --template react-ts
@@ -552,6 +563,7 @@ cd web && npm install
 - [ ] **Step 2: Add a `.gitignore`**
 
 Create `web/.gitignore`:
+
 ```
 node_modules
 dist
@@ -583,6 +595,7 @@ git commit -m "chore(web): scaffold Vite React-TS app"
 - [ ] **Step 1: Install Tailwind v4 + deps**
 
 Run:
+
 ```bash
 cd web
 npm install tailwindcss @tailwindcss/vite class-variance-authority clsx tailwind-merge lucide-react
@@ -609,6 +622,7 @@ export default defineConfig({
 ```
 
 Add to `web/tsconfig.app.json` under `compilerOptions`:
+
 ```json
 "baseUrl": ".",
 "paths": { "@/*": ["./src/*"] }
@@ -630,12 +644,12 @@ Replace `web/src/index.css`:
 }
 
 :root {
-  --background: #f4f1ea;     /* --paper */
-  --card: #efeae0;           /* --paper-2 */
-  --foreground: #16130f;     /* --ink */
+  --background: #f4f1ea; /* --paper */
+  --card: #efeae0; /* --paper-2 */
+  --foreground: #16130f; /* --ink */
   --muted-foreground: #6c6253; /* --muted */
-  --primary: #8c2f1f;        /* --oxblood */
-  --destructive: #9f2f35;    /* --danger */
+  --primary: #8c2f1f; /* --oxblood */
+  --destructive: #9f2f35; /* --danger */
   --border: rgba(22, 19, 15, 0.16); /* --rule */
 }
 
@@ -644,7 +658,7 @@ Replace `web/src/index.css`:
   --card: #1f1b16;
   --foreground: #f4f1ea;
   --muted-foreground: #a89a85;
-  --primary: #c8553d;        /* lightened oxblood for contrast on dark */
+  --primary: #c8553d; /* lightened oxblood for contrast on dark */
   --destructive: #d4565b;
   --border: rgba(244, 241, 234, 0.16);
 }
@@ -657,22 +671,29 @@ body {
 ```
 
 Import the three Google fonts in `web/index.html` `<head>`:
+
 ```html
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<link
+  href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
 ```
 
 - [ ] **Step 4: Init shadcn**
 
 Run:
+
 ```bash
 cd web && npx --yes shadcn@latest init -d
 ```
+
 When prompted (or via `-d` defaults), select the **Neutral** base color; we override colors via the CSS above. Confirm `components.json` was created and `@/components`/`@/lib/utils` resolve.
 
 - [ ] **Step 5: Add the shadcn primitives used throughout**
 
 Run:
+
 ```bash
 cd web && npx --yes shadcn@latest add button card badge sheet dialog alert-dialog input label select checkbox slider table tabs skeleton sidebar separator switch dropdown-menu accordion collapsible sonner chart tooltip progress scroll-area
 ```
@@ -700,11 +721,13 @@ git commit -m "chore(web): Tailwind v4 + shadcn with tokens ported from ui.py"
 - [ ] **Step 1: Install openapi-fetch and copy the contract type**
 
 Run:
+
 ```bash
 cd web && npm install openapi-fetch
 mkdir -p src/lib/api
 cp ../contracts/ts/api.ts src/lib/api/schema.ts
 ```
+
 (Document in `scripts/gen_ts_client.sh` later that the file is also copied to `web/src/lib/api/schema.ts`; handled in Task 8.4.)
 
 - [ ] **Step 2: Write the failing test**
@@ -726,11 +749,16 @@ describe("token storage", () => {
 
 describe("unwrap", () => {
   it("returns data when present", async () => {
-    const r = await unwrap(Promise.resolve({ data: { ok: 1 }, error: undefined } as any));
+    const r = await unwrap(
+      Promise.resolve({ data: { ok: 1 }, error: undefined } as any),
+    );
     expect(r).toEqual({ ok: 1 });
   });
   it("throws the error envelope message", async () => {
-    const env = { error: { error: { code: "NOT_FOUND", message: "nope" } }, data: undefined };
+    const env = {
+      error: { error: { code: "NOT_FOUND", message: "nope" } },
+      data: undefined,
+    };
     await expect(unwrap(Promise.resolve(env as any))).rejects.toThrow("nope");
   });
 });
@@ -773,7 +801,9 @@ api.use({
   },
 });
 
-type ErrorEnvelope = { error?: { code: string; message: string; details?: unknown } };
+type ErrorEnvelope = {
+  error?: { code: string; message: string; details?: unknown };
+};
 
 /** Unwrap an openapi-fetch result, throwing the API error-envelope message. */
 export async function unwrap<T>(
@@ -818,7 +848,10 @@ Create `web/src/app/theme.tsx`:
 import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "light" | "dark" | "system";
-const ThemeContext = createContext<{ theme: Theme; setTheme: (t: Theme) => void }>({
+const ThemeContext = createContext<{
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+}>({
   theme: "system",
   setTheme: () => {},
 });
@@ -831,11 +864,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
     const dark =
       theme === "dark" ||
-      (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      (theme === "system" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches);
     root.classList.toggle("dark", dark);
     localStorage.setItem("theme", theme);
   }, [theme]);
-  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 export const useTheme = () => useContext(ThemeContext);
 ```
@@ -851,7 +889,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "./theme";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
+  defaultOptions: {
+    queries: { staleTime: 30_000, refetchOnWindowFocus: false },
+  },
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -873,8 +913,17 @@ Create `web/src/app/AppLayout.tsx`:
 ```tsx
 import { NavLink, Outlet } from "react-router-dom";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader,
-  SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { RunActions } from "@/features/runs/RunActions";
 import { RunPanel } from "@/features/runs/RunPanel";
@@ -893,8 +942,12 @@ export function AppLayout() {
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader className="p-4">
-          <div className="font-mono text-xs uppercase tracking-[0.3em] text-[var(--primary)]">Resume Agent</div>
-          <div className="font-serif text-2xl font-bold leading-tight">The Broadsheet</div>
+          <div className="font-mono text-xs uppercase tracking-[0.3em] text-[var(--primary)]">
+            Resume Agent
+          </div>
+          <div className="font-serif text-2xl font-bold leading-tight">
+            The Broadsheet
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
@@ -905,7 +958,9 @@ export function AppLayout() {
                     {/* asChild keeps a single interactive element (the NavLink) — no
                         button-inside-anchor nesting. NavLink sets aria-current="page". */}
                     <SidebarMenuButton asChild>
-                      <NavLink to={n.to} end={n.end}>{n.label}</NavLink>
+                      <NavLink to={n.to} end={n.end}>
+                        {n.label}
+                      </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -919,10 +974,14 @@ export function AppLayout() {
           {/* Mobile trigger opens the sidebar as a sheet; hidden once the rail is docked. */}
           <SidebarTrigger className="md:hidden" />
           <RunActions />
-          <div className="ml-auto"><ThemeToggle /></div>
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </header>
         <RunPanel />
-        <main className="flex-1 p-6"><Outlet /></main>
+        <main className="flex-1 p-6">
+          <Outlet />
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );
@@ -930,8 +989,12 @@ export function AppLayout() {
 ```
 
 Active-link styling: NavLink sets `aria-current="page"` on the active route; add to `web/src/index.css`:
+
 ```css
-[data-sidebar="menu-button"][aria-current="page"] { background: var(--card); font-weight: 600; }
+[data-sidebar="menu-button"][aria-current="page"] {
+  background: var(--card);
+  font-weight: 600;
+}
 ```
 
 (`RunActions`, `RunPanel`, `ThemeToggle` are stubbed now and implemented in later tasks. Create one-line placeholder components returning `null` so the build passes; replace in Phase 6 / below.)
@@ -941,7 +1004,11 @@ Create `web/src/components/ThemeToggle.tsx`:
 ```tsx
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useTheme } from "@/app/theme";
 
 export function ThemeToggle() {
@@ -949,8 +1016,12 @@ export function ThemeToggle() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Toggle theme"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Toggle theme"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        >
           <Sun className="h-4 w-4 dark:hidden" />
           <Moon className="hidden h-4 w-4 dark:block" />
         </Button>
@@ -962,11 +1033,17 @@ export function ThemeToggle() {
 ```
 
 Create placeholders `web/src/features/runs/RunActions.tsx` and `RunPanel.tsx`:
+
 ```tsx
-export function RunActions() { return null; }
+export function RunActions() {
+  return null;
+}
 ```
+
 ```tsx
-export function RunPanel() { return null; }
+export function RunPanel() {
+  return null;
+}
 ```
 
 - [ ] **Step 5: Router + main**
@@ -998,9 +1075,13 @@ export const router = createBrowserRouter([
 ```
 
 Create each page as a placeholder returning `<div>` with its name (replaced in later phases), e.g. `web/src/features/shortlist/ShortlistPage.tsx`:
+
 ```tsx
-export function ShortlistPage() { return <div>Shortlist</div>; }
+export function ShortlistPage() {
+  return <div>Shortlist</div>;
+}
 ```
+
 (Repeat for Pipeline, Triage, Analytics, MatchGap with their own names.)
 
 Replace `web/src/main.tsx`:
@@ -1045,6 +1126,7 @@ git commit -m "feat(web): app shell — providers, router, theme, layout"
 - [ ] **Step 1: Install**
 
 Run:
+
 ```bash
 cd web && npm install -D vitest jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event msw @vitest/coverage-v8 vitest-axe
 ```
@@ -1094,6 +1176,7 @@ export const server = setupServer();
 - [ ] **Step 4: package.json scripts**
 
 In `web/package.json` `"scripts"` add:
+
 ```json
 "test": "vitest",
 "test:run": "vitest run",
@@ -1130,7 +1213,9 @@ import { normalizeSkill } from "./normalize";
 
 describe("normalizeSkill (port of match_gap.normalize_skill)", () => {
   it("lowercases, drops punctuation, collapses whitespace", () => {
-    expect(normalizeSkill("  Node.JS / TypeScript!! ")).toBe("node.js typescript");
+    expect(normalizeSkill("  Node.JS / TypeScript!! ")).toBe(
+      "node.js typescript",
+    );
     expect(normalizeSkill("C++")).toBe("c++");
     expect(normalizeSkill("C#")).toBe("c#");
     expect(normalizeSkill("Go-lang")).toBe("go lang");
@@ -1189,10 +1274,20 @@ export interface FilterState {
 
 export function emptyFilterState(): FilterState {
   return {
-    salaryMin: null, remote: new Set(), sponsorship: new Set(), seniority: new Set(),
-    employmentType: new Set(), industry: new Set(), country: new Set(), region: new Set(),
-    city: new Set(), companySize: new Set(), fitMin: null, skills: new Set(),
-    sort: "fit", preset: "balanced",
+    salaryMin: null,
+    remote: new Set(),
+    sponsorship: new Set(),
+    seniority: new Set(),
+    employmentType: new Set(),
+    industry: new Set(),
+    country: new Set(),
+    region: new Set(),
+    city: new Set(),
+    companySize: new Set(),
+    fitMin: null,
+    skills: new Set(),
+    sort: "fit",
+    preset: "balanced",
   };
 }
 ```
@@ -1226,17 +1321,38 @@ import { emptyFilterState, type ShortlistItem } from "./types";
 
 const base = (over: Partial<ShortlistItem> = {}): ShortlistItem =>
   ({
-    jobId: 1, company: "Acme", title: "Eng", location: "NYC", fitScore: 70,
-    fitRationale: null, sponsorshipSignal: null, salaryMin: null, salaryMax: 120000,
-    salaryCurrency: "USD", remotePolicy: "remote", seniority: "senior",
-    employmentType: "full_time", industry: "tech", companySize: "large",
-    postedAt: null, skills: [], sicMajor: "73", sicLabel: "Services", sicDivision: "I",
-    locationCountry: "US", locationRegion: "NY", locationCity: "New York", ...over,
+    jobId: 1,
+    company: "Acme",
+    title: "Eng",
+    location: "NYC",
+    fitScore: 70,
+    fitRationale: null,
+    sponsorshipSignal: null,
+    salaryMin: null,
+    salaryMax: 120000,
+    salaryCurrency: "USD",
+    remotePolicy: "remote",
+    seniority: "senior",
+    employmentType: "full_time",
+    industry: "tech",
+    companySize: "large",
+    postedAt: null,
+    skills: [],
+    sicMajor: "73",
+    sicLabel: "Services",
+    sicDivision: "I",
+    locationCountry: "US",
+    locationRegion: "NY",
+    locationCity: "New York",
+    ...over,
   }) as ShortlistItem;
 
 describe("applyFilters (port of filtering._passes)", () => {
   it("filters by USD salary max below salaryMin", () => {
-    const rows = [base({ salaryMax: 90000 }), base({ jobId: 2, salaryMax: 150000 })];
+    const rows = [
+      base({ salaryMax: 90000 }),
+      base({ jobId: 2, salaryMax: 150000 }),
+    ];
     const s = { ...emptyFilterState(), salaryMin: 100000 };
     expect(applyFilters(rows, s).map((r) => r.jobId)).toEqual([2]);
   });
@@ -1251,7 +1367,10 @@ describe("applyFilters (port of filtering._passes)", () => {
     expect(applyFilters(rows, s).map((r) => r.jobId)).toEqual([2]);
   });
   it("multi-select facets keep rows with null value (neutral)", () => {
-    const rows = [base({ remotePolicy: null }), base({ jobId: 2, remotePolicy: "onsite" })];
+    const rows = [
+      base({ remotePolicy: null }),
+      base({ jobId: 2, remotePolicy: "onsite" }),
+    ];
     const s = { ...emptyFilterState(), remote: new Set(["remote"]) };
     // null is neutral (kept); 'onsite' not in selection (dropped)
     expect(applyFilters(rows, s).map((r) => r.jobId)).toEqual([1]);
@@ -1259,7 +1378,10 @@ describe("applyFilters (port of filtering._passes)", () => {
   it("skills require any-token overlap", () => {
     const rows = [
       base({ skills: [{ name: "Go", covered: false, required: true }] }),
-      base({ jobId: 2, skills: [{ name: "Rust", covered: false, required: true }] }),
+      base({
+        jobId: 2,
+        skills: [{ name: "Rust", covered: false, required: true }],
+      }),
     ];
     const s = { ...emptyFilterState(), skills: new Set(["go"]) };
     expect(applyFilters(rows, s).map((r) => r.jobId)).toEqual([1]);
@@ -1285,7 +1407,8 @@ function passes(row: ShortlistItem, s: FilterState): boolean {
     const currency = (row.salaryCurrency ?? "USD").toUpperCase();
     if (currency === "USD" && row.salaryMax < s.salaryMin) return false;
   }
-  if (s.fitMin !== null && row.fitScore != null && row.fitScore < s.fitMin) return false;
+  if (s.fitMin !== null && row.fitScore != null && row.fitScore < s.fitMin)
+    return false;
 
   const facets: [Set<string>, string | null | undefined][] = [
     [s.remote, row.remotePolicy],
@@ -1305,13 +1428,20 @@ function passes(row: ShortlistItem, s: FilterState): boolean {
   if (s.skills.size) {
     const tokens = new Set(row.skills.map((t) => normalizeSkill(t.name)));
     let overlap = false;
-    for (const t of s.skills) if (tokens.has(t)) { overlap = true; break; }
+    for (const t of s.skills)
+      if (tokens.has(t)) {
+        overlap = true;
+        break;
+      }
     if (!overlap) return false;
   }
   return true;
 }
 
-export function applyFilters(rows: ShortlistItem[], s: FilterState): ShortlistItem[] {
+export function applyFilters(
+  rows: ShortlistItem[],
+  s: FilterState,
+): ShortlistItem[] {
   return rows.filter((r) => passes(r, s));
 }
 ```
@@ -1345,8 +1475,16 @@ import { emptyFilterState, type ShortlistItem } from "./types";
 
 const NOW = new Date("2026-06-22T00:00:00Z");
 const row = (over: Partial<ShortlistItem>): ShortlistItem =>
-  ({ jobId: 0, salaryMin: null, salaryMax: null, salaryCurrency: "USD", fitScore: null,
-     postedAt: null, skills: [], ...over }) as ShortlistItem;
+  ({
+    jobId: 0,
+    salaryMin: null,
+    salaryMax: null,
+    salaryCurrency: "USD",
+    fitScore: null,
+    postedAt: null,
+    skills: [],
+    ...over,
+  }) as ShortlistItem;
 
 describe("compositeScore (port of filtering.composite_score)", () => {
   it("uses NEUTRAL 50 for missing fit/salary/recency under balanced", () => {
@@ -1354,19 +1492,31 @@ describe("compositeScore (port of filtering.composite_score)", () => {
   });
   it("clamps future-dated recency to 100, not above", () => {
     const future = new Date(NOW.getTime() + 10 * 86400000).toISOString();
-    const s = compositeScore(row({ postedAt: future, fitScore: 50 }), "freshest", NOW);
+    const s = compositeScore(
+      row({ postedAt: future, fitScore: 50 }),
+      "freshest",
+      NOW,
+    );
     expect(s).toBeLessThanOrEqual(100);
   });
 });
 
 describe("sortRows", () => {
   it("sorts by fit desc with nulls last", () => {
-    const rows = [row({ jobId: 1, fitScore: 40 }), row({ jobId: 2, fitScore: null }), row({ jobId: 3, fitScore: 90 })];
+    const rows = [
+      row({ jobId: 1, fitScore: 40 }),
+      row({ jobId: 2, fitScore: null }),
+      row({ jobId: 3, fitScore: 90 }),
+    ];
     const out = sortRows(rows, { ...emptyFilterState(), sort: "fit" }, NOW);
     expect(out.map((r) => r.jobId)).toEqual([3, 1, 2]);
   });
   it("sorts by salary desc using salaryMax then salaryMin", () => {
-    const rows = [row({ jobId: 1, salaryMax: 100 }), row({ jobId: 2, salaryMin: 200 }), row({ jobId: 3, salaryMax: null })];
+    const rows = [
+      row({ jobId: 1, salaryMax: 100 }),
+      row({ jobId: 2, salaryMin: 200 }),
+      row({ jobId: 3, salaryMax: null }),
+    ];
     const out = sortRows(rows, { ...emptyFilterState(), sort: "salary" }, NOW);
     expect(out.map((r) => r.jobId)).toEqual([2, 1, 3]);
   });
@@ -1402,29 +1552,48 @@ function ageDays(r: ShortlistItem, now: Date): number | null {
   return (now.getTime() - new Date(r.postedAt).getTime()) / 86_400_000;
 }
 
-export function compositeScore(r: ShortlistItem, preset: Preset, now: Date): number {
+export function compositeScore(
+  r: ShortlistItem,
+  preset: Preset,
+  now: Date,
+): number {
   const [wFit, wSalary, wRecency] = PRESETS[preset] ?? PRESETS.balanced;
   const fitN = r.fitScore != null ? r.fitScore : NEUTRAL;
   const salary = salaryValue(r);
-  const salaryN = salary != null ? (Math.min(salary, SALARY_CEILING) / SALARY_CEILING) * 100 : NEUTRAL;
+  const salaryN =
+    salary != null
+      ? (Math.min(salary, SALARY_CEILING) / SALARY_CEILING) * 100
+      : NEUTRAL;
   const age = ageDays(r, now);
   const recencyN =
-    age != null ? Math.min(100, Math.max(0, 100 - (age / RECENCY_WINDOW_DAYS) * 100)) : NEUTRAL;
-  return Math.round((wFit * fitN + wSalary * salaryN + wRecency * recencyN) * 10000) / 10000;
+    age != null
+      ? Math.min(100, Math.max(0, 100 - (age / RECENCY_WINDOW_DAYS) * 100))
+      : NEUTRAL;
+  return (
+    Math.round(
+      (wFit * fitN + wSalary * salaryN + wRecency * recencyN) * 10000,
+    ) / 10000
+  );
 }
 
 // Mirror Python's reverse-sorted tuple keys with a comparator.
-export function sortRows(rows: ShortlistItem[], s: FilterState, now: Date = new Date()): ShortlistItem[] {
+export function sortRows(
+  rows: ShortlistItem[],
+  s: FilterState,
+  now: Date = new Date(),
+): ShortlistItem[] {
   const arr = [...rows];
   if (s.sort === "salary") {
     return arr.sort((a, b) => {
-      const av = salaryValue(a), bv = salaryValue(b);
+      const av = salaryValue(a),
+        bv = salaryValue(b);
       return Number(bv != null) - Number(av != null) || (bv ?? 0) - (av ?? 0);
     });
   }
   if (s.sort === "recency") {
     return arr.sort((a, b) => {
-      const aa = ageDays(a, now), ba = ageDays(b, now);
+      const aa = ageDays(a, now),
+        ba = ageDays(b, now);
       return (
         Number(!!b.postedAt) - Number(!!a.postedAt) ||
         Number(ba != null) - Number(aa != null) ||
@@ -1433,11 +1602,17 @@ export function sortRows(rows: ShortlistItem[], s: FilterState, now: Date = new 
     });
   }
   if (s.sort === "composite") {
-    return arr.sort((a, b) => compositeScore(b, s.preset, now) - compositeScore(a, s.preset, now));
+    return arr.sort(
+      (a, b) =>
+        compositeScore(b, s.preset, now) - compositeScore(a, s.preset, now),
+    );
   }
   // fit (default)
   return arr.sort((a, b) => {
-    return Number(b.fitScore != null) - Number(a.fitScore != null) || (b.fitScore ?? 0) - (a.fitScore ?? 0);
+    return (
+      Number(b.fitScore != null) - Number(a.fitScore != null) ||
+      (b.fitScore ?? 0) - (a.fitScore ?? 0)
+    );
   });
 }
 ```
@@ -1466,15 +1641,29 @@ Create `web/src/lib/filters/facets.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { availableCities, availableCountries, availableSkillCloud, availableStates } from "./facets";
+import {
+  availableCities,
+  availableCountries,
+  availableSkillCloud,
+  availableStates,
+} from "./facets";
 import type { ShortlistItem } from "./types";
 
-const r = (o: Partial<ShortlistItem>): ShortlistItem => ({ skills: [], ...o } as ShortlistItem);
+const r = (o: Partial<ShortlistItem>): ShortlistItem =>
+  ({ skills: [], ...o }) as ShortlistItem;
 
 describe("location facets (port of filtering.available_*)", () => {
   const rows = [
-    r({ locationCountry: "US", locationRegion: "NY", locationCity: "New York" }),
-    r({ locationCountry: "US", locationRegion: "CA", locationCity: "San Jose" }),
+    r({
+      locationCountry: "US",
+      locationRegion: "NY",
+      locationCity: "New York",
+    }),
+    r({
+      locationCountry: "US",
+      locationRegion: "CA",
+      locationCity: "San Jose",
+    }),
     r({ locationCountry: "UK", locationRegion: null, locationCity: "London" }),
   ];
   it("countries are sorted + unique", () => {
@@ -1484,7 +1673,9 @@ describe("location facets (port of filtering.available_*)", () => {
     expect(availableStates(rows, new Set(["US"]))).toEqual(["CA", "NY"]);
   });
   it("cities honor country + state filters", () => {
-    expect(availableCities(rows, new Set(["US"]), new Set(["NY"]))).toEqual(["New York"]);
+    expect(availableCities(rows, new Set(["US"]), new Set(["NY"]))).toEqual([
+      "New York",
+    ]);
   });
 });
 
@@ -1526,24 +1717,45 @@ export function availableCountries(rows: ShortlistItem[]): string[] {
   return uniqSorted(rows.map((r) => r.locationCountry));
 }
 
-export function availableStates(rows: ShortlistItem[], countries: Set<string>): string[] {
+export function availableStates(
+  rows: ShortlistItem[],
+  countries: Set<string>,
+): string[] {
   return uniqSorted(
-    rows.filter((r) => !countries.size || (r.locationCountry && countries.has(r.locationCountry)))
-        .map((r) => r.locationRegion),
+    rows
+      .filter(
+        (r) =>
+          !countries.size ||
+          (r.locationCountry && countries.has(r.locationCountry)),
+      )
+      .map((r) => r.locationRegion),
   );
 }
 
-export function availableCities(rows: ShortlistItem[], countries: Set<string>, states: Set<string>): string[] {
+export function availableCities(
+  rows: ShortlistItem[],
+  countries: Set<string>,
+  states: Set<string>,
+): string[] {
   return uniqSorted(
     rows
-      .filter((r) => !countries.size || (r.locationCountry && countries.has(r.locationCountry)))
-      .filter((r) => !states.size || (r.locationRegion && states.has(r.locationRegion)))
+      .filter(
+        (r) =>
+          !countries.size ||
+          (r.locationCountry && countries.has(r.locationCountry)),
+      )
+      .filter(
+        (r) =>
+          !states.size || (r.locationRegion && states.has(r.locationRegion)),
+      )
       .map((r) => r.locationCity),
   );
 }
 
 /** [(divisionLabel, [[code, label], ...]), ...] grouped + sorted, port of available_industries. */
-export function availableIndustries(rows: ShortlistItem[]): [string, [string, string][]][] {
+export function availableIndustries(
+  rows: ShortlistItem[],
+): [string, [string, string][]][] {
   const byDiv = new Map<string, Set<string>>(); // division -> set of "code\x00label"
   for (const r of rows) {
     if (r.sicMajor && r.sicDivision && r.sicLabel) {
@@ -1556,7 +1768,9 @@ export function availableIndustries(rows: ShortlistItem[]): [string, [string, st
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([div, codes]) => [
       div,
-      [...codes].map((c) => c.split(" ") as [string, string]).sort((a, b) => a[0].localeCompare(b[0])),
+      [...codes]
+        .map((c) => c.split(" ") as [string, string])
+        .sort((a, b) => a[0].localeCompare(b[0])),
     ]);
 }
 
@@ -1642,7 +1856,9 @@ export function FitMeter({ score }: { score: number | null }) {
   const label = score == null ? "no fit score" : `fit score ${score}`;
   return (
     <div className="flex flex-col items-center" aria-label={label}>
-      <span className="font-serif text-2xl font-bold leading-none">{score ?? "—"}</span>
+      <span className="font-serif text-2xl font-bold leading-none">
+        {score ?? "—"}
+      </span>
       <span className="font-mono text-[0.6rem] uppercase tracking-widest text-[var(--muted-foreground)]">
         fit
       </span>
@@ -1659,7 +1875,10 @@ import { Badge } from "@/components/ui/badge";
 export function StatusBadge({ status }: { status: string }) {
   // text label always present; color is supplementary
   return (
-    <Badge variant="outline" className="font-mono text-[0.65rem] uppercase tracking-wider">
+    <Badge
+      variant="outline"
+      className="font-mono text-[0.65rem] uppercase tracking-wider"
+    >
       {status.replace(/_/g, " ")}
     </Badge>
   );
@@ -1669,11 +1888,19 @@ export function StatusBadge({ status }: { status: string }) {
 Create `web/src/components/SkillChip.tsx`:
 
 ```tsx
-export function SkillChip({ name, active }: { name: string; active?: boolean }) {
+export function SkillChip({
+  name,
+  active,
+}: {
+  name: string;
+  active?: boolean;
+}) {
   return (
     <span
       className={`inline-block rounded-[var(--radius-sm)] border border-[var(--border)] px-2 py-0.5 text-xs ${
-        active ? "bg-[var(--primary)] text-white" : "text-[var(--muted-foreground)]"
+        active
+          ? "bg-[var(--primary)] text-white"
+          : "text-[var(--muted-foreground)]"
       }`}
     >
       {name}
@@ -1711,7 +1938,9 @@ import { EmptyState } from "./EmptyState";
 
 describe("EmptyState", () => {
   it("renders a status region with title + body", () => {
-    render(<EmptyState title="Nothing here" body="Run a pull to ingest jobs." />);
+    render(
+      <EmptyState title="Nothing here" body="Run a pull to ingest jobs." />,
+    );
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.getByText("Nothing here")).toBeInTheDocument();
     expect(screen.getByText(/Run a pull/)).toBeInTheDocument();
@@ -1746,8 +1975,13 @@ export function MetricRow({ items }: { items: [string, string][] }) {
   return (
     <div className="mb-6 flex flex-wrap gap-3">
       {items.map(([label, value]) => (
-        <div key={label} className="min-w-[150px] flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
-          <div className="font-serif text-2xl font-bold leading-none">{value}</div>
+        <div
+          key={label}
+          className="min-w-[150px] flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4"
+        >
+          <div className="font-serif text-2xl font-bold leading-none">
+            {value}
+          </div>
           <div className="mt-2 font-mono text-[0.7rem] uppercase tracking-widest text-[var(--muted-foreground)]">
             {label}
           </div>
@@ -1787,11 +2021,19 @@ import { PageHeader } from "./PageHeader";
 
 describe("PageHeader", () => {
   it("title is the single h1; kicker is NOT a heading", () => {
-    render(<PageHeader kicker="Human checkpoint" title="The Shortlist" sub="Approve keepers." />);
+    render(
+      <PageHeader
+        kicker="Human checkpoint"
+        title="The Shortlist"
+        sub="Approve keepers."
+      />,
+    );
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1).toHaveTextContent("The Shortlist");
     // kicker text exists but not as a heading
-    expect(screen.getByText("Human checkpoint").tagName).not.toMatch(/^H[1-6]$/);
+    expect(screen.getByText("Human checkpoint").tagName).not.toMatch(
+      /^H[1-6]$/,
+    );
   });
 });
 ```
@@ -1806,12 +2048,26 @@ Expected: FAIL.
 Create `web/src/components/PageHeader.tsx`:
 
 ```tsx
-export function PageHeader({ kicker, title, sub }: { kicker: string; title: string; sub?: string }) {
+export function PageHeader({
+  kicker,
+  title,
+  sub,
+}: {
+  kicker: string;
+  title: string;
+  sub?: string;
+}) {
   return (
     <header className="mb-6 border-b-2 border-[var(--foreground)] pb-4">
-      <p className="font-mono text-xs uppercase tracking-[0.3em] text-[var(--primary)]">{kicker}</p>
+      <p className="font-mono text-xs uppercase tracking-[0.3em] text-[var(--primary)]">
+        {kicker}
+      </p>
       <h1 className="font-serif text-4xl font-bold leading-tight">{title}</h1>
-      {sub && <p className="mt-2 max-w-[70ch] text-[var(--muted-foreground)]">{sub}</p>}
+      {sub && (
+        <p className="mt-2 max-w-[70ch] text-[var(--muted-foreground)]">
+          {sub}
+        </p>
+      )}
     </header>
   );
 }
@@ -1884,8 +2140,14 @@ function JobCardSkeleton() {
 
 export function BoardSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div aria-busy="true" aria-label="Loading jobs" className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      {Array.from({ length: count }).map((_, i) => <JobCardSkeleton key={i} />)}
+    <div
+      aria-busy="true"
+      aria-label="Loading jobs"
+      className="grid grid-cols-1 gap-4 xl:grid-cols-2"
+    >
+      {Array.from({ length: count }).map((_, i) => (
+        <JobCardSkeleton key={i} />
+      ))}
     </div>
   );
 }
@@ -1937,12 +2199,19 @@ describe("ConfirmDialog", () => {
   it("fires onConfirm only after the confirm action", async () => {
     const onConfirm = vi.fn();
     render(
-      <ConfirmDialog trigger={<button>Delete</button>} title="Delete job?"
-        description="This cannot be undone." confirmLabel="Confirm delete" onConfirm={onConfirm} />,
+      <ConfirmDialog
+        trigger={<button>Delete</button>}
+        title="Delete job?"
+        description="This cannot be undone."
+        confirmLabel="Confirm delete"
+        onConfirm={onConfirm}
+      />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(onConfirm).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: /confirm delete/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /confirm delete/i }),
+    );
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 });
@@ -1959,15 +2228,29 @@ Create `web/src/components/ConfirmDialog.tsx`:
 
 ```tsx
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 export function ConfirmDialog({
-  trigger, title, description, confirmLabel = "Confirm", onConfirm,
+  trigger,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  onConfirm,
 }: {
-  trigger: React.ReactNode; title: string; description: string;
-  confirmLabel?: string; onConfirm: () => void;
+  trigger: React.ReactNode;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  onConfirm: () => void;
 }) {
   return (
     <AlertDialog>
@@ -1979,7 +2262,9 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>{confirmLabel}</AlertDialogAction>
+          <AlertDialogAction onClick={onConfirm}>
+            {confirmLabel}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -1998,10 +2283,18 @@ When implementing Tasks 4.5 (Triage "Delete selected"), 4.5 PrunePanel ("Prune n
 
 ```tsx
 <ConfirmDialog
-  trigger={<Button variant="destructive" disabled={job.hasProgress}>Delete</Button>}
-  title="Delete this job?" description="This cannot be undone."
+  trigger={
+    <Button variant="destructive" disabled={job.hasProgress}>
+      Delete
+    </Button>
+  }
+  title="Delete this job?"
+  description="This cannot be undone."
   confirmLabel="Confirm delete"
-  onConfirm={() => { del.mutate(job.id); onDeleted(); }}
+  onConfirm={() => {
+    del.mutate(job.id);
+    onDeleted();
+  }}
 />
 ```
 
@@ -2074,7 +2367,9 @@ export function useShortlist() {
   return useQuery({
     queryKey: ["shortlist"],
     queryFn: async (): Promise<ShortlistItem[]> => {
-      const page = await unwrap(api.GET("/api/shortlist", { params: { query: { pageSize: 200 } } }));
+      const page = await unwrap(
+        api.GET("/api/shortlist", { params: { query: { pageSize: 200 } } }),
+      );
       return (page as { data: ShortlistItem[] }).data;
     },
   });
@@ -2094,7 +2389,9 @@ export function usePipeline() {
   return useQuery({
     queryKey: ["pipeline"],
     queryFn: async (): Promise<PipelineItem[]> => {
-      const page = await unwrap(api.GET("/api/pipeline", { params: { query: { pageSize: 200 } } }));
+      const page = await unwrap(
+        api.GET("/api/pipeline", { params: { query: { pageSize: 200 } } }),
+      );
       return (page as { data: PipelineItem[] }).data;
     },
   });
@@ -2115,7 +2412,9 @@ export function useTriage(archived: boolean) {
     queryKey: ["triage", archived],
     queryFn: async (): Promise<TriageItem[]> => {
       const page = await unwrap(
-        api.GET("/api/triage", { params: { query: { archived, pageSize: 200 } } }),
+        api.GET("/api/triage", {
+          params: { query: { archived, pageSize: 200 } },
+        }),
       );
       return (page as { data: TriageItem[] }).data;
     },
@@ -2154,8 +2453,14 @@ import { emptyFilterState } from "@/lib/filters/types";
 
 describe("filter URL serialization", () => {
   it("round-trips a populated state", () => {
-    const s = { ...emptyFilterState(), fitMin: 70, sort: "composite" as const, preset: "pay_first" as const,
-      remote: new Set(["remote", "hybrid"]), skills: new Set(["go"]) };
+    const s = {
+      ...emptyFilterState(),
+      fitMin: 70,
+      sort: "composite" as const,
+      preset: "pay_first" as const,
+      remote: new Set(["remote", "hybrid"]),
+      skills: new Set(["go"]),
+    };
     const round = paramsToState(stateToParams(s));
     expect(round.fitMin).toBe(70);
     expect(round.sort).toBe("composite");
@@ -2181,10 +2486,25 @@ Create `web/src/features/shortlist/use-board-filters.ts`:
 ```ts
 import { useSearchParams } from "react-router-dom";
 import { useMemo } from "react";
-import { emptyFilterState, type FilterState, type Preset, type SortKey } from "@/lib/filters/types";
+import {
+  emptyFilterState,
+  type FilterState,
+  type Preset,
+  type SortKey,
+} from "@/lib/filters/types";
 
-const SET_KEYS = ["remote", "sponsorship", "seniority", "employmentType", "industry",
-  "country", "region", "city", "companySize", "skills"] as const;
+const SET_KEYS = [
+  "remote",
+  "sponsorship",
+  "seniority",
+  "employmentType",
+  "industry",
+  "country",
+  "region",
+  "city",
+  "companySize",
+  "skills",
+] as const;
 
 export function stateToParams(s: FilterState): URLSearchParams {
   const p = new URLSearchParams();
@@ -2253,14 +2573,21 @@ import { FilterDesk } from "./FilterDesk";
 import { emptyFilterState, type ShortlistItem } from "@/lib/filters/types";
 
 const rows: ShortlistItem[] = [
-  { jobId: 1, locationCountry: "US", locationRegion: "NY", locationCity: "New York",
-    skills: [{ name: "Go", covered: false, required: true }] } as ShortlistItem,
+  {
+    jobId: 1,
+    locationCountry: "US",
+    locationRegion: "NY",
+    locationCity: "New York",
+    skills: [{ name: "Go", covered: false, required: true }],
+  } as ShortlistItem,
 ];
 
 describe("FilterDesk", () => {
   it("emits an updated fitMin when the slider changes", async () => {
     const onChange = vi.fn();
-    render(<FilterDesk rows={rows} state={emptyFilterState()} onChange={onChange} />);
+    render(
+      <FilterDesk rows={rows} state={emptyFilterState()} onChange={onChange} />,
+    );
     // min-fit control is labelled
     expect(screen.getByLabelText(/min fit/i)).toBeInTheDocument();
   });
@@ -2270,7 +2597,11 @@ describe("FilterDesk", () => {
     );
     expect(screen.queryByLabelText(/preset/i)).not.toBeInTheDocument();
     rerender(
-      <FilterDesk rows={rows} state={{ ...emptyFilterState(), sort: "composite" }} onChange={() => {}} />,
+      <FilterDesk
+        rows={rows}
+        state={{ ...emptyFilterState(), sort: "composite" }}
+        onChange={() => {}}
+      />,
     );
     expect(screen.getByLabelText(/preset/i)).toBeInTheDocument();
   });
@@ -2292,88 +2623,200 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { MultiSelect } from "./MultiSelect";
 import {
-  availableCities, availableCountries, availableIndustries, availableSkillCloud, availableStates,
+  availableCities,
+  availableCountries,
+  availableIndustries,
+  availableSkillCloud,
+  availableStates,
 } from "@/lib/filters/facets";
 import { normalizeSkill } from "@/lib/filters/normalize";
-import type { FilterState, ShortlistItem, SortKey, Preset } from "@/lib/filters/types";
+import type {
+  FilterState,
+  ShortlistItem,
+  SortKey,
+  Preset,
+} from "@/lib/filters/types";
 
 const SORTS: [SortKey, string][] = [
-  ["fit", "Fit"], ["salary", "Salary"], ["recency", "Recency"], ["composite", "Composite"],
+  ["fit", "Fit"],
+  ["salary", "Salary"],
+  ["recency", "Recency"],
+  ["composite", "Composite"],
 ];
 const PRESETS: [Preset, string][] = [
-  ["balanced", "Balanced"], ["pay_first", "Pay-first"], ["freshest", "Freshest"],
+  ["balanced", "Balanced"],
+  ["pay_first", "Pay-first"],
+  ["freshest", "Freshest"],
 ];
 
 export function FilterDesk({
-  rows, state, onChange,
-}: { rows: ShortlistItem[]; state: FilterState; onChange: (s: FilterState) => void }) {
+  rows,
+  state,
+  onChange,
+}: {
+  rows: ShortlistItem[];
+  state: FilterState;
+  onChange: (s: FilterState) => void;
+}) {
   const set = (patch: Partial<FilterState>) => onChange({ ...state, ...patch });
   const countries = useMemo(() => availableCountries(rows), [rows]);
-  const states = useMemo(() => availableStates(rows, state.country), [rows, state.country]);
-  const cities = useMemo(() => availableCities(rows, state.country, state.region), [rows, state.country, state.region]);
+  const states = useMemo(
+    () => availableStates(rows, state.country),
+    [rows, state.country],
+  );
+  const cities = useMemo(
+    () => availableCities(rows, state.country, state.region),
+    [rows, state.country, state.region],
+  );
   const industries = useMemo(() => availableIndustries(rows), [rows]);
   const skills = useMemo(() => availableSkillCloud(rows), [rows]);
-  const sizes = useMemo(() => [...new Set(rows.map((r) => r.companySize).filter(Boolean) as string[])].sort(), [rows]);
+  const sizes = useMemo(
+    () =>
+      [
+        ...new Set(rows.map((r) => r.companySize).filter(Boolean) as string[]),
+      ].sort(),
+    [rows],
+  );
 
   return (
-    <section aria-label="Filter and sort" className="mb-6 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4">
-      <div className="mb-3 font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">Filter &amp; sort</div>
+    <section
+      aria-label="Filter and sort"
+      className="mb-6 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4"
+    >
+      <div className="mb-3 font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">
+        Filter &amp; sort
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Label htmlFor="f-salary">Min salary (USD)</Label>
-          <Input id="f-salary" type="number" min={0} step={10000}
+          <Input
+            id="f-salary"
+            type="number"
+            min={0}
+            step={10000}
             value={state.salaryMin ?? 0}
-            onChange={(e) => set({ salaryMin: Number(e.target.value) || null })} />
+            onChange={(e) => set({ salaryMin: Number(e.target.value) || null })}
+          />
         </div>
         <div>
           <Label htmlFor="f-fit">Min fit</Label>
-          <Slider id="f-fit" min={0} max={100} step={1} value={[state.fitMin ?? 0]}
-            onValueChange={([v]) => set({ fitMin: v || null })} />
+          <Slider
+            id="f-fit"
+            min={0}
+            max={100}
+            step={1}
+            value={[state.fitMin ?? 0]}
+            onValueChange={([v]) => set({ fitMin: v || null })}
+          />
         </div>
         <div>
           <Label htmlFor="f-sort">Sort by</Label>
-          <Select value={state.sort} onValueChange={(v) => set({ sort: v as SortKey })}>
-            <SelectTrigger id="f-sort"><SelectValue /></SelectTrigger>
+          <Select
+            value={state.sort}
+            onValueChange={(v) => set({ sort: v as SortKey })}
+          >
+            <SelectTrigger id="f-sort">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {SORTS.map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
+              {SORTS.map(([k, l]) => (
+                <SelectItem key={k} value={k}>
+                  {l}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-        <MultiSelect label="Company size" options={sizes} selected={state.companySize}
-          onChange={(s) => set({ companySize: s })} />
+        <MultiSelect
+          label="Company size"
+          options={sizes}
+          selected={state.companySize}
+          onChange={(s) => set({ companySize: s })}
+        />
 
-        <MultiSelect label="Remote" options={["remote", "hybrid", "onsite"]} selected={state.remote}
-          onChange={(s) => set({ remote: s })} />
-        <MultiSelect label="Sponsorship" options={["offered", "silent", "denied"]} selected={state.sponsorship}
-          onChange={(s) => set({ sponsorship: s })} />
-        <MultiSelect label="Seniority" options={["junior", "mid", "senior", "staff", "principal"]}
-          selected={state.seniority} onChange={(s) => set({ seniority: s })} />
-        <MultiSelect label="Type" options={["full_time", "contract", "internship", "part_time"]}
-          selected={state.employmentType} onChange={(s) => set({ employmentType: s })} />
+        <MultiSelect
+          label="Remote"
+          options={["remote", "hybrid", "onsite"]}
+          selected={state.remote}
+          onChange={(s) => set({ remote: s })}
+        />
+        <MultiSelect
+          label="Sponsorship"
+          options={["offered", "silent", "denied"]}
+          selected={state.sponsorship}
+          onChange={(s) => set({ sponsorship: s })}
+        />
+        <MultiSelect
+          label="Seniority"
+          options={["junior", "mid", "senior", "staff", "principal"]}
+          selected={state.seniority}
+          onChange={(s) => set({ seniority: s })}
+        />
+        <MultiSelect
+          label="Type"
+          options={["full_time", "contract", "internship", "part_time"]}
+          selected={state.employmentType}
+          onChange={(s) => set({ employmentType: s })}
+        />
 
-        <MultiSelect label="Country" options={countries} selected={state.country}
-          onChange={(s) => set({ country: s })} />
-        <MultiSelect label="State (US)" options={states} selected={state.region}
-          onChange={(s) => set({ region: s })} />
-        <MultiSelect label="City" options={cities} selected={state.city}
-          onChange={(s) => set({ city: s })} />
-        <MultiSelect label="Industry — division" options={industries.map(([d]) => d)}
-          selected={state.industry /* division uses sic_division? see note */} onChange={() => {}} disabled />
+        <MultiSelect
+          label="Country"
+          options={countries}
+          selected={state.country}
+          onChange={(s) => set({ country: s })}
+        />
+        <MultiSelect
+          label="State (US)"
+          options={states}
+          selected={state.region}
+          onChange={(s) => set({ region: s })}
+        />
+        <MultiSelect
+          label="City"
+          options={cities}
+          selected={state.city}
+          onChange={(s) => set({ city: s })}
+        />
+        <MultiSelect
+          label="Industry — division"
+          options={industries.map(([d]) => d)}
+          selected={state.industry /* division uses sic_division? see note */}
+          onChange={() => {}}
+          disabled
+        />
 
-        <MultiSelect label="Skills (any match)" options={skills.map((t) => t.name)}
+        <MultiSelect
+          label="Skills (any match)"
+          options={skills.map((t) => t.name)}
           selected={new Set([...state.skills])}
-          onChange={(picked) => set({ skills: new Set([...picked].map(normalizeSkill)) })} />
+          onChange={(picked) =>
+            set({ skills: new Set([...picked].map(normalizeSkill)) })
+          }
+        />
         {state.sort === "composite" && (
           <div>
             <Label htmlFor="f-preset">Preset</Label>
-            <Select value={state.preset} onValueChange={(v) => set({ preset: v as Preset })}>
-              <SelectTrigger id="f-preset"><SelectValue /></SelectTrigger>
+            <Select
+              value={state.preset}
+              onValueChange={(v) => set({ preset: v as Preset })}
+            >
+              <SelectTrigger id="f-preset">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {PRESETS.map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
+                {PRESETS.map(([k, l]) => (
+                  <SelectItem key={k} value={k}>
+                    {l}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -2390,16 +2833,26 @@ Create `web/src/components/MultiSelect.tsx`:
 
 ```tsx
 import {
-  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 export function MultiSelect({
-  label, options, selected, onChange, disabled,
+  label,
+  options,
+  selected,
+  onChange,
+  disabled,
 }: {
-  label: string; options: string[]; selected: Set<string>;
-  onChange: (s: Set<string>) => void; disabled?: boolean;
+  label: string;
+  options: string[];
+  selected: Set<string>;
+  onChange: (s: Set<string>) => void;
+  disabled?: boolean;
 }) {
   const id = `ms-${label.replace(/\W+/g, "-").toLowerCase()}`;
   const toggle = (opt: string) => {
@@ -2412,13 +2865,22 @@ export function MultiSelect({
       <Label htmlFor={id}>{label}</Label>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button id={id} variant="outline" disabled={disabled} className="w-full justify-start font-normal">
+          <Button
+            id={id}
+            variant="outline"
+            disabled={disabled}
+            className="w-full justify-start font-normal"
+          >
             {selected.size ? `${selected.size} selected` : "Any"}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="max-h-64 overflow-auto">
           {options.map((opt) => (
-            <DropdownMenuCheckboxItem key={opt} checked={selected.has(opt)} onCheckedChange={() => toggle(opt)}>
+            <DropdownMenuCheckboxItem
+              key={opt}
+              checked={selected.has(opt)}
+              onCheckedChange={() => toggle(opt)}
+            >
               {opt.replace(/_/g, " ")}
             </DropdownMenuCheckboxItem>
           ))}
@@ -2462,25 +2924,50 @@ import { ShortlistContainer } from "./ShortlistContainer";
 
 const wrap = (ui: React.ReactNode) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 };
 
 describe("ShortlistContainer", () => {
   it("shows empty state when no rows", async () => {
-    server.use(http.get("/api/shortlist", () =>
-      HttpResponse.json({ data: [], pagination: { page: 1, pageSize: 200, totalItems: 0, totalPages: 0 } })));
+    server.use(
+      http.get("/api/shortlist", () =>
+        HttpResponse.json({
+          data: [],
+          pagination: { page: 1, pageSize: 200, totalItems: 0, totalPages: 0 },
+        }),
+      ),
+    );
     wrap(<ShortlistContainer />);
-    await waitFor(() => expect(screen.getByText(/nothing shortlisted yet/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/nothing shortlisted yet/i)).toBeInTheDocument(),
+    );
   });
   it("renders a card per row", async () => {
-    server.use(http.get("/api/shortlist", () =>
-      HttpResponse.json({
-        data: [{ jobId: 7, company: "Acme", title: "Staff Engineer", location: "Remote",
-                 fitScore: 81, skills: [] }],
-        pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
-      })));
+    server.use(
+      http.get("/api/shortlist", () =>
+        HttpResponse.json({
+          data: [
+            {
+              jobId: 7,
+              company: "Acme",
+              title: "Staff Engineer",
+              location: "Remote",
+              fitScore: 81,
+              skills: [],
+            },
+          ],
+          pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+        }),
+      ),
+    );
     wrap(<ShortlistContainer />);
-    await waitFor(() => expect(screen.getByText("Staff Engineer")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Staff Engineer")).toBeInTheDocument(),
+    );
     expect(screen.getByText("81")).toBeInTheDocument();
   });
 });
@@ -2502,29 +2989,42 @@ import { SkillChip } from "./SkillChip";
 import type { ShortlistItem } from "@/lib/filters/types";
 
 export function JobCard({
-  row, activeSkills, onOpen, footer,
+  row,
+  activeSkills,
+  onOpen,
+  footer,
 }: {
-  row: ShortlistItem; activeSkills: Set<string>;
-  onOpen: () => void; footer?: React.ReactNode;
+  row: ShortlistItem;
+  activeSkills: Set<string>;
+  onOpen: () => void;
+  footer?: React.ReactNode;
 }) {
   return (
     <Card className="flex flex-col gap-3 p-4">
       <button onClick={onOpen} className="flex gap-4 text-left">
         <FitMeter score={row.fitScore} />
         <div className="min-w-0">
-          <div className="font-serif text-lg font-semibold">{row.title ?? "—"}</div>
+          <div className="font-serif text-lg font-semibold">
+            {row.title ?? "—"}
+          </div>
           <div className="text-sm text-[var(--muted-foreground)]">
             {row.company ?? "—"} · {row.location ?? "location n/a"}
           </div>
           {row.skills.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {row.skills.slice(0, 6).map((t) => (
-                <SkillChip key={t.name} name={t.name} active={activeSkills.has(t.name.toLowerCase())} />
+                <SkillChip
+                  key={t.name}
+                  name={t.name}
+                  active={activeSkills.has(t.name.toLowerCase())}
+                />
               ))}
             </div>
           )}
           {row.fitRationale && (
-            <p className="mt-2 line-clamp-4 text-sm text-[var(--muted-foreground)]">{row.fitRationale}</p>
+            <p className="mt-2 line-clamp-4 text-sm text-[var(--muted-foreground)]">
+              {row.fitRationale}
+            </p>
           )}
         </div>
       </button>
@@ -2546,13 +3046,18 @@ export function useApprove() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (jobId: number) =>
-      unwrap(api.PATCH("/api/jobs/{job_id}", {
-        params: { path: { job_id: jobId } }, body: { status: "approved" },
-      })),
+      unwrap(
+        api.PATCH("/api/jobs/{job_id}", {
+          params: { path: { job_id: jobId } },
+          body: { status: "approved" },
+        }),
+      ),
     onMutate: async (jobId) => {
       await qc.cancelQueries({ queryKey: ["shortlist"] });
       const prev = qc.getQueryData<ShortlistItem[]>(["shortlist"]);
-      qc.setQueryData<ShortlistItem[]>(["shortlist"], (old) => old?.filter((r) => r.jobId !== jobId));
+      qc.setQueryData<ShortlistItem[]>(["shortlist"], (old) =>
+        old?.filter((r) => r.jobId !== jobId),
+      );
       return { prev };
     },
     onError: (_e, _id, ctx) => {
@@ -2590,45 +3095,95 @@ export function ShortlistContainer() {
   const approve = useApprove();
   const [params, setParams] = useSearchParams();
 
-  const visible = useMemo(() => (rows ? sortRows(applyFilters(rows, filters), filters) : []), [rows, filters]);
+  const visible = useMemo(
+    () => (rows ? sortRows(applyFilters(rows, filters), filters) : []),
+    [rows, filters],
+  );
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
-  if (error) return <EmptyState title="Failed to load" body={(error as Error).message} />;
+  if (error)
+    return (
+      <EmptyState title="Failed to load" body={(error as Error).message} />
+    );
 
-  const avg = rows?.length ? Math.round(rows.reduce((a, r) => a + (r.fitScore ?? 0), 0) / rows.length) : 0;
-  const sponsored = rows?.filter((r) => r.sponsorshipSignal === "offered").length ?? 0;
+  const avg = rows?.length
+    ? Math.round(rows.reduce((a, r) => a + (r.fitScore ?? 0), 0) / rows.length)
+    : 0;
+  const sponsored =
+    rows?.filter((r) => r.sponsorshipSignal === "offered").length ?? 0;
   const openId = params.get("job");
 
   return (
     <>
-      <PageHeader kicker="Human checkpoint" title="The Shortlist"
-        sub="The cost gate before the premium tailoring step. Approve only the jobs worth the spend." />
-      <MetricRow items={[["Awaiting review", String(rows?.length ?? 0)], ["Avg fit", String(avg)],
-        ["Sponsorship offered", String(sponsored)]]} />
+      <PageHeader
+        kicker="Human checkpoint"
+        title="The Shortlist"
+        sub="The cost gate before the premium tailoring step. Approve only the jobs worth the spend."
+      />
+      <MetricRow
+        items={[
+          ["Awaiting review", String(rows?.length ?? 0)],
+          ["Avg fit", String(avg)],
+          ["Sponsorship offered", String(sponsored)],
+        ]}
+      />
       {!rows?.length ? (
-        <EmptyState title="Nothing shortlisted yet"
-          body="Run a discover to score jobs and surface the keepers here." />
+        <EmptyState
+          title="Nothing shortlisted yet"
+          body="Run a discover to score jobs and surface the keepers here."
+        />
       ) : (
         <>
           <FilterDesk rows={rows} state={filters} onChange={setFilters} />
           {visible.length === 0 ? (
-            <EmptyState title="No jobs match these filters" body="Loosen a filter or clear the skill tags." />
+            <EmptyState
+              title="No jobs match these filters"
+              body="Loosen a filter or clear the skill tags."
+            />
           ) : (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {visible.map((row) => (
-                <JobCard key={row.jobId} row={row} activeSkills={filters.skills}
-                  onOpen={() => setParams((p) => { p.set("job", String(row.jobId)); return p; }, { replace: true })}
+                <JobCard
+                  key={row.jobId}
+                  row={row}
+                  activeSkills={filters.skills}
+                  onOpen={() =>
+                    setParams(
+                      (p) => {
+                        p.set("job", String(row.jobId));
+                        return p;
+                      },
+                      { replace: true },
+                    )
+                  }
                   footer={
-                    <Button className="w-full" onClick={() => approve.mutate(row.jobId)}>
+                    <Button
+                      className="w-full"
+                      onClick={() => approve.mutate(row.jobId)}
+                    >
                       Approve for tailoring →
                     </Button>
-                  } />
+                  }
+                />
               ))}
             </div>
           )}
         </>
       )}
-      {openId && <JobDrawer jobId={Number(openId)} onClose={() => setParams((p) => { p.delete("job"); return p; }, { replace: true })} />}
+      {openId && (
+        <JobDrawer
+          jobId={Number(openId)}
+          onClose={() =>
+            setParams(
+              (p) => {
+                p.delete("job");
+                return p;
+              },
+              { replace: true },
+            )
+          }
+        />
+      )}
     </>
   );
 }
@@ -2638,7 +3193,9 @@ Rewrite `web/src/features/shortlist/ShortlistPage.tsx`:
 
 ```tsx
 import { ShortlistContainer } from "./ShortlistContainer";
-export function ShortlistPage() { return <ShortlistContainer />; }
+export function ShortlistPage() {
+  return <ShortlistContainer />;
+}
 ```
 
 (`JobDrawer` is implemented in Phase 5; create a temporary stub `web/src/components/JobDrawer.tsx` returning `null` with the `{ jobId, onClose }` signature so this compiles, replaced in Task 5.1.)
@@ -2677,22 +3234,43 @@ import { TriageContainer } from "./TriageContainer";
 
 const wrap = (ui: React.ReactNode) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 };
 
 describe("TriageContainer", () => {
   it("selecting a row enables Archive selected", async () => {
-    server.use(http.get("/api/triage", () =>
-      HttpResponse.json({
-        data: [{ jobId: 3, company: "Acme", title: "Eng", location: "NYC", source: "adzuna",
-                 status: "raw", fitScore: 40, postedAt: null, archivedAt: null, hasProgress: false }],
-        pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
-      })));
+    server.use(
+      http.get("/api/triage", () =>
+        HttpResponse.json({
+          data: [
+            {
+              jobId: 3,
+              company: "Acme",
+              title: "Eng",
+              location: "NYC",
+              source: "adzuna",
+              status: "raw",
+              fitScore: 40,
+              postedAt: null,
+              archivedAt: null,
+              hasProgress: false,
+            },
+          ],
+          pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+        }),
+      ),
+    );
     wrap(<TriageContainer />);
     await waitFor(() => expect(screen.getByText("Eng")).toBeInTheDocument());
     const archive = screen.getByRole("button", { name: /archive selected/i });
     expect(archive).toBeDisabled();
-    await userEvent.click(screen.getByRole("checkbox", { name: /select job 3/i }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /select job 3/i }),
+    );
     expect(archive).toBeEnabled();
   });
 });
@@ -2716,7 +3294,12 @@ export function useArchive() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (jobId: number) =>
-      unwrap(api.PATCH("/api/jobs/{job_id}", { params: { path: { job_id: jobId } }, body: { archived: true } })),
+      unwrap(
+        api.PATCH("/api/jobs/{job_id}", {
+          params: { path: { job_id: jobId } },
+          body: { archived: true },
+        }),
+      ),
     onSettled: () => qc.invalidateQueries({ queryKey: ["triage"] }),
   });
 }
@@ -2725,7 +3308,12 @@ export function useRestore() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (jobId: number) =>
-      unwrap(api.PATCH("/api/jobs/{job_id}", { params: { path: { job_id: jobId } }, body: { archived: false } })),
+      unwrap(
+        api.PATCH("/api/jobs/{job_id}", {
+          params: { path: { job_id: jobId } },
+          body: { archived: false },
+        }),
+      ),
     onSettled: () => qc.invalidateQueries({ queryKey: ["triage"] }),
   });
 }
@@ -2734,11 +3322,16 @@ export function useDeleteJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (jobId: number) =>
-      unwrap(api.DELETE("/api/jobs/{job_id}", { params: { path: { job_id: jobId } } })),
+      unwrap(
+        api.DELETE("/api/jobs/{job_id}", {
+          params: { path: { job_id: jobId } },
+        }),
+      ),
     onError: () => toast.error("Job has progress and cannot be deleted"),
     // Invalidate every board: delete is reachable from the drawer over any of them.
     onSettled: () => {
-      for (const k of ["triage", "pipeline", "shortlist"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["triage", "pipeline", "shortlist"])
+        qc.invalidateQueries({ queryKey: [k] });
     },
   });
 }
@@ -2754,18 +3347,35 @@ import { StatusBadge } from "@/components/StatusBadge";
 import type { TriageItem } from "./use-triage";
 
 export function TriageCard({
-  row, checked, onCheck, onOpen,
-}: { row: TriageItem; checked: boolean; onCheck: (v: boolean) => void; onOpen: () => void }) {
+  row,
+  checked,
+  onCheck,
+  onOpen,
+}: {
+  row: TriageItem;
+  checked: boolean;
+  onCheck: (v: boolean) => void;
+  onOpen: () => void;
+}) {
   return (
     <Card className="flex items-start gap-3 p-4">
-      <Checkbox checked={checked} onCheckedChange={(v) => onCheck(!!v)}
-        aria-label={`Select job ${row.jobId}`} />
+      <Checkbox
+        checked={checked}
+        onCheckedChange={(v) => onCheck(!!v)}
+        aria-label={`Select job ${row.jobId}`}
+      />
       <button onClick={onOpen} className="min-w-0 flex-1 text-left">
-        <div className="font-serif text-base font-semibold">{row.title ?? "—"}</div>
-        <div className="text-sm text-[var(--muted-foreground)]">{row.company ?? "—"} · {row.location ?? "location n/a"}</div>
+        <div className="font-serif text-base font-semibold">
+          {row.title ?? "—"}
+        </div>
+        <div className="text-sm text-[var(--muted-foreground)]">
+          {row.company ?? "—"} · {row.location ?? "location n/a"}
+        </div>
         <div className="mt-1 flex items-center gap-2">
           <StatusBadge status={row.status} />
-          <span className="font-mono text-xs text-[var(--muted-foreground)]">{row.source}</span>
+          <span className="font-mono text-xs text-[var(--muted-foreground)]">
+            {row.source}
+          </span>
         </div>
       </button>
       <FitMeter score={row.fitScore} />
@@ -2802,56 +3412,127 @@ export function TriageContainer() {
   const del = useDeleteJob();
 
   const toggle = (id: number, on: boolean) =>
-    setSelected((s) => { const n = new Set(s); on ? n.add(id) : n.delete(id); return n; });
+    setSelected((s) => {
+      const n = new Set(s);
+      on ? n.add(id) : n.delete(id);
+      return n;
+    });
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
-  const deletable = new Set((rows ?? []).filter((r) => !r.hasProgress).map((r) => r.jobId));
-  const allSelectedDeletable = selected.size > 0 && [...selected].every((id) => deletable.has(id));
+  const deletable = new Set(
+    (rows ?? []).filter((r) => !r.hasProgress).map((r) => r.jobId),
+  );
+  const allSelectedDeletable =
+    selected.size > 0 && [...selected].every((id) => deletable.has(id));
   const openId = params.get("job");
 
   return (
     <>
-      <PageHeader kicker="Intake" title="Triage Desk"
-        sub="Raw and rejected jobs before the shortlist. Archive noise, delete dead-ends, prune in bulk." />
+      <PageHeader
+        kicker="Intake"
+        title="Triage Desk"
+        sub="Raw and rejected jobs before the shortlist. Archive noise, delete dead-ends, prune in bulk."
+      />
       <div className="mb-4 flex items-center gap-2">
-        <Switch id="show-archived" checked={archived} onCheckedChange={setArchived} />
+        <Switch
+          id="show-archived"
+          checked={archived}
+          onCheckedChange={setArchived}
+        />
         <Label htmlFor="show-archived">Show archived</Label>
       </div>
-      <MetricRow items={[["In view", String(rows?.length ?? 0)], ["Deletable", String(deletable.size)]]} />
+      <MetricRow
+        items={[
+          ["In view", String(rows?.length ?? 0)],
+          ["Deletable", String(deletable.size)],
+        ]}
+      />
       <PrunePanel />
       {!rows?.length ? (
-        <EmptyState title="Nothing to triage" body="Run a pull to bring in jobs, or toggle archived." />
+        <EmptyState
+          title="Nothing to triage"
+          body="Run a pull to bring in jobs, or toggle archived."
+        />
       ) : (
         <>
           <div className="mb-4 flex items-center gap-3">
-            <span className="text-sm"><strong>{selected.size}</strong> selected</span>
+            <span className="text-sm">
+              <strong>{selected.size}</strong> selected
+            </span>
             {archived ? (
-              <Button disabled={!selected.size}
-                onClick={() => { selected.forEach((id) => restore.mutate(id)); setSelected(new Set()); }}>
+              <Button
+                disabled={!selected.size}
+                onClick={() => {
+                  selected.forEach((id) => restore.mutate(id));
+                  setSelected(new Set());
+                }}
+              >
                 Restore selected
               </Button>
             ) : (
-              <Button disabled={!selected.size}
-                onClick={() => { selected.forEach((id) => archive.mutate(id)); setSelected(new Set()); }}>
+              <Button
+                disabled={!selected.size}
+                onClick={() => {
+                  selected.forEach((id) => archive.mutate(id));
+                  setSelected(new Set());
+                }}
+              >
                 Archive selected
               </Button>
             )}
-            <Button variant="destructive" disabled={!allSelectedDeletable}
-              onClick={() => { if (confirm(`Delete ${selected.size} job(s)? This cannot be undone.`)) { selected.forEach((id) => del.mutate(id)); setSelected(new Set()); } }}>
+            <Button
+              variant="destructive"
+              disabled={!allSelectedDeletable}
+              onClick={() => {
+                if (
+                  confirm(
+                    `Delete ${selected.size} job(s)? This cannot be undone.`,
+                  )
+                ) {
+                  selected.forEach((id) => del.mutate(id));
+                  setSelected(new Set());
+                }
+              }}
+            >
               Delete selected
             </Button>
           </div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             {rows.map((row) => (
-              <TriageCard key={row.jobId} row={row} checked={selected.has(row.jobId)}
+              <TriageCard
+                key={row.jobId}
+                row={row}
+                checked={selected.has(row.jobId)}
                 onCheck={(v) => toggle(row.jobId, v)}
-                onOpen={() => setParams((p) => { p.set("job", String(row.jobId)); return p; }, { replace: true })} />
+                onOpen={() =>
+                  setParams(
+                    (p) => {
+                      p.set("job", String(row.jobId));
+                      return p;
+                    },
+                    { replace: true },
+                  )
+                }
+              />
             ))}
           </div>
         </>
       )}
-      {openId && <JobDrawer jobId={Number(openId)} onClose={() => setParams((p) => { p.delete("job"); return p; }, { replace: true })} />}
+      {openId && (
+        <JobDrawer
+          jobId={Number(openId)}
+          onClose={() =>
+            setParams(
+              (p) => {
+                p.delete("job");
+                return p;
+              },
+              { replace: true },
+            )
+          }
+        />
+      )}
     </>
   );
 }
@@ -2862,7 +3543,12 @@ Create `web/src/features/triage/PrunePanel.tsx`:
 ```tsx
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -2879,11 +3565,29 @@ export function PrunePanel() {
 
   const preview = useMutation({
     mutationFn: (): Promise<PruneReport> =>
-      unwrap(api.POST("/api/prune", { body: { dryRun: true, fitThreshold: fit, staleDays: stale, retentionDays: retain } })) as Promise<PruneReport>,
+      unwrap(
+        api.POST("/api/prune", {
+          body: {
+            dryRun: true,
+            fitThreshold: fit,
+            staleDays: stale,
+            retentionDays: retain,
+          },
+        }),
+      ) as Promise<PruneReport>,
   });
   const run = useMutation({
     mutationFn: (): Promise<PruneReport> =>
-      unwrap(api.POST("/api/prune", { body: { dryRun: false, fitThreshold: fit, staleDays: stale, retentionDays: retain } })) as Promise<PruneReport>,
+      unwrap(
+        api.POST("/api/prune", {
+          body: {
+            dryRun: false,
+            fitThreshold: fit,
+            staleDays: stale,
+            retentionDays: retain,
+          },
+        }),
+      ) as Promise<PruneReport>,
     onSettled: () => qc.invalidateQueries({ queryKey: ["triage"] }),
   });
 
@@ -2893,18 +3597,52 @@ export function PrunePanel() {
         <AccordionTrigger>Prune (archive junk, expire old)</AccordionTrigger>
         <AccordionContent>
           <div className="grid grid-cols-3 gap-3">
-            <div><Label htmlFor="p-fit">Fit below</Label><Input id="p-fit" type="number" value={fit} onChange={(e) => setFit(Number(e.target.value))} /></div>
-            <div><Label htmlFor="p-stale">Stale days</Label><Input id="p-stale" type="number" value={stale} onChange={(e) => setStale(Number(e.target.value))} /></div>
-            <div><Label htmlFor="p-ret">Retention days</Label><Input id="p-ret" type="number" value={retain} onChange={(e) => setRetain(Number(e.target.value))} /></div>
+            <div>
+              <Label htmlFor="p-fit">Fit below</Label>
+              <Input
+                id="p-fit"
+                type="number"
+                value={fit}
+                onChange={(e) => setFit(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="p-stale">Stale days</Label>
+              <Input
+                id="p-stale"
+                type="number"
+                value={stale}
+                onChange={(e) => setStale(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="p-ret">Retention days</Label>
+              <Input
+                id="p-ret"
+                type="number"
+                value={retain}
+                onChange={(e) => setRetain(Number(e.target.value))}
+              />
+            </div>
           </div>
           <div className="mt-3 flex items-center gap-3">
-            <Button variant="outline" onClick={() => preview.mutate()}>Preview</Button>
-            <Button onClick={() => { if (confirm("Run prune? Expiry cannot be undone.")) run.mutate(); }}>Prune now</Button>
+            <Button variant="outline" onClick={() => preview.mutate()}>
+              Preview
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirm("Run prune? Expiry cannot be undone."))
+                  run.mutate();
+              }}
+            >
+              Prune now
+            </Button>
           </div>
           {preview.data && (
             <p className="mt-2 text-sm text-[var(--muted-foreground)]">
-              {preview.data.rejected} rejected · {preview.data.lowFit} low-fit · {preview.data.stale} stale →
-              {" "}{preview.data.archived} archive · {preview.data.expired} expire · {preview.data.skipped} skipped
+              {preview.data.rejected} rejected · {preview.data.lowFit} low-fit ·{" "}
+              {preview.data.stale} stale → {preview.data.archived} archive ·{" "}
+              {preview.data.expired} expire · {preview.data.skipped} skipped
             </p>
           )}
         </AccordionContent>
@@ -2918,7 +3656,9 @@ Rewrite `web/src/features/triage/TriagePage.tsx`:
 
 ```tsx
 import { TriageContainer } from "./TriageContainer";
-export function TriagePage() { return <TriageContainer />; }
+export function TriagePage() {
+  return <TriageContainer />;
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -2954,19 +3694,48 @@ import { PipelineContainer } from "./PipelineContainer";
 
 const wrap = (ui: React.ReactNode) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 };
 
 describe("PipelineContainer", () => {
   it("groups cards by stage", async () => {
-    server.use(http.get("/api/pipeline", () =>
-      HttpResponse.json({
-        data: [
-          { jobId: 1, company: "A", title: "Eng", status: "approved", fitScore: 70, jdText: "x", critiqueJson: null, pdfPath: null, applicationStatus: null, hasProgress: false },
-          { jobId: 2, company: "B", title: "Dev", status: "rendered", fitScore: 88, jdText: "y", critiqueJson: null, pdfPath: null, applicationStatus: null, hasProgress: true },
-        ],
-        pagination: { page: 1, pageSize: 200, totalItems: 2, totalPages: 1 },
-      })));
+    server.use(
+      http.get("/api/pipeline", () =>
+        HttpResponse.json({
+          data: [
+            {
+              jobId: 1,
+              company: "A",
+              title: "Eng",
+              status: "approved",
+              fitScore: 70,
+              jdText: "x",
+              critiqueJson: null,
+              pdfPath: null,
+              applicationStatus: null,
+              hasProgress: false,
+            },
+            {
+              jobId: 2,
+              company: "B",
+              title: "Dev",
+              status: "rendered",
+              fitScore: 88,
+              jdText: "y",
+              critiqueJson: null,
+              pdfPath: null,
+              applicationStatus: null,
+              hasProgress: true,
+            },
+          ],
+          pagination: { page: 1, pageSize: 200, totalItems: 2, totalPages: 1 },
+        }),
+      ),
+    );
     wrap(<PipelineContainer />);
     await waitFor(() => expect(screen.getByText("Eng")).toBeInTheDocument());
     expect(screen.getByText(/approved/i)).toBeInTheDocument();
@@ -2989,21 +3758,33 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { PipelineItem } from "./use-pipeline";
 
-export function PipelineCard({ row, onOpen }: { row: PipelineItem; onOpen: () => void }) {
+export function PipelineCard({
+  row,
+  onOpen,
+}: {
+  row: PipelineItem;
+  onOpen: () => void;
+}) {
   return (
     <Card className="p-4">
       <button onClick={onOpen} className="w-full text-left">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="font-serif text-base font-semibold">{row.title ?? "—"}</div>
-            <div className="text-sm text-[var(--muted-foreground)]">{row.company ?? "—"}</div>
+            <div className="font-serif text-base font-semibold">
+              {row.title ?? "—"}
+            </div>
+            <div className="text-sm text-[var(--muted-foreground)]">
+              {row.company ?? "—"}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <StatusBadge status={row.status} />
             <span className="font-mono text-xs">fit {row.fitScore ?? "—"}</span>
           </div>
         </div>
-        <p className="mt-2 line-clamp-3 whitespace-pre-line text-sm text-[var(--muted-foreground)]">{row.jdText}</p>
+        <p className="mt-2 line-clamp-3 whitespace-pre-line text-sm text-[var(--muted-foreground)]">
+          {row.jdText}
+        </p>
       </button>
     </Card>
   );
@@ -3026,7 +3807,14 @@ import { JobDrawer } from "@/components/JobDrawer";
 import { PipelineCard } from "./PipelineCard";
 import { usePipeline } from "./use-pipeline";
 
-const STAGE_ORDER = ["raw", "shortlisted", "approved", "tailored", "rendered", "rejected"];
+const STAGE_ORDER = [
+  "raw",
+  "shortlisted",
+  "approved",
+  "tailored",
+  "rendered",
+  "rejected",
+];
 
 export function PipelineContainer() {
   const { data: rows, isLoading } = usePipeline();
@@ -3036,30 +3824,61 @@ export function PipelineContainer() {
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return (rows ?? []).filter((r) =>
-      (r.fitScore == null || r.fitScore >= minFit) &&
-      (!needle || `${r.company ?? ""} ${r.title ?? ""}`.toLowerCase().includes(needle)));
+    return (rows ?? []).filter(
+      (r) =>
+        (r.fitScore == null || r.fitScore >= minFit) &&
+        (!needle ||
+          `${r.company ?? ""} ${r.title ?? ""}`.toLowerCase().includes(needle)),
+    );
   }, [rows, q, minFit]);
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
   const byStage = new Map<string, typeof visible>();
-  for (const r of visible) byStage.set(r.status, [...(byStage.get(r.status) ?? []), r]);
-  const stages = [...STAGE_ORDER.filter((s) => byStage.has(s)), ...[...byStage.keys()].filter((s) => !STAGE_ORDER.includes(s))];
+  for (const r of visible)
+    byStage.set(r.status, [...(byStage.get(r.status) ?? []), r]);
+  const stages = [
+    ...STAGE_ORDER.filter((s) => byStage.has(s)),
+    ...[...byStage.keys()].filter((s) => !STAGE_ORDER.includes(s)),
+  ];
   const rendered = byStage.get("rendered")?.length ?? 0;
   const openId = params.get("job");
 
   return (
     <>
-      <PageHeader kicker="Mission control" title="Pipeline / Board"
-        sub="Every job by pipeline stage, with its tailored PDF, review critiques, and your application status." />
-      <MetricRow items={[["In view", String(visible.length)], ["Rendered", String(rendered)], ["Stages active", String(byStage.size)]]} />
+      <PageHeader
+        kicker="Mission control"
+        title="Pipeline / Board"
+        sub="Every job by pipeline stage, with its tailored PDF, review critiques, and your application status."
+      />
+      <MetricRow
+        items={[
+          ["In view", String(visible.length)],
+          ["Rendered", String(rendered)],
+          ["Stages active", String(byStage.size)],
+        ]}
+      />
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div><Label htmlFor="pipe-q">Company/title</Label><Input id="pipe-q" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        <div><Label htmlFor="pipe-fit">Min fit</Label><Slider id="pipe-fit" min={0} max={100} value={[minFit]} onValueChange={([v]) => setMinFit(v)} /></div>
+        <div>
+          <Label htmlFor="pipe-q">Company/title</Label>
+          <Input id="pipe-q" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="pipe-fit">Min fit</Label>
+          <Slider
+            id="pipe-fit"
+            min={0}
+            max={100}
+            value={[minFit]}
+            onValueChange={([v]) => setMinFit(v)}
+          />
+        </div>
       </div>
       {!rows?.length ? (
-        <EmptyState title="No jobs in the pipeline" body="Start by adding a job or running a pull." />
+        <EmptyState
+          title="No jobs in the pipeline"
+          body="Start by adding a job or running a pull."
+        />
       ) : (
         stages.map((stage) => (
           <section key={stage} className="mb-6">
@@ -3068,14 +3887,38 @@ export function PipelineContainer() {
             </h2>
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {byStage.get(stage)!.map((row) => (
-                <PipelineCard key={row.jobId} row={row}
-                  onOpen={() => setParams((p) => { p.set("job", String(row.jobId)); return p; }, { replace: true })} />
+                <PipelineCard
+                  key={row.jobId}
+                  row={row}
+                  onOpen={() =>
+                    setParams(
+                      (p) => {
+                        p.set("job", String(row.jobId));
+                        return p;
+                      },
+                      { replace: true },
+                    )
+                  }
+                />
               ))}
             </div>
           </section>
         ))
       )}
-      {openId && <JobDrawer jobId={Number(openId)} onClose={() => setParams((p) => { p.delete("job"); return p; }, { replace: true })} />}
+      {openId && (
+        <JobDrawer
+          jobId={Number(openId)}
+          onClose={() =>
+            setParams(
+              (p) => {
+                p.delete("job");
+                return p;
+              },
+              { replace: true },
+            )
+          }
+        />
+      )}
     </>
   );
 }
@@ -3085,7 +3928,9 @@ Rewrite `web/src/features/pipeline/PipelinePage.tsx`:
 
 ```tsx
 import { PipelineContainer } from "./PipelineContainer";
-export function PipelinePage() { return <PipelineContainer />; }
+export function PipelinePage() {
+  return <PipelineContainer />;
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -3127,15 +3972,35 @@ const wrap = (ui: React.ReactNode) => {
 
 describe("JobDrawer", () => {
   it("renders job detail with a proper heading and JD", async () => {
-    server.use(http.get("/api/jobs/42", () =>
-      HttpResponse.json({
-        id: 42, source: "greenhouse", url: null, company: "Acme", title: "Staff Engineer",
-        location: "Remote", jdText: "Build things.", status: "approved", fitScore: 80,
-        fitRationale: "Strong match.", criteriaJson: null, postedAt: null, archivedAt: null,
-        createdAt: "2026-06-01T00:00:00Z", hasProgress: false, application: null, resumeVersions: [],
-      })));
+    server.use(
+      http.get("/api/jobs/42", () =>
+        HttpResponse.json({
+          id: 42,
+          source: "greenhouse",
+          url: null,
+          company: "Acme",
+          title: "Staff Engineer",
+          location: "Remote",
+          jdText: "Build things.",
+          status: "approved",
+          fitScore: 80,
+          fitRationale: "Strong match.",
+          criteriaJson: null,
+          postedAt: null,
+          archivedAt: null,
+          createdAt: "2026-06-01T00:00:00Z",
+          hasProgress: false,
+          application: null,
+          resumeVersions: [],
+        }),
+      ),
+    );
     wrap(<JobDrawer jobId={42} onClose={() => {}} />);
-    await waitFor(() => expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: /staff engineer/i }),
+      ).toBeInTheDocument(),
+    );
     expect(screen.getByText("Build things.")).toBeInTheDocument();
   });
 });
@@ -3161,7 +4026,9 @@ export function useJobDetail(jobId: number) {
   return useQuery({
     queryKey: ["job", jobId],
     queryFn: (): Promise<JobDetail> =>
-      unwrap(api.GET("/api/jobs/{job_id}", { params: { path: { job_id: jobId } } })) as Promise<JobDetail>,
+      unwrap(
+        api.GET("/api/jobs/{job_id}", { params: { path: { job_id: jobId } } }),
+      ) as Promise<JobDetail>,
   });
 }
 ```
@@ -3173,8 +4040,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, unwrap } from "@/lib/api/client";
 
-function invalidateBoards(qc: ReturnType<typeof useQueryClient>, jobId: number) {
-  for (const key of ["shortlist", "pipeline", "triage", ["job", jobId]] as const) {
+function invalidateBoards(
+  qc: ReturnType<typeof useQueryClient>,
+  jobId: number,
+) {
+  for (const key of [
+    "shortlist",
+    "pipeline",
+    "triage",
+    ["job", jobId],
+  ] as const) {
     qc.invalidateQueries({ queryKey: Array.isArray(key) ? key : [key] });
   }
 }
@@ -3183,8 +4058,16 @@ export function useSetStage(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (status: string) =>
-      unwrap(api.PATCH("/api/jobs/{job_id}", { params: { path: { job_id: jobId } }, body: { status } })),
-    onSuccess: () => { invalidateBoards(qc, jobId); toast.success("Stage updated"); },
+      unwrap(
+        api.PATCH("/api/jobs/{job_id}", {
+          params: { path: { job_id: jobId } },
+          body: { status },
+        }),
+      ),
+    onSuccess: () => {
+      invalidateBoards(qc, jobId);
+      toast.success("Stage updated");
+    },
     onError: () => toast.error("Failed to update stage"),
   });
 }
@@ -3193,8 +4076,16 @@ export function useUpsertApplication(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { status: string; notes?: string | null }) =>
-      unwrap(api.PUT("/api/jobs/{job_id}/application", { params: { path: { job_id: jobId } }, body })),
-    onSuccess: () => { invalidateBoards(qc, jobId); toast.success("Application saved"); },
+      unwrap(
+        api.PUT("/api/jobs/{job_id}/application", {
+          params: { path: { job_id: jobId } },
+          body,
+        }),
+      ),
+    onSuccess: () => {
+      invalidateBoards(qc, jobId);
+      toast.success("Application saved");
+    },
   });
 }
 
@@ -3202,7 +4093,11 @@ export function useRenderVersion(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (versionId: number) =>
-      unwrap(api.POST("/api/resume-versions/{version_id}/render", { params: { path: { version_id: versionId } } })),
+      unwrap(
+        api.POST("/api/resume-versions/{version_id}/render", {
+          params: { path: { version_id: versionId } },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
 }
@@ -3211,7 +4106,12 @@ export function useRenderVersion(jobId: number) {
 Replace `web/src/components/JobDrawer.tsx`:
 
 ```tsx
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -3221,7 +4121,13 @@ import { StageManager } from "@/features/job/StageManager";
 import { useJobDetail } from "@/features/job/use-job-detail";
 import { useRenderVersion } from "@/features/job/use-job-mutations";
 
-export function JobDrawer({ jobId, onClose }: { jobId: number; onClose: () => void }) {
+export function JobDrawer({
+  jobId,
+  onClose,
+}: {
+  jobId: number;
+  onClose: () => void;
+}) {
   const { data: job, isLoading } = useJobDetail(jobId);
   const render = useRenderVersion(jobId);
 
@@ -3233,9 +4139,12 @@ export function JobDrawer({ jobId, onClose }: { jobId: number; onClose: () => vo
         ) : (
           <>
             <SheetHeader>
-              <SheetTitle className="font-serif text-2xl">{job.title ?? "—"}</SheetTitle>
+              <SheetTitle className="font-serif text-2xl">
+                {job.title ?? "—"}
+              </SheetTitle>
               <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
-                {job.company ?? "—"} · {job.location ?? "location n/a"} <StatusBadge status={job.status} />
+                {job.company ?? "—"} · {job.location ?? "location n/a"}{" "}
+                <StatusBadge status={job.status} />
               </div>
             </SheetHeader>
             <Tabs defaultValue="jd" className="mt-4">
@@ -3246,28 +4155,62 @@ export function JobDrawer({ jobId, onClose }: { jobId: number; onClose: () => vo
                 <TabsTrigger value="manage">Manage</TabsTrigger>
               </TabsList>
               <TabsContent value="jd">
-                {job.fitRationale && <p className="mb-3 text-sm">{job.fitRationale}</p>}
-                <h3 className="font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">Job description</h3>
-                <pre className="mt-1 whitespace-pre-wrap font-sans text-sm">{job.jdText}</pre>
+                {job.fitRationale && (
+                  <p className="mb-3 text-sm">{job.fitRationale}</p>
+                )}
+                <h3 className="font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">
+                  Job description
+                </h3>
+                <pre className="mt-1 whitespace-pre-wrap font-sans text-sm">
+                  {job.jdText}
+                </pre>
               </TabsContent>
               <TabsContent value="versions">
-                <h3 className="font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">Resume versions</h3>
-                {job.resumeVersions.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">Not tailored yet.</p>}
+                <h3 className="font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">
+                  Resume versions
+                </h3>
+                {job.resumeVersions.length === 0 && (
+                  <p className="text-sm text-[var(--muted-foreground)]">
+                    Not tailored yet.
+                  </p>
+                )}
                 <ul className="mt-2 space-y-2">
                   {job.resumeVersions.map((v) => (
-                    <li key={v.id} className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border)] p-2">
-                      <span className="text-sm">Round {v.round} · score {v.reviewScore ?? "—"} · {v.factCheckPassed ? "fact-check ✓" : "fact-check ✗"}</span>
+                    <li
+                      key={v.id}
+                      className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border)] p-2"
+                    >
+                      <span className="text-sm">
+                        Round {v.round} · score {v.reviewScore ?? "—"} ·{" "}
+                        {v.factCheckPassed ? "fact-check ✓" : "fact-check ✗"}
+                      </span>
                       {v.pdfPath ? (
-                        <a className="text-sm underline" href={`/api/resume-versions/${v.id}/pdf`} target="_blank" rel="noreferrer">Download PDF</a>
+                        <a
+                          className="text-sm underline"
+                          href={`/api/resume-versions/${v.id}/pdf`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Download PDF
+                        </a>
                       ) : (
-                        <Button size="sm" variant="outline" onClick={() => render.mutate(v.id)}>Render</Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => render.mutate(v.id)}
+                        >
+                          Render
+                        </Button>
                       )}
                     </li>
                   ))}
                 </ul>
               </TabsContent>
               <TabsContent value="application">
-                <ApplicationEditor jobId={jobId} application={job.application} />
+                <ApplicationEditor
+                  jobId={jobId}
+                  application={job.application}
+                />
               </TabsContent>
               <TabsContent value="manage">
                 <StageManager job={job} onDeleted={onClose} />
@@ -3288,15 +4231,25 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useUpsertApplication } from "./use-job-mutations";
 import type { components } from "@/lib/api/schema";
 
 const STATUSES = ["ready", "submitted", "interview", "offer", "rejected"];
 
 export function ApplicationEditor({
-  jobId, application,
-}: { jobId: number; application: components["schemas"]["ApplicationOut"] | null }) {
+  jobId,
+  application,
+}: {
+  jobId: number;
+  application: components["schemas"]["ApplicationOut"] | null;
+}) {
   const [status, setStatus] = useState(application?.status ?? "ready");
   const [notes, setNotes] = useState(application?.notes ?? "");
   const save = useUpsertApplication(jobId);
@@ -3305,15 +4258,30 @@ export function ApplicationEditor({
       <div>
         <Label htmlFor="app-status">Application status</Label>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger id="app-status"><SelectValue /></SelectTrigger>
-          <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+          <SelectTrigger id="app-status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
       <div>
         <Label htmlFor="app-notes">Notes</Label>
-        <Input id="app-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. applied via referral" />
+        <Input
+          id="app-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="e.g. applied via referral"
+        />
       </div>
-      <Button onClick={() => save.mutate({ status, notes: notes || null })}>Save</Button>
+      <Button onClick={() => save.mutate({ status, notes: notes || null })}>
+        Save
+      </Button>
     </div>
   );
 }
@@ -3325,14 +4293,33 @@ Create `web/src/features/job/StageManager.tsx`:
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useSetStage } from "./use-job-mutations";
 import { useDeleteJob } from "@/features/triage/use-triage-mutations";
 import type { JobDetail } from "./use-job-detail";
 
-const STAGES = ["raw", "shortlisted", "approved", "tailored", "rendered", "rejected"];
+const STAGES = [
+  "raw",
+  "shortlisted",
+  "approved",
+  "tailored",
+  "rendered",
+  "rejected",
+];
 
-export function StageManager({ job, onDeleted }: { job: JobDetail; onDeleted: () => void }) {
+export function StageManager({
+  job,
+  onDeleted,
+}: {
+  job: JobDetail;
+  onDeleted: () => void;
+}) {
   const [stage, setStage] = useState(job.status);
   const setStageMut = useSetStage(job.id);
   const del = useDeleteJob();
@@ -3341,18 +4328,38 @@ export function StageManager({ job, onDeleted }: { job: JobDetail; onDeleted: ()
       <div>
         <Label htmlFor="mng-stage">Stage</Label>
         <Select value={stage} onValueChange={setStage}>
-          <SelectTrigger id="mng-stage"><SelectValue /></SelectTrigger>
-          <SelectContent>{STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+          <SelectTrigger id="mng-stage">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STAGES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
       <div className="flex gap-2">
         <Button onClick={() => setStageMut.mutate(stage)}>Set stage</Button>
-        <Button variant="destructive" disabled={job.hasProgress}
-          onClick={() => { if (confirm("Delete this job? This cannot be undone.")) { del.mutate(job.id); onDeleted(); } }}>
+        <Button
+          variant="destructive"
+          disabled={job.hasProgress}
+          onClick={() => {
+            if (confirm("Delete this job? This cannot be undone.")) {
+              del.mutate(job.id);
+              onDeleted();
+            }
+          }}
+        >
           Delete
         </Button>
       </div>
-      {job.hasProgress && <p className="text-xs text-[var(--muted-foreground)]">Has progress — delete disabled.</p>}
+      {job.hasProgress && (
+        <p className="text-xs text-[var(--muted-foreground)]">
+          Has progress — delete disabled.
+        </p>
+      )}
     </div>
   );
 }
@@ -3389,12 +4396,36 @@ import { useRunStore } from "./store";
 describe("run store", () => {
   beforeEach(() => useRunStore.setState({ runs: {} }));
   it("upserts run progress by id", () => {
-    useRunStore.getState().upsert({ runId: "r1", kind: "pull", status: "running", percent: 10, phase: "adzuna" });
-    useRunStore.getState().upsert({ runId: "r1", kind: "pull", status: "running", percent: 60, phase: "adzuna" });
+    useRunStore
+      .getState()
+      .upsert({
+        runId: "r1",
+        kind: "pull",
+        status: "running",
+        percent: 10,
+        phase: "adzuna",
+      });
+    useRunStore
+      .getState()
+      .upsert({
+        runId: "r1",
+        kind: "pull",
+        status: "running",
+        percent: 60,
+        phase: "adzuna",
+      });
     expect(useRunStore.getState().runs["r1"].percent).toBe(60);
   });
   it("removes a run", () => {
-    useRunStore.getState().upsert({ runId: "r2", kind: "discover", status: "running", percent: 0, phase: "" });
+    useRunStore
+      .getState()
+      .upsert({
+        runId: "r2",
+        kind: "discover",
+        status: "running",
+        percent: 0,
+        phase: "",
+      });
     useRunStore.getState().remove("r2");
     expect(useRunStore.getState().runs["r2"]).toBeUndefined();
   });
@@ -3431,7 +4462,11 @@ interface RunState {
 export const useRunStore = create<RunState>((set) => ({
   runs: {},
   upsert: (r) => set((s) => ({ runs: { ...s.runs, [r.runId]: r } })),
-  remove: (id) => set((s) => { const { [id]: _, ...rest } = s.runs; return { runs: rest }; }),
+  remove: (id) =>
+    set((s) => {
+      const { [id]: _, ...rest } = s.runs;
+      return { runs: rest };
+    }),
 }));
 ```
 
@@ -3441,11 +4476,17 @@ Create `web/src/lib/runs/sse.ts`:
 import { useRunStore } from "./store";
 
 /** Subscribe to a run's SSE stream; resolves when the run terminates. */
-export function watchRun(runId: string, kind: string, onDone?: () => void): () => void {
+export function watchRun(
+  runId: string,
+  kind: string,
+  onDone?: () => void,
+): () => void {
   const source = new EventSource(`/api/runs/${runId}/events`);
   const update = (data: any, status: RunStatus) =>
     useRunStore.getState().upsert({
-      runId, kind, status,
+      runId,
+      kind,
+      status,
       percent: typeof data?.percent === "number" ? data.percent : 0,
       phase: data?.phase ?? "",
       error: data?.error,
@@ -3453,16 +4494,33 @@ export function watchRun(runId: string, kind: string, onDone?: () => void): () =
   type RunStatus = "running" | "succeeded" | "failed";
 
   source.onmessage = (e) => {
-    try { update(JSON.parse(e.data), "running"); } catch { /* ignore keep-alive */ }
+    try {
+      update(JSON.parse(e.data), "running");
+    } catch {
+      /* ignore keep-alive */
+    }
   };
   source.addEventListener("done", (e) => {
-    try { update(JSON.parse((e as MessageEvent).data), "succeeded"); } catch { update({}, "succeeded"); }
+    try {
+      update(JSON.parse((e as MessageEvent).data), "succeeded");
+    } catch {
+      update({}, "succeeded");
+    }
     source.close();
     onDone?.();
     setTimeout(() => useRunStore.getState().remove(runId), 4000);
   });
   source.addEventListener("error", () => {
-    useRunStore.getState().upsert({ runId, kind, status: "failed", percent: 0, phase: "", error: "stream error" });
+    useRunStore
+      .getState()
+      .upsert({
+        runId,
+        kind,
+        status: "failed",
+        percent: 0,
+        phase: "",
+        error: "stream error",
+      });
     source.close();
     onDone?.();
   });
@@ -3503,7 +4561,15 @@ import { useRunStore } from "@/lib/runs/store";
 describe("RunPanel", () => {
   beforeEach(() => useRunStore.setState({ runs: {} }));
   it("renders an accessible progressbar for an active run", () => {
-    useRunStore.getState().upsert({ runId: "r1", kind: "pull", status: "running", percent: 42, phase: "adzuna" });
+    useRunStore
+      .getState()
+      .upsert({
+        runId: "r1",
+        kind: "pull",
+        status: "running",
+        percent: 42,
+        phase: "adzuna",
+      });
     render(<RunPanel />);
     const bar = screen.getByRole("progressbar", { name: /pull/i });
     expect(bar).toHaveAttribute("aria-valuenow", "42");
@@ -3543,8 +4609,18 @@ export function useLaunchRun() {
     ) => {
       try {
         const run = (await call()) as RunOut;
-        useRunStore.getState().upsert({ runId: run.runId, kind, status: "running", percent: 0, phase: "" });
-        watchRun(run.runId, kind, () => invalidate.forEach((k) => qc.invalidateQueries({ queryKey: [k] })));
+        useRunStore
+          .getState()
+          .upsert({
+            runId: run.runId,
+            kind,
+            status: "running",
+            percent: 0,
+            phase: "",
+          });
+        watchRun(run.runId, kind, () =>
+          invalidate.forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
+        );
       } catch (e) {
         toast.error(`Failed to start ${kind}: ${(e as Error).message}`);
       }
@@ -3564,7 +4640,13 @@ Create `web/src/features/runs/AddUrlDialog.tsx`:
 
 ```tsx
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -3577,15 +4659,35 @@ export function AddUrlDialog() {
   const { launch } = useLaunchRun();
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="outline">+ Add URL</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        <Button variant="outline">+ Add URL</Button>
+      </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Add job by URL</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Add job by URL</DialogTitle>
+        </DialogHeader>
         <Label htmlFor="add-url">Job posting URL</Label>
-        <Input id="add-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
-        <Button onClick={async () => {
-          await launch("addJobUrl", () => unwrap(api.POST("/api/jobs/from-url", { body: { url, allowBrowser: true } })));
-          setOpen(false); setUrl("");
-        }}>Add job</Button>
+        <Input
+          id="add-url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://…"
+        />
+        <Button
+          onClick={async () => {
+            await launch("addJobUrl", () =>
+              unwrap(
+                api.POST("/api/jobs/from-url", {
+                  body: { url, allowBrowser: true },
+                }),
+              ),
+            );
+            setOpen(false);
+            setUrl("");
+          }}
+        >
+          Add job
+        </Button>
       </DialogContent>
     </Dialog>
   );
@@ -3604,7 +4706,9 @@ export function RunActions() {
   return (
     <div className="flex items-center gap-2">
       <Button onClick={() => launch("pull", launchers.pull)}>Pull</Button>
-      <Button onClick={() => launch("discover", launchers.discover)}>Discover</Button>
+      <Button onClick={() => launch("discover", launchers.discover)}>
+        Discover
+      </Button>
       <AddUrlDialog />
     </div>
   );
@@ -3622,16 +4726,33 @@ export function RunPanel() {
   if (runs.length === 0) return null;
   return (
     // aria-live announces start/progress/completion to screen readers (SSE push, accessibly).
-    <div aria-live="polite" className="space-y-2 border-b border-[var(--border)] px-6 py-3">
+    <div
+      aria-live="polite"
+      className="space-y-2 border-b border-[var(--border)] px-6 py-3"
+    >
       {runs.map((r) => (
-        <div key={r.runId} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-2">
+        <div
+          key={r.runId}
+          className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-2"
+        >
           <div className="flex items-baseline justify-between font-mono text-xs uppercase tracking-widest">
-            <span>{r.kind}{r.phase ? ` · ${r.phase}` : ""}</span>
-            <span>{r.status === "failed" ? "failed" : `${Math.round(r.percent)}%`}</span>
+            <span>
+              {r.kind}
+              {r.phase ? ` · ${r.phase}` : ""}
+            </span>
+            <span>
+              {r.status === "failed" ? "failed" : `${Math.round(r.percent)}%`}
+            </span>
           </div>
           {/* Radix Progress provides role="progressbar" + aria-valuenow; we add the label. */}
-          <Progress value={Math.round(r.percent)} aria-label={`${r.kind} progress`} className="mt-1 h-1.5" />
-          {r.error && <p className="mt-1 text-xs text-[var(--destructive)]">{r.error}</p>}
+          <Progress
+            value={Math.round(r.percent)}
+            aria-label={`${r.kind} progress`}
+            className="mt-1 h-1.5"
+          />
+          {r.error && (
+            <p className="mt-1 text-xs text-[var(--destructive)]">{r.error}</p>
+          )}
         </div>
       ))}
     </div>
@@ -3700,9 +4821,19 @@ export function useBulkRun() {
   const { launch } = useLaunchRun();
   return {
     tailorApproved: () =>
-      launch("tailor", () => unwrap(api.POST("/api/tailor", { body: { approved: true, jobIds: null } }))),
+      launch("tailor", () =>
+        unwrap(
+          api.POST("/api/tailor", { body: { approved: true, jobIds: null } }),
+        ),
+      ),
     coverLettersApproved: () =>
-      launch("coverLetter", () => unwrap(api.POST("/api/cover-letters", { body: { approved: true, jobIds: null } }))),
+      launch("coverLetter", () =>
+        unwrap(
+          api.POST("/api/cover-letters", {
+            body: { approved: true, jobIds: null },
+          }),
+        ),
+      ),
   };
 }
 ```
@@ -3718,9 +4849,13 @@ import { useBulkRun } from "@/features/runs/use-bulk-run";
 const bulk = useBulkRun();
 // in JSX, below PageHeader:
 <div className="mb-4 flex gap-2">
-  <Button variant="outline" onClick={bulk.tailorApproved}>Tailor approved</Button>
-  <Button variant="outline" onClick={bulk.coverLettersApproved}>Cover letters (approved)</Button>
-</div>
+  <Button variant="outline" onClick={bulk.tailorApproved}>
+    Tailor approved
+  </Button>
+  <Button variant="outline" onClick={bulk.coverLettersApproved}>
+    Cover letters (approved)
+  </Button>
+</div>;
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -3762,19 +4897,43 @@ const wrap = (ui: React.ReactNode) => {
 
 describe("AnalyticsContainer", () => {
   it("renders an accessible source table", async () => {
-    server.use(http.get("/api/analytics", () =>
-      HttpResponse.json({
-        bySource: [{ label: "greenhouse", applications: 10, responses: 4, interviews: 2, offers: 1, responseRate: 40, interviewRate: 20, offerRate: 10 }],
-        byBand: [],
-      })));
+    server.use(
+      http.get("/api/analytics", () =>
+        HttpResponse.json({
+          bySource: [
+            {
+              label: "greenhouse",
+              applications: 10,
+              responses: 4,
+              interviews: 2,
+              offers: 1,
+              responseRate: 40,
+              interviewRate: 20,
+              offerRate: 10,
+            },
+          ],
+          byBand: [],
+        }),
+      ),
+    );
     wrap(<AnalyticsContainer />);
-    await waitFor(() => expect(screen.getByRole("table", { name: /by source/i })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole("table", { name: /by source/i }),
+      ).toBeInTheDocument(),
+    );
     expect(screen.getByText("greenhouse")).toBeInTheDocument();
   });
   it("shows empty state when no applications", async () => {
-    server.use(http.get("/api/analytics", () => HttpResponse.json({ bySource: [], byBand: [] })));
+    server.use(
+      http.get("/api/analytics", () =>
+        HttpResponse.json({ bySource: [], byBand: [] }),
+      ),
+    );
     wrap(<AnalyticsContainer />);
-    await waitFor(() => expect(screen.getByText(/no applications tracked/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/no applications tracked/i)).toBeInTheDocument(),
+    );
   });
 });
 ```
@@ -3798,7 +4957,8 @@ export type Analytics = components["schemas"]["AnalyticsOut"];
 export function useAnalytics() {
   return useQuery({
     queryKey: ["analytics"],
-    queryFn: (): Promise<Analytics> => unwrap(api.GET("/api/analytics", {})) as Promise<Analytics>,
+    queryFn: (): Promise<Analytics> =>
+      unwrap(api.GET("/api/analytics", {})) as Promise<Analytics>,
   });
 }
 ```
@@ -3807,7 +4967,14 @@ Create `web/src/features/analytics/AnalyticsContainer.tsx`:
 
 ```tsx
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
@@ -3816,23 +4983,41 @@ import type { components } from "@/lib/api/schema";
 
 type Cohort = components["schemas"]["CohortOut"];
 
-function CohortTable({ caption, header, rows }: { caption: string; header: string; rows: Cohort[] }) {
+function CohortTable({
+  caption,
+  header,
+  rows,
+}: {
+  caption: string;
+  header: string;
+  rows: Cohort[];
+}) {
   return (
     <Table>
-      <caption className="mb-2 text-left font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">{caption}</caption>
+      <caption className="mb-2 text-left font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">
+        {caption}
+      </caption>
       <TableHeader>
         <TableRow>
-          <TableHead>{header}</TableHead><TableHead>Apps</TableHead><TableHead>Responses</TableHead>
-          <TableHead>Interviews</TableHead><TableHead>Offers</TableHead>
-          <TableHead>Interview %</TableHead><TableHead>Offer %</TableHead>
+          <TableHead>{header}</TableHead>
+          <TableHead>Apps</TableHead>
+          <TableHead>Responses</TableHead>
+          <TableHead>Interviews</TableHead>
+          <TableHead>Offers</TableHead>
+          <TableHead>Interview %</TableHead>
+          <TableHead>Offer %</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((c) => (
           <TableRow key={c.label}>
-            <TableCell>{c.label}</TableCell><TableCell>{c.applications}</TableCell><TableCell>{c.responses}</TableCell>
-            <TableCell>{c.interviews}</TableCell><TableCell>{c.offers}</TableCell>
-            <TableCell>{c.interviewRate}</TableCell><TableCell>{c.offerRate}</TableCell>
+            <TableCell>{c.label}</TableCell>
+            <TableCell>{c.applications}</TableCell>
+            <TableCell>{c.responses}</TableCell>
+            <TableCell>{c.interviews}</TableCell>
+            <TableCell>{c.offers}</TableCell>
+            <TableCell>{c.interviewRate}</TableCell>
+            <TableCell>{c.offerRate}</TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -3847,15 +5032,35 @@ export function AnalyticsContainer() {
   const totalOffers = data?.bySource.reduce((a, c) => a + c.offers, 0) ?? 0;
   return (
     <>
-      <PageHeader kicker="Conversion" title="Analytics / Funnel"
-        sub="Which sources and fit-score bands actually convert. Rates are share of submitted applications." />
-      <MetricRow items={[["Submitted", String(totalApps)], ["Offers", String(totalOffers)], ["Sources tracked", String(data?.bySource.length ?? 0)]]} />
+      <PageHeader
+        kicker="Conversion"
+        title="Analytics / Funnel"
+        sub="Which sources and fit-score bands actually convert. Rates are share of submitted applications."
+      />
+      <MetricRow
+        items={[
+          ["Submitted", String(totalApps)],
+          ["Offers", String(totalOffers)],
+          ["Sources tracked", String(data?.bySource.length ?? 0)],
+        ]}
+      />
       {totalApps === 0 ? (
-        <EmptyState title="No applications tracked yet" body="Mark applications as submitted in the Pipeline board to populate analytics." />
+        <EmptyState
+          title="No applications tracked yet"
+          body="Mark applications as submitted in the Pipeline board to populate analytics."
+        />
       ) : (
         <div className="space-y-8">
-          <CohortTable caption="By source" header="Source" rows={data!.bySource} />
-          <CohortTable caption="By fit-score band" header="Fit band" rows={data!.byBand} />
+          <CohortTable
+            caption="By source"
+            header="Source"
+            rows={data!.bySource}
+          />
+          <CohortTable
+            caption="By fit-score band"
+            header="Fit band"
+            rows={data!.byBand}
+          />
         </div>
       )}
     </>
@@ -3867,7 +5072,9 @@ Rewrite `web/src/features/analytics/AnalyticsPage.tsx`:
 
 ```tsx
 import { AnalyticsContainer } from "./AnalyticsContainer";
-export function AnalyticsPage() { return <AnalyticsContainer />; }
+export function AnalyticsPage() {
+  return <AnalyticsContainer />;
+}
 ```
 
 - [ ] **Step 3b: Add the funnel chart (visual enhancement over the canonical table)**
@@ -3876,7 +5083,12 @@ Create `web/src/features/analytics/ConversionChart.tsx` using the shadcn `chart`
 
 ```tsx
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import type { components } from "@/lib/api/schema";
 
 type Cohort = components["schemas"]["CohortOut"];
@@ -3895,7 +5107,11 @@ export function ConversionChart({ rows }: { rows: Cohort[] }) {
           <XAxis dataKey="label" tickLine={false} axisLine={false} />
           <YAxis allowDecimals={false} width={28} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="applications" fill="var(--color-applications)" radius={4} />
+          <Bar
+            dataKey="applications"
+            fill="var(--color-applications)"
+            radius={4}
+          />
           <Bar dataKey="interviews" fill="var(--color-interviews)" radius={4} />
           <Bar dataKey="offers" fill="var(--color-offers)" radius={4} />
         </BarChart>
@@ -3906,11 +5122,13 @@ export function ConversionChart({ rows }: { rows: Cohort[] }) {
 ```
 
 Render it in `AnalyticsContainer` above the "By source" table (only when `totalApps > 0`):
+
 ```tsx
 import { ConversionChart } from "./ConversionChart";
 // inside the non-empty branch, before <CohortTable caption="By source" ...>:
-<ConversionChart rows={data!.bySource} />
+<ConversionChart rows={data!.bySource} />;
 ```
+
 `recharts` is a transitive dependency of the shadcn `chart` component installed in Task 1.2; if `npx tsc` reports it missing, run `npm install recharts`.
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -3950,16 +5168,37 @@ const wrap = (ui: React.ReactNode) => {
 
 describe("MatchGapContainer", () => {
   it("lists missing skills with demand share", async () => {
-    server.use(http.get("/api/match-gap", () =>
-      HttpResponse.json({ targetTotal: 4, gaps: [{ skill: "Kubernetes", demandCount: 3, targetTotal: 4, demandShare: 75 }] })));
+    server.use(
+      http.get("/api/match-gap", () =>
+        HttpResponse.json({
+          targetTotal: 4,
+          gaps: [
+            {
+              skill: "Kubernetes",
+              demandCount: 3,
+              targetTotal: 4,
+              demandShare: 75,
+            },
+          ],
+        }),
+      ),
+    );
     wrap(<MatchGapContainer />);
-    await waitFor(() => expect(screen.getByText("Kubernetes")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Kubernetes")).toBeInTheDocument(),
+    );
     expect(screen.getByText("75")).toBeInTheDocument();
   });
   it("shows no-profile empty state when targetTotal is 0", async () => {
-    server.use(http.get("/api/match-gap", () => HttpResponse.json({ targetTotal: 0, gaps: [] })));
+    server.use(
+      http.get("/api/match-gap", () =>
+        HttpResponse.json({ targetTotal: 0, gaps: [] }),
+      ),
+    );
     wrap(<MatchGapContainer />);
-    await waitFor(() => expect(screen.getByText(/no target jobs yet/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/no target jobs yet/i)).toBeInTheDocument(),
+    );
   });
 });
 ```
@@ -3983,7 +5222,8 @@ export type MatchGap = components["schemas"]["MatchGapOut"];
 export function useMatchGap() {
   return useQuery({
     queryKey: ["match-gap"],
-    queryFn: (): Promise<MatchGap> => unwrap(api.GET("/api/match-gap", {})) as Promise<MatchGap>,
+    queryFn: (): Promise<MatchGap> =>
+      unwrap(api.GET("/api/match-gap", {})) as Promise<MatchGap>,
   });
 }
 ```
@@ -3992,7 +5232,14 @@ Create `web/src/features/match-gap/MatchGapContainer.tsx`:
 
 ```tsx
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
@@ -4003,24 +5250,46 @@ export function MatchGapContainer() {
   if (isLoading) return <Skeleton className="h-64 w-full" />;
   return (
     <>
-      <PageHeader kicker="Closed loop" title="Match / Gap"
-        sub="Skills your target jobs demand that your profile does not show yet. Read-only." />
-      <MetricRow items={[["Target jobs", String(data?.targetTotal ?? 0)], ["Distinct gaps", String(data?.gaps.length ?? 0)]]} />
+      <PageHeader
+        kicker="Closed loop"
+        title="Match / Gap"
+        sub="Skills your target jobs demand that your profile does not show yet. Read-only."
+      />
+      <MetricRow
+        items={[
+          ["Target jobs", String(data?.targetTotal ?? 0)],
+          ["Distinct gaps", String(data?.gaps.length ?? 0)],
+        ]}
+      />
       {!data || data.targetTotal === 0 ? (
-        <EmptyState title="No target jobs yet" body="Shortlist or approve jobs to populate the gap report." />
+        <EmptyState
+          title="No target jobs yet"
+          body="Shortlist or approve jobs to populate the gap report."
+        />
       ) : data.gaps.length === 0 ? (
-        <EmptyState title="No gaps" body="Your profile covers every required skill across your target jobs." />
+        <EmptyState
+          title="No gaps"
+          body="Your profile covers every required skill across your target jobs."
+        />
       ) : (
         <Table>
-          <caption className="mb-2 text-left font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">Most-demanded missing skills</caption>
+          <caption className="mb-2 text-left font-mono text-xs uppercase tracking-widest text-[var(--muted-foreground)]">
+            Most-demanded missing skills
+          </caption>
           <TableHeader>
-            <TableRow><TableHead>Skill</TableHead><TableHead>Demanded by</TableHead><TableHead>Share %</TableHead></TableRow>
+            <TableRow>
+              <TableHead>Skill</TableHead>
+              <TableHead>Demanded by</TableHead>
+              <TableHead>Share %</TableHead>
+            </TableRow>
           </TableHeader>
           <TableBody>
             {data.gaps.map((g) => (
               <TableRow key={g.skill}>
                 <TableCell>{g.skill}</TableCell>
-                <TableCell>{g.demandCount}/{g.targetTotal}</TableCell>
+                <TableCell>
+                  {g.demandCount}/{g.targetTotal}
+                </TableCell>
                 <TableCell>{g.demandShare}</TableCell>
               </TableRow>
             ))}
@@ -4036,7 +5305,9 @@ Rewrite `web/src/features/match-gap/MatchGapPage.tsx`:
 
 ```tsx
 import { MatchGapContainer } from "./MatchGapContainer";
-export function MatchGapPage() { return <MatchGapContainer />; }
+export function MatchGapPage() {
+  return <MatchGapContainer />;
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -4075,13 +5346,23 @@ import { ShortlistContainer } from "@/features/shortlist/ShortlistContainer";
 
 const wrap = (ui: React.ReactNode) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 };
 
 describe("a11y", () => {
   it("shortlist (empty) has no axe violations", async () => {
-    server.use(http.get("/api/shortlist", () =>
-      HttpResponse.json({ data: [], pagination: { page: 1, pageSize: 200, totalItems: 0, totalPages: 0 } })));
+    server.use(
+      http.get("/api/shortlist", () =>
+        HttpResponse.json({
+          data: [],
+          pagination: { page: 1, pageSize: 200, totalItems: 0, totalPages: 0 },
+        }),
+      ),
+    );
     const { container, findByText } = wrap(<ShortlistContainer />);
     await findByText(/nothing shortlisted yet/i);
     expect(await axe(container)).toHaveNoViolations();
@@ -4090,6 +5371,7 @@ describe("a11y", () => {
 ```
 
 Add the matcher in `web/src/test/setup.ts`:
+
 ```ts
 import * as matchers from "vitest-axe/matchers";
 import { expect } from "vitest";
@@ -4145,16 +5427,54 @@ import { test, expect } from "@playwright/test";
 // Intercept the API so the smoke test is hermetic.
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/shortlist*", (route) =>
-    route.fulfill({ json: { data: [{ jobId: 1, company: "Acme", title: "Staff Engineer", location: "Remote", fitScore: 81, skills: [] }], pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 } } }));
+    route.fulfill({
+      json: {
+        data: [
+          {
+            jobId: 1,
+            company: "Acme",
+            title: "Staff Engineer",
+            location: "Remote",
+            fitScore: 81,
+            skills: [],
+          },
+        ],
+        pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+      },
+    }),
+  );
 });
 
 test("loads shortlist and opens a job drawer", async ({ page }) => {
   await page.route("**/api/jobs/1", (route) =>
-    route.fulfill({ json: { id: 1, source: "greenhouse", url: null, company: "Acme", title: "Staff Engineer", location: "Remote", jdText: "Build.", status: "shortlisted", fitScore: 81, fitRationale: null, criteriaJson: null, postedAt: null, archivedAt: null, createdAt: "2026-06-01T00:00:00Z", hasProgress: false, application: null, resumeVersions: [] } }));
+    route.fulfill({
+      json: {
+        id: 1,
+        source: "greenhouse",
+        url: null,
+        company: "Acme",
+        title: "Staff Engineer",
+        location: "Remote",
+        jdText: "Build.",
+        status: "shortlisted",
+        fitScore: 81,
+        fitRationale: null,
+        criteriaJson: null,
+        postedAt: null,
+        archivedAt: null,
+        createdAt: "2026-06-01T00:00:00Z",
+        hasProgress: false,
+        application: null,
+        resumeVersions: [],
+      },
+    }),
+  );
   await page.goto("/");
   await expect(page.getByText("Staff Engineer")).toBeVisible();
   await page.getByText("Staff Engineer").click();
-  await expect(page.getByRole("heading", { name: /staff engineer/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /staff engineer/i }),
+  ).toBeVisible();
 });
 ```
 
@@ -4243,6 +5563,7 @@ Run: `cd web && npm run build && cd .. && .venv/Scripts/python.exe -m resume_age
 ```bash
 git rm -r src/resume_agent/dashboard
 ```
+
 Remove the Streamlit dependency and any `dashboard` script/entrypoint from `pyproject.toml`. Search for residual imports:
 
 Run: `grep -rn "resume_agent.dashboard\|streamlit" src tests pyproject.toml`
@@ -4287,12 +5608,14 @@ git commit -m "chore: retire Streamlit dashboard in favor of web/ SPA"
 ## frontend-ui-engineering review pass (applied)
 
 **Bugs fixed in-plan:**
+
 1. **Filter-engine port mismatch (Task 2.4):** `availableSkillCloud` ordering and its test contradicted the Python source key `(not covered, name)`. Corrected to covered-first with a clean comparator and matching test — preserves "verbatim behavior" parity.
 2. **Stale boards after delete (Task 4.5):** `useDeleteJob` invalidated only `triage`; since delete is reachable from the drawer over any board, it now invalidates `shortlist`, `pipeline`, and `triage`.
 3. **No mobile navigation (Task 1.4):** the hand-rolled `<aside>` was `hidden md:block`, leaving zero navigation below 768px. Replaced with the shadcn `Sidebar` primitive (mobile sheet + trigger + `Cmd/Ctrl+B`), restoring §10 responsive integrity.
 4. **Deprecated `toast` installed (Task 1.2):** dropped in favor of `sonner`.
 
 **User-friendly `ui/` components adopted (real registry components, verified present):**
+
 - `Sidebar` (+ `SidebarProvider`/`SidebarInset`/`SidebarTrigger`) — collapsible, keyboard- and mobile-aware nav (ref: `cards/sidebar-nav.tsx`).
 - Content-shaped `Skeleton` compositions `BoardSkeleton`/`DrawerSkeleton` (Task 3.4) replacing generic grey blocks (ref: `cards/skeleton/*`) — satisfies the skill's loading-state guidance.
 - `AlertDialog`-based `ConfirmDialog` (Task 3.5) replacing `window.confirm` for all destructive actions — focus-trapped, keyboard-dismissible.

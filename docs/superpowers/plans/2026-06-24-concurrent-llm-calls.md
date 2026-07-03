@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Run the independent, I/O-bound LLM calls in discovery (relevance / extract / score) and tailor (across jobs *and* each job's reviewer panel) concurrently with asyncio, bounded by one global semaphore, so wall-clock time stops growing linearly with job count.
+**Goal:** Run the independent, I/O-bound LLM calls in discovery (relevance / extract / score) and tailor (across jobs _and_ each job's reviewer panel) concurrently with asyncio, bounded by one global semaphore, so wall-clock time stops growing linearly with job count.
 
 **Architecture:** A small `concurrency.py` provides `gather_isolated` (run coroutines concurrently, return results in input order, isolate per-item failures, report completion count for progress). The `Runner` seam gains `arun`; a single `asyncio.Semaphore` is acquired **only inside the leaf agent call** (`acall`), never around orchestration coroutines, so nested tailor fan-out (jobs × panel) cannot deadlock. Each phase keeps a **sync** public signature and runs `asyncio.run(...)` internally: load rows → fan out the pure LLM calls → apply results to the `Session` + commit on the single event-loop thread (no locks, no per-worker sessions). Retry/backoff is delegated to agno's per-agent config (`retries`, `delay_between_retries`, `exponential_backoff`).
 
@@ -15,10 +15,10 @@
 ## Design notes the implementer must respect
 
 - **Leaf-only semaphore.** The `asyncio.Semaphore` is acquired solely in `acall(agent, prompt, *, sem)`. Orchestration coroutines (the per-job loop, the panel gather) never hold a permit while awaiting a child that needs one — that is what prevents the nested-fan-out deadlock. Do **not** move the semaphore into `gather_isolated`.
-- **Semaphore construction.** On Python 3.10+ `asyncio.Semaphore(n)` does **not** bind to a loop at construction; it binds lazily on first `async with`. So constructing it *before* `asyncio.run(...)` and using it inside is correct here.
+- **Semaphore construction.** On Python 3.10+ `asyncio.Semaphore(n)` does **not** bind to a loop at construction; it binds lazily on first `async with`. So constructing it _before_ `asyncio.run(...)` and using it inside is correct here.
 - **Validate semaphore size.** `Settings.llm_concurrency` must be `>= 1`; `0` would create a zero-permit semaphore and hang every `acall`. Retry count/delay must be `>= 0`.
 - **Pure LLM functions only inside the fan-out.** The async siblings (`aextract_job_criteria`, `ascore_fit`, `ajudge_relevance`, `areview_one`, `atailor`, `arevise`, `arun_tailor_review`) touch **no** `Session`. All DB mutation happens after the gather, serially, on the main thread.
-- **Error isolation semantics.** Discovery already skips a failed job (leaves it in its prior status for the next run); `gather_isolated` reproduces this. Tailor previously had *no* per-job isolation — a failure aborted the whole run and lost earlier work only if uncommitted. The new tailor path **improves** this: a failed job is skipped (left in `approved`), peers still persist. This is an intentional, documented behavior change on the *error* path; the *success* path produces identical DB state.
+- **Error isolation semantics.** Discovery already skips a failed job (leaves it in its prior status for the next run); `gather_isolated` reproduces this. Tailor previously had _no_ per-job isolation — a failure aborted the whole run and lost earlier work only if uncommitted. The new tailor path **improves** this: a failed job is skipped (left in `approved`), peers still persist. This is an intentional, documented behavior change on the _error_ path; the _success_ path produces identical DB state.
 - **Keep the sync siblings.** `score_fit`, `extract_job_criteria`, `judge_relevance`, `review_one`, `run_panel`, `tailor`, `revise`, `run_tailor_review` stay as-is (still call `agent.run`). Their unit tests stay green unchanged. Only the higher-level phase orchestrators switch to the async siblings.
 - **Fakes that flow into async paths need `arun`.** Confirmed sites: `tests/test_discovery_pipeline.py` (`_ExtractAgent`, `_FitAgent`, `_Judge`, `_ReextractAgent`, `_SicLocFitAgent`, `_OneBadExtractAgent`, `_RawStrExtractAgent`, `_OneBadFitAgent`), `tests/test_tailor_service.py` (`_ContentAgent`, `_FactCheck`), `tests/test_services_discovery.py` (`_bundle()` dynamic fakes). Add `async def arun(self, prompt): return self.run(prompt)` to each. The final task runs the full suite to catch any straggler.
 
@@ -27,6 +27,7 @@
 ### Task 1: Concurrency & retry settings
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py:16-31` (Settings fields)
 - Test: `tests/test_config.py` (create if absent)
 
@@ -113,6 +114,7 @@ git commit -m "feat: add llm_concurrency and retry settings"
 ### Task 2: `gather_isolated` fan-out helper
 
 **Files:**
+
 - Create: `src/resume_agent/concurrency.py`
 - Test: `tests/test_concurrency.py`
 
@@ -249,6 +251,7 @@ git commit -m "feat: add gather_isolated concurrent fan-out helper"
 ### Task 3: `Runner.arun`, `acall`, and `retry_kwargs`
 
 **Files:**
+
 - Modify: `src/resume_agent/llm_runner.py:1-19` (imports + Runner + AgentRunner), append `acall` + `retry_kwargs`
 - Test: `tests/test_llm_runner.py` (append)
 
@@ -398,6 +401,7 @@ git commit -m "feat: add Runner.arun, acall semaphore leaf, retry_kwargs"
 ### Task 4: Wire `retry_kwargs()` into every agent builder
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/extract.py:22-33`
 - Modify: `src/resume_agent/discovery/fit.py:40-51`
 - Modify: `src/resume_agent/discovery/relevance.py:30-44`
@@ -436,10 +440,13 @@ Expected: FAIL — `assert 0 == 2` (agno default `retries=0`).
 In every builder below, add the import and spread `**retry_kwargs()` into the `Agent(...)` call (after `use_json_mode=...`).
 
 `src/resume_agent/discovery/extract.py` — change the import line:
+
 ```python
 from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
+
 and the `Agent(...)`:
+
 ```python
         Agent(
             model=model,
@@ -452,29 +459,37 @@ and the `Agent(...)`:
 ```
 
 `src/resume_agent/discovery/fit.py` — import:
+
 ```python
 from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
+
 and add `**retry_kwargs(),` after `use_json_mode=use_json_mode_for(model),` in `build_fit_agent`.
 
 `src/resume_agent/discovery/relevance.py` — import (add `retry_kwargs` to the existing multi-line import) and add `**retry_kwargs(),` after `use_json_mode=use_json_mode_for(model),` inside the `Agent(...)` in `build_relevance_agent` (the branch after the `if not resolve_api_key(...)` guard).
 
 `src/resume_agent/discovery/url_ingest/llm.py` — import:
+
 ```python
 from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
+
 and add `**retry_kwargs(),` in `build_url_extract_agent`'s `Agent(...)`.
 
 `src/resume_agent/cover_letter/agents.py` — import:
+
 ```python
 from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
+
 and add `**retry_kwargs(),` in **both** `build_cover_letter_agent` and `build_cover_letter_reviser_agent`.
 
 `src/resume_agent/tailor/agents.py` — import:
+
 ```python
 from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
 ```
+
 and add `**retry_kwargs(),` in **all three** of `build_tailor_agent`, `build_reviser_agent`, `build_reviewer_agent`.
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -494,6 +509,7 @@ git commit -m "feat: configure agno retry/backoff on every agent builder"
 ### Task 5: Async discovery siblings
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/extract.py` (append `aextract_job_criteria`)
 - Modify: `src/resume_agent/discovery/fit.py` (append `ascore_fit`)
 - Modify: `src/resume_agent/discovery/relevance.py` (append `ajudge_relevance`)
@@ -635,6 +651,7 @@ git commit -m "feat: add async siblings for extract/score/relevance"
 ### Task 6: Make discovery phases concurrent
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/pipeline.py` (imports + `run_extract`, `run_score`, `run_relevance`)
 - Test: `tests/test_discovery_pipeline.py` (add `arun` to existing fakes; add concurrency tests)
 
@@ -719,6 +736,7 @@ from resume_agent.discovery.filter import apply_filters
 from resume_agent.discovery.fit import FitScore, ascore_fit, compose_fit_input, score_fit  # noqa: F401
 from resume_agent.discovery.relevance import ajudge_relevance, judge_relevance  # noqa: F401
 ```
+
 (Keep the remaining existing imports unchanged.)
 
 Replace `run_extract` (currently lines ~30-58) with:
@@ -877,6 +895,7 @@ git commit -m "feat: run discovery relevance/extract/score concurrently"
 ### Task 7: Async tailor leaf calls, panel, and workflow
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/tailoring.py` (append `atailor`, `arevise`)
 - Modify: `src/resume_agent/tailor/panel.py` (extract `_panel_inputs`; add `areview_one`, `arun_panel`)
 - Modify: `src/resume_agent/tailor/workflow.py` (append `arun_tailor_review`)
@@ -1125,6 +1144,7 @@ from resume_agent.tailor.tailoring import (
     tailor,
 )
 ```
+
 and add `import asyncio` at the top. Append:
 
 ```python
@@ -1188,6 +1208,7 @@ git commit -m "feat: add async tailor leaf calls, concurrent panel, async workfl
 ### Task 8: Concurrent tailor service (jobs × panel)
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/service.py` (split persist; rewrite `tailor_job`, `tailor_jobs`)
 - Test: `tests/test_tailor_service.py` (add `arun` to fakes; add concurrency + isolation tests)
 
@@ -1472,6 +1493,7 @@ git commit -m "feat: run tailor jobs and panels concurrently under one cap"
 ### Task 9: Fix service-level integration fakes and run the full suite
 
 **Files:**
+
 - Modify: `tests/test_services_discovery.py:92-108` (`_bundle()` fakes need `arun`)
 - Test: entire suite
 
@@ -1532,6 +1554,7 @@ git commit -m "test: give service-level discovery fakes an async path"
 ### Task 10: Update developer docs
 
 **Files:**
+
 - Modify: `CLAUDE.md` ("Known design notes" + a Hot-paths/concurrency mention)
 
 - [ ] **Step 1: Replace the deferral note**
@@ -1581,6 +1604,7 @@ git commit -m "docs: record concurrent LLM fan-out design"
 ## Self-Review
 
 **Spec coverage:**
+
 - Goal/success (concurrent discovery + tailor, bounded, identical success-path DB) → Tasks 2, 6, 8.
 - asyncio + `arun`, contained behind sync signatures → Tasks 3, 6, 8 (asyncio.run inside `run_*`/`tailor_jobs`; note: contained at the pipeline/tailor layer that services call, equivalent to the spec's "service boundary").
 - Both tailor axes under one shared semaphore → Tasks 7 (arun_panel/arun_tailor_review) + 8 (one sem, nested).
@@ -1599,6 +1623,7 @@ git commit -m "docs: record concurrent LLM fan-out design"
 **Type consistency:** `Result(ok, value, error)`, `gather_isolated(items, fn, *, on_complete)`, `acall(agent, prompt, *, sem)`, `retry_kwargs()`, and the async siblings (`aextract_job_criteria`, `ascore_fit`, `ajudge_relevance`, `areview_one`, `arun_panel`, `atailor`, `arevise`, `arun_tailor_review`, `_persist_rounds`) use identical names and signatures across the tasks that define and call them.
 
 **Known tradeoffs (intentional):**
+
 - Timing-based assertions (`elapsed < ...`) use 4–5× margins; if a loaded CI flakes, raise the bound — they prove "not serial," not exact latency.
 - Tailor error path now isolates per job (improvement over serial all-or-nothing); documented in Task 8 and CLAUDE.md.
 - `asyncio.run` is created per phase in discovery (3 loops/discover) — phases are sequential so a per-phase semaphore is equivalent to a shared one; only tailor needs one shared sem (its nesting is within a single phase).

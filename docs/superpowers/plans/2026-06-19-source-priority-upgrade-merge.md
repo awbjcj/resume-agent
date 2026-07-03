@@ -14,15 +14,15 @@
 
 ## File Structure
 
-| File | Responsibility | Action |
-|---|---|---|
-| `src/resume_agent/discovery/source_tier.py` | `source_rank` — fixed direct>aggregator tier | Create |
-| `src/resume_agent/discovery/ingest.py` | `IngestOutcome`, `IngestCounts`, `save_or_upgrade`, thin `add_job`, counted ingest helpers | Modify |
-| `src/resume_agent/discovery/connectors/runner.py` | Use outcome-aware ingest counts in pull telemetry | Modify |
-| `tests/test_source_tier.py` | tier ranking | Create |
-| `tests/test_discovery_ingest.py` | upgrade/skip/freeze behavior of `save_or_upgrade`/`add_job` | Modify |
-| `tests/test_ingest_jobs.py` | upgrade not double-counted; cross-run upgrade | Modify |
-| `tests/test_connector_runner.py` | pull telemetry includes upgrades | Modify/Create |
+| File                                              | Responsibility                                                                             | Action        |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------- |
+| `src/resume_agent/discovery/source_tier.py`       | `source_rank` — fixed direct>aggregator tier                                               | Create        |
+| `src/resume_agent/discovery/ingest.py`            | `IngestOutcome`, `IngestCounts`, `save_or_upgrade`, thin `add_job`, counted ingest helpers | Modify        |
+| `src/resume_agent/discovery/connectors/runner.py` | Use outcome-aware ingest counts in pull telemetry                                          | Modify        |
+| `tests/test_source_tier.py`                       | tier ranking                                                                               | Create        |
+| `tests/test_discovery_ingest.py`                  | upgrade/skip/freeze behavior of `save_or_upgrade`/`add_job`                                | Modify        |
+| `tests/test_ingest_jobs.py`                       | upgrade not double-counted; cross-run upgrade                                              | Modify        |
+| `tests/test_connector_runner.py`                  | pull telemetry includes upgrades                                                           | Modify/Create |
 
 No change to `repository.py`, `cli.py`, config, or schema.
 
@@ -31,6 +31,7 @@ No change to `repository.py`, `cli.py`, config, or schema.
 ## Task 1: Fixed source tier
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/source_tier.py`
 - Test: `tests/test_source_tier.py`
 
@@ -98,6 +99,7 @@ git commit -m "feat: fixed direct>aggregator source tier"
 ## Task 2: `save_or_upgrade` — upgrade on better source, skip otherwise
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/ingest.py`
 - Test: `tests/test_discovery_ingest.py`
 
@@ -295,6 +297,7 @@ git commit -m "feat: save_or_upgrade with tier-based upgrade-on-better-source"
 ## Task 3: Preserve user progress; freeze text post-`raw`
 
 **Files:**
+
 - Test only: `tests/test_discovery_ingest.py`
 - (Verifies the guard already written in Task 2 — no new src code expected; if a test fails, the guard is wrong and gets fixed here.)
 
@@ -377,6 +380,7 @@ git commit -m "test: upgrade preserves progress and freezes post-raw text"
 ## Task 4: Add outcome-aware ingest counts without changing legacy `ingest_jobs`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/ingest.py` (`ingest_jobs`)
 - Test: `tests/test_ingest_jobs.py`
 
@@ -479,6 +483,7 @@ git commit -m "feat: ingest_jobs counts inserts, not upgrades"
 ## Task 5: Surface upgrades in pull telemetry without changing added totals
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/runner.py`
 - Test: `tests/test_connector_runner.py`
 
@@ -613,4 +618,7 @@ git add -A && git commit -m "chore: lint source-priority upgrade-merge"
 - **Type consistency:** `save_or_upgrade(...) -> tuple[Job | None, IngestOutcome]` is used by `add_job` and `ingest_jobs_with_outcomes`; `IngestCounts(added, upgraded)` is used by `run_pull`; `IngestOutcome` members `inserted`/`upgraded`/`skipped` are referenced consistently; `source_rank(source: str) -> int` signature matches both call sites.
 - **Architecture (deletion test):** `save_or_upgrade` concentrates normalize+dedup+tier+upgrade behind one interface that two callers (`add_job`, `ingest_jobs_with_outcomes`) reuse. `source_tier.py` is a one-function module, separately testable, with the tier list in exactly one place (locality).
 - **Noted-not-fixed (spec §5):** `compute_dedup_key` still drops location; this plan does not change it. Flagged for a follow-up micro-spec.
+
+```
+
 ```

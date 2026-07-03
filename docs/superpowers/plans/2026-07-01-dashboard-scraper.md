@@ -62,10 +62,12 @@ repository and current Agno, Playwright, and Pydantic documentation.
 ### Task 1: `ScrapeRecipe` model
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/scraper/recipe.py`
 - Test: `tests/scraper/test_recipe.py`
 
 **Interfaces:**
+
 - Produces:
   - `RECIPE_SCHEMA_VERSION: int = 1`
   - `Pagination(pattern: Literal["numbered","next","infinite","load_more"], control_sel: str | None = None, max_pages: int = 10)`
@@ -178,10 +180,12 @@ git commit -m "feat: add ScrapeRecipe model for learned dashboard selectors"
 ### Task 2: `recipe_store` — cache JSON per host
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/scraper/recipe_store.py`
 - Test: `tests/scraper/test_recipe_store.py`
 
 **Interfaces:**
+
 - Consumes: `ScrapeRecipe`, `RECIPE_SCHEMA_VERSION`.
 - Produces:
   - `host_key(url: str) -> str` — lowercase netloc, `www.` stripped, `:`/`/` sanitized.
@@ -309,11 +313,13 @@ git commit -m "feat: cache learned scrape recipes as per-host JSON"
 ### Task 3: `recipe_parse` — deterministic card/detail parsing + relearn sentinel
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/scraper/recipe_parse.py`
 - Create: `tests/scraper/fixtures/board_list.html`, `tests/scraper/fixtures/board_detail.html`
 - Test: `tests/scraper/test_recipe_parse.py`
 
 **Interfaces:**
+
 - Consumes: `ScrapeRecipe`, `ScrapedCard` (`scraper/models.py`), `html_to_markdown` +
   `clean_job_description_text` (`connectors/text.py`).
 - Produces:
@@ -324,27 +330,45 @@ git commit -m "feat: cache learned scrape recipes as per-host JSON"
 - [ ] **Step 1: Create the fixtures**
 
 `tests/scraper/fixtures/board_list.html`:
+
 ```html
-<html><body>
-<div id="results">
-  <ul>
-    <li class="job"><a href="/jobs/1">Backend Engineer</a><span class="loc">Remote</span></li>
-    <li class="job"><a href="/jobs/2">Data Scientist</a><span class="loc">Austin, TX</span></li>
-    <li class="job"><a href="/jobs/3">Product Manager</a><span class="loc">NYC</span></li>
-  </ul>
-  <a class="next" href="?page=2">Next</a>
-</div>
-</body></html>
+<html>
+  <body>
+    <div id="results">
+      <ul>
+        <li class="job">
+          <a href="/jobs/1">Backend Engineer</a><span class="loc">Remote</span>
+        </li>
+        <li class="job">
+          <a href="/jobs/2">Data Scientist</a
+          ><span class="loc">Austin, TX</span>
+        </li>
+        <li class="job">
+          <a href="/jobs/3">Product Manager</a><span class="loc">NYC</span>
+        </li>
+      </ul>
+      <a class="next" href="?page=2">Next</a>
+    </div>
+  </body>
+</html>
 ```
 
 `tests/scraper/fixtures/board_detail.html`:
+
 ```html
-<html><body>
-<nav>Home About</nav>
-<div class="jd"><h2>About the role</h2><p>Build <b>services</b> in Python.</p>
-<ul><li>5 years experience</li></ul></div>
-<footer>© Acme</footer>
-</body></html>
+<html>
+  <body>
+    <nav>Home About</nav>
+    <div class="jd">
+      <h2>About the role</h2>
+      <p>Build <b>services</b> in Python.</p>
+      <ul>
+        <li>5 years experience</li>
+      </ul>
+    </div>
+    <footer>© Acme</footer>
+  </body>
+</html>
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -499,10 +523,12 @@ git commit -m "feat: deterministic card/detail parsing from a scrape recipe"
 ### Task 4: `learn` — prune HTML + LLM recipe learner
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/scraper/learn.py`
 - Test: `tests/scraper/test_learn.py`
 
 **Interfaces:**
+
 - Consumes: `ScrapeRecipe`, `build_model`/`AgentRunner`/`Runner`/`retry_kwargs`/`use_json_mode_for`
   (`llm_runner`), `get_settings` (`config`).
 - Produces:
@@ -656,10 +682,12 @@ git commit -m "feat: prune HTML and learn a scrape recipe via the LLM seam"
 ### Task 5: `DashboardScraper` core (learn-on-miss, replay, enumerate → gate → skip → detail)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/scraper/dashboard.py`
 - Test: `tests/scraper/test_dashboard.py`
 
 **Interfaces:**
+
 - Consumes: everything above, plus `title_relevance_gate` + `gate_and_limit`
   (`connectors/harvest.py` / `connectors/text.py`), `RawJob`/`FetchResult`
   (`connectors/base.py`), `ScrapeTarget` (Task 7 — for now the connector takes a plain
@@ -1000,10 +1028,12 @@ git commit -m "feat: DashboardScraper core replay (learn-on-miss, enumerate, gat
 ### Task 6: Guarded relearn + per-card `extract_fields` fallback
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/scraper/dashboard.py`
 - Test: `tests/scraper/test_dashboard.py` (extend)
 
 **Interfaces:**
+
 - Consumes: `has_job_like_content` (`recipe_parse`), `extract_fields` + `html_to_text`
   (`url_ingest/llm.py`), `build_url_extract_agent` (`url_ingest/llm.py`).
 - Produces: `_recipe_for` relearns once when a page has job-like content but parsed zero
@@ -1087,6 +1117,7 @@ Expected: FAIL — no relearn (learn.calls == 1) / empty JD (no jobs).
 - [ ] **Step 3: Edit `dashboard.py`**
 
 Add imports:
+
 ```python
 from resume_agent.discovery.scraper.recipe_parse import has_job_like_content, parse_cards, parse_detail
 from resume_agent.discovery.url_ingest.llm import build_url_extract_agent, extract_fields, html_to_text
@@ -1095,6 +1126,7 @@ from resume_agent.discovery.scraper.recipe_store import RECIPES_DIR, host_key, l
 ```
 
 Add the extractor seam:
+
 ```python
     def _extractor(self) -> Runner:
         if self._extract_agent is None:
@@ -1103,6 +1135,7 @@ Add the extractor seam:
 ```
 
 Replace `_recipe_for` with a version that relearns once on empty-with-content:
+
 ```python
     def _recipe_for(self, target, search: SearchConfig) -> tuple[ScrapeRecipe, list[str]]:
         host = host_key(target.url)
@@ -1124,6 +1157,7 @@ Replace `_recipe_for` with a version that relearns once on empty-with-content:
 ```
 
 Replace `_jd_for` with the fallback:
+
 ```python
     def _jd_for(self, card: ScrapedCard, recipe: ScrapeRecipe) -> str:
         html = self._detail_html(card, recipe)
@@ -1150,12 +1184,14 @@ git commit -m "feat: guarded relearn and per-card extract_fields fallback for th
 ### Task 7: Config, registry, and canonical source tier
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/config.py`
 - Modify: `src/resume_agent/discovery/connectors/registry.py`
 - Modify: `src/resume_agent/discovery/source_tier.py`
 - Test: `tests/scraper/test_scrape_registry.py`, extend `tests/test_source_tier.py`
 
 **Interfaces:**
+
 - Produces:
   - `ScrapeTarget(url: str, enabled: bool = True, label: str | None = None)`
   - `ScrapeConfig(enabled: bool = False, targets: list[ScrapeTarget] = [])`
@@ -1187,6 +1223,7 @@ def test_scrape_connector_absent_when_disabled():
 ```
 
 Add to `tests/test_source_tier.py`:
+
 ```python
 def test_scrape_source_is_canonical():
     from resume_agent.discovery.source_tier import source_rank
@@ -1201,6 +1238,7 @@ Expected: FAIL — `ScrapeConfig` missing / `source_rank("scrape") == 1`.
 - [ ] **Step 3: Implement config + registry + tier**
 
 In `connectors/config.py`, add the models and field:
+
 ```python
 class ScrapeTarget(ExtensibleModel):
     url: str
@@ -1212,6 +1250,7 @@ class ScrapeConfig(ExtensibleModel):
     enabled: bool = False
     targets: list[ScrapeTarget] = Field(default_factory=list)
 ```
+
 ```python
 class ConnectorsConfig(ExtensibleModel):
     greenhouse: GreenhouseConfig = Field(default_factory=GreenhouseConfig)
@@ -1227,13 +1266,16 @@ In `source_tier.py`, add `"scrape"` to `_CANONICAL`.
 
 In `registry.py`, add the import and build both entry points. In `build_connectors`,
 before the return:
+
 ```python
     if config.scrape.enabled:
         targets = [t for t in config.scrape.targets if t.enabled]
         if targets:
             connectors.append(DashboardScraper(targets))
 ```
+
 In `build_source_connectors`, before the return:
+
 ```python
     if config.scrape.enabled:
         for target in config.scrape.targets:
@@ -1241,7 +1283,9 @@ In `build_source_connectors`, before the return:
             if picked(source_id, target.enabled):
                 connectors.append(_named(DashboardScraper([target]), source_id))
 ```
+
 Add imports at the top of `registry.py`:
+
 ```python
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
 from resume_agent.discovery.scraper.recipe_store import host_key
@@ -1264,12 +1308,14 @@ git commit -m "feat: opt-in scrape config section + canonical scrape source"
 ### Task 8: CLI `--relearn`, example config, docs, full regression
 
 **Files:**
+
 - Modify: `src/resume_agent/services/discovery.py` (`pull_jobs` → pass `relearn` to the scraper)
 - Modify: `src/resume_agent/cli.py` (`pull_cmd` `--relearn` flag)
 - Modify: `config/connectors.yaml.example`, `CLAUDE.md`
 - Test: `tests/test_pull_refresh.py` (extend) or a small new test.
 
 **Interfaces:**
+
 - Produces: `pull_jobs(..., relearn: bool = False)` forwards to the scraper build; a
   `resume-agent pull --relearn` flag sets it. Because the scraper is built inside
   `build_source_connectors`, thread `relearn` by setting it on the built
@@ -1305,6 +1351,7 @@ Expected: FAIL — `pull_jobs() got an unexpected keyword argument 'relearn'`.
 
 In `services/discovery.py`, add `relearn` to `pull_jobs` and apply it to any built
 `DashboardScraper`:
+
 ```python
 def pull_jobs(
     session: Session,
@@ -1331,14 +1378,17 @@ def pull_jobs(
         limit=limit, reporter=reporter, finish=finish, skip_known=skip_known,
     )
 ```
+
 Add the import: `from resume_agent.discovery.scraper.dashboard import DashboardScraper`.
 
 In `cli.py` `pull_cmd`, add the flag and pass it:
+
 ```python
     relearn: bool = typer.Option(
         False, "--relearn", help="Force scrape connectors to re-learn their recipe this run."
     ),
 ```
+
 ```python
         report = pull_jobs(
             session, search_path=search, connectors_path=connectors_path,
@@ -1350,6 +1400,7 @@ In `cli.py` `pull_cmd`, add the flag and pass it:
 - [ ] **Step 4: Update example config + CLAUDE.md**
 
 In `config/connectors.yaml.example`, add:
+
 ```yaml
 # Opt-in browser scraper for company-owned boards with no supported ATS.
 # Disabled by default; opens a real (non-headless) browser and uses the LLM to

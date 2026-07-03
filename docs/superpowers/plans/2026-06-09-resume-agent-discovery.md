@@ -18,6 +18,7 @@
 ## Reference & scoped decisions
 
 Design spec §5.2. Decisions for this plan:
+
 - **Scraper deferred.** This plan delivers the funnel + `addjob`. The LinkedIn Playwright scraper (and `playwright` dependency) is a separate plan calibrated against live HTML.
 - **Sponsorship rule** (spec Decision #5): with `sponsorship_required: true`, `denied` → reject, `silent` → **keep** (uncertainty is conveyed by the persisted `sponsorship_signal=silent` in `criteria_json`; the shortlist UI surfaces it), `offered` → keep.
 - **Repository lives in `tracking/`** (`tracking/repository.py`) — it's the shared persistence layer; the Tracking component plan will extend it for `applications`/`resume_versions`.
@@ -54,12 +55,14 @@ tests/
 ## Task 1: Discovery scaffold + SearchConfig
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/__init__.py`, `src/resume_agent/discovery/search_config.py`
 - Test: `tests/test_discovery_search_config.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_discovery_search_config.py`:
+
 ```python
 from resume_agent.discovery.search_config import SearchConfig, load_search_config
 
@@ -88,19 +91,23 @@ def test_load_from_yaml(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_search_config.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/discovery/__init__.py`:
+
 ```python
 """Discovery component: fetch/ingest jobs and funnel them to a shortlist."""
 ```
 
 Create `src/resume_agent/discovery/search_config.py`:
+
 ```python
 from pathlib import Path
 
@@ -130,9 +137,11 @@ def load_search_config(path: str | Path) -> SearchConfig:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_search_config.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
@@ -147,12 +156,14 @@ git commit -m "feat(discovery): SearchConfig + loader" -m "Co-Authored-By: Claud
 ## Task 2: Jobs repository
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_repository.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -201,14 +212,17 @@ def test_status_counts():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_repository.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.repository'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/tracking/repository.py`:
+
 ```python
 from sqlalchemy import func
 from sqlmodel import Session, select
@@ -245,9 +259,11 @@ def status_counts(session: Session) -> dict[str, int]:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_repository.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -262,12 +278,14 @@ git commit -m "feat(tracking): jobs repository (save/query/dedupe/counts)" -m "C
 ## Task 3: Ingest (normalize + dedupe + insert raw)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/ingest.py`
 - Test: `tests/test_discovery_ingest.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_discovery_ingest.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -309,14 +327,17 @@ def test_add_job_dedupes_by_url():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_ingest.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.ingest'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/discovery/ingest.py`:
+
 ```python
 from sqlmodel import Session
 
@@ -361,9 +382,11 @@ def add_job(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_ingest.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -378,12 +401,14 @@ git commit -m "feat(discovery): add_job ingest with normalize + dedupe" -m "Co-A
 ## Task 4: Extract (Agno agent → JobCriteria)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/extract.py`
 - Test: `tests/test_discovery_extract.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_discovery_extract.py`:
+
 ```python
 import pytest
 
@@ -429,14 +454,17 @@ def test_build_extract_agent_is_agent(monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_extract.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.extract'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/discovery/extract.py`:
+
 ```python
 from typing import Any, Protocol
 
@@ -479,9 +507,11 @@ def extract_job_criteria(jd_text: str, agent: Runner) -> JobCriteria:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_extract.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -496,12 +526,14 @@ git commit -m "feat(discovery): Agno extractor -> JobCriteria" -m "Co-Authored-B
 ## Task 5: Hard filter
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/filter.py`
 - Test: `tests/test_discovery_filter.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_discovery_filter.py`:
+
 ```python
 from resume_agent.discovery.filter import FilterDecision, apply_filters
 from resume_agent.discovery.search_config import SearchConfig
@@ -553,14 +585,17 @@ def test_clean_match_is_kept():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_filter.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.filter'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/discovery/filter.py`:
+
 ```python
 from pydantic import Field
 
@@ -606,9 +641,11 @@ def apply_filters(criteria: JobCriteria, config: SearchConfig) -> FilterDecision
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_filter.py -v
 ```
+
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
@@ -623,12 +660,14 @@ git commit -m "feat(discovery): deterministic hard filter" -m "Co-Authored-By: C
 ## Task 6: Fit-score (Agno agent → FitScore)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/fit.py`
 - Test: `tests/test_discovery_fit.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_discovery_fit.py`:
+
 ```python
 import pytest
 from pydantic import ValidationError
@@ -683,14 +722,17 @@ def test_build_fit_agent_is_agent(monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_fit.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.fit'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/discovery/fit.py`:
+
 ```python
 from typing import Any, Protocol
 
@@ -749,9 +791,11 @@ def score_fit(input_text: str, agent: Runner) -> FitScore:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_fit.py -v
 ```
+
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
@@ -766,12 +810,14 @@ git commit -m "feat(discovery): Agno fit-scorer -> FitScore" -m "Co-Authored-By:
 ## Task 7: Pipeline orchestration
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/pipeline.py`
 - Test: `tests/test_discovery_pipeline.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_discovery_pipeline.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -833,14 +879,17 @@ def test_discover_extracts_filters_scores_and_shortlists():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_pipeline.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.pipeline'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/discovery/pipeline.py`:
+
 ```python
 from sqlmodel import Session
 
@@ -900,9 +949,11 @@ def discover(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_discovery_pipeline.py -v
 ```
+
 Expected: PASS (1 test).
 
 - [ ] **Step 5: Commit**
@@ -917,12 +968,14 @@ git commit -m "feat(discovery): funnel pipeline (extract/filter/score/shortlist)
 ## Task 8: CLI — `discover` and `addjob`
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_discovery.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_discovery.py`:
+
 ```python
 from sqlmodel import select
 
@@ -987,14 +1040,17 @@ def test_discover_runs_and_reports_counts(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_discovery.py -v
 ```
+
 Expected: FAIL — `AttributeError`/`SystemExit`: the `addjob` and `discover` commands don't exist yet.
 
 - [ ] **Step 3: Write the implementation**
 
 Add these imports near the top of `src/resume_agent/cli.py` (below the existing imports):
+
 ```python
 from resume_agent.config import get_settings
 from resume_agent.db import get_session, init_db, make_engine
@@ -1007,6 +1063,7 @@ from resume_agent.profile.store import load_facts
 ```
 
 Then append these two commands to the END of `src/resume_agent/cli.py` (before the `if __name__ == "__main__":` block — move that block to the very end if needed):
+
 ```python
 DEFAULT_SEARCH = "config/search.yaml"
 
@@ -1061,26 +1118,32 @@ def discover_cmd(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_discovery.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Verify the commands are wired**
 
 Run:
+
 ```bash
 uv run resume-agent addjob --help
 uv run resume-agent discover --help
 ```
+
 Expected: help text for each (exit 0).
 
 - [ ] **Step 6: Run the full suite**
 
 Run:
+
 ```bash
 uv run pytest -q
 ```
+
 Expected: all tests pass (Profile total + Discovery additions).
 
 - [ ] **Step 7: Commit**
@@ -1101,8 +1164,10 @@ git commit -m "feat(discovery): discover + addjob CLI commands" -m "Co-Authored-
 ---
 
 ## Notes to carry into later plans
+
 - **Tracking plan:** extend `tracking/repository.py` for `applications`/`resume_versions`; add `updated_at` `onupdate` + decide tz-aware vs naive datetime (deferred from Foundation review). Shortlist UI surfaces `sponsorship_signal=silent` as "uncertain".
 - **Scraper plan (next after Discovery):** LinkedIn Playwright source implementing a `JobSource` that calls `add_job(...)`; calibrate selectors against live HTML with saved fixtures; add `playwright` dep + `playwright install chromium`.
 
 ## Execution Handoff
+
 After this plan is executed and green, the next plan is the **LinkedIn scraper** (calibrated against live HTML), then **Tailor + Review** (the Agno panel).

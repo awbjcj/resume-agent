@@ -72,32 +72,34 @@ provider-search and generic agent primitives can land independently.
 
 ## File Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/resume_agent/config.py` | **Add** validated `search_mode` and `advisor_model` to `Settings`. (`github_token` already exists.) |
-| `pyproject.toml`, `uv.lock` | **Add** the DDGS search-tool runtime dependency. |
-| `src/resume_agent/llm_runner.py` | **Add** `plan_search` (pure decision) + `build_search_equipped` (model+tools) + native-search constants. |
-| `src/resume_agent/suggestions/agents.py` | **New.** `SuggestionDraft` + nested models; `build_search_agent`, `build_formatter_agent`. |
-| `src/resume_agent/github/repos.py` | **New.** `RepoMeta`, `parse_github_url`, `verify_repo`. |
-| `src/resume_agent/services/suggestions.py` | **New.** `generate_suggestion`, `suggestion_fingerprint`, context-prompt helpers, upsert. |
-| `src/resume_agent/tracking/tables.py` | **Add** `SkillSuggestion` table. |
-| `src/resume_agent/api/schemas/suggestions.py` | **New.** camelCase `SuggestionOut` + envelope. |
-| `src/resume_agent/api/routers/suggestions.py` | **New.** `POST /suggestions/generate` (Run) + `GET /suggestions`. |
-| `src/resume_agent/api/app.py` | **Add** router registration. |
-| `web/src/features/match-gap/use-suggestion.ts` | **New.** query + generate hooks. |
-| `web/src/features/match-gap/SuggestionPanel.tsx` | **New.** rendered suggestion. |
-| `web/src/features/match-gap/SkillDrawer.tsx` | **Modify** (Spec A's file) to host the suggestion section + theme learning-path. |
+| Path                                             | Responsibility                                                                                           |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `src/resume_agent/config.py`                     | **Add** validated `search_mode` and `advisor_model` to `Settings`. (`github_token` already exists.)      |
+| `pyproject.toml`, `uv.lock`                      | **Add** the DDGS search-tool runtime dependency.                                                         |
+| `src/resume_agent/llm_runner.py`                 | **Add** `plan_search` (pure decision) + `build_search_equipped` (model+tools) + native-search constants. |
+| `src/resume_agent/suggestions/agents.py`         | **New.** `SuggestionDraft` + nested models; `build_search_agent`, `build_formatter_agent`.               |
+| `src/resume_agent/github/repos.py`               | **New.** `RepoMeta`, `parse_github_url`, `verify_repo`.                                                  |
+| `src/resume_agent/services/suggestions.py`       | **New.** `generate_suggestion`, `suggestion_fingerprint`, context-prompt helpers, upsert.                |
+| `src/resume_agent/tracking/tables.py`            | **Add** `SkillSuggestion` table.                                                                         |
+| `src/resume_agent/api/schemas/suggestions.py`    | **New.** camelCase `SuggestionOut` + envelope.                                                           |
+| `src/resume_agent/api/routers/suggestions.py`    | **New.** `POST /suggestions/generate` (Run) + `GET /suggestions`.                                        |
+| `src/resume_agent/api/app.py`                    | **Add** router registration.                                                                             |
+| `web/src/features/match-gap/use-suggestion.ts`   | **New.** query + generate hooks.                                                                         |
+| `web/src/features/match-gap/SuggestionPanel.tsx` | **New.** rendered suggestion.                                                                            |
+| `web/src/features/match-gap/SkillDrawer.tsx`     | **Modify** (Spec A's file) to host the suggestion section + theme learning-path.                         |
 
 ---
 
 ## Task 1: Settings additions
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py`
 - Modify: `pyproject.toml`, `uv.lock`
 - Test: `tests/test_config_search.py` (new)
 
 **Interfaces:**
+
 - Produces on `Settings`: `search_mode:Literal["auto","native","tool","off"]="auto"`, `advisor_model:str=""`.
 
 - [ ] **Step 1: Write the failing test**
@@ -157,10 +159,12 @@ git commit -m "feat: add advisor search settings"
 ## Task 2: Search seam (`plan_search` + `build_search_equipped`)
 
 **Files:**
+
 - Modify: `src/resume_agent/llm_runner.py`
 - Test: `tests/test_search_seam.py` (new)
 
 **Interfaces:**
+
 - Consumes: existing `split_provider`, `build_model`, `resolve_api_key`, `get_settings`.
 - Produces:
   - `ANTHROPIC_WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}`
@@ -320,10 +324,12 @@ git commit -m "feat: native/tool web-search seam"
 ## Task 3: `SkillSuggestion` table
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py`
 - Test: `tests/test_skill_suggestion_table.py` (new)
 
 **Interfaces:**
+
 - Produces: `SkillSuggestion(SQLModel, table=True)` with `id, kind, key, payload_json(JSON), fingerprint, generated_at`.
 
 - [ ] **Step 1: Write the failing test**
@@ -397,10 +403,12 @@ git commit -m "feat: add skill_suggestions table"
 ## Task 4: Suggestion agents + `SuggestionDraft`
 
 **Files:**
+
 - Create: `src/resume_agent/suggestions/__init__.py` (empty), `src/resume_agent/suggestions/agents.py`
 - Test: `tests/test_suggestion_agents.py` (new)
 
 **Interfaces:**
+
 - Consumes: `build_search_equipped` (Task 2), existing `AgentRunner`, `build_model`, `use_json_mode_for`, `retry_kwargs`, `get_settings`, `ExtensibleModel`, `Runner`.
 - Produces:
   - `RepoRef{name:str, url:str, why:str}`, `ResourceRef{title:str, url:str, kind:str}`, `ProjectIdea{title:str, summary:str, skills_demonstrated:list[str]}`
@@ -571,10 +579,12 @@ git commit -m "feat: two-stage advisor agents"
 ## Task 5: GitHub verification (`github/repos.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/github/__init__.py` (empty), `src/resume_agent/github/repos.py`
 - Test: `tests/test_github_repos.py` (new)
 
 **Interfaces:**
+
 - Produces:
   - `@dataclass RepoMeta(full_name:str, url:str, stars:int, description:str|None)`
   - `parse_github_url(url:str) -> tuple[str,str] | None` (owner, name)
@@ -714,10 +724,12 @@ git commit -m "feat: github repo verification"
 ## Task 6: Generation service (`services/suggestions.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/services/suggestions.py`
 - Test: `tests/test_services_suggestions.py` (new)
 
 **Interfaces:**
+
 - Consumes: `SuggestionDraft`/`RepoRef` (Task 4), `parse_github_url`/`RepoMeta` (Task 5), `profile_skill_tokens` (existing in `tracking/match_gap.py`), `SkillSuggestion` (Task 3).
 - Produces:
   - `SuggestionContext(kind, key, label, members, demanding_job_ids, jobs_context)`
@@ -1070,10 +1082,12 @@ git commit -m "feat: generate_suggestion service"
 ## Task 7: API schemas (`api/schemas/suggestions.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/suggestions.py`
 - Test: `tests/api/test_schemas_suggestions.py` (new)
 
 **Interfaces:**
+
 - Consumes: `CamelModel`.
 - Produces (all `CamelModel`): `RepoOut`, `ResourceOut`, `ProjectOut`, `SuggestionOut`, `SuggestionEnvelope`.
 
@@ -1179,11 +1193,13 @@ git commit -m "feat: advisor api schemas"
 ## Task 8: Router (`POST generate` Run + `GET` cached) + registration
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/suggestions.py`
 - Modify: `src/resume_agent/api/app.py`
 - Test: `tests/api/test_suggestions.py` (new)
 
 **Interfaces:**
+
 - Consumes: `generate_suggestion`/`suggestion_fingerprint` (Task 6), `build_search_agent`/`build_formatter_agent` (Task 4), `verify_repo` (Task 5), Task-7 schemas, `record_to_run`, `RunManager`, `load_facts`, `profile_skill_tokens`.
 - Produces: `GET /api/suggestions?kind=&key=` → `SuggestionEnvelope`; `POST /api/suggestions/generate` → `RunOut` (202).
 
@@ -1398,6 +1414,7 @@ In `src/resume_agent/api/app.py`, add the import (near the other router imports)
 ```python
 from resume_agent.api.routers import suggestions as suggestions_router
 ```
+
 ```python
     app.include_router(suggestions_router.router, prefix="/api", dependencies=guarded)
 ```
@@ -1426,6 +1443,7 @@ git commit -m "feat: advisor generate + cached suggestion endpoints"
 ## Task 9: Regenerate OpenAPI + TS contract
 
 **Files:**
+
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_openapi_contract.py`
 
@@ -1456,10 +1474,12 @@ git commit -m "chore: regenerate contract for advisor endpoints"
 ## Task 10: Frontend hooks (`use-suggestion.ts`)
 
 **Files:**
+
 - Create: `web/src/features/match-gap/use-suggestion.ts`
 - Test: none new (thin glue; exercised by Task 11/12 tests).
 
 **Interfaces:**
+
 - Consumes: `api`/`unwrap` (`@/lib/api/client`), `useLaunchRun` (`@/features/runs/use-launch-run`), `useQuery`.
 - Produces:
   - `useSuggestion(kind, key, enabled)` → query of `SuggestionEnvelope`
@@ -1484,14 +1504,20 @@ export function suggestionQueryKey(kind: SuggestionKind, key: string) {
   return `suggestion:${kind}:${key}`;
 }
 
-export function useSuggestion(kind: SuggestionKind, key: string | null, enabled: boolean) {
+export function useSuggestion(
+  kind: SuggestionKind,
+  key: string | null,
+  enabled: boolean,
+) {
   const cacheKey = suggestionQueryKey(kind, key ?? "");
   return useQuery({
     queryKey: [cacheKey],
     enabled: enabled && !!key,
     queryFn: (): Promise<SuggestionEnvelope> =>
       unwrap(
-        api.GET("/api/suggestions", { params: { query: { kind, key: key ?? "" } } }),
+        api.GET("/api/suggestions", {
+          params: { query: { kind, key: key ?? "" } },
+        }),
       ) as Promise<SuggestionEnvelope>,
   });
 }
@@ -1500,13 +1526,16 @@ export function useGenerateSuggestion() {
   const { launch } = useLaunchRun();
   const generating = useRunStore((state) =>
     Object.values(state.runs).some(
-      (run) => run.kind === "suggestion" && (run.status === "running" || run.status === "cancelling"),
+      (run) =>
+        run.kind === "suggestion" &&
+        (run.status === "running" || run.status === "cancelling"),
     ),
   );
   const generate = (kind: SuggestionKind, key: string) =>
     launch(
       "suggestion",
-      () => unwrap(api.POST("/api/suggestions/generate", { body: { kind, key } })),
+      () =>
+        unwrap(api.POST("/api/suggestions/generate", { body: { kind, key } })),
       [suggestionQueryKey(kind, key)],
     );
   return { generate, generating };
@@ -1534,10 +1563,12 @@ git commit -m "feat: suggestion hooks"
 ## Task 11: `SuggestionPanel.tsx`
 
 **Files:**
+
 - Create: `web/src/features/match-gap/SuggestionPanel.tsx`
 - Test: `web/src/features/match-gap/SuggestionPanel.test.tsx` (new)
 
 **Interfaces:**
+
 - Consumes: `SuggestionEnvelope` type (Task 10).
 - Produces: `SuggestionPanel({ envelope, isLoading, isError, onRetry, onGenerate, generating })`.
 
@@ -1553,10 +1584,23 @@ import { SuggestionPanel } from "./SuggestionPanel";
 const envelope = {
   stale: false,
   suggestion: {
-    kind: "skill", key: "Kubernetes",
-    repos: [{ name: "foo/bar", url: "https://github.com/foo/bar", why: "ref", stars: 42, description: "d" }],
+    kind: "skill",
+    key: "Kubernetes",
+    repos: [
+      {
+        name: "foo/bar",
+        url: "https://github.com/foo/bar",
+        why: "ref",
+        stars: 42,
+        description: "d",
+      },
+    ],
     resources: [{ title: "K8s docs", url: "https://k8s.io", kind: "doc" }],
-    project: { title: "Mini scheduler", summary: "build it", skillsDemonstrated: ["Go"] },
+    project: {
+      title: "Mini scheduler",
+      summary: "build it",
+      skillsDemonstrated: ["Go"],
+    },
     bridge: "You know Docker, so Kubernetes is a short jump.",
     citations: ["https://k8s.io"],
     generatedAt: "2026-06-26T00:00:00Z",
@@ -1565,7 +1609,14 @@ const envelope = {
 
 describe("SuggestionPanel", () => {
   it("renders repos, resources, project, and bridge", () => {
-    render(<SuggestionPanel envelope={envelope} isLoading={false} onGenerate={() => {}} generating={false} />);
+    render(
+      <SuggestionPanel
+        envelope={envelope}
+        isLoading={false}
+        onGenerate={() => {}}
+        generating={false}
+      />,
+    );
     expect(screen.getByText("foo/bar")).toBeInTheDocument();
     expect(screen.getByText(/42/)).toBeInTheDocument();
     expect(screen.getByText("K8s docs")).toBeInTheDocument();
@@ -1583,7 +1634,9 @@ describe("SuggestionPanel", () => {
         generating={false}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: /how to close this gap/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /how to close this gap/i }),
+    );
     expect(onGenerate).toHaveBeenCalled();
   });
 
@@ -1597,7 +1650,9 @@ describe("SuggestionPanel", () => {
       />,
     );
     expect(screen.getByText(/stale/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /regenerate/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /regenerate/i }),
+    ).toBeInTheDocument();
   });
 });
 ```
@@ -1633,7 +1688,11 @@ export function SuggestionPanel({
 
   if (isLoading) {
     return (
-      <div aria-busy="true" aria-label="Loading gap-closing advice" className="space-y-2">
+      <div
+        aria-busy="true"
+        aria-label="Loading gap-closing advice"
+        className="space-y-2"
+      >
         <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
         <div className="h-4 w-full animate-pulse rounded bg-muted" />
         <div className="h-4 w-5/6 animate-pulse rounded bg-muted" />
@@ -1645,7 +1704,9 @@ export function SuggestionPanel({
     return (
       <div role="alert" className="space-y-2 text-sm">
         <p>Couldn't load cached advice.</p>
-        <Button size="sm" variant="outline" onClick={onRetry}>Retry</Button>
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          Retry
+        </Button>
       </div>
     );
   }
@@ -1667,7 +1728,12 @@ export function SuggestionPanel({
             stale
           </span>
         )}
-        <Button size="sm" variant="outline" disabled={generating} onClick={onGenerate}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={generating}
+          onClick={onGenerate}
+        >
           {generating ? "Researching…" : "Regenerate"}
         </Button>
       </div>
@@ -1680,11 +1746,23 @@ export function SuggestionPanel({
           <ul className="space-y-1">
             {s.repos.map((r) => (
               <li key={r.url}>
-                <a className="text-primary hover:underline" href={r.url} target="_blank" rel="noreferrer">
+                <a
+                  className="text-primary hover:underline"
+                  href={r.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   {r.name}
                 </a>
-                {typeof r.stars === "number" && <span className="text-muted-foreground"> · ★ {r.stars}</span>}
-                {r.description && <span className="text-muted-foreground"> — {r.description}</span>}
+                {typeof r.stars === "number" && (
+                  <span className="text-muted-foreground"> · ★ {r.stars}</span>
+                )}
+                {r.description && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    — {r.description}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -1697,7 +1775,12 @@ export function SuggestionPanel({
           <ul className="space-y-1">
             {s.resources.map((r) => (
               <li key={r.url}>
-                <a className="text-primary hover:underline" href={r.url} target="_blank" rel="noreferrer">
+                <a
+                  className="text-primary hover:underline"
+                  href={r.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   {r.title}
                 </a>
                 <span className="text-muted-foreground"> · {r.kind}</span>
@@ -1721,7 +1804,12 @@ export function SuggestionPanel({
           <ul className="mt-1 space-y-1 break-all text-xs">
             {s.citations.map((url) => (
               <li key={url}>
-                <a className="text-primary underline" href={url} target="_blank" rel="noreferrer">
+                <a
+                  className="text-primary underline"
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   {url}
                 </a>
               </li>
@@ -1751,10 +1839,12 @@ git commit -m "feat: suggestion panel"
 ## Task 12: Wire into `SkillDrawer` (Spec A's component)
 
 **Files:**
+
 - Modify: `web/src/features/match-gap/SkillDrawer.tsx` (created in Spec A)
 - Test: `web/src/features/match-gap/SkillDrawer.test.tsx` (extend Spec A's test)
 
 **Interfaces:**
+
 - Consumes: `useSuggestion`/`useGenerateSuggestion` (Task 10), `SuggestionPanel` (Task 11).
 - Produces: the drawer renders a `SuggestionPanel` for the open skill. (Theme learning-path entry is wired the same way with `kind="theme"`; the per-theme button in the dashboard sets the drawer's `kind`. For v1, the drawer accepts a `kind` prop defaulting to `"skill"`.)
 
@@ -1777,19 +1867,25 @@ import { server } from "@/test/server";
 
 it("shows the generate button when no suggestion is cached", async () => {
   server.use(
-    http.get("/api/suggestions", () => HttpResponse.json({ suggestion: null, stale: false })),
+    http.get("/api/suggestions", () =>
+      HttpResponse.json({ suggestion: null, stale: false }),
+    ),
   );
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
       <SkillDrawer
         skill="Kubernetes"
-        jobs={[{ id: 1, company: "Stripe", title: "Backend", seniority: "senior" }]}
+        jobs={[
+          { id: 1, company: "Stripe", title: "Backend", seniority: "senior" },
+        ]}
         onClose={() => {}}
       />
     </QueryClientProvider>,
   );
-  expect(await screen.findByRole("button", { name: /how to close this gap/i })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("button", { name: /how to close this gap/i }),
+  ).toBeInTheDocument();
 });
 ```
 
@@ -1820,9 +1916,12 @@ export function SkillDrawer({
   onClose: () => void;
   kind?: "skill" | "theme";
 }) {
-  const { data: envelope, isLoading, isError, refetch } = useSuggestion(
-    kind, skill, skill !== null
-  );
+  const {
+    data: envelope,
+    isLoading,
+    isError,
+    refetch,
+  } = useSuggestion(kind, skill, skill !== null);
   const { generate, generating } = useGenerateSuggestion();
 
   // ...within <SheetContent>, after the <ul> of jobs:
@@ -1840,16 +1939,16 @@ export function SkillDrawer({
 Concretely, splice this block in immediately before `</SheetContent>` and add `kind = "skill"` to the destructured props plus the two hooks at the top of the component:
 
 ```tsx
-        <div className="mt-6 border-t pt-4">
-          <SuggestionPanel
-            envelope={envelope}
-            isLoading={isLoading}
-            generating={generating}
-            isError={isError}
-            onRetry={() => void refetch()}
-            onGenerate={() => skill && generate(kind, skill)}
-          />
-        </div>
+<div className="mt-6 border-t pt-4">
+  <SuggestionPanel
+    envelope={envelope}
+    isLoading={isLoading}
+    generating={generating}
+    isError={isError}
+    onRetry={() => void refetch()}
+    onGenerate={() => skill && generate(kind, skill)}
+  />
+</div>
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1886,6 +1985,7 @@ Expected: all green.
 ## Self-Review
 
 **Spec coverage:**
+
 - §2.1/§2.2 native-vs-tool per provider, `auto` default → Task 2 (`plan_search` covers anthropic/openai/gemini/deepseek + native/tool/off). ✔
 - §2.3 new Settings (`github_token` already existed) → Task 1. ✔
 - §3 two-stage synthesis (search agent no-schema → formatter schema) → Task 4 + Task 6 (`generate_suggestion` calls both). ✔

@@ -4,7 +4,7 @@
 
 **Goal:** Add LinkedIn as a real job source: a Playwright driver (persistent logged-in **burner** profile) navigates search + detail pages; **pure HTML-parsing functions** turn that HTML into structured cards and JD text; an orchestrator dedupes and inserts them as `jobs(status=raw)`, ready for the existing discovery funnel. A `scrape` CLI command runs it.
 
-**Architecture — the honest part:** LinkedIn's live DOM cannot be parsed "blind" and changes over time, so this component is **fixture-driven and calibrated**. The parser is plain functions over HTML strings, tested against saved fixtures in `tests/fixtures/linkedin/`. The plan ships realistic *starting* fixtures + selectors (LinkedIn's guest-job markup, which is comparatively stable) so the tests pass immediately; a dedicated **calibration task** has you save real HTML from your burner session and adjust selectors until the tests pass on *your* fixtures. The Playwright driver sits behind a `JobSource` protocol and is **not** run in CI (manual verification only); the orchestrator is fully unit-tested with a fake source.
+**Architecture — the honest part:** LinkedIn's live DOM cannot be parsed "blind" and changes over time, so this component is **fixture-driven and calibrated**. The parser is plain functions over HTML strings, tested against saved fixtures in `tests/fixtures/linkedin/`. The plan ships realistic _starting_ fixtures + selectors (LinkedIn's guest-job markup, which is comparatively stable) so the tests pass immediately; a dedicated **calibration task** has you save real HTML from your burner session and adjust selectors until the tests pass on _your_ fixtures. The Playwright driver sits behind a `JobSource` protocol and is **not** run in CI (manual verification only); the orchestrator is fully unit-tested with a fake source.
 
 **Tech Stack:** Python 3.13, uv, **playwright** + **beautifulsoup4** (new deps), SQLModel, Typer, pytest. (Reuses `discovery.ingest.add_job` for normalize/dedupe/insert.)
 
@@ -18,6 +18,7 @@
 ## Reference & scoped decisions
 
 Design spec §5.2 + Decisions #3/#4 + Risk #1. Decisions for this plan:
+
 - **Parser is pure + fixture-tested.** No network in CI. Saved HTML is the calibration artifact and the regression guard.
 - **Driver behind an interface.** `JobSource` protocol with `search(config)` + `fetch_jd(card)`. `LinkedInScraper` (Playwright) implements it; the orchestrator depends only on the protocol, so it tests with a fake.
 - **Burner account, persistent context.** `launch_persistent_context(user_data_dir, headless=False)` reuses one saved login; the first run logs in by hand once. Human-like pacing + a result cap. Credentials/data-dir from settings.
@@ -50,6 +51,7 @@ tests/
 ## Task 1: Dependencies + ScrapedCard model
 
 **Files:**
+
 - Modify: `pyproject.toml`, `.gitignore`
 - Create: `src/resume_agent/discovery/scraper/__init__.py`, `src/resume_agent/discovery/scraper/models.py`
 - Test: `tests/test_scraper_parser.py` (model portion only this task)
@@ -57,14 +59,17 @@ tests/
 - [ ] **Step 1: Add dependencies**
 
 Run:
+
 ```bash
 uv add playwright beautifulsoup4
 ```
+
 Expected: `pyproject.toml` gains both; `uv.lock` updates; install succeeds. (Browser binaries are installed later in the calibration task, not now.)
 
 - [ ] **Step 2: Ignore local browser sessions and live captures**
 
 Add to `.gitignore`:
+
 ```gitignore
 .linkedin_profile/
 tests/fixtures/linkedin/*_live.html
@@ -73,6 +78,7 @@ tests/fixtures/linkedin/*_live.html
 - [ ] **Step 3: Write the failing test**
 
 Create `tests/test_scraper_parser.py`:
+
 ```python
 from resume_agent.discovery.scraper.models import ScrapedCard
 
@@ -92,19 +98,23 @@ def test_scraped_card_fields():
 - [ ] **Step 4: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_scraper_parser.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.scraper'`.
 
 - [ ] **Step 5: Implement**
 
 Create `src/resume_agent/discovery/scraper/__init__.py`:
+
 ```python
 """LinkedIn scraper: Playwright driver + pure HTML parsers (fixture-tested)."""
 ```
 
 Create `src/resume_agent/discovery/scraper/models.py`:
+
 ```python
 from dataclasses import dataclass
 
@@ -123,9 +133,11 @@ class ScrapedCard:
 - [ ] **Step 6: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_scraper_parser.py -v
 ```
+
 Expected: PASS (1 test).
 
 - [ ] **Step 7: Commit**
@@ -140,17 +152,25 @@ git commit -m "feat(scraper): deps + ScrapedCard model" -m "Co-Authored-By: Clau
 ## Task 2: HTML parsers (fixture-driven)
 
 **Files:**
+
 - Create: `tests/fixtures/linkedin/search.html`, `tests/fixtures/linkedin/job.html`, `src/resume_agent/discovery/scraper/parser.py`
 - Test: `tests/test_scraper_parser.py` (append)
 
 - [ ] **Step 1: Create the fixtures**
 
 Create `tests/fixtures/linkedin/search.html`:
+
 ```html
 <ul class="jobs-search__results-list">
   <li>
-    <div class="base-card relative" data-entity-urn="urn:li:jobPosting:3700000001">
-      <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000001/?trk=public_jobs">
+    <div
+      class="base-card relative"
+      data-entity-urn="urn:li:jobPosting:3700000001"
+    >
+      <a
+        class="base-card__full-link"
+        href="https://www.linkedin.com/jobs/view/3700000001/?trk=public_jobs"
+      >
         <span class="sr-only">Senior Backend Engineer</span>
       </a>
       <h3 class="base-search-card__title">Senior Backend Engineer</h3>
@@ -161,8 +181,14 @@ Create `tests/fixtures/linkedin/search.html`:
     </div>
   </li>
   <li>
-    <div class="base-card relative" data-entity-urn="urn:li:jobPosting:3700000002">
-      <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/3700000002/">
+    <div
+      class="base-card relative"
+      data-entity-urn="urn:li:jobPosting:3700000002"
+    >
+      <a
+        class="base-card__full-link"
+        href="https://www.linkedin.com/jobs/view/3700000002/"
+      >
         <span class="sr-only">Platform Engineer</span>
       </a>
       <h3 class="base-search-card__title">Platform Engineer</h3>
@@ -176,6 +202,7 @@ Create `tests/fixtures/linkedin/search.html`:
 ```
 
 Create `tests/fixtures/linkedin/job.html`:
+
 ```html
 <section class="core-section-container">
   <div class="show-more-less-html__markup">
@@ -197,6 +224,7 @@ Create `tests/fixtures/linkedin/job.html`:
 - [ ] **Step 2: Write the failing test**
 
 Append to `tests/test_scraper_parser.py`:
+
 ```python
 from pathlib import Path
 
@@ -230,14 +258,17 @@ def test_parse_job_detail_returns_clean_text():
 - [ ] **Step 3: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_scraper_parser.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.scraper.parser'`.
 
 - [ ] **Step 4: Implement**
 
 Create `src/resume_agent/discovery/scraper/parser.py`:
+
 ```python
 from bs4 import BeautifulSoup
 
@@ -288,9 +319,11 @@ def parse_job_detail(html: str) -> str:
 - [ ] **Step 5: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_scraper_parser.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 6: Commit**
@@ -305,12 +338,14 @@ git commit -m "feat(scraper): fixture-driven LinkedIn HTML parsers" -m "Co-Autho
 ## Task 3: Ingest orchestrator (JobSource protocol)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/scraper/ingest.py`
 - Test: `tests/test_scraper_ingest.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_scraper_ingest.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -373,14 +408,17 @@ def test_ingest_scraped_respects_limit():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_scraper_ingest.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery.scraper.ingest'`.
 
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/discovery/scraper/ingest.py`:
+
 ```python
 from typing import Protocol
 
@@ -425,9 +463,11 @@ def ingest_scraped(
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_scraper_ingest.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -442,6 +482,7 @@ git commit -m "feat(scraper): JobSource protocol + ingest_scraped orchestrator" 
 ## Task 4: Playwright driver (not CI-tested)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/scraper/linkedin.py`
 
 > This task has **no unit test** — it drives a real browser against a live, changing site. Its parsing logic is already covered by Task 2's fixture tests; this file is the thin, manually-maintained I/O shell. Correctness is checked in Task 6 (calibration).
@@ -449,6 +490,7 @@ git commit -m "feat(scraper): JobSource protocol + ingest_scraped orchestrator" 
 - [ ] **Step 1: Implement the driver**
 
 Create `src/resume_agent/discovery/scraper/linkedin.py`:
+
 ```python
 import time
 import urllib.parse
@@ -517,9 +559,11 @@ def build_linkedin_scraper() -> LinkedInScraper:
 - [ ] **Step 2: Verify it imports (no browser launch)**
 
 Run:
+
 ```bash
 uv run python -c "from resume_agent.discovery.scraper.linkedin import LinkedInScraper, build_linkedin_scraper; print('import ok')"
 ```
+
 Expected: prints `import ok` (importing must not launch a browser).
 
 - [ ] **Step 3: Commit**
@@ -534,12 +578,14 @@ git commit -m "feat(scraper): Playwright LinkedIn driver (persistent burner prof
 ## Task 5: CLI — `scrape`
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_scrape.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_scrape.py`:
+
 ```python
 from typer.testing import CliRunner
 
@@ -563,21 +609,26 @@ def test_scrape_command_runs_ingest(tmp_path, monkeypatch):
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_scrape.py -v
 ```
+
 Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'build_linkedin_scraper'`.
 
 - [ ] **Step 3: Implement**
 
 Add imports near the other imports in `src/resume_agent/cli.py`:
+
 ```python
 from resume_agent.discovery.scraper.ingest import ingest_scraped
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 ```
+
 (`load_search_config` is already imported from the Discovery task — do not duplicate.)
 
 Add the command AFTER the `dashboard` command and BEFORE `if __name__ == "__main__":`:
+
 ```python
 @app.command("scrape")
 def scrape_cmd(
@@ -597,18 +648,22 @@ def scrape_cmd(
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_scrape.py -v
 ```
+
 Expected: PASS (1 test). (The scraper + ingest are patched, so no browser launches.)
 
 - [ ] **Step 5: Verify wiring + full suite**
 
 Run:
+
 ```bash
 uv run resume-agent scrape --help
 uv run pytest -q
 ```
+
 Expected: help text (exit 0); all tests pass (Tracking total + scraper additions).
 
 - [ ] **Step 6: Commit**
@@ -627,6 +682,7 @@ git commit -m "feat(scraper): scrape CLI command" -m "Co-Authored-By: Claude Opu
 - [ ] **Step 1: Install the browser binary**
 
 Run:
+
 ```bash
 uv run playwright install chromium
 ```
@@ -634,14 +690,17 @@ uv run playwright install chromium
 - [ ] **Step 2: Log in once (persistent profile)**
 
 Run:
+
 ```bash
 uv run python -c "from playwright.sync_api import sync_playwright; p=sync_playwright().start(); c=p.chromium.launch_persistent_context('.linkedin_profile', headless=False); pg=c.new_page(); pg.goto('https://www.linkedin.com/login'); input('Log in with your BURNER account, then press Enter...'); c.close(); p.stop()"
 ```
+
 `.linkedin_profile/` is already ignored from Task 1; never commit a logged-in session.
 
 - [ ] **Step 3: Save real HTML and compare to the fixtures**
 
 Run a search in that window, then in a Python REPL (`uv run python`) capture the current page HTML:
+
 ```python
 from playwright.sync_api import sync_playwright
 p = sync_playwright().start()
@@ -654,23 +713,29 @@ open("tests/fixtures/linkedin/search_live.html", "w", encoding="utf-8").write(pg
 open("tests/fixtures/linkedin/job_live.html", "w", encoding="utf-8").write(pg.content())
 c.close(); p.stop()
 ```
+
 The `*_live.html` files are ignored. Before committing any fixture update, sanitize it down to the minimum stable DOM excerpt needed by the parser tests.
 
 - [ ] **Step 4: Point the parser tests at the live fixtures and adjust selectors**
 
 Run the parser over the live HTML:
+
 ```bash
 uv run python -c "from resume_agent.discovery.scraper.parser import parse_search_cards; print(len(parse_search_cards(open('tests/fixtures/linkedin/search_live.html', encoding='utf-8').read())))"
 ```
+
 If it prints `0`, the live DOM differs. Inspect `search_live.html`, update the CSS selectors in `parser.py` (e.g. the card container, title, subtitle, location, link), and re-run until cards are extracted. Repeat for `parse_job_detail` against `job_live.html`. Then update `tests/fixtures/linkedin/search.html` / `job.html` (or add `*_live`-derived fixtures) so Task 2's tests reflect the real structure.
 
 - [ ] **Step 5: End-to-end dry run**
 
 Run:
+
 ```bash
 uv run resume-agent scrape --limit 3
 ```
+
 Expected: "Added N new job(s)." Then `uv run resume-agent discover` should extract/filter/score them. If selectors changed, commit the parser + fixture updates:
+
 ```bash
 git add src/resume_agent/discovery/scraper/parser.py tests/fixtures/linkedin/ tests/test_scraper_parser.py
 git commit -m "fix(scraper): calibrate selectors against live LinkedIn HTML" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -687,8 +752,10 @@ git commit -m "fix(scraper): calibrate selectors against live LinkedIn HTML" -m 
 ---
 
 ## Notes / future
+
 - **v2 (memo):** add an Indeed `JobSource` implementing the same protocol; `ingest_scraped` is source-agnostic. Greenhouse/Lever/Ashby JSON endpoints would be far more stable sources behind the same interface.
 - Consider persisting the raw card HTML on the job row (`extra`) for re-parsing after selector fixes without re-scraping.
 
 ## Execution Handoff
+
 This is the last v1 component. After it is executed and calibrated, the full v1 pipeline runs end-to-end: `scrape → discover → approve → tailor → render → dashboard`. v2–v4 remain as the roadmap memo in the design spec (§10) and need their own brainstorming before planning.

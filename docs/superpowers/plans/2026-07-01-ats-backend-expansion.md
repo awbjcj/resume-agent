@@ -74,10 +74,12 @@ must follow the captured payloads and these verified contracts instead.
 ### Task 0: `primary_location` filter helper
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/text.py`
 - Test: `tests/test_connector_text.py` (extend, or create if absent)
 
 **Interfaces:**
+
 - Produces: `primary_location(search: SearchConfig) -> str` — the first non-empty
   configured location, `""` when none. Mirrors `primary_search_term`.
 
@@ -134,6 +136,7 @@ git commit -m "feat: add primary_location helper for server-side location push"
 ### Task 1: SmartRecruiters backend (N+1, server-side `q`) + detection + register
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/smartrecruiters.py`
 - Create: `tests/fixtures/smartrecruiters_list.json`, `tests/fixtures/smartrecruiters_detail.json`
 - Modify: `src/resume_agent/discovery/connectors/detect.py`
@@ -141,6 +144,7 @@ git commit -m "feat: add primary_location helper for server-side location push"
 - Test: `tests/test_connector_smartrecruiters.py`, extend `tests/test_connector_detect.py`
 
 **Interfaces:**
+
 - Consumes: `AtsTarget` (token = SmartRecruiters companyId), `harvest_detailed`,
   `html_to_markdown`, `primary_search_term`, `parse_iso_datetime`.
 - Produces:
@@ -153,11 +157,13 @@ git commit -m "feat: add primary_location helper for server-side location push"
 - [ ] **Step 1: Capture fixtures** (one-time, live; commit the JSON)
 
 Run (replace `Bosch` with any real SmartRecruiters company):
+
 ```bash
 curl -s "https://api.smartrecruiters.com/v1/companies/Bosch/postings?limit=2" > tests/fixtures/smartrecruiters_list.json
 POSTING_ID=$(python -c "import json;print(json.load(open('tests/fixtures/smartrecruiters_list.json'))['content'][0]['id'])")
 curl -s "https://api.smartrecruiters.com/v1/companies/Bosch/postings/$POSTING_ID" > tests/fixtures/smartrecruiters_detail.json
 ```
+
 Open both files and confirm the field paths used in Step 3 (`content[].id/name/location`,
 `jobAd.sections.*.text`, `applyUrl`). Adjust Step 3 to match reality if they differ.
 
@@ -210,6 +216,7 @@ def test_apply_detail_fills_markdown_jd():
 ```
 
 Plus detection, in `tests/test_connector_detect.py`:
+
 ```python
 def test_l1_smartrecruiters_url():
     assert detect_ats("https://jobs.smartrecruiters.com/Acme") == AtsTarget(
@@ -353,6 +360,7 @@ _L1_HOSTS: list[tuple[str, str]] = [
 ```
 
 And an L2 marker (for SmartRecruiters embedded on a custom careers domain) in `_L2_MARKERS`:
+
 ```python
     (
         "smartrecruiters",
@@ -369,6 +377,7 @@ from resume_agent.discovery.connectors.smartrecruiters import fetch_smartrecruit
 def _smartrecruiters(target, search, limit=None, skip_seen=None):
     return fetch_smartrecruiters(target, search, limit, skip_seen=skip_seen)
 ```
+
 ```python
 _BACKENDS = {
     ...
@@ -394,7 +403,7 @@ git commit -m "feat: add SmartRecruiters backend with server-side q narrowing"
 
 Each of these five backends follows the **same five-step recipe** as SmartRecruiters
 (capture → failing test → implement parser+fetch → detect → register → commit). They
-are grouped because the *shape* is identical; only the endpoint, host pattern, and JSON
+are grouped because the _shape_ is identical; only the endpoint, host pattern, and JSON
 field mapping differ. Do them one at a time, each a standalone commit.
 
 **Per-backend recipe (apply to each row below):**
@@ -416,19 +425,20 @@ field mapping differ. Do them one at a time, each a standalone commit.
 5. **Test + commit**: `pytest tests/test_connector_<name>.py tests/test_connector_detect.py`,
    then commit backend + fixture + detect + companies + tests together.
 
-| Task | Backend | Detect host → token | Endpoint (verify live) | Shape | JD source (best-known) |
-| --- | --- | --- | --- | --- | --- |
-| 2 | **workable** | `apply.workable.com/j/{token}`, `{token}.workable.com` | `GET https://www.workable.com/api/accounts/{token}?details=true` | single-request | `results[].description` (HTML); title `results[].title`, url `results[].url`/`application_url`, location `results[].location.city/country` |
-| 3 | **recruitee** | `{token}.recruitee.com` | `GET https://{token}.recruitee.com/api/offers/` | single-request | `offers[].description` (HTML); title `offers[].title`, url `offers[].careers_url`/`careers_apply_url`, location `offers[].city`/`country_code` |
-| 5 | **breezy** | `{token}.breezy.hr` | `GET https://{token}.breezy.hr/json` | single-request (array) | `[].description` (HTML); title `[].name`, url `[].url`, location `[].location.name` (reverse-engineered — isolate parse failures) |
-| 6 | **jazzhr** | `{token}.applytojob.com` | `GET https://{token}.applytojob.com/api/v1/jobs` (or the board's JSON/RSS feed — confirm) | single-request | `jobs[].description`; title `jobs[].title`, url `jobs[].url`, location `jobs[].city`,`jobs[].state` (reverse-engineered) |
-| 7 | **bamboohr** | `{token}.bamboohr.com` | `GET https://{token}.bamboohr.com/careers/list` then detail `GET .../careers/{id}/detail` | N+1 | list `result[].jobOpeningName`/`location`; detail `.description` (HTML) (reverse-engineered) |
+| Task | Backend       | Detect host → token                                    | Endpoint (verify live)                                                                    | Shape                  | JD source (best-known)                                                                                                                         |
+| ---- | ------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2    | **workable**  | `apply.workable.com/j/{token}`, `{token}.workable.com` | `GET https://www.workable.com/api/accounts/{token}?details=true`                          | single-request         | `results[].description` (HTML); title `results[].title`, url `results[].url`/`application_url`, location `results[].location.city/country`     |
+| 3    | **recruitee** | `{token}.recruitee.com`                                | `GET https://{token}.recruitee.com/api/offers/`                                           | single-request         | `offers[].description` (HTML); title `offers[].title`, url `offers[].careers_url`/`careers_apply_url`, location `offers[].city`/`country_code` |
+| 5    | **breezy**    | `{token}.breezy.hr`                                    | `GET https://{token}.breezy.hr/json`                                                      | single-request (array) | `[].description` (HTML); title `[].name`, url `[].url`, location `[].location.name` (reverse-engineered — isolate parse failures)              |
+| 6    | **jazzhr**    | `{token}.applytojob.com`                               | `GET https://{token}.applytojob.com/api/v1/jobs` (or the board's JSON/RSS feed — confirm) | single-request         | `jobs[].description`; title `jobs[].title`, url `jobs[].url`, location `jobs[].city`,`jobs[].state` (reverse-engineered)                       |
+| 7    | **bamboohr**  | `{token}.bamboohr.com`                                 | `GET https://{token}.bamboohr.com/careers/list` then detail `GET .../careers/{id}/detail` | N+1                    | list `result[].jobOpeningName`/`location`; detail `.description` (HTML) (reverse-engineered)                                                   |
 
 For Workable and Recruitee (Task 2, 3), also push a server-side location filter where
 the endpoint supports it (Workable `details=true` widget filters minimally — if there is
 no cheap param, omit it per the best-effort rule and rely on the local gate).
 
 Example detection test to add per backend (adjust host/token):
+
 ```python
 def test_l1_recruitee_url():
     assert detect_ats("https://acme.recruitee.com/o/backend-engineer") == AtsTarget(
@@ -448,12 +458,14 @@ def test_l1_recruitee_url():
 ### Task 4: Personio backend (single-request XML feed) — fully specified
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/personio.py`
 - Create: `tests/fixtures/personio_feed.xml`
 - Modify: `detect.py`, `companies.py`
 - Test: `tests/test_connector_personio.py`, extend `tests/test_connector_detect.py`
 
 **Interfaces:**
+
 - Produces: `feed_url(token) -> str`, `parse_personio(xml_text, company) -> list[RawJob]`,
   `fetch_personio(target, search, limit=None, skip_seen=None) -> list[RawJob]`.
 - Detection: `{token}.jobs.personio.com` and `{token}.jobs.personio.de` → subdomain token.
@@ -463,6 +475,7 @@ def test_l1_recruitee_url():
 ```bash
 curl -s "https://<company>.jobs.personio.com/xml" > tests/fixtures/personio_feed.xml
 ```
+
 Confirm the element names (`position`, `name`, `office`, `jobDescriptions/jobDescription/value`).
 
 - [ ] **Step 2: Write the failing test**
@@ -551,15 +564,18 @@ def fetch_personio(
 
 In `detect.py`, add to the `_SUBDOMAIN_HOSTS` table introduced in Task 3's note (create
 it if Tasks 2/3 haven't run yet):
+
 ```python
 _SUBDOMAIN_HOSTS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^(?P<token>[a-z0-9-]+)\.jobs\.personio\.(?:com|de)$", re.IGNORECASE), "personio"),
     # ... recruitee/workable/breezy/jazzhr/bamboohr entries from Tasks 2,3,5,6,7
 ]
 ```
+
 with a `_l1` branch that returns `AtsTarget(ats, token=match.group("token"))` on match.
 
 In `companies.py`:
+
 ```python
 from resume_agent.discovery.connectors.personio import fetch_personio
 
@@ -567,11 +583,13 @@ from resume_agent.discovery.connectors.personio import fetch_personio
 def _personio(target, search, limit=None, skip_seen=None):
     return fetch_personio(target, search, limit, skip_seen=skip_seen)
 ```
+
 ```python
 _BACKENDS = { ..., "personio": _personio }
 ```
 
 Detection test:
+
 ```python
 def test_subdomain_personio_url():
     assert detect_ats("https://acme.jobs.personio.com/") == AtsTarget("personio", "acme")
@@ -594,11 +612,13 @@ git commit -m "feat: add Personio XML-feed backend"
 ### Task 8: Server-side location push for Lever
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/lever.py`
 - Modify: `src/resume_agent/discovery/connectors/companies.py` (`_lever` adapter passes `search`)
 - Test: `tests/test_connector_lever.py` (create/extend)
 
 **Interfaces:**
+
 - Produces: `fetch_lever_board(token, search=None) -> list` — when `search` carries a
   location, add Lever's `?location=` query param (best-effort narrow).
 
@@ -665,10 +685,12 @@ def fetch_lever_board(token: str, search: SearchConfig | None = None) -> list:
 ```
 
 Update `LeverConnector.fetch` to pass `search`:
+
 ```python
     def _get_board(self, token: str, search: SearchConfig) -> list:
         return fetch_lever_board(token, search)
 ```
+
 ```python
         return harvest(
             self.boards,
@@ -678,6 +700,7 @@ Update `LeverConnector.fetch` to pass `search`:
 ```
 
 In `companies.py`, update the `_lever` adapter to pass `search`:
+
 ```python
 def _lever(target, search, limit=None, skip_seen=None):
     return parse_lever(fetch_lever_board(target.token, search), target.token)
@@ -700,16 +723,17 @@ git commit -m "feat: push server-side location filter to Lever boards"
 ### Task 9: Docs, example config, full-suite regression
 
 **Files:**
+
 - Modify: `CLAUDE.md` (source-priority table + hot-paths + companies dispatch note)
 - Modify: `config/connectors.yaml.example` (comment the newly auto-detected hosts)
 - Test: full suite + lint.
 
 - [ ] **Step 1: Update `CLAUDE.md`** — add the new canonical sources to the source-priority
-  table row (`smartrecruiters`, `workable`, `recruitee`, `personio`, `breezy`, `jazzhr`,
-  `bamboohr`) and to `source_tier._CANONICAL` if not already covered.
+      table row (`smartrecruiters`, `workable`, `recruitee`, `personio`, `breezy`, `jazzhr`,
+      `bamboohr`) and to `source_tier._CANONICAL` if not already covered.
 
 - [ ] **Step 2: Update `source_tier._CANONICAL`** — add the seven new source strings so
-  they rank as direct (0), not aggregator:
+      they rank as direct (0), not aggregator:
 
 ```python
 _CANONICAL = {
@@ -717,7 +741,9 @@ _CANONICAL = {
     "smartrecruiters", "workable", "recruitee", "personio", "breezy", "jazzhr", "bamboohr",
 }
 ```
+
 Add a test in `tests/test_source_tier.py`:
+
 ```python
 from resume_agent.discovery.source_tier import source_rank
 
@@ -727,9 +753,9 @@ def test_new_ats_sources_rank_as_direct():
 ```
 
 - [ ] **Step 3: Comment the example config** — in `config/connectors.yaml.example`, under
-  the `companies:` section, note that pasting any `jobs.smartrecruiters.com/...`,
-  `*.workable.com`, `*.recruitee.com`, `*.jobs.personio.com`, `*.breezy.hr`,
-  `*.applytojob.com`, or `*.bamboohr.com` careers URL is auto-detected.
+      the `companies:` section, note that pasting any `jobs.smartrecruiters.com/...`,
+      `*.workable.com`, `*.recruitee.com`, `*.jobs.personio.com`, `*.breezy.hr`,
+      `*.applytojob.com`, or `*.bamboohr.com` careers URL is auto-detected.
 
 - [ ] **Step 4: Full suite + lint**
 

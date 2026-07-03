@@ -87,9 +87,9 @@ Parsing rules:
 - [ ] Write tests for every accepted state and every rejection rule above.
 - [ ] Add `parse_run_snapshot` and `RunSnapshot`.
 - [ ] Refactor `RunManager.get(run_id)` to return `RunSnapshot | None`; keep a
-  private `_read_record` only for state-transition writes.
+      private `_read_record` only for state-transition writes.
 - [ ] Refactor `record_to_run` to consume `RunSnapshot`, deriving percentage/ETA
-  without exposing a persistence dictionary.
+      without exposing a persistence dictionary.
 - [ ] Update existing route/SSE tests and callers for the typed interface.
 
 Run:
@@ -136,10 +136,10 @@ def recover_interrupted(self) -> int: ...
 - leaves terminal and invalid files unchanged.
 
 - [ ] Test mixed active/terminal/corrupt files, identical creation timestamps, a
-  stored process ID that disagrees with the file stem, and a phase transition that
-  changes `started_at` without changing list order.
+      stored process ID that disagrees with the file stem, and a phase transition that
+      changes `started_at` without changing list order.
 - [ ] Test that startup recovery returns its changed count and makes all recovered
-  records terminal.
+      records terminal.
 - [ ] Test that a recovered record is not returned by `list_active`.
 - [ ] Implement and call `recover_interrupted()` before `sweep()` in lifespan.
 
@@ -187,9 +187,9 @@ Rules:
 - do not infer singleton state by scanning files on every submit.
 
 - [ ] Test a race with two threads submitting the same key: one work callable runs
-  and both calls return the same ID.
+      and both calls return the same ID.
 - [ ] Test the existing `InlineExecutor` path does not deadlock and releases the
-  key before `submit` returns.
+      key before `submit` returns.
 - [ ] Test key release after done, error, and queued cancellation.
 - [ ] Test different keys still run independently.
 - [ ] Implement without changing existing launch call sites.
@@ -241,7 +241,7 @@ Contract details:
 - auth and the standard error envelope come from existing router/app wiring.
 
 - [ ] Test page metadata, deterministic ordering, active-only filtering, camelCase,
-  invalid query validation, and auth when configured.
+      invalid query validation, and auth when configured.
 - [ ] Implement the endpoint with shared pagination modules.
 - [ ] Regenerate and verify contracts.
 
@@ -294,10 +294,10 @@ Implementation rules:
   calls `watchRun` directly.
 
 - [ ] Add tests for dedupe, callback fan-out, registry cleanup, transient transport
-  error, backend-terminal reconciliation, and reset cleanup.
+      error, backend-terminal reconciliation, and reset cleanup.
 - [ ] Export the status mapper and keep unknown values impossible at the typed
-  contract; defensively map runtime unknowns to `running` only in the transport
-  parser.
+      contract; defensively map runtime unknowns to `running` only in the transport
+      parser.
 - [ ] Refactor launch tracking.
 
 Run from `web/`:
@@ -329,8 +329,8 @@ Behavior:
 - call the hook once from `AppLayout`.
 
 - [ ] Test multiple pages, latest-snapshot overwrite, existing-store-but-not-tracked,
-  already-tracked dedupe, React Strict Mode/remount, fetch failure, and unmount
-  before response.
+      already-tracked dedupe, React Strict Mode/remount, fetch failure, and unmount
+      before response.
 - [ ] Implement the hook and mount it.
 
 Run from `web/`:
@@ -364,9 +364,9 @@ npm run build
 ```
 
 - [ ] Manual smoke test: launch a run, refresh the page, confirm one network SSE
-  connection for that run, then confirm terminal cleanup.
+      connection for that run, then confirm terminal cleanup.
 - [ ] Manual restart test: stop the backend during a run, restart it, and confirm
-  the old record is terminal rather than rehydrated as active.
+      the old record is terminal rather than rehydrated as active.
 
 ## Review corrections captured
 

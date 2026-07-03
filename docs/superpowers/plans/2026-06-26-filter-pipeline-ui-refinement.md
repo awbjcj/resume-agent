@@ -28,6 +28,7 @@
 ### Task 1: Controlled, polished facet popovers
 
 **Files:**
+
 - Modify: `web/src/components/ui/popover.tsx`
 - Modify: `web/src/components/filters/FacetPopover.tsx`
 - Test: `web/src/components/filters/FacetPopover.test.tsx`
@@ -38,8 +39,8 @@ Extend `FacetPopover.test.tsx` with explicit controlled props and these assertio
 
 ```tsx
 it("renders a labeled panel with selection actions", () => {
-  const onChange = vi.fn()
-  const onOpenChange = vi.fn()
+  const onChange = vi.fn();
+  const onOpenChange = vi.fn();
 
   render(
     <FacetPopover
@@ -50,17 +51,19 @@ it("renders a labeled panel with selection actions", () => {
       open
       onOpenChange={onOpenChange}
     />,
-  )
+  );
 
-  expect(screen.getByText("Filter by Skills")).toBeInTheDocument()
-  expect(screen.getByText("1 selected")).toBeInTheDocument()
+  expect(screen.getByText("Filter by Skills")).toBeInTheDocument();
+  expect(screen.getByText("1 selected")).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole("button", { name: "Clear Skills filter" }))
-  expect(onChange).toHaveBeenCalledWith(new Set())
+  fireEvent.click(screen.getByRole("button", { name: "Clear Skills filter" }));
+  expect(onChange).toHaveBeenCalledWith(new Set());
 
-  fireEvent.click(screen.getByRole("button", { name: "Done filtering Skills" }))
-  expect(onOpenChange).toHaveBeenCalledWith(false)
-})
+  fireEvent.click(
+    screen.getByRole("button", { name: "Done filtering Skills" }),
+  );
+  expect(onOpenChange).toHaveBeenCalledWith(false);
+});
 
 it("reports an empty search without losing the footer actions", () => {
   render(
@@ -72,15 +75,17 @@ it("reports an empty search without losing the footer actions", () => {
       open
       onOpenChange={vi.fn()}
     />,
-  )
+  );
 
   fireEvent.change(screen.getByPlaceholderText("Search skills..."), {
     target: { value: "rust" },
-  })
+  });
 
-  expect(screen.getByText("No matching skills")).toBeInTheDocument()
-  expect(screen.getByRole("button", { name: "Done filtering Skills" })).toBeInTheDocument()
-})
+  expect(screen.getByText("No matching skills")).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Done filtering Skills" }),
+  ).toBeInTheDocument();
+});
 ```
 
 - [ ] **Step 2: Run the focused test and verify failure**
@@ -99,17 +104,17 @@ Expected: FAIL because `FacetPopover` does not accept `open`/`onOpenChange` and 
 Replace the custom context implementation in `ui/popover.tsx` with the current Base UI composition already present in `@base-ui/react`. Preserve the exported names used by `NotificationsBell` and add the semantic exports needed by facets:
 
 ```tsx
-import * as React from "react"
-import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
+import * as React from "react";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 function Popover(props: PopoverPrimitive.Root.Props) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+  return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
 function PopoverTrigger(props: PopoverPrimitive.Trigger.Props) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
+  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
 function PopoverContent({
@@ -120,7 +125,10 @@ function PopoverContent({
   sideOffset = 4,
   ...props
 }: PopoverPrimitive.Popup.Props &
-  Pick<PopoverPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
+  Pick<
+    PopoverPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset"
+  >) {
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Positioner
@@ -140,19 +148,40 @@ function PopoverContent({
         />
       </PopoverPrimitive.Positioner>
     </PopoverPrimitive.Portal>
-  )
+  );
 }
 
 function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="popover-header" className={cn("flex flex-col gap-0.5", className)} {...props} />
+  return (
+    <div
+      data-slot="popover-header"
+      className={cn("flex flex-col gap-0.5", className)}
+      {...props}
+    />
+  );
 }
 
 function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
-  return <PopoverPrimitive.Title data-slot="popover-title" className={cn("font-medium", className)} {...props} />
+  return (
+    <PopoverPrimitive.Title
+      data-slot="popover-title"
+      className={cn("font-medium", className)}
+      {...props}
+    />
+  );
 }
 
-function PopoverDescription({ className, ...props }: PopoverPrimitive.Description.Props) {
-  return <PopoverPrimitive.Description data-slot="popover-description" className={cn("text-muted-foreground", className)} {...props} />
+function PopoverDescription({
+  className,
+  ...props
+}: PopoverPrimitive.Description.Props) {
+  return (
+    <PopoverPrimitive.Description
+      data-slot="popover-description"
+      className={cn("text-muted-foreground", className)}
+      {...props}
+    />
+  );
 }
 
 export {
@@ -162,7 +191,7 @@ export {
   PopoverHeader,
   PopoverTitle,
   PopoverTrigger,
-}
+};
 ```
 
 This is a manual smart merge of the inspected `npx shadcn@latest add popover --diff popover.tsx`; do not run `--overwrite`.
@@ -180,29 +209,48 @@ presentation?: "chip" | "field"
 Use `<Popover open={open} onOpenChange={onOpenChange}>`. Compose the content as:
 
 ```tsx
-<PopoverContent align="start" className="w-[min(20rem,calc(100vw-2rem))] gap-0 p-0">
+<PopoverContent
+  align="start"
+  className="w-[min(20rem,calc(100vw-2rem))] gap-0 p-0"
+>
   <PopoverHeader className="border-b p-3">
     <div className="flex items-center justify-between gap-3">
       <PopoverTitle>Filter by {label}</PopoverTitle>
       <Badge variant="secondary">{selected.size} selected</Badge>
     </div>
-    <PopoverDescription>Select any values that should remain visible.</PopoverDescription>
+    <PopoverDescription>
+      Select any values that should remain visible.
+    </PopoverDescription>
   </PopoverHeader>
   <Command>
-    <CommandInput placeholder={`Search ${label.toLowerCase()}...`} value={q} onValueChange={setQ} />
+    <CommandInput
+      placeholder={`Search ${label.toLowerCase()}...`}
+      value={q}
+      onValueChange={setQ}
+    />
     <CommandList className="max-h-64">
-      {shown.length === 0 && <CommandEmpty>No matching {label.toLowerCase()}</CommandEmpty>}
+      {shown.length === 0 && (
+        <CommandEmpty>No matching {label.toLowerCase()}</CommandEmpty>
+      )}
       <CommandGroup className="flex flex-col gap-1">
         {shown.map((option) => {
-          const checked = selected.has(option)
+          const checked = selected.has(option);
           return (
-            <CommandItem key={option} value={option} onSelect={() => toggle(option)}>
+            <CommandItem
+              key={option}
+              value={option}
+              onSelect={() => toggle(option)}
+            >
               <Checkbox checked={checked} aria-hidden />
-              <span className="flex-1 truncate">{getLabel ? getLabel(option) : option}</span>
-              <span className="text-xs tabular-nums text-muted-foreground">{counts[option]}</span>
+              <span className="flex-1 truncate">
+                {getLabel ? getLabel(option) : option}
+              </span>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {counts[option]}
+              </span>
               {checked && <CheckIcon className="text-primary" />}
             </CommandItem>
-          )
+          );
         })}
       </CommandGroup>
     </CommandList>
@@ -244,6 +292,7 @@ git commit -m "feat(web): refine controlled facet popovers"
 ### Task 2: Status-first command desk and polished thresholds
 
 **Files:**
+
 - Create: `web/src/components/SalaryThresholdInput.tsx`
 - Modify: `web/src/components/MinFitInput.tsx`
 - Modify: `web/src/components/FilterDesk.tsx`
@@ -256,7 +305,7 @@ Add status/source facet data and verify DOM order with `compareDocumentPosition`
 
 ```tsx
 it("keeps only one facet panel open", async () => {
-  const user = userEvent.setup()
+  const user = userEvent.setup();
   render(
     <FilterDesk
       filter={emptyFilterState()}
@@ -264,28 +313,30 @@ it("keeps only one facet panel open", async () => {
       total={3}
       onChange={vi.fn()}
     />,
-  )
+  );
 
-  await user.click(screen.getByRole("button", { name: /^Status/ }))
-  expect(screen.getByText("Filter by Status")).toBeInTheDocument()
+  await user.click(screen.getByRole("button", { name: /^Status/ }));
+  expect(screen.getByText("Filter by Status")).toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: /^Source/ }))
-  expect(screen.queryByText("Filter by Status")).not.toBeInTheDocument()
-  expect(screen.getByText("Filter by Source")).toBeInTheDocument()
-})
+  await user.click(screen.getByRole("button", { name: /^Source/ }));
+  expect(screen.queryByText("Filter by Status")).not.toBeInTheDocument();
+  expect(screen.getByText("Filter by Source")).toBeInTheDocument();
+});
 ```
 
 Replace the obsolete “numeric input instead of a slider” assertion with:
 
 ```tsx
-expect(screen.getByRole("spinbutton", { name: "Min fit" })).toBeInTheDocument()
-expect(screen.getByRole("slider", { name: "Minimum fit slider" })).toBeInTheDocument()
+expect(screen.getByRole("spinbutton", { name: "Min fit" })).toBeInTheDocument();
+expect(
+  screen.getByRole("slider", { name: "Minimum fit slider" }),
+).toBeInTheDocument();
 ```
 
 Extend the existing draft test to expect the annual salary summary after typing `120000`:
 
 ```tsx
-expect(screen.getByText("$120k+ / year")).toBeInTheDocument()
+expect(screen.getByText("$120k+ / year")).toBeInTheDocument();
 ```
 
 - [ ] **Step 2: Run the two FilterDesk test files and verify failure**
@@ -334,13 +385,13 @@ Move salary presentation and validation out of `FilterDesk` while keeping the dr
 
 ```tsx
 export function salarySummary(value: string) {
-  const amount = Number(value)
-  if (!Number.isFinite(amount) || amount <= 0) return "Any annual salary"
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "Any annual salary";
   const compact = new Intl.NumberFormat("en-US", {
     notation: "compact",
     maximumFractionDigits: amount >= 100_000 ? 0 : 1,
-  }).format(amount)
-  return `$${compact.toLowerCase()}+ / year`
+  }).format(amount);
+  return `$${compact.toLowerCase()}+ / year`;
 }
 
 export function SalaryThresholdInput({
@@ -349,18 +400,23 @@ export function SalaryThresholdInput({
   valid,
   onChange,
 }: {
-  id: string
-  value: string
-  valid: boolean
-  onChange: (value: string) => void
+  id: string;
+  value: string;
+  valid: boolean;
+  onChange: (value: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-[0.14em]">
+      <Label
+        htmlFor={id}
+        className="text-xs font-semibold uppercase tracking-[0.14em]"
+      >
         Min salary
       </Label>
       <div className="relative">
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground">$</span>
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground">
+          $
+        </span>
         <Input
           id={id}
           type="number"
@@ -374,11 +430,16 @@ export function SalaryThresholdInput({
           onChange={(event) => onChange(event.target.value)}
         />
       </div>
-      <p id={`${id}-hint`} className={valid ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
+      <p
+        id={`${id}-hint`}
+        className={
+          valid ? "text-xs text-muted-foreground" : "text-xs text-destructive"
+        }
+      >
         {valid ? salarySummary(value) : "Enter a non-negative annual salary."}
       </p>
     </div>
-  )
+  );
 }
 ```
 
@@ -405,6 +466,7 @@ git commit -m "feat(web): build status-first filter command desk"
 ### Task 3: Post-processed-first collapsible pipeline groups
 
 **Files:**
+
 - Create: `web/src/features/pipeline/pipeline-stages.ts`
 - Create: `web/src/features/pipeline/PipelineStageSection.tsx`
 - Modify: `web/src/features/pipeline/PipelineContainer.tsx`
@@ -426,7 +488,7 @@ const pipelineItem = (jobId: number, status: string, title: string) => ({
   pdfPath: null,
   applicationStatus: null,
   hasProgress: status === "tailored" || status === "rendered",
-})
+});
 
 server.use(
   http.get("/api/pipeline", () =>
@@ -439,11 +501,13 @@ server.use(
         pipelineItem(5, "screening", "Screening role"),
       ],
       pagination: { page: 1, pageSize: 200, totalItems: 5, totalPages: 1 },
-      facets: { status: { raw: 1, approved: 1, rendered: 1, tailored: 1, screening: 1 } },
+      facets: {
+        status: { raw: 1, approved: 1, rendered: 1, tailored: 1, screening: 1 },
+      },
       total: 5,
     }),
   ),
-)
+);
 ```
 
 Assert heading order is `Tailored, Rendered, Approved, Raw, Screening`; Tailored and Rendered job titles are initially visible; Approved, Raw, and Screening titles are initially absent. Then click the Approved trigger, assert its job appears, click again, and assert it is hidden.
@@ -451,18 +515,18 @@ Assert heading order is `Tailored, Rendered, Approved, Raw, Screening`; Tailored
 Use role queries so the test verifies accessible controls:
 
 ```tsx
-const tailored = screen.getByRole("button", { name: /tailored.*1 job/i })
-const rendered = screen.getByRole("button", { name: /rendered.*1 job/i })
-const approved = screen.getByRole("button", { name: /approved.*1 job/i })
+const tailored = screen.getByRole("button", { name: /tailored.*1 job/i });
+const rendered = screen.getByRole("button", { name: /rendered.*1 job/i });
+const approved = screen.getByRole("button", { name: /approved.*1 job/i });
 
-expect(tailored).toHaveAttribute("aria-expanded", "true")
-expect(rendered).toHaveAttribute("aria-expanded", "true")
-expect(approved).toHaveAttribute("aria-expanded", "false")
+expect(tailored).toHaveAttribute("aria-expanded", "true");
+expect(rendered).toHaveAttribute("aria-expanded", "true");
+expect(approved).toHaveAttribute("aria-expanded", "false");
 
-await user.click(approved)
-expect(screen.getByText("Approved role")).toBeInTheDocument()
-await user.click(approved)
-expect(screen.queryByText("Approved role")).not.toBeInTheDocument()
+await user.click(approved);
+expect(screen.getByText("Approved role")).toBeInTheDocument();
+await user.click(approved);
+expect(screen.queryByText("Approved role")).not.toBeInTheDocument();
 ```
 
 - [ ] **Step 2: Run the pipeline test and verify failure**
@@ -486,24 +550,28 @@ export const PIPELINE_STAGE_ORDER = [
   "shortlisted",
   "raw",
   "rejected",
-] as const
+] as const;
 
-const rank = new Map<string, number>(PIPELINE_STAGE_ORDER.map((stage, index) => [stage, index]))
+const rank = new Map<string, number>(
+  PIPELINE_STAGE_ORDER.map((stage, index) => [stage, index]),
+);
 
 export function orderPipelineStages(stages: Iterable<string>) {
   return [...stages].sort((left, right) => {
-    const leftRank = rank.get(left) ?? Number.MAX_SAFE_INTEGER
-    const rightRank = rank.get(right) ?? Number.MAX_SAFE_INTEGER
-    return leftRank - rightRank || left.localeCompare(right)
-  })
+    const leftRank = rank.get(left) ?? Number.MAX_SAFE_INTEGER;
+    const rightRank = rank.get(right) ?? Number.MAX_SAFE_INTEGER;
+    return leftRank - rightRank || left.localeCompare(right);
+  });
 }
 
 export function initialOpenPipelineStages() {
-  return new Set<string>(["tailored", "rendered"])
+  return new Set<string>(["tailored", "rendered"]);
 }
 
 export function pipelineStageLabel(stage: string) {
-  return stage.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+  return stage
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 ```
 
@@ -513,14 +581,14 @@ Create `PipelineStageSection.tsx` using `Collapsible`, `CollapsibleTrigger`, and
 
 ```ts
 type PipelineStageSectionProps = {
-  stage: string
-  rows: PipelineItem[]
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  isSelected: (jobId: number) => boolean
-  onSelect: (row: PipelineItem) => void
-  onOpen: (row: PipelineItem) => void
-}
+  stage: string;
+  rows: PipelineItem[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isSelected: (jobId: number) => boolean;
+  onSelect: (row: PipelineItem) => void;
+  onOpen: (row: PipelineItem) => void;
+};
 ```
 
 The trigger is a full-width Button-compatible control containing a level-two heading, pluralized count (`1 job`, `2 jobs`), and `ChevronDownIcon` with `data-icon="inline-end"` plus `transition-transform group-data-panel-open:rotate-180`. The content contains the existing responsive `PipelineCard` grid. Do not duplicate filter or selection state in this component.
@@ -530,17 +598,17 @@ The trigger is a full-width Button-compatible control containing a level-two hea
 In `PipelineContainer`:
 
 ```tsx
-const [openStages, setOpenStages] = useState(initialOpenPipelineStages)
-const stages = orderPipelineStages(byStage.keys())
+const [openStages, setOpenStages] = useState(initialOpenPipelineStages);
+const stages = orderPipelineStages(byStage.keys());
 
 const setStageOpen = (stage: string, open: boolean) => {
   setOpenStages((current) => {
-    const next = new Set(current)
-    if (open) next.add(stage)
-    else next.delete(stage)
-    return next
-  })
-}
+    const next = new Set(current);
+    if (open) next.add(stage);
+    else next.delete(stage);
+    return next;
+  });
+};
 ```
 
 Render `PipelineStageSection` for each returned stage. Move the Status Select to the first cell in the filter form, Min fit second, Company/title third, and Apply last. Import `PIPELINE_STAGE_ORDER` for both status selects so display order and mutation choices agree.
@@ -557,6 +625,7 @@ git commit -m "feat(web): add collapsible pipeline stage groups"
 ### Task 4: Regression, accessibility, and responsive verification
 
 **Files:**
+
 - Modify only if a verification failure requires a scoped fix.
 
 - [ ] **Step 1: Run all directly affected tests**

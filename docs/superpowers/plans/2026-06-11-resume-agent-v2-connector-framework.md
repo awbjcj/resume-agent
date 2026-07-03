@@ -4,7 +4,7 @@
 
 **Goal:** Replace the LinkedIn-shaped `JobSource` seam with a one-shot `Connector.fetch(search, limit=None) -> list[RawJob]` interface, add cross-source deduplication via a normalized `(company, title)` key, and refactor the existing LinkedIn scraper onto the new seam — so every later connector (Greenhouse, Adzuna, RemoteOK, …) inherits correct source attribution and dedupe for free.
 
-**Architecture:** This is the **backbone plan** (Plan 1 of 6) for v2 — design spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`. It builds three deep modules behind small interfaces: (1) the `Connector` **seam** with `RawJob` as its single output type; (2) a dedup module whose `compute_dedup_key` + extended `find_existing` concentrate *all* cross-source identity logic in the tracking layer (so connectors never re-solve dedupe — the **deletion test**: push this into each connector and the complexity reappears N times); (3) `ingest_jobs`, which concentrates "loop → skip-empty → dedupe → attribute source → count" in one place. LinkedIn becomes the first **adapter** on the seam; Plan 2 adds the second, making it a real seam.
+**Architecture:** This is the **backbone plan** (Plan 1 of 6) for v2 — design spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`. It builds three deep modules behind small interfaces: (1) the `Connector` **seam** with `RawJob` as its single output type; (2) a dedup module whose `compute_dedup_key` + extended `find_existing` concentrate _all_ cross-source identity logic in the tracking layer (so connectors never re-solve dedupe — the **deletion test**: push this into each connector and the complexity reappears N times); (3) `ingest_jobs`, which concentrates "loop → skip-empty → dedupe → attribute source → count" in one place. LinkedIn becomes the first **adapter** on the seam; Plan 2 adds the second, making it a real seam.
 
 **Tech Stack:** Python 3.13, uv, SQLModel/SQLAlchemy, Typer, pytest. **No new dependencies** — reuses the existing `httpx`/Playwright/`beautifulsoup4` stack. (API/feed connectors and their deps arrive in Plan 2.)
 
@@ -18,11 +18,13 @@
 ## Architecture notes (the two lenses)
 
 **Deepening (improve-codebase-architecture):**
+
 - The `Connector` seam has a tiny interface (`name` + `fetch`) hiding arbitrary per-source behavior (HTML scraping, JSON paging, RSS) — high **leverage**.
 - Dedup **locality**: `compute_dedup_key` lives once in `tracking/dedup.py`, consumed by `add_job` (write) and `find_existing` (lookup). A future change to identity rules touches one file.
 - LinkedIn's browser I/O is isolated into two thin seam methods (`_search_html`, `_detail_html`) so `fetch`'s composition logic becomes **testable without a browser** — coverage the v1 driver lacked.
 
 **Restraint (karpathy-guidelines) — what this plan deliberately does NOT build:**
+
 - No connector **registry** / `build_connectors` and no `connectors.yaml` loader yet — they have no consumer until real connectors exist (Plan 2/3). Building them now would be speculative.
 - `RawJob` carries exactly the six fields `add_job` already consumes — no "flexible" extras.
 - `ScrapedCard` is **kept** as LinkedIn's internal pre-JD representation; we don't churn the parser or its fixtures. Every changed line traces to this plan's goal.
@@ -62,12 +64,14 @@ tests/
 ## Task 1: `RawJob` + `Connector` protocol
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/__init__.py`, `src/resume_agent/discovery/connectors/base.py`
 - Test: `tests/test_connectors_base.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_connectors_base.py`:
+
 ```python
 from resume_agent.discovery.connectors.base import Connector, RawJob
 from resume_agent.discovery.search_config import SearchConfig
@@ -106,11 +110,13 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/discovery/connectors/__init__.py`:
+
 ```python
 """Job-source connectors: a one-shot fetch() seam shared by scrapers, APIs, and feeds."""
 ```
 
 Create `src/resume_agent/discovery/connectors/base.py`:
+
 ```python
 from dataclasses import dataclass
 from typing import Protocol
@@ -164,12 +170,14 @@ git commit -m "feat(connectors): RawJob + Connector seam" -m "Co-Authored-By: Cl
 ## Task 2: dedup key (pure normalization)
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/dedup.py`
 - Test: `tests/test_dedup.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_dedup.py`:
+
 ```python
 from resume_agent.tracking.dedup import compute_dedup_key
 
@@ -202,6 +210,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/tracking/dedup.py`:
+
 ```python
 import re
 
@@ -249,12 +258,14 @@ git commit -m "feat(dedup): normalized company+title dedup key" -m "Co-Authored-
 ## Task 3: wire `dedup_key` through the Job model, `find_existing`, and `add_job`
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py` (Job model), `src/resume_agent/tracking/repository.py` (`find_existing`), `src/resume_agent/discovery/ingest.py` (`add_job`)
 - Test: `tests/test_discovery_ingest.py` (append)
 
 - [ ] **Step 1: Write the failing test**
 
 Append to `tests/test_discovery_ingest.py`:
+
 ```python
 def test_add_job_dedupes_same_company_title_across_sources():
     # Same posting from an ATS and an aggregator: different url + jd text, same identity.
@@ -286,6 +297,7 @@ Expected: FAIL on `test_add_job_dedupes_same_company_title_across_sources` — `
 - [ ] **Step 3: Add the column to the Job model**
 
 In `src/resume_agent/tracking/tables.py`, inside `class Job`, add `dedup_key` immediately after the `location` field:
+
 ```python
     location: str | None = None
     dedup_key: str | None = Field(default=None, index=True)
@@ -295,6 +307,7 @@ In `src/resume_agent/tracking/tables.py`, inside `class Job`, add `dedup_key` im
 - [ ] **Step 4: Extend `find_existing` to check the dedup key**
 
 In `src/resume_agent/tracking/repository.py`, replace the whole `find_existing` function with:
+
 ```python
 def find_existing(
     session: Session, url: str | None, jd_text: str, dedup_key: str | None = None
@@ -316,10 +329,13 @@ def find_existing(
 - [ ] **Step 5: Compute and store the key in `add_job`**
 
 In `src/resume_agent/discovery/ingest.py`, add the import and update `add_job`:
+
 ```python
 from resume_agent.tracking.dedup import compute_dedup_key
 ```
+
 Then, inside `add_job`, replace the body from the `jd_text = jd_text.strip()` line through the `Job(...)` construction with:
+
 ```python
     jd_text = jd_text.strip()
     url = _clean(url)
@@ -357,9 +373,10 @@ git commit -m "feat(dedup): cross-source dedupe via Job.dedup_key" -m "Co-Author
 
 ## Task 4: SQLite migration — add + backfill `dedup_key` on existing DBs
 
-> `SQLModel.metadata.create_all` only creates missing *tables*, never missing *columns*. Existing `data/resume_agent.db` files would break on `dedup_key`. This task adds an idempotent column-ensure + backfill and wires it into `init_db` so every run self-heals — without touching the user's tracked applications.
+> `SQLModel.metadata.create_all` only creates missing _tables_, never missing _columns_. Existing `data/resume_agent.db` files would break on `dedup_key`. This task adds an idempotent column-ensure + backfill and wires it into `init_db` so every run self-heals — without touching the user's tracked applications.
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/migrate.py`
 - Modify: `src/resume_agent/db.py`
 - Test: `tests/test_migrate.py`
@@ -367,6 +384,7 @@ git commit -m "feat(dedup): cross-source dedupe via Job.dedup_key" -m "Co-Author
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_migrate.py`:
+
 ```python
 from sqlalchemy import text
 from sqlmodel import create_engine
@@ -413,6 +431,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.
 - [ ] **Step 3: Implement the migration**
 
 Create `src/resume_agent/tracking/migrate.py`:
+
 ```python
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -449,9 +468,11 @@ def ensure_dedup_key_column(engine: Engine) -> None:
 - [ ] **Step 4: Wire it into `init_db`**
 
 In `src/resume_agent/db.py`, add the import and call after `create_all`:
+
 ```python
 from resume_agent.tracking.migrate import ensure_dedup_key_column
 ```
+
 ```python
 def init_db(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
@@ -475,6 +496,7 @@ git commit -m "feat(dedup): idempotent dedup_key column migration + backfill" -m
 ## Task 5: `ingest_jobs` orchestrator + remove `ingest_scraped`/`JobSource`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/ingest.py` (add `ingest_jobs`)
 - Delete: `src/resume_agent/discovery/scraper/ingest.py`, `tests/test_scraper_ingest.py`
 - Test: `tests/test_ingest_jobs.py` (new)
@@ -482,6 +504,7 @@ git commit -m "feat(dedup): idempotent dedup_key column migration + backfill" -m
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_ingest_jobs.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -542,13 +565,16 @@ Expected: FAIL — `ImportError: cannot import name 'ingest_jobs' from 'resume_a
 - [ ] **Step 3: Implement `ingest_jobs`**
 
 In `src/resume_agent/discovery/ingest.py`, add at the top:
+
 ```python
 from collections import Counter
 from typing import Iterable
 
 from resume_agent.discovery.connectors.base import RawJob
 ```
+
 Add at the end of the file:
+
 ```python
 def ingest_jobs(session: Session, raw_jobs: Iterable[RawJob]) -> dict[str, int]:
     """Insert RawJobs through the shared normalize/dedupe path. Returns per-source added counts.
@@ -584,6 +610,7 @@ Expected: PASS (3 tests).
 ```bash
 git rm src/resume_agent/discovery/scraper/ingest.py tests/test_scraper_ingest.py
 ```
+
 (Task 6 removes the last importer — the LinkedIn driver — and Task 7 removes the CLI import. The `scrape` command still references the old import until then, so do NOT run the full suite yet; the per-file runs above are green.)
 
 - [ ] **Step 6: Commit**
@@ -600,12 +627,14 @@ git commit -m "feat(connectors): ingest_jobs orchestrator; drop JobSource/ingest
 > The pure parsers (`parse_search_cards`, `parse_job_detail`) and their fixtures are **unchanged**. Only the driver's outer shape changes: `search()`+`fetch_jd()` → one `fetch()`, with browser I/O isolated behind `_search_html`/`_detail_html` so `fetch`'s composition is unit-testable against the existing HTML fixtures (no browser in CI).
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/scraper/linkedin.py`
 - Test: `tests/test_linkedin_connector.py` (new)
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_linkedin_connector.py`:
+
 ```python
 from pathlib import Path
 
@@ -647,6 +676,7 @@ Expected: FAIL — `AttributeError: 'LinkedInScraper' object has no attribute '_
 - [ ] **Step 3: Rewrite the driver**
 
 Replace the entire contents of `src/resume_agent/discovery/scraper/linkedin.py` with:
+
 ```python
 import time
 import urllib.parse
@@ -771,12 +801,14 @@ git commit -m "refactor(scraper): LinkedIn implements Connector.fetch" -m "Co-Au
 ## Task 7: update the `scrape` CLI command + full suite
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_scrape.py`
 
 - [ ] **Step 1: Rewrite the test**
 
 Replace the entire contents of `tests/test_cli_scrape.py` with:
+
 ```python
 from typer.testing import CliRunner
 
@@ -812,6 +844,7 @@ Expected: FAIL — `ImportError`/`AttributeError` from the still-present `from r
 - [ ] **Step 3: Update the CLI imports**
 
 In `src/resume_agent/cli.py`:
+
 - Delete the line: `from resume_agent.discovery.scraper.ingest import ingest_scraped`
 - Change `from resume_agent.discovery.ingest import add_job` to:
   `from resume_agent.discovery.ingest import add_job, ingest_jobs`
@@ -821,6 +854,7 @@ In `src/resume_agent/cli.py`:
 - [ ] **Step 4: Update the `scrape` command**
 
 In `src/resume_agent/cli.py`, replace the body of `scrape_cmd` with:
+
 ```python
     """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""
     config = load_search_config(search)
@@ -857,11 +891,12 @@ git commit -m "feat(connectors): scrape runs via Connector.fetch + ingest_jobs" 
 ## Self-Review (completed during plan authoring)
 
 **Spec coverage (§5.1, §5.3, Decisions #2/#4):**
+
 - One-shot `Connector.fetch(search, limit=None) -> list[RawJob]` with `RawJob.source` — Task 1 (fixes the v1 `source="linkedin"` hardcode, regression-tested in Task 5).
 - `ingest_jobs` replacing `ingest_scraped` — Task 5.
 - Dedup: `dedup_key` + `normalize` + extended `find_existing` + backfill — Tasks 2–4. Canonical-copy-via-ordering is asserted by `test_ingest_jobs_dedupes_same_posting_across_sources` (Task 5).
 - LinkedIn refactored onto the seam, parsers/fixtures untouched — Task 6.
-- **Deliberately deferred to Plan 2/3 (documented in Architecture notes):** `connectors.yaml` loader + `build_connectors` registry. No spec requirement for *this* plan is left unimplemented.
+- **Deliberately deferred to Plan 2/3 (documented in Architecture notes):** `connectors.yaml` loader + `build_connectors` registry. No spec requirement for _this_ plan is left unimplemented.
 
 **Placeholder scan:** none — every code step shows complete code; every run step shows the exact command + expected result. Task 5 Step 5 is a real `git rm`, not a placeholder.
 
@@ -875,11 +910,11 @@ git commit -m "feat(connectors): scrape runs via Connector.fetch + ingest_jobs" 
 
 Per the spec's build sequence (§10), each is its own plan file, same TDD style. The spine is strict; the leaves are independent.
 
-2. **Reference connectors** — `connectors.yaml` + `ConnectorsConfig`, `build_connectors` registry, and **Greenhouse + Adzuna + RemoteOK** connectors (each a pure JSON→`RawJob` mapper over saved fixtures, no network in CI). *Depends on Plan 1.*
-3. **`pull` + `sources`** — ordered multi-connector run (ATS→feeds→aggregator→LinkedIn), per-source count table, connector telemetry/health. `scrape` becomes a thin LinkedIn-only alias. *Depends on Plan 2.*
-4. **Cover letters** — `CoverLetterContent`, fact-locked draft + light review, `cover_letter.typ`, `cover_letters` table, `cover-letter` command. *Depends on Plan 1 only.*
-5. **Gmail auto-status** — read-only Gmail client, email→application matching, rules+cheap-LLM classification, `sync-status` proposing transitions. *Depends on v1 tracking only.*
-6. **Application analytics** — dashboard page: response/interview/offer rates by source and fit-score band. *Depends on v1 tracking only.*
+1. **Reference connectors** — `connectors.yaml` + `ConnectorsConfig`, `build_connectors` registry, and **Greenhouse + Adzuna + RemoteOK** connectors (each a pure JSON→`RawJob` mapper over saved fixtures, no network in CI). _Depends on Plan 1._
+2. **`pull` + `sources`** — ordered multi-connector run (ATS→feeds→aggregator→LinkedIn), per-source count table, connector telemetry/health. `scrape` becomes a thin LinkedIn-only alias. _Depends on Plan 2._
+3. **Cover letters** — `CoverLetterContent`, fact-locked draft + light review, `cover_letter.typ`, `cover_letters` table, `cover-letter` command. _Depends on Plan 1 only._
+4. **Gmail auto-status** — read-only Gmail client, email→application matching, rules+cheap-LLM classification, `sync-status` proposing transitions. _Depends on v1 tracking only._
+5. **Application analytics** — dashboard page: response/interview/offer rates by source and fit-score band. _Depends on v1 tracking only._
 
 ---
 

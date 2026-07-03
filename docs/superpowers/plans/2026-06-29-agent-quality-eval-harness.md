@@ -27,12 +27,14 @@
 ### Task 1: Package scaffold + case schema & loader
 
 **Files:**
+
 - Create: `evals/__init__.py`
 - Create: `evals/schema.py`
 - Create: `tests/eval/__init__.py`
 - Test: `tests/eval/test_schema.py`
 
 **Interfaces:**
+
 - Produces:
   - `Trap(BaseModel)` fields: `id: str`, `kind: TrapKind`, `forbidden_terms: list[str]`, `description: str`, `probe_claim: str`, `probe_provenance: str`
   - `EvalCase(BaseModel)` fields: `id: str`, `profile_ref: str`, `jd_text: str`, `criteria: JobCriteria | None = None`, `traps: list[Trap]`, `must_cite: list[str]`, `rubric: list[str]`
@@ -211,10 +213,12 @@ git commit -m "Adds eval case schema and loader"
 ### Task 2: Resume text scanner + trap detection
 
 **Files:**
+
 - Create: `evals/textscan.py`
 - Test: `tests/eval/test_textscan.py`
 
 **Interfaces:**
+
 - Consumes: `Trap` (Task 1), `ResumeContent` (`resume_agent.models.resume`)
 - Produces:
   - `resume_text(content: ResumeContent) -> str` — generated claim-bearing text (summary, roles, bullets, projects, skills, publications, certifications, awards, volunteer), space-joined and Unicode-normalized; intentionally excludes verbatim contact/education/language fields
@@ -349,10 +353,12 @@ git commit -m "Adds resume text scanner and trap-term detection"
 ### Task 3: Deterministic per-case checks
 
 **Files:**
+
 - Create: `evals/metrics.py`
 - Test: `tests/eval/test_metrics_deterministic.py`
 
 **Interfaces:**
+
 - Consumes: `trap_terms_hit` (Task 2); `Trap` (Task 1); `LengthBudget`; `check_provenance`, `referenced_ids`; `ResumeContent`, `ProfileFacts`
 - Produces:
   - `trap_avoided(content: ResumeContent, traps: list[Trap]) -> bool`
@@ -495,10 +501,12 @@ git commit -m "Adds deterministic per-case eval checks"
 ### Task 4: Meta-metrics (trap recall, correlation, convergence)
 
 **Files:**
+
 - Modify: `evals/metrics.py` (append)
 - Test: `tests/eval/test_metrics_meta.py`
 
 **Interfaces:**
+
 - Consumes: `ResumeContent`, `ReviewCritique`
 - Produces:
   - `RoundRecord` dataclass: `round_num: int`, `content: ResumeContent`, `aggregate_score: int | None`, `critiques: list[ReviewCritique]`; use `None` when provenance skipped the scored panel
@@ -637,10 +645,12 @@ git commit -m "Adds meta-metrics: trap recall, correlation, convergence"
 ### Task 5: The quality judge (schema, input, agent)
 
 **Files:**
+
 - Create: `evals/judge.py`
 - Test: `tests/eval/test_judge.py`
 
 **Interfaces:**
+
 - Consumes: `ResumeContent`; `AgentRunner`, `build_model`, `use_json_mode_for`, `retry_kwargs`; `model_for_tier`; `Runner`
 - Produces:
   - `DimensionScore(BaseModel)`: `dimension: str`, `score: int` (0–100), `rationale: str`
@@ -793,10 +803,12 @@ git commit -m "Adds profile-blind quality judge agent"
 ### Task 5A: Eval-only Agno usage collector
 
 **Files:**
+
 - Create: `evals/usage.py`
 - Test: `tests/eval/test_usage.py`
 
 **Interfaces:**
+
 - frozen `UsageTotals`: calls, failed calls, metrics-bearing calls, input/output/total/cache tokens, and duration default to zero; `cost: float | None` defaults to `None`
 - `UsageCollector.observe(result)`: accumulates `result.metrics` when present
 - `UsageCollector.snapshot() -> UsageTotals`: returns an immutable per-case snapshot for `CaseResult`
@@ -815,10 +827,12 @@ This decorator is the observation seam: wrap the existing bundle, judge, and opt
 ### Task 6: Case runner (orchestrates loop + probes + checks + judge)
 
 **Files:**
+
 - Create: `evals/runner.py`
 - Test: `tests/eval/test_runner.py`
 
 **Interfaces:**
+
 - Consumes: `ProbeRecord`, `RoundRecord`, deterministic checks (Tasks 3–4); `JudgeVerdict`, `compose_judge_input` (Task 5); `MeteredRunner`, `UsageCollector`, `UsageTotals` (Task 5A); `EvalCase` (Task 1); `run_tailor_review`; fact-check panel input helpers; `TailorBundle`; `ReviewConfig`; optional criteria extractor; `ProfileFacts`
 - Produces:
   - `CaseResult` dataclass: `case_id`, JD, resolved criteria, rubric, traps, all rounds and deterministic/judge fields, plus `probes: list[ProbeRecord]` and `usage: UsageTotals`
@@ -1123,10 +1137,12 @@ git commit -m "Adds case runner orchestrating loop, checks, and judge"
 ### Task 7: Report renderer
 
 **Files:**
+
 - Create: `evals/report.py`
 - Test: `tests/eval/test_report.py`
 
 **Interfaces:**
+
 - Consumes: `CaseResult` (Task 6); `RoundRecord`, `correlation`, `fact_check_trap_recall`, `convergence` (Task 4); `ReviewConfig`
 - Produces:
   - `render_report(results: list[CaseResult], config: ReviewConfig, *, metadata: dict[str, str] | None = None, failures: list[str] | None = None) -> str` — markdown containing per-case quality/deterministic/convergence/usage fields, aggregate quality and usage, controlled-probe fact-check recall, per-reviewer `panel_agreement`, failures, and a justified **"Weakest reviewer:"** callout. When a metric lacks enough observations, print `insufficient data` and do not rank it.
@@ -1310,11 +1326,13 @@ git commit -m "Adds eval report renderer with weakest-reviewer callout"
 ### Task 8: CLI entry + Make target + lint scope
 
 **Files:**
+
 - Create: `evals/run_eval.py`
 - Modify: `Makefile` (add `eval` target; add `evals` to `lint-py`)
 - Test: `tests/eval/test_run_eval_cli.py`
 
 **Interfaces:**
+
 - Consumes: `load_cases`, `load_profile`; `run_case`; `render_report`; tailor/reviewer/reviser builders; criteria extractor; `load_review_config`; `load_style_guide`
 - Produces:
   - `build_argparser() -> argparse.ArgumentParser`
@@ -1530,20 +1548,20 @@ In `Makefile`, change the `lint-py` recipe from `$(UV) run ruff check src tests`
 
 ```makefile
 lint-py:
-	$(UV) run ruff check src tests evals
+ $(UV) run ruff check src tests evals
 ```
 
-Add to `.PHONY` line: append ` eval`. Add this target after `verify`:
+Add to `.PHONY` line: append `eval`. Add this target after `verify`:
 
 ```makefile
 eval:
-	$(UV) run python -m evals.run_eval
+ $(UV) run python -m evals.run_eval
 ```
 
 Add a help line under the `verify` echo:
 
 ```makefile
-	@echo "  make eval           Run the live resume-quality evals (needs an API key)"
+ @echo "  make eval           Run the live resume-quality evals (needs an API key)"
 ```
 
 - [ ] **Step 6: Verify lint + offline suite are clean**
@@ -1563,6 +1581,7 @@ git commit -m "Adds eval CLI entry, make target, and lint scope"
 ### Task 9: Seed adversarial cases + profiles + calibration doc
 
 **Files:**
+
 - Create: `evals/profiles/backend_eng.json` (a real `ProfileFacts`)
 - Create: `evals/cases/case_01_missing_skill.json` … `case_08_*.json` (8 cases, ~2 per trap kind)
 - Create: `evals/CALIBRATION.md`
@@ -1570,6 +1589,7 @@ git commit -m "Adds eval CLI entry, make target, and lint scope"
 - Test: `tests/eval/test_seed_cases.py`
 
 **Interfaces:**
+
 - Consumes: `load_cases`, `load_profile` (Task 1); `index_facts` (`tailor/provenance.py`)
 - Produces: validated seed data. The test is the deliverable's gate.
 
@@ -1626,27 +1646,62 @@ Create `evals/profiles/backend_eng.json` — a real `ProfileFacts` with stable i
 
 ```json
 {
-  "contact": {"name": "Jordan Rivera", "email": "jordan@example.com"},
+  "contact": { "name": "Jordan Rivera", "email": "jordan@example.com" },
   "summary": "Backend engineer with 6 years building Python REST services.",
   "experience": [
-    {"id": "e1", "company": "Acme Payments", "title": "Software Engineer",
-     "start": "2021", "end": "2025",
-     "bullets": [
-       {"id": "e1b1", "text": "Built and operated Python FastAPI services handling 2k requests/sec."},
-       {"id": "e1b2", "text": "Designed PostgreSQL schemas and tuned slow queries."},
-       {"id": "e1b3", "text": "Added CI with GitHub Actions and pytest coverage gates."}
-     ]},
-    {"id": "e2", "company": "Bluefin Labs", "title": "Junior Developer",
-     "start": "2019", "end": "2021",
-     "bullets": [
-       {"id": "e2b1", "text": "Maintained a Django monolith and wrote integration tests."}
-     ]}
+    {
+      "id": "e1",
+      "company": "Acme Payments",
+      "title": "Software Engineer",
+      "start": "2021",
+      "end": "2025",
+      "bullets": [
+        {
+          "id": "e1b1",
+          "text": "Built and operated Python FastAPI services handling 2k requests/sec."
+        },
+        {
+          "id": "e1b2",
+          "text": "Designed PostgreSQL schemas and tuned slow queries."
+        },
+        {
+          "id": "e1b3",
+          "text": "Added CI with GitHub Actions and pytest coverage gates."
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "company": "Bluefin Labs",
+      "title": "Junior Developer",
+      "start": "2019",
+      "end": "2021",
+      "bullets": [
+        {
+          "id": "e2b1",
+          "text": "Maintained a Django monolith and wrote integration tests."
+        }
+      ]
+    }
   ],
   "skills": {
-    "languages": [{"id": "s_py", "name": "Python"}, {"id": "s_sql", "name": "SQL"}],
-    "frameworks": [{"id": "s_fastapi", "name": "FastAPI"}, {"id": "s_django", "name": "Django"}]
+    "languages": [
+      { "id": "s_py", "name": "Python" },
+      { "id": "s_sql", "name": "SQL" }
+    ],
+    "frameworks": [
+      { "id": "s_fastapi", "name": "FastAPI" },
+      { "id": "s_django", "name": "Django" }
+    ]
   },
-  "education": [{"id": "ed1", "institution": "State University", "degree": "BS Computer Science", "end": "2019"}]
+  "education": [
+    {
+      "id": "ed1",
+      "institution": "State University",
+      "degree": "BS Computer Science",
+      "end": "2019"
+    }
+  ]
 }
 ```
 
@@ -1671,7 +1726,13 @@ Each case names `backend_eng` as `profile_ref`, embeds realistic `JobCriteria` c
     {
       "id": "missing-k8s-go",
       "kind": "missing_skill",
-      "forbidden_terms": ["Kubernetes", "k8s", "Istio", "Golang", "Go programming"],
+      "forbidden_terms": [
+        "Kubernetes",
+        "k8s",
+        "Istio",
+        "Golang",
+        "Go programming"
+      ],
       "description": "Profile has no Kubernetes, service mesh, or Go experience.",
       "probe_claim": "Built Golang services on Kubernetes with Istio.",
       "probe_provenance": "e1b1"
@@ -1683,6 +1744,7 @@ Each case names `backend_eng` as `profile_ref`, embeds realistic `JobCriteria` c
 ```
 
 Author the remaining seven analogously:
+
 - `case_02_adjacent_skill` — JD wants Flask; profile has FastAPI/Django. forbidden_terms `["Flask"]`.
 - `case_03_inflatable_metric` — JD stresses scale; profile says "2k requests/sec". forbidden_terms `["million requests", "100k requests/sec"]`.
 - `case_04_seniority_inflation` — JD wants "Engineering Manager / led team of 10". forbidden_terms `["managed a team", "engineering manager", "led a team of"]`.
@@ -1703,6 +1765,7 @@ Create `evals/CALIBRATION.md`:
 The live eval judge (`evals/judge.py`) is trusted only after a one-time human anchor.
 
 ## Procedure
+
 1. Run `make eval` once with a real API key and retain its timestamped JSON artifact.
 2. Pick ~5 cases from that artifact. For each, read the final resume, JD, and rubric and rate `output_quality` 0–100
    (blind to profile facts, traps, panel scores, and the judge's score).
@@ -1710,11 +1773,12 @@ The live eval judge (`evals/judge.py`) is trusted only after a one-time human an
 4. Re-run this anchor whenever the judge prompt or model changes.
 
 ## Record
-| date | judge model | prompt sha256 | case | human | judge | abs error |
-| --- | --- | --- | --- | --- | --- | --- |
-| _TBD_ | | | | | | |
 
-**MAE:** _TBD_  ·  **Trusted:** _no (not yet anchored)_
+| date  | judge model | prompt sha256 | case | human | judge | abs error |
+| ----- | ----------- | ------------- | ---- | ----- | ----- | --------- |
+| _TBD_ |             |               |      |       |       |           |
+
+**MAE:** _TBD_ · **Trusted:** _no (not yet anchored)_
 ```
 
 Create an empty `evals/reports/.gitkeep`.
@@ -1741,10 +1805,11 @@ git commit -m "Adds 8 adversarial seed cases, profile, and calibration doc"
 ## Self-Review
 
 **Spec coverage:**
+
 - §4.1 two-tier — Tasks 1–9 plus 5A are the live package; `tests/eval/*` are offline. ✓
 - §4.2 layout — schema T1, scanner T2, metrics T3/T4, judge T5, usage T5A, runner T6, report T7, CLI T8, cases/calibration T9. ✓
-- §4.3 case schema — T1. ✓  §4.4 deterministic signals — T3; controlled probes/meta-metrics — T4/T6; judge — T5; usage — T5A. ✓
-- §4.5 calibration — T9 (`CALIBRATION.md`). ✓  §4.6 offline scope — every logic module has a faked unit test. ✓
+- §4.3 case schema — T1. ✓ §4.4 deterministic signals — T3; controlled probes/meta-metrics — T4/T6; judge — T5; usage — T5A. ✓
+- §4.5 calibration — T9 (`CALIBRATION.md`). ✓ §4.6 offline scope — every logic module has a faked unit test. ✓
 - §4.7 CLI/flow — T8 implements model override, live extraction, style-guide parity, timestamped/partial reports, metadata, and failure continuation. ✓
 - §4.8 leanings — realistic embedded criteria by default; Agno metrics captured now; eight seeds. ✓
 - §6 success criteria — report includes every required signal and only ranks reviewers with sufficient data; no task changes `src/resume_agent/tailor/`. ✓

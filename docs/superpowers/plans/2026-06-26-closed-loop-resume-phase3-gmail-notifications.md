@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- **Inbound only, human-gated.** Classification can misfire; notifications are *proposed*, never auto-applied. Accept is an explicit user action.
+- **Inbound only, human-gated.** Classification can misfire; notifications are _proposed_, never auto-applied. Accept is an explicit user action.
 - **Idempotent sync.** Re-syncing the same inbox must not duplicate a proposal or resurrect a dismissed one — upsert keyed on `(application_id, message_id)`.
 - **Tests are offline.** No Gmail network. Fake `fetch_recent_messages`/`classify`; build `EmailMessage` fixtures. Run: `.venv/Scripts/python.exe -m pytest`.
 - **Wire format is camelCase** via `CamelModel`. Regenerate contracts (`bash scripts/gen_ts_client.sh`); `tests/api/test_openapi_contract.py` is the drift gate.
@@ -22,10 +22,12 @@
 ### Task 1: Surface `message_id` on `EmailMessage`
 
 **Files:**
+
 - Modify: `src/resume_agent/gmail/client.py:9-17` (`EmailMessage`), `:54-78` (`fetch_recent_messages`)
 - Test: `tests/test_gmail_client.py` (append; create if absent)
 
 **Interfaces:**
+
 - Produces: `EmailMessage.message_id: str | None` populated from the Gmail `ref["id"]`.
 
 - [ ] **Step 1: Write the failing test**
@@ -109,10 +111,12 @@ git commit -m "feat: surface Gmail message_id on EmailMessage"
 ### Task 2: `Notification` table
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py` (add `Notification` at end)
 - Test: `tests/test_tracking_repository.py` (append)
 
 **Interfaces:**
+
 - Produces: `Notification(id, application_id, kind, proposed_status, evidence, message_id, state, created_at)` with `state` default `"pending"`. Created via `SQLModel.metadata.create_all` (new table — no ALTER migration needed).
 
 - [ ] **Step 1: Write the failing test**
@@ -172,10 +176,12 @@ git commit -m "feat: Notification table for Gmail-derived proposals"
 ### Task 3: Carry `message_id` on `Proposal`
 
 **Files:**
+
 - Modify: `src/resume_agent/gmail/propose.py:16-23` (`Proposal`), `:33-59` (`propose_transitions`)
 - Test: `tests/test_gmail_propose.py` (append; mirror existing propose tests)
 
 **Interfaces:**
+
 - Produces: `Proposal.message_id: str` carried from the matching email, so the sync upsert has its dedup key.
 
 - [ ] **Step 1: Write the failing test**
@@ -234,11 +240,13 @@ git commit -m "feat: carry message_id on gmail Proposal"
 ### Task 4: Notifications service (sync upsert + accept + dismiss + list)
 
 **Files:**
+
 - Create: `src/resume_agent/services/notifications.py`
 - Modify: `src/resume_agent/tracking/repository.py` (add `notification_by_key`, `pending_notifications`, `save_notification`, `get_notification`)
 - Test: `tests/test_services_notifications.py`
 
 **Interfaces:**
+
 - Consumes: `application_job_pairs`, `propose_transitions`, `classify_email`, `update_application_status`.
 - Produces:
   - `sync_notifications(session, emails, *, classify=classify_email) -> list[Notification]` — upsert by `(application_id, message_id)`; returns all pending after sync.
@@ -419,6 +427,7 @@ git commit -m "feat: notifications service with idempotent gmail sync, accept, d
 ### Task 5: API — notifications schemas, list/accept/dismiss router, Gmail-sync Run
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/notifications.py`
 - Create: `src/resume_agent/api/routers/notifications.py`
 - Modify: `src/resume_agent/api/routers/runs.py` (add `launch_gmail_sync`)
@@ -426,6 +435,7 @@ git commit -m "feat: notifications service with idempotent gmail sync, accept, d
 - Test: `tests/api/test_notifications.py`
 
 **Interfaces:**
+
 - Consumes: `list_pending`, `accept_notification`, `dismiss_notification` (Task 4); `build_gmail_service`, `fetch_recent_messages`, `sync_notifications`.
 - Produces:
   - `NotificationOut{id, application_id, kind, proposed_status, evidence, message_id, state, created_at}`.
@@ -575,6 +585,7 @@ git commit -m "feat: notifications API + gmail-sync run endpoint"
 ### Task 6: Regenerate API contracts
 
 **Files:**
+
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts`
 - Verify: `tests/api/test_openapi_contract.py`
 
@@ -599,10 +610,12 @@ git commit -m "chore: regenerate contracts for notifications endpoints"
 ### Task 7: Frontend — notifications hooks
 
 **Files:**
+
 - Create: `web/src/features/notifications/use-notifications.ts`
 - Test: `web/src/features/notifications/use-notifications.test.tsx`
 
 **Interfaces:**
+
 - Produces: `useNotifications()` (query `GET /api/notifications`, key `["notifications"]`), `useAcceptNotification()`, `useDismissNotification()`, `useGmailSync()` (POST `/api/gmail/sync`) — accept/dismiss/sync invalidate `["notifications"]`.
 
 - [ ] **Step 1: Write the failing test**
@@ -619,14 +632,17 @@ Expected: FAIL (no module).
 ```ts
 // web/src/features/notifications/use-notifications.ts
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api/client";  // match the real helper names
+import { apiGet, apiPost } from "@/lib/api/client"; // match the real helper names
 import type { components } from "@/lib/api/schema";
 
 type Notification = components["schemas"]["NotificationOut"];
 const KEY = ["notifications"];
 
 export function useNotifications() {
-  return useQuery<Notification[]>({ queryKey: KEY, queryFn: () => apiGet("/api/notifications") });
+  return useQuery<Notification[]>({
+    queryKey: KEY,
+    queryFn: () => apiGet("/api/notifications"),
+  });
 }
 
 export function useAcceptNotification() {
@@ -673,11 +689,13 @@ git commit -m "feat: notifications query + mutation hooks"
 ### Task 8: Frontend — notifications bell + inbox
 
 **Files:**
+
 - Create: `web/src/features/notifications/NotificationsBell.tsx`
 - Modify: `web/src/app/AppLayout.tsx` (mount the bell in the header)
 - Test: `web/src/features/notifications/NotificationsBell.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useNotifications`, `useAcceptNotification`, `useDismissNotification`, `useGmailSync` (Task 7).
 - Produces: a header control showing a pending-count badge; opening it lists each pending notification with its `evidence` + proposed transition and Accept / Dismiss buttons, plus a "Sync Gmail" button.
 
@@ -691,7 +709,7 @@ import { NotificationsBell } from "./NotificationsBell";
 // return one pending item (or mock the fetch layer the other tests use).
 
 it("shows the pending count badge", async () => {
-  renderWithClient(<NotificationsBell />);  // with one mocked pending notification
+  renderWithClient(<NotificationsBell />); // with one mocked pending notification
   expect(await screen.findByText("1")).toBeInTheDocument();
 });
 ```
@@ -706,11 +724,16 @@ Expected: FAIL (no module).
 ```tsx
 // web/src/features/notifications/NotificationsBell.tsx
 import {
-  Popover, PopoverContent, PopoverTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import {
-  useAcceptNotification, useDismissNotification, useGmailSync, useNotifications,
+  useAcceptNotification,
+  useDismissNotification,
+  useGmailSync,
+  useNotifications,
 } from "./use-notifications";
 
 export function NotificationsBell() {
@@ -722,19 +745,32 @@ export function NotificationsBell() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative" aria-label="Notifications">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="relative"
+          aria-label="Notifications"
+        >
           🔔
           {items.length > 0 && (
-            <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 text-xs
-              font-semibold text-primary-foreground">{items.length}</span>
+            <span
+              className="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 text-xs
+              font-semibold text-primary-foreground"
+            >
+              {items.length}
+            </span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-96">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-semibold">Notifications</span>
-          <Button size="sm" variant="outline" disabled={sync.isPending}
-            onClick={() => sync.mutate()}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={sync.isPending}
+            onClick={() => sync.mutate()}
+          >
             {sync.isPending ? "Syncing…" : "Sync Gmail"}
           </Button>
         </div>
@@ -747,8 +783,14 @@ export function NotificationsBell() {
               <div className="font-medium">→ {n.proposedStatus}</div>
               <div className="text-xs text-muted-foreground">{n.evidence}</div>
               <div className="mt-2 flex gap-2">
-                <Button size="sm" onClick={() => accept.mutate(n.id)}>Accept</Button>
-                <Button size="sm" variant="ghost" onClick={() => dismiss.mutate(n.id)}>
+                <Button size="sm" onClick={() => accept.mutate(n.id)}>
+                  Accept
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => dismiss.mutate(n.id)}
+                >
                   Dismiss
                 </Button>
               </div>
@@ -802,6 +844,7 @@ git add -A && git commit -m "chore: phase-3 notifications verification"
 ## Self-Review
 
 **Spec coverage (Phase 3):**
+
 - Sync as Run + SSE → Task 5 (`launch_gmail_sync`, kind `gmailSync`). ✓
 - `Notification` table `{application_id, kind, proposed_status, evidence, message_id, state, created_at}` → Task 2. ✓
 - Idempotent upsert on `(application_id, message_id)` → Task 4 (`test_sync_creates_pending_and_is_idempotent`, `notification_by_key`). ✓

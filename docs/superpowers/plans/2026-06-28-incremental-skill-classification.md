@@ -99,11 +99,11 @@ Keep orchestration helpers private. Tests exercise pure projectors directly only
 where an invariant cannot be observed safely through the public interface.
 
 - [ ] Add validation tests for configuration and direct `batch_size=0` /
-  `concurrency=0` calls.
+      `concurrency=0` calls.
 - [ ] Add frozen data contracts and a placeholder `classify_incrementally` that
-  raises `NotImplementedError`.
+      raises `NotImplementedError`.
 - [ ] Avoid a new classifier protocol: `Runner` already has production and fake
-  adapters and is the real seam.
+      adapters and is the real seam.
 
 Run:
 
@@ -142,7 +142,7 @@ def build_incremental_themer_agent() -> Runner: ...
 Canonical input:
 
 ```json
-{"new": ["k8s"], "existingCanonicals": ["kubernetes"]}
+{ "new": ["k8s"], "existingCanonicals": ["kubernetes"] }
 ```
 
 Theme input:
@@ -151,7 +151,7 @@ Theme input:
 {
   "new": ["kubernetes"],
   "existingThemes": [
-    {"id": "cloud-infra", "label": "Cloud / Infrastructure", "skills": []}
+    { "id": "cloud-infra", "label": "Cloud / Infrastructure", "skills": [] }
   ]
 }
 ```
@@ -169,9 +169,9 @@ Prompt contracts:
   repository's configured retry policy.
 
 - [ ] Test premium/mid model selection, output schemas, JSON-mode selection, and
-  retry configuration with faked model construction.
+      retry configuration with faked model construction.
 - [ ] Add prompt snapshot/assertion tests for the discriminated theme intent and
-  existing IDs.
+      existing IDs.
 - [ ] Implement builders using the existing `AgentRunner` adapter.
 
 Run:
@@ -286,13 +286,13 @@ Reconcile:
 - rewrite each successful alias through the head map.
 
 - [ ] Test fold to existing canonical, new-token synonym cluster, omission,
-  invention, duplicate assignment, multiple existing canonicals, and existing
-  canonical not first.
+      invention, duplicate assignment, multiple existing canonicals, and existing
+      canonical not first.
 - [ ] Test one failed batch leaves its tokens absent while siblings remain.
 - [ ] Test reconcile merges cross-batch synonyms.
 - [ ] Test reconcile failure raises and exposes no outcome.
 - [ ] Test semaphore maximum with an active-counter fake (`<= concurrency` and
-  `> 1` when multiple delayed batches exist).
+      `> 1` when multiple delayed batches exist).
 - [ ] Test `acall` release observation after both success and runner exception.
 
 Run:
@@ -351,14 +351,14 @@ Do not call `reporter.done` inside this module.
 
 - [ ] Test a pre-existing unthemed canonical is themed on a warm alias path.
 - [ ] Test a failed theme batch leaves `theme_of` absent and succeeds on the next
-  invocation.
+      invocation.
 - [ ] Test malformed theme intent affects only authoritative tokens in that batch.
 - [ ] Test existing ID reuse and new-label collision allocation.
 - [ ] Test progress totals with alias count != theme count.
 - [ ] Test warm path has zero runner calls and one short local phase.
 - [ ] Test cancellation during fan-out and before outcome return.
 - [ ] Populate `ClassificationMetrics` from monotonic timing, prompt byte counts,
-  batch counts, and observed in-flight maximum.
+      batch counts, and observed in-flight maximum.
 
 Run:
 
@@ -437,7 +437,7 @@ tests to the correct module.
 - [ ] Keep the concurrent refresh serialization test.
 - [ ] Test summary fields and JSON serialization.
 - [ ] Remove terminal `reporter.done` calls; manager completion writes terminal
-  state exactly once.
+      state exactly once.
 
 Run:
 
@@ -468,10 +468,10 @@ run_id = mgr.submit(
 - [ ] Update endpoint fakes to implement async `arun` and the new schemas.
 - [ ] Test successful result summary.
 - [ ] Test two immediate POSTs return the same active `runId` and execute one
-  classification operation.
+      classification operation.
 - [ ] Test a later POST after terminal completion gets a new `runId`.
 - [ ] Test partial batch failures produce a done run with nonzero failure counts,
-  while reconcile failure produces an error run and preserves the file.
+      while reconcile failure produces an error run and preserves the file.
 
 Run:
 
@@ -493,23 +493,23 @@ Do not change indexes, cache data, or cap existing context without measurement.
   credentials are available outside CI.
 
 - [ ] Offline fake-runner scenario: 240 new tokens, batch size 60, concurrency 4.
-  Assert 4 canonical batches, max in-flight 4, bounded prompt bytes, and expected
-  theme batch count from the fake output.
+      Assert 4 canonical batches, max in-flight 4, bounded prompt bytes, and expected
+      theme batch count from the fake output.
 - [ ] Warm scenario: same demanded set and complete map. Assert zero model calls and
-  prompt bytes 0.
+      prompt bytes 0.
 - [ ] Growth scenario: hold delta fixed and increase existing context; assert the
-  metric exposes linear prompt-byte growth. This is a guard/measurement, not an
-  optimization.
+      metric exposes linear prompt-byte growth. This is a guard/measurement, not an
+      optimization.
 - [ ] Run a representative real-model calibration when credentials are available:
 
-| Scenario | Tokens | Existing canonicals | Batch size | Concurrency | Calls | Prompt bytes | Wall time | Longest visible phase |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Before, cold | | | monolith | 1 | | | | |
-| After, cold | | | 60 | configured | | | | |
-| After, warm | | | 60 | configured | 0 | 0 | | |
+| Scenario     | Tokens | Existing canonicals | Batch size | Concurrency | Calls | Prompt bytes | Wall time | Longest visible phase |
+| ------------ | -----: | ------------------: | ---------: | ----------: | ----: | -----------: | --------: | --------------------: |
+| Before, cold |        |                     |   monolith |           1 |       |              |           |                       |
+| After, cold  |        |                     |         60 |  configured |       |              |           |                       |
+| After, warm  |        |                     |         60 |  configured |     0 |            0 |           |                       |
 
 - [ ] Keep `cluster_batch_size=60` unless measurements show a better latency/cost
-  tradeoff. Record any change and its evidence.
+      tradeoff. Record any change and its evidence.
 - [ ] Verify the complete backend suite:
 
 ```powershell

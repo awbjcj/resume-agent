@@ -17,30 +17,31 @@
 
 ## File Structure
 
-| File | Responsibility | Action |
-|---|---|---|
-| `src/resume_agent/models/job.py` | `JobCriteria` + new `Seniority`/`EmploymentType` enums + 5 fields | Modify |
-| `src/resume_agent/discovery/extract.py` | Extract-agent instructions cover new fields | Modify |
-| `src/resume_agent/tracking/tables.py` | `Job.posted_at` column | Modify |
-| `src/resume_agent/tracking/migrate.py` | `ensure_posted_at_column` (idempotent ALTER) | Modify |
-| `src/resume_agent/db.py` | Call the new migration in `init_db` | Modify |
-| `src/resume_agent/discovery/connectors/base.py` | `RawJob.posted_at` | Modify |
-| `src/resume_agent/discovery/connectors/dates.py` | `parse_iso_datetime` pure helper | Create |
-| `src/resume_agent/discovery/connectors/{greenhouse,remoteok,adzuna}.py` | Populate `RawJob.posted_at` | Modify |
-| `src/resume_agent/discovery/ingest.py` | Thread `posted_at` into `Job` | Modify |
-| `src/resume_agent/discovery/pipeline.py` | `reextract` over post-raw jobs | Modify |
-| `src/resume_agent/cli.py` | `discover --reextract` flag | Modify |
-| `src/resume_agent/tracking/queries.py` | Widen `ShortlistRow`/`PipelineRow`, `SkillTag`, coverage tagging | Modify |
-| `src/resume_agent/dashboard/filtering.py` | `FilterState`, filter/sort/composite/cloud — pure | Create |
-| `src/resume_agent/dashboard/ui.py` | `skill_chip`, `meta_line`, control-desk + chip CSS | Modify |
-| `src/resume_agent/dashboard/pages.py` | Shortlist control desk + rich cards; Pipeline meta line | Modify |
-| `tests/...` | One test file per module above | Create/Modify |
+| File                                                                    | Responsibility                                                    | Action        |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------- |
+| `src/resume_agent/models/job.py`                                        | `JobCriteria` + new `Seniority`/`EmploymentType` enums + 5 fields | Modify        |
+| `src/resume_agent/discovery/extract.py`                                 | Extract-agent instructions cover new fields                       | Modify        |
+| `src/resume_agent/tracking/tables.py`                                   | `Job.posted_at` column                                            | Modify        |
+| `src/resume_agent/tracking/migrate.py`                                  | `ensure_posted_at_column` (idempotent ALTER)                      | Modify        |
+| `src/resume_agent/db.py`                                                | Call the new migration in `init_db`                               | Modify        |
+| `src/resume_agent/discovery/connectors/base.py`                         | `RawJob.posted_at`                                                | Modify        |
+| `src/resume_agent/discovery/connectors/dates.py`                        | `parse_iso_datetime` pure helper                                  | Create        |
+| `src/resume_agent/discovery/connectors/{greenhouse,remoteok,adzuna}.py` | Populate `RawJob.posted_at`                                       | Modify        |
+| `src/resume_agent/discovery/ingest.py`                                  | Thread `posted_at` into `Job`                                     | Modify        |
+| `src/resume_agent/discovery/pipeline.py`                                | `reextract` over post-raw jobs                                    | Modify        |
+| `src/resume_agent/cli.py`                                               | `discover --reextract` flag                                       | Modify        |
+| `src/resume_agent/tracking/queries.py`                                  | Widen `ShortlistRow`/`PipelineRow`, `SkillTag`, coverage tagging  | Modify        |
+| `src/resume_agent/dashboard/filtering.py`                               | `FilterState`, filter/sort/composite/cloud — pure                 | Create        |
+| `src/resume_agent/dashboard/ui.py`                                      | `skill_chip`, `meta_line`, control-desk + chip CSS                | Modify        |
+| `src/resume_agent/dashboard/pages.py`                                   | Shortlist control desk + rich cards; Pipeline meta line           | Modify        |
+| `tests/...`                                                             | One test file per module above                                    | Create/Modify |
 
 ---
 
 ## Task 1: Extend `JobCriteria` with new metadata fields
 
 **Files:**
+
 - Modify: `src/resume_agent/models/job.py`
 - Test: `tests/test_models_job.py`
 
@@ -163,6 +164,7 @@ git commit -m "feat(models): add seniority, employment type, tech stack, industr
 ## Task 2: Teach the extract agent the new fields
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/extract.py`
 - Test: `tests/test_discovery_extract.py`
 
@@ -221,6 +223,7 @@ git commit -m "feat(discovery): extend extract-agent instructions for new metada
 ## Task 3: Add `Job.posted_at` column + idempotent migration
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py:37-54` (the `Job` model)
 - Modify: `src/resume_agent/tracking/migrate.py`
 - Modify: `src/resume_agent/db.py:28-30` (`init_db`)
@@ -332,6 +335,7 @@ git commit -m "feat(db): add Job.posted_at column with idempotent migration"
 ## Task 4: Add `RawJob.posted_at` + thread it through ingest
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/base.py:7-16` (`RawJob`)
 - Modify: `src/resume_agent/discovery/ingest.py:19-67`
 - Test: `tests/test_ingest_jobs.py`
@@ -463,6 +467,7 @@ git commit -m "feat(ingest): thread RawJob.posted_at into Job"
 ## Task 5: ISO date helper + populate `posted_at` in API connectors
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/dates.py`
 - Modify: `src/resume_agent/discovery/connectors/greenhouse.py:11-26`
 - Modify: `src/resume_agent/discovery/connectors/remoteok.py:10-26`
@@ -668,6 +673,7 @@ git commit -m "feat(connectors): capture posting date into RawJob.posted_at for 
 ## Task 6: `discover --reextract` backfill path
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/pipeline.py`
 - Modify: `src/resume_agent/cli.py:164-178`
 - Test: `tests/test_discovery_pipeline.py`, `tests/test_cli_discovery.py`
@@ -832,6 +838,7 @@ git commit -m "feat(discovery): add 'discover --reextract' backfill path"
 ## Task 7: Widen `ShortlistRow`/`PipelineRow` with metadata + skill coverage
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/queries.py`
 - Test: `tests/test_tracking_queries.py`
 
@@ -1031,6 +1038,7 @@ git commit -m "feat(queries): flatten metadata + profile-coverage skill tags int
 ## Task 8: Pure filtering / sorting / composite module
 
 **Files:**
+
 - Create: `src/resume_agent/dashboard/filtering.py`
 - Test: `tests/test_dashboard_filtering.py` (create)
 
@@ -1311,6 +1319,7 @@ git commit -m "feat(dashboard): pure metadata filtering, sorting, and named-pres
 ## Task 9: `ui.py` chip + meta-line helpers and CSS
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/ui.py`
 - Test: `tests/test_dashboard_ui.py`
 
@@ -1414,19 +1423,54 @@ Then extend `THEME_CSS` — add this block just before the closing `</style>`:
 
 ```css
 /* ── Control desk + skill chips ───────────────────────────────── */
-.controldesk { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 6px;
-  padding: 0.8rem 1rem; margin: 0 0 1.2rem; }
-.metaline { font-family:'IBM Plex Mono', monospace; font-size: 0.84rem; color: var(--ink);
-  margin-top: 0.45rem; }
-.skills { display:flex; flex-wrap:wrap; gap: 0.3rem; margin-top: 0.5rem; }
-.chip { display:inline-block; font-family:'IBM Plex Mono', monospace; font-size: 0.66rem;
-  letter-spacing: 0.04em; padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid var(--rule);
-  background:#fff; color: var(--muted); }
-.chip-have { color: var(--emerald, #2f7d4f); border-color: var(--emerald, #2f7d4f);
-  background: color-mix(in srgb, var(--emerald, #2f7d4f) 10%, #fff); }
-.chip-gap { color: var(--muted); border-color: var(--rule); }
-.chip-nice { border-style: dashed; font-size: 0.6rem; opacity: 0.92; }
-.chip-sel { box-shadow: 0 0 0 2px color-mix(in srgb, var(--oxblood) 60%, transparent); font-weight: 700; }
+.controldesk {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin: 0 0 1.2rem;
+}
+.metaline {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.84rem;
+  color: var(--ink);
+  margin-top: 0.45rem;
+}
+.skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+.chip {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: #fff;
+  color: var(--muted);
+}
+.chip-have {
+  color: var(--emerald, #2f7d4f);
+  border-color: var(--emerald, #2f7d4f);
+  background: color-mix(in srgb, var(--emerald, #2f7d4f) 10%, #fff);
+}
+.chip-gap {
+  color: var(--muted);
+  border-color: var(--rule);
+}
+.chip-nice {
+  border-style: dashed;
+  font-size: 0.6rem;
+  opacity: 0.92;
+}
+.chip-sel {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--oxblood) 60%, transparent);
+  font-weight: 700;
+}
 ```
 
 Note: `--emerald` is not currently a CSS variable (it's a Python constant). The fallback `#2f7d4f` in `color-mix`/`color` keeps the chip correct without touching `:root`.
@@ -1448,6 +1492,7 @@ git commit -m "feat(dashboard): skill-chip + meta-line helpers and control-desk 
 ## Task 10: Shortlist control desk + rich cards
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/pages.py:65-113` (`render_shortlist_page`)
 - Test: manual (Streamlit page render; logic already covered by Tasks 7–9)
 
@@ -1602,6 +1647,7 @@ git commit -m "feat(dashboard): Shortlist control desk, metadata filters, skill-
 ## Task 11: Pipeline board lean meta line
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/pages.py:116-132` (`_render_pipeline_card`)
 - Test: manual (covered by `PipelineRow` widening in Task 7)
 
@@ -1660,12 +1706,13 @@ Expected: no errors. Fix any reported issues and re-run.
 
 Run: `.venv/Scripts/python -m streamlit run src/resume_agent/dashboard/app.py --server.headless true`
 Then in a browser at the printed URL, on a DB that has shortlisted jobs:
+
 - Confirm the control desk renders below the masthead with all filters + sort + skill cloud.
 - Confirm cards show the meta line + skill chips (emerald = covered, ringed = actively filtered, `+` prefix on nice-to-haves).
 - Toggle a skill tag, a seniority filter, and the salary slider; confirm the visible set narrows correctly.
 - Switch Sort → Composite; confirm the three presets appear and reorder cards.
 - Confirm the Pipeline board shows the single lean meta line and no filters.
-Stop with Ctrl-C.
+  Stop with Ctrl-C.
 
 - [ ] **Step 4: Final commit (if lint produced fixes)**
 

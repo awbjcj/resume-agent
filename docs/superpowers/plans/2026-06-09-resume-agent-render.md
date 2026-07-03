@@ -18,8 +18,9 @@
 ## Reference & scoped decisions
 
 Design spec §5.4. Decisions for this plan:
+
 - **Typst via the bundled Python package** (`import typst`), not a shelled-out `typst` binary — zero system dependency, works in CI.
-- **Data in, never markup out:** the LLM already produced structured `ResumeContent`; the template is the *only* place layout lives. Restyling never needs an LLM.
+- **Data in, never markup out:** the LLM already produced structured `ResumeContent`; the template is the _only_ place layout lives. Restyling never needs an LLM.
 - **Single-column, no custom font:** rely on Typst's bundled default font so compiles never fail on a missing font. Font/template choice is config (`config/render.yaml`) for later.
 - **Injected compile step:** `render_version(..., render_fn=render_pdf)` so the DB/persistence logic is tested with a fake; `render_pdf` itself gets one real integration test.
 - **Filename:** `output/{company}_{title}_{YYYYMMDD}.pdf`, slugified.
@@ -52,6 +53,7 @@ tests/
 ## Task 1: Dependency + RenderConfig
 
 **Files:**
+
 - Modify: `pyproject.toml`
 - Create: `src/resume_agent/render/__init__.py`, `src/resume_agent/render/render_config.py`
 - Test: `tests/test_render_config.py`
@@ -59,22 +61,27 @@ tests/
 - [ ] **Step 1: Add the dependency**
 
 Run:
+
 ```bash
 uv add typst
 ```
+
 Expected: `pyproject.toml` gains `typst>=...` under `dependencies`; `uv.lock` updates; install succeeds.
 
 - [ ] **Step 2: Verify the package imports**
 
 Run:
+
 ```bash
 uv run python -c "import typst; print('typst ok')"
 ```
+
 Expected: prints `typst ok`.
 
 - [ ] **Step 3: Write the failing test**
 
 Create `tests/test_render_config.py`:
+
 ```python
 from resume_agent.render.render_config import RenderConfig, load_render_config
 
@@ -98,19 +105,23 @@ def test_load_from_yaml(tmp_path):
 - [ ] **Step 4: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_render_config.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.render'`.
 
 - [ ] **Step 5: Implement**
 
 Create `src/resume_agent/render/__init__.py`:
+
 ```python
 """Render component: ResumeContent -> Typst -> PDF (deterministic, no LLM)."""
 ```
 
 Create `src/resume_agent/render/render_config.py`:
+
 ```python
 from pathlib import Path
 
@@ -130,9 +141,11 @@ def load_render_config(path: str | Path) -> RenderConfig:
 - [ ] **Step 6: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_render_config.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 7: Commit**
@@ -147,12 +160,14 @@ git commit -m "feat(render): add typst dep + RenderConfig" -m "Co-Authored-By: C
 ## Task 2: Typst template + renderer
 
 **Files:**
+
 - Create: `templates/resume.typ`, `src/resume_agent/render/renderer.py`
 - Test: `tests/test_renderer.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_renderer.py`:
+
 ```python
 from pathlib import Path
 
@@ -215,14 +230,17 @@ def test_render_pdf_writes_a_pdf(tmp_path):
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_renderer.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.render.renderer'`.
 
 - [ ] **Step 3: Implement the template**
 
 Create `templates/resume.typ`:
+
 ```typst
 // Single-column, ATS-parseable resume. Data arrives as a JSON string in
 // `sys.inputs.data` (see render/renderer.py) and is decoded here.
@@ -313,6 +331,7 @@ Create `templates/resume.typ`:
 - [ ] **Step 4: Implement the renderer**
 
 Create `src/resume_agent/render/renderer.py`:
+
 ```python
 import re
 from pathlib import Path
@@ -349,17 +368,21 @@ def render_pdf(
 - [ ] **Step 5: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_renderer.py -v
 ```
+
 Expected: PASS (2 tests). If the compile errors on Typst syntax, fix `templates/resume.typ` until `test_render_pdf_writes_a_pdf` produces a `%PDF`.
 
 - [ ] **Step 6: Eyeball the output (manual, optional)**
 
 Run:
+
 ```bash
 uv run python -c "from tests.test_renderer import _full_content; from resume_agent.render.renderer import render_pdf; render_pdf(_full_content(), 'output/_sample.pdf'); print('wrote output/_sample.pdf')"
 ```
+
 Open `output/_sample.pdf` to confirm it looks like a one-page resume. (Delete it afterward; `output/` holds generated artifacts.)
 
 - [ ] **Step 7: Commit**
@@ -374,12 +397,14 @@ git commit -m "feat(render): Typst template + render_pdf" -m "Co-Authored-By: Cl
 ## Task 3: Repository — fetch a resume version
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Append to `tests/test_repository.py`:
+
 ```python
 def test_get_resume_version_roundtrip():
     from sqlmodel import SQLModel, create_engine, Session
@@ -399,14 +424,17 @@ def test_get_resume_version_roundtrip():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_repository.py::test_get_resume_version_roundtrip -v
 ```
+
 Expected: FAIL — `ImportError: cannot import name 'get_resume_version'`.
 
 - [ ] **Step 3: Implement**
 
 Add to `src/resume_agent/tracking/repository.py` (after `resume_versions_for_job`):
+
 ```python
 def get_resume_version(session: Session, version_id: int) -> ResumeVersion | None:
     return session.get(ResumeVersion, version_id)
@@ -415,9 +443,11 @@ def get_resume_version(session: Session, version_id: int) -> ResumeVersion | Non
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_repository.py -v
 ```
+
 Expected: PASS (all existing repo tests + the new one).
 
 - [ ] **Step 5: Commit**
@@ -432,12 +462,14 @@ git commit -m "feat(render): get_resume_version repository fn" -m "Co-Authored-B
 ## Task 4: Render service (persistence + job status)
 
 **Files:**
+
 - Create: `src/resume_agent/render/service.py`
 - Test: `tests/test_render_service.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_render_service.py`:
+
 ```python
 from pathlib import Path
 
@@ -495,14 +527,17 @@ def test_render_version_missing_returns_none(tmp_path):
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_render_service.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.render.service'`.
 
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/render/service.py`:
+
 ```python
 from pathlib import Path
 from typing import Callable
@@ -549,9 +584,11 @@ def render_version(
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_render_service.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
@@ -566,6 +603,7 @@ git commit -m "feat(render): render_version persistence service" -m "Co-Authored
 ## Task 5: CLI — `render`
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Create: `config/render.yaml.example`
 - Test: `tests/test_cli_render.py`
@@ -573,6 +611,7 @@ git commit -m "feat(render): render_version persistence service" -m "Co-Authored
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_render.py`:
+
 ```python
 from pathlib import Path
 
@@ -621,20 +660,24 @@ def test_render_command(tmp_path, monkeypatch):
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_render.py -v
 ```
+
 Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'load_render_config'`.
 
 - [ ] **Step 3: Implement**
 
 Add imports near the other imports in `src/resume_agent/cli.py`:
+
 ```python
 from resume_agent.render.render_config import load_render_config
 from resume_agent.render.service import render_version
 ```
 
 Add the command AFTER the `tailor` command and BEFORE `if __name__ == "__main__":`:
+
 ```python
 DEFAULT_RENDER = "config/render.yaml"
 
@@ -661,6 +704,7 @@ def render_cmd(
 ```
 
 Create `config/render.yaml.example`:
+
 ```yaml
 # Render settings (see design spec §5.4).
 template_path: templates/resume.typ
@@ -670,25 +714,31 @@ output_dir: output
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_render.py -v
 ```
+
 Expected: PASS (1 test).
 
 - [ ] **Step 5: Verify wiring**
 
 Run:
+
 ```bash
 uv run resume-agent render --help
 ```
+
 Expected: help text (exit 0).
 
 - [ ] **Step 6: Run the full suite**
 
 Run:
+
 ```bash
 uv run pytest -q
 ```
+
 Expected: all tests pass (101 prior + Render additions).
 
 - [ ] **Step 7: Commit**
@@ -709,8 +759,10 @@ git commit -m "feat(render): render CLI command + render.yaml example" -m "Co-Au
 ---
 
 ## Notes to carry into later plans
+
 - **Tracking plan:** the Pipeline board reads `resume_versions.pdf_path` for the "open PDF" link; surface `rendered` jobs. A `dashboard`-driven render button can call `render_version` directly.
 - A future "render the latest passing version for a job" convenience (`render_job <job_id>`) can select `max(round)` where `fact_check_passed` — deferred until the dashboard needs it.
 
 ## Execution Handoff
+
 After this plan is executed and green, the remaining v1 components are **Tracking** (Streamlit dashboard) and the deferred **LinkedIn scraper** (see their plans).

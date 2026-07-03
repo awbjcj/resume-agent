@@ -240,8 +240,7 @@ Commit: `feat(api): include suggestion status in match-gap snapshot`
 
 Test with synchronization events, not sleeps:
 
-1. `suggestion_batch_concurrency` defaults to 3 and rejects 0 and values above
-   16.
+1. `suggestion_batch_concurrency` defaults to 3 and rejects 0 and values above 16.
 2. At most N suggestion functions enter concurrently.
 3. While the suggestion lane is saturated, a default-lane run completes.
 4. `shutdown()` closes every manager-created executor exactly once.
@@ -292,7 +291,7 @@ Define request/output types before route code:
 - `SuggestionRunsRequest.targets` has length 1–25.
 - Accepted and not-found outputs are a discriminated union by `outcome`.
 - Generated OpenAPI produces a useful TypeScript union, not `Record<string,
-  unknown>`.
+unknown>`.
 
 Route tests cover:
 

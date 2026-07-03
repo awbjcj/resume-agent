@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** One command — `resume-agent pull` — runs every *enabled* connector in canonical dedup order, ingests through the shared dedupe, records per-connector telemetry, and prints a per-source count table. A second command — `resume-agent sources` — shows each connector's last run, jobs added, and last error. `scrape` survives as a thin LinkedIn-only alias.
+**Goal:** One command — `resume-agent pull` — runs every _enabled_ connector in canonical dedup order, ingests through the shared dedupe, records per-connector telemetry, and prints a per-source count table. A second command — `resume-agent sources` — shows each connector's last run, jobs added, and last error. `scrape` survives as a thin LinkedIn-only alias.
 
 **Architecture:** This is **Plan 3 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`). The deep module here is `run_pull`: it concentrates "iterate connectors → fetch → ingest → isolate failures → record telemetry → tally" in one place, so the CLI command is a thin shell and the orchestration is unit-tested with fake connectors (including one that raises). Telemetry is a **JSON state file** (`data/connector_runs.json`) — chosen over a DB table to avoid schema churn, per the spec's lean.
 
@@ -40,12 +40,14 @@ tests/test_cli_sources.py            # CREATE
 ## Task 1: connector run telemetry (JSON state file)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/telemetry.py`
 - Test: `tests/test_connectors_telemetry.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_connectors_telemetry.py`:
+
 ```python
 from resume_agent.discovery.connectors.telemetry import read_runs, record_run
 
@@ -81,6 +83,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/discovery/connectors/telemetry.py`:
+
 ```python
 import json
 from datetime import datetime, timezone
@@ -125,12 +128,14 @@ git commit -m "feat(pull): connector run telemetry (JSON state file)" -m "Co-Aut
 ## Task 2: `run_pull` orchestrator (failure-isolating)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/runner.py`
 - Test: `tests/test_connectors_runner.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_connectors_runner.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -183,6 +188,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/discovery/connectors/runner.py`:
+
 ```python
 from pathlib import Path
 
@@ -236,12 +242,14 @@ git commit -m "feat(pull): run_pull orchestrator with per-connector failure isol
 ## Task 3: `pull` CLI command
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_pull.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_pull.py`:
+
 ```python
 from typer.testing import CliRunner
 
@@ -292,12 +300,15 @@ Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute '
 - [ ] **Step 3: Implement — imports + constants**
 
 In `src/resume_agent/cli.py`, add near the other discovery imports:
+
 ```python
 from resume_agent.discovery.connectors.config import load_connectors_config
 from resume_agent.discovery.connectors.registry import build_connectors
 from resume_agent.discovery.connectors.runner import run_pull
 ```
+
 Add a default path constant near `DEFAULT_SEARCH`:
+
 ```python
 DEFAULT_CONNECTORS = "config/connectors.yaml"
 CONNECTOR_RUNS_PATH = "data/connector_runs.json"
@@ -306,6 +317,7 @@ CONNECTOR_RUNS_PATH = "data/connector_runs.json"
 - [ ] **Step 4: Implement — the command**
 
 Add this command after `scrape_cmd` in `src/resume_agent/cli.py`:
+
 ```python
 @app.command("pull")
 def pull_cmd(
@@ -352,12 +364,14 @@ git commit -m "feat(pull): pull CLI command (all enabled connectors)" -m "Co-Aut
 ## Task 4: `sources` CLI command (connector health)
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_sources.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_sources.py`:
+
 ```python
 from typer.testing import CliRunner
 
@@ -395,10 +409,13 @@ Expected: FAIL — `typer` reports no such command `sources` (exit code != 0).
 - [ ] **Step 3: Implement**
 
 Add the import near the other connector imports in `src/resume_agent/cli.py`:
+
 ```python
 from resume_agent.discovery.connectors.telemetry import read_runs
 ```
+
 Add this command after `pull_cmd`:
+
 ```python
 @app.command("sources")
 def sources_cmd() -> None:

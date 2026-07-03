@@ -12,13 +12,13 @@
 
 ## File Structure
 
-| File | Responsibility |
-|------|----------------|
-| `src/resume_agent/dashboard/ui.py` | NEW. `THEME_CSS`, palette constants, `column_count`, `status_badge`, `fit_block`, `masthead`, `metric_row`, `empty_state`, table-styling helper. |
+| File                                  | Responsibility                                                                                                                                                                                       |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/resume_agent/dashboard/ui.py`    | NEW. `THEME_CSS`, palette constants, `column_count`, `status_badge`, `fit_block`, `masthead`, `metric_row`, `empty_state`, table-styling helper.                                                     |
 | `src/resume_agent/dashboard/pages.py` | NEW. `render_shortlist_page`, `render_pipeline_page`, `render_analytics_page`, `render_match_gap_page`, `analytics_table_rows`, `match_gap_table_rows`, `_render_pipeline_card`, `_new_application`. |
-| `src/resume_agent/dashboard/app.py` | SLIMMED. `main()`, sidebar nav, `_engine()`, and re-exports of the public API. |
-| `.streamlit/config.toml` | MODIFIED. Light Broadsheet palette. |
-| `tests/test_dashboard_ui.py` | NEW. `column_count` + moved-helper unit tests. |
+| `src/resume_agent/dashboard/app.py`   | SLIMMED. `main()`, sidebar nav, `_engine()`, and re-exports of the public API.                                                                                                                       |
+| `.streamlit/config.toml`              | MODIFIED. Light Broadsheet palette.                                                                                                                                                                  |
+| `tests/test_dashboard_ui.py`          | NEW. `column_count` + moved-helper unit tests.                                                                                                                                                       |
 
 **Re-export contract:** `app.py` must expose `status_badge`, `fit_block`, `analytics_table_rows`, `match_gap_table_rows`, `render_shortlist_page`, `render_pipeline_page`, `render_analytics_page`, `render_match_gap_page`, `main`. Existing tests (`test_dashboard_app.py`, `test_dashboard_analytics.py`, `test_dashboard_match_gap.py`) import these names from `resume_agent.dashboard.app` and must not be edited.
 
@@ -27,6 +27,7 @@
 ### Task 1: `column_count` pure function + `ui.py` scaffold
 
 **Files:**
+
 - Create: `src/resume_agent/dashboard/ui.py`
 - Test: `tests/test_dashboard_ui.py`
 
@@ -94,6 +95,7 @@ git commit -m "feat(dashboard): add column_count pure helper + ui.py scaffold"
 Move `status_badge`, `fit_block`, `_masthead`→`masthead`, `_metric_row`→`metric_row`, `_empty_state`→`empty_state` and the palette/`STATUS_COLORS` constants out of `app.py` and into `ui.py`, **re-tuned for the light Broadsheet palette** (logic unchanged). `masthead`/`metric_row`/`empty_state` keep calling `st.markdown`, so they're imported lazily inside the functions to keep `ui.py` import-pure.
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/ui.py`
 - Test: `tests/test_dashboard_ui.py`
 
@@ -234,6 +236,7 @@ git commit -m "feat(dashboard): move palette + HTML helpers into ui.py (light pa
 Move the four `render_*` functions plus `analytics_table_rows`, `match_gap_table_rows`, `_render_pipeline_card`, `_new_application` from `app.py` into a new `pages.py`. They import their helpers from `ui.py` (`masthead`, `metric_row`, `empty_state`, `status_badge`, `fit_block`) and from `ui` the palette constant `AMBER`. Behavior is unchanged from today's `app.py`.
 
 **Files:**
+
 - Create: `src/resume_agent/dashboard/pages.py`
 - Test: existing `tests/test_dashboard_analytics.py`, `tests/test_dashboard_match_gap.py` (via re-export in Task 4)
 
@@ -519,6 +522,7 @@ git commit -m "feat(dashboard): extract page renderers into pages.py"
 Rewrite `app.py` to: load `THEME_CSS` from `ui.py`, render the sidebar nav, route to `pages.py`, and **re-export** the public API so existing tests resolve their imports. (`THEME_CSS` is added in Task 5; reference it now and Task 5 fills it.)
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/app.py` (full rewrite)
 - Modify: `src/resume_agent/dashboard/ui.py` (add `THEME_CSS = ""` placeholder so the import resolves)
 - Test: `tests/test_dashboard_app.py`, `tests/test_dashboard_analytics.py`, `tests/test_dashboard_match_gap.py` (unchanged)
@@ -618,6 +622,7 @@ git commit -m "refactor(dashboard): slim app.py to router + re-exports"
 Replace the placeholder `THEME_CSS` with the full Broadsheet stylesheet: Newsreader/IBM Plex Mono/IBM Plex Sans, paper palette, hairline rules, the `.card-grid` responsive grid (4-up on 4K), wide container, `clamp()` type, and re-themed stock elements (tables, selectbox, expander, buttons).
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/ui.py` (replace `THEME_CSS`)
 - Test: `tests/test_dashboard_app.py` (the `AppTest` smoke test re-run)
 
@@ -745,6 +750,7 @@ git commit -m "feat(dashboard): Broadsheet light identity + responsive 4K grid C
 ### Task 6: Light Broadsheet `.streamlit/config.toml`
 
 **Files:**
+
 - Modify: `.streamlit/config.toml`
 
 - [ ] **Step 1: Replace the theme block**
@@ -790,6 +796,7 @@ Open the local URL in a browser maximized on the 32″ 4K display (or emulate ~2
 - [ ] **Step 2: Verify the checklist**
 
 Confirm visually:
+
 - Shortlist cards reflow to **~4 columns** at full 4K width, ~2 at ~1440px, 1 on a laptop.
 - Newsreader serif headlines, IBM Plex Mono figures/kickers, IBM Plex Sans body.
 - Paper canvas `#f4f1ea`, oxblood accent only on the kicker, fit numbers, rules, and the Approve button.
@@ -813,6 +820,7 @@ git commit -m "chore(dashboard): 4K visual pass tweaks"
 ## Self-Review
 
 **Spec coverage:**
+
 - §4.1 module split → Tasks 1–4. ✓ (re-export contract verified against the three test files.)
 - §4.2 Broadsheet identity (3 families, palette, motifs) → Tasks 2 (palette consts) + 5 (CSS) + 6 (config). ✓
 - §4.3 adaptive 4K layout (`column_count`, `.card-grid`, 2400px, `clamp()`) → Tasks 1 + 5 + 6 + 7. ✓
@@ -820,6 +828,6 @@ git commit -m "chore(dashboard): 4K visual pass tweaks"
 - §4.5 out of scope (no new features) → honored; only layout/identity/split touched. ✓
 - §6 testing (column_count, moved helpers, smoke) → Tasks 1, 2, 4. ✓
 
-**Placeholder scan:** `THEME_CSS = "<style></style>"` is an *intentional, named* placeholder filled in the very next task (4→5), not a plan gap. No "TBD"/"add error handling" present.
+**Placeholder scan:** `THEME_CSS = "<style></style>"` is an _intentional, named_ placeholder filled in the very next task (4→5), not a plan gap. No "TBD"/"add error handling" present.
 
 **Type consistency:** Helper names are consistent across tasks — `masthead`/`metric_row`/`empty_state` (renamed from the underscored `app.py` originals) are defined in Task 2 and consumed in Task 3; `status_badge`/`fit_block`/`column_count`/`AMBER`/`THEME_CSS` names match between definition and import sites. `app.py` re-exports exactly the four names the tests import.

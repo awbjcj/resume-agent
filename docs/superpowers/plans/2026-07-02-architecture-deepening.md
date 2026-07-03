@@ -19,15 +19,15 @@
 
 ## Source findings this plan is built on (verified 2026-07-02)
 
-| # | Finding | Evidence |
-|---|---------|----------|
-| 1 | `pipeline_rows` issues `best_resume_version` (1 query) + `application_for_job` (1) + `has_progress` (up to 4) **per job**; `triage_rows`/`archived_rows` issue `has_progress` per job. `_progressed_job_ids` (repository.py:346) already demonstrates the 3-query batched fix. | `src/resume_agent/tracking/queries.py:295-393`, `repository.py:333-355` |
-| 2 | `ingest_jobs_with_outcomes` → `save_or_upgrade` → `save_job` commits **once per RawJob**; `find_existing` probes `Job.url` (unindexed) and `Job.jd_text` (unindexed) with full scans. `content_fingerprint` **is** indexed and is a pure function of `jd_text` (`compute_content_fingerprint`), so equal `jd_text` ⇒ equal fingerprint. | `ingest.py:128-170`, `repository.py:52-86`, `tables.py:42-54`, `dedup.py:47-52` |
-| 3 | `registry.py` hand-enumerates all 7 connector kinds in two near-duplicate builders (`build_connectors`, `build_source_connectors`); adding an ATS touches both plus imports. | `registry.py:15-116` |
-| 4 | `load_facts` re-reads + re-validates `facts.json` on every board/detail request (`services/board.py:280,324`); `load_aliases` re-reads on every `shortlist_rows`/`job_facets`/`job_detail_row` call. | `profile/store.py:34-36`, `taxonomy/skills.py:56-61` |
-| 5 | `run_pull` fetches connectors serially; pull latency = Σ connector latencies. `gather_isolated` exists for exactly this fan-out shape. | `connectors/runner.py:67-125`, `concurrency.py:28` |
-| 6 | `retry_kwargs()` gives agno `retries=llm_retries` which retries bare `Exception` (auth/schema failures burn retries × tokens); spread into 21 `Agent(...)` builders. `pipeline.py:160-165` swallows `classify_industries` outages with a silent `except Exception: additions = {}`. | `llm_runner.py:266-273`, `discovery/pipeline.py:158-165` |
-| 7 | The facet vocabulary is stated 4 times in `services/board.py`: `BoardFilter` fields, `_row_value`, the `set_filters` tuple in `_passes_filter`, and the key tuple in `board_facets`. Drift = silent filter bug. | `services/board.py:53-74,101-124,171-183,244-265` |
+| #   | Finding                                                                                                                                                                                                                                                                                                                                 | Evidence                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1   | `pipeline_rows` issues `best_resume_version` (1 query) + `application_for_job` (1) + `has_progress` (up to 4) **per job**; `triage_rows`/`archived_rows` issue `has_progress` per job. `_progressed_job_ids` (repository.py:346) already demonstrates the 3-query batched fix.                                                          | `src/resume_agent/tracking/queries.py:295-393`, `repository.py:333-355`         |
+| 2   | `ingest_jobs_with_outcomes` → `save_or_upgrade` → `save_job` commits **once per RawJob**; `find_existing` probes `Job.url` (unindexed) and `Job.jd_text` (unindexed) with full scans. `content_fingerprint` **is** indexed and is a pure function of `jd_text` (`compute_content_fingerprint`), so equal `jd_text` ⇒ equal fingerprint. | `ingest.py:128-170`, `repository.py:52-86`, `tables.py:42-54`, `dedup.py:47-52` |
+| 3   | `registry.py` hand-enumerates all 7 connector kinds in two near-duplicate builders (`build_connectors`, `build_source_connectors`); adding an ATS touches both plus imports.                                                                                                                                                            | `registry.py:15-116`                                                            |
+| 4   | `load_facts` re-reads + re-validates `facts.json` on every board/detail request (`services/board.py:280,324`); `load_aliases` re-reads on every `shortlist_rows`/`job_facets`/`job_detail_row` call.                                                                                                                                    | `profile/store.py:34-36`, `taxonomy/skills.py:56-61`                            |
+| 5   | `run_pull` fetches connectors serially; pull latency = Σ connector latencies. `gather_isolated` exists for exactly this fan-out shape.                                                                                                                                                                                                  | `connectors/runner.py:67-125`, `concurrency.py:28`                              |
+| 6   | `retry_kwargs()` gives agno `retries=llm_retries` which retries bare `Exception` (auth/schema failures burn retries × tokens); spread into 21 `Agent(...)` builders. `pipeline.py:160-165` swallows `classify_industries` outages with a silent `except Exception: additions = {}`.                                                     | `llm_runner.py:266-273`, `discovery/pipeline.py:158-165`                        |
+| 7   | The facet vocabulary is stated 4 times in `services/board.py`: `BoardFilter` fields, `_row_value`, the `set_filters` tuple in `_passes_filter`, and the key tuple in `board_facets`. Drift = silent filter bug.                                                                                                                         | `services/board.py:53-74,101-124,171-183,244-265`                               |
 
 Task order is safest-first and keeps the two tasks that touch `repository.py` (1 and 2) adjacent. Tasks are otherwise independent.
 
@@ -36,11 +36,13 @@ Task order is safest-first and keeps the two tasks that touch `repository.py` (1
 ### Task 1: Batch the board read-models
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py` (add batched loaders near `_progressed_job_ids`, repository.py:346)
 - Modify: `src/resume_agent/tracking/queries.py:295-393` (`pipeline_rows`, `_triage_row`, `triage_rows`, `archived_rows`)
 - Test: `tests/test_tracking_queries.py` (append)
 
 **Interfaces:**
+
 - Consumes: existing `pick_best(versions) -> BestResume`, `_PROGRESS_STATUSES` (both already in repository.py).
 - Produces (new public functions in `resume_agent.tracking.repository`):
   - `versions_by_job(session: Session) -> dict[int, list[ResumeVersion]]`
@@ -278,6 +280,7 @@ git commit -m "Batches board read-model queries to constant count"
 ### Task 2: Batch ingest writes + index the dedup probes
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py:42` (`Job.url` gains `index=True`)
 - Modify: `src/resume_agent/tracking/migrate.py` (add `ensure_url_index`)
 - Modify: `src/resume_agent/db.py:54-63` (wire `ensure_url_index` into `init_db`)
@@ -287,6 +290,7 @@ git commit -m "Batches board read-model queries to constant count"
 - Test: `tests/test_migrate.py`, `tests/test_ingest_jobs.py` (append)
 
 **Interfaces:**
+
 - Consumes: `compute_content_fingerprint(jd_text) -> str | None` (`tracking/dedup.py:47`), existing `IncomingJob` / `decide` merge seam.
 - Produces: `save_or_upgrade(..., commit: bool = True)` — new keyword-only param, default preserves every existing caller. `find_existing` signature unchanged. `ingest_jobs_with_outcomes` signature unchanged, now transactional (one commit per call).
 - Invariant relied on: every persisted `Job` carries `content_fingerprint` (the Insert/Rebase/RefreshText paths set it from `jd_text`, and `ensure_content_fingerprint_column` backfills legacy rows), so prefiltering the exact-`jd_text` probe by fingerprint cannot change which row matches.
@@ -403,7 +407,7 @@ def _persist(session: Session, job: Job, commit: bool) -> Job:
     return job
 ```
 
-2. Thread a `commit` flag through `save_or_upgrade` and `_apply` (defaults keep `add_job` and every other existing caller commit-per-call):
+1. Thread a `commit` flag through `save_or_upgrade` and `_apply` (defaults keep `add_job` and every other existing caller commit-per-call):
 
 ```python
 def save_or_upgrade(
@@ -422,7 +426,7 @@ def save_or_upgrade(
 
 …pass `commit` to `_apply(session, existing, incoming, decide(existing, incoming), commit)`, and in `_apply` replace both `save_job(session, job)` / `save_job(session, existing)` calls with `_persist(session, job, commit)` / `_persist(session, existing, commit)` (add `commit: bool` as `_apply`'s last parameter).
 
-3. In `ingest_jobs_with_outcomes`, pass `commit=False` in the per-row `save_or_upgrade(...)` call and add a single `session.commit()` immediately before the `return IngestCounts(...)` statement.
+1. In `ingest_jobs_with_outcomes`, pass `commit=False` in the per-row `save_or_upgrade(...)` call and add a single `session.commit()` immediately before the `return IngestCounts(...)` statement.
 
 - [ ] **Step 6: Roll back a failed connector batch in run_pull**
 
@@ -458,10 +462,12 @@ git commit -m "Batches ingest commits and indexes dedup probes"
 ### Task 3: Connector registry as a data table
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/registry.py` (full rewrite around `ConnectorSpec`)
 - Test: `tests/test_connectors_registry.py` (existing tests are the conformance gate; append one drift test)
 
 **Interfaces:**
+
 - Consumes: all existing connector constructors and id helpers already imported by registry.py (`GreenhouseConnector`, `LeverConnector`, `CompaniesConnector`, `DashboardScraper`, `RemoteOKConnector`, `AdzunaConnector`, `build_linkedin_scraper`, `company_url_id`, `host_key`).
 - Produces: `build_connectors(config, settings)` and `build_source_connectors(config, settings, source_ids=None)` — **signatures and output order unchanged** (spec table order = today's canonical dedup order). New exported types: `ConnectorUnit`, `ConnectorSpec`, `CONNECTOR_SPECS`.
 - To add a new ATS after this task: append one `ConnectorSpec` entry. Nothing else.
@@ -617,6 +623,7 @@ def build_source_connectors(
 ```
 
 Behavioral notes to preserve (all encoded above — verify, don't re-derive):
+
 - Aggregate builder: a multi-unit kind with zero enabled units appends nothing (the `if not payloads` guard); a singleton kind contributes `payloads == [None]` when enabled, so it always builds.
 - Old `build_connectors` gated adzuna on keys, old `build_source_connectors` gated it via `pullable` — both now flow through `spec.pullable`.
 - Singleton `unit.enabled` mirrors its section flag, so per-source selection (`source_ids=["remoteok"]`) behaves exactly as before.
@@ -654,11 +661,13 @@ git commit -m "Collapses connector registry to one spec table"
 ### Task 4: mtime-keyed caches for load_facts / load_aliases
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/store.py:34-36`
 - Modify: `src/resume_agent/taxonomy/skills.py:56-61`
 - Test: `tests/test_taxonomy_skills.py` (append), Create: `tests/test_profile_store_cache.py`
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: `load_facts(path) -> ProfileFacts` and `load_aliases(path) -> dict[str, str]` — signatures, error behavior (missing facts file still raises `FileNotFoundError`; missing aliases file still returns `{}`), and return types unchanged. New contract: **returned objects are shared and must be treated as read-only** (verified by grep in Step 4).
 
@@ -776,7 +785,7 @@ def load_aliases(path: str | Path) -> dict[str, str]:
 - [ ] **Step 4: Verify no caller mutates the shared returns**
 
 Run: `grep -rn "load_facts(\|load_aliases(" src/resume_agent --include=*.py`
-Inspect each call site: confirm none assigns into the returned dict/model (`aliases[...] = `, `facts.x = `, `.append(`, `.update(` on the return). Known-safe today: `merge_aliases` copies (`merged = dict(new)`), `queries.py` only reads. If a mutating caller exists, give it a copy at that call site (`dict(load_aliases(...))`) — do not weaken the cache.
+Inspect each call site: confirm none assigns into the returned dict/model (`aliases[...] =`, `facts.x =`, `.append(`, `.update(` on the return). Known-safe today: `merge_aliases` copies (`merged = dict(new)`), `queries.py` only reads. If a mutating caller exists, give it a copy at that call site (`dict(load_aliases(...))`) — do not weaken the cache.
 
 - [ ] **Step 5: Run the new tests + everything touching facts/aliases**
 
@@ -796,10 +805,12 @@ git commit -m "Caches facts and alias loads on file mtime"
 ### Task 5: One facet table in the Board seam
 
 **Files:**
+
 - Modify: `src/resume_agent/services/board.py:89-265` (`_row_value`, `_passes_filter`, `board_facets`)
 - Test: `tests/test_services_board.py` (existing tests are the conformance gate; append one drift test)
 
 **Interfaces:**
+
 - Consumes: `BoardFilter` (unchanged — its fields stay explicit for the API layer).
 - Produces: `FacetSpec` dataclass + `FACET_SPECS` tuple exported from `services.board`; `_row_value`, `_passes_filter`, `board_facets` behavior identical (wire facet keys — `source`…`companySize` camelCase — unchanged, so no OpenAPI regen).
 
@@ -864,7 +875,7 @@ In `_passes_filter`, replace the `set_filters = (...)` tuple **and** its `for ke
             return False
 ```
 
-(The original loop's `if key == "industry" and value is None: continue` special case is now the `skip_unset_rows` flag. Note the original checked it *before* the `selected and value not in selected` test — the replacement preserves that order.)
+(The original loop's `if key == "industry" and value is None: continue` special case is now the `skip_unset_rows` flag. Note the original checked it _before_ the `selected and value not in selected` test — the replacement preserves that order.)
 
 In `board_facets`, replace the hardcoded key tuple:
 
@@ -916,6 +927,7 @@ git commit -m "Derives board facet vocabulary from one spec table"
 ### Task 6: Concurrent connector fetch in run_pull
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py` (add `pull_concurrency` next to `llm_concurrency`, config.py:36)
 - Modify: `src/resume_agent/discovery/connectors/base.py` (class attribute `concurrent_fetch: bool = True` on `Connector`)
 - Modify: `src/resume_agent/discovery/scraper/dashboard.py`, `src/resume_agent/discovery/scraper/linkedin.py` (or wherever its scraper class lives — grep `build_linkedin_scraper`), `src/resume_agent/discovery/connectors/adzuna.py` (set `concurrent_fetch = False` — they drive a real browser)
@@ -923,6 +935,7 @@ git commit -m "Derives board facet vocabulary from one spec table"
 - Test: `tests/test_pull_runner_concurrency.py` (create)
 
 **Interfaces:**
+
 - Consumes: `gather_isolated(items, fn) -> list[Result]` (`concurrency.py:28` — ordered, error-isolated), `Result.ok/.value/.error`.
 - Produces: `run_pull` signature and `PullReport` unchanged. New `Settings.pull_concurrency: int` (default 4, `ge=1`). New `Connector.concurrent_fetch: bool` class attribute (default `True`; browser-driven connectors opt out and are serialized among themselves).
 - Invariants preserved: ingest happens **serially, on the calling thread, in connector-list order** (canonical dedup order — Task 2's single Session batching depends on this); per-connector failure isolation and telemetry unchanged; `skip_seen` closes over a prebuilt read-only index (dict lookups — safe to share across fetch threads).
@@ -1154,11 +1167,13 @@ git commit -m "Fetches connectors concurrently with serial ordered ingest"
 ### Task 7: Transient-only LLM retry at the model seam
 
 **Files:**
+
 - Modify: `src/resume_agent/llm_runner.py` (`AgentRunner.run/arun` gain the retry loop; new `is_transient`; `retry_kwargs` stops feeding agno)
 - Modify: `src/resume_agent/discovery/pipeline.py:158-165` (log classifier outages instead of swallowing)
 - Test: `tests/test_llm_runner_retry.py` (create)
 
 **Interfaces:**
+
 - Consumes: `Settings.llm_retries` / `llm_retry_delay` (config.py:37-38, already validated `ge=0`).
 - Produces: `is_transient(exc: BaseException) -> bool` exported from `llm_runner`. `AgentRunner.run/arun` signatures unchanged. `retry_kwargs()` still exists and is still spread into all 21 `Agent(...)` builders — its body now returns `{"retries": 0}` so agno's bare-`Exception` retry is off and none of the 21 call sites need touching.
 - Behavior change (intended): a `ValidationError`/auth failure now surfaces after **one** call instead of `1 + llm_retries`; only network/rate-limit/5xx-shaped failures retry.
@@ -1380,6 +1395,7 @@ git commit -m "Retries only transient LLM failures at the runner seam"
 ### Task 8: Documentation sweep
 
 **Files:**
+
 - Modify: `CLAUDE.md` (three touched claims)
 
 **Interfaces:** none — docs only.
@@ -1387,6 +1403,7 @@ git commit -m "Retries only transient LLM failures at the runner seam"
 - [ ] **Step 1: Update the stale claims**
 
 In `CLAUDE.md`:
+
 1. "Known design notes" bullet on LLM retry — replace "note it retries bare `Exception`, so a parse failure costs `llm_retries` extra calls — kept low (default 2)" with: "retries live in `AgentRunner` behind the `is_transient` predicate (rate-limit/timeout/5xx retry with exponential backoff; auth/schema/parse failures surface after one call); agno's own retry is disabled via `retry_kwargs() == {\"retries\": 0}`."
 2. "Companies connector dispatch" section — append one line: "Connector construction itself is table-driven: `CONNECTOR_SPECS` in `registry.py` is the single enumeration of connector kinds; adding an ATS appends one `ConnectorSpec`."
 3. Hot-paths table — the `runner.py` row's role becomes "Pull orchestration: concurrent fetch (bounded by `pull_concurrency`), serial canonical-order ingest, `+N added` telemetry".

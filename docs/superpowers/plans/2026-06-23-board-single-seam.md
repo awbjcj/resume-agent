@@ -2,36 +2,37 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make `services` the single place board-data *policy*, *assembled reads*, and the *prune use-case* live — collapse the hand-built `JobDetail` projection in the API router (B), stop the Streamlit dashboard from reaching past `board` into `tracking.repository` for mutations (C), and lift the duplicated prune override-merge into a `services.prune` use-case (D).
+**Goal:** Make `services` the single place board-data _policy_, _assembled reads_, and the _prune use-case_ live — collapse the hand-built `JobDetail` projection in the API router (B), stop the Streamlit dashboard from reaching past `board` into `tracking.repository` for mutations (C), and lift the duplicated prune override-merge into a `services.prune` use-case (D).
 
 **Architecture:** `board` already wraps mutation policy (`set_stage`/`set_archived`/`delete`/`upsert_application`) and the board read-models. Two adapters bypass it: the API router assembles `JobDetail` by hand from four queries plus an 18-field manual projection, and the dashboard imports the repository's mutation functions directly. We add one deep read-model — `board.get_job_detail` returning a flat `JobDetailRow` the schema projects in one `model_validate` line — and route every dashboard mutation through `board`. Raw list projections (`shortlist_rows`/`pipeline_rows`/`triage_rows`) stay in `tracking.queries` and remain callable by both adapters: wrapping them in `board` would add shallow pass-throughs and would fight the dashboard's rich in-process filtering. Separately, prune is the one use-case all three adapters call `tracking` for directly, duplicating the config-load + sparse override-merge + preview/run dispatch (byte-identical between CLI and API); we lift that into `services.prune`. `match_gap` is deliberately untouched — it is already deep at `tracking.match_gap` and its per-adapter prep (canonicalizer, existence guards, formatting) is genuine divergence, not duplication.
 
 **Tech Stack:** Python 3 / FastAPI / SQLModel / pydantic v2 (`from_attributes`); pytest. The `api → services → tracking` dependency points one way only — `services`/`tracking` never import `api`.
 
-**Domain terms (CONTEXT.md):** *Board seam*, *JobDetailRow*.
+**Domain terms (CONTEXT.md):** _Board seam_, _JobDetailRow_.
 
 ---
 
 ## File Structure
 
-| File | Responsibility | Action |
-| --- | --- | --- |
-| `src/resume_agent/tracking/queries.py` | `JobDetailRow` dataclass + `job_detail_row()` assembling it (reuses `_shortlist_row`) | Modify |
-| `src/resume_agent/services/board.py` | `get_job_detail()` wraps `job_detail_row` (loads facts like `job_detail_facets`) | Modify |
-| `src/resume_agent/api/routers/jobs.py` | Collapse `_job_detail` (32–75) to `board.get_job_detail` + `JobDetail.model_validate` | Modify |
-| `src/resume_agent/dashboard/pages.py` | Mutations → `board.set_stage`/`set_archived`/`delete`/`upsert_application`; drop repository mutation imports | Modify |
-| `tests/test_job_detail_row.py` | Unit test for the read-model assembly | Create |
-| `tests/api/test_job_detail.py` | API test: detail shape unchanged through the new path | Extend |
-| `tests/test_dashboard_seam.py` | Fitness test: dashboard imports no mutation funcs from `tracking.repository` | Create |
-| `src/resume_agent/services/prune.py` | `prune()` use-case: load config, merge sparse overrides, dispatch preview/run | Create |
-| `src/resume_agent/cli.py:445-482` · `api/routers/prune.py` · `dashboard/pages.py:744-773` | Call `services.prune`; drop the duplicated override-merge | Modify |
-| `tests/test_services_prune.py` | Unit test for the prune use-case (override merge + dispatch) | Create |
+| File                                                                                      | Responsibility                                                                                               | Action |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------ |
+| `src/resume_agent/tracking/queries.py`                                                    | `JobDetailRow` dataclass + `job_detail_row()` assembling it (reuses `_shortlist_row`)                        | Modify |
+| `src/resume_agent/services/board.py`                                                      | `get_job_detail()` wraps `job_detail_row` (loads facts like `job_detail_facets`)                             | Modify |
+| `src/resume_agent/api/routers/jobs.py`                                                    | Collapse `_job_detail` (32–75) to `board.get_job_detail` + `JobDetail.model_validate`                        | Modify |
+| `src/resume_agent/dashboard/pages.py`                                                     | Mutations → `board.set_stage`/`set_archived`/`delete`/`upsert_application`; drop repository mutation imports | Modify |
+| `tests/test_job_detail_row.py`                                                            | Unit test for the read-model assembly                                                                        | Create |
+| `tests/api/test_job_detail.py`                                                            | API test: detail shape unchanged through the new path                                                        | Extend |
+| `tests/test_dashboard_seam.py`                                                            | Fitness test: dashboard imports no mutation funcs from `tracking.repository`                                 | Create |
+| `src/resume_agent/services/prune.py`                                                      | `prune()` use-case: load config, merge sparse overrides, dispatch preview/run                                | Create |
+| `src/resume_agent/cli.py:445-482` · `api/routers/prune.py` · `dashboard/pages.py:744-773` | Call `services.prune`; drop the duplicated override-merge                                                    | Modify |
+| `tests/test_services_prune.py`                                                            | Unit test for the prune use-case (override merge + dispatch)                                                 | Create |
 
 ---
 
 ### Task 1: `JobDetailRow` read-model + `job_detail_row`
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/queries.py` (add after `ShortlistRow`, ~line 60; and a builder near `job_facets`, ~line 199)
 - Test: `tests/test_job_detail_row.py`
 
@@ -213,6 +214,7 @@ git commit -m "feat(queries): add JobDetailRow read-model for the detail view"
 ### Task 2: `board.get_job_detail` + collapse the router projection (B)
 
 **Files:**
+
 - Modify: `src/resume_agent/services/board.py`
 - Modify: `src/resume_agent/api/routers/jobs.py:32-75,78-128`
 - Test: `tests/api/test_job_detail.py`
@@ -332,6 +334,7 @@ git commit -m "refactor(api): project JobDetail via board.get_job_detail in one 
 ### Task 3: Route dashboard mutations through `board` (C)
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/pages.py:49-60,313-322,430-435,452-460,663,718,725,739`
 - Test: `tests/test_dashboard_seam.py`
 
@@ -419,6 +422,7 @@ git commit -m "refactor(dashboard): route mutations through the board seam"
 ### Task 4: Lift prune into a `services.prune` use-case (D)
 
 **Files:**
+
 - Create: `src/resume_agent/services/prune.py`
 - Modify: `src/resume_agent/cli.py:453-482`
 - Modify: `src/resume_agent/api/routers/prune.py`

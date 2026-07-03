@@ -14,19 +14,19 @@
 
 ## File Structure
 
-| File | Responsibility | Action |
-|---|---|---|
-| `src/resume_agent/discovery/connectors/detect.py` | `AtsTarget` descriptor; URL/host → target | Modify |
-| `src/resume_agent/discovery/connectors/workday.py` | Workday cxs list+detail fetch, request-shaping, list-gate | Create |
-| `src/resume_agent/discovery/connectors/tesla.py` | Tesla careers JSON singleton backend | Create |
-| `src/resume_agent/discovery/connectors/google.py` | Google careers JSON singleton backend | Create |
-| `src/resume_agent/discovery/connectors/companies.py` | Dispatch table; thread `search`/`limit` to adapters | Modify |
-| `src/resume_agent/discovery/connectors/text.py` | Shared `primary_search_text` and list-row relevance gate | Modify |
-| `tests/test_connector_detect.py` | Extend with Workday triple + singletons | Modify |
-| `tests/test_connector_workday.py` | Workday parse/list-gate/fetch | Create |
-| `tests/test_connector_tesla.py` | Tesla parse/fetch | Create |
-| `tests/test_connector_google.py` | Google parse/fetch | Create |
-| `tests/test_connector_companies.py` | Dispatch to new backends | Modify |
+| File                                                 | Responsibility                                            | Action |
+| ---------------------------------------------------- | --------------------------------------------------------- | ------ |
+| `src/resume_agent/discovery/connectors/detect.py`    | `AtsTarget` descriptor; URL/host → target                 | Modify |
+| `src/resume_agent/discovery/connectors/workday.py`   | Workday cxs list+detail fetch, request-shaping, list-gate | Create |
+| `src/resume_agent/discovery/connectors/tesla.py`     | Tesla careers JSON singleton backend                      | Create |
+| `src/resume_agent/discovery/connectors/google.py`    | Google careers JSON singleton backend                     | Create |
+| `src/resume_agent/discovery/connectors/companies.py` | Dispatch table; thread `search`/`limit` to adapters       | Modify |
+| `src/resume_agent/discovery/connectors/text.py`      | Shared `primary_search_text` and list-row relevance gate  | Modify |
+| `tests/test_connector_detect.py`                     | Extend with Workday triple + singletons                   | Modify |
+| `tests/test_connector_workday.py`                    | Workday parse/list-gate/fetch                             | Create |
+| `tests/test_connector_tesla.py`                      | Tesla parse/fetch                                         | Create |
+| `tests/test_connector_google.py`                     | Google parse/fetch                                        | Create |
+| `tests/test_connector_companies.py`                  | Dispatch to new backends                                  | Modify |
 
 No change to `config.py`, `registry.py`, or `connectors.yaml` — Workday/Tesla/Google URLs go in the existing `companies.urls`.
 
@@ -35,6 +35,7 @@ No change to `config.py`, `registry.py`, or `connectors.yaml` — Workday/Tesla/
 ## Task 1: Extend `AtsTarget` with Workday triple + singleton support
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/detect.py:47-50`
 - Test: `tests/test_connector_detect.py`
 
@@ -93,6 +94,7 @@ git commit -m "feat: extend AtsTarget with optional workday/singleton fields"
 ## Task 2: Detect the full Workday triple without emitting partial Workday targets
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/detect.py:44,70-73,91-93`
 - Test: `tests/test_connector_detect.py`
 
@@ -182,6 +184,7 @@ git commit -m "feat: capture workday tenant/datacenter/site in L1 detection"
 ## Task 3: Host-match singletons for Tesla and Google
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/detect.py` (add `_singleton`, call it first in `detect_ats`)
 - Test: `tests/test_connector_detect.py`
 
@@ -267,6 +270,7 @@ git commit -m "feat: detect tesla/google careers by host-match singleton"
 ## Task 4: Shared search/listing helpers + Workday list parsing
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/workday.py`
 - Modify: `src/resume_agent/discovery/connectors/text.py`
 - Test: `tests/test_connector_workday.py`
@@ -448,6 +452,7 @@ git commit -m "feat: workday list parsing and cxs request body"
 ## Task 5: Workday detail parsing
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/workday.py`
 - Test: `tests/test_connector_workday.py`
 
@@ -538,6 +543,7 @@ git commit -m "feat: workday detail parsing (jd, url, posted_at)"
 ## Task 6: Workday fetch — paginate, list-gate before detail, honor limit
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/workday.py`
 - Test: `tests/test_connector_workday.py`
 
@@ -673,10 +679,11 @@ git commit -m "feat: workday fetch with request-shaping and list-gate-before-det
 ## Task 7: Tesla singleton backend
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/tesla.py`
 - Test: `tests/test_connector_tesla.py`
 
-> **Build-time note:** confirm Tesla's exact careers endpoints from the browser network tab before running live. The parser below targets the documented shape (`/cua-api/apps/careers/state` listings + `/cua-api/apps/careers/job/{id}` detail); the tests pin the *parser* against a fixture, so only the two URL constants need confirming.
+> **Build-time note:** confirm Tesla's exact careers endpoints from the browser network tab before running live. The parser below targets the documented shape (`/cua-api/apps/careers/state` listings + `/cua-api/apps/careers/job/{id}` detail); the tests pin the _parser_ against a fixture, so only the two URL constants need confirming.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -808,6 +815,7 @@ git commit -m "feat: tesla careers singleton backend (parser fixture-tested)"
 ## Task 8: Google singleton backend
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/google.py`
 - Test: `tests/test_connector_google.py`
 
@@ -931,6 +939,7 @@ git commit -m "feat: google careers singleton backend (search-shaped, fixture-te
 ## Task 9: Wire the dispatch table in `CompaniesConnector`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/companies.py`
 - Test: `tests/test_connector_companies.py`
 

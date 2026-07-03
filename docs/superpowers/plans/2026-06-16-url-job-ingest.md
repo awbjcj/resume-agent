@@ -15,6 +15,7 @@
 ### Task 1: Package skeleton + shared models
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/url_ingest/__init__.py`
 - Create: `src/resume_agent/discovery/url_ingest/models.py`
 - Test: `tests/url_ingest/__init__.py`, `tests/url_ingest/test_models.py`
@@ -100,6 +101,7 @@ git commit -m "feat(url-ingest): add package skeleton and shared models"
 ### Task 2: LinkedIn detail-page meta parser
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/scraper/models.py`
 - Modify: `src/resume_agent/discovery/scraper/parser.py`
 - Test: `tests/test_scraper_parser.py`
@@ -196,6 +198,7 @@ git commit -m "feat(scraper): parse title/company/location from LinkedIn detail 
 ### Task 3: Greenhouse parser
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/url_ingest/greenhouse.py`
 - Test: `tests/url_ingest/test_greenhouse.py`
 
@@ -294,6 +297,7 @@ git commit -m "feat(url-ingest): add deterministic Greenhouse parser"
 ### Task 4: HTML cleaner + LLM extractor
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/url_ingest/llm.py`
 - Test: `tests/url_ingest/test_llm.py`
 
@@ -420,6 +424,7 @@ git commit -m "feat(url-ingest): add HTML cleaner and LLM field extractor"
 ### Task 5: One-shot rendered fetch (Playwright)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/url_ingest/browser.py`
 - Test: `tests/url_ingest/test_browser.py`
 
@@ -561,6 +566,7 @@ git commit -m "feat(url-ingest): add one-shot rendered fetch via Playwright"
 ### Task 6: Fetch routing (HTTP-first, browser fallback)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/url_ingest/fetch.py`
 - Test: `tests/url_ingest/test_fetch.py`
 
@@ -715,6 +721,7 @@ git commit -m "feat(url-ingest): route fetching HTTP-first with browser fallback
 ### Task 7: Service orchestrator (`job_from_url`)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/url_ingest/service.py`
 - Test: `tests/url_ingest/test_service.py`
 
@@ -868,6 +875,7 @@ git commit -m "feat(url-ingest): add job_from_url orchestrator with domain routi
 ### Task 8: Wire `addjob --url` into the CLI
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py:14` (imports) and `src/resume_agent/cli.py:93-112` (`addjob`)
 - Test: `tests/test_cli_addjob_url.py`
 

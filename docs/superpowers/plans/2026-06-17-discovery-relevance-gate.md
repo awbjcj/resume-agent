@@ -4,7 +4,7 @@
 
 **Goal:** Stop wildly off-target jobs ("Class A CDL Driver", "Creative Lead") from entering the raw list and burning two LLM calls each. Add a **tiered relevance gate** — a free deterministic title-anchored lexical gate at the connector edge, plus a cheap haiku relevance stage before extraction — and **narrow at the source**: a tightened Adzuna query and, for LinkedIn, its **native search filters** (`f_*`/`geoId`/`distance`/`sortBy`) applied from config before scraping.
 
-**Architecture:** Two new tiers slot in *before* the existing LLM stages. Tier 1 (lexical, title-anchored) replaces `filter_by_search` inside connectors so junk never reaches the DB. Tier 2 (`run_relevance`, haiku) is a new pipeline stage that marks off-target `raw` jobs `rejected` with a reason and lets survivors flow to `run_extract`. Source-narrowing is per-connector: Adzuna gets a targeted query (Task 4); LinkedIn's `_search_url` emits native filter params with a **login-free** geoId lookup (Tasks 8–9). Everything fails open: empty config / no API key / LLM error / unresolved geo ⇒ that gate or param is a no-op. No DB migration; config-only additions.
+**Architecture:** Two new tiers slot in _before_ the existing LLM stages. Tier 1 (lexical, title-anchored) replaces `filter_by_search` inside connectors so junk never reaches the DB. Tier 2 (`run_relevance`, haiku) is a new pipeline stage that marks off-target `raw` jobs `rejected` with a reason and lets survivors flow to `run_extract`. Source-narrowing is per-connector: Adzuna gets a targeted query (Task 4); LinkedIn's `_search_url` emits native filter params with a **login-free** geoId lookup (Tasks 8–9). Everything fails open: empty config / no API key / LLM error / unresolved geo ⇒ that gate or param is a no-op. No DB migration; config-only additions.
 
 **Tech Stack:** Python 3.13, Pydantic v2 (`ExtensibleModel`, `extra="allow"`), SQLModel/SQLAlchemy (SQLite), Typer (CLI), Agno + Claude (LLM), httpx (connectors), pytest (offline; agents/HTTP faked).
 
@@ -17,27 +17,28 @@
 
 ## File Structure
 
-| File | Responsibility | Action |
-|---|---|---|
-| `src/resume_agent/discovery/search_config.py` | New `role_anchors`, `exclude_terms`, `target_role`, shared `distance`/`max_days_old`, `experience_levels`, `employment_types` fields | Modify |
-| `config/search.yaml.example` | Document the new fields with sensible defaults | Modify |
-| `src/resume_agent/discovery/connectors/text.py` | `relevance_gate` (title-anchored, word-boundary); keep `filter_by_search` as fallback | Modify |
-| `src/resume_agent/discovery/connectors/{greenhouse,lever,adzuna,remoteok}.py` | Call `relevance_gate`; record `self.filtered` | Modify |
-| `src/resume_agent/discovery/connectors/adzuna.py` | Targeted server-side query | Modify |
-| `src/resume_agent/discovery/connectors/runner.py` | Surface `filtered` count in telemetry note | Modify |
-| `src/resume_agent/discovery/relevance.py` | `build_relevance_agent`, `judge_relevance` (haiku gate) | Create |
-| `src/resume_agent/discovery/pipeline.py` | `run_relevance` stage; call it inside `discover` | Modify |
-| `src/resume_agent/cli.py` | Build + thread the relevance agent into `discover` | Modify |
-| `src/resume_agent/discovery/scraper/geo.py` | `resolve_geo_id` (login-free LinkedIn typeahead) + cache | Create |
-| `src/resume_agent/discovery/scraper/linkedin.py` | `_search_url` emits `f_*`/`geoId`/`distance`/`sortBy` from config | Modify |
-| `tests/fixtures/relevance/*.json` | Labeled golden corpus | Create |
-| `tests/...` | One test file per module above | Create/Modify |
+| File                                                                          | Responsibility                                                                                                                       | Action        |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| `src/resume_agent/discovery/search_config.py`                                 | New `role_anchors`, `exclude_terms`, `target_role`, shared `distance`/`max_days_old`, `experience_levels`, `employment_types` fields | Modify        |
+| `config/search.yaml.example`                                                  | Document the new fields with sensible defaults                                                                                       | Modify        |
+| `src/resume_agent/discovery/connectors/text.py`                               | `relevance_gate` (title-anchored, word-boundary); keep `filter_by_search` as fallback                                                | Modify        |
+| `src/resume_agent/discovery/connectors/{greenhouse,lever,adzuna,remoteok}.py` | Call `relevance_gate`; record `self.filtered`                                                                                        | Modify        |
+| `src/resume_agent/discovery/connectors/adzuna.py`                             | Targeted server-side query                                                                                                           | Modify        |
+| `src/resume_agent/discovery/connectors/runner.py`                             | Surface `filtered` count in telemetry note                                                                                           | Modify        |
+| `src/resume_agent/discovery/relevance.py`                                     | `build_relevance_agent`, `judge_relevance` (haiku gate)                                                                              | Create        |
+| `src/resume_agent/discovery/pipeline.py`                                      | `run_relevance` stage; call it inside `discover`                                                                                     | Modify        |
+| `src/resume_agent/cli.py`                                                     | Build + thread the relevance agent into `discover`                                                                                   | Modify        |
+| `src/resume_agent/discovery/scraper/geo.py`                                   | `resolve_geo_id` (login-free LinkedIn typeahead) + cache                                                                             | Create        |
+| `src/resume_agent/discovery/scraper/linkedin.py`                              | `_search_url` emits `f_*`/`geoId`/`distance`/`sortBy` from config                                                                    | Modify        |
+| `tests/fixtures/relevance/*.json`                                             | Labeled golden corpus                                                                                                                | Create        |
+| `tests/...`                                                                   | One test file per module above                                                                                                       | Create/Modify |
 
 ---
 
 ## Task 1: Add relevance config fields to `SearchConfig`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/search_config.py`
 - Modify: `config/search.yaml.example`
 - Test: `tests/test_search_config.py`
@@ -146,13 +147,13 @@ target_role: >
   Applied AI / LLM engineering roles, including forward-deployed,
   autonomy solutions, and ML platform engineering.
 # Shared source-narrowing (used by BOTH Adzuna and LinkedIn).
-distance: 40              # miles radius around locations[0]
-max_days_old: 30         # freshness window (Adzuna max_days_old; LinkedIn f_TPR)
+distance: 40 # miles radius around locations[0]
+max_days_old: 30 # freshness window (Adzuna max_days_old; LinkedIn f_TPR)
 # LinkedIn native filters (named; mapped to f_E / f_JT codes by the scraper).
-experience_levels:       # internship | entry | associate | mid-senior | director | executive
+experience_levels: # internship | entry | associate | mid-senior | director | executive
   - mid-senior
   - director
-employment_types:        # full_time | contract | part_time | temporary | internship
+employment_types: # full_time | contract | part_time | temporary | internship
   - full_time
 ```
 
@@ -172,6 +173,7 @@ git commit -m "feat(discovery): add relevance-gate config fields to SearchConfig
 ## Task 2: Title-anchored lexical gate (`relevance_gate`)
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/text.py`
 - Test: `tests/test_connectors_text.py`
 
@@ -305,6 +307,7 @@ git commit -m "feat(discovery): add title-anchored relevance_gate with word-boun
 ## Task 3: Route connectors through `relevance_gate` + record filtered count
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/greenhouse.py`, `lever.py`, `adzuna.py`, `remoteok.py`
 - Modify: `src/resume_agent/discovery/connectors/runner.py`
 - Test: `tests/test_connector_greenhouse.py`, `tests/test_connectors_runner.py`
@@ -427,6 +430,7 @@ git commit -m "feat(connectors): route fetch through relevance_gate and report f
 ## Task 4: Targeted Adzuna server-side query
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/adzuna.py`
 - Test: `tests/test_connector_adzuna.py`
 
@@ -535,6 +539,7 @@ git commit -m "feat(adzuna): push a targeted server-side query instead of an all
 ## Task 5: Haiku relevance gate module (`relevance.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/relevance.py`
 - Test: `tests/test_discovery_relevance.py` (create)
 
@@ -672,6 +677,7 @@ git commit -m "feat(discovery): add haiku relevance-gate agent and judge_relevan
 ## Task 6: `run_relevance` pipeline stage (fail-open) + wire into `discover`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/pipeline.py`
 - Test: `tests/test_discovery_pipeline.py`
 
@@ -836,6 +842,7 @@ git commit -m "feat(discovery): add fail-open run_relevance stage ahead of extra
 ## Task 7: CLI wiring + golden corpus + live before/after
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Create: `tests/fixtures/relevance/labeled.json`
 - Create/Modify: `tests/test_relevance_corpus.py`, `tests/test_cli_discovery.py`
@@ -922,7 +929,7 @@ def test_tier1_gate_matches_labels():
 - [ ] **Step 5: Run the corpus + CLI tests to verify they pass**
 
 Run: `.venv/Scripts/python -m pytest tests/test_relevance_corpus.py tests/test_cli_discovery.py -q`
-Expected: PASS. (If a label is genuinely ambiguous, fix the *fixture* label or tune the default
+Expected: PASS. (If a label is genuinely ambiguous, fix the _fixture_ label or tune the default
 anchor/exclude lists in `search.yaml.example` — not the gate logic.)
 
 - [ ] **Step 6: Live before/after smoke (manual, recorded in PR)**
@@ -963,6 +970,7 @@ git commit -m "feat(discovery): wire relevance agent into CLI + golden-corpus re
 ## Task 8: Login-free LinkedIn geoId resolver
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/scraper/geo.py`
 - Test: `tests/test_scraper_geo.py` (create)
 
@@ -1114,6 +1122,7 @@ git commit -m "feat(scraper): login-free LinkedIn geoId resolver with cache and 
 ## Task 9: Emit LinkedIn native filters in `_search_url`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/scraper/linkedin.py`
 - Test: `tests/test_scraper_linkedin.py`
 

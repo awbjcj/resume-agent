@@ -27,11 +27,13 @@
 ### Task 1: Settings shell — routes, layout, secondary nav, sidebar entry
 
 **Files:**
+
 - Create: `web/src/features/settings/SettingsLayout.tsx`
 - Modify: `web/src/app/router.tsx`, `web/src/app/AppLayout.tsx`
 - Test: `web/src/features/settings/SettingsLayout.test.tsx`
 
 **Interfaces:**
+
 - Produces: routes `/settings/*` rendering `SettingsLayout` (secondary nav + `<Outlet/>`); `SETTINGS_NAV` export: `{ to, label }[]` for `profile`, `search`, `sources`, `keys`, `review`, `rendering`, `pruning`, `style-guide`. Placeholder index redirect `/settings` → `/settings/profile`.
 
 - [ ] **Step 1: Write the failing test**
@@ -56,7 +58,9 @@ describe("SettingsLayout", () => {
       </MemoryRouter>,
     );
     for (const item of SETTINGS_NAV) {
-      expect(screen.getByRole("link", { name: item.label })).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: item.label }),
+      ).toBeInTheDocument();
     }
     expect(screen.getByText("search page")).toBeInTheDocument();
   });
@@ -160,7 +164,7 @@ import { Settings } from "lucide-react";
       </SidebarMenuItem>
     </SidebarMenu>
   </SidebarGroupContent>
-</SidebarGroup>
+</SidebarGroup>;
 ```
 
 - [ ] **Step 4: Run tests, lint**
@@ -180,11 +184,13 @@ git commit -m "feat(web): settings shell with secondary nav and sidebar entry"
 ### Task 2: Config data hooks + SaveBar (shared dirty-form machinery)
 
 **Files:**
+
 - Create: `web/src/features/settings/use-config.ts`
 - Create: `web/src/features/settings/SaveBar.tsx`
 - Test: `web/src/features/settings/use-config.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `api`, `unwrap` from `@/lib/api/client`; generated `paths` types.
 - Produces:
   - `useConfig<P extends ConfigPath>(path: P)` → TanStack `useQuery` keyed `["config", path]` returning the GET body.
@@ -206,8 +212,14 @@ import { useConfig, useSaveConfig } from "./use-config";
 
 const server = setupServer(
   http.get("*/api/config/prune", () =>
-    HttpResponse.json({ fitThreshold: 40, staleDays: 60, retentionDays: 30,
-      enableRejected: true, enableLowFit: true, enableStale: true }),
+    HttpResponse.json({
+      fitThreshold: 40,
+      staleDays: 60,
+      retentionDays: 30,
+      enableRejected: true,
+      enableLowFit: true,
+      enableStale: true,
+    }),
   ),
   http.put("*/api/config/prune", async ({ request }) =>
     HttpResponse.json(await request.json()),
@@ -224,16 +236,24 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 describe("useConfig", () => {
   it("fetches the config document", async () => {
-    const { result } = renderHook(() => useConfig("/api/config/prune"), { wrapper });
+    const { result } = renderHook(() => useConfig("/api/config/prune"), {
+      wrapper,
+    });
     await waitFor(() => expect(result.current.data).toBeDefined());
     expect(result.current.data?.fitThreshold).toBe(40);
   });
 
   it("save mutation PUTs and resolves with the echoed doc", async () => {
-    const { result } = renderHook(() => useSaveConfig("/api/config/prune"), { wrapper });
+    const { result } = renderHook(() => useSaveConfig("/api/config/prune"), {
+      wrapper,
+    });
     const saved = await result.current.mutateAsync({
-      fitThreshold: 55, staleDays: 60, retentionDays: 30,
-      enableRejected: false, enableLowFit: true, enableStale: true,
+      fitThreshold: 55,
+      staleDays: 60,
+      retentionDays: 30,
+      enableRejected: false,
+      enableLowFit: true,
+      enableStale: true,
     });
     expect(saved.fitThreshold).toBe(55);
   });
@@ -294,14 +314,22 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 export function SaveBar({
-  dirty, saving, onSave, onDiscard,
+  dirty,
+  saving,
+  onSave,
+  onDiscard,
 }: {
-  dirty: boolean; saving: boolean; onSave: () => void; onDiscard: () => void;
+  dirty: boolean;
+  saving: boolean;
+  onSave: () => void;
+  onDiscard: () => void;
 }) {
   if (!dirty) return null;
   return (
     <div className="sticky bottom-0 z-10 mt-6 flex items-center gap-3 rounded-lg border bg-background/95 p-3 backdrop-blur">
-      <span className="text-sm text-muted-foreground">You have unsaved changes</span>
+      <span className="text-sm text-muted-foreground">
+        You have unsaved changes
+      </span>
       <div className="ml-auto flex gap-2">
         <Button variant="outline" onClick={onDiscard} disabled={saving}>
           Discard
@@ -329,6 +357,7 @@ git commit -m "feat(web): shared config query/save hooks and SaveBar"
 ### Task 3: Search settings page (form shared with the wizard)
 
 **Files:**
+
 - Create: `web/src/features/settings/forms/TagListInput.tsx`
 - Create: `web/src/features/settings/forms/SearchConfigForm.tsx`
 - Create: `web/src/features/settings/pages/SearchSettingsPage.tsx`
@@ -336,6 +365,7 @@ git commit -m "feat(web): shared config query/save hooks and SaveBar"
 - Test: `web/src/features/settings/forms/SearchConfigForm.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useConfig`/`useSaveConfig` (Task 2), shadcn `Field`/`FieldGroup`/`Input`/`Switch`/`ToggleGroup`/`Badge`.
 - Produces:
   - `TagListInput({ id, value, onChange, placeholder })` — Enter/comma adds a tag (rendered as `Badge` with an ✕ button), Backspace on empty input removes the last.
@@ -354,10 +384,21 @@ import { describe, expect, it } from "vitest";
 import { SearchConfigForm, type SearchDoc } from "./SearchConfigForm";
 
 const EMPTY: SearchDoc = {
-  keywords: [], titles: [], locations: [], remotePolicy: null,
-  minSalary: null, yoeMin: null, yoeMax: null, sponsorshipRequired: false,
-  roleAnchors: [], excludeTerms: [], targetRole: null,
-  distance: null, maxDaysOld: null, experienceLevels: [], employmentTypes: [],
+  keywords: [],
+  titles: [],
+  locations: [],
+  remotePolicy: null,
+  minSalary: null,
+  yoeMin: null,
+  yoeMax: null,
+  sponsorshipRequired: false,
+  roleAnchors: [],
+  excludeTerms: [],
+  targetRole: null,
+  distance: null,
+  maxDaysOld: null,
+  experienceLevels: [],
+  employmentTypes: [],
 };
 
 function Harness() {
@@ -404,9 +445,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
 export function TagListInput({
-  id, value, onChange, placeholder,
+  id,
+  value,
+  onChange,
+  placeholder,
 }: {
-  id: string; value: string[]; onChange: (next: string[]) => void; placeholder?: string;
+  id: string;
+  value: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
 }) {
   const [draft, setDraft] = useState("");
 
@@ -445,7 +492,11 @@ export function TagListInput({
           if (e.key === "Enter" || e.key === ",") {
             e.preventDefault();
             commit();
-          } else if (e.key === "Backspace" && draft === "" && value.length > 0) {
+          } else if (
+            e.key === "Backspace" &&
+            draft === "" &&
+            value.length > 0
+          ) {
             onChange(value.slice(0, -1));
           }
         }}
@@ -458,7 +509,10 @@ export function TagListInput({
 ```tsx
 // web/src/features/settings/forms/SearchConfigForm.tsx
 import {
-  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -483,9 +537,11 @@ function numOrNull(raw: string): number | null {
 }
 
 export function SearchConfigForm({
-  value, onChange,
+  value,
+  onChange,
 }: {
-  value: SearchDoc; onChange: (next: SearchDoc) => void;
+  value: SearchDoc;
+  onChange: (next: SearchDoc) => void;
 }) {
   const set = <K extends keyof SearchDoc>(key: K, v: SearchDoc[K]) =>
     onChange({ ...value, [key]: v });
@@ -494,52 +550,83 @@ export function SearchConfigForm({
     <FieldGroup>
       <Field>
         <FieldLabel htmlFor="keywords">Keywords</FieldLabel>
-        <TagListInput id="keywords" value={value.keywords ?? []}
-          onChange={(v) => set("keywords", v)} placeholder="python, distributed systems…" />
+        <TagListInput
+          id="keywords"
+          value={value.keywords ?? []}
+          onChange={(v) => set("keywords", v)}
+          placeholder="python, distributed systems…"
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor="titles">Titles</FieldLabel>
-        <TagListInput id="titles" value={value.titles ?? []}
-          onChange={(v) => set("titles", v)} placeholder="Software Engineer…" />
+        <TagListInput
+          id="titles"
+          value={value.titles ?? []}
+          onChange={(v) => set("titles", v)}
+          placeholder="Software Engineer…"
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor="locations">Locations</FieldLabel>
-        <TagListInput id="locations" value={value.locations ?? []}
-          onChange={(v) => set("locations", v)} placeholder="Remote, Austin TX…" />
+        <TagListInput
+          id="locations"
+          value={value.locations ?? []}
+          onChange={(v) => set("locations", v)}
+          placeholder="Remote, Austin TX…"
+        />
       </Field>
       <Field>
         <FieldLabel>Remote policy</FieldLabel>
         <ToggleGroup
           type="single"
           value={value.remotePolicy ?? "any"}
-          onValueChange={(v: string) => set("remotePolicy", v === "any" ? null : v)}
+          onValueChange={(v: string) =>
+            set("remotePolicy", v === "any" ? null : v)
+          }
         >
           {REMOTE_OPTIONS.map((o) => (
-            <ToggleGroupItem key={o.value} value={o.value}>{o.label}</ToggleGroupItem>
+            <ToggleGroupItem key={o.value} value={o.value}>
+              {o.label}
+            </ToggleGroupItem>
           ))}
         </ToggleGroup>
       </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="minSalary">Minimum salary</FieldLabel>
-          <Input id="minSalary" type="number" value={value.minSalary ?? ""}
-            onChange={(e) => set("minSalary", numOrNull(e.target.value))} />
+          <Input
+            id="minSalary"
+            type="number"
+            value={value.minSalary ?? ""}
+            onChange={(e) => set("minSalary", numOrNull(e.target.value))}
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="yoeMin">Years of experience, min</FieldLabel>
-          <Input id="yoeMin" type="number" value={value.yoeMin ?? ""}
-            onChange={(e) => set("yoeMin", numOrNull(e.target.value))} />
+          <Input
+            id="yoeMin"
+            type="number"
+            value={value.yoeMin ?? ""}
+            onChange={(e) => set("yoeMin", numOrNull(e.target.value))}
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="yoeMax">Years of experience, max</FieldLabel>
-          <Input id="yoeMax" type="number" value={value.yoeMax ?? ""}
-            onChange={(e) => set("yoeMax", numOrNull(e.target.value))} />
+          <Input
+            id="yoeMax"
+            type="number"
+            value={value.yoeMax ?? ""}
+            onChange={(e) => set("yoeMax", numOrNull(e.target.value))}
+          />
         </Field>
       </div>
       <Field>
         <div className="flex items-center gap-3">
-          <Switch id="sponsorship" checked={value.sponsorshipRequired ?? false}
-            onCheckedChange={(v: boolean) => set("sponsorshipRequired", v)} />
+          <Switch
+            id="sponsorship"
+            checked={value.sponsorshipRequired ?? false}
+            onCheckedChange={(v: boolean) => set("sponsorshipRequired", v)}
+          />
           <FieldLabel htmlFor="sponsorship">I need visa sponsorship</FieldLabel>
         </div>
       </Field>
@@ -550,18 +637,27 @@ export function SearchConfigForm({
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="roleAnchors">Role anchors</FieldLabel>
-                <TagListInput id="roleAnchors" value={value.roleAnchors ?? []}
-                  onChange={(v) => set("roleAnchors", v)} />
+                <TagListInput
+                  id="roleAnchors"
+                  value={value.roleAnchors ?? []}
+                  onChange={(v) => set("roleAnchors", v)}
+                />
               </Field>
               <Field>
                 <FieldLabel htmlFor="excludeTerms">Exclude terms</FieldLabel>
-                <TagListInput id="excludeTerms" value={value.excludeTerms ?? []}
-                  onChange={(v) => set("excludeTerms", v)} />
+                <TagListInput
+                  id="excludeTerms"
+                  value={value.excludeTerms ?? []}
+                  onChange={(v) => set("excludeTerms", v)}
+                />
               </Field>
               <Field>
                 <FieldLabel htmlFor="targetRole">Target role</FieldLabel>
-                <Input id="targetRole" value={value.targetRole ?? ""}
-                  onChange={(e) => set("targetRole", e.target.value || null)} />
+                <Input
+                  id="targetRole"
+                  value={value.targetRole ?? ""}
+                  onChange={(e) => set("targetRole", e.target.value || null)}
+                />
               </Field>
             </FieldGroup>
           </AccordionContent>
@@ -603,14 +699,17 @@ export function SearchSettingsPage() {
       <header>
         <h1 className="text-lg font-semibold">Search</h1>
         <p className="text-sm text-muted-foreground">
-          What discovery looks for. Tighter role anchors mean fewer wasted fetches.
+          What discovery looks for. Tighter role anchors mean fewer wasted
+          fetches.
         </p>
       </header>
       <SearchConfigForm value={draft} onChange={setDraft} />
       <SaveBar
         dirty={dirty}
         saving={save.isPending}
-        onSave={() => save.mutate(draft, { onSuccess: (saved) => setDraft(saved) })}
+        onSave={() =>
+          save.mutate(draft, { onSuccess: (saved) => setDraft(saved) })
+        }
         onDiscard={() => setDraft(data)}
       />
     </div>
@@ -641,6 +740,7 @@ git commit -m "feat(web): search settings page with shared SearchConfigForm"
 ### Task 4: API keys page (secrets + models)
 
 **Files:**
+
 - Create: `web/src/features/settings/use-secrets.ts`
 - Create: `web/src/features/settings/forms/SecretsForm.tsx`
 - Create: `web/src/features/settings/pages/KeysSettingsPage.tsx`
@@ -648,6 +748,7 @@ git commit -m "feat(web): search settings page with shared SearchConfigForm"
 - Test: `web/src/features/settings/forms/SecretsForm.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `GET/PUT /api/secrets` (list of `{key, isSet, hint}`), `useConfig("/api/config/models")` + `useSaveConfig`.
 - Produces:
   - `useSecrets()` — query `["secrets"]`; `useSaveSecrets()` — mutation PUTting a partial `{[camelKey]: string | null}` map, invalidating `["secrets"]` and `["setup-status"]`.
@@ -681,8 +782,13 @@ describe("SecretsForm", () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     render(<SecretsForm statuses={STATUSES} saving={false} onSave={onSave} />);
-    await user.click(screen.getByRole("button", { name: "Add OpenAI API key" }));
-    await user.type(screen.getByLabelText("OpenAI API key new value"), "sk-oai-123");
+    await user.click(
+      screen.getByRole("button", { name: "Add OpenAI API key" }),
+    );
+    await user.type(
+      screen.getByLabelText("OpenAI API key new value"),
+      "sk-oai-123",
+    );
     await user.click(screen.getByRole("button", { name: "Save key" }));
     expect(onSave).toHaveBeenCalledWith({ openaiApiKey: "sk-oai-123" });
   });
@@ -691,7 +797,9 @@ describe("SecretsForm", () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     render(<SecretsForm statuses={STATUSES} saving={false} onSave={onSave} />);
-    await user.click(screen.getByRole("button", { name: "Clear Anthropic API key" }));
+    await user.click(
+      screen.getByRole("button", { name: "Clear Anthropic API key" }),
+    );
     expect(onSave).toHaveBeenCalledWith({ anthropicApiKey: null });
   });
 });
@@ -725,7 +833,9 @@ export function useSaveSecrets() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (patch: SecretsPatch) =>
-      unwrap(api.PUT("/api/secrets", { body: patch as never })) as Promise<SecretStatus[]>,
+      unwrap(api.PUT("/api/secrets", { body: patch as never })) as Promise<
+        SecretStatus[]
+      >,
     onSuccess: (statuses) => {
       qc.setQueryData(["secrets"], statuses);
       qc.invalidateQueries({ queryKey: ["setup-status"] });
@@ -759,9 +869,13 @@ export const SECRET_LABELS: Record<string, string> = {
 };
 
 export function SecretsForm({
-  statuses, saving, onSave,
+  statuses,
+  saving,
+  onSave,
 }: {
-  statuses: SecretStatus[]; saving: boolean; onSave: (patch: SecretsPatch) => void;
+  statuses: SecretStatus[];
+  saving: boolean;
+  onSave: (patch: SecretsPatch) => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -780,20 +894,30 @@ export function SecretsForm({
             <div className="flex flex-wrap items-center gap-3">
               <FieldLabel className="min-w-44">{label}</FieldLabel>
               {s.isSet ? (
-                <Badge variant="secondary">Set{s.hint ? ` · ••••${s.hint}` : ""}</Badge>
+                <Badge variant="secondary">
+                  Set{s.hint ? ` · ••••${s.hint}` : ""}
+                </Badge>
               ) : (
                 <Badge variant="outline">Not set</Badge>
               )}
               <div className="ml-auto flex gap-2">
                 {editing !== s.key && (
-                  <Button variant="outline" size="sm" onClick={() => startEdit(s.key)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => startEdit(s.key)}
+                  >
                     {s.isSet ? `Replace ${label}` : `Add ${label}`}
                   </Button>
                 )}
                 {s.isSet && (
-                  <Button variant="outline" size="sm" disabled={saving}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={saving}
                     aria-label={`Clear ${label}`}
-                    onClick={() => onSave({ [s.key]: null })}>
+                    onClick={() => onSave({ [s.key]: null })}
+                  >
                     Clear {label}
                   </Button>
                 )}
@@ -808,11 +932,18 @@ export function SecretsForm({
                   onChange={(e) => setDraft(e.target.value)}
                   autoComplete="off"
                 />
-                <Button disabled={saving || draft === ""}
-                  onClick={() => { onSave({ [s.key]: draft }); setEditing(null); }}>
+                <Button
+                  disabled={saving || draft === ""}
+                  onClick={() => {
+                    onSave({ [s.key]: draft });
+                    setEditing(null);
+                  }}
+                >
                   Save key
                 </Button>
-                <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+                <Button variant="ghost" onClick={() => setEditing(null)}>
+                  Cancel
+                </Button>
               </div>
             )}
           </Field>
@@ -855,7 +986,8 @@ export function KeysSettingsPage() {
     if (models.data && draft === null) setDraft(models.data as ModelsDoc);
   }, [models.data, draft]);
 
-  if (!secrets.data || !models.data || !draft) return <Skeleton className="h-64 w-full" />;
+  if (!secrets.data || !models.data || !draft)
+    return <Skeleton className="h-64 w-full" />;
   const dirty = JSON.stringify(draft) !== JSON.stringify(models.data);
 
   return (
@@ -863,11 +995,15 @@ export function KeysSettingsPage() {
       <header>
         <h1 className="text-lg font-semibold">API keys</h1>
         <p className="text-sm text-muted-foreground">
-          Keys are write-only: once saved, only the last four characters are shown.
+          Keys are write-only: once saved, only the last four characters are
+          shown.
         </p>
       </header>
-      <SecretsForm statuses={secrets.data} saving={saveSecrets.isPending}
-        onSave={(patch) => saveSecrets.mutate(patch)} />
+      <SecretsForm
+        statuses={secrets.data}
+        saving={saveSecrets.isPending}
+        onSave={(patch) => saveSecrets.mutate(patch)}
+      />
       <Separator />
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-medium">Model tiers</h2>
@@ -875,14 +1011,22 @@ export function KeysSettingsPage() {
           {MODEL_FIELDS.map((f) => (
             <Field key={f.key}>
               <FieldLabel htmlFor={f.key}>{f.label}</FieldLabel>
-              <Input id={f.key} value={draft[f.key]}
-                onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} />
+              <Input
+                id={f.key}
+                value={draft[f.key]}
+                onChange={(e) =>
+                  setDraft({ ...draft, [f.key]: e.target.value })
+                }
+              />
             </Field>
           ))}
         </FieldGroup>
-        <SaveBar dirty={dirty} saving={saveModels.isPending}
+        <SaveBar
+          dirty={dirty}
+          saving={saveModels.isPending}
           onSave={() => saveModels.mutate(draft as never)}
-          onDiscard={() => setDraft(models.data as ModelsDoc)} />
+          onDiscard={() => setDraft(models.data as ModelsDoc)}
+        />
       </section>
     </div>
   );
@@ -904,6 +1048,7 @@ git commit -m "feat(web): API keys page with write-only secrets and model tiers"
 ### Task 5: Review, Rendering, Pruning settings pages
 
 **Files:**
+
 - Create: `web/src/features/settings/pages/ReviewSettingsPage.tsx`
 - Create: `web/src/features/settings/pages/RenderingSettingsPage.tsx`
 - Create: `web/src/features/settings/pages/PruningSettingsPage.tsx`
@@ -911,6 +1056,7 @@ git commit -m "feat(web): API keys page with write-only secrets and model tiers"
 - Test: `web/src/features/settings/pages/PruningSettingsPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useConfig`/`useSaveConfig`/`SaveBar` (Task 2); shadcn `Table`, `Select`, `Switch`, `Alert`.
 - Produces: three pages, each following the SearchSettingsPage load→draft→dirty→SaveBar pattern.
 
@@ -950,8 +1096,14 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { PruningSettingsPage } from "./PruningSettingsPage";
 
-const DOC = { fitThreshold: 40, staleDays: 60, retentionDays: 30,
-  enableRejected: true, enableLowFit: true, enableStale: true };
+const DOC = {
+  fitThreshold: 40,
+  staleDays: 60,
+  retentionDays: 30,
+  enableRejected: true,
+  enableLowFit: true,
+  enableStale: true,
+};
 let lastPut: unknown = null;
 
 const server = setupServer(
@@ -962,13 +1114,18 @@ const server = setupServer(
   }),
 );
 beforeAll(() => server.listen());
-afterEach(() => { server.resetHandlers(); lastPut = null; });
+afterEach(() => {
+  server.resetHandlers();
+  lastPut = null;
+});
 afterAll(() => server.close());
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={qc}><PruningSettingsPage /></QueryClientProvider>,
+    <QueryClientProvider client={qc}>
+      <PruningSettingsPage />
+    </QueryClientProvider>,
   );
 }
 
@@ -976,7 +1133,9 @@ describe("PruningSettingsPage", () => {
   it("shows SaveBar only after an edit, then PUTs the full document", async () => {
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByLabelText("Fit threshold")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Fit threshold")).toBeInTheDocument(),
+    );
     expect(screen.queryByText(/unsaved changes/i)).not.toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("Fit threshold"));
@@ -1004,7 +1163,12 @@ beyond `SaveBar`/`useConfig`):
 // web/src/features/settings/pages/PruningSettingsPage.tsx
 import { useEffect, useState } from "react";
 
-import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -1012,15 +1176,29 @@ import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import type { paths } from "@/lib/api/schema";
 
-type PruneDoc = paths["/api/config/prune"]["get"]["responses"][200]["content"]["application/json"];
+type PruneDoc =
+  paths["/api/config/prune"]["get"]["responses"][200]["content"]["application/json"];
 
-const RULES: { key: "enableRejected" | "enableLowFit" | "enableStale"; label: string; help: string }[] = [
-  { key: "enableRejected", label: "Archive rejected jobs",
-    help: "Jobs the discovery filter already rejected" },
-  { key: "enableLowFit", label: "Archive low-fit jobs",
-    help: "Scored jobs below the fit threshold" },
-  { key: "enableStale", label: "Archive stale jobs",
-    help: "Postings older than the stale window" },
+const RULES: {
+  key: "enableRejected" | "enableLowFit" | "enableStale";
+  label: string;
+  help: string;
+}[] = [
+  {
+    key: "enableRejected",
+    label: "Archive rejected jobs",
+    help: "Jobs the discovery filter already rejected",
+  },
+  {
+    key: "enableLowFit",
+    label: "Archive low-fit jobs",
+    help: "Scored jobs below the fit threshold",
+  },
+  {
+    key: "enableStale",
+    label: "Archive stale jobs",
+    help: "Postings older than the stale window",
+  },
 ];
 
 export function PruningSettingsPage() {
@@ -1034,8 +1212,9 @@ export function PruningSettingsPage() {
 
   if (!data || !draft) return <Skeleton className="h-64 w-full" />;
   const dirty = JSON.stringify(draft) !== JSON.stringify(data);
-  const setNum = (key: keyof PruneDoc) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setDraft({ ...draft, [key]: Number(e.target.value || 0) });
+  const setNum =
+    (key: keyof PruneDoc) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setDraft({ ...draft, [key]: Number(e.target.value || 0) });
 
   return (
     <div className="flex flex-col gap-6">
@@ -1049,26 +1228,47 @@ export function PruningSettingsPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field>
             <FieldLabel htmlFor="fitThreshold">Fit threshold</FieldLabel>
-            <Input id="fitThreshold" type="number" value={draft.fitThreshold}
-              onChange={setNum("fitThreshold")} />
-            <FieldDescription>Archive scored jobs below this fit score</FieldDescription>
+            <Input
+              id="fitThreshold"
+              type="number"
+              value={draft.fitThreshold}
+              onChange={setNum("fitThreshold")}
+            />
+            <FieldDescription>
+              Archive scored jobs below this fit score
+            </FieldDescription>
           </Field>
           <Field>
             <FieldLabel htmlFor="staleDays">Stale after (days)</FieldLabel>
-            <Input id="staleDays" type="number" value={draft.staleDays}
-              onChange={setNum("staleDays")} />
+            <Input
+              id="staleDays"
+              type="number"
+              value={draft.staleDays}
+              onChange={setNum("staleDays")}
+            />
           </Field>
           <Field>
-            <FieldLabel htmlFor="retentionDays">Delete archived after (days)</FieldLabel>
-            <Input id="retentionDays" type="number" value={draft.retentionDays}
-              onChange={setNum("retentionDays")} />
+            <FieldLabel htmlFor="retentionDays">
+              Delete archived after (days)
+            </FieldLabel>
+            <Input
+              id="retentionDays"
+              type="number"
+              value={draft.retentionDays}
+              onChange={setNum("retentionDays")}
+            />
           </Field>
         </div>
         {RULES.map((rule) => (
           <Field key={rule.key}>
             <div className="flex items-center gap-3">
-              <Switch id={rule.key} checked={draft[rule.key]}
-                onCheckedChange={(v: boolean) => setDraft({ ...draft, [rule.key]: v })} />
+              <Switch
+                id={rule.key}
+                checked={draft[rule.key]}
+                onCheckedChange={(v: boolean) =>
+                  setDraft({ ...draft, [rule.key]: v })
+                }
+              />
               <div>
                 <FieldLabel htmlFor={rule.key}>{rule.label}</FieldLabel>
                 <FieldDescription>{rule.help}</FieldDescription>
@@ -1077,8 +1277,12 @@ export function PruningSettingsPage() {
           </Field>
         ))}
       </FieldGroup>
-      <SaveBar dirty={dirty} saving={save.isPending}
-        onSave={() => save.mutate(draft)} onDiscard={() => setDraft(data)} />
+      <SaveBar
+        dirty={dirty}
+        saving={save.isPending}
+        onSave={() => save.mutate(draft)}
+        onDiscard={() => setDraft(data)}
+      />
     </div>
   );
 }
@@ -1101,6 +1305,7 @@ git commit -m "feat(web): review, rendering, and pruning settings pages"
 ### Task 6: Style guide page (adds textarea component)
 
 **Files:**
+
 - Create: `web/src/components/ui/textarea.tsx` (via shadcn CLI)
 - Create: `web/src/features/settings/pages/StyleGuideSettingsPage.tsx`
 - Modify: `web/src/app/router.tsx` (register `style-guide`)
@@ -1126,26 +1331,40 @@ import { StyleGuideSettingsPage } from "./StyleGuideSettingsPage";
 
 let lastPut: unknown = null;
 const server = setupServer(
-  http.get("*/api/config/style-guide", () => HttpResponse.json({ content: "# Voice" })),
+  http.get("*/api/config/style-guide", () =>
+    HttpResponse.json({ content: "# Voice" }),
+  ),
   http.put("*/api/config/style-guide", async ({ request }) => {
     lastPut = await request.json();
     return HttpResponse.json(lastPut);
   }),
 );
 beforeAll(() => server.listen());
-afterEach(() => { server.resetHandlers(); lastPut = null; });
+afterEach(() => {
+  server.resetHandlers();
+  lastPut = null;
+});
 afterAll(() => server.close());
 
 describe("StyleGuideSettingsPage", () => {
   it("edits and saves the markdown content", async () => {
     const user = userEvent.setup();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={qc}><StyleGuideSettingsPage /></QueryClientProvider>);
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={qc}>
+        <StyleGuideSettingsPage />
+      </QueryClientProvider>,
+    );
     const box = await waitFor(() => screen.getByLabelText("Style guide"));
     await user.type(box, "\nBe concrete.");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
-      expect((lastPut as { content: string }).content).toContain("Be concrete."));
+      expect((lastPut as { content: string }).content).toContain(
+        "Be concrete.",
+      ),
+    );
   });
 });
 ```
@@ -1184,14 +1403,23 @@ export function StyleGuideSettingsPage() {
       </header>
       <Field>
         <FieldLabel htmlFor="style-guide">Style guide</FieldLabel>
-        <Textarea id="style-guide" value={draft} rows={20}
+        <Textarea
+          id="style-guide"
+          value={draft}
+          rows={20}
           className="font-mono text-sm"
-          onChange={(e) => setDraft(e.target.value)} />
-        <FieldDescription>{draft.length} characters · Markdown</FieldDescription>
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <FieldDescription>
+          {draft.length} characters · Markdown
+        </FieldDescription>
       </Field>
-      <SaveBar dirty={dirty} saving={save.isPending}
+      <SaveBar
+        dirty={dirty}
+        saving={save.isPending}
         onSave={() => save.mutate({ content: draft })}
-        onDiscard={() => setDraft(data.content)} />
+        onDiscard={() => setDraft(data.content)}
+      />
     </div>
   );
 }
@@ -1212,6 +1440,7 @@ git commit -m "feat(web): style guide editor page"
 ### Task 7: Profile & documents page (upload, list, delete, rebuild)
 
 **Files:**
+
 - Create: `web/src/features/settings/use-documents.ts`
 - Create: `web/src/features/settings/forms/DocumentManager.tsx`
 - Create: `web/src/features/settings/pages/ProfileSettingsPage.tsx`
@@ -1219,6 +1448,7 @@ git commit -m "feat(web): style guide editor page"
 - Test: `web/src/features/settings/forms/DocumentManager.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `GET/POST/DELETE /api/profile/documents`, `POST /api/profile/build`, `useConfig("/api/config/profile")`; the existing run-launch machinery — read `web/src/features/runs/use-launch-run.ts` first and reuse it for the build run (it owns registering the run in the RunPanel store); `GET /api/setup/status` invalidation.
 - Produces:
   - `useDocuments()` (query `["profile-documents"]`), `useUploadDocument()` (multipart POST via `fetch` — openapi-fetch and multipart don't mix well; POST with `FormData` directly to `/api/profile/documents`, headers from the token helper), `useDeleteDocument()`.
@@ -1238,16 +1468,34 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { DocumentManager } from "./DocumentManager";
 
-const DOCS = [{ id: "abc123", filename: "resume.pdf", docType: "resume",
-  sizeBytes: 1234, uploadedAt: "2026-07-01T00:00:00+00:00" }];
+const DOCS = [
+  {
+    id: "abc123",
+    filename: "resume.pdf",
+    docType: "resume",
+    sizeBytes: 1234,
+    uploadedAt: "2026-07-01T00:00:00+00:00",
+  },
+];
 
 const server = setupServer(
   http.get("*/api/profile/documents", () => HttpResponse.json(DOCS)),
   http.post("*/api/profile/documents", () =>
-    HttpResponse.json({ id: "new456", filename: "transcript.pdf", docType: "transcript",
-      sizeBytes: 99, uploadedAt: "2026-07-01T01:00:00+00:00" }, { status: 201 })),
-  http.delete("*/api/profile/documents/abc123", () =>
-    new HttpResponse(null, { status: 204 })),
+    HttpResponse.json(
+      {
+        id: "new456",
+        filename: "transcript.pdf",
+        docType: "transcript",
+        sizeBytes: 99,
+        uploadedAt: "2026-07-01T01:00:00+00:00",
+      },
+      { status: 201 },
+    ),
+  ),
+  http.delete(
+    "*/api/profile/documents/abc123",
+    () => new HttpResponse(null, { status: 204 }),
+  ),
 );
 beforeAll(() => server.listen());
 afterEach(() => server.resetHandlers());
@@ -1255,13 +1503,19 @@ afterAll(() => server.close());
 
 function renderManager() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><DocumentManager /></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <DocumentManager />
+    </QueryClientProvider>,
+  );
 }
 
 describe("DocumentManager", () => {
   it("lists documents with their type", async () => {
     renderManager();
-    await waitFor(() => expect(screen.getByText("resume.pdf")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("resume.pdf")).toBeInTheDocument(),
+    );
     expect(screen.getByText("resume")).toBeInTheDocument();
   });
 
@@ -1270,8 +1524,13 @@ describe("DocumentManager", () => {
     renderManager();
     await waitFor(() => screen.getByText("resume.pdf"));
     const input = screen.getByTestId("file-input") as HTMLInputElement;
-    await user.upload(input, new File(["x"], "transcript.pdf", { type: "application/pdf" }));
-    await waitFor(() => expect(screen.getByText("transcript.pdf")).toBeInTheDocument());
+    await user.upload(
+      input,
+      new File(["x"], "transcript.pdf", { type: "application/pdf" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText("transcript.pdf")).toBeInTheDocument(),
+    );
   });
 });
 ```
@@ -1286,17 +1545,25 @@ import { toast } from "sonner";
 import { api, getToken, unwrap } from "@/lib/api/client";
 
 export type ProfileDocument = {
-  id: string; filename: string; docType: string; sizeBytes: number; uploadedAt: string;
+  id: string;
+  filename: string;
+  docType: string;
+  sizeBytes: number;
+  uploadedAt: string;
 };
 
 export function useDocuments() {
   return useQuery({
     queryKey: ["profile-documents"],
-    queryFn: () => unwrap(api.GET("/api/profile/documents")) as Promise<ProfileDocument[]>,
+    queryFn: () =>
+      unwrap(api.GET("/api/profile/documents")) as Promise<ProfileDocument[]>,
   });
 }
 
-async function postDocument(file: File, docType: string): Promise<ProfileDocument> {
+async function postDocument(
+  file: File,
+  docType: string,
+): Promise<ProfileDocument> {
   const form = new FormData();
   form.append("file", file);
   form.append("docType", docType);
@@ -1304,7 +1571,9 @@ async function postDocument(file: File, docType: string): Promise<ProfileDocumen
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const resp = await fetch(`${window.location.origin}/api/profile/documents`, {
-    method: "POST", body: form, headers,
+    method: "POST",
+    body: form,
+    headers,
   });
   const body = await resp.json();
   if (!resp.ok) throw new Error(body?.error?.message ?? "Upload failed");
@@ -1329,9 +1598,11 @@ export function useDeleteDocument() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (docId: string) =>
-      unwrap(api.DELETE("/api/profile/documents/{doc_id}", {
-        params: { path: { doc_id: docId } },
-      } as never)),
+      unwrap(
+        api.DELETE("/api/profile/documents/{doc_id}", {
+          params: { path: { doc_id: docId } },
+        } as never),
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile-documents"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
@@ -1350,20 +1621,40 @@ import { useRef, useState } from "react";
 import { FileUp, Trash2 } from "lucide-react";
 
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
-  AlertDialogTitle, AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { useDeleteDocument, useDocuments, useUploadDocument } from "../use-documents";
+import {
+  useDeleteDocument,
+  useDocuments,
+  useUploadDocument,
+} from "../use-documents";
 
 const DOC_TYPES = ["resume", "transcript", "portfolio", "other"] as const;
 
@@ -1383,7 +1674,10 @@ export function DocumentManager() {
       <div
         className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center"
         onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          handleFiles(e.dataTransfer.files);
+        }}
       >
         <FileUp className="size-6 text-muted-foreground" aria-hidden="true" />
         <p className="text-sm text-muted-foreground">
@@ -1396,20 +1690,32 @@ export function DocumentManager() {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {DOC_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                {DOC_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
           <Button variant="outline" onClick={() => fileInput.current?.click()}>
             Choose file
           </Button>
-          <input ref={fileInput} data-testid="file-input" type="file" className="hidden"
-            accept=".pdf,.docx,.txt,.md" onChange={(e) => handleFiles(e.target.files)} />
+          <input
+            ref={fileInput}
+            data-testid="file-input"
+            type="file"
+            className="hidden"
+            accept=".pdf,.docx,.txt,.md"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
         </div>
       </div>
 
       {docs.data && docs.data.length === 0 && (
-        <Empty>No documents yet — your resume is the one that matters most.</Empty>
+        <Empty>
+          No documents yet — your resume is the one that matters most.
+        </Empty>
       )}
       {docs.data && docs.data.length > 0 && (
         <Table>
@@ -1425,7 +1731,9 @@ export function DocumentManager() {
             {docs.data.map((doc) => (
               <TableRow key={doc.id}>
                 <TableCell className="font-medium">{doc.filename}</TableCell>
-                <TableCell><Badge variant="secondary">{doc.docType}</Badge></TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{doc.docType}</Badge>
+                </TableCell>
                 <TableCell className="text-muted-foreground">
                   {new Date(doc.uploadedAt).toLocaleDateString()}
                 </TableCell>
@@ -1433,17 +1741,23 @@ export function DocumentManager() {
                   <AlertDialog>
                     <AlertDialogTrigger
                       render={
-                        <Button variant="ghost" size="sm" aria-label={`Delete ${doc.filename}`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Delete ${doc.filename}`}
+                        >
                           <Trash2 aria-hidden="true" />
                         </Button>
                       }
                     />
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete {doc.filename}?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                          Delete {doc.filename}?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                          The file is removed permanently. Facts already extracted stay
-                          until the next profile build.
+                          The file is removed permanently. Facts already
+                          extracted stay until the next profile build.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -1512,6 +1826,7 @@ git commit -m "feat(web): profile documents manager with upload and rebuild"
 ### Task 8: Setup wizard (shell, steps, gate, finish)
 
 **Files:**
+
 - Create: `web/src/features/setup/SetupWizard.tsx` (shell: stepper header + outlet)
 - Create: `web/src/features/setup/steps/KeysStep.tsx`
 - Create: `web/src/features/setup/steps/DocumentsStep.tsx`
@@ -1523,6 +1838,7 @@ git commit -m "feat(web): profile documents manager with upload and rebuild"
 - Test: `web/src/features/setup/SetupWizard.test.tsx`, `web/src/features/setup/SetupGate.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSetupStatus` (Task 7), `SecretsForm`+`useSecrets` (Task 4), `DocumentManager` (Task 7), `SearchConfigForm`+`useConfig` (Task 3), the existing `SourcesPage` internals (Task 9 extracts `SourcesManager`; until then embed `SourcesPage` directly), run launch hook (Task 7 pattern).
 - Produces:
   - Route `/setup` (own top-level route, NOT inside `AppLayout` — single-column, no sidebar) with children `keys`, `documents`, `search`, `sources`, `finish`; index redirects to the first incomplete step.
@@ -1539,14 +1855,29 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 import { SetupGate } from "./SetupGate";
 
 const INCOMPLETE = {
   secrets: { anthropicKey: false, anyLlmKey: false },
-  profile: { documentCount: 0, hasResume: false, factsBuiltAt: null, githubUsername: null },
-  search: { configured: false }, sources: { enabledCount: 0 }, complete: false,
+  profile: {
+    documentCount: 0,
+    hasResume: false,
+    factsBuiltAt: null,
+    githubUsername: null,
+  },
+  search: { configured: false },
+  sources: { enabledCount: 0 },
+  complete: false,
 };
 
 const server = setupServer(
@@ -1563,7 +1894,14 @@ function renderGate() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
-          <Route path="/" element={<SetupGate><div>dashboard</div></SetupGate>} />
+          <Route
+            path="/"
+            element={
+              <SetupGate>
+                <div>dashboard</div>
+              </SetupGate>
+            }
+          />
           <Route path="/setup" element={<div>wizard</div>} />
         </Routes>
       </MemoryRouter>
@@ -1580,14 +1918,24 @@ describe("SetupGate", () => {
   it("does not redirect when the user dismissed setup", async () => {
     localStorage.setItem("resume-agent-setup-dismissed", "1");
     renderGate();
-    await waitFor(() => expect(screen.getByText("dashboard")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("dashboard")).toBeInTheDocument(),
+    );
   });
 
   it("fails open when the status endpoint errors", async () => {
-    server.use(http.get("*/api/setup/status", () =>
-      HttpResponse.json({ error: { code: "X", message: "boom" } }, { status: 500 })));
+    server.use(
+      http.get("*/api/setup/status", () =>
+        HttpResponse.json(
+          { error: { code: "X", message: "boom" } },
+          { status: 500 },
+        ),
+      ),
+    );
     renderGate();
-    await waitFor(() => expect(screen.getByText("dashboard")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("dashboard")).toBeInTheDocument(),
+    );
   });
 });
 ```
@@ -1600,8 +1948,15 @@ import { firstIncompleteStep, STEPS } from "./SetupWizard";
 
 const status = (over: object) => ({
   secrets: { anthropicKey: false, anyLlmKey: false },
-  profile: { documentCount: 0, hasResume: false, factsBuiltAt: null, githubUsername: null },
-  search: { configured: false }, sources: { enabledCount: 0 }, complete: false,
+  profile: {
+    documentCount: 0,
+    hasResume: false,
+    factsBuiltAt: null,
+    githubUsername: null,
+  },
+  search: { configured: false },
+  sources: { enabledCount: 0 },
+  complete: false,
   ...over,
 });
 
@@ -1611,23 +1966,43 @@ describe("firstIncompleteStep", () => {
   });
   it("resumes at search when keys and documents are done", () => {
     expect(
-      firstIncompleteStep(status({
-        secrets: { anthropicKey: true, anyLlmKey: true },
-        profile: { documentCount: 1, hasResume: true, factsBuiltAt: null, githubUsername: null },
-      })),
+      firstIncompleteStep(
+        status({
+          secrets: { anthropicKey: true, anyLlmKey: true },
+          profile: {
+            documentCount: 1,
+            hasResume: true,
+            factsBuiltAt: null,
+            githubUsername: null,
+          },
+        }),
+      ),
     ).toBe("search");
   });
   it("lands on finish when every step is done", () => {
     expect(
-      firstIncompleteStep(status({
-        secrets: { anthropicKey: true, anyLlmKey: true },
-        profile: { documentCount: 1, hasResume: true, factsBuiltAt: null, githubUsername: null },
-        search: { configured: true }, sources: { enabledCount: 2 },
-      })),
+      firstIncompleteStep(
+        status({
+          secrets: { anthropicKey: true, anyLlmKey: true },
+          profile: {
+            documentCount: 1,
+            hasResume: true,
+            factsBuiltAt: null,
+            githubUsername: null,
+          },
+          search: { configured: true },
+          sources: { enabledCount: 2 },
+        }),
+      ),
     ).toBe("finish");
   });
   it("exposes exactly four steps", () => {
-    expect(STEPS.map((s) => s.slug)).toEqual(["keys", "documents", "search", "sources"]);
+    expect(STEPS.map((s) => s.slug)).toEqual([
+      "keys",
+      "documents",
+      "search",
+      "sources",
+    ]);
   });
 });
 ```
@@ -1643,13 +2018,32 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useSetupStatus, type SetupStatus } from "@/features/settings/use-setup-status";
+import {
+  useSetupStatus,
+  type SetupStatus,
+} from "@/features/settings/use-setup-status";
 
 export const STEPS = [
-  { slug: "keys", label: "Keys", done: (s: SetupStatus) => s.secrets.anyLlmKey },
-  { slug: "documents", label: "Documents", done: (s: SetupStatus) => s.profile.hasResume },
-  { slug: "search", label: "Search", done: (s: SetupStatus) => s.search.configured },
-  { slug: "sources", label: "Sources", done: (s: SetupStatus) => s.sources.enabledCount > 0 },
+  {
+    slug: "keys",
+    label: "Keys",
+    done: (s: SetupStatus) => s.secrets.anyLlmKey,
+  },
+  {
+    slug: "documents",
+    label: "Documents",
+    done: (s: SetupStatus) => s.profile.hasResume,
+  },
+  {
+    slug: "search",
+    label: "Search",
+    done: (s: SetupStatus) => s.search.configured,
+  },
+  {
+    slug: "sources",
+    label: "Sources",
+    done: (s: SetupStatus) => s.sources.enabledCount > 0,
+  },
 ] as const;
 
 export function firstIncompleteStep(status: SetupStatus): string {
@@ -1665,11 +2059,15 @@ export function SetupWizard() {
         <div className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-primary">
           Resume Agent · First-run setup
         </div>
-        <Button variant="ghost" size="sm" className="ml-auto"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto"
           onClick={() => {
             localStorage.setItem("resume-agent-setup-dismissed", "1");
             navigate("/");
-          }}>
+          }}
+        >
           Exit setup
         </Button>
       </header>
@@ -1677,11 +2075,15 @@ export function SetupWizard() {
         {STEPS.map((step, i) => (
           <div key={step.slug} className="flex items-center gap-2">
             {i > 0 && <div className="h-px w-6 bg-border" aria-hidden="true" />}
-            <NavLink to={`/setup/${step.slug}`}
+            <NavLink
+              to={`/setup/${step.slug}`}
               className={({ isActive }) =>
-                cn("flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm",
-                   isActive && "border-primary font-medium")
-              }>
+                cn(
+                  "flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm",
+                  isActive && "border-primary font-medium",
+                )
+              }
+            >
               {status && step.done(status) && (
                 <Check className="size-3.5 text-primary" aria-hidden="true" />
               )}
@@ -1690,7 +2092,9 @@ export function SetupWizard() {
           </div>
         ))}
       </nav>
-      <main className="flex-1"><Outlet /></main>
+      <main className="flex-1">
+        <Outlet />
+      </main>
     </div>
   );
 }
@@ -1727,8 +2131,9 @@ import { useSetupStatus } from "@/features/settings/use-setup-status";
 export function SetupGate({ children }: { children: ReactNode }) {
   const { data, isError } = useSetupStatus();
   if (isError) return <>{children}</>; // fail open — never lock a working app
-  if (!data) return <>{children}</>;   // loading: render normally, no flash-gate
-  const dismissed = localStorage.getItem("resume-agent-setup-dismissed") === "1";
+  if (!data) return <>{children}</>; // loading: render normally, no flash-gate
+  const dismissed =
+    localStorage.getItem("resume-agent-setup-dismissed") === "1";
   if (!data.complete && !dismissed) return <Navigate to="/setup" replace />;
   return <>{children}</>;
 }
@@ -1744,6 +2149,7 @@ redirect); wrap the `AppLayout` element as
 ```bash
 cd web && npm run test:run && npm run lint && npm run build
 ```
+
 Expected: all green; build succeeds.
 
 - [ ] **Step 4: Commit**
@@ -1758,6 +2164,7 @@ git commit -m "feat(web): four-step setup wizard with first-run gate and finish 
 ### Task 9: Sources relocation (`/sources` → `/settings/sources`)
 
 **Files:**
+
 - Modify: `web/src/features/sources/SourcesPage.tsx` (extract `SourcesManager` — the page body without the page header — and re-export both)
 - Modify: `web/src/app/router.tsx` (register `/settings/sources`; `/sources` becomes `<Navigate to="/settings/sources" replace />`)
 - Modify: `web/src/app/AppLayout.tsx` (remove Sources from the Workflows NAV array — it now lives under Settings)
@@ -1777,6 +2184,7 @@ page-level header into `export function SourcesManager()` in the same file;
 ```bash
 cd web && npm run test:run && npm run lint
 ```
+
 Expected: green — if `SourcesPage.test.tsx` asserted the route, update it to the new path.
 
 - [ ] **Step 4: Commit**
@@ -1791,6 +2199,7 @@ git commit -m "refactor(web): relocate sources under settings with redirect"
 ### Task 10: End-to-end smoke (first-run → wizard → settings)
 
 **Files:**
+
 - Create: `web/e2e/setup-wizard.spec.ts`
 - Test: Playwright (`npm run e2e`) — check `web/playwright.config.ts` first for
   how the backend is provided (webServer block vs manual); follow the existing
@@ -1804,7 +2213,9 @@ git commit -m "refactor(web): relocate sources under settings with redirect"
 import { expect, test } from "@playwright/test";
 
 // Serves the SPA against a fresh backend (empty config/env), so the gate fires.
-test("first run gates to the wizard; exit reaches the app; settings nav works", async ({ page }) => {
+test("first run gates to the wizard; exit reaches the app; settings nav works", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/setup/);
   await expect(page.getByText("First-run setup")).toBeVisible();

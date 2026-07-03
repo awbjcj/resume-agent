@@ -35,11 +35,13 @@
 ### Task 1: Surface cache-read / cache-write tokens in the eval report
 
 **Files:**
+
 - Modify: `evals/usage.py` (`UsageTotals`, `UsageCollector.observe`)
 - Modify: `evals/report.py` (`render_report` aggregate block)
 - Test: `tests/eval/test_usage.py` (append), `tests/eval/test_report.py` (append)
 
 **Interfaces:**
+
 - Consumes: agno `RunOutput.metrics` fields `cache_read_tokens`, `cache_write_tokens`
 - Produces: `UsageTotals` carries `cache_read_tokens: int = 0` and `cache_write_tokens: int = 0`; `render_report` prints both as run aggregates so a cache win is legible per run
 
@@ -148,6 +150,7 @@ git commit -m "Surfaces Anthropic cache read/write tokens in the eval report"
 ### Task 2: Lever A — system-prompt caching (ships unconditionally)
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py` (`Settings`: add `prompt_cache_enabled`)
 - Modify: `src/resume_agent/llm_runner.py` (`build_model`: add `cache_system_prompt` param)
 - Modify: `src/resume_agent/tailor/agents.py` (tailor-family builders request caching)
@@ -155,6 +158,7 @@ git commit -m "Surfaces Anthropic cache read/write tokens in the eval report"
 - Test: `tests/test_llm_runner.py` (append), `tests/test_tailor_agents.py` (append)
 
 **Interfaces:**
+
 - Consumes: `Settings.prompt_cache_enabled`
 - Produces: `build_model(model_id, api_key=None, *, cache_system_prompt: bool = False)` — Anthropic branch passes `cache_system_prompt`; other providers ignore it. Tailor-family agents (tailor, reviser, revision, reviewers), the match-plan agent, and the judge build their model with `cache_system_prompt=Settings.prompt_cache_enabled` (default `True`).
 
@@ -291,11 +295,13 @@ git commit -m "Enables Anthropic system-prompt caching for tailor-family agents"
 ### Task 3: Lever D — regression early-stop (eval-gated, default-off)
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/review_config.py` (`ReviewConfig`: add `early_stop_on_regression`)
 - Modify: `src/resume_agent/tailor/workflow.py` (both loops)
 - Test: `tests/test_tailor_workflow.py` (append)
 
 **Interfaces:**
+
 - Consumes: nothing new
 - Produces: `ReviewConfig.early_stop_on_regression: bool = False`. Once a gate-passing round exists, the loop stops when a later round breaks the gate or scores below the best prior clean round. It does not stop while all rounds are gate-failing.
 
@@ -430,21 +436,24 @@ git commit -m "Adds default-off regression early-stop cost lever"
 
 ## Deferred levers — interface-locked, implement after the baseline ranks them
 
-Per the spec (§3.2: *"adopt greedily while quality holds"*) and writing-plans' YAGNI, the two heavier behavior-changing levers are **not** built speculatively. Build each as its own task **only after** a recorded baseline shows the prior lever earned its place and the band holds. Each is specified enough to start without re-deriving the design.
+Per the spec (§3.2: _"adopt greedily while quality holds"_) and writing-plans' YAGNI, the two heavier behavior-changing levers are **not** built speculatively. Build each as its own task **only after** a recorded baseline shows the prior lever earned its place and the band holds. Each is specified enough to start without re-deriving the design.
 
 ### Lever B — Tier escalation (eval-gated)
+
 - **Config:** `ReviewConfig.escalation_enabled: bool = False`, `escalation_band: int = 5`.
 - **Behavior:** each non-gate reviewer runs at its **cheap** tier first; if its score is within `escalation_band` of `score_threshold` (contested), re-run that reviewer at **premium** and keep the premium critique. Gates (fact-check, provenance) always run at their configured tier.
 - **Shape:** build a `{name: (cheap_runner, premium_runner)}` map once in the bundle; add an `escalate` wrapper consumed by `run_panel`/`arun_panel` (passed via `config`), never building agents inside the loop.
 - **Risk:** the cheap tier may misjudge a contested score. **Adopt only if** `mean(candidate - baseline output_quality) >= -2 AND trap_recall unchanged` and cost drops.
 
 ### Lever C — Skip passed reviewers (eval-gated, highest risk)
+
 - **Config:** `ReviewConfig.skip_passed_enabled: bool = False`.
 - **Behavior:** on a revise round, skip re-running non-gate reviewers that **passed** the previous round and carry their prior critique forward into the verdict. The **fact-check and provenance gates always re-run** (revision is exactly when new fabrication can enter).
 - **Shape:** thread a `skip: set[str]` into `_panel_inputs`/`run_panel`; merge carried critiques into `aggregate`'s scored set. Touches `panel.py`, `workflow.py`, `verdict.py`.
 - **Risk (spec-flagged as unsound):** a whole-resume `revise` can stale a carried-forward score (an ATS fix can hurt concision). **Adopt only if** the band holds across repeated runs; pairs best **after** Phase 2's surgical-patch protocol (deferred there) makes revisions local.
 
 ### Further cache lever — cache the JD/profile prefix (investigate)
+
 agno's `cache_system_prompt` caches only the system prompt. The larger stable prefix (JD + profile/evidence, currently in the **user** message) is not cached. Caching it requires relocating it into the system message or attaching a manual `cache_control` block — a bigger change with its own correctness surface. Investigate only if Task 2's `cache_read_tokens` shows the instruction-only cache is too small to matter.
 
 ---
@@ -452,6 +461,7 @@ agno's `cache_system_prompt` caches only the system prompt. The larger stable pr
 ## Self-Review
 
 **Spec coverage (`2026-06-30-phase3-cost-latency-design.md`):**
+
 - §3.1 measurement first (Task 0): confirm `RunOutput` usage shape + cache surface, wire token usage into the report — Task 1 (cache split) builds on Phase 0's capture; the cache surface is confirmed in Global Constraints. ✓
 - §3.2 ships unconditionally — cache-aware system-prompt caching, transparent, no quality A/B — Task 2. ✓
 - §3.2 eval-gated by tolerance band — regression early-stop implemented default-off with an A/B config (Task 3); tier-escalation and skip-passed interface-locked for post-baseline adoption (Deferred levers), each with the explicit signed-delta quality gate. ✓
@@ -463,6 +473,7 @@ agno's `cache_system_prompt` caches only the system prompt. The larger stable pr
 **Type consistency:** `cache_system_prompt` flows `Settings.prompt_cache_enabled` → `build_model(..., cache_system_prompt=)` → tailor-family/match-plan/judge builders. `cache_read_tokens`/`cache_write_tokens` flow agno metrics → `UsageCollector` → `UsageTotals` → `render_report`. `early_stop_on_regression` is read only inside both workflow loops. ✓
 
 ## Notes for the implementer
+
 - This phase **does** change `src/resume_agent/tailor/` (unlike Phases 0–1) — that is expected; it is gated on Phases 1 and 2 being merged so quality is settled first.
 - Cache caveat: `cache_read_tokens > 0` is the only proof the cache took effect. A `0` reading means the cached prefix is below Anthropic's minimum — the lever is still safe, just inert; pursue the JD/profile-prefix lever instead.
 - Do not flip any eval-gated default (`early_stop_on_regression`, and later `escalation_enabled`/`skip_passed_enabled`) without a recorded run showing the band held. Eight stochastic cases are directional, not proof — confirm across repeated timestamped runs.

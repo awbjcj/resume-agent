@@ -24,10 +24,12 @@
 ### Task 1: `BoardFilter` contract + query-param parser
 
 **Files:**
+
 - Create: `src/resume_agent/services/board_query.py`
 - Test: `tests/test_services_board_query.py`
 
 **Interfaces:**
+
 - Produces: `BoardFilter` dataclass; `parse_csv(value: str | None) -> set[str]`; `to_filter_state(f: BoardFilter) -> dashboard.filtering.FilterState`.
 
 `BoardFilter` is the superset of every board's filters. Per-board `list_*` functions
@@ -147,11 +149,13 @@ git commit -m "feat(board): BoardFilter contract + query-param helpers"
 ### Task 2: Server-side filter + sort on the board lists
 
 **Files:**
+
 - Create: `src/resume_agent/services/board_query.py` (extend — add cross-cutting predicate + sorters)
 - Modify: `src/resume_agent/services/board.py` (`list_shortlist`, `list_pipeline`, `list_triage`)
 - Test: `tests/test_services_board.py` (append cases)
 
 **Interfaces:**
+
 - Consumes: `BoardFilter`, `to_filter_state` (Task 1); `apply_filters`, `sort_rows` (`dashboard/filtering`); `triage_rows`, `archived_rows`, `pipeline_rows`, `shortlist_rows` (`tracking/queries`); `paginate` (`services/pagination`).
 - Produces: `list_shortlist(session, *, filter: BoardFilter, page, page_size) -> Page[ShortlistRow]`; same shape for `list_triage` / `list_pipeline`. Helpers `apply_common(rows, f)`, `age_days(row, now)`, `sort_triage(rows, f)`.
 
@@ -343,11 +347,13 @@ git commit -m "feat(board): server-side BoardFilter filter+sort on every board l
 ### Task 3: Facet counts (`board_facets`) with excluding-self semantics
 
 **Files:**
+
 - Modify: `src/resume_agent/services/board_query.py` (add `compute_facets`)
 - Modify: `src/resume_agent/services/board.py` (add `board_facets`)
 - Test: `tests/test_services_board.py` (append)
 
 **Interfaces:**
+
 - Produces: `compute_facets(rows, f, now, specs) -> dict[str, dict[str, int]]` where `specs` maps facet-name → row attribute name (or a callable). `board.board_facets(session, board, filter) -> dict[str, dict[str, int]]`.
 
 Each facet's counts are computed over rows passing **all other** facets (excluding that
@@ -496,12 +502,14 @@ git commit -m "feat(board): excluding-self facet counts for triage + shortlist"
 ### Task 4: `BoardPage` envelope + filter query params on the GET endpoints
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/base.py` (add `BoardPage`)
 - Modify: `src/resume_agent/api/mappers.py` (add `to_board_page`)
 - Modify: `src/resume_agent/api/routers/boards.py` (filter params + facets)
 - Test: `tests/api/test_boards.py` (append)
 
 **Interfaces:**
+
 - Consumes: `board.list_*`, `board.board_facets`, `BoardFilter`, `parse_csv` (Tasks 1–3).
 - Produces: `BoardPage[T]` = `Page[T]` + `facets: dict[str, dict[str, int]]` + `total: int`; dependency `board_filter_params(...) -> BoardFilter`.
 
@@ -674,12 +682,14 @@ git commit -m "feat(api): BoardPage envelope (facets+total) + filter query param
 ### Task 5: `bulk_apply` service + `POST /api/jobs/bulk`
 
 **Files:**
+
 - Modify: `src/resume_agent/services/board.py` (add `resolve_ids`, `bulk_apply`)
 - Create: `src/resume_agent/api/schemas/bulk.py`
 - Modify: `src/resume_agent/api/routers/jobs.py` (add the endpoint)
 - Test: `tests/test_services_board.py`, `tests/api/test_job_mutations.py` (append)
 
 **Interfaces:**
+
 - Consumes: `archive_job`, `restore_job`, `delete_job`, `has_progress`, `get_job` (`tracking/repository`); `set_stage` (`board`); `list_triage`/`list_shortlist`/`list_pipeline` (for `scope="query"` id resolution); `JobStatus` (`tracking/tables`).
 - Produces: `BulkResult` dataclass `{affected:int, skipped:int, reasons:dict[str,int]}`; `bulk_apply(session, *, board, action, scope, filter, ids, status, dry_run) -> BulkResult`. Schemas `BulkRequest` / `BulkResultOut`.
 
@@ -931,10 +941,12 @@ git commit -m "feat(api): act-by-query bulk endpoint (archive/restore/delete/app
 ### Task 6: Database indexes for filter/sort at scale
 
 **Files:**
+
 - Modify: `src/resume_agent/db.py` (`init_db` — add `ensure_indexes`)
 - Test: `tests/test_db_indexes.py` (create)
 
 **Interfaces:**
+
 - Produces: `ensure_indexes(engine)` — idempotent `CREATE INDEX IF NOT EXISTS` for `status`, `archived_at`, `fit_score`, `source`, `company` on the `jobs` table; called at the end of `init_db`.
 
 Using `CREATE INDEX IF NOT EXISTS` (not `Field(index=True)`) so **existing** databases
@@ -1009,11 +1021,13 @@ git commit -m "perf(db): idempotent indexes on job filter/sort columns"
 ### Task 7: Regenerate the OpenAPI + TypeScript contract
 
 **Files:**
+
 - Modify: `contracts/openapi.json` (generated)
 - Modify: `contracts/ts/api.ts` (generated)
 - Verify: `tests/api/test_openapi_contract.py` (drift gate — should pass after regen)
 
 **Interfaces:**
+
 - Consumes: every schema/endpoint added in Tasks 4–5.
 - Produces: the frozen contract the web plan consumes (`BoardPage`, `BulkRequest`, `BulkResultOut`, new query params).
 

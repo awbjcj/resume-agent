@@ -32,6 +32,7 @@ Run the whole suite at any time with: `pytest -q`
 Lift the inlined httpx call into a module function each connector delegates to, so the new connector can reuse it. The existing subclass-and-override-`_get_board` tests must keep passing, so `_get_board` stays as a thin delegating method.
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/greenhouse.py:62-65`
 - Modify: `src/resume_agent/discovery/connectors/lever.py:80-83`
 - Test: `tests/test_connector_greenhouse.py`, `tests/test_connector_lever.py`
@@ -134,6 +135,7 @@ git commit -m "refactor: extract shared greenhouse/lever board fetchers"
 A new ATS backend: fetch a board's JSON and map it to `RawJob`s, mirroring `greenhouse.py`.
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/ashby.py`
 - Create: `tests/fixtures/ashby/job_board.json`
 - Test: `tests/test_connector_ashby.py`
@@ -289,6 +291,7 @@ git commit -m "feat: add ashby ATS backend (fetch + parse)"
 Resolve a careers URL to `(ats, token)` via L1 URL pattern, then L2 one-GET HTML sniff. Pure logic plus a single injectable HTML fetch.
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/detect.py`
 - Test: `tests/test_connector_detect.py`
 
@@ -452,6 +455,7 @@ git commit -m "feat: add ATS detection (L1 url pattern + L2 html sniff)"
 Add the config section that holds careers URLs. Coexists with existing sections; default-off.
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/config.py:44-53`
 - Modify: `config/connectors.yaml.example`
 - Test: `tests/test_connectors_config.py`
@@ -506,7 +510,6 @@ Then add the field to `ConnectorsConfig` (after the `linkedin` field, line 53):
 Append to `config/connectors.yaml.example`:
 
 ```yaml
-
 # Company careers pages by URL. The connector auto-detects the ATS
 # (Greenhouse / Lever / Ashby) and pulls all current openings. A direct
 # board URL works too; Workday is recognized but not yet fetched.
@@ -535,6 +538,7 @@ git commit -m "feat: add companies connector config section"
 The connector itself: detect → dispatch → collect → gate, with per-URL fail isolation and `.failures`/`.filtered` telemetry. Then register it.
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/companies.py`
 - Modify: `src/resume_agent/discovery/connectors/registry.py`
 - Test: `tests/test_connector_companies.py`, `tests/test_connectors_registry.py`
@@ -784,6 +788,7 @@ Expected: no errors.
 - [ ] **Step 3: Sanity-check detection against the spec acceptance criteria**
 
 Confirm by reading the tests that all eight acceptance criteria in the spec are covered:
+
 1. direct GH/Lever/Ashby by pattern → `test_l1_*` (Task 3)
 2. embedded Greenhouse via L2 → `test_l2_detects_embedded_greenhouse` (Task 3)
 3. Workday detected, reported unsupported → `test_workday_recognized_but_unsupported` (Task 5)

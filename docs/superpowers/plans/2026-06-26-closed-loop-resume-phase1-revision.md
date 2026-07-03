@@ -23,12 +23,14 @@
 ### Task 1: `ResumeVersion` revision columns + migration
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py:61-73` (`ResumeVersion`)
 - Modify: `src/resume_agent/tracking/migrate.py` (add helper at end)
 - Modify: `src/resume_agent/db.py:8-14,51-57` (import + call helper)
 - Test: `tests/test_tracking_migrate.py` (create if absent)
 
 **Interfaces:**
+
 - Produces: `ResumeVersion.origin: str` (default `"tailor"`), `ResumeVersion.instruction: str | None`, `ResumeVersion.parent_version_id: int | None`; `ensure_resume_version_revision_columns(engine: Engine) -> None`.
 
 - [ ] **Step 1: Write the failing test**
@@ -126,6 +128,7 @@ from resume_agent.tracking.migrate import (
     ensure_resume_version_revision_columns,
 )
 ```
+
 ```python
     ensure_resume_version_revision_columns(engine)
 ```
@@ -147,12 +150,14 @@ git commit -m "feat: add revision lineage columns to resume_versions"
 ### Task 2: `CoverLetter` revision columns + `Application.cover_letter_id` migration
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py:90-100` (`CoverLetter`), `:76-87` (`Application`)
 - Modify: `src/resume_agent/tracking/migrate.py`
 - Modify: `src/resume_agent/db.py` (call new helpers)
 - Test: `tests/test_tracking_migrate.py`
 
 **Interfaces:**
+
 - Produces: `CoverLetter.origin: str` (default `"draft"`), `CoverLetter.instruction: str | None`, `CoverLetter.parent_id: int | None`; `Application.cover_letter_id: int | None`; `ensure_cover_letter_revision_columns(engine)`, `ensure_application_cover_letter_id_column(engine)`.
 
 - [ ] **Step 1: Write the failing test**
@@ -252,11 +257,13 @@ git commit -m "feat: add revision columns to cover_letters and application.cover
 ### Task 3: Resume revision agent + composer
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/agents.py` (add `build_revision_agent`)
 - Create: `src/resume_agent/tailor/revision.py` (composer + run helper)
 - Test: `tests/test_tailor_revision.py`
 
 **Interfaces:**
+
 - Consumes: `Runner` (`agent.run(text).content -> ResumeContent`), `ResumeContent`, `ProfileFacts`.
 - Produces: `build_revision_agent(model_id=None, style_guide=None) -> Runner`; `compose_user_revision_input(content: ResumeContent, instruction: str, profile_facts: ProfileFacts) -> str`; `apply_revision(input_text: str, agent: Runner) -> ResumeContent`.
 
@@ -373,10 +380,12 @@ git commit -m "feat: add resume revision agent and instruction composer"
 ### Task 4: Add revision agent to `TailorBundle`
 
 **Files:**
+
 - Modify: `src/resume_agent/services/agents.py:38-43` (`TailorBundle`), `:60-71` (`build_tailor_bundle`), `:81-90` (`__all__`)
 - Test: `tests/test_services_agents.py` (create if absent)
 
 **Interfaces:**
+
 - Consumes: `build_revision_agent` (Task 3).
 - Produces: `TailorBundle.revision: Runner`.
 
@@ -417,6 +426,7 @@ from resume_agent.tailor.agents import (
     model_for_tier,
 )
 ```
+
 ```python
 @dataclass
 class TailorBundle:
@@ -425,6 +435,7 @@ class TailorBundle:
     reviewers: Mapping[str, Runner]
     revision: Runner
 ```
+
 ```python
     return TailorBundle(
         tailor=build_tailor_agent(style_guide=style_guide),
@@ -453,10 +464,12 @@ git commit -m "feat: expose revision agent on TailorBundle"
 ### Task 5: Resume revision service (`revise_resume_version`)
 
 **Files:**
+
 - Create: `src/resume_agent/services/revision.py`
 - Test: `tests/test_services_revision.py`
 
 **Interfaces:**
+
 - Consumes: `get_resume_version`, `get_job`, `save_resume_version`, `load_facts`, `build_tailor_bundle`, `compose_user_revision_input`/`apply_revision` (Task 3), `provenance_critique` (`resume_agent.tailor.provenance`), `run_panel`/`aggregate` for the optional re-review.
 - Produces: `revise_resume_version(session, version_id: int, instruction: str, *, re_review: bool = False, review_path: str = DEFAULT_REVIEW, facts_path: str = DEFAULT_FACTS, bundle: TailorBundle | None = None) -> ResumeVersion | None`. Returns the new version, or `None` if `version_id` does not exist.
 
@@ -643,6 +656,7 @@ git commit -m "feat: resume version revision service with fact-gate flagging"
 ### Task 6: Cover-letter revision agent, composer, and service
 
 **Files:**
+
 - Modify: `src/resume_agent/cover_letter/agents.py` (add `build_cover_letter_revision_agent`)
 - Modify: `src/resume_agent/cover_letter/drafting.py` (add `compose_user_revision_input` + run helper)
 - Modify: `src/resume_agent/services/agents.py` (`CoverLetterBundle.revision`)
@@ -650,6 +664,7 @@ git commit -m "feat: resume version revision service with fact-gate flagging"
 - Test: `tests/test_services_cover_letter_revision.py`
 
 **Interfaces:**
+
 - Produces: `build_cover_letter_revision_agent(model_id=None) -> Runner`; `compose_cl_user_revision_input(content: CoverLetterContent, instruction: str, profile_facts: ProfileFacts) -> str`; `apply_cl_revision(text, agent) -> CoverLetterContent`; `CoverLetterBundle.revision: Runner`; `revise_cover_letter_version(session, cover_letter_id: int, instruction: str, *, facts_path=DEFAULT_FACTS, bundle: CoverLetterBundle | None = None) -> CoverLetter | None`.
 
 - [ ] **Step 1: Write the failing test**
@@ -767,6 +782,7 @@ from resume_agent.cover_letter.agents import (
     build_cover_letter_revision_agent,
 )
 ```
+
 ```python
 @dataclass
 class CoverLetterBundle:
@@ -774,6 +790,7 @@ class CoverLetterBundle:
     reviser: Runner
     revision: Runner
 ```
+
 ```python
 def build_cover_letter_bundle() -> CoverLetterBundle:
     return CoverLetterBundle(
@@ -852,10 +869,12 @@ git commit -m "feat: cover-letter revision agent, composer, and service"
 ### Task 7: Version-selection service (set chosen resume/cover letter on the Application)
 
 **Files:**
+
 - Modify: `src/resume_agent/services/board.py:438-446` (after `upsert_application`)
 - Test: `tests/test_services_board.py`
 
 **Interfaces:**
+
 - Consumes: `application_for_job`, `save_application`, `Application`.
 - Produces: `select_resume_version(session, job_id: int, version_id: int) -> Application`; `select_cover_letter(session, job_id: int, cover_letter_id: int) -> Application`. Both create the Application if missing.
 
@@ -920,11 +939,13 @@ git commit -m "feat: application resume/cover-letter selection services"
 ### Task 8: API — resume revise + select endpoints and schema fields
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/jobs.py:73-81` (`ResumeVersionOut`), add `ReviseRequest`
 - Modify: `src/resume_agent/api/routers/resumes.py` (add endpoints)
 - Test: `tests/api/test_resumes_revise.py`
 
 **Interfaces:**
+
 - Consumes: `revise_resume_version` (Task 5), `select_resume_version` (Task 7).
 - Produces: `POST /api/resume-versions/{id}/revise` body `ReviseRequest{instruction: str, reReview: bool=False}` → `ResumeVersionOut`; `POST /api/jobs/{job_id}/select-resume/{version_id}` → `ApplicationOut`. `ResumeVersionOut` gains `origin`, `instruction`, `parent_version_id`.
 
@@ -1021,6 +1042,7 @@ git commit -m "feat: resume revise + select-resume API endpoints"
 ### Task 9: API — cover letters in JobDetail + revise/select endpoints
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/jobs.py` (add `CoverLetterOut`; add `cover_letters` + `application` already present)
 - Modify: `src/resume_agent/tracking/queries.py` (`job_detail_row` to include cover letters — locate the DTO it returns)
 - Create: `src/resume_agent/api/routers/cover_letters.py`
@@ -1028,6 +1050,7 @@ git commit -m "feat: resume revise + select-resume API endpoints"
 - Test: `tests/api/test_cover_letters_revise.py`
 
 **Interfaces:**
+
 - Consumes: `revise_cover_letter_version` (Task 6), `select_cover_letter` (Task 7), `get_cover_letter`.
 - Produces: `CoverLetterOut{id, job_id, origin, instruction, parent_id, fact_check_passed, pdf_path, created_at}`; `JobDetail.cover_letters: list[CoverLetterOut]`; `POST /api/cover-letters/{id}/revise` → `CoverLetterOut`; `POST /api/jobs/{job_id}/select-cover-letter/{cover_letter_id}` → `ApplicationOut`; `GET /api/cover-letters/{id}/pdf`.
 
@@ -1149,6 +1172,7 @@ git commit -m "feat: cover-letter revise/select/pdf endpoints and JobDetail.cove
 ### Task 10: Regenerate API contracts
 
 **Files:**
+
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (generated)
 - Verify: `tests/api/test_openapi_contract.py`
 
@@ -1178,10 +1202,12 @@ git commit -m "chore: regenerate API contracts for revision endpoints"
 ### Task 11: Frontend — revise + select mutations
 
 **Files:**
+
 - Modify: `web/src/features/job/use-job-mutations.ts` (add hooks)
 - Test: `web/src/features/job/use-job-mutations.test.tsx` (create if absent; mirror an existing mutation test)
 
 **Interfaces:**
+
 - Produces: `useReviseVersion(jobId)`, `useReviseCoverLetter(jobId)`, `useSelectResume(jobId)`, `useSelectCoverLetter(jobId)` — each a TanStack mutation that POSTs and invalidates the job-detail query key.
 
 - [ ] **Step 1: Write the failing test**
@@ -1201,9 +1227,19 @@ In `web/src/features/job/use-job-mutations.ts`, mirror `useRenderVersion`:
 export function useReviseVersion(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ versionId, instruction, reReview }:
-      { versionId: number; instruction: string; reReview?: boolean }) =>
-      apiPost(`/api/resume-versions/${versionId}/revise`, { instruction, reReview: reReview ?? false }),
+    mutationFn: ({
+      versionId,
+      instruction,
+      reReview,
+    }: {
+      versionId: number;
+      instruction: string;
+      reReview?: boolean;
+    }) =>
+      apiPost(`/api/resume-versions/${versionId}/revise`, {
+        instruction,
+        reReview: reReview ?? false,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
 }
@@ -1211,7 +1247,8 @@ export function useReviseVersion(jobId: number) {
 export function useSelectResume(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (versionId: number) => apiPost(`/api/jobs/${jobId}/select-resume/${versionId}`, {}),
+    mutationFn: (versionId: number) =>
+      apiPost(`/api/jobs/${jobId}/select-resume/${versionId}`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
 }
@@ -1219,7 +1256,13 @@ export function useSelectResume(jobId: number) {
 export function useReviseCoverLetter(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ coverLetterId, instruction }: { coverLetterId: number; instruction: string }) =>
+    mutationFn: ({
+      coverLetterId,
+      instruction,
+    }: {
+      coverLetterId: number;
+      instruction: string;
+    }) =>
       apiPost(`/api/cover-letters/${coverLetterId}/revise`, { instruction }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
@@ -1254,11 +1297,13 @@ git commit -m "feat: revise + select mutation hooks"
 ### Task 12: Frontend — Versions tab revise UI + lineage + selection
 
 **Files:**
+
 - Create: `web/src/features/job/VersionRow.tsx` (one version row with revise box + use-for-application)
 - Modify: `web/src/components/JobModal.tsx:100-140` (Versions tab body → render `VersionRow`)
 - Test: `web/src/features/job/VersionRow.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useReviseVersion`, `useSelectResume` (Task 11); `ResumeVersionOut` (now with `origin`/`instruction`/`parentVersionId`).
 - Produces: `VersionRow` — renders round/score/fact-check, a red badge when `!factCheckPassed`, origin + instruction text on revisions, an instruction `<input>` + Revise button + reReview checkbox, a "Use for application" button (highlighted when this id equals the application's `resumeVersionId`), and the existing Download/Render affordance.
 
@@ -1271,10 +1316,22 @@ import { VersionRow } from "./VersionRow";
 // wrap in the project's QueryClientProvider test helper (see neighboring tests)
 
 it("shows the instruction and a fact-check-failed badge on a flagged revision", () => {
-  const v = { id: 5, jobId: 1, round: 2, reviewScore: null, factCheckPassed: false,
-    pdfPath: null, origin: "revision", instruction: "add team of 10", parentVersionId: 3,
-    createdAt: "2026-06-26T00:00:00Z", critiqueJson: null };
-  renderWithClient(<VersionRow jobId={1} version={v as any} appliedVersionId={null} />);
+  const v = {
+    id: 5,
+    jobId: 1,
+    round: 2,
+    reviewScore: null,
+    factCheckPassed: false,
+    pdfPath: null,
+    origin: "revision",
+    instruction: "add team of 10",
+    parentVersionId: 3,
+    createdAt: "2026-06-26T00:00:00Z",
+    critiqueJson: null,
+  };
+  renderWithClient(
+    <VersionRow jobId={1} version={v as any} appliedVersionId={null} />,
+  );
   expect(screen.getByText(/add team of 10/)).toBeInTheDocument();
   expect(screen.getByText(/fact-check ✗/)).toBeInTheDocument();
 });
@@ -1299,8 +1356,15 @@ import type { components } from "@/lib/api/schema";
 
 type V = components["schemas"]["ResumeVersionOut"];
 
-export function VersionRow({ jobId, version, appliedVersionId }:
-  { jobId: number; version: V; appliedVersionId: number | null }) {
+export function VersionRow({
+  jobId,
+  version,
+  appliedVersionId,
+}: {
+  jobId: number;
+  version: V;
+  appliedVersionId: number | null;
+}) {
   const [instruction, setInstruction] = useState("");
   const [reReview, setReReview] = useState(false);
   const revise = useReviseVersion(jobId);
@@ -1311,38 +1375,68 @@ export function VersionRow({ jobId, version, appliedVersionId }:
     <li className="space-y-2 rounded-xl border bg-background/60 p-3">
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <span>
-          {version.origin === "revision" ? "Revision" : `Round ${version.round}`} · score{" "}
-          {version.reviewScore ?? "—"} ·{" "}
+          {version.origin === "revision"
+            ? "Revision"
+            : `Round ${version.round}`}{" "}
+          · score {version.reviewScore ?? "—"} ·{" "}
           <span className={version.factCheckPassed ? "" : "text-destructive"}>
             {version.factCheckPassed ? "fact-check ✓" : "fact-check ✗"}
           </span>
           {version.parentVersionId && (
-            <span className="ml-1 opacity-60">(from #{version.parentVersionId})</span>
+            <span className="ml-1 opacity-60">
+              (from #{version.parentVersionId})
+            </span>
           )}
         </span>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant={applied ? "default" : "outline"}
-            onClick={() => select.mutate(version.id)}>
+          <Button
+            size="sm"
+            variant={applied ? "default" : "outline"}
+            onClick={() => select.mutate(version.id)}
+          >
             {applied ? "Applied ✓" : "Use for application"}
           </Button>
           {version.pdfPath && (
-            <a className="text-sm underline" target="_blank" rel="noreferrer"
-               href={withTokenParam(`/api/resume-versions/${version.id}/pdf`)}>Download PDF</a>
+            <a
+              className="text-sm underline"
+              target="_blank"
+              rel="noreferrer"
+              href={withTokenParam(`/api/resume-versions/${version.id}/pdf`)}
+            >
+              Download PDF
+            </a>
           )}
         </div>
       </div>
       {version.instruction && (
-        <p className="text-xs italic text-muted-foreground">“{version.instruction}”</p>
+        <p className="text-xs italic text-muted-foreground">
+          “{version.instruction}”
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Input value={instruction} onChange={(e) => setInstruction(e.target.value)}
-          placeholder="Revise: e.g. lead with Python, drop volunteering" className="flex-1" />
+        <Input
+          value={instruction}
+          onChange={(e) => setInstruction(e.target.value)}
+          placeholder="Revise: e.g. lead with Python, drop volunteering"
+          className="flex-1"
+        />
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Checkbox checked={reReview} onCheckedChange={(v) => setReReview(Boolean(v))} /> re-review
+          <Checkbox
+            checked={reReview}
+            onCheckedChange={(v) => setReReview(Boolean(v))}
+          />{" "}
+          re-review
         </label>
-        <Button size="sm" disabled={!instruction.trim() || revise.isPending}
-          onClick={() => revise.mutate({ versionId: version.id, instruction, reReview },
-            { onSuccess: () => setInstruction("") })}>
+        <Button
+          size="sm"
+          disabled={!instruction.trim() || revise.isPending}
+          onClick={() =>
+            revise.mutate(
+              { versionId: version.id, instruction, reReview },
+              { onSuccess: () => setInstruction("") },
+            )
+          }
+        >
           {revise.isPending ? "Revising…" : "Revise"}
         </Button>
       </div>
@@ -1358,8 +1452,12 @@ In `JobModal.tsx`, replace the `<li>` map body (lines ~110-138) with:
 ```tsx
 <ul className="mt-2 space-y-2">
   {job.resumeVersions.map((v) => (
-    <VersionRow key={v.id} jobId={jobId} version={v}
-      appliedVersionId={job.application?.resumeVersionId ?? null} />
+    <VersionRow
+      key={v.id}
+      jobId={jobId}
+      version={v}
+      appliedVersionId={job.application?.resumeVersionId ?? null}
+    />
   ))}
 </ul>
 ```
@@ -1383,12 +1481,14 @@ git commit -m "feat: Versions tab revise box, lineage, and apply-selection"
 ### Task 13: Frontend — Cover Letters tab
 
 **Files:**
+
 - Create: `web/src/features/job/CoverLetterRow.tsx`
 - Create: `web/src/features/job/CoverLettersTab.tsx`
 - Modify: `web/src/components/JobModal.tsx:72-85` (add `<TabsTrigger value="coverLetters">`), `:142-148` (add `<TabsContent>`)
 - Test: `web/src/features/job/CoverLettersTab.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useReviseCoverLetter`, `useSelectCoverLetter` (Task 11); `JobDetail.coverLetters: CoverLetterOut[]`, `application.coverLetterId`.
 - Produces: a tab listing each cover letter with the same revise + use-for-application affordances as `VersionRow`, PDF link to `/api/cover-letters/{id}/pdf`.
 
@@ -1400,7 +1500,9 @@ import { render, screen } from "@testing-library/react";
 import { CoverLettersTab } from "./CoverLettersTab";
 
 it("renders an empty state when there are no cover letters", () => {
-  renderWithClient(<CoverLettersTab jobId={1} coverLetters={[]} appliedId={null} />);
+  renderWithClient(
+    <CoverLettersTab jobId={1} coverLetters={[]} appliedId={null} />,
+  );
   expect(screen.getByText(/no cover letter/i)).toBeInTheDocument();
 });
 ```
@@ -1421,15 +1523,29 @@ import type { components } from "@/lib/api/schema";
 
 type CL = components["schemas"]["CoverLetterOut"];
 
-export function CoverLettersTab({ jobId, coverLetters, appliedId }:
-  { jobId: number; coverLetters: CL[]; appliedId: number | null }) {
+export function CoverLettersTab({
+  jobId,
+  coverLetters,
+  appliedId,
+}: {
+  jobId: number;
+  coverLetters: CL[];
+  appliedId: number | null;
+}) {
   if (coverLetters.length === 0) {
-    return <p className="mt-2 text-sm text-muted-foreground">No cover letter yet.</p>;
+    return (
+      <p className="mt-2 text-sm text-muted-foreground">No cover letter yet.</p>
+    );
   }
   return (
     <ul className="mt-2 space-y-2">
       {coverLetters.map((cl) => (
-        <CoverLetterRow key={cl.id} jobId={jobId} coverLetter={cl} appliedId={appliedId} />
+        <CoverLetterRow
+          key={cl.id}
+          jobId={jobId}
+          coverLetter={cl}
+          appliedId={appliedId}
+        />
       ))}
     </ul>
   );
@@ -1442,8 +1558,11 @@ Add a trigger `<TabsTrigger value="coverLetters" className="text-sm">Cover lette
 
 ```tsx
 <TabsContent value="coverLetters" className="mt-0">
-  <CoverLettersTab jobId={jobId} coverLetters={job.coverLetters ?? []}
-    appliedId={job.application?.coverLetterId ?? null} />
+  <CoverLettersTab
+    jobId={jobId}
+    coverLetters={job.coverLetters ?? []}
+    appliedId={job.application?.coverLetterId ?? null}
+  />
 </TabsContent>
 ```
 
@@ -1491,6 +1610,7 @@ git commit -m "chore: phase-1 revision verification"
 ## Self-Review
 
 **Spec coverage (Phase 1 only):**
+
 - Single-shot instructed revision → Tasks 3–6, 8–9. ✓
 - Dedicated revision agent + composer (resume + CL) → Tasks 3, 6. ✓
 - Persist-and-flag failing fact-check → Task 5 (`test_revision_persists_and_flags_unsupported`), Task 6. ✓

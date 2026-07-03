@@ -27,7 +27,7 @@ Some skill advice violates the fact-lock invariant (e.g. resume-quantifier's
 "estimate numbers when exact data unavailable"). Every distilled instruction is
 filtered to the truthful form: **quantify only when a profile fact supplies the
 number**. Craft never overrides the integrity instructions; composition order is
-always *integrity rules → craft block → house style*, and the existing
+always _integrity rules → craft block → house style_, and the existing
 `STYLE_GUIDE_HEADER` precedence statement continues to apply.
 
 ## Order of operations
@@ -67,16 +67,17 @@ preference doc. The **fact-check reviewer receives no craft block** — it is th
 safety gate, and holding it fixed keeps `trap_recall` attributable to writer
 changes rather than checker drift.
 
-| Constant | Distilled from | Injected into |
-| --- | --- | --- |
+| Constant                                                                                                                                                                                                                                                      | Distilled from                                                       | Injected into           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------- |
 | `CRAFT_WRITER` — X-Y-Z bullet form ("accomplished X measured by Y by doing Z"), strong action verbs, no duty-listing ("responsible for"), quantify only from profile facts, order sections by JD relevance, summary names the target role only when supported | bullet-writer, quantifier (filtered), section-builder, resume-tailor | tailor + reviser agents |
-| `CRAFT_MATCH_PLAN` — must-have coverage first, evidence-strength ranking | resume-tailor | match-plan agent |
-| `CRAFT_REVIEWERS["ats-keyword"]` — exact term vs industry-equivalent, dual placement (skills list + in-context bullet), must-have coverage weighting | ats-optimizer | ats-keyword reviewer |
-| `CRAFT_REVIEWERS["recruiter"]` — 6-second-scan heuristics: strongest evidence in top third, target-role clarity, scannable bullet lead-words | resume-tailor, tech-optimizer | recruiter reviewer |
-| `CRAFT_REVIEWERS["hiring-manager"]` — scale/impact signals, depth vs breadth, seniority-consistent evidence | tech-optimizer | hiring-manager reviewer |
-| `CRAFT_REVIEWERS["concision"]` — bullet-length caps, weak-verb/passive detection, one-page density | bullet-writer, formatter (text rules only) | concision reviewer |
+| `CRAFT_MATCH_PLAN` — must-have coverage first, evidence-strength ranking                                                                                                                                                                                      | resume-tailor                                                        | match-plan agent        |
+| `CRAFT_REVIEWERS["ats-keyword"]` — exact term vs industry-equivalent, dual placement (skills list + in-context bullet), must-have coverage weighting                                                                                                          | ats-optimizer                                                        | ats-keyword reviewer    |
+| `CRAFT_REVIEWERS["recruiter"]` — 6-second-scan heuristics: strongest evidence in top third, target-role clarity, scannable bullet lead-words                                                                                                                  | resume-tailor, tech-optimizer                                        | recruiter reviewer      |
+| `CRAFT_REVIEWERS["hiring-manager"]` — scale/impact signals, depth vs breadth, seniority-consistent evidence                                                                                                                                                   | tech-optimizer                                                       | hiring-manager reviewer |
+| `CRAFT_REVIEWERS["concision"]` — bullet-length caps, weak-verb/passive detection, one-page density                                                                                                                                                            | bullet-writer, formatter (text rules only)                           | concision reviewer      |
 
 Scope guards:
+
 - No roster, weight, threshold, or loop changes. `review.yaml` tuning becomes
   possible with baseline data but is a follow-up.
 - No schema, API, or contract changes.

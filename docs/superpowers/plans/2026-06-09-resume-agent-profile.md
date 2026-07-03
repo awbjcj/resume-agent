@@ -20,6 +20,7 @@
 Design spec: `docs/superpowers/specs/2026-06-08-resume-agent-design.md` §5.1.
 
 Plan-author decisions (documented; override if undesired):
+
 - **GitHub client uses `httpx` raw REST**, not PyGithub — testable against `httpx.MockTransport` fixtures with no network.
 - **GitHub ingest is comprehensive in v1.** Repo metadata maps deterministically to `Project` facts, and README text is summarized by a cheap-model Agno agent when present. Metadata-only `repo_to_project(...)` remains the fallback when a README is missing or the summary agent is intentionally omitted in tests.
 - **LLM calls are explicit and injectable.** Resume-text → `ProfileFacts` and README-text → `Project` both use cheap-model Agno agents with fakes in tests.
@@ -60,20 +61,24 @@ tests/
 ## Task 1: Dependencies, config, and package scaffold
 
 **Files:**
+
 - Modify: `pyproject.toml`, `src/resume_agent/config.py`, `tests/test_config.py`
 - Create: `src/resume_agent/profile/__init__.py`, `config/profile_sources.yaml.example`
 
 - [ ] **Step 1: Add the Profile dependencies**
 
 Run:
+
 ```bash
 uv add agno anthropic httpx pypdf python-docx typer
 ```
+
 Expected: these appear in `pyproject.toml` `dependencies`; `uv.lock` updates.
 
 - [ ] **Step 2: Write the failing config test (add to `tests/test_config.py`)**
 
 Append this test to `tests/test_config.py`:
+
 ```python
 def test_settings_has_cheap_model_default():
     settings = Settings(_env_file=None)
@@ -83,14 +88,17 @@ def test_settings_has_cheap_model_default():
 - [ ] **Step 3: Run it to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_config.py::test_settings_has_cheap_model_default -v
 ```
+
 Expected: FAIL — `AttributeError: 'Settings' object has no attribute 'cheap_model'`.
 
 - [ ] **Step 4: Add the setting**
 
 In `src/resume_agent/config.py`, add this line to the `Settings` class, right after `db_url`:
+
 ```python
     cheap_model: str = "claude-haiku-4-5-20251001"
 ```
@@ -98,24 +106,28 @@ In `src/resume_agent/config.py`, add this line to the `Settings` class, right af
 - [ ] **Step 5: Create the package + example sources file**
 
 Create `src/resume_agent/profile/__init__.py`:
+
 ```python
 """Profile component: build the fact-lock from resume + GitHub."""
 ```
 
 Create `config/profile_sources.yaml.example`:
+
 ```yaml
 # Where your ground-truth facts come from (see design spec §5.1).
 # Copy to config/profile_sources.yaml and edit.
-resume_path: path/to/your_resume.pdf   # .pdf, .docx, or .txt
-github_username: your-github-username    # leave blank to skip GitHub
+resume_path: path/to/your_resume.pdf # .pdf, .docx, or .txt
+github_username: your-github-username # leave blank to skip GitHub
 ```
 
 - [ ] **Step 6: Run config tests to verify they pass**
 
 Run:
+
 ```bash
 uv run pytest tests/test_config.py -v
 ```
+
 Expected: PASS (5 tests).
 
 - [ ] **Step 7: Commit**
@@ -130,12 +142,14 @@ git commit -m "feat(profile): add deps, cheap_model setting, package scaffold" -
 ## Task 2: Resume text reader
 
 **Files:**
+
 - Create: `src/resume_agent/profile/resume_reader.py`
 - Test: `tests/test_profile_resume_reader.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_profile_resume_reader.py`:
+
 ```python
 import pytest
 
@@ -172,14 +186,17 @@ def test_unsupported_format_raises(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_resume_reader.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.resume_reader'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/profile/resume_reader.py`:
+
 ```python
 from pathlib import Path
 
@@ -214,9 +231,11 @@ def _read_docx(p: Path) -> str:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_resume_reader.py -v
 ```
+
 Expected: PASS (3 tests). (PDF extraction is exercised manually with a real resume; `.txt`/`.docx` are covered here.)
 
 - [ ] **Step 5: Commit**
@@ -231,12 +250,14 @@ git commit -m "feat(profile): resume text reader for pdf/docx/txt" -m "Co-Author
 ## Task 3: GitHub client
 
 **Files:**
+
 - Create: `src/resume_agent/profile/github.py`
 - Test: `tests/test_profile_github.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_profile_github.py`:
+
 ```python
 import httpx
 
@@ -299,14 +320,17 @@ def test_fetch_readme_missing_returns_none():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_github.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.github'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/profile/github.py`:
+
 ```python
 import httpx
 
@@ -360,9 +384,11 @@ class GitHubClient:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_github.py -v
 ```
+
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
@@ -377,12 +403,14 @@ git commit -m "feat(profile): httpx-based GitHub REST client" -m "Co-Authored-By
 ## Task 4: Resume extractor (Agno agent)
 
 **Files:**
+
 - Create: `src/resume_agent/profile/extractor.py`
 - Test: `tests/test_profile_extractor.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_profile_extractor.py`:
+
 ```python
 import pytest
 
@@ -430,14 +458,17 @@ def test_build_extractor_agent_is_configured(monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_extractor.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.extractor'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/profile/extractor.py`:
+
 ```python
 from typing import Any, Protocol
 
@@ -485,9 +516,11 @@ def extract_profile_facts(resume_text: str, agent: Runner) -> ProfileFacts:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_extractor.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -502,12 +535,14 @@ git commit -m "feat(profile): Agno agent + resume->ProfileFacts extractor" -m "C
 ## Task 5: GitHub ingest (metadata mapping + README fallback)
 
 **Files:**
+
 - Create: `src/resume_agent/profile/github_ingest.py`
 - Test: `tests/test_profile_github_ingest.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_profile_github_ingest.py`:
+
 ```python
 from resume_agent.models.profile import GitHubProfile, Project
 from resume_agent.profile.github_ingest import build_github_profile, repo_to_project
@@ -565,14 +600,17 @@ def test_repo_to_project_falls_back_to_html_url_when_no_homepage():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_github_ingest.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.github_ingest'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/profile/github_ingest.py`:
+
 ```python
 from collections import Counter
 
@@ -619,9 +657,11 @@ def repo_to_project(repo: dict) -> Project:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_github_ingest.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -636,12 +676,14 @@ git commit -m "feat(profile): GitHub profile/repo metadata ingest" -m "Co-Author
 ## Task 5A: GitHub README project summarizer
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/github_ingest.py`
 - Test: `tests/test_profile_github_ingest.py`
 
 - [ ] **Step 1: Add failing tests for README summaries**
 
 Append to `tests/test_profile_github_ingest.py`:
+
 ```python
 import pytest
 
@@ -692,6 +734,7 @@ def test_summarize_repo_project_rejects_wrong_agent_type():
 - [ ] **Step 2: Implement the summarizer**
 
 Add these imports near the top of `src/resume_agent/profile/github_ingest.py`:
+
 ```python
 from typing import Any, Protocol
 
@@ -702,6 +745,7 @@ from resume_agent.config import get_settings
 ```
 
 Then append:
+
 ```python
 class Runner(Protocol):
     def run(self, prompt: str) -> Any: ...
@@ -757,9 +801,11 @@ def summarize_repo_project(repo: dict, readme_text: str, agent: Runner) -> Proje
 - [ ] **Step 3: Run tests**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_github_ingest.py -v
 ```
+
 Expected: PASS.
 
 - [ ] **Step 4: Commit**
@@ -774,12 +820,14 @@ git commit -m "feat(profile): summarize GitHub READMEs into Project facts" -m "C
 ## Task 6: Merge
 
 **Files:**
+
 - Create: `src/resume_agent/profile/merge.py`
 - Test: `tests/test_profile_merge.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_profile_merge.py`:
+
 ```python
 from resume_agent.models.profile import Contact, GitHubProfile, ProfileFacts, Project
 from resume_agent.profile.merge import merge_facts
@@ -811,14 +859,17 @@ def test_merge_without_github_is_unchanged_copy():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_merge.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.merge'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/profile/merge.py`:
+
 ```python
 from resume_agent.models.profile import GitHubProfile, ProfileFacts, Project
 
@@ -844,9 +895,11 @@ def merge_facts(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_merge.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
@@ -861,12 +914,14 @@ git commit -m "feat(profile): merge resume + GitHub facts" -m "Co-Authored-By: C
 ## Task 7: Store (facts.json)
 
 **Files:**
+
 - Create: `src/resume_agent/profile/store.py`
 - Test: `tests/test_profile_store.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_profile_store.py`:
+
 ```python
 from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.profile.store import load_facts, save_facts
@@ -895,14 +950,17 @@ def test_saved_json_is_human_readable(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_store.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.store'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/profile/store.py`:
+
 ```python
 from pathlib import Path
 
@@ -925,9 +983,11 @@ def load_facts(path: str | Path) -> ProfileFacts:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_store.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
@@ -942,12 +1002,14 @@ git commit -m "feat(profile): facts.json save/load" -m "Co-Authored-By: Claude O
 ## Task 8: Build orchestrator
 
 **Files:**
+
 - Create: `src/resume_agent/profile/build.py`
 - Test: `tests/test_profile_build.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_profile_build.py`:
+
 ```python
 from resume_agent.models.profile import Contact, ProfileFacts, Project
 from resume_agent.profile.build import build_profile
@@ -1014,14 +1076,17 @@ def test_build_profile_skips_github_when_no_username(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_build.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.profile.build'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/profile/build.py`:
+
 ```python
 from pathlib import Path
 
@@ -1077,9 +1142,11 @@ def build_profile(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_profile_build.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
@@ -1094,6 +1161,7 @@ git commit -m "feat(profile): build_profile orchestrator" -m "Co-Authored-By: Cl
 ## Task 9: CLI — `resume-agent profile build`
 
 **Files:**
+
 - Create: `src/resume_agent/cli.py`
 - Modify: `pyproject.toml` (add `[project.scripts]`)
 - Test: `tests/test_cli_profile.py`
@@ -1101,6 +1169,7 @@ git commit -m "feat(profile): build_profile orchestrator" -m "Co-Authored-By: Cl
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_profile.py`:
+
 ```python
 from typer.testing import CliRunner
 
@@ -1163,14 +1232,17 @@ def test_profile_build_refresh_overwrites(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_profile.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.cli'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/cli.py`:
+
 ```python
 from pathlib import Path
 
@@ -1219,14 +1291,17 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_profile.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Register the console script**
 
 In `pyproject.toml`, add this block (after `[project]`/dependencies, near the other tool blocks):
+
 ```toml
 [project.scripts]
 resume-agent = "resume_agent.cli:app"
@@ -1235,17 +1310,21 @@ resume-agent = "resume_agent.cli:app"
 - [ ] **Step 6: Verify the CLI is wired**
 
 Run:
+
 ```bash
 uv run resume-agent profile build --help
 ```
+
 Expected: help text for the `profile build` command (exit 0).
 
 - [ ] **Step 7: Run the full suite**
 
 Run:
+
 ```bash
 uv run pytest -q
 ```
+
 Expected: all tests pass (Foundation 31 + Profile additions).
 
 - [ ] **Step 8: Commit**
@@ -1267,8 +1346,10 @@ git commit -m "feat(profile): profile build CLI with overwrite protection" -m "C
 ---
 
 ## Notes to carry into later plans
+
 - **Tracking plan:** add `updated_at` auto-update (`onupdate`) and decide tz-aware vs naive datetime storage for the SQLModel tables (deferred from the Foundation review).
 - **v2 roadmap:** resume-projects vs GitHub-projects dedup in `merge_facts`; richer README summarization that reads repo file trees beyond the README.
 
 ## Execution Handoff
+
 After this plan is executed and green, the next plan is **Discovery** (LinkedIn scrape → clean → extract → filter → fit-score → shortlist).

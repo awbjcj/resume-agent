@@ -4,7 +4,7 @@
 
 **Goal:** Distill craft knowledge from six resume-writing skill playbooks into role-targeted agent instructions, gated by before/after eval runs.
 
-**Architecture:** A new pure-data module `src/resume_agent/tailor/craft.py` holds per-role instruction blocks. `tailor/agents.py` and `tailor/match_plan.py` append them *after* the integrity (fact-lock) instructions and *before* the user style guide. Four new craft-focused eval cases land first so the (never-yet-run) baseline covers them; the ship decision compares baseline vs. after reports from `evals/run_eval`.
+**Architecture:** A new pure-data module `src/resume_agent/tailor/craft.py` holds per-role instruction blocks. `tailor/agents.py` and `tailor/match_plan.py` append them _after_ the integrity (fact-lock) instructions and _before_ the user style guide. Four new craft-focused eval cases land first so the (never-yet-run) baseline covers them; the ship decision compares baseline vs. after reports from `evals/run_eval`.
 
 **Tech Stack:** Python 3.12, pydantic, agno agents, pytest (offline, all agents faked), existing `evals/` harness.
 
@@ -28,6 +28,7 @@
 Four new eval profiles and four craft-focused cases so the baseline can detect craft deltas. Each case still carries one light fabrication trap because `tests/eval/test_seed_cases.py::test_each_case_valid_and_grounded` requires ≥1 trap per case (and it keeps `trap_recall` probes meaningful on the expanded set).
 
 **Files:**
+
 - Create: `evals/profiles/metric_rich_eng.json`
 - Create: `evals/profiles/terminology_eng.json`
 - Create: `evals/profiles/overlong_eng.json`
@@ -39,10 +40,12 @@ Four new eval profiles and four craft-focused cases so the baseline can detect c
 - Modify: `tests/eval/test_seed_cases.py` (add one test)
 
 **Interfaces:**
+
 - Consumes: `evals/schema.py` — `EvalCase` (fields `id`, `profile_ref`, `jd_text`, `criteria`, `traps`, `must_cite`, `rubric`), `Trap` (fields `id`, `kind`, `forbidden_terms`, `description`, `probe_claim`, `probe_provenance`), `load_cases(dir)`.
 - Produces: 12 total cases under `evals/cases/` that Tasks 2 and 5 run unchanged.
 
 Constraints baked into the JSON below (do not "fix" them):
+
 - Every `probe_provenance` is a **bullet** id present in its profile (the seed test asserts `isinstance(fact, Bullet)`).
 - Every `probe_claim` contains one of its trap's `forbidden_terms`.
 - No `forbidden_terms` string appears anywhere in the corresponding profile.
@@ -75,7 +78,7 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
 
 ```json
 {
-  "contact": {"name": "Maya Chen", "email": "maya@example.com"},
+  "contact": { "name": "Maya Chen", "email": "maya@example.com" },
   "summary": "Senior backend engineer focused on performance and cost efficiency.",
   "experience": [
     {
@@ -85,9 +88,18 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2022",
       "end": "2025",
       "bullets": [
-        {"id": "e1b1", "text": "Reduced p95 API latency from 800ms to 240ms by adding Redis caching and query batching."},
-        {"id": "e1b2", "text": "Cut monthly cloud spend by $18k (31%) by rightsizing container workloads."},
-        {"id": "e1b3", "text": "Led a 4-engineer effort migrating 12 services to event-driven processing with zero missed SLAs."}
+        {
+          "id": "e1b1",
+          "text": "Reduced p95 API latency from 800ms to 240ms by adding Redis caching and query batching."
+        },
+        {
+          "id": "e1b2",
+          "text": "Cut monthly cloud spend by $18k (31%) by rightsizing container workloads."
+        },
+        {
+          "id": "e1b3",
+          "text": "Led a 4-engineer effort migrating 12 services to event-driven processing with zero missed SLAs."
+        }
       ]
     },
     {
@@ -97,23 +109,34 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2019",
       "end": "2022",
       "bullets": [
-        {"id": "e2b1", "text": "Built an order-processing pipeline handling 1.2M orders/day in Python."},
-        {"id": "e2b2", "text": "Raised unit test coverage from 45% to 88%, halving production incidents."}
+        {
+          "id": "e2b1",
+          "text": "Built an order-processing pipeline handling 1.2M orders/day in Python."
+        },
+        {
+          "id": "e2b2",
+          "text": "Raised unit test coverage from 45% to 88%, halving production incidents."
+        }
       ]
     }
   ],
   "skills": {
     "languages": [
-      {"id": "s_py", "name": "Python"},
-      {"id": "s_sql", "name": "SQL"}
+      { "id": "s_py", "name": "Python" },
+      { "id": "s_sql", "name": "SQL" }
     ],
     "frameworks": [
-      {"id": "s_fastapi", "name": "FastAPI"},
-      {"id": "s_redis", "name": "Redis"}
+      { "id": "s_fastapi", "name": "FastAPI" },
+      { "id": "s_redis", "name": "Redis" }
     ]
   },
   "education": [
-    {"id": "ed1", "institution": "State University", "degree": "BS Computer Science", "end": "2019"}
+    {
+      "id": "ed1",
+      "institution": "State University",
+      "degree": "BS Computer Science",
+      "end": "2019"
+    }
   ]
 }
 ```
@@ -122,7 +145,7 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
 
 ```json
 {
-  "contact": {"name": "Sam Okafor", "email": "sam@example.com"},
+  "contact": { "name": "Sam Okafor", "email": "sam@example.com" },
   "summary": "Backend engineer with five years of cloud service delivery.",
   "experience": [
     {
@@ -132,9 +155,18 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2020",
       "end": "2025",
       "bullets": [
-        {"id": "e1b1", "text": "Deployed microservices to Amazon Web Services using Elastic Container Service and Lambda functions."},
-        {"id": "e1b2", "text": "Set up continuous integration and continuous delivery pipelines with automated test gates."},
-        {"id": "e1b3", "text": "Practiced test-driven development across a Python codebase with pytest."}
+        {
+          "id": "e1b1",
+          "text": "Deployed microservices to Amazon Web Services using Elastic Container Service and Lambda functions."
+        },
+        {
+          "id": "e1b2",
+          "text": "Set up continuous integration and continuous delivery pipelines with automated test gates."
+        },
+        {
+          "id": "e1b3",
+          "text": "Practiced test-driven development across a Python codebase with pytest."
+        }
       ]
     },
     {
@@ -144,22 +176,30 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2018",
       "end": "2020",
       "bullets": [
-        {"id": "e2b1", "text": "Maintained REST endpoints and wrote integration tests for a Python web service."}
+        {
+          "id": "e2b1",
+          "text": "Maintained REST endpoints and wrote integration tests for a Python web service."
+        }
       ]
     }
   ],
   "skills": {
     "languages": [
-      {"id": "s_py", "name": "Python"},
-      {"id": "s_ts", "name": "TypeScript"}
+      { "id": "s_py", "name": "Python" },
+      { "id": "s_ts", "name": "TypeScript" }
     ],
     "frameworks": [
-      {"id": "s_aws", "name": "Amazon Web Services"},
-      {"id": "s_ci", "name": "Continuous Integration"}
+      { "id": "s_aws", "name": "Amazon Web Services" },
+      { "id": "s_ci", "name": "Continuous Integration" }
     ]
   },
   "education": [
-    {"id": "ed1", "institution": "City College", "degree": "BS Software Engineering", "end": "2018"}
+    {
+      "id": "ed1",
+      "institution": "City College",
+      "degree": "BS Software Engineering",
+      "end": "2018"
+    }
   ]
 }
 ```
@@ -168,7 +208,7 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
 
 ```json
 {
-  "contact": {"name": "Priya Nair", "email": "priya@example.com"},
+  "contact": { "name": "Priya Nair", "email": "priya@example.com" },
   "summary": "Full-stack engineer with ten years across web platforms.",
   "experience": [
     {
@@ -178,10 +218,22 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2022",
       "end": "2025",
       "bullets": [
-        {"id": "e1b1", "text": "Led rebuild of the React checkout flow, raising conversion 12%."},
-        {"id": "e1b2", "text": "Designed Python order APIs serving 40k daily users."},
-        {"id": "e1b3", "text": "Mentored three junior engineers through onboarding."},
-        {"id": "e1b4", "text": "Introduced feature flags, cutting rollback time to minutes."}
+        {
+          "id": "e1b1",
+          "text": "Led rebuild of the React checkout flow, raising conversion 12%."
+        },
+        {
+          "id": "e1b2",
+          "text": "Designed Python order APIs serving 40k daily users."
+        },
+        {
+          "id": "e1b3",
+          "text": "Mentored three junior engineers through onboarding."
+        },
+        {
+          "id": "e1b4",
+          "text": "Introduced feature flags, cutting rollback time to minutes."
+        }
       ]
     },
     {
@@ -191,10 +243,19 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2019",
       "end": "2022",
       "bullets": [
-        {"id": "e2b1", "text": "Built React dashboards for operations teams."},
-        {"id": "e2b2", "text": "Wrote Django services for inventory tracking."},
-        {"id": "e2b3", "text": "Added Cypress end-to-end tests to the release pipeline."},
-        {"id": "e2b4", "text": "Migrated legacy jQuery pages to React."}
+        {
+          "id": "e2b1",
+          "text": "Built React dashboards for operations teams."
+        },
+        {
+          "id": "e2b2",
+          "text": "Wrote Django services for inventory tracking."
+        },
+        {
+          "id": "e2b3",
+          "text": "Added Cypress end-to-end tests to the release pipeline."
+        },
+        { "id": "e2b4", "text": "Migrated legacy jQuery pages to React." }
       ]
     },
     {
@@ -204,10 +265,16 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2017",
       "end": "2019",
       "bullets": [
-        {"id": "e3b1", "text": "Delivered client marketing sites on a PHP CMS."},
-        {"id": "e3b2", "text": "Built a booking widget in vanilla JavaScript."},
-        {"id": "e3b3", "text": "Handled client support rotations."},
-        {"id": "e3b4", "text": "Wrote HTML email templates for campaigns."}
+        {
+          "id": "e3b1",
+          "text": "Delivered client marketing sites on a PHP CMS."
+        },
+        {
+          "id": "e3b2",
+          "text": "Built a booking widget in vanilla JavaScript."
+        },
+        { "id": "e3b3", "text": "Handled client support rotations." },
+        { "id": "e3b4", "text": "Wrote HTML email templates for campaigns." }
       ]
     },
     {
@@ -217,10 +284,16 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2015",
       "end": "2017",
       "bullets": [
-        {"id": "e4b1", "text": "Fixed cross-browser CSS bugs across client sites."},
-        {"id": "e4b2", "text": "Maintained WordPress plugins."},
-        {"id": "e4b3", "text": "Sliced design mockups into templates."},
-        {"id": "e4b4", "text": "Wrote weekly status reports for account managers."}
+        {
+          "id": "e4b1",
+          "text": "Fixed cross-browser CSS bugs across client sites."
+        },
+        { "id": "e4b2", "text": "Maintained WordPress plugins." },
+        { "id": "e4b3", "text": "Sliced design mockups into templates." },
+        {
+          "id": "e4b4",
+          "text": "Wrote weekly status reports for account managers."
+        }
       ]
     },
     {
@@ -230,10 +303,10 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2014",
       "end": "2015",
       "bullets": [
-        {"id": "e5b1", "text": "Executed manual regression test plans."},
-        {"id": "e5b2", "text": "Logged and triaged defects in Jira."},
-        {"id": "e5b3", "text": "Verified fixes across staging environments."},
-        {"id": "e5b4", "text": "Documented test cases for new features."}
+        { "id": "e5b1", "text": "Executed manual regression test plans." },
+        { "id": "e5b2", "text": "Logged and triaged defects in Jira." },
+        { "id": "e5b3", "text": "Verified fixes across staging environments." },
+        { "id": "e5b4", "text": "Documented test cases for new features." }
       ]
     },
     {
@@ -243,25 +316,36 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2013",
       "end": "2014",
       "bullets": [
-        {"id": "e6b1", "text": "Resolved help-desk tickets for students and staff."},
-        {"id": "e6b2", "text": "Imaged and deployed lab computers."},
-        {"id": "e6b3", "text": "Maintained printer fleets across two buildings."},
-        {"id": "e6b4", "text": "Wrote how-to guides for common issues."}
+        {
+          "id": "e6b1",
+          "text": "Resolved help-desk tickets for students and staff."
+        },
+        { "id": "e6b2", "text": "Imaged and deployed lab computers." },
+        {
+          "id": "e6b3",
+          "text": "Maintained printer fleets across two buildings."
+        },
+        { "id": "e6b4", "text": "Wrote how-to guides for common issues." }
       ]
     }
   ],
   "skills": {
     "languages": [
-      {"id": "s_py", "name": "Python"},
-      {"id": "s_js", "name": "JavaScript"}
+      { "id": "s_py", "name": "Python" },
+      { "id": "s_js", "name": "JavaScript" }
     ],
     "frameworks": [
-      {"id": "s_react", "name": "React"},
-      {"id": "s_django", "name": "Django"}
+      { "id": "s_react", "name": "React" },
+      { "id": "s_django", "name": "Django" }
     ]
   },
   "education": [
-    {"id": "ed1", "institution": "State University", "degree": "BS Computer Science", "end": "2013"}
+    {
+      "id": "ed1",
+      "institution": "State University",
+      "degree": "BS Computer Science",
+      "end": "2013"
+    }
   ]
 }
 ```
@@ -270,7 +354,7 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
 
 ```json
 {
-  "contact": {"name": "Dana Torres", "email": "dana@example.com"},
+  "contact": { "name": "Dana Torres", "email": "dana@example.com" },
   "summary": "Former math teacher who retrained as a software developer.",
   "experience": [
     {
@@ -280,9 +364,18 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2023",
       "end": "2025",
       "bullets": [
-        {"id": "e1b1", "text": "Built React components and Python API endpoints for a scheduling product."},
-        {"id": "e1b2", "text": "Wrote pytest suites covering new endpoints before merge."},
-        {"id": "e1b3", "text": "Shipped a CSV import feature used by 200 customer accounts."}
+        {
+          "id": "e1b1",
+          "text": "Built React components and Python API endpoints for a scheduling product."
+        },
+        {
+          "id": "e1b2",
+          "text": "Wrote pytest suites covering new endpoints before merge."
+        },
+        {
+          "id": "e1b3",
+          "text": "Shipped a CSV import feature used by 200 customer accounts."
+        }
       ]
     },
     {
@@ -292,24 +385,41 @@ Expected: `test_craft_cases_present` FAILS (missing ids); the other three tests 
       "start": "2016",
       "end": "2022",
       "bullets": [
-        {"id": "e2b1", "text": "Taught algebra and statistics to 150 students per year."},
-        {"id": "e2b2", "text": "Designed a data-literacy elective adopted by two other schools."},
-        {"id": "e2b3", "text": "Led a robotics club that placed second in a state competition."}
+        {
+          "id": "e2b1",
+          "text": "Taught algebra and statistics to 150 students per year."
+        },
+        {
+          "id": "e2b2",
+          "text": "Designed a data-literacy elective adopted by two other schools."
+        },
+        {
+          "id": "e2b3",
+          "text": "Led a robotics club that placed second in a state competition."
+        }
       ]
     }
   ],
   "skills": {
     "languages": [
-      {"id": "s_py", "name": "Python"},
-      {"id": "s_js", "name": "JavaScript"}
+      { "id": "s_py", "name": "Python" },
+      { "id": "s_js", "name": "JavaScript" }
     ],
-    "frameworks": [
-      {"id": "s_react", "name": "React"}
-    ]
+    "frameworks": [{ "id": "s_react", "name": "React" }]
   },
   "education": [
-    {"id": "ed1", "institution": "Metro Coding Bootcamp", "degree": "Full-Stack Certificate", "end": "2023"},
-    {"id": "ed2", "institution": "State University", "degree": "BA Mathematics", "end": "2016"}
+    {
+      "id": "ed1",
+      "institution": "Metro Coding Bootcamp",
+      "degree": "Full-Stack Certificate",
+      "end": "2023"
+    },
+    {
+      "id": "ed2",
+      "institution": "State University",
+      "degree": "BA Mathematics",
+      "end": "2016"
+    }
   ]
 }
 ```
@@ -453,11 +563,13 @@ git commit -m "feat: add four craft-focused eval cases and profiles"
 **This task needs `ANTHROPIC_API_KEY` (configured via the project's `.env`/settings) and the user's participation. Do not fake or skip it. If running as a subagent, stop and report back so the user can drive it.**
 
 **Files:**
+
 - Modify: `evals/CALIBRATION.md` (fill the anchor table)
 - Create: `evals/reports/2026-07-baseline-mp-off.json` (force-add; dir is gitignored)
 - Create: `evals/reports/2026-07-baseline-mp-on.json` (force-add)
 
 **Interfaces:**
+
 - Consumes: Task 1's 12 cases; `evals/run_eval` CLI (`--config`, `--out`); `config/review.match_plan.yaml` (tracked, `match_plan_enabled: true`).
 - Produces: two baseline artifacts whose rendered reports include `**Mean output_quality:**`, the trap-recall line, and `**Total tokens:**` — Task 5 compares against these.
 
@@ -489,10 +601,12 @@ git commit -m "chore: record baseline eval runs (match-plan off/on) and judge an
 ### Task 3: `craft.py` — per-role craft blocks + guard tests
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/craft.py`
 - Create: `tests/test_tailor_craft.py`
 
 **Interfaces:**
+
 - Consumes: nothing from the package (pure data module — no imports).
 - Produces: `CRAFT_WRITER: list[str]`, `CRAFT_MATCH_PLAN: list[str]`, `CRAFT_REVIEWERS: dict[str, list[str]]` (keys: `ats-keyword`, `recruiter`, `hiring-manager`, `concision`; deliberately **no** `fact-check` key). Task 4 imports all three.
 
@@ -646,11 +760,13 @@ git commit -m "feat: add role-targeted craft instruction blocks"
 ### Task 4: Wire craft blocks into the agents
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/agents.py` (import craft; add `_writer_instructions`; touch three call sites)
 - Modify: `src/resume_agent/tailor/match_plan.py` (import craft; add `_plan_instructions`; one call site)
 - Modify: `tests/test_tailor_craft.py` (append wiring tests)
 
 **Interfaces:**
+
 - Consumes: `CRAFT_WRITER`, `CRAFT_MATCH_PLAN`, `CRAFT_REVIEWERS` from Task 3; existing `compose_instructions(base, style_guide)` and `STYLE_GUIDE_HEADER` from `resume_agent.tailor.style_guide`.
 - Produces: `_writer_instructions(base: list[str]) -> list[str]` in `agents.py`; `_plan_instructions() -> list[str]` in `match_plan.py`. The revision agent and fact-check reviewer compositions are unchanged.
 
@@ -802,12 +918,14 @@ git commit -m "feat: compose craft blocks into writer, reviewer, and match-plan 
 **Needs `ANTHROPIC_API_KEY` and a trusted judge (Task 2 gate). If running as a subagent, stop and report back so the user can drive it.**
 
 **Files:**
+
 - Create: `evals/reports/2026-07-after-mp-off.json` (force-add)
 - Create: `evals/reports/2026-07-after-mp-on.json` (force-add)
 - Create: `evals/RESULTS.md`
 - Modify (conditional): `config/review.yaml.example` and `config/review.match_plan.yaml` comment — only if the match-plan arm wins.
 
 **Interfaces:**
+
 - Consumes: Task 2 baseline artifacts; the rendered report's summary lines (`**Mean output_quality:**`, trap-recall line, `**Total tokens:**`) plus per-case `trap_ok`/`prov_ok` columns.
 - Produces: the ship/revert decision, recorded in `evals/RESULTS.md`.
 
@@ -820,8 +938,9 @@ Expected: both complete over 12 cases.
 - [ ] **Step 2: Apply the ship rule**
 
 Compare after vs. baseline per arm using the rendered report summaries:
+
 - **Ship** if mean `output_quality` after − baseline ≥ **+5**, AND trap recall + per-case `trap_ok`/`prov_ok` show **no regression**, AND total tokens grew ≤ **+20%**.
-- **Match-plan default:** flips on only if the mp-on arm beats mp-off under the same rule *after* the craft change.
+- **Match-plan default:** flips on only if the mp-on arm beats mp-off under the same rule _after_ the craft change.
 - Anything else → iterate on `craft.py` wording (repeat Task 5) or revert the Task 3/4 commits. Record whichever happens.
 
 - [ ] **Step 3: Record the decision**
@@ -833,10 +952,10 @@ Create `evals/RESULTS.md`:
 
 ## 2026-07 craft prompt enrichment
 
-| arm | baseline quality | after quality | Δ | trap recall b→a | tokens b→a | verdict |
-| --- | --- | --- | --- | --- | --- | --- |
-| match-plan off | _fill_ | _fill_ | _fill_ | _fill_ | _fill_ | _fill_ |
-| match-plan on | _fill_ | _fill_ | _fill_ | _fill_ | _fill_ | _fill_ |
+| arm            | baseline quality | after quality | Δ      | trap recall b→a | tokens b→a | verdict |
+| -------------- | ---------------- | ------------- | ------ | --------------- | ---------- | ------- |
+| match-plan off | _fill_           | _fill_        | _fill_ | _fill_          | _fill_     | _fill_  |
+| match-plan on  | _fill_           | _fill_        | _fill_ | _fill_          | _fill_     | _fill_  |
 
 **Decision:** _ship / iterate / revert, and whether match-plan flips default-on._
 **Artifacts:** `evals/reports/2026-07-{baseline,after}-mp-{off,on}.json`

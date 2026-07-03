@@ -32,11 +32,13 @@
 ### Task 1: Shared score-band rubric (prompt-only)
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/agents.py` (`_COMMON_REVIEWER_INSTRUCTIONS`, ~line 117)
 - Modify: `src/resume_agent/tailor/review_config.py`, `src/resume_agent/services/agents.py`, `evals/run_eval.py`
 - Test: `tests/test_tailor_agents.py` (append)
 
 **Interfaces:**
+
 - Consumes: `ReviewerSpec.score_bands: bool = False`
 - Produces: only opted-in reviewers carry the explicit 0–100 band scale; production config remains unchanged until a baseline identifies the weakest reviewer.
 
@@ -99,10 +101,12 @@ git commit -m "Adds shared score-band rubric to reviewer instructions"
 ### Task 2: Severity-structured revise input
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/tailoring.py` (`compose_revise_input`, ~line 48; add `Severity` import, line 7)
 - Test: `tests/test_tailoring.py` (append; create if absent)
 
 **Interfaces:**
+
 - Consumes: `ReviewCritique`, `ReviewIssue`, `Severity` (`models/review.py`)
 - Produces: `compose_revise_input(...)` output groups issues **BLOCKING → MAJOR → MINOR**, includes each issue's `location`, and instructs the reviser to copy every unimplicated record byte-for-byte. Signature unchanged.
 
@@ -230,11 +234,13 @@ git commit -m "Restructures revise input by severity with locations"
 ### Task 3: `MatchPlan` model + pre-draft agent
 
 **Files:**
+
 - Create: `src/resume_agent/models/match_plan.py`
 - Create: `src/resume_agent/tailor/match_plan.py`
 - Test: `tests/test_match_plan.py`
 
 **Interfaces:**
+
 - Consumes: `JobCriteria`, `ProfileFacts`; `AgentRunner`, `Runner`, `build_model`, `retry_kwargs`, `use_json_mode_for`; `model_for_tier`; `compose_instructions`; `acall`
 - Produces:
   - `MatchPlanRequirement(ExtensibleModel)`: `jd_requirement: str`, `supporting_fact_ids: list[str]`, `emphasis: str`, `gap: bool`
@@ -426,12 +432,14 @@ git commit -m "Adds referential MatchPlan model and pre-draft agent"
 ### Task 4: Thread the match-plan through the tailor input + loop (flag default-off)
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/review_config.py` (`ReviewConfig`, ~line 24)
 - Modify: `src/resume_agent/tailor/tailoring.py` (`compose_tailor_input`, ~line 12)
 - Modify: `src/resume_agent/tailor/workflow.py` (both `run_tailor_review` and `arun_tailor_review`)
 - Test: `tests/test_tailor_workflow.py` (append; create if absent)
 
 **Interfaces:**
+
 - Consumes: `MatchPlan` (Task 3); `match_plan`, `amatch_plan`, `compose_match_plan_input` (Task 3)
 - Produces:
   - `ReviewConfig.match_plan_enabled: bool = False`
@@ -667,12 +675,14 @@ git commit -m "Threads optional match-plan into the tailor loop behind a default
 ### Task 5: Build the match-plan agent in the bundle + A/B in the eval harness
 
 **Files:**
+
 - Modify: `src/resume_agent/services/agents.py` (`TailorBundle`, `build_tailor_bundle`)
 - Modify: `src/resume_agent/tailor/service.py` (`tailor_job`, `tailor_jobs` — thread `match_plan_agent`)
 - Modify: `evals/runner.py` (`run_case` — pass `bundle.match_plan` into `run_tailor_review`)
 - Test: `tests/test_services_agents.py` (append; create if absent), `tests/eval/test_runner.py` (append)
 
 **Interfaces:**
+
 - Consumes: `build_match_plan_agent` (Task 3); `match_plan_enabled` (Task 4)
 - Produces:
   - `TailorBundle.match_plan: Runner | None = None`
@@ -884,6 +894,7 @@ git commit -m "Wires match-plan into the bundle, service, and eval A/B harness"
 ## Self-Review
 
 **Spec coverage (`2026-06-30-phase2-output-quality-design.md`):**
+
 - §3.1 match-plan: separate fact-id-referential agent, no claim text, config-flagged default off, A/B-gated, premium call — Tasks 3–5. ✓
 - §3.2 rubric: explicit score bands are per-reviewer and default-off, so the eval-named weakest reviewer can be targeted without changing the rest of the panel — Task 1. ✓
 - §3.3 sharper revise: severity-grouped input with locations + preserve-unimplicated reinforcement; whole-resume `revise` unchanged; surgical-patch protocol **not** adopted — Task 2. ✓
@@ -895,6 +906,7 @@ git commit -m "Wires match-plan into the bundle, service, and eval A/B harness"
 **Type consistency:** `MatchPlan`/`MatchPlanRequirement` (models) → `match_plan`/`amatch_plan`/`compose_match_plan_input` (tailor) → `compose_tailor_input(..., match_plan=plan)` → `run_tailor_review(..., match_plan_agent=...)` → `TailorBundle.match_plan` → `run_case`. `ReviewConfig.match_plan_enabled` gates every build/run path. ✓
 
 ## Notes for the implementer
+
 - **Order matters:** Task 1 and Task 2 are independent and low-risk — land them first. Tasks 3–5 are the match-plan and must land together to be runnable.
 - The fact-lock is the safety net for the whole phase: if any A/B run shows `trap_recall` or `provenance_ok` dropping, **do not** flip a default on — revert the experiment.
 - Build agents once. `build_match_plan_agent` is called by `build_tailor_bundle` (once per run), never inside `run_case`/`run_tailor_review`.

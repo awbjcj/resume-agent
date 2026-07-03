@@ -14,20 +14,20 @@
 
 ## File Structure
 
-| File | Responsibility | Action |
-| --- | --- | --- |
-| `src/resume_agent/tracking/tables.py` | Add `Job.archived_at` column | Modify |
-| `src/resume_agent/tracking/migrate.py` | `ensure_archived_at_column` | Modify |
-| `src/resume_agent/db.py` | Wire migration into `init_db` | Modify |
-| `src/resume_agent/tracking/repository.py` | `has_progress`, `archive_job`, `restore_job`, `delete_job`, `prune_preview`, `prune_run`; archived filter on `jobs_by_status`/`status_counts` | Modify |
-| `src/resume_agent/tracking/queries.py` | Archived filter on `shortlist_rows`/`pipeline_rows`; `triage_rows`, `archived_rows`, `TriageRow` | Modify |
-| `src/resume_agent/tracking/prune.py` | Pure prune predicates, `PruneRow`, `PruneReport` | Create |
-| `src/resume_agent/tracking/prune_config.py` | `PruneConfig`, `load_prune_config` | Create |
-| `config/prune.yaml.example` | Documented default thresholds | Create |
-| `src/resume_agent/cli.py` | `prune` command | Modify |
-| `src/resume_agent/dashboard/selection.py` | Pure selection-state helpers | Create |
-| `src/resume_agent/dashboard/pages.py` | `render_triage_page`, prune panel, pipeline enhancements | Modify |
-| `src/resume_agent/dashboard/app.py` | Sidebar nav + routing for Triage | Modify |
+| File                                        | Responsibility                                                                                                                                | Action |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `src/resume_agent/tracking/tables.py`       | Add `Job.archived_at` column                                                                                                                  | Modify |
+| `src/resume_agent/tracking/migrate.py`      | `ensure_archived_at_column`                                                                                                                   | Modify |
+| `src/resume_agent/db.py`                    | Wire migration into `init_db`                                                                                                                 | Modify |
+| `src/resume_agent/tracking/repository.py`   | `has_progress`, `archive_job`, `restore_job`, `delete_job`, `prune_preview`, `prune_run`; archived filter on `jobs_by_status`/`status_counts` | Modify |
+| `src/resume_agent/tracking/queries.py`      | Archived filter on `shortlist_rows`/`pipeline_rows`; `triage_rows`, `archived_rows`, `TriageRow`                                              | Modify |
+| `src/resume_agent/tracking/prune.py`        | Pure prune predicates, `PruneRow`, `PruneReport`                                                                                              | Create |
+| `src/resume_agent/tracking/prune_config.py` | `PruneConfig`, `load_prune_config`                                                                                                            | Create |
+| `config/prune.yaml.example`                 | Documented default thresholds                                                                                                                 | Create |
+| `src/resume_agent/cli.py`                   | `prune` command                                                                                                                               | Modify |
+| `src/resume_agent/dashboard/selection.py`   | Pure selection-state helpers                                                                                                                  | Create |
+| `src/resume_agent/dashboard/pages.py`       | `render_triage_page`, prune panel, pipeline enhancements                                                                                      | Modify |
+| `src/resume_agent/dashboard/app.py`         | Sidebar nav + routing for Triage                                                                                                              | Modify |
 
 Tasks are ordered as a dependency chain; each leaves the suite green.
 
@@ -36,6 +36,7 @@ Tasks are ordered as a dependency chain; each leaves the suite green.
 ## Task 1: Add `archived_at` column + migration
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py`
 - Modify: `src/resume_agent/tracking/migrate.py`
 - Modify: `src/resume_agent/db.py`
@@ -139,6 +140,7 @@ git commit -m "Add jobs.archived_at column and migration"
 ## Task 2: `has_progress` safety predicate
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
@@ -229,6 +231,7 @@ git commit -m "Add has_progress safety predicate"
 ## Task 3: `archive_job` / `restore_job`
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
@@ -309,6 +312,7 @@ git commit -m "Add archive_job and restore_job"
 ## Task 4: `delete_job` with cascade + progress guard
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py`
 - Test: `tests/test_repository.py`
 
@@ -388,6 +392,7 @@ git commit -m "Add delete_job with cascade and progress guard"
 ## Task 5: Exclude archived jobs from all views
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py` (`jobs_by_status`, `status_counts`)
 - Modify: `src/resume_agent/tracking/queries.py` (`shortlist_rows`, `pipeline_rows`, `application_job_pairs`)
 - Modify: `src/resume_agent/tracking/match_gap.py` (`_target_jobs`)
@@ -619,6 +624,7 @@ git commit -m "Exclude archived jobs from normal dashboard and sync views"
 ## Task 6: `PruneConfig` + loader + example file
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/prune_config.py`
 - Create: `config/prune.yaml.example`
 - Test: `tests/test_prune_config.py`
@@ -699,13 +705,13 @@ Create `config/prune.yaml.example`:
 
 # A job is archived (reversible) if it matches ANY enabled rule below AND has no
 # user progress (no application/resume version/cover letter, status not advanced).
-fit_threshold: 40        # archive scored jobs with fit_score below this
-stale_days: 60           # archive jobs whose posting is older than this many days
-retention_days: 30       # hard-delete archived zero-progress jobs after this many days
+fit_threshold: 40 # archive scored jobs with fit_score below this
+stale_days: 60 # archive jobs whose posting is older than this many days
+retention_days: 30 # hard-delete archived zero-progress jobs after this many days
 
-enable_rejected: true    # archive jobs the discovery filter already rejected
-enable_low_fit: true     # archive jobs below fit_threshold
-enable_stale: true       # archive jobs older than stale_days
+enable_rejected: true # archive jobs the discovery filter already rejected
+enable_low_fit: true # archive jobs below fit_threshold
+enable_stale: true # archive jobs older than stale_days
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
@@ -725,6 +731,7 @@ git commit -m "Add PruneConfig with YAML loader and example"
 ## Task 7: Pure prune predicates
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/prune.py`
 - Test: `tests/test_prune.py`
 
@@ -939,6 +946,7 @@ git commit -m "Add pure prune and expire predicates"
 ## Task 8: `prune_preview` + `prune_run` orchestrators
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py`
 - Test: `tests/test_prune_run.py`
 
@@ -1106,6 +1114,7 @@ git commit -m "Add prune_preview and prune_run orchestrators"
 ## Task 9: `resume-agent prune` CLI command
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_prune.py`
 
@@ -1241,6 +1250,7 @@ git commit -m "Add resume-agent prune CLI command"
 ## Task 10: `triage_rows` + `archived_rows` builders
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/queries.py`
 - Test: `tests/test_tracking_queries.py`
 
@@ -1383,6 +1393,7 @@ git commit -m "Add triage_rows and archived_rows builders"
 ## Task 11: Pure selection-state helper
 
 **Files:**
+
 - Create: `src/resume_agent/dashboard/selection.py`
 - Test: `tests/test_dashboard_selection.py`
 
@@ -1439,6 +1450,7 @@ git commit -m "Add pure Triage selection helpers"
 ## Task 12: Triage page (render + prune panel + nav)
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/pages.py`
 - Modify: `src/resume_agent/dashboard/app.py`
 - Test: `tests/test_dashboard_app.py`
@@ -1729,7 +1741,7 @@ div[data-testid="stVerticalBlock"][class*="st-key-triage_actionbar"] {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 0.7rem;
-  box-shadow: 0 4px 18px rgba(22,19,15,0.12);
+  box-shadow: 0 4px 18px rgba(22, 19, 15, 0.12);
 }
 ```
 
@@ -1787,6 +1799,7 @@ git commit -m "Add Triage filtering, bulk actions, undo, restore, and prune pane
 ## Task 13: Pipeline board controls
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/pages.py`
 - Test: `tests/test_dashboard_app.py`
 
@@ -1965,6 +1978,7 @@ git commit -m "Add pipeline board filtering, archive/delete, stage change, and c
 ## Task 14: Full suite + lint + docs
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 - Test: full suite
 
@@ -1984,6 +1998,7 @@ Add a short subsection under "Core invariants" documenting the archive/delete/pr
 
 ```markdown
 ### Archive, delete, prune
+
 `Job.archived_at` (orthogonal to `status`) soft-hides a job; every view filters
 `archived_at IS NULL` except dedupe lookup, which intentionally still sees trash-bin
 jobs to avoid duplicate re-ingest. `has_progress(session, job_id)` — status in
@@ -2011,4 +2026,7 @@ git commit -m "Document archive/delete/prune model in CLAUDE.md"
 - **Blast radius (spec §3):** archived filter on shortlist/pipeline/status_counts/jobs_by_status/application_job_pairs/match-gap/analytics — Task 5. Tested. Dedupe lookup remains intentionally unfiltered.
 - **Type consistency:** `PruneRow`/`PruneReport`/`PruneConfig`, `triage_rows`/`archived_rows`/`TriageRow`, `has_progress`, `archive_job`/`restore_job`/`delete_job`, `prune_preview`/`prune_run` used with identical signatures across tasks.
 - **AppTest seeding:** Task 12's render test uses the repo's verified pattern (`DB_URL` env var + `get_settings.cache_clear()` in a `try/finally`), copied from `test_dashboard_pages_render_without_error`.
+
+```
+
 ```

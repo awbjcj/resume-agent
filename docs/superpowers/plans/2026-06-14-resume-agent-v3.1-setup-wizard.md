@@ -12,26 +12,27 @@
 
 ## File Structure
 
-| File | Responsibility |
-|------|----------------|
-| `src/resume_agent/setup/__init__.py` | Package marker. |
-| `src/resume_agent/setup/state.py` | `WizardState` dataclass + `managed_env()`. The single source screens bind to. |
-| `src/resume_agent/setup/env_writer.py` | `parse_env`, `merge_env`, `format_env` (pure). |
-| `src/resume_agent/setup/yaml_gen.py` | `parse_greenhouse_boards`, `build_profile_sources/build_search/build_connectors` (pure), `render_from_example`. |
-| `src/resume_agent/setup/preflight.py` | `CheckResult` + detect-and-instruct preflight checks (injected callables). |
-| `src/resume_agent/setup/validate.py` | `anthropic_ping`, `connector_smoke` (injected clients). |
-| `src/resume_agent/setup/writer.py` | `atomic_write_all` (temp file + `os.replace`, per-file, tmp cleanup on error) + `load_existing_state`. |
-| `src/resume_agent/setup/app.py` | Thin Textual `SetupApp` (screen per step) + `_perform_write` seam. |
-| `src/resume_agent/cli.py` | `setup` command (MODIFY). |
-| `pyproject.toml` | Add `textual` (MODIFY via `uv add`). |
-| `README.md` | One line on running `setup` after `uv sync` (MODIFY). |
-| `tests/test_setup_state.py`, `test_setup_env_writer.py`, `test_setup_yaml_gen.py`, `test_setup_preflight.py`, `test_setup_validate.py`, `test_setup_writer.py`, `test_setup_app.py`, `test_cli_setup.py` | NEW. |
+| File                                                                                                                                                                                                     | Responsibility                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/resume_agent/setup/__init__.py`                                                                                                                                                                     | Package marker.                                                                                                 |
+| `src/resume_agent/setup/state.py`                                                                                                                                                                        | `WizardState` dataclass + `managed_env()`. The single source screens bind to.                                   |
+| `src/resume_agent/setup/env_writer.py`                                                                                                                                                                   | `parse_env`, `merge_env`, `format_env` (pure).                                                                  |
+| `src/resume_agent/setup/yaml_gen.py`                                                                                                                                                                     | `parse_greenhouse_boards`, `build_profile_sources/build_search/build_connectors` (pure), `render_from_example`. |
+| `src/resume_agent/setup/preflight.py`                                                                                                                                                                    | `CheckResult` + detect-and-instruct preflight checks (injected callables).                                      |
+| `src/resume_agent/setup/validate.py`                                                                                                                                                                     | `anthropic_ping`, `connector_smoke` (injected clients).                                                         |
+| `src/resume_agent/setup/writer.py`                                                                                                                                                                       | `atomic_write_all` (temp file + `os.replace`, per-file, tmp cleanup on error) + `load_existing_state`.          |
+| `src/resume_agent/setup/app.py`                                                                                                                                                                          | Thin Textual `SetupApp` (screen per step) + `_perform_write` seam.                                              |
+| `src/resume_agent/cli.py`                                                                                                                                                                                | `setup` command (MODIFY).                                                                                       |
+| `pyproject.toml`                                                                                                                                                                                         | Add `textual` (MODIFY via `uv add`).                                                                            |
+| `README.md`                                                                                                                                                                                              | One line on running `setup` after `uv sync` (MODIFY).                                                           |
+| `tests/test_setup_state.py`, `test_setup_env_writer.py`, `test_setup_yaml_gen.py`, `test_setup_preflight.py`, `test_setup_validate.py`, `test_setup_writer.py`, `test_setup_app.py`, `test_cli_setup.py` | NEW.                                                                                                            |
 
 ---
 
 ### Task 1: `textual` dependency + `setup` package + `WizardState`
 
 **Files:**
+
 - Modify: `pyproject.toml` (via `uv add`)
 - Create: `src/resume_agent/setup/__init__.py`, `src/resume_agent/setup/state.py`
 - Test: `tests/test_setup_state.py`
@@ -158,6 +159,7 @@ git commit -m "feat(setup): add textual dep + WizardState"
 ### Task 2: `parse_greenhouse_boards` pure parser
 
 **Files:**
+
 - Create: `src/resume_agent/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
@@ -244,6 +246,7 @@ git commit -m "feat(setup): parse_greenhouse_boards pure parser"
 ### Task 3: `.env` merge (`env_writer.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/setup/env_writer.py`
 - Test: `tests/test_setup_env_writer.py`
 
@@ -336,6 +339,7 @@ git commit -m "feat(setup): pure .env merge/format"
 ### Task 4: `build_profile_sources` + round-trip through `load_yaml`
 
 **Files:**
+
 - Modify: `src/resume_agent/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
@@ -393,6 +397,7 @@ git commit -m "feat(setup): build_profile_sources + round-trip"
 ### Task 5: `build_search` + round-trip through `load_search_config`
 
 **Files:**
+
 - Modify: `src/resume_agent/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
@@ -459,6 +464,7 @@ git commit -m "feat(setup): build_search + round-trip"
 ### Task 6: `build_connectors` + round-trip through `load_connectors_config`
 
 **Files:**
+
 - Modify: `src/resume_agent/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
@@ -526,6 +532,7 @@ git commit -m "feat(setup): build_connectors + round-trip"
 review.yaml and render.yaml take no wizard input, so they are generated by copying the maintained `.example` (the single source of the default roster) with a provenance header — verified by round-tripping through the real loaders.
 
 **Files:**
+
 - Modify: `src/resume_agent/setup/yaml_gen.py`
 - Test: `tests/test_setup_yaml_gen.py`
 
@@ -593,6 +600,7 @@ git commit -m "feat(setup): render review/render configs from maintained example
 ### Task 8: Preflight checks (`preflight.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/setup/preflight.py`
 - Test: `tests/test_setup_preflight.py`
 
@@ -728,6 +736,7 @@ git commit -m "feat(setup): detect-and-instruct preflight checks"
 ### Task 9: Live validation with injected clients (`validate.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/setup/validate.py`
 - Test: `tests/test_setup_validate.py`
 
@@ -830,6 +839,7 @@ git commit -m "feat(setup): anthropic_ping + connector_smoke with injected clien
 ### Task 10: Atomic write-all + existing-state pre-fill (`writer.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/setup/writer.py`
 - Test: `tests/test_setup_writer.py`
 
@@ -1044,6 +1054,7 @@ git commit -m "feat(setup): atomic_write_all + load_existing_state pre-fill"
 The full screen-by-screen UI follows the screen table in the spec (§5.2). This task builds the **thin testable shell**: a `SetupApp` that holds a `WizardState`, accepts an injected `writer`, exposes a `_perform_write()` seam, and boots cleanly. The engineer fleshes out the per-screen widgets following the spec table; the pilot tests below guard the wiring.
 
 **Files:**
+
 - Create: `src/resume_agent/setup/app.py`
 - Test: `tests/test_setup_app.py`
 
@@ -1156,6 +1167,7 @@ git commit -m "feat(setup): thin Textual shell + write seam"
 ### Task 12: `setup` CLI command
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_setup.py`
 
@@ -1227,6 +1239,7 @@ git commit -m "feat(cli): add 'setup' command launching the wizard"
 ### Task 13: README pointer + full-suite green
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Add the setup-wizard line**
@@ -1235,10 +1248,11 @@ In `README.md`, in the **Setup** section, immediately after step 1 (`uv sync`), 
 
 ```markdown
 # 1a. (Recommended) Run the guided setup wizard instead of hand-editing config
+
 uv run resume-agent setup
 ```
 
-And add a one-line note under the section: *"`resume-agent setup` walks you through secrets, search criteria, and connectors, then writes `.env` and `config/*.yaml` for you — the manual steps below are the alternative."*
+And add a one-line note under the section: _"`resume-agent setup` walks you through secrets, search criteria, and connectors, then writes `.env` and `config/_.yaml` for you — the manual steps below are the alternative."\*
 
 - [ ] **Step 2: Run the full suite + lint**
 
@@ -1265,6 +1279,7 @@ git commit -m "docs(setup): point new users at 'resume-agent setup'"
 ## Self-Review
 
 **Spec coverage (§5):**
+
 - §5.1 package layout → Tasks 1–11 create exactly the listed modules. ✓
 - §5.2 screen flow → Task 11 builds the thin shell + write seam; per-screen widgets are explicitly delegated to the engineer following the spec table (the logic each screen calls is fully built and tested in Tasks 2–10). ✓
 - §5.3 secrets model (6 prompted / 4 advanced / 2 omitted; `merge_env` preserves unmanaged) → Tasks 1 (`managed_env` omits openai/user_data_dir) + 3 (`merge_env` preserves unmanaged, tested with `OPENAI_API_KEY`). ✓
@@ -1278,4 +1293,7 @@ git commit -m "docs(setup): point new users at 'resume-agent setup'"
 **Placeholder scan:** No "TBD"/"add error handling"/"handle edge cases". The one delegation — per-screen Textual widgets in Task 11 — is explicit and bounded (the spec table is the contract, and every function those screens call is fully implemented and tested in earlier tasks), not a hidden gap.
 
 **Type consistency:** `WizardState` field names are used identically across `managed_env`, `build_*`, `atomic_write_all`, and `load_existing_state`. `CheckResult` is defined once in `preflight.py` and imported by `validate.py` (same shape everywhere). `atomic_write_all(state, root=...)` signature matches its call sites in tests and the `_perform_write` seam. `anthropic_ping(api_key, client_factory=...)` and `connector_smoke(enabled, probe)` signatures match their tests.
+
+```
+
 ```

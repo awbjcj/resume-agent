@@ -22,11 +22,13 @@
 ### Task 1: Extend filter-state + URL ↔ BoardFilter query serialization
 
 **Files:**
+
 - Modify: `web/src/lib/filters/types.ts` (extend `FilterState`)
 - Create: `web/src/lib/filters/params.ts` (`boardFilterToParams`)
 - Test: `web/src/lib/filters/params.test.ts`
 
 **Interfaces:**
+
 - Produces: extended `FilterState` with `q: string`, `source: Set<string>`, `status: Set<string>`, `maxFit: number | null`, `staleDays: number | null`; `boardFilterToParams(s: FilterState, opts?: { page?: number; pageSize?: number; archived?: boolean }) -> Record<string, string>`.
 
 - [ ] **Step 1: Write the failing test**
@@ -68,16 +70,22 @@ In `web/src/lib/filters/types.ts`, add to the `FilterState` interface and `empty
 Also widen `SortKey` to include the board defaults and API sorts used here:
 
 ```ts
-export type SortKey = "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+export type SortKey =
+  | "fit"
+  | "salary"
+  | "recency"
+  | "composite"
+  | "company"
+  | "stage";
 ```
 
 ```ts
 // add to interface FilterState
-  q: string;
-  source: Set<string>;
-  status: Set<string>;
-  maxFit: number | null;
-  staleDays: number | null;
+q: string;
+source: Set<string>;
+status: Set<string>;
+maxFit: number | null;
+staleDays: number | null;
 ```
 
 ```ts
@@ -96,11 +104,18 @@ export type SortKey = "fit" | "salary" | "recency" | "composite" | "company" | "
 import type { FilterState } from "./types";
 
 const SET_PARAM: [keyof FilterState, string][] = [
-  ["source", "source"], ["status", "status"], ["remote", "remote"],
-  ["sponsorship", "sponsorship"], ["seniority", "seniority"],
-  ["employmentType", "employmentType"], ["industry", "industry"],
-  ["country", "country"], ["region", "region"], ["city", "city"],
-  ["companySize", "companySize"], ["skills", "skills"],
+  ["source", "source"],
+  ["status", "status"],
+  ["remote", "remote"],
+  ["sponsorship", "sponsorship"],
+  ["seniority", "seniority"],
+  ["employmentType", "employmentType"],
+  ["industry", "industry"],
+  ["country", "country"],
+  ["region", "region"],
+  ["city", "city"],
+  ["companySize", "companySize"],
+  ["skills", "skills"],
 ];
 
 export function boardFilterToParams(
@@ -143,10 +158,12 @@ git commit -m "feat(web): extend FilterState + BoardFilter param serialization"
 ### Task 2: `useBoardQuery` — server-driven infinite list with facets
 
 **Files:**
+
 - Create: `web/src/features/board/use-board-query.ts`
 - Test: `web/src/features/board/use-board-query.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `api` (`@/lib/api/client`), `boardFilterToParams` (Task 1).
 - Produces: `useBoardQuery<T>(board, filter, { archived?, pageSize? }) -> { rows: T[]; facets: Facets; total: number; fetchNextPage; hasNextPage; isLoading }` where `Facets = Record<string, Record<string, number>>`.
 
@@ -177,7 +194,9 @@ describe("useBoardQuery", () => {
     server.use(
       http.get("/api/triage", () =>
         HttpResponse.json({
-          data: [{ jobId: 1, company: "Acme", source: "adzuna", status: "rejected" }],
+          data: [
+            { jobId: 1, company: "Acme", source: "adzuna", status: "rejected" },
+          ],
           pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 },
           facets: { source: { adzuna: 1 } },
           total: 1,
@@ -213,7 +232,11 @@ import type { FilterState } from "@/lib/filters/types";
 
 export type Facets = Record<string, Record<string, number>>;
 type Board = "shortlist" | "triage" | "pipeline";
-const PATH = { shortlist: "/api/shortlist", triage: "/api/triage", pipeline: "/api/pipeline" } as const;
+const PATH = {
+  shortlist: "/api/shortlist",
+  triage: "/api/triage",
+  pipeline: "/api/pipeline",
+} as const;
 
 interface Envelope<T> {
   data: T[];
@@ -228,7 +251,10 @@ export function useBoardQuery<T>(
   opts: { archived?: boolean; pageSize?: number } = {},
 ) {
   const pageSize = opts.pageSize ?? 50;
-  const baseParams = boardFilterToParams(filter, { pageSize, archived: opts.archived });
+  const baseParams = boardFilterToParams(filter, {
+    pageSize,
+    archived: opts.archived,
+  });
 
   const query = useInfiniteQuery({
     queryKey: [board, baseParams, opts.archived ?? false],
@@ -236,11 +262,18 @@ export function useBoardQuery<T>(
     queryFn: ({ pageParam }): Promise<Envelope<T>> =>
       unwrap(
         api.GET(PATH[board], {
-          params: { query: { ...baseParams, page: pageParam } as Record<string, string | number> },
+          params: {
+            query: { ...baseParams, page: pageParam } as Record<
+              string,
+              string | number
+            >,
+          },
         }),
       ) as Promise<Envelope<T>>,
     getNextPageParam: (last) =>
-      last.pagination.page < last.pagination.totalPages ? last.pagination.page + 1 : undefined,
+      last.pagination.page < last.pagination.totalPages
+        ? last.pagination.page + 1
+        : undefined,
   });
 
   const pages = query.data?.pages ?? [];
@@ -273,10 +306,12 @@ git commit -m "feat(web): useBoardQuery infinite list with server facets + total
 ### Task 3: `useSelection` — two-mode (ids | query) selection engine
 
 **Files:**
+
 - Create: `web/src/features/board/use-selection.ts`
 - Test: `web/src/features/board/use-selection.test.tsx`
 
 **Interfaces:**
+
 - Produces: `useSelection() -> { mode, ids, count, isAllMatching, toggle(id, index?, shift?), selectPage(ids), selectAllMatching(total), reconcile(loadedIds,total), clear, isSelected(id) }`.
 
 `toggle` with a `shift` flag and the row `index` selects a range from the last-clicked
@@ -376,17 +411,20 @@ export function useSelection() {
     setMatchingTotal(total);
   }, []);
 
-  const reconcile = useCallback((loadedIds: number[], total: number) => {
-    const loaded = new Set(loadedIds);
-    if (mode === "query") {
-      setMatchingTotal(total);
-      return;
-    }
-    setIds((prev) => {
-      const next = new Set([...prev].filter((id) => loaded.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [mode]);
+  const reconcile = useCallback(
+    (loadedIds: number[], total: number) => {
+      const loaded = new Set(loadedIds);
+      if (mode === "query") {
+        setMatchingTotal(total);
+        return;
+      }
+      setIds((prev) => {
+        const next = new Set([...prev].filter((id) => loaded.has(id)));
+        return next.size === prev.size ? prev : next;
+      });
+    },
+    [mode],
+  );
 
   const isSelected = useCallback(
     (id: number) => (mode === "query" ? true : ids.has(id)),
@@ -425,10 +463,12 @@ git commit -m "feat(web): two-mode selection engine (ids | all-matching)"
 ### Task 4: `useBulkAction` — act-by-query bulk mutations with dry-run preview
 
 **Files:**
+
 - Create: `web/src/features/board/use-bulk-action.ts`
 - Test: `web/src/features/board/use-bulk-action.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `api` (`@/lib/api/client`), `boardFilterToParams`-style serialization but as arrays for the JSON body, `FilterState`, the selection shape from Task 3.
 - Produces: `useBulkAction(board) -> { run(args), preview(args) }` where `args = { action, selection, filter, status?, archived? }` and both return `Promise<BulkResultOut>`. `run` invalidates the board caches + toasts.
 
@@ -457,7 +497,11 @@ describe("useBulkAction", () => {
     server.use(
       http.post("/api/jobs/bulk", async ({ request }) => {
         received = await request.json();
-        return HttpResponse.json({ affected: 10, skipped: 1, reasons: { hasProgress: 1 } });
+        return HttpResponse.json({
+          affected: 10,
+          skipped: 1,
+          reasons: { hasProgress: 1 },
+        });
       }),
     );
     const filter = emptyFilterState();
@@ -505,21 +549,35 @@ interface Args {
 }
 
 const ARR: [keyof FilterState, string][] = [
-  ["source", "source"], ["status", "statusIn"], ["remote", "remote"],
-  ["sponsorship", "sponsorship"], ["seniority", "seniority"],
-  ["employmentType", "employmentType"], ["industry", "industry"],
-  ["country", "country"], ["region", "region"], ["city", "city"],
-  ["companySize", "companySize"], ["skills", "skills"],
+  ["source", "source"],
+  ["status", "statusIn"],
+  ["remote", "remote"],
+  ["sponsorship", "sponsorship"],
+  ["seniority", "seniority"],
+  ["employmentType", "employmentType"],
+  ["industry", "industry"],
+  ["country", "country"],
+  ["region", "region"],
+  ["city", "city"],
+  ["companySize", "companySize"],
+  ["skills", "skills"],
 ];
 
 function body(board: Board, a: Args, dryRun: boolean) {
   const f = a.filter;
   const out: Record<string, unknown> = {
-    board, action: a.action, scope: a.selection.mode, dryRun,
-    ids: [...a.selection.ids], status: a.status ?? null,
+    board,
+    action: a.action,
+    scope: a.selection.mode,
+    dryRun,
+    ids: [...a.selection.ids],
+    status: a.status ?? null,
     archived: a.archived ?? false,
     q: f.q.trim() || null,
-    minFit: f.fitMin, maxFit: f.maxFit, minSalary: f.salaryMin, staleDays: f.staleDays,
+    minFit: f.fitMin,
+    maxFit: f.maxFit,
+    minSalary: f.salaryMin,
+    staleDays: f.staleDays,
   };
   for (const [key, param] of ARR) out[param] = [...(f[key] as Set<string>)];
   return out;
@@ -528,13 +586,16 @@ function body(board: Board, a: Args, dryRun: boolean) {
 export function useBulkAction(board: Board) {
   const qc = useQueryClient();
   const call = (a: Args, dryRun: boolean): Promise<BulkResultOut> =>
-    unwrap(api.POST("/api/jobs/bulk", { body: body(board, a, dryRun) as never })) as Promise<BulkResultOut>;
+    unwrap(
+      api.POST("/api/jobs/bulk", { body: body(board, a, dryRun) as never }),
+    ) as Promise<BulkResultOut>;
 
   return {
     preview: (a: Args) => call(a, true),
     run: async (a: Args) => {
       const res = await call(a, false);
-      for (const k of ["shortlist", "pipeline", "triage"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["shortlist", "pipeline", "triage"])
+        qc.invalidateQueries({ queryKey: [k] });
       const tail = res.skipped ? ` · ${res.skipped} skipped` : "";
       toast.success(`${a.action}: ${res.affected} job(s)${tail}`);
       return res;
@@ -560,11 +621,13 @@ git commit -m "feat(web): act-by-query bulk action hook with dry-run preview"
 ### Task 5: `FacetPills` + `FacetPopover` filter controls
 
 **Files:**
+
 - Create: `web/src/components/filters/FacetPills.tsx`
 - Create: `web/src/components/filters/FacetPopover.tsx`
 - Test: `web/src/components/filters/FacetPills.test.tsx`, `web/src/components/filters/FacetPopover.test.tsx`
 
 **Interfaces:**
+
 - Produces:
   - `FacetPills({ label, options, counts, selected, onChange, getLabel? })` — fixed-enum toggle pills; `options: string[]`, `counts: Record<string,number>`, `selected: Set<string>`.
   - `FacetPopover({ label, counts, selected, onChange, getLabel? })` — a chip with a count badge opening a searchable, counted checkbox list. Options are the keys of `counts` (data-driven), sorted by count desc.
@@ -573,6 +636,7 @@ These replace `MultiSelect.tsx` entirely. Compactness is a requirement: pills in
 popover chip shows `Label · N` when active.
 
 Shadcn/base rules for this task:
+
 - `FacetPills` uses `ToggleGroup multiple` + `ToggleGroupItem`, not custom active buttons.
 - `FacetPopover` uses `Popover` + `Command` for searchable content, not `DropdownMenu` with an `Input` nested inside it.
 - Base UI triggers use `render={<Button />}`. Icons inside `Button` use lucide with `data-icon`; do not use text glyph chevrons.
@@ -590,8 +654,13 @@ describe("FacetPills", () => {
   it("toggles a value and shows its count", () => {
     const onChange = vi.fn();
     render(
-      <FacetPills label="Remote" options={["remote", "hybrid"]}
-        counts={{ remote: 12 }} selected={new Set()} onChange={onChange} />,
+      <FacetPills
+        label="Remote"
+        options={["remote", "hybrid"]}
+        counts={{ remote: 12 }}
+        selected={new Set()}
+        onChange={onChange}
+      />,
     );
     expect(screen.getByText("12")).toBeInTheDocument();
     fireEvent.click(screen.getByText("remote"));
@@ -610,11 +679,17 @@ describe("FacetPopover", () => {
   it("filters options by the search box and toggles selection", () => {
     const onChange = vi.fn();
     render(
-      <FacetPopover label="Skills" counts={{ python: 52, react: 38, go: 11 }}
-        selected={new Set()} onChange={onChange} />,
+      <FacetPopover
+        label="Skills"
+        counts={{ python: 52, react: 38, go: 11 }}
+        selected={new Set()}
+        onChange={onChange}
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: /Skills/ }));
-    fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: "rea" } });
+    fireEvent.change(screen.getByPlaceholderText(/search/i), {
+      target: { value: "rea" },
+    });
     expect(screen.queryByText("python")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("react"));
     expect(onChange).toHaveBeenCalledWith(new Set(["react"]));
@@ -636,7 +711,12 @@ import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export function FacetPills({
-  label, options, counts, selected, onChange, getLabel,
+  label,
+  options,
+  counts,
+  selected,
+  onChange,
+  getLabel,
 }: {
   label: string;
   options: string[];
@@ -647,7 +727,9 @@ export function FacetPills({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs font-semibold uppercase tracking-[0.14em]">{label}</Label>
+      <Label className="text-xs font-semibold uppercase tracking-[0.14em]">
+        {label}
+      </Label>
       <ToggleGroup
         multiple
         value={[...selected]}
@@ -686,13 +768,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
 } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export function FacetPopover({
-  label, counts, selected, onChange, getLabel,
+  label,
+  counts,
+  selected,
+  onChange,
+  getLabel,
 }: {
   label: string;
   counts: Record<string, number>;
@@ -702,7 +797,10 @@ export function FacetPopover({
 }) {
   const [q, setQ] = useState("");
   const options = useMemo(
-    () => Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k]) => k),
+    () =>
+      Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k]) => k),
     [counts],
   );
   const shown = options.filter((o) =>
@@ -717,27 +815,47 @@ export function FacetPopover({
     <Popover>
       <PopoverTrigger
         render={
-          <Button variant="outline" size="sm"
-            className={cn("rounded-full", selected.size && "border-primary text-primary")}>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "rounded-full",
+              selected.size && "border-primary text-primary",
+            )}
+          >
             {label}
-            {selected.size > 0 && <Badge variant="secondary">{selected.size}</Badge>}
+            {selected.size > 0 && (
+              <Badge variant="secondary">{selected.size}</Badge>
+            )}
             <ChevronDownIcon data-icon="inline-end" />
           </Button>
         }
       />
       <PopoverContent align="start" className="w-72 p-0">
         <Command>
-          <CommandInput placeholder={`Search ${label.toLowerCase()}...`} value={q} onValueChange={setQ} />
+          <CommandInput
+            placeholder={`Search ${label.toLowerCase()}...`}
+            value={q}
+            onValueChange={setQ}
+          />
           <CommandList>
             <CommandEmpty>No matches</CommandEmpty>
             <CommandGroup>
               {shown.map((opt) => {
                 const checked = selected.has(opt);
                 return (
-                  <CommandItem key={opt} value={opt} onSelect={() => toggle(opt)}>
+                  <CommandItem
+                    key={opt}
+                    value={opt}
+                    onSelect={() => toggle(opt)}
+                  >
                     <Checkbox checked={checked} aria-hidden />
-                    <span className="flex-1 truncate">{getLabel ? getLabel(opt) : opt}</span>
-                    <span className="text-xs text-muted-foreground">{counts[opt]}</span>
+                    <span className="flex-1 truncate">
+                      {getLabel ? getLabel(opt) : opt}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {counts[opt]}
+                    </span>
                     {checked && <CheckIcon />}
                   </CommandItem>
                 );
@@ -770,6 +888,7 @@ git commit -m "feat(web): FacetPills + searchable FacetPopover filter controls"
 ### Task 6: New `FilterDesk` + `ActiveFilterSummary`; retire client-side filter compute
 
 **Files:**
+
 - Create: `web/src/components/filters/ActiveFilterSummary.tsx`
 - Rewrite: `web/src/components/FilterDesk.tsx` (use server facets + new controls)
 - Modify: `web/src/features/shortlist/use-board-filters.ts` (serialize the new keys to URL)
@@ -778,6 +897,7 @@ git commit -m "feat(web): FacetPills + searchable FacetPopover filter controls"
 - Test: `web/src/components/filters/ActiveFilterSummary.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `FacetPills`, `FacetPopover` (Task 5), `useBoardQuery` (Task 2), `Facets`.
 - Produces: `ActiveFilterSummary({ filter, total, onRemove, onClear })`; `FilterDesk({ filter, facets, total, onChange })` (no longer takes `rows`). `total` is the server-filtered matching count from `BoardPage.total`; the contract does not include an unfiltered board total.
 
@@ -806,8 +926,12 @@ describe("ActiveFilterSummary", () => {
     filter.seniority = new Set(["senior"]);
     const onRemove = vi.fn();
     render(
-      <ActiveFilterSummary filter={filter} total={1284}
-        onRemove={onRemove} onClear={vi.fn()} />,
+      <ActiveFilterSummary
+        filter={filter}
+        total={1284}
+        onRemove={onRemove}
+        onClear={vi.fn()}
+      />,
     );
     expect(screen.getByText(/1,284 matching/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /senior/ }));
@@ -830,12 +954,25 @@ import { XIcon } from "lucide-react";
 import type { FilterState } from "@/lib/filters/types";
 
 const SET_KEYS: (keyof FilterState)[] = [
-  "source", "status", "remote", "sponsorship", "seniority", "employmentType",
-  "industry", "country", "region", "city", "companySize", "skills",
+  "source",
+  "status",
+  "remote",
+  "sponsorship",
+  "seniority",
+  "employmentType",
+  "industry",
+  "country",
+  "region",
+  "city",
+  "companySize",
+  "skills",
 ];
 
 export function ActiveFilterSummary({
-  filter, total, onRemove, onClear,
+  filter,
+  total,
+  onRemove,
+  onClear,
 }: {
   filter: FilterState;
   total: number;
@@ -846,21 +983,34 @@ export function ActiveFilterSummary({
   for (const key of SET_KEYS) {
     for (const value of filter[key] as Set<string>) chips.push({ key, value });
   }
-  const hasScalar = filter.fitMin != null || filter.salaryMin != null || filter.q.trim();
+  const hasScalar =
+    filter.fitMin != null || filter.salaryMin != null || filter.q.trim();
   if (!chips.length && !hasScalar) return null;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
-      <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Active</span>
+      <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+        Active
+      </span>
       {chips.map(({ key, value }) => (
-        <Button key={`${key}:${value}`} size="sm" variant="secondary"
-          className="h-7 rounded-full px-2.5 text-xs" onClick={() => onRemove(key, value)}>
+        <Button
+          key={`${key}:${value}`}
+          size="sm"
+          variant="secondary"
+          className="h-7 rounded-full px-2.5 text-xs"
+          onClick={() => onRemove(key, value)}
+        >
           {value.replace(/_/g, " ")}
           <XIcon data-icon="inline-end" />
         </Button>
       ))}
       <span className="ml-auto text-xs text-muted-foreground">
         {total.toLocaleString()} matching
-        <Button variant="link" size="sm" className="h-auto px-2 py-0" onClick={onClear}>
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto px-2 py-0"
+          onClick={onClear}
+        >
           Clear all
         </Button>
       </span>
@@ -874,6 +1024,7 @@ export function ActiveFilterSummary({
 Replace `web/src/components/FilterDesk.tsx` so it takes `{ filter, facets, total, onChange }`
 (no `rows`), renders the scalar controls (Min fit slider, Min salary input, Sort select)
 plus:
+
 - `FacetPills` for `remote`, `seniority`, `employmentType` (`type`), `sponsorship`, `companySize`, plus board-specific `status`/`source` only when those facet maps are present. Use current literal arrays for true fixed enums; use `Object.keys(facets.source ?? {})` for source because enabled connectors are data-driven. `counts` = `facets[name]`; do not render an empty pill group.
 - `FacetPopover` for `industry` (getLabel via `facets` keys → label map is gone; use the SIC code as the value and the server-provided label if present — for v1 show the code), `country`, `region`, `city`, `skills` — `counts` = `facets[name]`. Do not render an empty popover if that facet is absent from the current board's `facets`.
 - `ActiveFilterSummary` at the bottom.
@@ -891,6 +1042,7 @@ the same way `salaryMin`/`fitMin` are handled. (Sets serialize as comma-joined, 
 - [ ] **Step 6: Rewire `ShortlistContainer` to the server query**
 
 In `web/src/features/shortlist/ShortlistContainer.tsx`:
+
 - Replace `useShortlist()` + `useMemo(applyFilters/sortRows)` with
   `const { rows, facets, total, fetchNextPage, hasNextPage, isLoading } = useBoardQuery<ShortlistItem>("shortlist", filters)`.
 - `visible` is just `rows` (server already filtered/sorted). Drop the `applyFilters`/`sortRows` imports.
@@ -935,12 +1087,14 @@ git commit -m "feat(web): server-driven FilterDesk + summary; retire client filt
 ### Task 7: Dense `JobTable` + `BulkActionBar` + two-tier banner (Triage)
 
 **Files:**
+
 - Create: `web/src/components/JobTable.tsx`
 - Create: `web/src/components/BulkActionBar.tsx`
 - Rewrite: `web/src/features/triage/TriageContainer.tsx`
 - Test: `web/src/components/JobTable.test.tsx`, `web/src/components/BulkActionBar.test.tsx`, `web/src/features/triage/TriageContainer.test.tsx` (update)
 
 **Interfaces:**
+
 - Consumes: `useBoardQuery` (Task 2), `useSelection` (Task 3), `useBulkAction` (Task 4), `FilterDesk` (Task 6), `TriageItem` (`@/lib/api/schema`).
 - Produces:
   - `JobTable({ rows, columns, selection, onToggle, onOpen })` — dense table; header select-all checkbox; row checkbox; shift-click range via `onToggle(id, index, shiftKey, orderedIds)`.
@@ -955,16 +1109,34 @@ import { describe, expect, it, vi } from "vitest";
 import { JobTable } from "./JobTable";
 
 const rows = [
-  { jobId: 1, company: "Acme", title: "Eng", fitScore: 22, source: "adzuna", status: "rejected" },
-  { jobId: 2, company: "Globex", title: "PM", fitScore: 40, source: "lever", status: "rejected" },
+  {
+    jobId: 1,
+    company: "Acme",
+    title: "Eng",
+    fitScore: 22,
+    source: "adzuna",
+    status: "rejected",
+  },
+  {
+    jobId: 2,
+    company: "Globex",
+    title: "PM",
+    fitScore: 40,
+    source: "lever",
+    status: "rejected",
+  },
 ];
 
 describe("JobTable", () => {
   it("renders rows and toggles a row checkbox", () => {
     const onToggle = vi.fn();
     render(
-      <JobTable rows={rows} selection={{ isSelected: () => false }}
-        onToggle={onToggle} onOpen={vi.fn()} />,
+      <JobTable
+        rows={rows}
+        selection={{ isSelected: () => false }}
+        onToggle={onToggle}
+        onOpen={vi.fn()}
+      />,
     );
     expect(screen.getByText("Acme")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("checkbox")[1]); // first is header
@@ -1009,23 +1181,43 @@ Expected: FAIL — module missing.
 ```tsx
 // web/src/components/JobTable.tsx
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 
 type Row = {
-  jobId: number; company: string | null; title: string | null;
-  fitScore: number | null; source?: string; location?: string | null;
-  status?: string; postedAt?: string | null;
+  jobId: number;
+  company: string | null;
+  title: string | null;
+  fitScore: number | null;
+  source?: string;
+  location?: string | null;
+  status?: string;
+  postedAt?: string | null;
 };
 
 export function JobTable({
-  rows, selection, onToggle, onOpen, onToggleAll, allChecked,
+  rows,
+  selection,
+  onToggle,
+  onOpen,
+  onToggleAll,
+  allChecked,
 }: {
   rows: Row[];
   selection: { isSelected: (id: number) => boolean };
-  onToggle: (id: number, index: number, shift: boolean, ordered: number[]) => void;
+  onToggle: (
+    id: number,
+    index: number,
+    shift: boolean,
+    ordered: number[],
+  ) => void;
   onOpen: (id: number) => void;
   onToggleAll?: (checked: boolean) => void;
   allChecked?: boolean;
@@ -1051,14 +1243,22 @@ export function JobTable({
       </TableHeader>
       <TableBody>
         {rows.map((r, i) => (
-          <TableRow key={r.jobId} data-selected={selection.isSelected(r.jobId)}
-            className="cursor-pointer data-[selected=true]:bg-secondary/60">
+          <TableRow
+            key={r.jobId}
+            data-selected={selection.isSelected(r.jobId)}
+            className="cursor-pointer data-[selected=true]:bg-secondary/60"
+          >
             <TableCell onClick={(e) => e.stopPropagation()}>
               <Checkbox
                 aria-label={`Select ${r.company ?? "job"} ${r.title ?? ""}`.trim()}
                 checked={selection.isSelected(r.jobId)}
                 onClick={(e) =>
-                  onToggle(r.jobId, i, (e as React.MouseEvent).shiftKey, ordered)
+                  onToggle(
+                    r.jobId,
+                    i,
+                    (e as React.MouseEvent).shiftKey,
+                    ordered,
+                  )
                 }
               />
             </TableCell>
@@ -1092,7 +1292,13 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 export function BulkActionBar({
-  count, isAllMatching, pageCount, total, onSelectAllMatching, onClear, children,
+  count,
+  isAllMatching,
+  pageCount,
+  total,
+  onSelectAllMatching,
+  onClear,
+  children,
 }: {
   count: number;
   isAllMatching: boolean;
@@ -1110,17 +1316,24 @@ export function BulkActionBar({
           <strong>{count.toLocaleString()}</strong> selected
         </span>
         {children}
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={onClear}>Clear</Button>
+        <Button variant="ghost" size="sm" className="ml-auto" onClick={onClear}>
+          Clear
+        </Button>
       </div>
       {!isAllMatching && count === pageCount && total > pageCount && (
         <>
-        <Separator />
-        <div className="bg-primary/5 px-3 py-2 text-sm text-primary">
-          All {pageCount} loaded selected.{" "}
-          <Button variant="link" size="sm" className="h-auto px-1 py-0" onClick={onSelectAllMatching}>
-            Select all {total.toLocaleString()} matching this filter
-          </Button>
-        </div>
+          <Separator />
+          <div className="bg-primary/5 px-3 py-2 text-sm text-primary">
+            All {pageCount} loaded selected.{" "}
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto px-1 py-0"
+              onClick={onSelectAllMatching}
+            >
+              Select all {total.toLocaleString()} matching this filter
+            </Button>
+          </div>
         </>
       )}
     </div>
@@ -1131,6 +1344,7 @@ export function BulkActionBar({
 - [ ] **Step 5: Rewrite `TriageContainer`**
 
 Rewrite `web/src/features/triage/TriageContainer.tsx` to:
+
 - Hold a `FilterState` (via a triage-scoped `useBoardFilters`) and `archived` toggle.
 - `const { rows, facets, total, fetchNextPage, hasNextPage } = useBoardQuery<TriageItem>("triage", filter, { archived })`.
 - `const selection = useSelection();` and `const bulk = useBulkAction("triage");`
@@ -1167,12 +1381,14 @@ git commit -m "feat(web): dense Triage table with two-tier selection + bulk acti
 ### Task 8: Quick-filter pruning (replace `PrunePanel`)
 
 **Files:**
+
 - Create: `web/src/features/triage/QuickFilters.tsx`
 - Modify: `web/src/features/triage/TriageContainer.tsx` (mount `QuickFilters`; remove `PrunePanel`)
 - Delete: `web/src/features/triage/PrunePanel.tsx`
 - Test: `web/src/features/triage/QuickFilters.test.tsx`
 
 **Interfaces:**
+
 - Produces: `QuickFilters({ onApply })` where `onApply(patch: Partial<FilterState>)` merges a preset into the active filter. Presets: Low-fit (`maxFit: 40`, with unknown fit scores excluded by the server), Stale (`staleDays: 45`), Off-target (`status: new Set(["rejected"])`).
 
 Pruning is now: click a quick filter → the table + bulk bar reflect the matching set →
@@ -1209,18 +1425,35 @@ import { Button } from "@/components/ui/button";
 import { FilterIcon } from "lucide-react";
 import type { FilterState } from "@/lib/filters/types";
 
-export function QuickFilters({ onApply }: { onApply: (patch: Partial<FilterState>) => void }) {
+export function QuickFilters({
+  onApply,
+}: {
+  onApply: (patch: Partial<FilterState>) => void;
+}) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Quick prune</span>
-      <Button size="sm" variant="outline" onClick={() => onApply({ maxFit: 40 })}>
+      <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+        Quick prune
+      </span>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => onApply({ maxFit: 40 })}
+      >
         <FilterIcon data-icon="inline-start" /> Low-fit (&lt;40)
       </Button>
-      <Button size="sm" variant="outline" onClick={() => onApply({ staleDays: 45 })}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => onApply({ staleDays: 45 })}
+      >
         <FilterIcon data-icon="inline-start" /> Stale (&gt;45d)
       </Button>
-      <Button size="sm" variant="outline"
-        onClick={() => onApply({ status: new Set(["rejected"]) })}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => onApply({ status: new Set(["rejected"]) })}
+      >
         <FilterIcon data-icon="inline-start" /> Off-target rejected
       </Button>
     </div>
@@ -1254,10 +1487,12 @@ git commit -m "feat(web): quick-filter pruning replaces the threshold prune pane
 ### Task 9: Shortlist bulk Approve/Archive bar (cards retained)
 
 **Files:**
+
 - Modify: `web/src/features/shortlist/ShortlistContainer.tsx`
 - Test: `web/src/features/shortlist/ShortlistContainer.test.tsx` (update)
 
 **Interfaces:**
+
 - Consumes: `useSelection`, `useBulkAction("shortlist")`, `BulkActionBar`.
 
 Cards stay (decision surface); add per-card selection + a bulk bar with **Approve** and
@@ -1301,10 +1536,12 @@ git commit -m "feat(web): bulk Approve/Archive on the Shortlist (cards retained)
 ### Task 10: Pipeline bulk set-status / Archive
 
 **Files:**
+
 - Modify: `web/src/features/pipeline/PipelineContainer.tsx`
 - Test: `web/src/features/pipeline/PipelineContainer.test.tsx` (update)
 
 **Interfaces:**
+
 - Consumes: `useSelection`, `useBulkAction("pipeline")`, `BulkActionBar`.
 
 Stage groups stay; add selection + a bulk bar with a status `Select` (to `setStatus`) and

@@ -9,6 +9,7 @@
 **Tech Stack:** Python 3.12, SQLModel/SQLAlchemy, FastAPI, Typer, pytest; React 19, TypeScript, Vitest, `react-markdown`, `markdownify`.
 
 **Test commands:**
+
 - Backend (offline): `.venv/Scripts/python.exe -m pytest`
 - Backend lint: `ruff check`
 - Web: `cd web && npm run test` (vitest)
@@ -45,11 +46,13 @@ Apply these corrections to the task snippets below where they differ:
 ## File-structure map
 
 **Create:**
+
 - `tests/test_migrate_lifecycle.py` — migration backfill tests
 - `web/src/lib/format/prettify.ts` — `prettifyPlainText()` for legacy flat JD text
 - `web/src/lib/format/prettify.test.ts` — vitest for the above
 
 **Modify (backend):**
+
 - `src/resume_agent/tracking/dedup.py` — title abbreviations + `compute_content_fingerprint`
 - `src/resume_agent/tracking/tables.py` — two new `Job` columns
 - `src/resume_agent/tracking/migrate.py` — two new `ensure_*_column` helpers
@@ -67,6 +70,7 @@ Apply these corrections to the task snippets below where they differ:
 - `pyproject.toml` — add `markdownify`
 
 **Modify (web):**
+
 - `web/package.json` — add `react-markdown`
 - `web/src/components/JobModal.tsx` — markdown render
 - `web/src/components/SkillMatrix.tsx` — "Nice-to-have" label + comment
@@ -82,6 +86,7 @@ Apply these corrections to the task snippets below where they differ:
 ## Task 1: Title abbreviation normalization (dedup)
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/dedup.py`
 - Test: `tests/test_tracking_dedup.py` (create if absent)
 
@@ -152,6 +157,7 @@ git commit -m "feat(dedup): expand role-noun abbreviations in title normalizatio
 ## Task 2: Content fingerprint helper (dedup)
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/dedup.py`
 - Test: `tests/test_tracking_dedup.py`
 
@@ -216,6 +222,7 @@ git commit -m "feat(dedup): add content fingerprint helper for keyless dedup"
 ## Task 3: Schema columns + migrations
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py:52` (Job model)
 - Modify: `src/resume_agent/tracking/migrate.py`
 - Modify: `src/resume_agent/db.py:49-53`
@@ -386,6 +393,7 @@ git commit -m "feat(schema): add reject_category + content_fingerprint columns w
 ## Task 4: Ingest fingerprint fallback
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/merge.py:61-64,127-136`
 - Modify: `src/resume_agent/discovery/ingest.py:57,71-82`
 - Modify: `src/resume_agent/tracking/repository.py:49-63`
@@ -494,7 +502,7 @@ In `_apply`, in the `Insert` branch, add `content_fingerprint` to the `Job(...)`
 - [ ] **Step 6: Reconcile the existing keyless test**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_discovery_ingest.py -k "keeps_distinct_when_company_or_title_missing" -v`
-Expected: PASS (that test uses *different* JD text, so fingerprints differ → still distinct). If it happens to use identical text, change one job's `jd_text` so the two remain genuinely different postings.
+Expected: PASS (that test uses _different_ JD text, so fingerprints differ → still distinct). If it happens to use identical text, change one job's `jd_text` so the two remain genuinely different postings.
 
 - [ ] **Step 7: Run the full ingest suite + lint**
 
@@ -513,6 +521,7 @@ git commit -m "feat(dedup): collapse keyless near-duplicates via content fingerp
 ## Task 5: Classify rejections in the pipeline
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/pipeline.py:57-67` (run_filter), `139-177` (run_relevance)
 - Test: `tests/test_discovery_pipeline.py`
 
@@ -580,6 +589,7 @@ git commit -m "feat(pipeline): tag rejections with reject_category (filtered|rel
 ## Task 6: The `reprocess` funnel
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/pipeline.py` (add `reprocess`, delete `reextract` + `backfill_rescore`)
 - Test: `tests/test_discovery_pipeline.py`
 
@@ -691,9 +701,9 @@ In `src/resume_agent/discovery/pipeline.py`:
 from resume_agent.tracking.repository import has_progress, jobs_by_status, status_counts
 ```
 
-2. **Delete** the `reextract` function (lines ~180-195) and the `backfill_rescore` function (lines ~218-244), and the now-unused `_REEXTRACT_STATUSES` constant (lines ~24-32).
+1. **Delete** the `reextract` function (lines ~180-195) and the `backfill_rescore` function (lines ~218-244), and the now-unused `_REEXTRACT_STATUSES` constant (lines ~24-32).
 
-3. **Thread an optional `job_ids` filter through every funnel stage** so reprocess
+2. **Thread an optional `job_ids` filter through every funnel stage** so reprocess
    only touches the jobs it selected (resetting jobs to `raw` and calling the
    unfiltered `discover` would also sweep up unrelated `raw` jobs — see P1 in review).
 
@@ -706,10 +716,10 @@ from resume_agent.tracking.repository import has_progress, jobs_by_status, statu
         jobs = [job for job in jobs if job.id in job_ids]
 ```
 
-   (For `run_filter`, which currently iterates `jobs_by_status(...)` inline, first
-   bind it to a `jobs` local, apply the same filter, then iterate `jobs`.)
+(For `run_filter`, which currently iterates `jobs_by_status(...)` inline, first
+bind it to a `jobs` local, apply the same filter, then iterate `jobs`.)
 
-   Then update `discover` to accept and forward the filter:
+Then update `discover` to accept and forward the filter:
 
 ```python
 def discover(
@@ -736,10 +746,10 @@ def discover(
     return status_counts(session)
 ```
 
-   `job_ids` defaults to `None` (process all), so existing `discover_jobs` / CLI /
-   API callers are unaffected.
+`job_ids` defaults to `None` (process all), so existing `discover_jobs` / CLI /
+API callers are unaffected.
 
-4. Add scope selection + `reprocess`. The reset clears **all derived/scored fields**
+1. Add scope selection + `reprocess`. The reset clears **all derived/scored fields**
    (not just status) so a job that re-fails relevance/filtering cannot keep stale
    `fit_score` / `fit_rationale` / `criteria_json` (P1 in review):
 
@@ -831,6 +841,7 @@ git commit -m "feat(pipeline): add scoped reprocess; remove dead reextract/backf
 ## Task 7: Service wrappers — reprocess_jobs + refresh_jobs
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/runner.py` (`run_pull` gains a `finish` flag)
 - Modify: `src/resume_agent/services/discovery.py` (`pull_jobs` forwards `finish`; delete `reextract_metadata`/`rescore_existing`; add `reprocess_jobs`, `refresh_jobs`, `RefreshReport`)
 - Test: `tests/test_services_discovery.py` (create if absent)
@@ -919,9 +930,9 @@ In `src/resume_agent/services/discovery.py`:
 from resume_agent.discovery.pipeline import discover, reprocess
 ```
 
-2. **Delete** `reextract_metadata` and `rescore_existing` (lines ~112-152).
+1. **Delete** `reextract_metadata` and `rescore_existing` (lines ~112-152).
 
-3. Add `from dataclasses import dataclass` to the **top-of-file import block**
+2. Add `from dataclasses import dataclass` to the **top-of-file import block**
    (with the other stdlib/`from __future__` imports — NOT mid-file, which trips
    Ruff E402), then define `RefreshReport` after the module constants:
 
@@ -934,7 +945,7 @@ class RefreshReport:
     failures: dict[str, dict[str, str]]
 ```
 
-4. **Let pull run as a non-finishing sub-step of refresh.** `run_pull`
+1. **Let pull run as a non-finishing sub-step of refresh.** `run_pull`
    (`src/resume_agent/discovery/connectors/runner.py`) ends with
    `if reporter: reporter.done(added=added_total)`. That terminal `done` frame
    makes the web SSE watcher (`web/src/lib/runs/sse.ts`) close the run — so a
@@ -946,7 +957,7 @@ class RefreshReport:
         reporter.done(added=added_total)
 ```
 
-   Add the same `finish: bool = True` parameter to `pull_jobs` and forward it:
+Add the same `finish: bool = True` parameter to `pull_jobs` and forward it:
 
 ```python
     return run_pull(
@@ -955,9 +966,9 @@ class RefreshReport:
     )
 ```
 
-   (Default `True` keeps the standalone `pull` CLI/API behavior unchanged.)
+(Default `True` keeps the standalone `pull` CLI/API behavior unchanged.)
 
-5. Add the two use-cases:
+1. Add the two use-cases:
 
 ```python
 def reprocess_jobs(
@@ -1026,6 +1037,7 @@ git commit -m "feat(services): add reprocess_jobs + refresh_jobs; drop dead back
 ## Task 8: CLI — drop modes, add reprocess + refresh
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py:14,25-31,159-204` and add two commands
 - Test: `tests/test_cli_discovery.py`
 
@@ -1081,6 +1093,7 @@ Expected: FAIL — commands don't exist; `reprocess_jobs`/`refresh_jobs` not imp
 - [ ] **Step 3: Update imports**
 
 In `src/resume_agent/cli.py`:
+
 - Line 14: **delete** `from resume_agent.discovery.pipeline import backfill_rescore, reextract`.
 - Lines 25-31: extend the services import:
 
@@ -1187,6 +1200,7 @@ git commit -m "feat(cli): trim discover modes; add reprocess + refresh commands"
 ## Task 9: API — endpoints + OpenAPI regen
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/runs.py`
 - Modify: `src/resume_agent/api/routers/runs.py`
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`
@@ -1252,9 +1266,9 @@ from resume_agent.services.discovery import (
 )
 ```
 
-2. Update the schema import to add `ReprocessParams, RefreshParams` and keep `DiscoverParams`.
+1. Update the schema import to add `ReprocessParams, RefreshParams` and keep `DiscoverParams`.
 
-3. Replace `launch_discover` with the modeless version:
+2. Replace `launch_discover` with the modeless version:
 
 ```python
 @router.post("/discover", response_model=RunOut, status_code=202)
@@ -1275,7 +1289,7 @@ def launch_discover(
     return record_to_run(run_id, record)
 ```
 
-4. Add two endpoints after `launch_pull`:
+1. Add two endpoints after `launch_pull`:
 
 ```python
 @router.post("/reprocess", response_model=RunOut, status_code=202)
@@ -1342,6 +1356,7 @@ git commit -m "feat(api): modeless discover; add reprocess + refresh run endpoin
 ## Task 10: html_to_markdown at ingest
 
 **Files:**
+
 - Modify: `pyproject.toml:17` (add dependency)
 - Modify: `src/resume_agent/discovery/connectors/text.py:10-15`
 - Modify: connectors `greenhouse.py`, `lever.py`, `ashby.py`, `google.py`, `remoteok.py`, `tesla.py`, `workday.py`, `adzuna.py`
@@ -1454,6 +1469,7 @@ git commit -m "feat(connectors): store JD as markdown via html_to_markdown at in
 ## Task 11: Web — markdown JD renderer
 
 **Files:**
+
 - Modify: `web/package.json` (+ lockfile) — add `react-markdown`, `remark-gfm`, `remark-breaks`
 - Create: `web/src/lib/format/prettify.ts`, `web/src/lib/format/prettify.test.ts`
 - Create: `web/src/components/JdBody.tsx`, `web/src/components/JdBody.test.tsx`
@@ -1499,7 +1515,9 @@ describe("prettifyPlainText", () => {
   });
 
   it("leaves markdown headings and existing dashes intact", () => {
-    expect(prettifyPlainText("## Responsibilities")).toBe("## Responsibilities");
+    expect(prettifyPlainText("## Responsibilities")).toBe(
+      "## Responsibilities",
+    );
     expect(prettifyPlainText("- already a bullet")).toBe("- already a bullet");
   });
 
@@ -1552,7 +1570,9 @@ import { JdBody } from "./JdBody";
 
 describe("JdBody", () => {
   it("keeps newline-heavy legacy text on separate lines (no run-on)", () => {
-    const { container } = render(<JdBody text={"Line one\nLine two\nLine three"} />);
+    const { container } = render(
+      <JdBody text={"Line one\nLine two\nLine three"} />,
+    );
     // remark-breaks renders soft newlines as <br>, so the lines stay distinct.
     expect(container.querySelectorAll("br").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/Line one/)).toBeInTheDocument();
@@ -1560,7 +1580,9 @@ describe("JdBody", () => {
   });
 
   it("renders a real markdown list as <li> items", () => {
-    const { container } = render(<JdBody text={"## Skills\n\n- Python\n- Go"} />);
+    const { container } = render(
+      <JdBody text={"## Skills\n\n- Python\n- Go"} />,
+    );
     expect(container.querySelectorAll("li").length).toBe(2);
     expect(screen.getByRole("heading", { name: "Skills" })).toBeInTheDocument();
   });
@@ -1607,23 +1629,54 @@ No `@tailwindcss/typography` plugin is installed, so style the container explici
 Append to `web/src/index.css` (plain CSS, after the existing Tailwind import/directives):
 
 ```css
-.jd-markdown > :first-child { margin-top: 0; }
-.jd-markdown h1, .jd-markdown h2, .jd-markdown h3, .jd-markdown h4 {
+.jd-markdown > :first-child {
+  margin-top: 0;
+}
+.jd-markdown h1,
+.jd-markdown h2,
+.jd-markdown h3,
+.jd-markdown h4 {
   font-weight: 600;
   line-height: 1.3;
   margin: 1.1em 0 0.4em;
 }
-.jd-markdown h1 { font-size: 1.25rem; }
-.jd-markdown h2 { font-size: 1.1rem; }
-.jd-markdown h3, .jd-markdown h4 { font-size: 1rem; }
-.jd-markdown p { margin: 0.6em 0; }
-.jd-markdown ul, .jd-markdown ol { margin: 0.6em 0; padding-left: 1.4em; }
-.jd-markdown ul { list-style: disc; }
-.jd-markdown ol { list-style: decimal; }
-.jd-markdown li { margin: 0.2em 0; }
-.jd-markdown a { text-decoration: underline; }
-.jd-markdown strong { font-weight: 600; }
-.jd-markdown code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.9em; }
+.jd-markdown h1 {
+  font-size: 1.25rem;
+}
+.jd-markdown h2 {
+  font-size: 1.1rem;
+}
+.jd-markdown h3,
+.jd-markdown h4 {
+  font-size: 1rem;
+}
+.jd-markdown p {
+  margin: 0.6em 0;
+}
+.jd-markdown ul,
+.jd-markdown ol {
+  margin: 0.6em 0;
+  padding-left: 1.4em;
+}
+.jd-markdown ul {
+  list-style: disc;
+}
+.jd-markdown ol {
+  list-style: decimal;
+}
+.jd-markdown li {
+  margin: 0.2em 0;
+}
+.jd-markdown a {
+  text-decoration: underline;
+}
+.jd-markdown strong {
+  font-weight: 600;
+}
+.jd-markdown code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.9em;
+}
 ```
 
 - [ ] **Step 11: Use JdBody in the modal**
@@ -1637,7 +1690,7 @@ import { JdBody } from "./JdBody";
 Replace the `<pre>` block (lines 96-98) with:
 
 ```tsx
-                      <JdBody text={job.jdText} />
+<JdBody text={job.jdText} />
 ```
 
 - [ ] **Step 12: Run web tests + typecheck**
@@ -1657,6 +1710,7 @@ git commit -m "feat(web): render JD as markdown (gfm+breaks) with legacy prettif
 ## Task 12: Web — reprocess + refresh actions
 
 **Files:**
+
 - Modify: `web/src/features/runs/use-launch-run.ts:57-64`
 - Modify: `web/src/features/runs/RunLaunchDialogs.tsx`
 - Modify: `web/src/features/runs/RunActions.tsx`
@@ -1688,6 +1742,7 @@ export const launchers = {
 - [ ] **Step 2: Simplify DiscoverDialog + add Reprocess and Refresh**
 
 In `web/src/features/runs/RunLaunchDialogs.tsx`:
+
 - Replace `DISCOVER_MODES` + `DiscoverDialog` with a modeless discover trigger:
 
 ```tsx
@@ -1711,7 +1766,10 @@ export function DiscoverDialog() {
 export function RefreshButton() {
   const { launch } = useLaunchRun();
   return (
-    <Button size="sm" onClick={() => launch("refresh", () => launchers.refresh())}>
+    <Button
+      size="sm"
+      onClick={() => launch("refresh", () => launchers.refresh())}
+    >
       Refresh
     </Button>
   );
@@ -1731,31 +1789,44 @@ export function ReprocessDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline">Reprocess</Button>} />
+      <DialogTrigger
+        render={
+          <Button size="sm" variant="outline">
+            Reprocess
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Reprocess</DialogTitle>
           <DialogDescription>
-            Re-run the full funnel over a scope. Can change fit + status. Submitted jobs
-            are never touched.
+            Re-run the full funnel over a scope. Can change fit + status.
+            Submitted jobs are never touched.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="reprocess-scope">Scope</Label>
-          <Select value={scope} onValueChange={(v) => setScope(v as ReprocessScope)}>
+          <Select
+            value={scope}
+            onValueChange={(v) => setScope(v as ReprocessScope)}
+          >
             <SelectTrigger id="reprocess-scope" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {REPROCESS_SCOPES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <Button
           onClick={async () => {
-            const ok = await launch("reprocess", () => launchers.reprocess([scope]));
+            const ok = await launch("reprocess", () =>
+              launchers.reprocess([scope]),
+            );
             if (ok) setOpen(false);
           }}
         >
@@ -1812,6 +1883,7 @@ git commit -m "feat(web): add Refresh + Reprocess actions; modeless Discover"
 ## Task 13: Rename Best-have → Nice-to-have
 
 **Files:**
+
 - Modify: `web/src/components/SkillMatrix.tsx:1,90-96`
 - Modify: `web/src/components/JobCard.tsx:28`
 - Test: `web/src/components/SkillMatrix.test.tsx` (create if absent)
@@ -1852,10 +1924,12 @@ Expected: FAIL — current label is "Best-have".
 - [ ] **Step 3: Rename the label + comments**
 
 In `web/src/components/SkillMatrix.tsx`:
+
 - Line 1 comment: `// Full skill set, grouped Must-have / Nice-to-have. Two independent channels:`
 - Line ~91-96: change the second `<Group label="Best-have" ... />` to `label="Nice-to-have"`.
 
 In `web/src/components/JobCard.tsx`:
+
 - Line 28 comment: `// Must-have first, then nice-to-have — same priority the modal groups by.`
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1890,9 +1964,9 @@ Run: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -v`
 Expected: PASS (contracts regenerated and committed in Task 9).
 
 - [ ] **Manual smoke (optional, needs API keys + connectors.yaml):**
-  `resume-agent refresh --limit 5` → expect `+N pulled. Status counts: {...}`;
-  open a job in the dashboard → JD renders with headings/bullets; the optional skill
-  group reads "Nice-to-have".
+      `resume-agent refresh --limit 5` → expect `+N pulled. Status counts: {...}`;
+      open a job in the dashboard → JD renders with headings/bullets; the optional skill
+      group reads "Nice-to-have".
 
 ---
 

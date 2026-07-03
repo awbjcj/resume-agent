@@ -4,24 +4,24 @@
 
 **Goal:** Pin the shortlist filter-and-rank predicate — which genuinely runs in two runtimes — behind one cross-language behavioral contract, so the Python (Streamlit) and TypeScript (React) copies can no longer drift.
 
-**Architecture:** The filter/sort/rank predicate exists twice on purpose: `src/resume_agent/dashboard/filtering.py` filters in-process for Streamlit, `web/src/lib/filters/*` filters in-browser for instant React response. Neither can be deleted. We make the *behavior* the interface: a checked-in fixture of `(rows, filterState) → ordered [jobId]` cases in `contracts/`, plus two thin conformance harnesses (pytest + vitest) that prove each implementation satisfies it. We also remove the one known divergence — composite rank rounds banker's-style in Python and half-up in JS — by sorting on the unrounded composite (rounding becomes display-only).
+**Architecture:** The filter/sort/rank predicate exists twice on purpose: `src/resume_agent/dashboard/filtering.py` filters in-process for Streamlit, `web/src/lib/filters/*` filters in-browser for instant React response. Neither can be deleted. We make the _behavior_ the interface: a checked-in fixture of `(rows, filterState) → ordered [jobId]` cases in `contracts/`, plus two thin conformance harnesses (pytest + vitest) that prove each implementation satisfies it. We also remove the one known divergence — composite rank rounds banker's-style in Python and half-up in JS — by sorting on the unrounded composite (rounding becomes display-only).
 
 **Tech Stack:** Python 3 / pytest / dataclasses; TypeScript / vitest / Vite. Shared artifact is a JSON contract file in the camelCase `ShortlistItem` wire shape (the same shape `contracts/openapi.json` already defines).
 
-**Domain terms (CONTEXT.md):** *Filter contract*, *Conformance harness*, *Composite rank*.
+**Domain terms (CONTEXT.md):** _Filter contract_, _Conformance harness_, _Composite rank_.
 
 ---
 
 ## File Structure
 
-| File | Responsibility | Action |
-| --- | --- | --- |
-| `contracts/shortlist_filter.contract.json` | The Filter contract: seed cases `(now, rows, filterState) → expected ordered ids` | Create |
-| `contracts/README.md` | Document the contract + the rule "filter-behavior changes require a contract case" | Modify |
-| `tests/test_shortlist_filter_contract.py` | Python conformance harness; `row_from_wire` / `filter_state_from_wire` builders | Create |
-| `web/src/lib/filters/contract.test.ts` | TS conformance harness; `rowFromWire` / `filterStateFromWire` builders | Create |
-| `src/resume_agent/dashboard/filtering.py` | Sort composite on unrounded value; keep rounded `composite_score` for display | Modify (`88-109`, `134-135`) |
-| `web/src/lib/filters/sort.ts` | Same reconciliation in TS | Modify (`25-40`, `69-73`) |
+| File                                       | Responsibility                                                                     | Action                       |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------- |
+| `contracts/shortlist_filter.contract.json` | The Filter contract: seed cases `(now, rows, filterState) → expected ordered ids`  | Create                       |
+| `contracts/README.md`                      | Document the contract + the rule "filter-behavior changes require a contract case" | Modify                       |
+| `tests/test_shortlist_filter_contract.py`  | Python conformance harness; `row_from_wire` / `filter_state_from_wire` builders    | Create                       |
+| `web/src/lib/filters/contract.test.ts`     | TS conformance harness; `rowFromWire` / `filterStateFromWire` builders             | Create                       |
+| `src/resume_agent/dashboard/filtering.py`  | Sort composite on unrounded value; keep rounded `composite_score` for display      | Modify (`88-109`, `134-135`) |
+| `web/src/lib/filters/sort.ts`              | Same reconciliation in TS                                                          | Modify (`25-40`, `69-73`)    |
 
 Builders live inside their harness files — only one harness consumes each, so keep them local (DRY does not mean premature sharing across the language boundary).
 
@@ -30,6 +30,7 @@ Builders live inside their harness files — only one harness consumes each, so 
 ### Task 1: Create the Filter contract file
 
 **Files:**
+
 - Create: `contracts/shortlist_filter.contract.json`
 
 The contract rows use the camelCase `ShortlistItem` wire shape; `filterState` uses the camelCase `FilterState` keys with sets expressed as arrays. Missing row/state keys default (null / empty set) in the harness builders, so each case lists only the fields it exercises. `expected` is the ordered list of `jobId` after `applyFilters → sortRows`.
@@ -66,8 +67,14 @@ The contract rows use the camelCase `ShortlistItem` wire shape; `filterState` us
       "name": "skills overlap matches after normalization (case + trim)",
       "filterState": { "sort": "fit", "skills": ["python"] },
       "rows": [
-        { "jobId": 1, "skills": [{ "name": "PyThon ", "covered": true, "required": true }] },
-        { "jobId": 2, "skills": [{ "name": "Golang", "covered": false, "required": true }] }
+        {
+          "jobId": 1,
+          "skills": [{ "name": "PyThon ", "covered": true, "required": true }]
+        },
+        {
+          "jobId": 2,
+          "skills": [{ "name": "Golang", "covered": false, "required": true }]
+        }
       ],
       "expected": [1]
     },
@@ -97,6 +104,7 @@ git commit -m "feat(contracts): add shortlist filter behavioral contract"
 ### Task 2: Python conformance harness
 
 **Files:**
+
 - Create: `tests/test_shortlist_filter_contract.py`
 
 The harness loads the contract, builds a `ShortlistRow` and `FilterState` from each camelCase case (mapping camel→snake — this also guards the field mapping), runs `apply_filters → sort_rows`, and asserts the ordered ids.
@@ -209,6 +217,7 @@ git commit -m "test(contracts): python conformance harness for filter contract"
 ### Task 3: TypeScript conformance harness
 
 **Files:**
+
 - Create: `web/src/lib/filters/contract.test.ts`
 
 The harness reads the same contract file (resolved relative to this file via `import.meta.url`, so it works regardless of vitest's cwd), hydrates each case into `ShortlistItem` + `FilterState` (arrays → `Set`), runs `applyFilters → sortRows`, and asserts the ordered ids.
@@ -224,28 +233,65 @@ import { describe, expect, it } from "vitest";
 
 import { applyFilters } from "./apply";
 import { sortRows } from "./sort";
-import { emptyFilterState, type FilterState, type ShortlistItem } from "./types";
+import {
+  emptyFilterState,
+  type FilterState,
+  type ShortlistItem,
+} from "./types";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const contractPath = resolve(here, "../../../../contracts/shortlist_filter.contract.json");
+const contractPath = resolve(
+  here,
+  "../../../../contracts/shortlist_filter.contract.json",
+);
 const contract = JSON.parse(readFileSync(contractPath, "utf-8")) as {
   now: string;
-  cases: { name: string; filterState: Record<string, unknown>; rows: Partial<ShortlistItem>[]; expected: number[] }[];
+  cases: {
+    name: string;
+    filterState: Record<string, unknown>;
+    rows: Partial<ShortlistItem>[];
+    expected: number[];
+  }[];
 };
 
 const SET_KEYS = new Set([
-  "remote", "sponsorship", "seniority", "employmentType", "industry",
-  "country", "region", "city", "companySize", "skills",
+  "remote",
+  "sponsorship",
+  "seniority",
+  "employmentType",
+  "industry",
+  "country",
+  "region",
+  "city",
+  "companySize",
+  "skills",
 ]);
 
 function rowFromWire(d: Partial<ShortlistItem>): ShortlistItem {
   return {
-    jobId: 0, company: null, title: null, location: null, fitScore: null,
-    fitRationale: null, sponsorshipSignal: null, salaryMin: null, salaryMax: null,
-    salaryCurrency: null, remotePolicy: null, seniority: null, employmentType: null,
-    industry: null, companySize: null, postedAt: null, skills: [],
-    sicMajor: null, sicLabel: null, sicDivision: null,
-    locationCountry: null, locationRegion: null, locationCity: null,
+    jobId: 0,
+    company: null,
+    title: null,
+    location: null,
+    fitScore: null,
+    fitRationale: null,
+    sponsorshipSignal: null,
+    salaryMin: null,
+    salaryMax: null,
+    salaryCurrency: null,
+    remotePolicy: null,
+    seniority: null,
+    employmentType: null,
+    industry: null,
+    companySize: null,
+    postedAt: null,
+    skills: [],
+    sicMajor: null,
+    sicLabel: null,
+    sicDivision: null,
+    locationCountry: null,
+    locationRegion: null,
+    locationCity: null,
     ...d,
   } as ShortlistItem;
 }
@@ -297,10 +343,11 @@ git commit -m "test(contracts): typescript conformance harness for filter contra
 ### Task 4: Reconcile composite rounding — sort on the unrounded value
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/filtering.py:88-109,134-135`
 - Modify: `web/src/lib/filters/sort.ts:25-40,69-73`
 
-**Why (no behavior change for current data):** `composite_score` rounds with Python banker's rounding; `compositeScore` rounds half-up in JS. At an exact 4th-decimal tie they disagree, which can flip two jobs' order between the two boards. The rounded value is presentation only — sorting must read the raw weighted sum (bit-identical across both IEEE-754 runtimes). This is a deepening of the *Composite rank* term: ordering is defined on the raw score; rounding never enters it.
+**Why (no behavior change for current data):** `composite_score` rounds with Python banker's rounding; `compositeScore` rounds half-up in JS. At an exact 4th-decimal tie they disagree, which can flip two jobs' order between the two boards. The rounded value is presentation only — sorting must read the raw weighted sum (bit-identical across both IEEE-754 runtimes). This is a deepening of the _Composite rank_ term: ordering is defined on the raw score; rounding never enters it.
 
 - [ ] **Step 1: Python — split raw from rounded, sort on raw**
 
@@ -354,7 +401,9 @@ function compositeRaw(row: ShortlistItem, preset: Preset, now: Date): number {
 
   const salary = salaryValue(row);
   const salaryN =
-    salary !== null ? (Math.min(salary, SALARY_CEILING) / SALARY_CEILING) * 100 : NEUTRAL;
+    salary !== null
+      ? (Math.min(salary, SALARY_CEILING) / SALARY_CEILING) * 100
+      : NEUTRAL;
 
   const age = ageDays(row, now);
   const recencyN =
@@ -365,7 +414,11 @@ function compositeRaw(row: ShortlistItem, preset: Preset, now: Date): number {
   return wFit * fitN + wSalary * salaryN + wRecency * recencyN;
 }
 
-export function compositeScore(row: ShortlistItem, preset: Preset, now: Date): number {
+export function compositeScore(
+  row: ShortlistItem,
+  preset: Preset,
+  now: Date,
+): number {
   // Display value. Ordering uses the raw score (see compositeRaw).
   return Math.round(compositeRaw(row, preset, now) * 10000) / 10000;
 }
@@ -374,9 +427,12 @@ export function compositeScore(row: ShortlistItem, preset: Preset, now: Date): n
 Then change the composite branch in `sortRows` (lines `69-73`) to sort on the raw value:
 
 ```ts
-  if (state.sort === "composite") {
-    return arr.sort((a, b) => compositeRaw(b, state.preset, now) - compositeRaw(a, state.preset, now));
-  }
+if (state.sort === "composite") {
+  return arr.sort(
+    (a, b) =>
+      compositeRaw(b, state.preset, now) - compositeRaw(a, state.preset, now),
+  );
+}
 ```
 
 - [ ] **Step 3: Add a contract case that pins composite ordering at a rounding boundary**
@@ -416,11 +472,12 @@ git commit -m "fix(filters): order composite rank on unrounded score in both run
 ### Task 5: Migrate shared cases into the contract; document the rule
 
 **Files:**
+
 - Modify: `contracts/README.md`
 - Modify: `tests/test_dashboard_filtering.py` (move cross-language cases into the contract; keep language-local edges)
 - Modify: `web/src/lib/filters/apply.test.ts`, `web/src/lib/filters/sort.test.ts` (same)
 
-**Principle:** Any case that asserts behavior *both* runtimes must share belongs in the contract (asserted in both). Language-local concerns — `None` vs `undefined`, tz-naive datetimes, empty-set short-circuits — stay in the per-language unit tests.
+**Principle:** Any case that asserts behavior _both_ runtimes must share belongs in the contract (asserted in both). Language-local concerns — `None` vs `undefined`, tz-naive datetimes, empty-set short-circuits — stay in the per-language unit tests.
 
 - [ ] **Step 1: Add filter-membership + sponsorship/remote facet cases to the contract**
 
@@ -453,6 +510,7 @@ keys (sets as arrays); `expected` is the ordered `jobId` list after
 `applyFilters → sortRows`.
 
 Two conformance harnesses assert it:
+
 - `tests/test_shortlist_filter_contract.py` (Python — `dashboard/filtering.py`)
 - `web/src/lib/filters/contract.test.ts` (TypeScript — `lib/filters/*`)
 

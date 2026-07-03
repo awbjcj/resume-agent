@@ -57,6 +57,7 @@ Each file has one responsibility. Models are split by domain area (profile / job
 ## Task 1: Project setup & dependencies
 
 **Files:**
+
 - Modify: `pyproject.toml`
 - Create: `src/resume_agent/__init__.py`
 - Delete: `main.py`
@@ -65,17 +66,21 @@ Each file has one responsibility. Models are split by domain area (profile / job
 - [ ] **Step 1: Add runtime dependencies**
 
 Run:
+
 ```bash
 uv add pydantic pydantic-settings sqlmodel pyyaml
 ```
+
 Expected: `pyproject.toml` `dependencies` now lists pydantic, pydantic-settings, sqlmodel, pyyaml; a `uv.lock` is created.
 
 - [ ] **Step 2: Add the dev dependency**
 
 Run:
+
 ```bash
 uv add --dev pytest
 ```
+
 Expected: pytest appears under `[dependency-groups] dev` (or `[tool.uv] dev-dependencies`).
 
 - [ ] **Step 3: Make the project an installable src-layout package**
@@ -116,6 +121,7 @@ addopts = "-q"
 - [ ] **Step 4: Create the package and remove the uv stub**
 
 Create `src/resume_agent/__init__.py`:
+
 ```python
 """Resume Agent — personal job-hunt automation pipeline."""
 
@@ -123,6 +129,7 @@ __version__ = "0.1.0"
 ```
 
 Delete the hello-world stub:
+
 ```bash
 git rm main.py
 ```
@@ -130,6 +137,7 @@ git rm main.py
 - [ ] **Step 5: Write the smoke test**
 
 Create `tests/test_smoke.py`:
+
 ```python
 def test_package_imports():
     import resume_agent
@@ -140,9 +148,11 @@ def test_package_imports():
 - [ ] **Step 6: Run it (it should pass once the package installs)**
 
 Run:
+
 ```bash
 uv run pytest tests/test_smoke.py -v
 ```
+
 Expected: PASS. (`uv run` syncs the project into the venv in editable mode, making `resume_agent` importable.)
 
 - [ ] **Step 7: Commit**
@@ -157,6 +167,7 @@ git commit -m "chore: src-layout package scaffold + foundation deps" -m "Co-Auth
 ## Task 2: Base model primitives
 
 **Files:**
+
 - Create: `src/resume_agent/models/__init__.py`
 - Create: `src/resume_agent/models/base.py`
 - Test: `tests/test_models_base.py`
@@ -164,6 +175,7 @@ git commit -m "chore: src-layout package scaffold + foundation deps" -m "Co-Auth
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_models_base.py`:
+
 ```python
 from resume_agent.models.base import ExtensibleModel, FactItem, Source, new_id
 
@@ -204,19 +216,23 @@ def test_fact_item_source_round_trips():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_base.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/models/__init__.py`:
+
 ```python
 """Domain models for Resume Agent."""
 ```
 
 Create `src/resume_agent/models/base.py`:
+
 ```python
 import uuid
 from enum import Enum
@@ -264,9 +280,11 @@ class FactItem(ExtensibleModel):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_base.py -v
 ```
+
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
@@ -281,12 +299,14 @@ git commit -m "feat(models): extensible base model + provenance fact item" -m "C
 ## Task 3: Profile models (the fact-lock)
 
 **Files:**
+
 - Create: `src/resume_agent/models/profile.py`
 - Test: `tests/test_models_profile.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_models_profile.py`:
+
 ```python
 from resume_agent.models.profile import (
     Contact,
@@ -365,14 +385,17 @@ def test_profile_round_trips_through_json():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_profile.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.profile'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/models/profile.py`:
+
 ```python
 from pydantic import Field
 
@@ -517,9 +540,11 @@ class ProfileFacts(ExtensibleModel):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_profile.py -v
 ```
+
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
@@ -534,12 +559,14 @@ git commit -m "feat(models): comprehensive ProfileFacts fact-lock schema" -m "Co
 ## Task 4: Job model
 
 **Files:**
+
 - Create: `src/resume_agent/models/job.py`
 - Test: `tests/test_models_job.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_models_job.py`:
+
 ```python
 from resume_agent.models.job import JobCriteria, SalaryRange, SponsorshipSignal
 
@@ -575,14 +602,17 @@ def test_salary_range_defaults():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_job.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.job'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/models/job.py`:
+
 ```python
 from enum import Enum
 
@@ -621,9 +651,11 @@ class JobCriteria(ExtensibleModel):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_job.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -638,12 +670,14 @@ git commit -m "feat(models): JobCriteria extraction schema" -m "Co-Authored-By: 
 ## Task 5: Resume content model (tailored output with provenance)
 
 **Files:**
+
 - Create: `src/resume_agent/models/resume.py`
 - Test: `tests/test_models_resume.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_models_resume.py`:
+
 ```python
 import pytest
 from pydantic import ValidationError
@@ -699,14 +733,17 @@ def test_resume_content_round_trips_json():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_resume.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.resume'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/models/resume.py`:
+
 ```python
 from pydantic import Field
 
@@ -762,9 +799,11 @@ class ResumeContent(ExtensibleModel):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_resume.py -v
 ```
+
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
@@ -779,12 +818,14 @@ git commit -m "feat(models): ResumeContent with mandatory provenance" -m "Co-Aut
 ## Task 6: Review model
 
 **Files:**
+
 - Create: `src/resume_agent/models/review.py`
 - Test: `tests/test_models_review.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_models_review.py`:
+
 ```python
 from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
 
@@ -822,14 +863,17 @@ def test_critique_round_trips():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_review.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.models.review'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/models/review.py`:
+
 ```python
 from enum import Enum
 
@@ -865,9 +909,11 @@ class ReviewCritique(ExtensibleModel):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_models_review.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -882,6 +928,7 @@ git commit -m "feat(models): ReviewCritique schema for the Agno review panel" -m
 ## Task 7: SQLModel tables
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/__init__.py`
 - Create: `src/resume_agent/tracking/tables.py`
 - Test: `tests/test_tables.py`
@@ -889,6 +936,7 @@ git commit -m "feat(models): ReviewCritique schema for the Agno review panel" -m
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tables.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine, select
 
@@ -972,19 +1020,23 @@ def test_application_status_default_is_ready():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tables.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/tracking/__init__.py`:
+
 ```python
 """Persistence layer for Resume Agent."""
 ```
 
 Create `src/resume_agent/tracking/tables.py`:
+
 ```python
 from datetime import datetime, timezone
 from enum import Enum
@@ -1071,9 +1123,11 @@ class Application(SQLModel, table=True):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tables.py -v
 ```
+
 Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
@@ -1088,6 +1142,7 @@ git commit -m "feat(tracking): SQLModel tables with JSON columns + status enums"
 ## Task 8: Config loader
 
 **Files:**
+
 - Create: `src/resume_agent/config.py`
 - Create: `.env.example`
 - Create: `config/search.yaml.example`
@@ -1097,6 +1152,7 @@ git commit -m "feat(tracking): SQLModel tables with JSON columns + status enums"
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_config.py`:
+
 ```python
 import pytest
 
@@ -1149,14 +1205,17 @@ def test_load_yaml_rejects_non_mapping(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_config.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.config'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/config.py`:
+
 ```python
 from functools import lru_cache
 from pathlib import Path
@@ -1198,6 +1257,7 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
 ```
 
 Create `.env.example`:
+
 ```bash
 # Copy to .env and fill in. .env is git-ignored.
 ANTHROPIC_API_KEY=
@@ -1210,6 +1270,7 @@ DB_URL=sqlite:///data/resume_agent.db
 ```
 
 Create `config/search.yaml.example`:
+
 ```yaml
 # Discovery criteria + hard-filter rules (see design spec §5.2).
 keywords:
@@ -1221,21 +1282,22 @@ titles:
 locations:
   - Remote
   - Seattle, WA
-remote_policy: remote        # remote | hybrid | onsite | any
+remote_policy: remote # remote | hybrid | onsite | any
 min_salary: 120000
 yoe_min: 0
 yoe_max: 5
-sponsorship_required: true   # silent postings are kept + flagged, not rejected
+sponsorship_required: true # silent postings are kept + flagged, not rejected
 ```
 
 Create `config/review.yaml.example`:
+
 ```yaml
 # Reviewer roster, weights, and loop controls (see design spec §5.3).
 max_rounds: 3
 score_threshold: 85
 reviewers:
   - name: fact-check
-    gate: true            # blocking: any unsupported claim fails the round
+    gate: true # blocking: any unsupported claim fails the round
     weight: 0
     model_tier: premium
   - name: ats-keyword
@@ -1259,9 +1321,11 @@ reviewers:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_config.py -v
 ```
+
 Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
@@ -1276,12 +1340,14 @@ git commit -m "feat(config): settings loader + example env/yaml configs" -m "Co-
 ## Task 9: DB engine & session
 
 **Files:**
+
 - Create: `src/resume_agent/db.py`
 - Test: `tests/test_db.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_db.py`:
+
 ```python
 from sqlmodel import select
 
@@ -1314,14 +1380,17 @@ def test_init_db_creates_tables_and_session_round_trips(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_db.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.db'`.
 
 - [ ] **Step 3: Write the implementation**
 
 Create `src/resume_agent/db.py`:
+
 ```python
 from pathlib import Path
 
@@ -1360,17 +1429,21 @@ def get_session(engine: Engine) -> Session:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_db.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Run the full suite**
 
 Run:
+
 ```bash
 uv run pytest -v
 ```
+
 Expected: PASS — all tests across Tasks 1–9 green.
 
 - [ ] **Step 6: Commit**

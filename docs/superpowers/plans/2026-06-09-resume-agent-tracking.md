@@ -18,6 +18,7 @@
 ## Reference & scoped decisions
 
 Design spec §5.5. Decisions for this plan:
+
 - **Two status lifecycles stay separate:** `jobs.status` (pipeline) vs `applications.status` (employer funnel) — already modeled in Foundation; this plan adds the `applications` repository + the UI that drives both.
 - **Logic out of the view:** every query/mutation is a plain function unit-tested against in-memory SQLite. `dashboard/app.py` contains no business logic worth testing beyond wiring.
 - **DB URL via env:** the Streamlit script resolves the DB from `Settings.db_url` (env `DB_URL`), so the CLI can point it at any database by setting that variable for the subprocess. No Streamlit-specific config.
@@ -49,12 +50,14 @@ tests/
 ## Task 1: `applications.updated_at` auto-bump (deferred Foundation item)
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py`
 - Test: `tests/test_tables_onupdate.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tables_onupdate.py`:
+
 ```python
 from resume_agent.tracking.tables import Application
 
@@ -67,14 +70,17 @@ def test_application_updated_at_has_onupdate():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tables_onupdate.py -v
 ```
+
 Expected: FAIL — `assert None is not None`.
 
 - [ ] **Step 3: Implement**
 
 In `src/resume_agent/tracking/tables.py`, change the `Application.updated_at` field:
+
 ```python
     updated_at: datetime = Field(
         default_factory=utcnow, sa_column_kwargs={"onupdate": utcnow}
@@ -84,9 +90,11 @@ In `src/resume_agent/tracking/tables.py`, change the `Application.updated_at` fi
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tables_onupdate.py -v
 ```
+
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -101,12 +109,14 @@ git commit -m "feat(tracking): applications.updated_at auto-bump on update" -m "
 ## Task 2: Applications repository
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py`
 - Test: `tests/test_applications_repository.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_applications_repository.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -170,18 +180,23 @@ def test_latest_rendered_resume_version_picks_highest_round_with_pdf():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_applications_repository.py -v
 ```
+
 Expected: FAIL — `ImportError` (`save_application`, etc. not defined).
 
 - [ ] **Step 3: Implement**
 
 Add to `src/resume_agent/tracking/repository.py`. First extend the tables import line:
+
 ```python
 from resume_agent.tracking.tables import Application, Job, ResumeVersion
 ```
+
 Then append:
+
 ```python
 def save_application(session: Session, application: Application) -> Application:
     session.add(application)
@@ -236,9 +251,11 @@ def latest_rendered_resume_version(session: Session, job_id: int) -> ResumeVersi
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_applications_repository.py tests/test_repository.py -v
 ```
+
 Expected: PASS (new application tests + existing repository tests stay green).
 
 - [ ] **Step 5: Commit**
@@ -253,12 +270,14 @@ git commit -m "feat(tracking): applications repository + latest_resume_version" 
 ## Task 3: Read-model queries for the dashboard
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/queries.py`
 - Test: `tests/test_tracking_queries.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tracking_queries.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -322,14 +341,17 @@ def test_pipeline_rows_include_pdf_and_application_status():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tracking_queries.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tracking.queries'`.
 
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/tracking/queries.py`:
+
 ```python
 from dataclasses import dataclass
 
@@ -418,9 +440,11 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tracking_queries.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
@@ -435,20 +459,24 @@ git commit -m "feat(tracking): shortlist + pipeline read-model queries" -m "Co-A
 ## Task 4: Streamlit dashboard (thin view)
 
 **Files:**
+
 - Create: `src/resume_agent/dashboard/__init__.py`, `src/resume_agent/dashboard/app.py`
 - Test: `tests/test_dashboard_app.py`
 
 - [ ] **Step 1: Add the dependency**
 
 Run:
+
 ```bash
 uv add streamlit
 ```
+
 Expected: `pyproject.toml` gains `streamlit>=...`; `uv.lock` updates; install succeeds.
 
 - [ ] **Step 2: Write the failing test**
 
 Create `tests/test_dashboard_app.py`:
+
 ```python
 import importlib
 
@@ -464,19 +492,23 @@ def test_dashboard_module_exposes_render_functions():
 - [ ] **Step 3: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_dashboard_app.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.dashboard'`.
 
 - [ ] **Step 4: Implement**
 
 Create `src/resume_agent/dashboard/__init__.py`:
+
 ```python
 """Streamlit dashboard: shortlist checkpoint + pipeline board."""
 ```
 
 Create `src/resume_agent/dashboard/app.py`:
+
 ```python
 import streamlit as st
 
@@ -579,17 +611,21 @@ if __name__ == "__main__":
 - [ ] **Step 5: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_dashboard_app.py -v
 ```
+
 Expected: PASS (1 test). Importing the module must not require a running Streamlit server (only function/`main` definitions execute at import).
 
 - [ ] **Step 6: Manual verification (not in CI)**
 
 Run:
+
 ```bash
 uv run streamlit run src/resume_agent/dashboard/app.py
 ```
+
 With a populated DB: confirm the Shortlist page lists shortlisted jobs and "Approve" flips one to `approved`; the Pipeline board groups jobs, shows the PDF path, and saves an application status. Stop the server when done.
 
 - [ ] **Step 7: Commit**
@@ -604,12 +640,14 @@ git commit -m "feat(tracking): Streamlit shortlist + pipeline dashboard" -m "Co-
 ## Task 5: CLI — `dashboard`
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_dashboard.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_dashboard.py`:
+
 ```python
 from typer.testing import CliRunner
 
@@ -641,20 +679,24 @@ def test_dashboard_launches_streamlit(monkeypatch):
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_dashboard.py -v
 ```
+
 Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute 'subprocess'` (or no `dashboard` command).
 
 - [ ] **Step 3: Implement**
 
 Add these imports at the top of `src/resume_agent/cli.py`:
+
 ```python
 import os
 import subprocess
 ```
 
 Add the command AFTER the `render` command and BEFORE `if __name__ == "__main__":`:
+
 ```python
 @app.command("dashboard")
 def dashboard_cmd(
@@ -671,25 +713,31 @@ def dashboard_cmd(
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_dashboard.py -v
 ```
+
 Expected: PASS (1 test).
 
 - [ ] **Step 5: Verify wiring**
 
 Run:
+
 ```bash
 uv run resume-agent dashboard --help
 ```
+
 Expected: help text (exit 0).
 
 - [ ] **Step 6: Run the full suite**
 
 Run:
+
 ```bash
 uv run pytest -q
 ```
+
 Expected: all tests pass (Render total + Tracking additions).
 
 - [ ] **Step 7: Commit**
@@ -710,9 +758,11 @@ git commit -m "feat(tracking): dashboard CLI command" -m "Co-Authored-By: Claude
 ---
 
 ## Notes to carry into later plans
+
 - **LinkedIn scraper plan:** new scraped jobs land at `status=raw`; they flow through discovery → `shortlisted` and then appear on the Shortlist page automatically. No dashboard change needed.
 - **v2 (memo):** Gmail auto-status could write `applications.status` directly via `update_application_status`; the board already renders it.
 - A "render from the board" button should call `render.service.render_version(session, latest_resume_version(session, job_id).id, RenderConfig())` only after checking that `latest_resume_version(...)` is not `None`; wire it when the render flow is exercised end-to-end.
 
 ## Execution Handoff
+
 After this plan is executed and green, the last v1 component is the **LinkedIn scraper** (see its plan), which requires a live-HTML calibration session.

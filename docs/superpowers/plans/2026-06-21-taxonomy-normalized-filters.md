@@ -18,6 +18,7 @@
 ## File Structure
 
 **New — pure `taxonomy` package** (each module one responsibility; the interface is the test surface):
+
 - `src/resume_agent/taxonomy/__init__.py`
 - `src/resume_agent/taxonomy/sic.py` — load SIC table, derive label/division, coerce code.
 - `src/resume_agent/taxonomy/data/sic_codes.json` — bundled static reference (divisions + 2-digit major groups).
@@ -26,6 +27,7 @@
 - `src/resume_agent/taxonomy/company_size.py` — snap free-text to {startup, scaleup, enterprise}.
 
 **Modified:**
+
 - `src/resume_agent/discovery/extract.py` — prompt: atomic skills + bucketed company-size.
 - `src/resume_agent/discovery/fit.py` — `FitScore` gains `sic_major` + `location`; `compose_fit_input` takes location.
 - `src/resume_agent/discovery/pipeline.py` — `run_score` writes SIC + location into `criteria_json` + alias refresh; `discover` threads canonicalizer; new `backfill_rescore`.
@@ -41,6 +43,7 @@
 ## Task 1: SIC table + derivation (`taxonomy/sic.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/taxonomy/__init__.py` (empty)
 - Create: `src/resume_agent/taxonomy/data/sic_codes.json`
 - Create: `src/resume_agent/taxonomy/sic.py`
@@ -69,89 +72,125 @@ Create `src/resume_agent/taxonomy/data/sic_codes.json`:
     "J": "Public Administration"
   },
   "major_groups": {
-    "01": {"label": "Agricultural Production Crops", "division": "A"},
-    "02": {"label": "Agricultural Production Livestock", "division": "A"},
-    "07": {"label": "Agricultural Services", "division": "A"},
-    "08": {"label": "Forestry", "division": "A"},
-    "09": {"label": "Fishing, Hunting & Trapping", "division": "A"},
-    "10": {"label": "Metal Mining", "division": "B"},
-    "12": {"label": "Coal Mining", "division": "B"},
-    "13": {"label": "Oil & Gas Extraction", "division": "B"},
-    "14": {"label": "Mining of Nonmetallic Minerals", "division": "B"},
-    "15": {"label": "Building Construction-General Contractors", "division": "C"},
-    "16": {"label": "Heavy Construction", "division": "C"},
-    "17": {"label": "Construction-Special Trade Contractors", "division": "C"},
-    "20": {"label": "Food & Kindred Products", "division": "D"},
-    "21": {"label": "Tobacco Products", "division": "D"},
-    "22": {"label": "Textile Mill Products", "division": "D"},
-    "23": {"label": "Apparel & Other Finished Products", "division": "D"},
-    "24": {"label": "Lumber & Wood Products", "division": "D"},
-    "25": {"label": "Furniture & Fixtures", "division": "D"},
-    "26": {"label": "Paper & Allied Products", "division": "D"},
-    "27": {"label": "Printing & Publishing", "division": "D"},
-    "28": {"label": "Chemicals & Allied Products", "division": "D"},
-    "29": {"label": "Petroleum Refining", "division": "D"},
-    "30": {"label": "Rubber & Misc Plastics Products", "division": "D"},
-    "31": {"label": "Leather & Leather Products", "division": "D"},
-    "32": {"label": "Stone, Clay, Glass & Concrete Products", "division": "D"},
-    "33": {"label": "Primary Metal Industries", "division": "D"},
-    "34": {"label": "Fabricated Metal Products", "division": "D"},
-    "35": {"label": "Industrial Machinery & Computer Equipment", "division": "D"},
-    "36": {"label": "Electronic & Other Electrical Equipment", "division": "D"},
-    "37": {"label": "Transportation Equipment", "division": "D"},
-    "38": {"label": "Measuring & Controlling Instruments", "division": "D"},
-    "39": {"label": "Miscellaneous Manufacturing Industries", "division": "D"},
-    "40": {"label": "Railroad Transportation", "division": "E"},
-    "41": {"label": "Local & Interurban Passenger Transit", "division": "E"},
-    "42": {"label": "Motor Freight Transportation & Warehousing", "division": "E"},
-    "43": {"label": "United States Postal Service", "division": "E"},
-    "44": {"label": "Water Transportation", "division": "E"},
-    "45": {"label": "Transportation by Air", "division": "E"},
-    "46": {"label": "Pipelines, Except Natural Gas", "division": "E"},
-    "47": {"label": "Transportation Services", "division": "E"},
-    "48": {"label": "Communications", "division": "E"},
-    "49": {"label": "Electric, Gas & Sanitary Services", "division": "E"},
-    "50": {"label": "Wholesale Trade-Durable Goods", "division": "F"},
-    "51": {"label": "Wholesale Trade-Nondurable Goods", "division": "F"},
-    "52": {"label": "Building Materials & Garden Supplies", "division": "G"},
-    "53": {"label": "General Merchandise Stores", "division": "G"},
-    "54": {"label": "Food Stores", "division": "G"},
-    "55": {"label": "Automotive Dealers & Service Stations", "division": "G"},
-    "56": {"label": "Apparel & Accessory Stores", "division": "G"},
-    "57": {"label": "Home Furniture & Furnishings Stores", "division": "G"},
-    "58": {"label": "Eating & Drinking Places", "division": "G"},
-    "59": {"label": "Miscellaneous Retail", "division": "G"},
-    "60": {"label": "Depository Institutions", "division": "H"},
-    "61": {"label": "Non-depository Credit Institutions", "division": "H"},
-    "62": {"label": "Security & Commodity Brokers", "division": "H"},
-    "63": {"label": "Insurance Carriers", "division": "H"},
-    "64": {"label": "Insurance Agents, Brokers & Service", "division": "H"},
-    "65": {"label": "Real Estate", "division": "H"},
-    "67": {"label": "Holding & Other Investment Offices", "division": "H"},
-    "70": {"label": "Hotels & Other Lodging Places", "division": "I"},
-    "72": {"label": "Personal Services", "division": "I"},
-    "73": {"label": "Business Services", "division": "I"},
-    "75": {"label": "Automotive Repair, Services & Parking", "division": "I"},
-    "76": {"label": "Miscellaneous Repair Services", "division": "I"},
-    "78": {"label": "Motion Pictures", "division": "I"},
-    "79": {"label": "Amusement & Recreation Services", "division": "I"},
-    "80": {"label": "Health Services", "division": "I"},
-    "81": {"label": "Legal Services", "division": "I"},
-    "82": {"label": "Educational Services", "division": "I"},
-    "83": {"label": "Social Services", "division": "I"},
-    "84": {"label": "Museums & Botanical/Zoological Gardens", "division": "I"},
-    "86": {"label": "Membership Organizations", "division": "I"},
-    "87": {"label": "Engineering & Management Services", "division": "I"},
-    "88": {"label": "Private Households", "division": "I"},
-    "89": {"label": "Services-Miscellaneous", "division": "I"},
-    "91": {"label": "Executive, Legislative & General Government", "division": "J"},
-    "92": {"label": "Justice, Public Order & Safety", "division": "J"},
-    "93": {"label": "Public Finance & Taxation", "division": "J"},
-    "94": {"label": "Administration of Human Resource Programs", "division": "J"},
-    "95": {"label": "Administration of Environmental Programs", "division": "J"},
-    "96": {"label": "Administration of Economic Programs", "division": "J"},
-    "97": {"label": "National Security & International Affairs", "division": "J"},
-    "99": {"label": "Nonclassifiable Establishments", "division": "J"}
+    "01": { "label": "Agricultural Production Crops", "division": "A" },
+    "02": { "label": "Agricultural Production Livestock", "division": "A" },
+    "07": { "label": "Agricultural Services", "division": "A" },
+    "08": { "label": "Forestry", "division": "A" },
+    "09": { "label": "Fishing, Hunting & Trapping", "division": "A" },
+    "10": { "label": "Metal Mining", "division": "B" },
+    "12": { "label": "Coal Mining", "division": "B" },
+    "13": { "label": "Oil & Gas Extraction", "division": "B" },
+    "14": { "label": "Mining of Nonmetallic Minerals", "division": "B" },
+    "15": {
+      "label": "Building Construction-General Contractors",
+      "division": "C"
+    },
+    "16": { "label": "Heavy Construction", "division": "C" },
+    "17": {
+      "label": "Construction-Special Trade Contractors",
+      "division": "C"
+    },
+    "20": { "label": "Food & Kindred Products", "division": "D" },
+    "21": { "label": "Tobacco Products", "division": "D" },
+    "22": { "label": "Textile Mill Products", "division": "D" },
+    "23": { "label": "Apparel & Other Finished Products", "division": "D" },
+    "24": { "label": "Lumber & Wood Products", "division": "D" },
+    "25": { "label": "Furniture & Fixtures", "division": "D" },
+    "26": { "label": "Paper & Allied Products", "division": "D" },
+    "27": { "label": "Printing & Publishing", "division": "D" },
+    "28": { "label": "Chemicals & Allied Products", "division": "D" },
+    "29": { "label": "Petroleum Refining", "division": "D" },
+    "30": { "label": "Rubber & Misc Plastics Products", "division": "D" },
+    "31": { "label": "Leather & Leather Products", "division": "D" },
+    "32": {
+      "label": "Stone, Clay, Glass & Concrete Products",
+      "division": "D"
+    },
+    "33": { "label": "Primary Metal Industries", "division": "D" },
+    "34": { "label": "Fabricated Metal Products", "division": "D" },
+    "35": {
+      "label": "Industrial Machinery & Computer Equipment",
+      "division": "D"
+    },
+    "36": {
+      "label": "Electronic & Other Electrical Equipment",
+      "division": "D"
+    },
+    "37": { "label": "Transportation Equipment", "division": "D" },
+    "38": { "label": "Measuring & Controlling Instruments", "division": "D" },
+    "39": {
+      "label": "Miscellaneous Manufacturing Industries",
+      "division": "D"
+    },
+    "40": { "label": "Railroad Transportation", "division": "E" },
+    "41": { "label": "Local & Interurban Passenger Transit", "division": "E" },
+    "42": {
+      "label": "Motor Freight Transportation & Warehousing",
+      "division": "E"
+    },
+    "43": { "label": "United States Postal Service", "division": "E" },
+    "44": { "label": "Water Transportation", "division": "E" },
+    "45": { "label": "Transportation by Air", "division": "E" },
+    "46": { "label": "Pipelines, Except Natural Gas", "division": "E" },
+    "47": { "label": "Transportation Services", "division": "E" },
+    "48": { "label": "Communications", "division": "E" },
+    "49": { "label": "Electric, Gas & Sanitary Services", "division": "E" },
+    "50": { "label": "Wholesale Trade-Durable Goods", "division": "F" },
+    "51": { "label": "Wholesale Trade-Nondurable Goods", "division": "F" },
+    "52": { "label": "Building Materials & Garden Supplies", "division": "G" },
+    "53": { "label": "General Merchandise Stores", "division": "G" },
+    "54": { "label": "Food Stores", "division": "G" },
+    "55": { "label": "Automotive Dealers & Service Stations", "division": "G" },
+    "56": { "label": "Apparel & Accessory Stores", "division": "G" },
+    "57": { "label": "Home Furniture & Furnishings Stores", "division": "G" },
+    "58": { "label": "Eating & Drinking Places", "division": "G" },
+    "59": { "label": "Miscellaneous Retail", "division": "G" },
+    "60": { "label": "Depository Institutions", "division": "H" },
+    "61": { "label": "Non-depository Credit Institutions", "division": "H" },
+    "62": { "label": "Security & Commodity Brokers", "division": "H" },
+    "63": { "label": "Insurance Carriers", "division": "H" },
+    "64": { "label": "Insurance Agents, Brokers & Service", "division": "H" },
+    "65": { "label": "Real Estate", "division": "H" },
+    "67": { "label": "Holding & Other Investment Offices", "division": "H" },
+    "70": { "label": "Hotels & Other Lodging Places", "division": "I" },
+    "72": { "label": "Personal Services", "division": "I" },
+    "73": { "label": "Business Services", "division": "I" },
+    "75": { "label": "Automotive Repair, Services & Parking", "division": "I" },
+    "76": { "label": "Miscellaneous Repair Services", "division": "I" },
+    "78": { "label": "Motion Pictures", "division": "I" },
+    "79": { "label": "Amusement & Recreation Services", "division": "I" },
+    "80": { "label": "Health Services", "division": "I" },
+    "81": { "label": "Legal Services", "division": "I" },
+    "82": { "label": "Educational Services", "division": "I" },
+    "83": { "label": "Social Services", "division": "I" },
+    "84": {
+      "label": "Museums & Botanical/Zoological Gardens",
+      "division": "I"
+    },
+    "86": { "label": "Membership Organizations", "division": "I" },
+    "87": { "label": "Engineering & Management Services", "division": "I" },
+    "88": { "label": "Private Households", "division": "I" },
+    "89": { "label": "Services-Miscellaneous", "division": "I" },
+    "91": {
+      "label": "Executive, Legislative & General Government",
+      "division": "J"
+    },
+    "92": { "label": "Justice, Public Order & Safety", "division": "J" },
+    "93": { "label": "Public Finance & Taxation", "division": "J" },
+    "94": {
+      "label": "Administration of Human Resource Programs",
+      "division": "J"
+    },
+    "95": {
+      "label": "Administration of Environmental Programs",
+      "division": "J"
+    },
+    "96": { "label": "Administration of Economic Programs", "division": "J" },
+    "97": {
+      "label": "National Security & International Affairs",
+      "division": "J"
+    },
+    "99": { "label": "Nonclassifiable Establishments", "division": "J" }
   }
 }
 ```
@@ -278,6 +317,7 @@ git commit -m "Add SIC taxonomy table and derivation"
 ## Task 2: Skill splitter (`taxonomy/skills.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/taxonomy/skills.py`
 - Test: `tests/test_taxonomy_skills.py`
 
@@ -389,6 +429,7 @@ git commit -m "Add deterministic compound-skill splitter"
 ## Task 3: Skill alias map (`taxonomy/skills.py`)
 
 **Files:**
+
 - Modify: `src/resume_agent/taxonomy/skills.py`
 - Test: `tests/test_taxonomy_skills.py` (extend)
 
@@ -507,6 +548,7 @@ git commit -m "Add machine-grown skill alias map (load/canonical/merge/refresh)"
 ## Task 4: Location normalization (`taxonomy/location.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/taxonomy/location.py`
 - Test: `tests/test_taxonomy_location.py`
 
@@ -678,6 +720,7 @@ git commit -m "Add location normalization (ISO-2 country, USPS state, is_us)"
 ## Task 5: Company-size snap (`taxonomy/company_size.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/taxonomy/company_size.py`
 - Test: `tests/test_taxonomy_company_size.py`
 
@@ -799,6 +842,7 @@ git commit -m "Add company-size snap to {startup, scaleup, enterprise}"
 ## Task 6: Extract prompt — atomic skills + bucketed company-size
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/extract.py:9-18` (the `_INSTRUCTIONS` list)
 - Test: `tests/test_discovery_extract.py` (extend)
 
@@ -856,6 +900,7 @@ git commit -m "Extract prompt: atomic skills + bucketed company size"
 ## Task 7: Fit schema — SIC code + parsed location
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/fit.py`
 - Test: `tests/test_discovery_fit.py` (create)
 
@@ -988,6 +1033,7 @@ git commit -m "Fit schema: emit sic_major + parsed location; thread location int
 ## Task 8: `run_score` writes SIC + location + alias refresh
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/pipeline.py`
 - Test: `tests/test_discovery_pipeline.py` (extend)
 
@@ -1175,6 +1221,7 @@ git commit -m "run_score: write SIC + location to criteria_json; refresh skill a
 ## Task 9: Backfill via `discover --rescore`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/pipeline.py` (add `backfill_rescore`)
 - Modify: `src/resume_agent/cli.py:166-194` (the `discover` command)
 - Test: `tests/test_discovery_pipeline.py` (extend)
@@ -1324,6 +1371,7 @@ git commit -m "Add discover --rescore backfill for SIC + location"
 ## Task 10: Widen `ShortlistRow` + canonical skills + flatten SIC/location/size
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/queries.py`
 - Test: `tests/test_tracking_queries.py` (extend)
 
@@ -1497,6 +1545,7 @@ git commit -m "Widen ShortlistRow with SIC/location/size; split + canonicalize s
 ## Task 11: Filtering — `FilterState` + `_passes` + cascade builders
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/filtering.py`
 - Test: `tests/test_dashboard_filtering.py` (extend; update the `_row` helper)
 
@@ -1717,6 +1766,7 @@ git commit -m "Filtering: SIC/location/company-size filters + cascade builders"
 ## Task 12: Control-desk cascades (`dashboard/pages.py`)
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/pages.py:125-180` (filter control desk + `FilterState` construction)
 
 > This is Streamlit wiring (manual-verified). The pure option-builders it calls are already covered by Task 11. Keep edits surgical: only the industry/location/size controls change.
@@ -1822,6 +1872,7 @@ git commit -m "Shortlist control desk: SIC + location cascades + company-size fi
 ## Self-Review
 
 **Spec coverage:**
+
 - SIC 2-digit + Division derived → Task 1; classify at `run_score` → Task 7/8; invalid/unknown codes stored as `None` with `Unclassified` display fallback → Tasks 1/10; cascade UI → Tasks 11/12. ✓
 - Skill split (atomic + safety net) → Tasks 2, 6, 10. ✓
 - Skill synonyms (machine-grown persisted alias map, merge, refresh after score) → Tasks 3, 8; applied on read → Task 10. ✓
@@ -1836,6 +1887,7 @@ git commit -m "Shortlist control desk: SIC + location cascades + company-size fi
 **Placeholder scan:** No TBD/TODO; every code step shows complete code; SIC data file is fully enumerated.
 
 **Type consistency:**
+
 - `FitScore.sic_major: str | None`, `FitScore.location: FitLocation | None` — defined Task 7, used Tasks 8/9. ✓
 - `criteria_json` keys `sic_major` (str|None) + `location_parts` (dict from `StructuredLocation.as_dict()`) — written Tasks 8/9, read Task 10. ✓
 - `StructuredLocation.as_dict()` keys `{city, region, country, is_us, raw}` — defined Task 4, consumed Task 10 (reads `country/region/city/is_us`). ✓

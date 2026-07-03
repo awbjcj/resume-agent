@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add three production connectors — one per query model — behind the Plan 1 `Connector` seam: **Greenhouse** (ATS, company-scoped), **Adzuna** (aggregator, keyword), **RemoteOK** (feed). Each is a *pure JSON→`RawJob` mapper* tested against saved fixtures, wrapped in a thin connector whose only un-CI-tested part is a single HTTP call. Add `config/connectors.yaml` + `build_connectors()` so a config file decides which sources are live.
+**Goal:** Add three production connectors — one per query model — behind the Plan 1 `Connector` seam: **Greenhouse** (ATS, company-scoped), **Adzuna** (aggregator, keyword), **RemoteOK** (feed). Each is a _pure JSON→`RawJob` mapper_ tested against saved fixtures, wrapped in a thin connector whose only un-CI-tested part is a single HTTP call. Add `config/connectors.yaml` + `build_connectors()` so a config file decides which sources are live.
 
-**Architecture:** This is **Plan 2 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`). The valuable, fragile logic in every API connector is the *mapping* (payload → `RawJob`) and the *client-side keyword filter*; both are pure functions over fixtures — the **interface is the test surface**. The HTTP fetch lives behind a one-method seam (`_get_*`) overridden in tests, exactly like Plan 1's LinkedIn `_search_html`. `build_connectors()` is the registry that turns `ConnectorsConfig` into live `Connector` instances in canonical dedup order (ATS → feed → aggregator → LinkedIn).
+**Architecture:** This is **Plan 2 of 6** for v2 (spec `docs/superpowers/specs/2026-06-11-resume-agent-v2-connectors-design.md`). The valuable, fragile logic in every API connector is the _mapping_ (payload → `RawJob`) and the _client-side keyword filter_; both are pure functions over fixtures — the **interface is the test surface**. The HTTP fetch lives behind a one-method seam (`_get_*`) overridden in tests, exactly like Plan 1's LinkedIn `_search_html`. `build_connectors()` is the registry that turns `ConnectorsConfig` into live `Connector` instances in canonical dedup order (ATS → feed → aggregator → LinkedIn).
 
 **Tech Stack:** Python 3.13, uv, **httpx** (already a dep — no new deps), **beautifulsoup4** (already a dep, for HTML→text), pydantic, pytest.
 
@@ -51,12 +51,14 @@ tests/test_connectors_registry.py       # CREATE
 ## Task 1: shared connector text helpers (HTML→text + keyword filter)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/text.py`
 - Test: `tests/test_connectors_text.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_connectors_text.py`:
+
 ```python
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.text import filter_by_search, html_to_text
@@ -98,6 +100,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/discovery/connectors/text.py`:
+
 ```python
 import html
 
@@ -152,12 +155,14 @@ git commit -m "feat(connectors): shared html_to_text + keyword filter" -m "Co-Au
 ## Task 2: `ConnectorsConfig` + example file
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/config.py`, `config/connectors.yaml.example`
 - Test: `tests/test_connectors_config.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_connectors_config.py`:
+
 ```python
 from pathlib import Path
 
@@ -195,6 +200,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 3: Implement the config model**
 
 Create `src/resume_agent/discovery/connectors/config.py`:
+
 ```python
 from pathlib import Path
 
@@ -244,26 +250,27 @@ def load_connectors_config(path: str | Path) -> ConnectorsConfig:
 - [ ] **Step 4: Create the example file**
 
 Create `config/connectors.yaml.example`:
+
 ```yaml
 # Which job-source connectors `resume-agent pull` runs, and their parameters.
 # Copy to config/connectors.yaml and edit. Secrets (Adzuna keys) go in .env.
 
-greenhouse:            # ATS boards — company-scoped; lists ALL open roles per board.
+greenhouse: # ATS boards — company-scoped; lists ALL open roles per board.
   enabled: true
   boards:
-    - token: stripe    # board slug from boards.greenhouse.io/<slug>
-      company: Stripe  # optional display name (defaults to the token)
+    - token: stripe # board slug from boards.greenhouse.io/<slug>
+      company: Stripe # optional display name (defaults to the token)
     - token: airbnb
       company: Airbnb
 
-adzuna:                # keyword aggregator (needs ADZUNA_APP_ID / ADZUNA_APP_KEY in .env)
+adzuna: # keyword aggregator (needs ADZUNA_APP_ID / ADZUNA_APP_KEY in .env)
   enabled: true
   country: us
 
-remoteok:              # remote-jobs feed (no auth)
+remoteok: # remote-jobs feed (no auth)
   enabled: true
 
-linkedin:              # the v1 scraper; opt-in (brittle, needs a burner session)
+linkedin: # the v1 scraper; opt-in (brittle, needs a burner session)
   enabled: false
 ```
 
@@ -284,25 +291,27 @@ git commit -m "feat(connectors): connectors.yaml config model + example" -m "Co-
 ## Task 3: Greenhouse connector
 
 **Files:**
+
 - Create: `tests/fixtures/greenhouse/jobs.json`, `src/resume_agent/discovery/connectors/greenhouse.py`
 - Test: `tests/test_connector_greenhouse.py`
 
 - [ ] **Step 1: Create the fixture**
 
 Create `tests/fixtures/greenhouse/jobs.json`:
+
 ```json
 {
   "jobs": [
     {
       "absolute_url": "https://boards.greenhouse.io/stripe/jobs/1",
       "title": "Senior Backend Engineer",
-      "location": {"name": "Remote - US"},
+      "location": { "name": "Remote - US" },
       "content": "&lt;p&gt;Build &lt;b&gt;payment&lt;/b&gt; systems in Python.&lt;/p&gt;"
     },
     {
       "absolute_url": "https://boards.greenhouse.io/stripe/jobs/2",
       "title": "Office Manager",
-      "location": {"name": "San Francisco"},
+      "location": { "name": "San Francisco" },
       "content": "&lt;p&gt;Run the front desk.&lt;/p&gt;"
     }
   ]
@@ -312,6 +321,7 @@ Create `tests/fixtures/greenhouse/jobs.json`:
 - [ ] **Step 2: Write the failing test**
 
 Create `tests/test_connector_greenhouse.py`:
+
 ```python
 import json
 from pathlib import Path
@@ -355,6 +365,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 4: Implement**
 
 Create `src/resume_agent/discovery/connectors/greenhouse.py`:
+
 ```python
 import httpx
 
@@ -422,6 +433,7 @@ git commit -m "feat(connectors): Greenhouse ATS connector" -m "Co-Authored-By: C
 ## Task 4: Adzuna connector
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py` (Settings), `.env.example`
 - Create: `tests/fixtures/adzuna/search.json`, `src/resume_agent/discovery/connectors/adzuna.py`
 - Test: `tests/test_connector_adzuna.py`
@@ -429,12 +441,14 @@ git commit -m "feat(connectors): Greenhouse ATS connector" -m "Co-Authored-By: C
 - [ ] **Step 1: Add Adzuna credentials to Settings and `.env.example`**
 
 In `src/resume_agent/config.py`, add these two fields to `class Settings` after `github_token`:
+
 ```python
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""
 ```
 
 In `.env.example`, add:
+
 ```dotenv
 # Adzuna API credentials for the aggregator connector.
 ADZUNA_APP_ID=
@@ -444,21 +458,22 @@ ADZUNA_APP_KEY=
 - [ ] **Step 2: Create the fixture**
 
 Create `tests/fixtures/adzuna/search.json`:
+
 ```json
 {
   "results": [
     {
       "redirect_url": "https://www.adzuna.com/jobs/1",
       "title": "Backend Engineer",
-      "company": {"display_name": "Acme Corp"},
-      "location": {"display_name": "Remote, US"},
+      "company": { "display_name": "Acme Corp" },
+      "location": { "display_name": "Remote, US" },
       "description": "Work on distributed systems in Python and Go."
     },
     {
       "redirect_url": "https://www.adzuna.com/jobs/2",
       "title": "Platform Engineer",
-      "company": {"display_name": "Beta Inc"},
-      "location": {"display_name": "London, UK"},
+      "company": { "display_name": "Beta Inc" },
+      "location": { "display_name": "London, UK" },
       "description": "Operate Kubernetes clusters."
     }
   ]
@@ -468,6 +483,7 @@ Create `tests/fixtures/adzuna/search.json`:
 - [ ] **Step 3: Write the failing test**
 
 Create `tests/test_connector_adzuna.py`:
+
 ```python
 import json
 from pathlib import Path
@@ -509,6 +525,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 5: Implement**
 
 Create `src/resume_agent/discovery/connectors/adzuna.py`:
+
 ```python
 import httpx
 
@@ -585,6 +602,7 @@ git commit -m "feat(connectors): Adzuna aggregator connector" -m "Co-Authored-By
 ## Task 5: RemoteOK connector
 
 **Files:**
+
 - Create: `tests/fixtures/remoteok/api.json`, `src/resume_agent/discovery/connectors/remoteok.py`
 - Test: `tests/test_connector_remoteok.py`
 
@@ -593,9 +611,10 @@ git commit -m "feat(connectors): Adzuna aggregator connector" -m "Co-Authored-By
 > RemoteOK's API returns a JSON array whose **first element is a legal/metadata object** (no `position` key) — the parser must skip it.
 
 Create `tests/fixtures/remoteok/api.json`:
+
 ```json
 [
-  {"legal": "See https://remoteok.com/api for terms"},
+  { "legal": "See https://remoteok.com/api for terms" },
   {
     "id": "1001",
     "url": "https://remoteok.com/remote-jobs/1001",
@@ -618,6 +637,7 @@ Create `tests/fixtures/remoteok/api.json`:
 - [ ] **Step 2: Write the failing test**
 
 Create `tests/test_connector_remoteok.py`:
+
 ```python
 import json
 from pathlib import Path
@@ -664,6 +684,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 4: Implement**
 
 Create `src/resume_agent/discovery/connectors/remoteok.py`:
+
 ```python
 import httpx
 
@@ -725,12 +746,14 @@ git commit -m "feat(connectors): RemoteOK feed connector" -m "Co-Authored-By: Cl
 ## Task 6: `build_connectors` registry
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/registry.py`
 - Test: `tests/test_connectors_registry.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_connectors_registry.py`:
+
 ```python
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.config import ConnectorsConfig
@@ -774,6 +797,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.discovery
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/discovery/connectors/registry.py`:
+
 ```python
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.adzuna import AdzunaConnector

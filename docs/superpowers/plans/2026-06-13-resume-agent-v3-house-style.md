@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let the user inject their own prose resume-writing guidance into the *system message* of every resume tailor-loop agent (writer, reviser, reviewers), appended beneath the non-removable fact-lock core.
+**Goal:** Let the user inject their own prose resume-writing guidance into the _system message_ of every resume tailor-loop agent (writer, reviser, reviewers), appended beneath the non-removable fact-lock core.
 
 **Architecture:** A new pure module `tailor/style_guide.py` owns two functions — `load_style_guide(path)` (reads an opt-in prose file; missing/empty ⇒ `None`) and `compose_instructions(base, style_guide)` (appends a labeled block beneath fixed instructions, or returns the base unchanged). The three agent builders in `tailor/agents.py` gain an optional `style_guide` param and route their hardcoded instruction lists through `compose_instructions`. `review.yaml` gains a `style_guide_path` key; `cli.py`'s `tailor_cmd` loads the guide once and threads it into all loop agents. Zero DB changes.
 
@@ -27,6 +27,7 @@ Tasks 1–4 are independent of the CLI; Task 5 wires them together; Task 6 is do
 ### Task 1: `compose_instructions` — append style beneath the fixed core
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/style_guide.py`
 - Test: `tests/test_tailor_style_guide.py`
 
@@ -100,6 +101,7 @@ git commit -m "feat(tailor): compose_instructions appends house style beneath fa
 ### Task 2: `load_style_guide` — read the opt-in prose file
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/style_guide.py`
 - Test: `tests/test_tailor_style_guide.py`
 
@@ -169,6 +171,7 @@ git commit -m "feat(tailor): load_style_guide reads opt-in prose file (missing/e
 ### Task 3: `ReviewConfig.style_guide_path` — where the guide lives
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/review_config.py:24-28`
 - Test: `tests/test_tailor_review_config.py`
 
@@ -220,6 +223,7 @@ git commit -m "feat(tailor): add style_guide_path to ReviewConfig (default confi
 ### Task 4: Thread `style_guide` through the three agent builders
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/agents.py:57-87`
 - Test: `tests/test_tailor_agents.py`
 
@@ -320,6 +324,7 @@ git commit -m "feat(tailor): thread optional style_guide through writer/reviser/
 ### Task 5: Wire the guide into the tailor command (whole loop)
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py:20-37` (imports), `src/resume_agent/cli.py:189-194` (`build_reviewer_agents`), `src/resume_agent/cli.py:214-249` (`tailor_cmd`)
 - Test: `tests/test_cli_tailor.py`
 
@@ -463,6 +468,7 @@ git commit -m "feat(cli): load style guide once and thread it into the whole tai
 ### Task 6: Ship the example file + docs
 
 **Files:**
+
 - Create: `config/style_guide.md.example`
 - Modify: `README.md` (the `config/*.yaml` table around line 294-303, and the `templates/` note around line 305-308)
 
@@ -470,6 +476,7 @@ git commit -m "feat(cli): load style guide once and thread it into the whole tai
 
 ```markdown
 # config/style_guide.md.example
+
 <!--
 House style — optional, opt-in resume-writing guidance.
 
@@ -505,7 +512,7 @@ Expected: PASS. (The real `config/style_guide.md` does not exist, so `load_style
 In `README.md`, add a row to the `config/*.yaml` table (it currently ends with the `render.yaml` row):
 
 ```markdown
-| `style_guide.md` | *Optional.* Prose house-style guidance appended to the system message of the resume tailor loop (writer, reviser, reviewers). Governs *how* resumes are written, never *what* is claimed — fact-lock is unaffected. Absent ⇒ no change. Copy from `style_guide.md.example`. Path overridable via `review.yaml`'s `style_guide_path`. |
+| `style_guide.md` | _Optional._ Prose house-style guidance appended to the system message of the resume tailor loop (writer, reviser, reviewers). Governs _how_ resumes are written, never _what_ is claimed — fact-lock is unaffected. Absent ⇒ no change. Copy from `style_guide.md.example`. Path overridable via `review.yaml`'s `style_guide_path`. |
 ```
 
 Also add `cp config/style_guide.md.example config/style_guide.md   # optional: house writing style` to the setup copy-block in README (the block around line 74-80), as an optional line.
@@ -531,6 +538,7 @@ Expected: all green. Pay special attention to `test_tailor_agents.py`, `test_tai
 ## Self-Review
 
 **1. Spec coverage** (against spec §2 decisions 2–5, §5.1, §9):
+
 - Decision 2 (additive, fact-lock fixed) → Task 1 (`compose_instructions` appends beneath base; base never removed) + Task 4 test asserts the fact-lock line survives.
 - Decision 3 (whole loop) → Task 4 (all three builders) + Task 5 (`build_reviewer_agents` forwards style; `tailor_cmd` threads to writer+reviser+reviewers) + Task 5 test asserts all three receive it.
 - Decision 4 (resumes only, cover letters out) → no change to `cover_letter/agents.py`; nothing in this plan touches it. ✓

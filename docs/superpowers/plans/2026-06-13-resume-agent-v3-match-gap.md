@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Report which skills your *target* jobs (those that survived discovery) demand that your profile doesn't show — aggregated by frequency, with a per-job view — surfaced in both the CLI and the dashboard, read-only.
+**Goal:** Report which skills your _target_ jobs (those that survived discovery) demand that your profile doesn't show — aggregated by frequency, with a per-job view — surfaced in both the CLI and the dashboard, read-only.
 
 **Architecture:** A new pure module `tracking/match_gap.py` (sibling of `analytics.py`) holds `normalize_skill`, `profile_skill_tokens`, the `GapRow`/`MatchGapReport` dataclasses, and `match_gap(session, facts, canonicalizer=None)`. It reads `Job.criteria_json["must_have_skills"]` for jobs in `{shortlisted, approved, tailored, rendered}` and set-subtracts the profile's skill names+aliases. An optional cheap-LLM `canonicalizer` (in `tracking/canonicalize.py`) collapses synonyms like `k8s`≈`kubernetes`; it is off by default and injected as a plain callable so tests stay offline. `cli.py` gains a `match-gap` command; `dashboard/app.py` gains a Match-gap page. Zero DB changes.
 
@@ -25,6 +25,7 @@ Order matters: Tasks 1→2→3 build the pure core; Task 4 adds the optional LLM
 ### Task 1: `normalize_skill` — deterministic comparison key
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/match_gap.py`
 - Test: `tests/test_tracking_match_gap.py`
 
@@ -86,6 +87,7 @@ git commit -m "feat(match-gap): normalize_skill comparison key"
 ### Task 2: `profile_skill_tokens` — the profile's known-skill set
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/match_gap.py`
 - Test: `tests/test_tracking_match_gap.py`
 
@@ -155,6 +157,7 @@ git commit -m "feat(match-gap): profile_skill_tokens (names + aliases, normalize
 ### Task 3: `match_gap` — the pure core (aggregate + per-job)
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/match_gap.py`
 - Test: `tests/test_tracking_match_gap.py`
 
@@ -365,6 +368,7 @@ git commit -m "feat(match-gap): pure match_gap() — frequency-ranked gaps + per
 ### Task 4: Optional cheap-LLM synonym canonicalizer
 
 **Files:**
+
 - Create: `src/resume_agent/tracking/canonicalize.py`
 - Test: `tests/test_tracking_canonicalize.py`
 
@@ -501,6 +505,7 @@ git commit -m "feat(match-gap): optional cheap-LLM skill canonicalizer (synonym 
 ### Task 5: `match-gap` CLI command
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py` (imports near line 34-36; new command after `sources_cmd`, ~line 184)
 - Test: `tests/test_cli_match_gap.py`
 
@@ -645,6 +650,7 @@ git commit -m "feat(cli): match-gap command (aggregate + --job-id + --llm)"
 ### Task 6: Dashboard Match-gap page
 
 **Files:**
+
 - Modify: `src/resume_agent/dashboard/app.py` (imports near line 9-24; new helpers + page after `render_analytics_page` ~line 434; sidebar/dispatch in `main` ~line 446-462)
 - Test: `tests/test_dashboard_match_gap.py`
 
@@ -789,12 +795,14 @@ git commit -m "feat(dashboard): Match-gap page (most-demanded missing skills)"
 ### Task 7: Document the command + dashboard page
 
 **Files:**
+
 - Modify: `README.md` (command reference section, and the dashboard page list ~line 246-253)
 
 - [ ] **Step 1: Add a command-reference entry** (after the `sources` section)
 
-```markdown
+````markdown
 ### `match-gap` — what skills your target jobs want that you lack
+
 Compares the `must_have_skills` of every job that survived discovery
 (`shortlisted`/`approved`/`tailored`/`rendered`) against your profile's skills
 (names + aliases) and reports the gaps, ranked by how many target jobs demand
@@ -805,14 +813,16 @@ uv run resume-agent match-gap                 # aggregate, most-demanded first
 uv run resume-agent match-gap --job-id 7      # gaps for one job
 uv run resume-agent match-gap --llm           # add cheap-LLM synonym matching (k8s≈Kubernetes)
 ```
-```
+````
+
+````
 
 - [ ] **Step 2: Add the page to the dashboard description** — in the `dashboard` section's bullet list, add:
 
 ```markdown
 - **Match-gap** — skills your target jobs demand that your profile doesn't
   show, ranked by frequency. The closed-loop read on what to add or learn.
-```
+````
 
 - [ ] **Step 3: Commit**
 
@@ -835,6 +845,7 @@ Expected: all green, no network, no API key. Confirms the optional LLM pass stay
 ## Self-Review
 
 **1. Spec coverage** (against spec §2 decisions 6–10, §5.2, §9):
+
 - Decision 6 (input = survived-discovery, aggregate + per-job, no employer-rejection lens) → Task 3 `TARGET_STATUSES` + `test_match_gap_excludes_pre_shortlist_jobs` + `per_job`; no `Application` join anywhere. ✓
 - Decision 7 (deterministic + opt-in LLM canonicalization, faked in tests) → Task 1/2/3 deterministic; Task 4 canonicalizer injected as a callable, faked; `test_match_gap_honors_canonicalizer`. ✓
 - Decision 8 (both surfaces over one pure core) → Task 3 core; Task 5 CLI; Task 6 dashboard — both call `match_gap`. ✓

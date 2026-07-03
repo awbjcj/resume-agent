@@ -9,6 +9,7 @@
 **Tech Stack:** Python 3.13, Pydantic v2, SQLModel, Typst (`typst` pkg), `pypdf`, `pytest`, `uv`. Spec: `docs/superpowers/specs/2026-06-10-resume-agent-v1.5-design.md`.
 
 **Conventions:**
+
 - Run tests with `uv run pytest`.
 - Every commit message ends with the trailer line: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` (omitted from the short commands below for brevity — add it).
 - TDD: write the failing test, see it fail, implement minimally, see it pass, commit.
@@ -18,24 +19,24 @@
 
 ## File structure (what changes and why)
 
-| File | Responsibility | Change |
-|------|----------------|--------|
-| `src/resume_agent/models/resume.py` | The structured, fact-locked resume the renderer consumes | Add `Tailored{Publication,Certification,Award,Volunteer}`; add `publications/certifications/awards/languages/volunteer/section_order` to `ResumeContent` |
-| `src/resume_agent/tailor/provenance.py` *(new)* | **Deep module:** the single place that indexes profile fact ids, finds referenced ids, checks them, and resolves the evidence subset | Create |
-| `src/resume_agent/tailor/length.py` *(new)* | One-page budget formatting + deterministic resume size stats | Create |
-| `src/resume_agent/tailor/review_config.py` | Reviewer roster + thresholds | Add optional `LengthBudget` |
-| `src/resume_agent/tailor/panel.py` | Run reviewers; **seam:** compose input per reviewer (lean vs evidence) | Replace single shared input with per-reviewer composition |
-| `src/resume_agent/tailor/verdict.py` | Aggregate critiques into a verdict | Thread `provenance_passed` into the gate |
-| `src/resume_agent/tailor/workflow.py` | The draft→gate→review→revise loop | Run the deterministic provenance gate first; short-circuit broken provenance; pass the budget to tailor/reviser |
-| `src/resume_agent/tailor/tailoring.py` | Compose tailor/reviser prompts | Add the optional budget line |
-| `src/resume_agent/profile/extractor.py` | Resume-text → `ProfileFacts` | Default to the mid model |
-| `src/resume_agent/profile/merge.py` | Combine resume + GitHub facts | Dedupe GitHub projects against resume projects; enrich |
-| `src/resume_agent/profile/validate.py` *(new)* | Deterministic coverage report over `ProfileFacts` + raw text | Create |
-| `src/resume_agent/profile/build.py` | Orchestrate profile build | Return the coverage report alongside facts |
-| `src/resume_agent/cli.py` | `profile build` command | Print the coverage report |
-| `src/resume_agent/discovery/pipeline.py` | Discovery funnel stages | Commit once per stage, not per row |
-| `templates/resume.typ` | PDF layout (LLM-free) | Rework to hybrid layout; render new sections + enriched education; honor `section_order` |
-| `config/review.yaml.example` | Reviewer config doc | Document `length_budget` |
+| File                                            | Responsibility                                                                                                                       | Change                                                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/resume_agent/models/resume.py`             | The structured, fact-locked resume the renderer consumes                                                                             | Add `Tailored{Publication,Certification,Award,Volunteer}`; add `publications/certifications/awards/languages/volunteer/section_order` to `ResumeContent` |
+| `src/resume_agent/tailor/provenance.py` _(new)_ | **Deep module:** the single place that indexes profile fact ids, finds referenced ids, checks them, and resolves the evidence subset | Create                                                                                                                                                   |
+| `src/resume_agent/tailor/length.py` _(new)_     | One-page budget formatting + deterministic resume size stats                                                                         | Create                                                                                                                                                   |
+| `src/resume_agent/tailor/review_config.py`      | Reviewer roster + thresholds                                                                                                         | Add optional `LengthBudget`                                                                                                                              |
+| `src/resume_agent/tailor/panel.py`              | Run reviewers; **seam:** compose input per reviewer (lean vs evidence)                                                               | Replace single shared input with per-reviewer composition                                                                                                |
+| `src/resume_agent/tailor/verdict.py`            | Aggregate critiques into a verdict                                                                                                   | Thread `provenance_passed` into the gate                                                                                                                 |
+| `src/resume_agent/tailor/workflow.py`           | The draft→gate→review→revise loop                                                                                                    | Run the deterministic provenance gate first; short-circuit broken provenance; pass the budget to tailor/reviser                                          |
+| `src/resume_agent/tailor/tailoring.py`          | Compose tailor/reviser prompts                                                                                                       | Add the optional budget line                                                                                                                             |
+| `src/resume_agent/profile/extractor.py`         | Resume-text → `ProfileFacts`                                                                                                         | Default to the mid model                                                                                                                                 |
+| `src/resume_agent/profile/merge.py`             | Combine resume + GitHub facts                                                                                                        | Dedupe GitHub projects against resume projects; enrich                                                                                                   |
+| `src/resume_agent/profile/validate.py` _(new)_  | Deterministic coverage report over `ProfileFacts` + raw text                                                                         | Create                                                                                                                                                   |
+| `src/resume_agent/profile/build.py`             | Orchestrate profile build                                                                                                            | Return the coverage report alongside facts                                                                                                               |
+| `src/resume_agent/cli.py`                       | `profile build` command                                                                                                              | Print the coverage report                                                                                                                                |
+| `src/resume_agent/discovery/pipeline.py`        | Discovery funnel stages                                                                                                              | Commit once per stage, not per row                                                                                                                       |
+| `templates/resume.typ`                          | PDF layout (LLM-free)                                                                                                                | Rework to hybrid layout; render new sections + enriched education; honor `section_order`                                                                 |
+| `config/review.yaml.example`                    | Reviewer config doc                                                                                                                  | Document `length_budget`                                                                                                                                 |
 
 Test files mirror these under `tests/` (one per task below).
 
@@ -44,6 +45,7 @@ Test files mirror these under `tests/` (one per task below).
 ## Task 1: Extend `ResumeContent` with the restored sections
 
 **Files:**
+
 - Modify: `src/resume_agent/models/resume.py`
 - Test: `tests/test_models_resume.py`
 
@@ -177,9 +179,10 @@ git commit -m "feat(models): restore publications/certs/awards/languages/volunte
 
 ## Task 2: Deterministic provenance core (`index_facts`, `referenced_ids`, `check_provenance`)
 
-**Architecture note (deletion test):** these three functions are the *only* place that walks the fact graph. Deleting the module would scatter identical traversal logic across the workflow gate, the evidence view, and tests — complexity reappears across callers, so the module earns its keep. Its interface is small (ids in, report out); its implementation is the tedious traversal. That is a deep module.
+**Architecture note (deletion test):** these three functions are the _only_ place that walks the fact graph. Deleting the module would scatter identical traversal logic across the workflow gate, the evidence view, and tests — complexity reappears across callers, so the module earns its keep. Its interface is small (ids in, report out); its implementation is the tedious traversal. That is a deep module.
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/provenance.py`
 - Test: `tests/test_tailor_provenance.py`
 
@@ -348,6 +351,7 @@ git commit -m "feat(tailor): deterministic provenance index + check"
 ## Task 3: Evidence view (`resolve_evidence`)
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/provenance.py`
 - Test: `tests/test_tailor_provenance.py`
 
@@ -402,6 +406,7 @@ git commit -m "feat(tailor): provenance-resolved evidence view for the fact-chec
 ## Task 4: Length budget + resume stats (`tailor/length.py`, config)
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/length.py`
 - Modify: `src/resume_agent/tailor/review_config.py`
 - Test: `tests/test_tailor_length.py`
@@ -518,9 +523,10 @@ git commit -m "feat(tailor): length budget config + deterministic resume stats"
 
 ## Task 5: Per-reviewer payload trimming (the panel seam)
 
-**Architecture note (real seam):** the panel now has two adapters at one seam — a *lean* input (resume + JD + stats) for non-gate reviewers and an *evidence* input (resume + JD + only-referenced facts) for the gate reviewer. Two adapters = a real seam, not a hypothetical one. The raw profile stops flowing to four of five reviewers.
+**Architecture note (real seam):** the panel now has two adapters at one seam — a _lean_ input (resume + JD + stats) for non-gate reviewers and an _evidence_ input (resume + JD + only-referenced facts) for the gate reviewer. Two adapters = a real seam, not a hypothetical one. The raw profile stops flowing to four of five reviewers.
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/panel.py`
 - Modify: `src/resume_agent/tailor/workflow.py` (call site only; full rewrite is Task 6)
 - Test: `tests/test_tailor_panel.py`
@@ -740,6 +746,7 @@ git commit -m "perf(tailor): per-reviewer payload trimming (lean vs evidence inp
 ## Task 6: Provenance pre-gate in the loop
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/verdict.py`
 - Modify: `src/resume_agent/tailor/workflow.py`
 - Test: `tests/test_tailor_verdict.py`, `tests/test_tailor_workflow.py`
@@ -942,6 +949,7 @@ git commit -m "feat(tailor): deterministic provenance pre-gate short-circuits th
 ## Task 7: Length budget into the tailor/reviser contract
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/tailoring.py`
 - Test: `tests/test_tailor_tailoring.py`
 
@@ -1081,6 +1089,7 @@ git commit -m "feat(tailor): one-page length budget in the tailor/reviser contra
 ## Task 8: Profile extractor → mid tier
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/extractor.py`
 - Test: `tests/test_profile_extractor.py`
 
@@ -1136,6 +1145,7 @@ git commit -m "feat(profile): extract with the mid model for higher fidelity on 
 ## Task 9: Merge dedupe (GitHub vs resume projects)
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/merge.py`
 - Test: `tests/test_profile_merge.py`
 
@@ -1237,6 +1247,7 @@ git commit -m "feat(profile): dedupe GitHub projects against resume projects and
 ## Task 10: Deterministic profile coverage report
 
 **Files:**
+
 - Create: `src/resume_agent/profile/validate.py`
 - Modify: `src/resume_agent/profile/build.py`
 - Modify: `src/resume_agent/cli.py`
@@ -1418,6 +1429,7 @@ git commit -m "feat(profile): deterministic coverage report surfaced by 'profile
 ## Task 11: Rework the Typst template (hybrid layout + new sections + ordering)
 
 **Files:**
+
 - Modify: `templates/resume.typ`
 - Test: `tests/test_render_template_sections.py`
 
@@ -1674,6 +1686,7 @@ git commit -m "feat(render): hybrid template — new sections, enriched educatio
 ## Task 12: Batch DB commits in the discovery funnel
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/pipeline.py`
 - Test: `tests/test_discovery_pipeline.py`
 
@@ -1760,6 +1773,7 @@ git commit -m "perf(discovery): commit once per funnel stage instead of per row"
 ## Task 13: Document the new config + v1.6 deferral
 
 **Files:**
+
 - Modify: `config/review.yaml.example`
 - Modify: `README.md` (the `review.yaml` row + a brief note)
 
@@ -1801,6 +1815,7 @@ git commit -m "docs: document length_budget and the v1.5 quality pass"
 ## Self-review (completed against the spec)
 
 **Spec coverage:**
+
 - Restored sections (pubs/certs/awards/languages/volunteer, enriched education) → Tasks 1, 11. ✅
 - `section_order` hint + default order → Tasks 1, 11. ✅
 - Deterministic provenance pre-gate → Tasks 2, 6. ✅
@@ -1812,6 +1827,6 @@ git commit -m "docs: document length_budget and the v1.5 quality pass"
 
 **Placeholder scan:** No placeholders, no deliberate typos, no "TBD". Every code step is complete and copy-runnable. The only judgment call left to the implementer is fixing any Typst syntax error the golden test surfaces (Task 11), which is inherent to not being able to compile Typst at plan time.
 
-**Task independence:** Each task is internally green. The one cross-task seam (length budget) is threaded explicitly: Task 6 calls the 3-arg `compose_*`; Task 7 adds the optional `length_budget` param *and* updates the workflow's two call sites in the same task. No task depends on a later task to compile.
+**Task independence:** Each task is internally green. The one cross-task seam (length budget) is threaded explicitly: Task 6 calls the 3-arg `compose_*`; Task 7 adds the optional `length_budget` param _and_ updates the workflow's two call sites in the same task. No task depends on a later task to compile.
 
 **Type consistency:** `ProvenanceReport(ok, missing)`, `CoverageReport(ok, warnings)`, `LengthBudget(max_experiences, max_bullets_per_role, target_total_bullets)`, `run_panel(content, profile_facts, jd_text, config, reviewer_agents)`, and `aggregate(critiques, config, provenance_passed=True)` are used identically wherever they appear. `build_profile` returns `(ProfileFacts, str)` consistently in Tasks 10's callers.

@@ -18,7 +18,7 @@
 
 **Deepening:** three deep, pure modules behind tiny signatures — `classify_email(email) -> str`, `match_email_to_application(email, jobs) -> Job | None`, `propose_transitions(emails, pairs, classify) -> list[Proposal]`. The **interface is the test surface**: every risky heuristic is exercised against constructed `EmailMessage`s with no network. Gmail's API surface is hidden behind `fetch_recent_messages`, so the rest of the system depends on the small `EmailMessage` dataclass, not Google's payloads.
 
-**Restraint (karpathy):** read-only scope (no label/archive writes); no polling daemon (a manual command); the LLM fallback is *optional* and only fires when rules are inconclusive — most mail is classified for free. The forward-only guard prevents nonsensical proposals (e.g. moving an `offer` back to `interview`) without modeling a full state machine.
+**Restraint (karpathy):** read-only scope (no label/archive writes); no polling daemon (a manual command); the LLM fallback is _optional_ and only fires when rules are inconclusive — most mail is classified for free. The forward-only guard prevents nonsensical proposals (e.g. moving an `offer` back to `interview`) without modeling a full state machine.
 
 ---
 
@@ -45,6 +45,7 @@ tests/test_cli_sync_status.py          # CREATE
 ## Task 1: dependencies + `EmailMessage` + Gmail client shell
 
 **Files:**
+
 - Modify: `pyproject.toml`
 - Create: `src/resume_agent/gmail/__init__.py`, `src/resume_agent/gmail/client.py`
 
@@ -58,6 +59,7 @@ Expected: `pyproject.toml` + `uv.lock` updated; install succeeds.
 - [ ] **Step 2: Ignore the cached token**
 
 Add to `.gitignore`:
+
 ```gitignore
 data/gmail_token.json
 ```
@@ -65,11 +67,13 @@ data/gmail_token.json
 - [ ] **Step 3: Implement the boundary type + client shell**
 
 Create `src/resume_agent/gmail/__init__.py`:
+
 ```python
 """Read-only Gmail integration: fetch → match → classify → PROPOSE status transitions."""
 ```
 
 Create `src/resume_agent/gmail/client.py`:
+
 ```python
 import base64
 from dataclasses import dataclass
@@ -167,12 +171,14 @@ git commit -m "feat(gmail): deps + EmailMessage + read-only client shell" -m "Co
 ## Task 2: email classification (rules + optional LLM fallback)
 
 **Files:**
+
 - Create: `src/resume_agent/gmail/classify.py`
 - Test: `tests/test_gmail_classify.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_gmail_classify.py`:
+
 ```python
 from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import EmailMessage
@@ -218,6 +224,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.gmail.cla
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/gmail/classify.py`:
+
 ```python
 from resume_agent.gmail.client import EmailMessage
 from resume_agent.llm_runner import Runner
@@ -276,12 +283,14 @@ git commit -m "feat(gmail): rules+LLM email classification" -m "Co-Authored-By: 
 ## Task 3: match an email to a tracked job
 
 **Files:**
+
 - Create: `src/resume_agent/gmail/match.py`
 - Test: `tests/test_gmail_match.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_gmail_match.py`:
+
 ```python
 from resume_agent.gmail.client import EmailMessage
 from resume_agent.gmail.match import match_email_to_application
@@ -318,6 +327,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.gmail.mat
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/gmail/match.py`:
+
 ```python
 import re
 
@@ -361,6 +371,7 @@ git commit -m "feat(gmail): match email to tracked job by company" -m "Co-Author
 ## Task 4: propose transitions (forward-only) + pairs helper
 
 **Files:**
+
 - Create: `src/resume_agent/gmail/propose.py`
 - Modify: `src/resume_agent/tracking/queries.py`
 - Test: `tests/test_gmail_propose.py`
@@ -368,6 +379,7 @@ git commit -m "feat(gmail): match email to tracked job by company" -m "Co-Author
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_gmail_propose.py`:
+
 ```python
 from resume_agent.gmail.client import EmailMessage
 from resume_agent.gmail.propose import Proposal, propose_transitions
@@ -426,6 +438,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.gmail.pro
 - [ ] **Step 3: Implement the proposer**
 
 Create `src/resume_agent/gmail/propose.py`:
+
 ```python
 from dataclasses import dataclass
 
@@ -482,10 +495,13 @@ def propose_transitions(emails, pairs: list[tuple[Application, Job]], classify) 
 - [ ] **Step 4: Add the pairs query helper**
 
 In `src/resume_agent/tracking/queries.py`, update the tables import to include `Application`:
+
 ```python
 from resume_agent.tracking.tables import Application, Job, JobStatus
 ```
+
 Add at the end of the file:
+
 ```python
 def application_job_pairs(session: Session) -> list[tuple[Application, Job]]:
     """Every application paired with its job (for matching emails to applications)."""
@@ -514,12 +530,14 @@ git commit -m "feat(gmail): forward-only transition proposals + pairs helper" -m
 ## Task 5: `sync-status` CLI command
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_sync_status.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_sync_status.py`:
+
 ```python
 from typer.testing import CliRunner
 
@@ -579,6 +597,7 @@ Expected: FAIL — `AttributeError: module 'resume_agent.cli' has no attribute '
 - [ ] **Step 3: Add imports**
 
 In `src/resume_agent/cli.py`, add:
+
 ```python
 from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
@@ -586,11 +605,13 @@ from resume_agent.gmail.propose import propose_transitions
 from resume_agent.tracking.queries import application_job_pairs
 from resume_agent.tracking.repository import update_application_status
 ```
+
 (If `update_application_status` is already imported, don't duplicate.)
 
 - [ ] **Step 4: Add the command**
 
 Add after `dashboard_cmd` in `src/resume_agent/cli.py`:
+
 ```python
 @app.command("sync-status")
 def sync_status_cmd(

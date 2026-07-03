@@ -48,10 +48,12 @@ This section supersedes conflicting task snippets below.
 ### Task 1: `KnownJobsIndex` + `skip_seen` predicate
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/known_jobs.py`
 - Test: `tests/test_known_jobs.py`
 
 **Interfaces:**
+
 - Consumes: `RawJob` and `SkipSeen` (`discovery/connectors/base.py`), `source_rank` (`discovery/source_tier.py`), `compute_dedup_key` (`tracking/dedup.py`), `Job` (`tracking/tables.py`).
 - Produces:
   - `KnownJobsIndex` with `.match(url, company, title, location) -> KnownJob | None`
@@ -263,10 +265,12 @@ git commit -m "feat: add KnownJobsIndex + skip_seen predicate for pre-fetch skip
 ### Task 2: Apply `skip_seen` in `harvest_detailed`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/harvest.py`
 - Test: `tests/test_harvest_skip.py`
 
 **Interfaces:**
+
 - Consumes: `SkipSeen` (`discovery/known_jobs.py`).
 - Produces: `harvest_detailed(rows, fetch_detail, apply_detail, *, search, limit, skip_seen=None)` — a `skip_seen(row)` that returns True short-circuits **before** `fetch_detail`.
 
@@ -393,6 +397,7 @@ git commit -m "feat: skip known rows before the detail fetch in harvest_detailed
 ### Task 3: Propagate `skip_seen` through the N+1 backends (Workday, Tesla, Google) and Companies dispatch
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/workday.py`
 - Modify: `src/resume_agent/discovery/connectors/tesla.py`
 - Modify: `src/resume_agent/discovery/connectors/google.py`
@@ -400,6 +405,7 @@ git commit -m "feat: skip known rows before the detail fetch in harvest_detailed
 - Test: `tests/test_connector_companies.py` (extend)
 
 **Interfaces:**
+
 - Consumes: `SkipSeen`, `harvest_detailed(..., skip_seen=...)`.
 - Produces:
   - `fetch_workday(target, search, limit=None, skip_seen=None)`
@@ -554,10 +560,12 @@ git commit -m "feat: thread skip_seen through N+1 backends and companies dispatc
 ### Task 4: Apply `skip_seen` in Adzuna enrichment (skip the browser render)
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/adzuna.py`
 - Test: `tests/test_connector_adzuna.py` (extend)
 
 **Interfaces:**
+
 - Produces: `AdzunaConnector.fetch(search, limit=None, skip_seen=None)` — rows the
   predicate marks known are dropped **before** `enrich_adzuna_jobs` renders them, so
   the visible browser never opens for an already-known job.
@@ -633,6 +641,7 @@ git commit -m "feat: skip known Adzuna jobs before the browser render"
 ### Task 5: Add `skip_seen` to the Connector Protocol + remaining connectors
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/base.py` (Protocol)
 - Modify: `src/resume_agent/discovery/connectors/greenhouse.py`
 - Modify: `src/resume_agent/discovery/connectors/lever.py`
@@ -641,6 +650,7 @@ git commit -m "feat: skip known Adzuna jobs before the browser render"
 - Test: none new (covered by existing connector tests + Task 6 integration).
 
 **Interfaces:**
+
 - Produces: uniform `fetch(self, search, limit=None, skip_seen=None) -> FetchResult`
   across all connectors. Single-request connectors accept and ignore `skip_seen`
   (their fetch is one request; there is no per-job expense to avoid).
@@ -692,10 +702,12 @@ git commit -m "feat: accept skip_seen uniformly across the Connector protocol"
 ### Task 6: Build the index in `run_pull` and add `skip_known` toggle
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/runner.py`
 - Modify: `tests/test_connectors_runner.py` (update test doubles + add test)
 
 **Interfaces:**
+
 - Consumes: `build_known_index`, `make_skip_seen`.
 - Produces: `run_pull(session, connectors, search, telemetry_path, limit=None, reporter=None, finish=True, skip_known=True)`. When `skip_known` is True, builds the index once and passes a `skip_seen` closure to every `connector.fetch`; when False, passes `skip_seen=None`.
 
@@ -806,11 +818,13 @@ git commit -m "feat: build known-jobs index in run_pull with a skip_known toggle
 ### Task 7: Thread `skip_known` through the service + `--refresh` CLI flag
 
 **Files:**
+
 - Modify: `src/resume_agent/services/discovery.py` (`pull_jobs`)
 - Modify: `src/resume_agent/cli.py` (`pull_cmd`)
 - Test: `tests/test_services_sources.py` (extend) or a small new `tests/test_pull_refresh.py`
 
 **Interfaces:**
+
 - Produces:
   - `pull_jobs(..., skip_known: bool = True)` forwarding to `run_pull`.
   - `resume-agent pull --refresh` → `pull_jobs(skip_known=False)`.

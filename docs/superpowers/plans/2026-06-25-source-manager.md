@@ -27,11 +27,13 @@
 ### Task 1: Config schema — per-entry `enabled` + `CompanyUrl`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/config.py`
 - Modify: `src/resume_agent/discovery/connectors/registry.py:12-36`
 - Test: `tests/test_connectors_config.py`, `tests/test_connectors_registry.py`
 
 **Interfaces:**
+
 - Produces: `GreenhouseBoard.enabled: bool`, `LeverBoard.enabled: bool` (default `True`); `CompanyUrl(ExtensibleModel)` with `url: str`, `enabled: bool = True`, `label: str | None`; `CompaniesConfig.urls: list[CompanyUrl]` with a `mode="before"` validator coercing a bare string into `{"url": <string>}`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -135,10 +137,12 @@ git commit -m "feat(sources): per-entry enabled flag + CompanyUrl object form (b
 ### Task 2: Source identity + views + projection (pure helpers)
 
 **Files:**
+
 - Create: `src/resume_agent/discovery/connectors/sources.py`
 - Test: `tests/test_connector_sources.py`
 
 **Interfaces:**
+
 - Consumes: `ConnectorsConfig` (Task 1), `Settings`, `identify_host` (`discovery/connectors/detect.py:163`).
 - Produces:
   - `@dataclass(frozen=True) SourceView` with `id: str`, `kind: str`, `type: str` (`"board"|"aggregator"`), `display_name: str`, `enabled: bool`, `pullable: bool`, `detail: str`.
@@ -318,10 +322,12 @@ git commit -m "feat(sources): stable source ids + SourceView projection helpers"
 ### Task 3: Per-entry connector fan-out (the telemetry-granularity change)
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/registry.py`
 - Test: `tests/test_connectors_registry.py`
 
 **Interfaces:**
+
 - Consumes: `ConnectorsConfig`, `Settings`, `SourceView` ids (Task 2), connector classes.
 - Produces: `build_source_connectors(config: ConnectorsConfig, settings: Settings, source_ids: list[str] | None = None) -> list[Connector]` — one connector per **enabled, pullable, selected** entry, each with its instance `.name` set to the stable source id (boards/companies) or the fixed aggregator id. Order: greenhouse boards, lever boards, companies urls, remoteok, adzuna, linkedin.
 
@@ -455,10 +461,12 @@ git commit -m "feat(sources): build_source_connectors — one connector per entr
 ### Task 4: Count `skipped` in ingest
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/ingest.py:30-34,127-165`
 - Test: `tests/test_discovery_ingest.py`
 
 **Interfaces:**
+
 - Produces: `IngestCounts.skipped: dict[str, int]`; `ingest_jobs_with_outcomes` tallies the `IngestOutcome.skipped` branch per `raw.source`.
 
 - [ ] **Step 1: Write the failing test**
@@ -519,10 +527,12 @@ git commit -m "feat(sources): count skipped (first-seen-wins) ingest outcomes"
 ### Task 5: Carry `upgraded` + `skipped` on `PullReport`
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/runner.py:13-23,60-82`
 - Test: `tests/test_connectors_runner.py`
 
 **Interfaces:**
+
 - Consumes: `IngestCounts.skipped` (Task 4).
 - Produces: `PullReport.upgraded: dict[str, int]`, `PullReport.skipped: dict[str, int]`, populated per connector in `run_pull`.
 
@@ -644,10 +654,12 @@ git commit -m "feat(sources): PullReport carries per-source upgraded + skipped c
 ### Task 6: `pull_jobs(source_ids=...)` uses per-entry fan-out
 
 **Files:**
+
 - Modify: `src/resume_agent/services/discovery.py:105-122`
 - Test: `tests/test_services_discovery_pull.py` (create if absent)
 
 **Interfaces:**
+
 - Consumes: `build_source_connectors` (Task 3), `PullReport` (Task 5).
 - Produces: `pull_jobs(session, *, source_ids: list[str] | None = None, ...)` — builds connectors via `build_source_connectors`; `None` pulls all enabled and pullable entries.
 
@@ -724,10 +736,12 @@ git commit -m "feat(sources): pull_jobs(source_ids=...) selects via per-entry fa
 ### Task 7: `services/sources.py` — list / add / toggle / remove (atomic YAML)
 
 **Files:**
+
 - Create: `src/resume_agent/services/sources.py`
 - Test: `tests/test_services_sources.py`
 
 **Interfaces:**
+
 - Consumes: `ConnectorsConfig`, `load_connectors_config`, `list_source_views`, `company_url_id`, `detect_ats`, `DEFAULT_CONNECTORS`.
 - Produces:
   - `list_sources(connectors_path=DEFAULT_CONNECTORS, settings=None) -> list[SourceView]`
@@ -963,10 +977,12 @@ git commit -m "feat(sources): list/add/toggle/remove service with atomic YAML wr
 ### Task 8: `preview_source` — detect + bounded test-fetch
 
 **Files:**
+
 - Modify: `src/resume_agent/services/sources.py`
 - Test: `tests/test_services_sources_preview.py`
 
 **Interfaces:**
+
 - Consumes: `detect_ats`, `build_source_connectors`-style single-entry fetch, `load_search_config`.
 - Produces: `@dataclass(frozen=True) SourcePreview` with `ok: bool`, `url: str`, `kind: str | None`, `token: str | None`, `label: str | None`, `role_count: int | None`, `error: str | None`; and `preview_source(url: str, label: str | None = None) -> SourcePreview`.
 
@@ -1126,11 +1142,13 @@ git commit -m "feat(sources): preview_source — detect + bounded test-fetch, ne
 ### Task 9: API schemas — sources + `PullParams.sourceIds`
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/sources.py`
 - Modify: `src/resume_agent/api/schemas/runs.py:33-34`
 - Test: `tests/api/test_schemas_sources.py`
 
 **Interfaces:**
+
 - Consumes: `SourceView`, `SourcePreview` (Tasks 2, 8) via `model_validate` (`from_attributes`).
 - Produces: `SourceOut`, `SourcePreviewIn{url}`, `SourcePreviewOut`, `AddSourceIn{url, label?}`, `SetEnabledIn{enabled}` (all `CamelModel`); `PullParams.source_ids: list[str] | None = None`.
 
@@ -1235,12 +1253,14 @@ git commit -m "feat(sources): API schemas + PullParams.sourceIds"
 ### Task 10: Sources router + pull wiring + app registration
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/sources.py`
 - Modify: `src/resume_agent/api/routers/runs.py:109-123`
 - Modify: `src/resume_agent/api/app.py:16-22,82-89`
 - Test: `tests/api/test_sources_router.py`
 
 **Interfaces:**
+
 - Consumes: `services.sources` (Tasks 7, 8), `SourceError`, schemas (Task 9), `pull_jobs(source_ids=...)` (Task 6).
 - Produces: routes `GET /api/sources`, `POST /api/sources/preview`, `POST /api/sources`, `PATCH /api/sources/{source_id}`, `DELETE /api/sources/{source_id}`; `POST /api/pull` honors `sourceIds`.
 
@@ -1401,10 +1421,12 @@ git commit -m "feat(sources): sources router + pull sourceIds + app registration
 ### Task 11: Regenerate the API contract + extend the drift gate
 
 **Files:**
+
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` (generated)
 - Modify: `tests/api/test_openapi_contract.py:9-14`
 
 **Interfaces:**
+
 - Produces: committed contract that includes `/api/sources` paths, so the SPA's typed client can call them.
 
 - [ ] **Step 1: Add the new path to the drift-gate assertion**
@@ -1456,6 +1478,7 @@ git commit -m "test(sources): backend suite + lint green"
 ### Task 13: Frontend — sources data hooks + pull launcher
 
 **Files:**
+
 - Create: `web/src/features/sources/use-sources.ts`
 - Modify: `web/src/features/runs/use-launch-run.ts:64-72`
 - Modify: `web/src/lib/runs/store.ts`
@@ -1463,6 +1486,7 @@ git commit -m "test(sources): backend suite + lint green"
 - Test: `web/src/features/sources/use-sources.test.tsx`
 
 **Interfaces:**
+
 - Consumes: generated `api` client (`/api/sources*`, `/api/pull`), `@tanstack/react-query`, `useLaunchRun`, the existing run SSE stream.
 - Produces: `useSources()` query; `useAddSource()`, `useSetEnabled()`, `useRemoveSource()` mutations (invalidate `["sources"]`); `previewSource(url, label?)`; a `pullSources(ids)` launcher entry; `RunRecord.result` preserved from SSE so the Sources page can render the live/final per-source breakdown.
 
@@ -1504,28 +1528,28 @@ In `web/src/lib/runs/sse.ts`, import the result type, then parse and store `resu
 ```typescript
 import { useRunStore, type PullRunResult, type RunRecord } from "./store";
 
-    let data: {
-      state?: string;
-      percent?: number;
-      label?: string;
-      current?: number;
-      total?: number;
-      etaText?: string | null;
-      error?: string;
-      result?: PullRunResult | Record<string, unknown> | null;
-    };
-    useRunStore.getState().upsert({
-      runId,
-      kind,
-      status,
-      percent: typeof data.percent === "number" ? data.percent : 0,
-      phase: data.label ?? "",
-      current: typeof data.current === "number" ? data.current : 0,
-      total: typeof data.total === "number" ? data.total : 0,
-      etaText: data.etaText ?? null,
-      error: data.error ?? undefined,
-      result: data.result ?? null,
-    });
+let data: {
+  state?: string;
+  percent?: number;
+  label?: string;
+  current?: number;
+  total?: number;
+  etaText?: string | null;
+  error?: string;
+  result?: PullRunResult | Record<string, unknown> | null;
+};
+useRunStore.getState().upsert({
+  runId,
+  kind,
+  status,
+  percent: typeof data.percent === "number" ? data.percent : 0,
+  phase: data.label ?? "",
+  current: typeof data.current === "number" ? data.current : 0,
+  total: typeof data.total === "number" ? data.total : 0,
+  etaText: data.etaText ?? null,
+  error: data.error ?? undefined,
+  result: data.result ?? null,
+});
 ```
 
 - [ ] **Step 2: Write the failing hook test**
@@ -1541,7 +1565,9 @@ import { withQueryClient } from "@/test/utils"; // existing test helper; adjust 
 
 describe("useSources", () => {
   it("loads the source list", async () => {
-    const { result } = renderHook(() => useSources(), { wrapper: withQueryClient });
+    const { result } = renderHook(() => useSources(), {
+      wrapper: withQueryClient,
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(Array.isArray(result.current.data)).toBe(true);
   });
@@ -1591,7 +1617,10 @@ export function useSources() {
   });
 }
 
-export function previewSource(url: string, label?: string | null): Promise<Preview> {
+export function previewSource(
+  url: string,
+  label?: string | null,
+): Promise<Preview> {
   return unwrap(
     api.POST("/api/sources/preview", { body: { url, label: label ?? null } }),
   ) as Promise<Preview>;
@@ -1610,9 +1639,12 @@ export function useSetEnabled() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      unwrap(api.PATCH("/api/sources/{source_id}", {
-        params: { path: { source_id: id } }, body: { enabled },
-      })),
+      unwrap(
+        api.PATCH("/api/sources/{source_id}", {
+          params: { path: { source_id: id } },
+          body: { enabled },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sources"] }),
   });
 }
@@ -1621,7 +1653,11 @@ export function useRemoveSource() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      unwrap(api.DELETE("/api/sources/{source_id}", { params: { path: { source_id: id } } })),
+      unwrap(
+        api.DELETE("/api/sources/{source_id}", {
+          params: { path: { source_id: id } },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sources"] }),
   });
 }
@@ -1644,10 +1680,12 @@ git commit -m "feat(web): sources data hooks + pullSources launcher"
 ### Task 14: Frontend — Add Source dialog (preview + add)
 
 **Files:**
+
 - Create: `web/src/features/sources/AddSourceDialog.tsx`
 - Test: `web/src/features/sources/AddSourceDialog.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `previewSource`, `useAddSource` (Task 13), UI primitives (`dialog`, `button`, `input`, `label`).
 - Produces: `<AddSourceDialog />` — paste URL → Preview → shows detected kind + role count or error → Add (enabled only after a successful preview).
 
@@ -1670,7 +1708,9 @@ describe("AddSourceDialog", () => {
       target: { value: "https://jobs.ashbyhq.com/x" },
     });
     fireEvent.click(screen.getByText("Preview"));
-    await waitFor(() => expect(screen.getByText(/7 roles/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/7 roles/i)).toBeInTheDocument(),
+    );
     const addButtons = screen.getAllByRole("button", { name: "Add source" });
     expect(addButtons[addButtons.length - 1]).not.toBeDisabled();
   });
@@ -1692,7 +1732,11 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1707,31 +1751,62 @@ export function AddSourceDialog() {
   const [previewing, setPreviewing] = useState(false);
   const add = useAddSource();
 
-  const reset = () => { setUrl(""); setLabel(""); setPreview(null); };
+  const reset = () => {
+    setUrl("");
+    setLabel("");
+    setPreview(null);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
         <Plus className="size-4" aria-hidden="true" />
         Add source
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Add a job source</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Add a job source</DialogTitle>
+        </DialogHeader>
 
         <Label htmlFor="src-url">Careers or board URL</Label>
-        <Input id="src-url" value={url} placeholder="https://…"
-          onChange={(e) => { setUrl(e.target.value); setPreview(null); }} />
+        <Input
+          id="src-url"
+          value={url}
+          placeholder="https://…"
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setPreview(null);
+          }}
+        />
 
         <Label htmlFor="src-label">Display name (optional)</Label>
-        <Input id="src-label" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <Input
+          id="src-label"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
 
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled={!url.trim() || previewing}
+          <Button
+            variant="secondary"
+            disabled={!url.trim() || previewing}
             onClick={async () => {
               setPreviewing(true);
-              try { setPreview(await previewSource(url.trim(), label.trim() || null)); }
-              finally { setPreviewing(false); }
-            }}>
+              try {
+                setPreview(
+                  await previewSource(url.trim(), label.trim() || null),
+                );
+              } finally {
+                setPreviewing(false);
+              }
+            }}
+          >
             {previewing ? "Checking…" : "Preview"}
           </Button>
 
@@ -1745,13 +1820,21 @@ export function AddSourceDialog() {
           )}
         </div>
 
-        <Button disabled={!preview?.ok || add.isPending}
+        <Button
+          disabled={!preview?.ok || add.isPending}
           onClick={async () => {
             try {
-              await add.mutateAsync({ url: url.trim(), label: label.trim() || null });
-              setOpen(false); reset();
-            } catch (e) { toast.error((e as Error).message); }
-          }}>
+              await add.mutateAsync({
+                url: url.trim(),
+                label: label.trim() || null,
+              });
+              setOpen(false);
+              reset();
+            } catch (e) {
+              toast.error((e as Error).message);
+            }
+          }}
+        >
           Add source
         </Button>
       </DialogContent>
@@ -1777,12 +1860,14 @@ git commit -m "feat(web): Add Source dialog with live preview"
 ### Task 15: Frontend — Sources page, route, and nav
 
 **Files:**
+
 - Create: `web/src/features/sources/SourcesPage.tsx`
 - Modify: `web/src/app/router.tsx:6-46`
 - Modify: `web/src/app/AppLayout.tsx:1-37`
 - Test: `web/src/features/sources/SourcesPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSources`, `useSetEnabled`, `useRemoveSource` (Task 13), `useLaunchRun` + `launchers.pullSources` (Task 13), `<AddSourceDialog />` (Task 14), UI primitives (`switch`, `badge`, `checkbox`, `button`) and existing card surface tokens.
 - Produces: `<SourcesPage />` exported; route `path: "sources"`; nav entry `{ to: "/sources", label: "Sources", icon: Radar }`.
 
@@ -1805,15 +1890,21 @@ describe("SourcesPage", () => {
 
   it("renders boards and aggregators sections", async () => {
     render(<SourcesPage />, { wrapper: withQueryClient });
-    await waitFor(() => expect(screen.getByText(/Boards & careers pages/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Boards & careers pages/i)).toBeInTheDocument(),
+    );
     expect(screen.getByText(/Aggregators/i)).toBeInTheDocument();
   });
 
   it("disables pull controls for non-pullable sources", async () => {
     render(<SourcesPage />, { wrapper: withQueryClient });
-    await waitFor(() => expect(screen.getByText(/no API key/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/no API key/i)).toBeInTheDocument(),
+    );
     expect(screen.getByRole("button", { name: /Pull Adzuna/i })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: /Select Adzuna/i })).toBeDisabled();
+    expect(
+      screen.getByRole("checkbox", { name: /Select Adzuna/i }),
+    ).toBeDisabled();
   });
 
   it("renders the latest per-source pull result", async () => {
@@ -1834,7 +1925,9 @@ describe("SourcesPage", () => {
       },
     });
     render(<SourcesPage />, { wrapper: withQueryClient });
-    await waitFor(() => expect(screen.getByText(/Latest pull result/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Latest pull result/i)).toBeInTheDocument(),
+    );
     expect(screen.getByText("+3 added")).toBeInTheDocument();
     expect(screen.getByText("1 upd")).toBeInTheDocument();
     expect(screen.getByText("8 skip")).toBeInTheDocument();
@@ -1864,33 +1957,64 @@ import { useLaunchRun, launchers } from "@/features/runs/use-launch-run";
 import { useRunStore, type PullRunResult } from "@/lib/runs/store";
 import { AddSourceDialog } from "./AddSourceDialog";
 import {
-  useSources, useSetEnabled, useRemoveSource, type Source,
+  useSources,
+  useSetEnabled,
+  useRemoveSource,
+  type Source,
 } from "./use-sources";
 
-function Row({ source, checked, onToggleCheck }: {
-  source: Source; checked: boolean; onToggleCheck: (id: string) => void;
+function Row({
+  source,
+  checked,
+  onToggleCheck,
+}: {
+  source: Source;
+  checked: boolean;
+  onToggleCheck: (id: string) => void;
 }) {
   const setEnabled = useSetEnabled();
   const remove = useRemoveSource();
   const { launch } = useLaunchRun();
   const disabled = !source.pullable;
   return (
-    <li className="flex min-h-12 items-center gap-3 border-b py-2" aria-disabled={disabled}>
+    <li
+      className="flex min-h-12 items-center gap-3 border-b py-2"
+      aria-disabled={disabled}
+    >
       <Checkbox
         checked={checked}
         disabled={disabled}
         aria-label={`Select ${source.displayName}`}
         onCheckedChange={() => onToggleCheck(source.id)}
       />
-      <span className="min-w-0 flex-1 truncate font-medium">{source.displayName}</span>
+      <span className="min-w-0 flex-1 truncate font-medium">
+        {source.displayName}
+      </span>
       <Badge variant="outline">{source.kind}</Badge>
-      <span className="hidden w-48 truncate text-xs text-muted-foreground md:inline">{source.detail}</span>
-      <Switch aria-label={`Enable ${source.displayName}`} checked={source.enabled}
-        onCheckedChange={(v) => setEnabled.mutate({ id: source.id, enabled: v })} />
-      <Button size="sm" variant="secondary"
+      <span className="hidden w-48 truncate text-xs text-muted-foreground md:inline">
+        {source.detail}
+      </span>
+      <Switch
+        aria-label={`Enable ${source.displayName}`}
+        checked={source.enabled}
+        onCheckedChange={(v) =>
+          setEnabled.mutate({ id: source.id, enabled: v })
+        }
+      />
+      <Button
+        size="sm"
+        variant="secondary"
         aria-label={`Pull ${source.displayName}`}
         disabled={disabled}
-        onClick={() => launch("pull", () => launchers.pullSources([source.id]), ["shortlist", "pipeline", "triage", "sources"])}>
+        onClick={() =>
+          launch("pull", () => launchers.pullSources([source.id]), [
+            "shortlist",
+            "pipeline",
+            "triage",
+            "sources",
+          ])
+        }
+      >
         <Play className="size-3.5" aria-hidden="true" />
         Pull
       </Button>
@@ -1925,20 +2049,41 @@ function SourceResultPanel({ sources }: { sources: Source[] }) {
   ]);
 
   return (
-    <section aria-labelledby="sources-results" className="rounded-lg border bg-card p-4">
-      <h2 id="sources-results" className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+    <section
+      aria-labelledby="sources-results"
+      className="rounded-lg border bg-card p-4"
+    >
+      <h2
+        id="sources-results"
+        className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+      >
         Latest pull result
       </h2>
       <ul className="mt-3 divide-y">
         {[...ids].map((id) => {
           const failed = Object.keys(result.failures?.[id] ?? {}).length;
           return (
-            <li key={id} className="grid gap-2 py-2 text-sm md:grid-cols-[minmax(0,1fr)_repeat(4,auto)] md:items-center">
-              <span className="truncate font-medium">{labels.get(id) ?? id}</span>
-              <span className="tabular-nums">+{result.totals?.[id] ?? 0} added</span>
-              <span className="tabular-nums">{result.upgraded?.[id] ?? 0} upd</span>
-              <span className="tabular-nums">{result.skipped?.[id] ?? 0} skip</span>
-              <span className={failed ? "text-destructive" : "text-muted-foreground"}>
+            <li
+              key={id}
+              className="grid gap-2 py-2 text-sm md:grid-cols-[minmax(0,1fr)_repeat(4,auto)] md:items-center"
+            >
+              <span className="truncate font-medium">
+                {labels.get(id) ?? id}
+              </span>
+              <span className="tabular-nums">
+                +{result.totals?.[id] ?? 0} added
+              </span>
+              <span className="tabular-nums">
+                {result.upgraded?.[id] ?? 0} upd
+              </span>
+              <span className="tabular-nums">
+                {result.skipped?.[id] ?? 0} skip
+              </span>
+              <span
+                className={
+                  failed ? "text-destructive" : "text-muted-foreground"
+                }
+              >
                 {failed ? `${failed} failed` : "0 failed"}
               </span>
             </li>
@@ -1955,38 +2100,75 @@ export function SourcesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) =>
-    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
 
   const boards = data.filter((s) => s.type === "board");
   const aggregators = data.filter((s) => s.type === "aggregator");
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Sources" description="Manage the boards and careers pages you pull from." />
+      <PageHeader
+        title="Sources"
+        description="Manage the boards and careers pages you pull from."
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <AddSourceDialog />
-        <Button variant="outline" size="sm" disabled={selected.size === 0}
-          onClick={() => launch("pull", () => launchers.pullSources([...selected]), ["shortlist", "pipeline", "triage", "sources"])}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={selected.size === 0}
+          onClick={() =>
+            launch("pull", () => launchers.pullSources([...selected]), [
+              "shortlist",
+              "pipeline",
+              "triage",
+              "sources",
+            ])
+          }
+        >
           Pull selected ({selected.size})
         </Button>
-        <Button size="sm" onClick={() => launch("pull", () => launchers.pullSources(null), ["shortlist", "pipeline", "triage", "sources"])}>
+        <Button
+          size="sm"
+          onClick={() =>
+            launch("pull", () => launchers.pullSources(null), [
+              "shortlist",
+              "pipeline",
+              "triage",
+              "sources",
+            ])
+          }
+        >
           Pull all
         </Button>
       </div>
 
-      {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
         <>
           <section>
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Boards &amp; careers pages
             </h2>
             {boards.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No recurring boards yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No recurring boards yet.
+              </p>
             ) : (
               <ul role="list">
                 {boards.map((s) => (
-                  <Row key={s.id} source={s} checked={selected.has(s.id)} onToggleCheck={toggle} />
+                  <Row
+                    key={s.id}
+                    source={s}
+                    checked={selected.has(s.id)}
+                    onToggleCheck={toggle}
+                  />
                 ))}
               </ul>
             )}
@@ -1997,7 +2179,12 @@ export function SourcesPage() {
             </h2>
             <ul role="list">
               {aggregators.map((s) => (
-                <Row key={s.id} source={s} checked={selected.has(s.id)} onToggleCheck={toggle} />
+                <Row
+                  key={s.id}
+                  source={s}
+                  checked={selected.has(s.id)}
+                  onToggleCheck={toggle}
+                />
               ))}
             </ul>
           </section>
@@ -2044,10 +2231,12 @@ git commit -m "feat(web): Sources page, route, and nav entry"
 ### Task 16: Frontend — e2e smoke + full web gate
 
 **Files:**
+
 - Create: `web/e2e/sources.spec.ts`
 - Test: the Playwright smoke + the full web suite
 
 **Interfaces:**
+
 - Consumes: the running SPA + API (or mocked routes, matching how `web/e2e/smoke.spec.ts` runs today).
 
 - [ ] **Step 1: Write the smoke test**
@@ -2059,7 +2248,9 @@ import { test, expect } from "@playwright/test";
 
 test("sources page lists sections and add control", async ({ page }) => {
   await page.goto("/sources");
-  await expect(page.getByRole("heading", { name: /Boards & careers pages/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Boards & careers pages/i }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Add source" })).toBeVisible();
 });
 ```
@@ -2086,6 +2277,7 @@ git commit -m "test(web): sources page e2e smoke"
 ### Task 17: Migrate the commented-out board parking-lot (optional cleanup)
 
 **Files:**
+
 - Modify: `config/connectors.yaml`
 
 **Interfaces:** none — data hygiene so the spec's mitigation (decision #9) is realized.
@@ -2095,9 +2287,9 @@ git commit -m "test(web): sources page e2e smoke"
 In `config/connectors.yaml`, turn each commented-out Greenhouse/Lever board (Kodiak, Nuro, Divergent, StackAV, Outrider, Via, Buzz Solutions, Anduril…) into a real entry with `enabled: false`, e.g.:
 
 ```yaml
-    - token: kodiak
-      company: Kodiak Robotics
-      enabled: false
+- token: kodiak
+  company: Kodiak Robotics
+  enabled: false
 ```
 
 This way the backlog survives the first UI write (which would otherwise drop comments) and appears in the Sources page as paused rows.
@@ -2119,6 +2311,7 @@ git commit -m "chore(sources): migrate commented-out board backlog to disabled r
 ## Self-Review
 
 **Spec coverage:**
+
 - §2 view/add/remove/enable-disable → Tasks 7, 13–15. ✓
 - §2/§5.3 pull one/selection/all → Tasks 3, 6, 13, 15. ✓
 - §2/§5.4 per-source added/upgraded/skipped/failed → Tasks 4, 5, 10 (pull result payload). ✓

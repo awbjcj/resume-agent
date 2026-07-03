@@ -18,6 +18,7 @@
 ## Reference & scoped decisions
 
 Design spec §5.3. Decisions for this plan:
+
 - **Python-orchestrated loop** driving Agno agents (rationale above) — not the Agno `Loop` primitive.
 - **Model tiers** (spec Decision #8, "mix by stage"): tailor + reviser + fact-check → premium; ATS/recruiter/concision → mid. Tiers map to model ids via new `Settings.mid_model`/`premium_model` (cheap_model already exists).
 - **Aggregation:** fact-check is a binary **gate** (any `passed=False` from a `gate: true` reviewer fails the round, regardless of score). Non-gate reviewers contribute a **weighted average**. Round passes when `gate_passed AND aggregate_score >= score_threshold`.
@@ -57,6 +58,7 @@ tests/
 ## Task 1: Model-tier settings + ReviewConfig
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py`, `tests/test_config.py`
 - Create: `src/resume_agent/tailor/__init__.py`, `src/resume_agent/tailor/review_config.py`
 - Test: `tests/test_tailor_review_config.py`
@@ -64,6 +66,7 @@ tests/
 - [ ] **Step 1: Write the failing tests**
 
 Append to `tests/test_config.py`:
+
 ```python
 def test_settings_has_model_tier_defaults():
     settings = Settings(_env_file=None)
@@ -72,6 +75,7 @@ def test_settings_has_model_tier_defaults():
 ```
 
 Create `tests/test_tailor_review_config.py`:
+
 ```python
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec, load_review_config
 
@@ -101,25 +105,30 @@ def test_load_from_yaml(tmp_path):
 - [ ] **Step 2: Run to verify they fail**
 
 Run:
+
 ```bash
 uv run pytest tests/test_config.py::test_settings_has_model_tier_defaults tests/test_tailor_review_config.py -v
 ```
+
 Expected: FAIL (`AttributeError: ... 'mid_model'` and `ModuleNotFoundError: ... 'resume_agent.tailor'`).
 
 - [ ] **Step 3: Implement**
 
 In `src/resume_agent/config.py`, add these two lines to `Settings` immediately after `cheap_model`:
+
 ```python
     mid_model: str = "claude-sonnet-4-6"
     premium_model: str = "claude-opus-4-8"
 ```
 
 Create `src/resume_agent/tailor/__init__.py`:
+
 ```python
 """Tailor + Review component: draft, review, and revise a fact-locked resume."""
 ```
 
 Create `src/resume_agent/tailor/review_config.py`:
+
 ```python
 from pathlib import Path
 
@@ -149,9 +158,11 @@ def load_review_config(path: str | Path) -> ReviewConfig:
 - [ ] **Step 4: Run to verify they pass**
 
 Run:
+
 ```bash
 uv run pytest tests/test_config.py tests/test_tailor_review_config.py -v
 ```
+
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -166,12 +177,14 @@ git commit -m "feat(tailor): model-tier settings + ReviewConfig" -m "Co-Authored
 ## Task 2: Agent factories
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/agents.py`
 - Test: `tests/test_tailor_agents.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tailor_agents.py`:
+
 ```python
 from agno.agent import Agent
 
@@ -208,14 +221,17 @@ def test_build_reviewer_agent(monkeypatch):
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_agents.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.agents'`.
 
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/tailor/agents.py`:
+
 ```python
 from agno.agent import Agent
 from agno.models.anthropic import Claude
@@ -302,9 +318,11 @@ def build_reviewer_agent(name: str, model_id: str | None = None) -> Agent:
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_agents.py -v
 ```
+
 Expected: PASS (3 tests). The agent-construction tests must not make network calls; if they error on credentials, STOP and report BLOCKED.
 
 - [ ] **Step 5: Commit**
@@ -319,12 +337,14 @@ git commit -m "feat(tailor): tailor/reviser/reviewer Agno agent factories" -m "C
 ## Task 3: Tailor + revise wrappers
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/tailoring.py`
 - Test: `tests/test_tailor_tailoring.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tailor_tailoring.py`:
+
 ```python
 import pytest
 
@@ -402,14 +422,17 @@ def test_revise_returns_resume_content():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_tailoring.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.tailoring'`.
 
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/tailor/tailoring.py`:
+
 ```python
 from typing import Any, Protocol
 
@@ -479,9 +502,11 @@ def revise(input_text: str, agent: Runner) -> ResumeContent:
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_tailoring.py -v
 ```
+
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
@@ -496,12 +521,14 @@ git commit -m "feat(tailor): tailor + revise wrappers and prompt composition" -m
 ## Task 4: Review panel
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/panel.py`
 - Test: `tests/test_tailor_panel.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tailor_panel.py`:
+
 ```python
 import pytest
 
@@ -561,14 +588,17 @@ def test_run_panel_runs_every_configured_reviewer():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_panel.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.panel'`.
 
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/tailor/panel.py`:
+
 ```python
 from typing import Any, Protocol
 
@@ -609,9 +639,11 @@ def run_panel(input_text: str, config: ReviewConfig, reviewer_agents: dict[str, 
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_panel.py -v
 ```
+
 Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
@@ -626,12 +658,14 @@ git commit -m "feat(tailor): review panel (review_one + run_panel)" -m "Co-Autho
 ## Task 5: Verdict aggregation
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/verdict.py`
 - Test: `tests/test_tailor_verdict.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tailor_verdict.py`:
+
 ```python
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
@@ -687,14 +721,17 @@ def test_gate_pass_and_meets_threshold_passes():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_verdict.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.verdict'`.
 
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/tailor/verdict.py`:
+
 ```python
 from pydantic import Field
 
@@ -739,9 +776,11 @@ def aggregate(critiques: list[ReviewCritique], config: ReviewConfig) -> PanelVer
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_verdict.py -v
 ```
+
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -756,12 +795,14 @@ git commit -m "feat(tailor): panel verdict aggregation (gate + weighted score)" 
 ## Task 6: Tailor→review→revise loop
 
 **Files:**
+
 - Create: `src/resume_agent/tailor/workflow.py`
 - Test: `tests/test_tailor_workflow.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tailor_workflow.py`:
+
 ```python
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import Contact, ProfileFacts
@@ -858,14 +899,17 @@ def test_loop_stops_at_max_rounds_when_never_passing():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_workflow.py -v
 ```
+
 Expected: FAIL — `ModuleNotFoundError: No module named 'resume_agent.tailor.workflow'`.
 
 - [ ] **Step 3: Implement**
 
 Create `src/resume_agent/tailor/workflow.py`:
+
 ```python
 from typing import Any, Protocol
 
@@ -921,9 +965,11 @@ def run_tailor_review(
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_workflow.py -v
 ```
+
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
@@ -938,6 +984,7 @@ git commit -m "feat(tailor): tailor->review->revise loop" -m "Co-Authored-By: Cl
 ## Task 7: Repository extension + persistence service
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/repository.py`
 - Create: `src/resume_agent/tailor/service.py`
 - Test: `tests/test_tailor_service.py`
@@ -945,6 +992,7 @@ git commit -m "feat(tailor): tailor->review->revise loop" -m "Co-Authored-By: Cl
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_tailor_service.py`:
+
 ```python
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -1009,14 +1057,17 @@ def test_tailor_job_persists_versions_and_marks_tailored():
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_service.py -v
 ```
+
 Expected: FAIL — `ImportError`/`ModuleNotFoundError` (`resume_versions_for_job`, `resume_agent.tailor.service`).
 
 - [ ] **Step 3: Implement**
 
 Append to `src/resume_agent/tracking/repository.py` (add the `ResumeVersion` import to the existing tables import line, and add the functions):
+
 ```python
 from resume_agent.tracking.tables import Job, ResumeVersion
 
@@ -1035,9 +1086,11 @@ def save_resume_version(session: Session, version: ResumeVersion) -> ResumeVersi
 def resume_versions_for_job(session: Session, job_id: int) -> list[ResumeVersion]:
     return list(session.exec(select(ResumeVersion).where(ResumeVersion.job_id == job_id)).all())
 ```
+
 (The existing file already imports `Job` from `resume_agent.tracking.tables` and `select` from `sqlmodel`; change the `Job` import to `Job, ResumeVersion` rather than adding a duplicate import line.)
 
 Create `src/resume_agent/tailor/service.py`:
+
 ```python
 from typing import Any, Protocol
 
@@ -1088,9 +1141,11 @@ def tailor_job(
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_tailor_service.py tests/test_repository.py -v
 ```
+
 Expected: PASS (existing repository tests still green + the new service test).
 
 - [ ] **Step 5: Commit**
@@ -1105,12 +1160,14 @@ git commit -m "feat(tailor): persist resume versions + tailor_job service" -m "C
 ## Task 8: CLI — `approve` and `tailor`
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_tailor.py`
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/test_cli_tailor.py`:
+
 ```python
 from typer.testing import CliRunner
 
@@ -1183,14 +1240,17 @@ def test_tailor_reports_missing_job(tmp_path):
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_tailor.py -v
 ```
+
 Expected: FAIL — the `approve`/`tailor` commands don't exist yet.
 
 - [ ] **Step 3: Implement**
 
 Add these imports near the other imports in `src/resume_agent/cli.py`:
+
 ```python
 from resume_agent.discovery.search_config import load_search_config  # (already imported in Discovery task; do not duplicate)
 from resume_agent.tracking.repository import get_job, jobs_by_status, save_job
@@ -1199,9 +1259,11 @@ from resume_agent.tailor.agents import build_reviewer_agent, build_reviser_agent
 from resume_agent.tailor.review_config import load_review_config
 from resume_agent.tailor.service import tailor_job
 ```
+
 (If `load_search_config` / `jobs_by_status` are already imported from the Discovery task, do not add duplicate import lines.)
 
 Add this helper + the two commands AFTER the `discover` command but BEFORE the trailing `if __name__ == "__main__":` block:
+
 ```python
 DEFAULT_REVIEW = "config/review.yaml"
 
@@ -1272,26 +1334,32 @@ def tailor_cmd(
 - [ ] **Step 4: Run to verify it passes**
 
 Run:
+
 ```bash
 uv run pytest tests/test_cli_tailor.py -v
 ```
+
 Expected: PASS (3 tests). (The `tailor` test patches `cli.build_reviewer_agents`, `cli.tailor_job`, etc., so no real agents run.)
 
 - [ ] **Step 5: Verify wiring**
 
 Run:
+
 ```bash
 uv run resume-agent approve --help
 uv run resume-agent tailor --help
 ```
+
 Expected: help text for each (exit 0).
 
 - [ ] **Step 6: Run the full suite**
 
 Run:
+
 ```bash
 uv run pytest -q
 ```
+
 Expected: all tests pass (Discovery total + Tailor additions).
 
 - [ ] **Step 7: Commit**
@@ -1312,8 +1380,10 @@ git commit -m "feat(tailor): approve + tailor CLI commands" -m "Co-Authored-By: 
 ---
 
 ## Notes to carry into later plans
+
 - **Render plan (next):** read the latest passing `ResumeVersion.content_json` → `ResumeContent` → Typst → PDF; store `pdf_path`; set job→`rendered`.
 - **Tracking plan:** Streamlit shortlist page replaces the CLI `approve` gate; surface `fact_check_passed` + per-round critiques; extend repository for `applications`. Also the deferred Foundation items (`updated_at` onupdate; tz-aware datetimes).
 
 ## Execution Handoff
+
 After this plan is executed and green, the next plan is **Render** (Typst → PDF), then **Tracking** (Streamlit dashboard), then the deferred **LinkedIn scraper**.
