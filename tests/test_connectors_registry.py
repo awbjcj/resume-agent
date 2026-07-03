@@ -129,3 +129,13 @@ def test_build_source_connectors_skips_adzuna_without_keys():
     )
     names = [connector.name for connector in build_source_connectors(cfg, _settings())]
     assert "adzuna" not in names
+
+
+def test_spec_table_is_the_single_enumeration():
+    from resume_agent.discovery.connectors.registry import CONNECTOR_SPECS
+
+    kinds = [spec.kind for spec in CONNECTOR_SPECS]
+    assert kinds == [
+        "greenhouse", "lever", "companies", "scrape", "remoteok", "adzuna", "linkedin",
+    ]  # canonical dedup order
+    assert len(set(kinds)) == len(kinds)

@@ -1,3 +1,6 @@
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.adzuna import AdzunaConnector
 from resume_agent.discovery.connectors.base import Connector
@@ -12,41 +15,99 @@ from resume_agent.discovery.scraper.dashboard import DashboardScraper
 from resume_agent.discovery.scraper.recipe_store import host_key
 
 
+@dataclass(frozen=True)
+class ConnectorUnit:
+    """One pullable sub-source of a connector kind (a board, URL, target, or the
+    whole singleton), addressable by its stable source id."""
+
+    source_id: str
+    enabled: bool
+    payload: Any  # board / url / target object; None for singleton kinds
+
+
+@dataclass(frozen=True)
+class ConnectorSpec:
+    """Everything the registry knows about one connector kind.
+
+    ``build`` receives the enabled payloads — all of them for the aggregate
+    builder, exactly one for the per-source builder — so both public builders
+    collapse to loops over this table. Table order is the canonical dedup order.
+    """
+
+    kind: str
+    section_enabled: Callable[[ConnectorsConfig], bool]
+    units: Callable[[ConnectorsConfig], list[ConnectorUnit]]
+    build: Callable[[list[Any], ConnectorsConfig, Settings], Connector]
+    pullable: Callable[[Settings], bool] = field(default=lambda settings: True)
+
+
+CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
+    ConnectorSpec(
+        kind="greenhouse",
+        section_enabled=lambda c: c.greenhouse.enabled,
+        units=lambda c: [
+            ConnectorUnit(f"greenhouse:{b.token}", b.enabled, b) for b in c.greenhouse.boards
+        ],
+        build=lambda payloads, c, s: GreenhouseConnector(payloads),
+    ),
+    ConnectorSpec(
+        kind="lever",
+        section_enabled=lambda c: c.lever.enabled,
+        units=lambda c: [
+            ConnectorUnit(f"lever:{b.token}", b.enabled, b) for b in c.lever.boards
+        ],
+        build=lambda payloads, c, s: LeverConnector(payloads),
+    ),
+    ConnectorSpec(
+        kind="companies",
+        section_enabled=lambda c: c.companies.enabled,
+        units=lambda c: [
+            ConnectorUnit(company_url_id(e.url), e.enabled, e.url) for e in c.companies.urls
+        ],
+        build=lambda payloads, c, s: CompaniesConnector(payloads),
+    ),
+    ConnectorSpec(
+        kind="scrape",
+        section_enabled=lambda c: c.scrape.enabled,
+        units=lambda c: [
+            ConnectorUnit(f"scrape:{host_key(t.url)}", t.enabled, t) for t in c.scrape.targets
+        ],
+        build=lambda payloads, c, s: DashboardScraper(payloads),
+    ),
+    ConnectorSpec(
+        kind="remoteok",
+        section_enabled=lambda c: c.remoteok.enabled,
+        units=lambda c: [ConnectorUnit("remoteok", c.remoteok.enabled, None)],
+        build=lambda payloads, c, s: RemoteOKConnector(),
+    ),
+    ConnectorSpec(
+        kind="adzuna",
+        section_enabled=lambda c: c.adzuna.enabled,
+        units=lambda c: [ConnectorUnit("adzuna", c.adzuna.enabled, None)],
+        build=lambda payloads, c, s: AdzunaConnector(
+            s.adzuna_app_id, s.adzuna_app_key, c.adzuna.country
+        ),
+        pullable=lambda s: bool(s.adzuna_app_id and s.adzuna_app_key),
+    ),
+    ConnectorSpec(
+        kind="linkedin",
+        section_enabled=lambda c: c.linkedin.enabled,
+        units=lambda c: [ConnectorUnit("linkedin", c.linkedin.enabled, None)],
+        build=lambda payloads, c, s: build_linkedin_scraper(),
+    ),
+)
+
+
 def build_connectors(config: ConnectorsConfig, settings: Settings) -> list[Connector]:
     """Instantiate enabled connectors in canonical dedup order."""
     connectors: list[Connector] = []
-
-    if config.greenhouse.enabled:
-        boards = [board for board in config.greenhouse.boards if board.enabled]
-        if boards:
-            connectors.append(GreenhouseConnector(boards))
-
-    if config.lever.enabled:
-        boards = [board for board in config.lever.boards if board.enabled]
-        if boards:
-            connectors.append(LeverConnector(boards))
-
-    if config.companies.enabled:
-        urls = [entry.url for entry in config.companies.urls if entry.enabled]
-        if urls:
-            connectors.append(CompaniesConnector(urls))
-
-    if config.scrape.enabled:
-        targets = [target for target in config.scrape.targets if target.enabled]
-        if targets:
-            connectors.append(DashboardScraper(targets))
-
-    if config.remoteok.enabled:
-        connectors.append(RemoteOKConnector())
-
-    if config.adzuna.enabled and settings.adzuna_app_id and settings.adzuna_app_key:
-        connectors.append(
-            AdzunaConnector(settings.adzuna_app_id, settings.adzuna_app_key, config.adzuna.country)
-        )
-
-    if config.linkedin.enabled:
-        connectors.append(build_linkedin_scraper())
-
+    for spec in CONNECTOR_SPECS:
+        if not spec.section_enabled(config) or not spec.pullable(settings):
+            continue
+        payloads = [unit.payload for unit in spec.units(config) if unit.enabled]
+        if not payloads:
+            continue
+        connectors.append(spec.build(payloads, config, settings))
     return connectors
 
 
@@ -62,55 +123,16 @@ def build_source_connectors(
 ) -> list[Connector]:
     """Build one connector per enabled, pullable, selected source."""
     selected = set(source_ids) if source_ids is not None else None
-
-    def picked(source_id: str, enabled: bool, pullable: bool = True) -> bool:
-        if not enabled or not pullable:
-            return False
-        return selected is None or source_id in selected
-
     connectors: list[Connector] = []
-
-    if config.greenhouse.enabled:
-        for board in config.greenhouse.boards:
-            source_id = f"greenhouse:{board.token}"
-            if picked(source_id, board.enabled):
-                connectors.append(_named(GreenhouseConnector([board]), source_id))
-
-    if config.lever.enabled:
-        for board in config.lever.boards:
-            source_id = f"lever:{board.token}"
-            if picked(source_id, board.enabled):
-                connectors.append(_named(LeverConnector([board]), source_id))
-
-    if config.companies.enabled:
-        for entry in config.companies.urls:
-            source_id = company_url_id(entry.url)
-            if picked(source_id, entry.enabled):
-                connectors.append(_named(CompaniesConnector([entry.url]), source_id))
-
-    if config.scrape.enabled:
-        for target in config.scrape.targets:
-            source_id = f"scrape:{host_key(target.url)}"
-            if picked(source_id, target.enabled):
-                connectors.append(_named(DashboardScraper([target]), source_id))
-
-    if picked("remoteok", config.remoteok.enabled):
-        connectors.append(_named(RemoteOKConnector(), "remoteok"))
-
-    adzuna_pullable = bool(settings.adzuna_app_id and settings.adzuna_app_key)
-    if picked("adzuna", config.adzuna.enabled, adzuna_pullable):
-        connectors.append(
-            _named(
-                AdzunaConnector(
-                    settings.adzuna_app_id,
-                    settings.adzuna_app_key,
-                    config.adzuna.country,
-                ),
-                "adzuna",
+    for spec in CONNECTOR_SPECS:
+        if not spec.section_enabled(config) or not spec.pullable(settings):
+            continue
+        for unit in spec.units(config):
+            if not unit.enabled:
+                continue
+            if selected is not None and unit.source_id not in selected:
+                continue
+            connectors.append(
+                _named(spec.build([unit.payload], config, settings), unit.source_id)
             )
-        )
-
-    if picked("linkedin", config.linkedin.enabled):
-        connectors.append(_named(build_linkedin_scraper(), "linkedin"))
-
     return connectors
