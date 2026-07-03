@@ -13,7 +13,8 @@ def test_load_facts_caches_until_file_changes(tmp_path):
     assert load_facts(path) is first  # unchanged file -> cached object
 
     # save_facts replaces the file (new mtime/size) -> cache invalidates
-    os.utime(path, ns=(os.stat(path).st_mtime_ns + 1_000_000,) * 2)
+    new_ns = os.stat(path).st_mtime_ns + 1_000_000
+    os.utime(path, ns=(new_ns, new_ns))
     assert load_facts(path) is not first
 
 

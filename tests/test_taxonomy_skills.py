@@ -70,7 +70,8 @@ def test_load_aliases_caches_until_file_changes(tmp_path):
     assert skills.load_aliases(path) is first
 
     path.write_text(json.dumps({"js": "javascript", "ts": "typescript"}), "utf-8")
-    os.utime(path, ns=(os.stat(path).st_mtime_ns + 1_000_000,) * 2)
+    new_ns = os.stat(path).st_mtime_ns + 1_000_000
+    os.utime(path, ns=(new_ns, new_ns))
     assert skills.load_aliases(path)["ts"] == "typescript"
 
 
