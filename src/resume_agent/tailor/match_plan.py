@@ -16,6 +16,7 @@ from resume_agent.models.match_plan import MatchPlan
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import SkillMatchContext
 from resume_agent.tailor.agents import model_for_tier
+from resume_agent.tailor.craft import CRAFT_MATCH_PLAN
 from resume_agent.tailor.provenance import index_facts
 from resume_agent.tailor.style_guide import compose_instructions
 
@@ -35,6 +36,11 @@ _MATCH_PLAN_INSTRUCTIONS = [
     "evidence and never present the job's own term as a candidate skill. Satisfy soft-skill "
     "requirements with literal bullets, not labels or unsupported summary wording.",
 ]
+
+
+def _plan_instructions() -> list[str]:
+    """Integrity rules first, then craft guidance; the style guide is appended later."""
+    return [*_MATCH_PLAN_INSTRUCTIONS, *CRAFT_MATCH_PLAN]
 
 
 def compose_match_plan_input(
@@ -89,7 +95,7 @@ def build_match_plan_agent(
         Agent(
             model=model,
             description="Plan which profile facts to emphasize for a job, by fact id only.",
-            instructions=compose_instructions(_MATCH_PLAN_INSTRUCTIONS, style_guide),
+            instructions=compose_instructions(_plan_instructions(), style_guide),
             output_schema=MatchPlan,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

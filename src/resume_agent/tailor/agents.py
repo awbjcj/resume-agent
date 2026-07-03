@@ -10,6 +10,7 @@ from resume_agent.llm_runner import (
 )
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
+from resume_agent.tailor.craft import CRAFT_REVIEWERS, CRAFT_WRITER
 from resume_agent.tailor.style_guide import compose_instructions
 
 
@@ -73,6 +74,12 @@ _REVISION_INSTRUCTIONS = [
     "If the exact request is unsupported or conflicts with the fact-lock, make the narrowest truthful "
     "change that serves the request; if no truthful change is possible, return the current resume unchanged.",
 ]
+
+
+def _writer_instructions(base: list[str]) -> list[str]:
+    """Integrity rules first, then craft guidance; the style guide is appended later."""
+    return [*base, *CRAFT_WRITER]
+
 
 REVIEWER_INSTRUCTIONS: dict[str, list[str]] = {
     "fact-check": [
@@ -148,6 +155,7 @@ def _reviewer_instructions(name: str, *, score_bands: bool = False) -> list[str]
         *_COMMON_REVIEWER_INSTRUCTIONS,
         *([_SCORE_BAND_INSTRUCTION] if score_bands else []),
         *REVIEWER_INSTRUCTIONS.get(name, _DEFAULT_REVIEWER_INSTRUCTIONS),
+        *CRAFT_REVIEWERS.get(name, []),
     ]
 
 
@@ -160,7 +168,9 @@ def build_tailor_agent(model_id: str | None = None, style_guide: str | None = No
         Agent(
             model=model,
             description="Write a job-targeted, schema-valid resume under a strict profile fact-lock.",
-            instructions=compose_instructions(_TAILOR_INSTRUCTIONS, style_guide),
+            instructions=compose_instructions(
+                _writer_instructions(_TAILOR_INSTRUCTIONS), style_guide
+            ),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -177,7 +187,9 @@ def build_reviser_agent(model_id: str | None = None, style_guide: str | None = N
         Agent(
             model=model,
             description="Repair a reviewed resume while preserving its profile fact-lock.",
-            instructions=compose_instructions(_REVISER_INSTRUCTIONS, style_guide),
+            instructions=compose_instructions(
+                _writer_instructions(_REVISER_INSTRUCTIONS), style_guide
+            ),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
