@@ -145,3 +145,18 @@ def test_cache_status_is_stale_when_cached_source_disappears(tmp_path):
     )
     (profile_dir / "sources" / doc.filename).unlink()
     assert fragment_cache_status(profile_dir, doc) == "stale"
+
+
+def test_converter_version_bump_invalidates_cache(tmp_path, monkeypatch):
+    profile_dir = _setup(tmp_path)
+    manifest = load_manifest(profile_dir)
+    doc_id = manifest.docs[0].id
+    agent = _FakeAgent(ProfileFacts(contact=Contact(name="Ada")))
+
+    extract_fragments(profile_dir, manifest, agent)
+    assert agent.calls == 1
+
+    monkeypatch.setattr("resume_agent.profile.fragments.CONVERTER_VERSION", 99)
+    again = extract_fragments(profile_dir, load_manifest(profile_dir), agent)
+    assert agent.calls == 2
+    assert again.status[doc_id] == "extracted"

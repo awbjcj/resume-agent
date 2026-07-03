@@ -59,5 +59,27 @@ def test_read_pptx_slides_and_notes(tmp_path):
     assert "Led a team of four" in text
 
 
+def test_read_html(tmp_path):
+    doc = tmp_path / "page.html"
+    doc.write_text("<h1>Projects</h1><p>Built a compiler</p>", encoding="utf-8")
+    assert "Built a compiler" in read_document_text(doc)
+
+
+def test_read_xlsx(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Project", "Impact"])
+    ws.append(["Pipeline rewrite", "Cut runtime 40%"])
+    path = tmp_path / "impact.xlsx"
+    wb.save(str(path))
+
+    text = read_document_text(path)
+    assert "Pipeline rewrite" in text
+
+
 def test_supported_suffixes_cover_all_formats():
-    assert SUPPORTED_SUFFIXES == frozenset({".pdf", ".docx", ".txt", ".md", ".pptx"})
+    assert SUPPORTED_SUFFIXES == frozenset(
+        {".pdf", ".docx", ".txt", ".md", ".pptx", ".xlsx", ".html"}
+    )

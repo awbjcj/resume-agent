@@ -24,8 +24,6 @@ dependencies = [
     "pydantic-settings>=2.14.1",
     "pypdf>=6.13.1",
     "python-multipart>=0.0.9",
-    "python-docx>=1.2.0",
-    "python-pptx>=1.0",
     "pyyaml>=6.0.3",
     "sqlmodel>=0.0.38",
     "textual>=8.2.7",
@@ -33,12 +31,16 @@ dependencies = [
     "typst>=0.14.9",
     "markdownify>=0.13.0",
     "ddgs>=9.14.4",
+    "markitdown[docx,pdf,pptx,xlsx]>=0.1.6",
 ]
 
 [dependency-groups]
 dev = [
+    "openpyxl>=3.1.5",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
+    "python-docx>=1.2.0",
+    "python-pptx>=1.0.2",
     "ruff>=0.15.18",
 ]
 

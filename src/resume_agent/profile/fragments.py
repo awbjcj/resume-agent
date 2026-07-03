@@ -19,7 +19,7 @@ from resume_agent.profile.corpus import (
 )
 from resume_agent.profile.extractor import PROMPT_VERSION, extract_profile_facts
 from resume_agent.profile.ids import assign_fact_ids
-from resume_agent.profile.resume_reader import read_document_text
+from resume_agent.profile.resume_reader import CONVERTER_VERSION, read_document_text
 
 CacheStatus = Literal["cached", "stale", "source-changed", "missing"]
 
@@ -52,6 +52,7 @@ def _meta_matches(meta_path: Path, sha256: str) -> bool:
         isinstance(metadata, dict)
         and metadata.get("sha256") == sha256
         and metadata.get("prompt_version") == PROMPT_VERSION
+        and metadata.get("converter_version") == CONVERTER_VERSION
     )
 
 
@@ -83,7 +84,11 @@ def _save(
     fragment_path, meta_path = _paths(profile_dir, doc_id)
     fragment_path.parent.mkdir(parents=True, exist_ok=True)
     _atomic_write(fragment_path, facts.model_dump_json(indent=2) + "\n")
-    metadata = {"sha256": sha256, "prompt_version": PROMPT_VERSION}
+    metadata = {
+        "sha256": sha256,
+        "prompt_version": PROMPT_VERSION,
+        "converter_version": CONVERTER_VERSION,
+    }
     _atomic_write(meta_path, json.dumps(metadata, sort_keys=True) + "\n")
 
 
