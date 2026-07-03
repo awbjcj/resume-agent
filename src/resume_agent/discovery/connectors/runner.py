@@ -1,8 +1,11 @@
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from sqlmodel import Session
 
+from resume_agent.concurrency import Result, gather_isolated
+from resume_agent.config import get_settings
 from resume_agent.discovery.connectors.base import Connector, FetchResult
 from resume_agent.discovery.connectors.telemetry import record_run
 from resume_agent.discovery.ingest import ingest_jobs_with_outcomes
@@ -64,6 +67,33 @@ def _pull_result(report: PullReport) -> dict[str, object]:
     }
 
 
+def _fetch_all(
+    connectors: list[Connector],
+    search: SearchConfig,
+    limit: int | None,
+    skip_seen,
+) -> list[Result[FetchResult]]:
+    """Fetch every connector concurrently on worker threads (their APIs are sync
+    and network-bound). Browser-driven connectors (concurrent_fetch=False) are
+    serialized among themselves via one lock. Results come back in input order
+    with failures isolated, so ingest can stay serial and canonical-ordered."""
+    sem = asyncio.Semaphore(get_settings().pull_concurrency)
+    browser_lock = asyncio.Lock()
+
+    async def fetch_one(connector: Connector) -> FetchResult:
+        if getattr(connector, "concurrent_fetch", True):
+            async with sem:
+                return await asyncio.to_thread(
+                    connector.fetch, search, limit=limit, skip_seen=skip_seen
+                )
+        async with browser_lock:
+            return await asyncio.to_thread(
+                connector.fetch, search, limit=limit, skip_seen=skip_seen
+            )
+
+    return asyncio.run(gather_isolated(connectors, fetch_one))
+
+
 def run_pull(
     session: Session,
     connectors: list[Connector],
@@ -74,7 +104,8 @@ def run_pull(
     finish: bool = True,
     skip_known: bool = True,
 ) -> PullReport:
-    """Fetch + ingest each connector in order, isolating failures.
+    """Fetch every connector concurrently, then ingest serially in canonical
+    (connector-list) order, isolating each connector's failures.
 
     Progress is connector-granular: the total job count is unknown until each
     connector returns, so the bar advances per connector and carries a running
@@ -83,13 +114,25 @@ def run_pull(
     report = PullReport()
     skip_seen = make_skip_seen(build_known_index(session)) if skip_known else None
     if reporter:
-        reporter.begin(total=len(connectors), label="Starting", added=0)
+        reporter.begin(total=len(connectors), label="Fetching sources", added=0)
+    fetches = _fetch_all(connectors, search, limit, skip_seen)
     added_total = 0
-    for index, connector in enumerate(connectors, 1):
+    for index, (connector, fetched) in enumerate(zip(connectors, fetches), 1):
         if reporter:
-            reporter.step(index - 1, label=f"Pulling {connector.name}")
+            reporter.step(index - 1, label=f"Ingesting {connector.name}")
+        if not fetched.ok or fetched.value is None:
+            exc = fetched.error
+            record_run(
+                telemetry_path,
+                connector.name,
+                added=0,
+                error=f"{type(exc).__name__}: {exc}" if exc else "fetch failed",
+            )
+            if reporter:
+                reporter.step(index, added=added_total, result=_pull_result(report))
+            continue
+        result = fetched.value
         try:
-            result = connector.fetch(search, limit=limit, skip_seen=skip_seen)
             summary = ingest_jobs_with_outcomes(session, result.jobs)
             added_count = summary.added.get(connector.name, sum(summary.added.values()))
             upgraded_count = summary.upgraded.get(

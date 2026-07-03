@@ -202,6 +202,7 @@ class AdzunaConnector:
     """Keyword aggregator. One search call; results filtered client-side too."""
 
     name = "adzuna"
+    concurrent_fetch = False
 
     def __init__(
         self,

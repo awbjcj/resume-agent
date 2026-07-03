@@ -57,6 +57,7 @@ class DashboardScraper:
     """Replay learned selectors over explicitly configured company job boards."""
 
     name = "scrape"
+    concurrent_fetch = False
     # Each posting detail costs a browser navigation (and possibly an LLM
     # extract), so ``fetch`` honours the runner-supplied ``skip_seen`` gate to
     # drop cards already held from a same-or-higher-priority source before doing

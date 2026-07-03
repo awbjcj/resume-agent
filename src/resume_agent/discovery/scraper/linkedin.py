@@ -200,6 +200,7 @@ class LinkedInScraper:
     """
 
     name = "linkedin"
+    concurrent_fetch = False
 
     def __init__(
         self,

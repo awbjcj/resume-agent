@@ -61,6 +61,9 @@ class Connector(Protocol):
     """A job source behind the shared fetch seam."""
 
     name: str
+    # Whether fetch() may run on a worker thread alongside other connectors.
+    # Browser-driven connectors opt out; they are serialized among themselves.
+    concurrent_fetch: bool = True
 
     def fetch(
         self,
