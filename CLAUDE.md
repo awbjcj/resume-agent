@@ -152,6 +152,8 @@ server-side.
 
 To add a new backend: write `fetch_<name>(target, search, limit, skip_seen=None) -> list[RawJob]`
 in a new module, add detection logic to `detect.py`, register in `_BACKENDS`.
+Connector construction itself is table-driven: `CONNECTOR_SPECS` in `registry.py` is the
+single enumeration of connector kinds; adding an ATS appends one `ConnectorSpec`.
 
 ---
 
@@ -195,7 +197,7 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/discovery/connectors/tesla.py` | Tesla bespoke JSON portal |
 | `src/resume_agent/discovery/connectors/google.py` | Google Careers JSON API |
 | `src/resume_agent/discovery/connectors/text.py` | Relevance gates + `html_to_text` |
-| `src/resume_agent/discovery/connectors/runner.py` | Pull orchestration, `+N added, N upgraded` telemetry |
+| `src/resume_agent/discovery/connectors/runner.py` | Pull orchestration: concurrent fetch (bounded by `pull_concurrency`), serial canonical-order ingest, `+N added` telemetry |
 | `src/resume_agent/concurrency.py` | `gather_isolated` — ordered, error-isolated async fan-out |
 | `src/resume_agent/discovery/ingest.py` | `save_or_upgrade`, source-priority logic |
 | `src/resume_agent/tracking/dedup.py` | `compute_dedup_key` — `company|normalized_title` |
@@ -236,6 +238,7 @@ aggressiveness determines how many detail fetches are issued.
   `asyncio.Semaphore(Settings.llm_concurrency)` per `asyncio.run` caps in-flight calls
   (`llm_concurrency` is validated `>= 1`); it is acquired **only** inside `llm_runner.acall`
   (the leaf), so nested tailor fan-out (jobs × panel) can't deadlock. Retry/backoff is agno's
-  per-agent config via `retry_kwargs()` (`exponential_backoff=True`); note it retries bare
-  `Exception`, so a parse failure costs `llm_retries` extra calls — kept low (default 2).
+  per-agent config via `retry_kwargs()`; retries live in `AgentRunner` behind the `is_transient`
+  predicate (rate-limit/timeout/5xx retry with exponential backoff; auth/schema/parse failures
+  surface after one call); agno's own retry is disabled via `retry_kwargs() == {"retries": 0}`.
   A job whose LLM work fails is skipped (left in its prior status) and retried next run.
