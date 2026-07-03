@@ -202,7 +202,11 @@ def remove_source(
     save_manifest(manifest, profile_dir)
 
     fragments = Path(profile_dir) / FRAGMENTS_DIRNAME
-    for stale in (fragments / f"{doc.id}.json", fragments / f"{doc.id}.meta.json"):
+    for stale in (
+        fragments / f"{doc.id}.json",
+        fragments / f"{doc.id}.meta.json",
+        fragments / f"{doc.id}.evidence.json",
+    ):
         stale.unlink(missing_ok=True)
     if purge:
         doc_path(profile_dir, doc).unlink(missing_ok=True)

@@ -1,11 +1,19 @@
 import json
 
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
-from resume_agent.profile.corpus import add_source, load_manifest
+from resume_agent.profile.corpus import add_source, load_manifest, remove_source
 from resume_agent.profile.fragments import (
     extract_fragments,
+    extract_synthesis_fragments,
     fragment_cache_status,
     load_fragment,
+)
+from resume_agent.profile.synthesis import (
+    ClaimVerdict,
+    ClaimVerdicts,
+    SynthesizedClaim,
+    SynthesizedEntry,
+    SynthesizedFragment,
 )
 
 
@@ -160,3 +168,113 @@ def test_converter_version_bump_invalidates_cache(tmp_path, monkeypatch):
     again = extract_fragments(profile_dir, load_manifest(profile_dir), agent)
     assert agent.calls == 2
     assert again.status[doc_id] == "extracted"
+
+
+def _corpus_with_deck(tmp_path):
+    profile_dir = tmp_path / "profile"
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada Lovelace", encoding="utf-8")
+    add_source(profile_dir, resume, primary=True)
+    deck = tmp_path / "deck.md"
+    deck.write_text("Cut latency 30% at Acme.", encoding="utf-8")
+    doc = add_source(profile_dir, deck, mode="synthesis")
+    return profile_dir, doc
+
+
+_SKELETON = [{"id": "exp1", "kind": "experience", "company": "Acme",
+              "title": "Engineer", "start": None, "end": None}]
+
+
+def _synth_agent():
+    return _FakeAgent(SynthesizedFragment(entries=[SynthesizedEntry(
+        kind="experience_bullets", anchor_id="exp1",
+        claims=[SynthesizedClaim(text="Cut latency 30%",
+                                 support=["Cut latency 30%"])],
+    )]))
+
+
+class _ApproveAll:
+    calls = 0
+
+    def run(self, prompt):
+        self.calls += 1
+        claims = json.loads(prompt)
+        return _FakeResult(ClaimVerdicts(verdicts=[
+            ClaimVerdict(index=c["index"], verdict="supported") for c in claims
+        ]))
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+def test_extract_fragments_skips_synthesis_docs(tmp_path):
+    profile_dir, doc = _corpus_with_deck(tmp_path)
+    agent = _FakeAgent(ProfileFacts(contact=Contact(name="Ada")))
+    result = extract_fragments(profile_dir, load_manifest(profile_dir), agent)
+    assert doc.id not in result.fragments
+    assert agent.calls == 1  # only the literal resume
+
+
+def test_synthesis_fragments_cache_and_write_evidence(tmp_path):
+    profile_dir, doc = _corpus_with_deck(tmp_path)
+    synth = _synth_agent()
+
+    first = extract_synthesis_fragments(
+        profile_dir, load_manifest(profile_dir), _SKELETON, synth, _ApproveAll()
+    )
+    assert first.status[doc.id] == "extracted"
+    assert synth.calls == 1
+    stub = first.fragments[doc.id].experience[0]
+    assert stub.id == "exp1" and stub.bullets[0].synthesized
+
+    evidence_path = profile_dir / "fragments" / f"{doc.id}.evidence.json"
+    payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert payload[stub.bullets[0].id]["support"] == ["Cut latency 30%"]
+
+    second = extract_synthesis_fragments(
+        profile_dir, load_manifest(profile_dir), _SKELETON, synth, _ApproveAll()
+    )
+    assert second.status[doc.id] == "cached"
+    assert synth.calls == 1
+
+
+def test_anchor_change_invalidates_synthesis_cache(tmp_path):
+    from resume_agent.profile.corpus import update_source
+
+    profile_dir, doc = _corpus_with_deck(tmp_path)
+    synth = _synth_agent()
+    extract_synthesis_fragments(
+        profile_dir, load_manifest(profile_dir), _SKELETON, synth, _ApproveAll()
+    )
+    update_source(profile_dir, doc.id, anchor="exp1")
+    extract_synthesis_fragments(
+        profile_dir, load_manifest(profile_dir), _SKELETON, synth, _ApproveAll()
+    )
+    assert synth.calls == 2
+
+
+def test_synthesis_failure_keeps_previous_fragment(tmp_path):
+    profile_dir, doc = _corpus_with_deck(tmp_path)
+    extract_synthesis_fragments(
+        profile_dir, load_manifest(profile_dir), _SKELETON, _synth_agent(), _ApproveAll()
+    )
+    deck = profile_dir / "sources" / "deck.md"
+    deck.write_text("Different text now.", encoding="utf-8")
+
+    failing = _FakeAgent(None, fail=True)
+    result = extract_synthesis_fragments(
+        profile_dir, load_manifest(profile_dir), _SKELETON, failing, _ApproveAll()
+    )
+    assert result.status[doc.id].startswith("stale")
+    assert result.fragments[doc.id].experience[0].id == "exp1"  # cached fragment served
+
+
+def test_remove_source_deletes_evidence_sidecar(tmp_path):
+    profile_dir, doc = _corpus_with_deck(tmp_path)
+    extract_synthesis_fragments(
+        profile_dir, load_manifest(profile_dir), _SKELETON, _synth_agent(), _ApproveAll()
+    )
+    evidence_path = profile_dir / "fragments" / f"{doc.id}.evidence.json"
+    assert evidence_path.exists()
+    remove_source(profile_dir, doc.id)
+    assert not evidence_path.exists()

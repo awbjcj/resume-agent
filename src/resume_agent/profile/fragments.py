@@ -20,6 +20,11 @@ from resume_agent.profile.corpus import (
 from resume_agent.profile.extractor import PROMPT_VERSION, extract_profile_facts
 from resume_agent.profile.ids import assign_fact_ids
 from resume_agent.profile.resume_reader import CONVERTER_VERSION, read_document_text
+from resume_agent.profile.synthesis import (
+    SYNTHESIS_PROMPT_VERSION,
+    fragment_to_facts,
+    synthesize_document,
+)
 
 CacheStatus = Literal["cached", "stale", "source-changed", "missing"]
 
@@ -28,11 +33,16 @@ CacheStatus = Literal["cached", "stale", "source-changed", "missing"]
 class FragmentResult:
     fragments: dict[str, ProfileFacts] = field(default_factory=dict)
     status: dict[str, str] = field(default_factory=dict)
+    drops: dict[str, list[str]] = field(default_factory=dict)
 
 
 def _paths(profile_dir: str | Path, doc_id: str) -> tuple[Path, Path]:
     root = Path(profile_dir) / FRAGMENTS_DIRNAME
     return root / f"{doc_id}.json", root / f"{doc_id}.meta.json"
+
+
+def evidence_path(profile_dir: str | Path, doc_id: str) -> Path:
+    return Path(profile_dir) / FRAGMENTS_DIRNAME / f"{doc_id}.evidence.json"
 
 
 def load_fragment(profile_dir: str | Path, doc_id: str) -> ProfileFacts | None:
@@ -92,6 +102,24 @@ def _save(
     _atomic_write(meta_path, json.dumps(metadata, sort_keys=True) + "\n")
 
 
+def _synthesis_meta(doc: SourceDoc, sha256: str) -> dict:
+    return {
+        "sha256": sha256,
+        "synthesis_prompt_version": SYNTHESIS_PROMPT_VERSION,
+        "converter_version": CONVERTER_VERSION,
+        "mode": doc.mode,
+        "anchor": doc.anchor,
+    }
+
+
+def _synthesis_meta_matches(meta_path: Path, doc: SourceDoc, sha256: str) -> bool:
+    try:
+        metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(metadata, dict) and metadata == _synthesis_meta(doc, sha256)
+
+
 def fragment_cache_status(profile_dir: str | Path, doc: SourceDoc) -> CacheStatus:
     fragment_path, meta_path = _paths(profile_dir, doc.id)
     try:
@@ -100,7 +128,11 @@ def fragment_cache_status(profile_dir: str | Path, doc: SourceDoc) -> CacheStatu
         return "stale" if fragment_path.exists() else "missing"
     if observed_sha != doc.sha256:
         return "source-changed"
-    if _meta_matches(meta_path, observed_sha) and load_fragment(profile_dir, doc.id):
+    if doc.mode == "synthesis":
+        matches = _synthesis_meta_matches(meta_path, doc, observed_sha)
+    else:
+        matches = _meta_matches(meta_path, observed_sha)
+    if matches and load_fragment(profile_dir, doc.id):
         return "cached"
     return "stale" if fragment_path.exists() or meta_path.exists() else "missing"
 
@@ -112,6 +144,8 @@ def extract_fragments(
     result = FragmentResult()
     manifest_changed = False
     for doc in manifest.docs:
+        if doc.mode == "synthesis":
+            continue
         _, meta_path = _paths(profile_dir, doc.id)
         source_path = doc_path(profile_dir, doc)
         try:
@@ -151,6 +185,76 @@ def extract_fragments(
         _save(profile_dir, doc.id, facts, observed_sha)
         result.fragments[doc.id] = facts
         result.status[doc.id] = "source-changed" if source_changed else "extracted"
+
+    if manifest_changed:
+        save_manifest(manifest, profile_dir)
+    return result
+
+
+def extract_synthesis_fragments(
+    profile_dir: str | Path,
+    manifest: SourceManifest,
+    skeleton: list[dict],
+    synthesis_agent: Runner,
+    entailment_agent: Runner,
+) -> FragmentResult:
+    """Synthesize registered synthesis-mode documents, reusing valid caches."""
+    result = FragmentResult()
+    manifest_changed = False
+    for doc in manifest.docs:
+        if doc.mode != "synthesis":
+            continue
+        fragment_path, meta_path = _paths(profile_dir, doc.id)
+        source_path = doc_path(profile_dir, doc)
+        try:
+            observed_sha = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        except OSError as exc:
+            previous = load_fragment(profile_dir, doc.id)
+            if previous is None:
+                result.status[doc.id] = f"failed: {exc}"
+            else:
+                result.fragments[doc.id] = previous
+                result.status[doc.id] = f"stale: {exc}"
+            continue
+
+        source_changed = observed_sha != doc.sha256
+        if source_changed:
+            doc.sha256 = observed_sha
+            manifest_changed = True
+        if _synthesis_meta_matches(meta_path, doc, observed_sha):
+            cached = load_fragment(profile_dir, doc.id)
+            if cached is not None:
+                result.fragments[doc.id] = cached
+                result.status[doc.id] = "cached"
+                continue
+
+        try:
+            text = read_document_text(source_path)
+            fragment, drops = synthesize_document(
+                doc, text, skeleton, synthesis_agent, entailment_agent
+            )
+            facts, evidence = fragment_to_facts(doc, fragment, skeleton)
+        except Exception as exc:
+            previous = load_fragment(profile_dir, doc.id)
+            if previous is None:
+                result.status[doc.id] = f"failed: {exc}"
+            else:
+                result.fragments[doc.id] = previous
+                result.status[doc.id] = f"stale: {exc}"
+            continue
+
+        fragment_path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write(fragment_path, facts.model_dump_json(indent=2) + "\n")
+        _atomic_write(
+            evidence_path(profile_dir, doc.id),
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+        )
+        _atomic_write(
+            meta_path, json.dumps(_synthesis_meta(doc, observed_sha), sort_keys=True) + "\n"
+        )
+        result.fragments[doc.id] = facts
+        result.status[doc.id] = "source-changed" if source_changed else "extracted"
+        result.drops[doc.id] = drops
 
     if manifest_changed:
         save_manifest(manifest, profile_dir)
