@@ -130,6 +130,27 @@ def test_profile_add_sources_and_remove(tmp_path):
     assert "resume.txt" not in listing.output
 
 
+def test_profile_add_mode_flag_and_sources_listing(tmp_path):
+    doc = tmp_path / "notes.md"
+    doc.write_text("Shipped things", encoding="utf-8")
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada", encoding="utf-8")
+    profile_dir = tmp_path / "profile"
+
+    assert runner.invoke(
+        cli.app, ["profile", "add", str(resume), "--dir", str(profile_dir)]
+    ).exit_code == 0
+    result = runner.invoke(
+        cli.app,
+        ["profile", "add", str(doc), "--dir", str(profile_dir), "--mode", "synthesis"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "synthesis" in result.output
+
+    listing = runner.invoke(cli.app, ["profile", "sources", "--dir", str(profile_dir)])
+    assert "mode:synthesis" in listing.output
+
+
 def test_profile_build_rejects_cross_directory_output(tmp_path, monkeypatch):
     _configure_build(monkeypatch, ProfileFacts(contact=Contact(name="Ada")))
     result = runner.invoke(

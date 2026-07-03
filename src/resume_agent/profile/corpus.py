@@ -7,6 +7,7 @@ import shutil
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, model_validator
 
@@ -19,6 +20,15 @@ FRAGMENTS_DIRNAME = "fragments"
 
 _SLUG = re.compile(r"[^a-z0-9]+")
 
+SourceMode = Literal["literal", "synthesis"]
+
+_UNSET: object = object()
+
+
+def default_mode(filename: str) -> SourceMode:
+    """Decks default to synthesis; everything else stays literal extraction."""
+    return "synthesis" if Path(filename).suffix.lower() == ".pptx" else "literal"
+
 
 class SourceDoc(ExtensibleModel):
     id: str
@@ -26,15 +36,22 @@ class SourceDoc(ExtensibleModel):
     sha256: str
     added_at: str
     primary: bool = False
+    mode: SourceMode = "literal"
+    anchor: str | None = None
 
 
 class SourceManifest(ExtensibleModel):
     docs: list[SourceDoc] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def exactly_one_primary_when_nonempty(self) -> "SourceManifest":
+    def validate_docs(self) -> "SourceManifest":
         if self.docs and sum(doc.primary for doc in self.docs) != 1:
             raise ValueError("a non-empty source manifest must have exactly one primary")
+        for doc in self.docs:
+            if doc.primary and doc.mode != "literal":
+                raise ValueError(f"primary source {doc.id} must use literal mode")
+            if doc.anchor is not None and doc.mode != "synthesis":
+                raise ValueError(f"anchor on {doc.id} requires synthesis mode")
         return self
 
 
@@ -91,7 +108,11 @@ def _doc_id(filename: str, sha256: str) -> str:
 
 
 def add_source(
-    profile_dir: str | Path, file_path: str | Path, primary: bool = False
+    profile_dir: str | Path,
+    file_path: str | Path,
+    primary: bool = False,
+    mode: SourceMode | None = None,
+    anchor: str | None = None,
 ) -> SourceDoc:
     source = Path(file_path)
     suffix = source.suffix.lower()
@@ -101,24 +122,43 @@ def add_source(
             f"Unsupported document format: {suffix or '(none)'} (use {supported})"
         )
 
+    resolved_mode = mode or default_mode(source.name)
     data = source.read_bytes()
     sha256 = hashlib.sha256(data).hexdigest()
     manifest = load_manifest(profile_dir)
     existing = next((doc for doc in manifest.docs if doc.sha256 == sha256), None)
     if existing is not None:
+        changed = False
         if primary and not existing.primary:
             for doc in manifest.docs:
                 doc.primary = doc.id == existing.id
+            changed = True
+        if mode is not None and existing.mode != mode:
+            existing.mode = mode
+            if mode == "literal":
+                existing.anchor = None
+            changed = True
+        if anchor is not None and existing.anchor != anchor:
+            existing.anchor = anchor
+            changed = True
+        if changed:
             save_manifest(manifest, profile_dir)
         return existing
 
     primary = primary or not manifest.docs
+    if primary and resolved_mode != "literal":
+        raise ValueError(
+            "the first source becomes the primary resume and must be literal — "
+            "add your resume first, or pass --mode literal"
+        )
     doc = SourceDoc(
         id=_doc_id(source.name, sha256),
         filename=source.name,
         sha256=sha256,
         added_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         primary=primary,
+        mode=resolved_mode,
+        anchor=anchor,
     )
     target_dir = sources_dir(profile_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -149,7 +189,16 @@ def remove_source(
         return None
     manifest.docs = [candidate for candidate in manifest.docs if candidate.id != doc.id]
     if doc.primary and manifest.docs:
-        manifest.docs[0].primary = True
+        replacement = next(
+            (candidate for candidate in manifest.docs if candidate.mode == "literal"),
+            None,
+        )
+        if replacement is None:
+            raise ValueError(
+                "cannot remove the primary source while only synthesis-mode "
+                "sources remain — the primary must be a literal document"
+            )
+        replacement.primary = True
     save_manifest(manifest, profile_dir)
 
     fragments = Path(profile_dir) / FRAGMENTS_DIRNAME
@@ -157,6 +206,35 @@ def remove_source(
         stale.unlink(missing_ok=True)
     if purge:
         doc_path(profile_dir, doc).unlink(missing_ok=True)
+    return doc
+
+
+def update_source(
+    profile_dir: str | Path,
+    ident: str,
+    *,
+    mode: SourceMode | None = None,
+    anchor: str | None | object = _UNSET,
+    primary: bool | None = None,
+) -> SourceDoc | None:
+    """Update a registered doc's mode/anchor/primary. anchor=None clears it."""
+    manifest = load_manifest(profile_dir)
+    doc = next(
+        (c for c in manifest.docs if ident in (c.id, c.filename)),
+        None,
+    )
+    if doc is None:
+        return None
+    if mode is not None:
+        doc.mode = mode
+        if mode == "literal":
+            doc.anchor = None
+    if anchor is not _UNSET:
+        doc.anchor = anchor  # type: ignore[assignment]
+    if primary:
+        for other in manifest.docs:
+            other.primary = other.id == doc.id
+    save_manifest(manifest, profile_dir)
     return doc
 
 

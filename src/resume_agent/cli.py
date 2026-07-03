@@ -60,13 +60,19 @@ def profile_add(
     dir: str = typer.Option(
         DEFAULT_PROFILE_DIR, "--dir", help="Profile data directory."
     ),
+    mode: str | None = typer.Option(
+        None, "--mode", help="'literal' or 'synthesis' (default: by file type; .pptx → synthesis)."
+    ),
+    anchor: str | None = typer.Option(
+        None, "--anchor", help="Experience/project fact id synthesized entries attach to."
+    ),
 ) -> None:
     """Register a source document in the profile corpus."""
     from resume_agent.profile.corpus import add_source
 
-    doc = add_source(dir, file, primary=primary)
+    doc = add_source(dir, file, primary=primary, mode=mode, anchor=anchor)  # type: ignore[arg-type]
     suffix = " (primary)" if doc.primary else ""
-    typer.echo(f"Registered {doc.filename} as {doc.id}{suffix}")
+    typer.echo(f"Registered {doc.filename} as {doc.id} mode:{doc.mode}{suffix}")
 
 
 @profile_app.command("remove")
@@ -102,9 +108,10 @@ def profile_sources(
     for doc in manifest.docs:
         flags = " primary" if doc.primary else ""
         status = fragment_cache_status(dir, doc)
+        anchor = f" anchor:{doc.anchor}" if doc.anchor else ""
         typer.echo(
-            f"{doc.id}  {doc.filename}  sha:{doc.sha256[:8]}  "
-            f"added:{doc.added_at}  fragment:{status}{flags}"
+            f"{doc.id}  {doc.filename}  mode:{doc.mode}  sha:{doc.sha256[:8]}  "
+            f"added:{doc.added_at}  fragment:{status}{anchor}{flags}"
         )
 
 

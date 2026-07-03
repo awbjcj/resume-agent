@@ -4,11 +4,13 @@ from resume_agent.profile.corpus import (
     SourceDoc,
     SourceManifest,
     add_source,
+    default_mode,
     doc_path,
     load_manifest,
     migrate_legacy,
     remove_source,
     save_manifest,
+    update_source,
 )
 
 
@@ -149,3 +151,102 @@ def test_migrate_legacy_registers_primary_once(tmp_path):
     assert doc is not None and doc.primary is True
     assert migrate_legacy(profile_dir, str(legacy)) is None
     assert migrate_legacy(tmp_path / "other", None) is None
+
+
+def _file(tmp_path, name, content="body"):
+    f = tmp_path / name
+    f.write_text(content, encoding="utf-8")
+    return f
+
+
+def test_default_mode_by_suffix():
+    assert default_mode("deck.pptx") == "synthesis"
+    assert default_mode("resume.pdf") == "literal"
+    assert default_mode("notes.md") == "literal"
+
+
+def test_add_source_defaults_and_overrides_mode(tmp_path):
+    add_source(tmp_path / "p", _file(tmp_path, "resume.txt", "resume body"), primary=True)
+    doc = add_source(
+        tmp_path / "p", _file(tmp_path, "notes.md", "notes body"), mode="synthesis"
+    )
+    assert doc.mode == "synthesis"
+    reloaded = load_manifest(tmp_path / "p")
+    assert {d.filename: d.mode for d in reloaded.docs} == {
+        "resume.txt": "literal", "notes.md": "synthesis",
+    }
+
+
+def test_first_source_must_be_literal(tmp_path):
+    with pytest.raises(ValueError, match="literal"):
+        add_source(tmp_path / "p", _file(tmp_path, "deck.md"), mode="synthesis")
+
+
+def test_anchor_requires_synthesis_mode(tmp_path):
+    add_source(tmp_path / "p", _file(tmp_path, "resume.txt"), primary=True)
+    with pytest.raises(ValueError, match="synthesis"):
+        add_source(tmp_path / "p", _file(tmp_path, "notes.md"), anchor="abc123")
+
+
+def test_update_source_mode_anchor_primary(tmp_path):
+    profile_dir = tmp_path / "p"
+    add_source(profile_dir, _file(tmp_path, "resume.txt", "resume body"), primary=True)
+    doc = add_source(
+        profile_dir, _file(tmp_path, "notes.md", "notes body"), mode="synthesis"
+    )
+
+    updated = update_source(profile_dir, doc.id, anchor="fact42")
+    assert updated is not None and updated.anchor == "fact42"
+
+    cleared = update_source(profile_dir, doc.id, anchor=None)
+    assert cleared is not None and cleared.anchor is None
+
+    literal = update_source(profile_dir, doc.id, mode="literal")
+    assert literal is not None and literal.mode == "literal" and literal.anchor is None
+
+    promoted = update_source(profile_dir, doc.id, primary=True)
+    assert promoted is not None and promoted.primary
+    manifest = load_manifest(profile_dir)
+    assert sum(d.primary for d in manifest.docs) == 1
+
+    assert update_source(profile_dir, "nope") is None
+
+
+def test_remove_primary_promotes_a_literal_doc(tmp_path):
+    profile_dir = tmp_path / "p"
+    primary = add_source(
+        profile_dir, _file(tmp_path, "resume.txt", "resume body"), primary=True
+    )
+    add_source(profile_dir, _file(tmp_path, "deck.md", "deck body"), mode="synthesis")
+    literal = add_source(
+        profile_dir, _file(tmp_path, "old-resume.txt", "old resume body")
+    )
+
+    remove_source(profile_dir, primary.id)
+    manifest = load_manifest(profile_dir)
+    new_primary = next(d for d in manifest.docs if d.primary)
+    assert new_primary.id == literal.id
+
+
+def test_remove_primary_with_only_synthesis_left_fails(tmp_path):
+    profile_dir = tmp_path / "p"
+    primary = add_source(
+        profile_dir, _file(tmp_path, "resume.txt", "resume body"), primary=True
+    )
+    add_source(profile_dir, _file(tmp_path, "deck.md", "deck body"), mode="synthesis")
+    with pytest.raises(ValueError, match="literal"):
+        remove_source(profile_dir, primary.id)
+
+
+def test_legacy_manifest_without_mode_loads(tmp_path):
+    profile_dir = tmp_path / "p"
+    profile_dir.mkdir(parents=True)
+    sha256 = "0" * 64
+    (profile_dir / "sources.json").write_text(
+        '{"docs": [{"id": "r-1", "filename": "r.txt", "sha256": "' + sha256 + '",'
+        ' "added_at": "2026-01-01T00:00:00+00:00", "primary": true}]}',
+        encoding="utf-8",
+    )
+    manifest = load_manifest(profile_dir)
+    assert manifest.docs[0].mode == "literal"
+    assert manifest.docs[0].anchor is None
