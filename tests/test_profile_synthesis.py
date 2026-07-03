@@ -310,3 +310,28 @@ def test_fragment_to_facts_ids_are_deterministic():
     first, _ = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
     second, _ = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
     assert first.experience[0].bullets[0].id == second.experience[0].bullets[0].id
+
+
+def test_bad_tech_token_does_not_leak_when_a_sibling_claim_survives():
+    """An entry-level tech failure must not leak into the final fact, even when
+    a different claim in the same entry independently passes verification."""
+    entry = SynthesizedEntry(
+        kind="experience_bullets", anchor_id="exp1",
+        claims=[
+            _claim("Cut p99 latency 30%"),
+            SynthesizedClaim(text="Rebuilt the pipeline", support=["Built on Kubernetes"]),
+        ],
+        tech=["Terraform"],  # not in _DECK — must never survive verification
+    )
+    synthesis = _SeqAgent([SynthesizedFragment(entries=[entry])])
+
+    fragment, drops = synthesize_document(
+        _doc(), _DECK, profile_skeleton(_facts()), synthesis, _approve_all()
+    )
+
+    assert any("Terraform" in d for d in drops)
+    assert fragment.entries, "the sibling claim should have kept the entry alive"
+
+    facts, _ = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
+    stub = facts.experience[0]
+    assert "Terraform" not in stub.tech

@@ -184,6 +184,16 @@ def _proper_nouns(text: str) -> set[str]:
     return nouns
 
 
+def _tech_failures(tech: list[str], source_text: str) -> dict[str, str]:
+    """Bad tech token -> failure reason (deterministic, entry-level check)."""
+    source_folded = _normalize_ws(source_text).casefold()
+    return {
+        token: f"tech {token!r} not in source"
+        for token in tech
+        if token.casefold() not in source_folded
+    }
+
+
 def deterministic_failures(
     claim: SynthesizedClaim, source_text: str, tech: list[str] | None = None
 ) -> list[str]:
@@ -206,9 +216,7 @@ def deterministic_failures(
         if noun.casefold() not in source_folded:
             reasons.append(f"name {noun!r} not in source")
 
-    for token in tech or []:
-        if token.casefold() not in source_folded:
-            reasons.append(f"tech {token!r} not in source")
+    reasons.extend(_tech_failures(tech or [], source_text).values())
     return reasons
 
 
@@ -224,20 +232,32 @@ def _all_claims(
 
 def _verify(
     fragment: SynthesizedFragment, source_text: str, entailment_agent: Runner
-) -> dict[tuple[int, int], str]:
-    """(entry_index, claim_index) -> failure reason, for every failing claim."""
+) -> tuple[dict[tuple[int, int], str], dict[int, dict[str, str]]]:
+    """Returns (claim failures, tech failures).
+
+    Claim failures are keyed (entry_index, claim_index) -> reason, for every
+    failing claim. Tech failures are an entry-level property — keyed
+    entry_index -> {bad token: reason} — independent of any single claim, so a
+    bad tech token is never tied to (and can't ride along with) whichever
+    claim happens to be first.
+    """
     failures: dict[tuple[int, int], str] = {}
     pending: list[tuple[tuple[int, int], SynthesizedClaim]] = []
     for entry_index, claim_index, entry, claim in _all_claims(fragment):
-        tech = entry.tech if claim_index == 0 else []  # check entry tech once
-        reasons = deterministic_failures(claim, source_text, tech=tech)
+        reasons = deterministic_failures(claim, source_text)
         if reasons:
             failures[(entry_index, claim_index)] = "; ".join(reasons)
         else:
             pending.append(((entry_index, claim_index), claim))
 
+    tech_failures: dict[int, dict[str, str]] = {}
+    for entry_index, entry in enumerate(fragment.entries):
+        bad = _tech_failures(entry.tech, source_text)
+        if bad:
+            tech_failures[entry_index] = bad
+
     if not pending:
-        return failures
+        return failures, tech_failures
     payload = json.dumps(
         [
             {"index": index, "claim": claim.text, "support": claim.support}
@@ -254,7 +274,7 @@ def _verify(
             failures[key] = (
                 verdict.reason if verdict and verdict.reason else "not confirmed by verifier"
             )
-    return failures
+    return failures, tech_failures
 
 
 def _apply_pinned_anchor(fragment: SynthesizedFragment, doc: SourceDoc) -> None:
@@ -269,6 +289,7 @@ def _repair_prompt(
     skeleton: list[dict],
     fragment: SynthesizedFragment,
     failures: dict[tuple[int, int], str],
+    tech_failures: dict[int, dict[str, str]] | None = None,
 ) -> str:
     rejected = [
         {
@@ -276,6 +297,11 @@ def _repair_prompt(
             "reason": reason,
         }
         for (entry_index, claim_index), reason in sorted(failures.items())
+    ]
+    rejected += [
+        {"claim": f"tech: {token}", "reason": reason}
+        for entry_index, bad in sorted((tech_failures or {}).items())
+        for token, reason in bad.items()
     ]
     return (
         compose_synthesis_input(doc_text, skeleton)
@@ -288,11 +314,19 @@ def _repair_prompt(
 
 
 def _drop_failed(
-    fragment: SynthesizedFragment, failures: dict[tuple[int, int], str]
+    fragment: SynthesizedFragment,
+    failures: dict[tuple[int, int], str],
+    tech_failures: dict[int, dict[str, str]] | None = None,
 ) -> list[str]:
+    tech_failures = tech_failures or {}
     drops = [
         f"{fragment.entries[entry_index].claims[claim_index].text!r} — {reason}"
         for (entry_index, claim_index), reason in sorted(failures.items())
+    ]
+    drops += [
+        f"tech {token!r} — {reason}"
+        for entry_index, bad in sorted(tech_failures.items())
+        for token, reason in bad.items()
     ]
     failed_by_entry: dict[int, set[int]] = {}
     for entry_index, claim_index in failures:
@@ -304,6 +338,11 @@ def _drop_failed(
             claim for claim_index, claim in enumerate(entry.claims)
             if claim_index not in failed
         ]
+        bad_tech = tech_failures.get(entry_index)
+        if bad_tech:
+            # Strip only the tokens that failed verification — the rest of the
+            # entry's verified claims (and clean tech tokens) are still legitimate.
+            entry.tech = [token for token in entry.tech if token not in bad_tech]
         if entry.claims:
             kept_entries.append(entry)
     fragment.entries = kept_entries
@@ -326,10 +365,10 @@ def synthesize_document(
     fragment = content.model_copy(deep=True)
     _apply_pinned_anchor(fragment, doc)
 
-    failures = _verify(fragment, doc_text, entailment_agent)
-    if failures:
+    failures, tech_failures = _verify(fragment, doc_text, entailment_agent)
+    if failures or tech_failures:
         repaired = synthesis_agent.run(
-            _repair_prompt(doc_text, skeleton, fragment, failures)
+            _repair_prompt(doc_text, skeleton, fragment, failures, tech_failures)
         ).content
         if not isinstance(repaired, SynthesizedFragment):
             raise TypeError(
@@ -337,9 +376,9 @@ def synthesize_document(
             )
         fragment = repaired.model_copy(deep=True)
         _apply_pinned_anchor(fragment, doc)
-        failures = _verify(fragment, doc_text, entailment_agent)
+        failures, tech_failures = _verify(fragment, doc_text, entailment_agent)
 
-    drops = _drop_failed(fragment, failures)
+    drops = _drop_failed(fragment, failures, tech_failures)
     return fragment, drops
 
 
