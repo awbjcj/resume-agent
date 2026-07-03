@@ -79,17 +79,23 @@ def launch_profile_build(request: Request, mgr: RunManager = Depends(get_run_man
     if not any(env.get(k) for k in LLM_KEY_ENV_VARS):
         raise ApiException(400, "SETUP_INCOMPLETE",
                            "No LLM API key is set — add one in Settings > API Keys")
-    resume_path = _docs(request).latest_resume_path()
-    if resume_path is None:
-        raise ApiException(400, "SETUP_INCOMPLETE",
-                           "Upload a resume document before building the profile")
+    profile_dir = _profile_dir(request)
+    manifest = load_manifest(profile_dir)
+    if not manifest.docs:
+        resume_path = _docs(request).latest_resume_path()
+        if resume_path is None:
+            raise ApiException(400, "SETUP_INCOMPLETE",
+                               "Upload a resume document before building the profile")
+        # One-time migration mirroring the CLI's migrate_legacy: the wizard's
+        # newest resume becomes the corpus primary.
+        add_source(profile_dir, resume_path, primary=True)
     profile_cfg = request.app.state.config_store.get("profile")
     github_username = profile_cfg.github_username
     facts_out = request.app.state.data_dir / "profile" / "facts.json"
 
     def work(reporter):
-        return profile_build.run_profile_build(
-            reporter, resume_path=resume_path,
+        return profile_build.run_corpus_build(
+            reporter, profile_dir=profile_dir,
             github_username=github_username, facts_out=facts_out,
         )
 

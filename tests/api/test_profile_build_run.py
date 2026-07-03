@@ -55,7 +55,7 @@ def test_build_with_non_anthropic_key_launches_run(tmp_path, monkeypatch):
         from resume_agent.services import profile_build
 
         monkeypatch.setattr(
-            profile_build, "run_profile_build",
+            profile_build, "run_corpus_build",
             lambda reporter, **kwargs: {"experiences": 1, "projects": 0, "warnings": []},
         )
         resp = client.post("/api/profile/build")
@@ -74,9 +74,45 @@ def test_build_launches_run(client, monkeypatch):
     def fake_run(reporter, **kwargs):
         return {"experiences": 2, "projects": 1, "warnings": []}
 
-    monkeypatch.setattr(profile_build, "run_profile_build", fake_run)
+    monkeypatch.setattr(profile_build, "run_corpus_build", fake_run)
     resp = client.post("/api/profile/build")
     assert resp.status_code == 202
     body = resp.json()
     assert body["kind"] == "profile-build"
     assert body["runId"]
+
+
+def test_build_registers_wizard_resume_as_primary_source(client, monkeypatch):
+    client.post(
+        "/api/profile/documents",
+        files={"file": ("resume.txt", io.BytesIO(b"experience"), "text/plain")},
+        data={"docType": "resume"},
+    )
+    from resume_agent.services import profile_build
+
+    monkeypatch.setattr(
+        profile_build, "run_corpus_build",
+        lambda reporter, **kwargs: {"experiences": 0, "projects": 0, "warnings": []},
+    )
+    assert client.post("/api/profile/build").status_code == 202
+
+    sources = client.get("/api/profile/sources").json()
+    assert len(sources) == 1
+    assert sources[0]["primary"] is True and sources[0]["mode"] == "literal"
+
+
+def test_build_with_registered_sources_skips_document_store(client, monkeypatch):
+    """A corpus source satisfies the precondition without any wizard document."""
+    import io as _io
+
+    client.post(
+        "/api/profile/sources",
+        files={"file": ("resume.txt", _io.BytesIO(b"experience"), "text/plain")},
+    )
+    from resume_agent.services import profile_build
+
+    monkeypatch.setattr(
+        profile_build, "run_corpus_build",
+        lambda reporter, **kwargs: {"experiences": 0, "projects": 0, "warnings": []},
+    )
+    assert client.post("/api/profile/build").status_code == 202
