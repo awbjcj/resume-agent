@@ -10,6 +10,7 @@ because verification anchors each claim to user-authored source text.
 
 import json
 import re
+from pathlib import Path
 from typing import Literal
 
 from agno.agent import Agent
@@ -24,7 +25,9 @@ from resume_agent.llm_runner import (
     use_json_mode_for,
 )
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import ProfileFacts
+from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project, Skill
+from resume_agent.profile.corpus import SourceDoc
+from resume_agent.profile.ids import deterministic_id
 
 # Bump whenever synthesis or entailment instructions change so cached
 # synthesis fragments re-run.
@@ -207,3 +210,214 @@ def deterministic_failures(
         if token.casefold() not in source_folded:
             reasons.append(f"tech {token!r} not in source")
     return reasons
+
+
+def _all_claims(
+    fragment: SynthesizedFragment,
+) -> list[tuple[int, int, SynthesizedEntry, SynthesizedClaim]]:
+    return [
+        (entry_index, claim_index, entry, claim)
+        for entry_index, entry in enumerate(fragment.entries)
+        for claim_index, claim in enumerate(entry.claims)
+    ]
+
+
+def _verify(
+    fragment: SynthesizedFragment, source_text: str, entailment_agent: Runner
+) -> dict[tuple[int, int], str]:
+    """(entry_index, claim_index) -> failure reason, for every failing claim."""
+    failures: dict[tuple[int, int], str] = {}
+    pending: list[tuple[tuple[int, int], SynthesizedClaim]] = []
+    for entry_index, claim_index, entry, claim in _all_claims(fragment):
+        tech = entry.tech if claim_index == 0 else []  # check entry tech once
+        reasons = deterministic_failures(claim, source_text, tech=tech)
+        if reasons:
+            failures[(entry_index, claim_index)] = "; ".join(reasons)
+        else:
+            pending.append(((entry_index, claim_index), claim))
+
+    if not pending:
+        return failures
+    payload = json.dumps(
+        [
+            {"index": index, "claim": claim.text, "support": claim.support}
+            for index, (_, claim) in enumerate(pending)
+        ]
+    )
+    content = entailment_agent.run(payload).content
+    if not isinstance(content, ClaimVerdicts):
+        raise TypeError(f"Expected ClaimVerdicts from agent, got {type(content).__name__}")
+    verdicts = {verdict.index: verdict for verdict in content.verdicts}
+    for index, (key, _) in enumerate(pending):
+        verdict = verdicts.get(index)
+        if verdict is None or verdict.verdict != "supported":
+            failures[key] = (
+                verdict.reason if verdict and verdict.reason else "not confirmed by verifier"
+            )
+    return failures
+
+
+def _apply_pinned_anchor(fragment: SynthesizedFragment, doc: SourceDoc) -> None:
+    if doc.anchor:
+        for entry in fragment.entries:
+            if entry.kind != "skills":
+                entry.anchor_id = doc.anchor
+
+
+def _repair_prompt(
+    doc_text: str,
+    skeleton: list[dict],
+    fragment: SynthesizedFragment,
+    failures: dict[tuple[int, int], str],
+) -> str:
+    rejected = [
+        {
+            "claim": fragment.entries[entry_index].claims[claim_index].text,
+            "reason": reason,
+        }
+        for (entry_index, claim_index), reason in sorted(failures.items())
+    ]
+    return (
+        compose_synthesis_input(doc_text, skeleton)
+        + "\n\nREJECTED CLAIMS — your previous answer contained claims the document "
+        "does not support. Return the full corrected result: rewrite each rejected "
+        "claim so the document fully supports it (usually by removing the "
+        "unsupported detail), and keep every other entry unchanged.\n"
+        + json.dumps(rejected, indent=2)
+    )
+
+
+def _drop_failed(
+    fragment: SynthesizedFragment, failures: dict[tuple[int, int], str]
+) -> list[str]:
+    drops = [
+        f"{fragment.entries[entry_index].claims[claim_index].text!r} — {reason}"
+        for (entry_index, claim_index), reason in sorted(failures.items())
+    ]
+    failed_by_entry: dict[int, set[int]] = {}
+    for entry_index, claim_index in failures:
+        failed_by_entry.setdefault(entry_index, set()).add(claim_index)
+    kept_entries: list[SynthesizedEntry] = []
+    for entry_index, entry in enumerate(fragment.entries):
+        failed = failed_by_entry.get(entry_index, set())
+        entry.claims = [
+            claim for claim_index, claim in enumerate(entry.claims)
+            if claim_index not in failed
+        ]
+        if entry.claims:
+            kept_entries.append(entry)
+    fragment.entries = kept_entries
+    return drops
+
+
+def synthesize_document(
+    doc: SourceDoc,
+    doc_text: str,
+    skeleton: list[dict],
+    synthesis_agent: Runner,
+    entailment_agent: Runner,
+) -> tuple[SynthesizedFragment, list[str]]:
+    """Synthesize, verify, repair once, drop the rest. Returns (fragment, drops)."""
+    content = synthesis_agent.run(compose_synthesis_input(doc_text, skeleton)).content
+    if not isinstance(content, SynthesizedFragment):
+        raise TypeError(
+            f"Expected SynthesizedFragment from agent, got {type(content).__name__}"
+        )
+    fragment = content.model_copy(deep=True)
+    _apply_pinned_anchor(fragment, doc)
+
+    failures = _verify(fragment, doc_text, entailment_agent)
+    if failures:
+        repaired = synthesis_agent.run(
+            _repair_prompt(doc_text, skeleton, fragment, failures)
+        ).content
+        if not isinstance(repaired, SynthesizedFragment):
+            raise TypeError(
+                f"Expected SynthesizedFragment from agent, got {type(repaired).__name__}"
+            )
+        fragment = repaired.model_copy(deep=True)
+        _apply_pinned_anchor(fragment, doc)
+        failures = _verify(fragment, doc_text, entailment_agent)
+
+    drops = _drop_failed(fragment, failures)
+    return fragment, drops
+
+
+def fragment_to_facts(
+    doc: SourceDoc, fragment: SynthesizedFragment, skeleton: list[dict]
+) -> tuple[ProfileFacts, dict[str, dict]]:
+    """Convert a verified fragment into ProfileFacts + evidence keyed by fact id.
+
+    Anchored entries become Experience stubs whose ``id`` IS the anchor target
+    id — the merge phase matches them by id and appends their bullets.
+    """
+    by_id = {row["id"]: row for row in skeleton}
+    facts = ProfileFacts(contact=Contact(name=""))
+    evidence: dict[str, dict] = {}
+
+    for entry in fragment.entries:
+        anchor = by_id.get(entry.anchor_id or "")
+        if (
+            entry.kind == "experience_bullets"
+            and anchor is not None
+            and anchor["kind"] == "experience"
+        ):
+            stub = next(
+                (e for e in facts.experience if e.id == entry.anchor_id), None
+            )
+            if stub is None:
+                stub = Experience(
+                    id=entry.anchor_id,
+                    company=anchor["company"],
+                    title=anchor["title"],
+                    source_ref=doc.id,
+                    synthesized=True,
+                )
+                facts.experience.append(stub)
+            for claim in entry.claims:
+                bullet = Bullet(
+                    id=deterministic_id(
+                        doc.id, "synth-bullet", entry.anchor_id or "", claim.text.casefold()
+                    ),
+                    text=claim.text,
+                    source_ref=doc.id,
+                    synthesized=True,
+                )
+                stub.bullets.append(bullet)
+                evidence[bullet.id] = {"claim": claim.text, "support": claim.support}
+            for token in entry.tech:
+                if token not in stub.tech:
+                    stub.tech.append(token)
+        elif entry.kind == "skills":
+            category = entry.category or "hard"
+            for claim in entry.claims:
+                skill = Skill(
+                    id=deterministic_id(
+                        doc.id, "synth-skill", category, claim.text.casefold()
+                    ),
+                    name=claim.text,
+                    category=category,
+                    source_ref=doc.id,
+                    synthesized=True,
+                )
+                facts.skills.setdefault(category, []).append(skill)
+                evidence[skill.id] = {"claim": claim.text, "support": claim.support}
+        else:
+            # kind == "project", plus anchored entries whose anchor didn't resolve.
+            name = entry.title or Path(doc.filename).stem
+            project = Project(
+                id=deterministic_id(doc.id, "synth-proj", name.casefold()),
+                name=name,
+                source_ref=doc.id,
+                synthesized=True,
+                highlights=[claim.text for claim in entry.claims],
+                tech=list(entry.tech),
+            )
+            facts.projects.append(project)
+            evidence[project.id] = {
+                "claims": [
+                    {"claim": claim.text, "support": claim.support}
+                    for claim in entry.claims
+                ]
+            }
+    return facts, evidence

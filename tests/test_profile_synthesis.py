@@ -1,11 +1,16 @@
 from resume_agent.models.profile import Contact, Experience, ProfileFacts, Project
+from resume_agent.profile.corpus import SourceDoc
 from resume_agent.profile.synthesis import (
+    ClaimVerdict,
+    ClaimVerdicts,
     SynthesizedClaim,
     SynthesizedEntry,
     SynthesizedFragment,
     compose_synthesis_input,
     deterministic_failures,
+    fragment_to_facts,
     profile_skeleton,
+    synthesize_document,
 )
 
 
@@ -130,3 +135,178 @@ def test_unknown_tech_token_fails():
     )
     assert any("Terraform" in reason for reason in failures)
     assert not any("Kubernetes" in reason for reason in failures)
+
+
+class _SeqAgent:
+    """Returns queued contents in order; the last one repeats."""
+
+    def __init__(self, contents):
+        self._contents = list(contents)
+        self.calls = 0
+        self.prompts: list[str] = []
+
+    def run(self, prompt):
+        self.calls += 1
+        self.prompts.append(prompt)
+        content = (
+            self._contents.pop(0) if len(self._contents) > 1 else self._contents[0]
+        )
+        return _FakeResult(content)
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+def _doc(anchor=None):
+    return SourceDoc(id="deck-1", filename="deck.pptx", sha256="0" * 64,
+                     added_at="2026-07-03T00:00:00+00:00", mode="synthesis",
+                     anchor=anchor)
+
+
+_DECK = "The billing rewrite cut p99 latency 30%. Built on Kubernetes."
+
+
+def _entry(text="Cut p99 latency 30%", support=("cut p99 latency 30%",),
+           anchor_id="exp1", tech=()):
+    return SynthesizedEntry(
+        kind="experience_bullets", anchor_id=anchor_id,
+        claims=[SynthesizedClaim(text=text, support=list(support))],
+        tech=list(tech),
+    )
+
+
+def _approve_all():
+    class _Approve:
+        calls = 0
+
+        def run(self, prompt):
+            self.calls += 1
+            claims = __import__("json").loads(prompt)
+            return _FakeResult(ClaimVerdicts(verdicts=[
+                ClaimVerdict(index=c["index"], verdict="supported") for c in claims
+            ]))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    return _Approve()
+
+
+def test_happy_path_keeps_verified_claims():
+    synthesis = _SeqAgent([SynthesizedFragment(entries=[_entry()])])
+    fragment, drops = synthesize_document(
+        _doc(), _DECK, profile_skeleton(_facts()), synthesis, _approve_all()
+    )
+    assert drops == []
+    assert fragment.entries[0].claims[0].text == "Cut p99 latency 30%"
+    assert synthesis.calls == 1
+
+
+def test_pinned_anchor_overrides_agent_proposal():
+    synthesis = _SeqAgent([SynthesizedFragment(entries=[_entry(anchor_id="wrong")])])
+    fragment, _ = synthesize_document(
+        _doc(anchor="exp1"), _DECK, profile_skeleton(_facts()), synthesis, _approve_all()
+    )
+    assert fragment.entries[0].anchor_id == "exp1"
+
+
+def test_deterministic_failure_triggers_one_repair_round():
+    bad = SynthesizedFragment(entries=[_entry(text="Cut p99 latency 45%")])
+    fixed = SynthesizedFragment(entries=[_entry(text="Cut p99 latency 30%")])
+    synthesis = _SeqAgent([bad, fixed])
+
+    fragment, drops = synthesize_document(
+        _doc(), _DECK, profile_skeleton(_facts()), synthesis, _approve_all()
+    )
+    assert synthesis.calls == 2  # initial + one repair, no more
+    assert drops == []
+    assert fragment.entries[0].claims[0].text == "Cut p99 latency 30%"
+    assert "45%" in synthesis.prompts[1]  # repair prompt carries the reason
+
+
+def test_still_failing_claim_is_dropped_and_reported():
+    bad = SynthesizedFragment(entries=[_entry(text="Cut p99 latency 45%")])
+    synthesis = _SeqAgent([bad, bad])
+    fragment, drops = synthesize_document(
+        _doc(), _DECK, profile_skeleton(_facts()), synthesis, _approve_all()
+    )
+    assert fragment.entries == []
+    assert len(drops) == 1 and "45%" in drops[0]
+
+
+def test_entailment_unsupported_fails_closed():
+    synthesis = _SeqAgent([SynthesizedFragment(entries=[_entry()])])
+
+    class _RejectAll:
+        def run(self, prompt):
+            claims = __import__("json").loads(prompt)
+            return _FakeResult(ClaimVerdicts(verdicts=[
+                ClaimVerdict(index=c["index"], verdict="unsupported", reason="overreach")
+                for c in claims
+            ]))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    fragment, drops = synthesize_document(
+        _doc(), _DECK, profile_skeleton(_facts()), synthesis, _RejectAll()
+    )
+    assert fragment.entries == []
+    assert any("overreach" in d for d in drops)
+
+
+def test_missing_verdict_counts_as_unsupported():
+    synthesis = _SeqAgent([SynthesizedFragment(entries=[_entry()])])
+
+    class _Silent:
+        def run(self, prompt):
+            return _FakeResult(ClaimVerdicts(verdicts=[]))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    fragment, drops = synthesize_document(
+        _doc(), _DECK, profile_skeleton(_facts()), synthesis, _Silent()
+    )
+    assert fragment.entries == []
+    assert drops
+
+
+def test_fragment_to_facts_builds_anchored_stub_with_evidence():
+    fragment = SynthesizedFragment(entries=[
+        _entry(tech=["Kubernetes"]),
+        SynthesizedEntry(kind="skills", category="hard",
+                         claims=[SynthesizedClaim(text="Kubernetes",
+                                                  support=["Built on Kubernetes"])]),
+        SynthesizedEntry(kind="project", title="Billing rewrite",
+                         claims=[SynthesizedClaim(text="Rewrote billing",
+                                                  support=["billing rewrite"])]),
+    ])
+    facts, evidence = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
+
+    stub = facts.experience[0]
+    assert stub.id == "exp1" and stub.company == "Acme"
+    bullet = stub.bullets[0]
+    assert bullet.synthesized and bullet.source_ref == "deck-1"
+    assert evidence[bullet.id]["support"] == ["cut p99 latency 30%"]
+
+    skill = facts.skills["hard"][0]
+    assert skill.synthesized and skill.id in evidence
+
+    project = facts.projects[0]
+    assert project.name == "Billing rewrite" and project.synthesized
+    assert project.highlights == ["Rewrote billing"]
+
+
+def test_fragment_to_facts_unknown_anchor_becomes_project():
+    fragment = SynthesizedFragment(entries=[_entry(anchor_id="ghost")])
+    facts, _ = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
+    assert facts.experience == []
+    assert len(facts.projects) == 1
+
+
+def test_fragment_to_facts_ids_are_deterministic():
+    fragment = SynthesizedFragment(entries=[_entry()])
+    first, _ = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
+    second, _ = fragment_to_facts(_doc(), fragment, profile_skeleton(_facts()))
+    assert first.experience[0].bullets[0].id == second.experience[0].bullets[0].id
