@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -68,7 +69,7 @@ def _pull_result(report: PullReport) -> dict[str, object]:
 
 
 def _fetch_all(
-    connectors: list[Connector],
+    connectors: Sequence[Connector],
     search: SearchConfig,
     limit: int | None,
     skip_seen,
@@ -96,7 +97,7 @@ def _fetch_all(
 
 def run_pull(
     session: Session,
-    connectors: list[Connector],
+    connectors: Sequence[Connector],
     search: SearchConfig,
     telemetry_path: str | Path,
     limit: int | None = None,

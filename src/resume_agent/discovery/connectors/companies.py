@@ -146,6 +146,7 @@ class CompaniesConnector:
     """Pull openings from company careers URLs by auto-detecting their ATS."""
 
     name = "companies"
+    concurrent_fetch = True
 
     def __init__(self, urls: list[str]):
         self.urls = urls

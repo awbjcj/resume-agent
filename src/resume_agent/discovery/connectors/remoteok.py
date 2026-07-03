@@ -33,6 +33,7 @@ class RemoteOKConnector:
     """Remote-jobs feed. One GET returns everything; filtered client-side."""
 
     name = "remoteok"
+    concurrent_fetch = True
 
     def fetch(
         self,

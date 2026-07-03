@@ -18,6 +18,7 @@ def test_rawjob_carries_its_own_source():
 def test_connector_protocol_accepts_a_conforming_object():
     class _Fake:
         name = "fake"
+        concurrent_fetch = True
 
         def fetch(self, search, limit=None, skip_seen=None):
             return FetchResult(jobs=[RawJob("fake", None, "Acme", "Eng", None, "jd")])

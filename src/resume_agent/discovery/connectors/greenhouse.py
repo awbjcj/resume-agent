@@ -49,6 +49,7 @@ class GreenhouseConnector:
     """
 
     name = "greenhouse"
+    concurrent_fetch = True
 
     def __init__(self, boards: list[GreenhouseBoard]):
         self.boards = boards

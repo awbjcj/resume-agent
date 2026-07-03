@@ -71,6 +71,7 @@ class LeverConnector:
     """
 
     name = "lever"
+    concurrent_fetch = True
 
     def __init__(self, boards: list[LeverBoard]):
         self.boards = boards

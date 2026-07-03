@@ -16,6 +16,7 @@ def _session():
 
 class _Good:
     name = "greenhouse"
+    concurrent_fetch = True
 
     def fetch(self, search, limit=None, skip_seen=None):
         return FetchResult(
@@ -34,6 +35,7 @@ class _Good:
 
 class _Boom:
     name = "adzuna"
+    concurrent_fetch = True
 
     def fetch(self, search, limit=None, skip_seen=None):
         raise RuntimeError("HTTP 429")
@@ -75,6 +77,7 @@ def test_run_pull_reports_progress_with_added_total(tmp_path):
 def test_runner_note_includes_filtered_count(tmp_path):
     class _Conn:
         name = "fake"
+        concurrent_fetch = True
 
         def fetch(self, search, limit=None, skip_seen=None):
             return FetchResult(jobs=[], filtered=7)
@@ -88,6 +91,7 @@ def test_runner_note_includes_filtered_count(tmp_path):
 
 class _UpgradingConnector:
     name = "companies"
+    concurrent_fetch = True
 
     def fetch(self, search, limit=None, skip_seen=None):
         return FetchResult(
@@ -132,6 +136,7 @@ class _MixedConnector:
     """Fan-out connector whose sub-source labels never equal its own name."""
 
     name = "companies"
+    concurrent_fetch = True
 
     def fetch(self, search, limit=None, skip_seen=None):
         return FetchResult(
@@ -187,6 +192,7 @@ class _SeenAwareConnector:
     """Connector that captures the ``skip_seen`` gate the runner hands it."""
 
     name = "scrape"
+    concurrent_fetch = True
 
     def __init__(self):
         self.received: SkipSeen | str | None = "unset"
@@ -243,6 +249,7 @@ def test_run_pull_reports_upgraded_and_skipped(tmp_path):
 
     class OneBoard:
         name = "greenhouse:acme"
+        concurrent_fetch = True
 
         def fetch(self, search, limit=None, skip_seen=None):
             return FetchResult(jobs=[job])
@@ -258,6 +265,7 @@ def test_run_pull_reports_upgraded_and_skipped(tmp_path):
 
 class _SkipSpy:
     name = "workday"
+    concurrent_fetch = True
 
     def __init__(self):
         self.received = "unset"
