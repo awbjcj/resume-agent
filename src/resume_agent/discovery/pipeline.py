@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from pathlib import Path
 
 from sqlmodel import Session, select
@@ -41,6 +42,8 @@ from resume_agent.taxonomy.skills import refresh_aliases, split_skills
 from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
 from resume_agent.tracking.repository import has_progress, jobs_by_status, status_counts
 from resume_agent.tracking.tables import Job, JobStatus
+
+logger = logging.getLogger(__name__)
 
 SKILL_ALIASES_PATH = Path("data/skill_aliases.json")
 
@@ -162,6 +165,12 @@ def _normalize_job_industries(
                 list(unresolved.values()), existing, classifier
             ).assignments
         except Exception:
+            logger.warning(
+                "industry classification failed; %d industr%s left unresolved this run",
+                len(unresolved),
+                "y" if len(unresolved) == 1 else "ies",
+                exc_info=True,
+            )
             additions = {}
 
     alias_additions: dict[str, str] = {}

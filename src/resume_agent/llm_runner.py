@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
 from inspect import isawaitable
@@ -22,6 +23,40 @@ class _ModelWithAsyncClient(Protocol):
     async_client: Any | None
 
 
+# Failures worth retrying: rate limits, overload, timeouts, dropped connections.
+# Matched by status code and class name so no provider SDK is imported here
+# (the same lazy-import rule build_model follows).
+_TRANSIENT_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
+_TRANSIENT_NAMES = {
+    "APIConnectionError",
+    "APITimeoutError",
+    "ConnectError",
+    "ConnectTimeout",
+    "InternalServerError",
+    "OverloadedError",
+    "PoolTimeout",
+    "RateLimitError",
+    "ReadTimeout",
+    "RemoteProtocolError",
+    "ServiceUnavailableError",
+    "TimeoutException",
+    "WriteTimeout",
+}
+
+
+def is_transient(exc: BaseException) -> bool:
+    """Whether an LLM-call failure is worth retrying.
+
+    Auth, schema, and parse failures are deterministic — retrying them burns
+    llm_retries x tokens for the same answer — so anything unrecognized is
+    treated as permanent.
+    """
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status in _TRANSIENT_STATUS
+    return any(klass.__name__ in _TRANSIENT_NAMES for klass in type(exc).__mro__)
+
+
 class AgentRunner:
     """Adapter that narrows third-party agent APIs to ``run`` / ``arun``."""
 
@@ -29,10 +64,26 @@ class AgentRunner:
         self._agent = agent
 
     def run(self, prompt: str) -> Any:
-        return self._agent.run(prompt)
+        settings = get_settings()
+        for attempt in range(settings.llm_retries + 1):
+            try:
+                return self._agent.run(prompt)
+            except Exception as exc:
+                if attempt >= settings.llm_retries or not is_transient(exc):
+                    raise
+                time.sleep(settings.llm_retry_delay * (2**attempt))
+        raise AssertionError("unreachable")
 
     async def arun(self, prompt: str) -> Any:
-        return await self._agent.arun(prompt)
+        settings = get_settings()
+        for attempt in range(settings.llm_retries + 1):
+            try:
+                return await self._agent.arun(prompt)
+            except Exception as exc:
+                if attempt >= settings.llm_retries or not is_transient(exc):
+                    raise
+                await asyncio.sleep(settings.llm_retry_delay * (2**attempt))
+        raise AssertionError("unreachable")
 
     async def aclose(self) -> None:
         """Close and detach the SDK's cached async client on its active loop."""
@@ -264,10 +315,10 @@ async def acall(
 
 
 def retry_kwargs() -> dict[str, Any]:
-    """agno per-agent retry config, spread into every ``Agent(...)`` we build."""
-    s = get_settings()
-    return {
-        "retries": s.llm_retries,
-        "delay_between_retries": s.llm_retry_delay,
-        "exponential_backoff": True,
-    }
+    """agno per-agent retry config, spread into every ``Agent(...)`` we build.
+
+    Retries live in AgentRunner behind the is_transient predicate; agno's own
+    bare-``Exception`` retry is disabled so a deterministic failure (auth,
+    schema, parse) surfaces after one call instead of 1 + llm_retries.
+    """
+    return {"retries": 0}

@@ -246,7 +246,9 @@ def test_acall_observes_permit_release_after_error():
     assert events == ["acquire", "release"]
 
 
-def test_retry_kwargs_reads_settings(monkeypatch):
+def test_retry_kwargs_disables_agno_retry_regardless_of_settings(monkeypatch):
+    # Retries live in AgentRunner behind is_transient now; agno's own retry is
+    # always off, independent of llm_retries/llm_retry_delay.
     monkeypatch.setenv("LLM_RETRIES", "5")
     monkeypatch.setenv("LLM_RETRY_DELAY", "3")
     from resume_agent.config import get_settings
@@ -254,10 +256,6 @@ def test_retry_kwargs_reads_settings(monkeypatch):
 
     get_settings.cache_clear()
     try:
-        assert retry_kwargs() == {
-            "retries": 5,
-            "delay_between_retries": 3,
-            "exponential_backoff": True,
-        }
+        assert retry_kwargs() == {"retries": 0}
     finally:
         get_settings.cache_clear()
