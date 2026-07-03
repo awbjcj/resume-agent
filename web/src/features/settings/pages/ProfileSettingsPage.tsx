@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { BuildReportPanel } from "@/features/profile-sources/BuildReportPanel";
 import { SourceManager } from "@/features/profile-sources/SourceManager";
 import { useActiveRun } from "@/features/runs/use-active-run";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
@@ -65,6 +66,7 @@ export function ProfileSettingsPage() {
           {building ? "Building…" : "Rebuild profile"}
         </Button>
       </div>
+      <BuildReportPanel />
     </div>
   );
 }
