@@ -1,0 +1,42 @@
+{
+  "contact": {"name": "Maya Chen", "email": "maya@example.com"},
+  "summary": "Senior backend engineer focused on performance and cost efficiency.",
+  "experience": [
+    {
+      "id": "e1",
+      "company": "DataFlow Systems",
+      "title": "Senior Software Engineer",
+      "start": "2022",
+      "end": "2025",
+      "bullets": [
+        {"id": "e1b1", "text": "Reduced p95 API latency from 800ms to 240ms by adding Redis caching and query batching."},
+        {"id": "e1b2", "text": "Cut monthly cloud spend by $18k (31%) by rightsizing container workloads."},
+        {"id": "e1b3", "text": "Led a 4-engineer effort migrating 12 services to event-driven processing with zero missed SLAs."}
+      ]
+    },
+    {
+      "id": "e2",
+      "company": "Nimbus Retail",
+      "title": "Software Engineer",
+      "start": "2019",
+      "end": "2022",
+      "bullets": [
+        {"id": "e2b1", "text": "Built an order-processing pipeline handling 1.2M orders/day in Python."},
+        {"id": "e2b2", "text": "Raised unit test coverage from 45% to 88%, halving production incidents."}
+      ]
+    }
+  ],
+  "skills": {
+    "languages": [
+      {"id": "s_py", "name": "Python"},
+      {"id": "s_sql", "name": "SQL"}
+    ],
+    "frameworks": [
+      {"id": "s_fastapi", "name": "FastAPI"},
+      {"id": "s_redis", "name": "Redis"}
+    ]
+  },
+  "education": [
+    {"id": "ed1", "institution": "State University", "degree": "BS Computer Science", "end": "2019"}
+  ]
+}

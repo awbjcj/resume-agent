@@ -1,0 +1,24 @@
+{
+  "id": "case_10_keyword_mismatch",
+  "profile_ref": "terminology_eng",
+  "jd_text": "Backend Engineer at Shiply. Required: AWS (ECS and Lambda), CI/CD pipeline ownership, and TDD as a daily practice. Python required. Kafka experience is a plus. You will ship containerized services and own their delivery pipeline end to end.",
+  "criteria": {
+    "seniority": "mid",
+    "tech_stack": ["Python", "AWS"],
+    "yoe_min": 3,
+    "must_have_skills": ["AWS", "CI/CD", "TDD", "Python"],
+    "nice_to_have_skills": ["Kafka"]
+  },
+  "traps": [
+    {
+      "id": "kafka-missing",
+      "kind": "missing_skill",
+      "forbidden_terms": ["Kafka"],
+      "description": "The profile has no Kafka experience; claiming it fabricates the nice-to-have.",
+      "probe_claim": "Built Kafka event pipelines on AWS.",
+      "probe_provenance": "e1b1"
+    }
+  ],
+  "must_cite": ["e1b1", "e1b2"],
+  "rubric": ["keyword coverage", "terminology fidelity", "relevance"]
+}

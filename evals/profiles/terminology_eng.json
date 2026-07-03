@@ -1,0 +1,41 @@
+{
+  "contact": {"name": "Sam Okafor", "email": "sam@example.com"},
+  "summary": "Backend engineer with five years of cloud service delivery.",
+  "experience": [
+    {
+      "id": "e1",
+      "company": "CloudWorks",
+      "title": "Software Engineer",
+      "start": "2020",
+      "end": "2025",
+      "bullets": [
+        {"id": "e1b1", "text": "Deployed microservices to Amazon Web Services using Elastic Container Service and Lambda functions."},
+        {"id": "e1b2", "text": "Set up continuous integration and continuous delivery pipelines with automated test gates."},
+        {"id": "e1b3", "text": "Practiced test-driven development across a Python codebase with pytest."}
+      ]
+    },
+    {
+      "id": "e2",
+      "company": "BrightApps",
+      "title": "Junior Developer",
+      "start": "2018",
+      "end": "2020",
+      "bullets": [
+        {"id": "e2b1", "text": "Maintained REST endpoints and wrote integration tests for a Python web service."}
+      ]
+    }
+  ],
+  "skills": {
+    "languages": [
+      {"id": "s_py", "name": "Python"},
+      {"id": "s_ts", "name": "TypeScript"}
+    ],
+    "frameworks": [
+      {"id": "s_aws", "name": "Amazon Web Services"},
+      {"id": "s_ci", "name": "Continuous Integration"}
+    ]
+  },
+  "education": [
+    {"id": "ed1", "institution": "City College", "degree": "BS Software Engineering", "end": "2018"}
+  ]
+}

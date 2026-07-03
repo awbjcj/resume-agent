@@ -1,0 +1,23 @@
+{
+  "id": "case_11_overlong",
+  "profile_ref": "overlong_eng",
+  "jd_text": "Senior Full-Stack Engineer at Cartwheel. You will build React frontends and Python backends for our commerce platform, own features end to end, and mentor teammates. Required: 5+ years, React, Python or Django, automated testing. We value focus: show us what matters, not everything you have done.",
+  "criteria": {
+    "seniority": "senior",
+    "tech_stack": ["React", "Python", "Django"],
+    "yoe_min": 5,
+    "must_have_skills": ["React", "Python"]
+  },
+  "traps": [
+    {
+      "id": "principal-title",
+      "kind": "seniority_inflation",
+      "forbidden_terms": ["Principal Engineer", "Head of Engineering"],
+      "description": "The candidate peaked at Senior Software Engineer; a Principal or Head title is invented seniority.",
+      "probe_claim": "Promoted to Principal Engineer leading the platform group.",
+      "probe_provenance": "e1b1"
+    }
+  ],
+  "must_cite": ["e1b1", "e1b2"],
+  "rubric": ["prioritization", "concision", "relevance"]
+}

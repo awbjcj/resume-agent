@@ -46,3 +46,14 @@ def test_trap_kinds_cover_all_four():
         "inflatable_metric",
         "seniority_inflation",
     } <= kinds
+
+
+def test_craft_cases_present():
+    ids = {case.id for case in load_cases(CASES)}
+
+    assert {
+        "case_09_metric_rich",
+        "case_10_keyword_mismatch",
+        "case_11_overlong",
+        "case_12_career_changer",
+    } <= ids

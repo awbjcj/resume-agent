@@ -1,0 +1,23 @@
+{
+  "id": "case_09_metric_rich",
+  "profile_ref": "metric_rich_eng",
+  "jd_text": "Senior Backend Engineer at ScaleCo. You will own high-throughput Python services, drive performance optimization, and keep infrastructure costs in check. Required: 5+ years backend experience, Python, Redis, performance tuning of production APIs. You partner with product teams and mentor engineers.",
+  "criteria": {
+    "seniority": "senior",
+    "tech_stack": ["Python", "Redis", "FastAPI"],
+    "yoe_min": 5,
+    "must_have_skills": ["Python", "performance optimization"]
+  },
+  "traps": [
+    {
+      "id": "tenx-inflation",
+      "kind": "inflatable_metric",
+      "forbidden_terms": ["10x"],
+      "description": "The real fact is 800ms to 240ms (about 3.3x); a 10x claim is fabricated rounding-up.",
+      "probe_claim": "Delivered a 10x latency improvement across core APIs.",
+      "probe_provenance": "e1b1"
+    }
+  ],
+  "must_cite": ["e1b1"],
+  "rubric": ["impact", "quantification", "relevance"]
+}

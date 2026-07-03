@@ -1,0 +1,43 @@
+{
+  "contact": {"name": "Dana Torres", "email": "dana@example.com"},
+  "summary": "Former math teacher who retrained as a software developer.",
+  "experience": [
+    {
+      "id": "e1",
+      "company": "Lakeside Startup",
+      "title": "Junior Software Developer",
+      "start": "2023",
+      "end": "2025",
+      "bullets": [
+        {"id": "e1b1", "text": "Built React components and Python API endpoints for a scheduling product."},
+        {"id": "e1b2", "text": "Wrote pytest suites covering new endpoints before merge."},
+        {"id": "e1b3", "text": "Shipped a CSV import feature used by 200 customer accounts."}
+      ]
+    },
+    {
+      "id": "e2",
+      "company": "Riverview High School",
+      "title": "Mathematics Teacher",
+      "start": "2016",
+      "end": "2022",
+      "bullets": [
+        {"id": "e2b1", "text": "Taught algebra and statistics to 150 students per year."},
+        {"id": "e2b2", "text": "Designed a data-literacy elective adopted by two other schools."},
+        {"id": "e2b3", "text": "Led a robotics club that placed second in a state competition."}
+      ]
+    }
+  ],
+  "skills": {
+    "languages": [
+      {"id": "s_py", "name": "Python"},
+      {"id": "s_js", "name": "JavaScript"}
+    ],
+    "frameworks": [
+      {"id": "s_react", "name": "React"}
+    ]
+  },
+  "education": [
+    {"id": "ed1", "institution": "Metro Coding Bootcamp", "degree": "Full-Stack Certificate", "end": "2023"},
+    {"id": "ed2", "institution": "State University", "degree": "BA Mathematics", "end": "2016"}
+  ]
+}

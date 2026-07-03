@@ -1,0 +1,97 @@
+{
+  "contact": {"name": "Priya Nair", "email": "priya@example.com"},
+  "summary": "Full-stack engineer with ten years across web platforms.",
+  "experience": [
+    {
+      "id": "e1",
+      "company": "Streamline",
+      "title": "Senior Software Engineer",
+      "start": "2022",
+      "end": "2025",
+      "bullets": [
+        {"id": "e1b1", "text": "Led rebuild of the React checkout flow, raising conversion 12%."},
+        {"id": "e1b2", "text": "Designed Python order APIs serving 40k daily users."},
+        {"id": "e1b3", "text": "Mentored three junior engineers through onboarding."},
+        {"id": "e1b4", "text": "Introduced feature flags, cutting rollback time to minutes."}
+      ]
+    },
+    {
+      "id": "e2",
+      "company": "Streamline",
+      "title": "Software Engineer",
+      "start": "2019",
+      "end": "2022",
+      "bullets": [
+        {"id": "e2b1", "text": "Built React dashboards for operations teams."},
+        {"id": "e2b2", "text": "Wrote Django services for inventory tracking."},
+        {"id": "e2b3", "text": "Added Cypress end-to-end tests to the release pipeline."},
+        {"id": "e2b4", "text": "Migrated legacy jQuery pages to React."}
+      ]
+    },
+    {
+      "id": "e3",
+      "company": "Webify Agency",
+      "title": "Software Engineer",
+      "start": "2017",
+      "end": "2019",
+      "bullets": [
+        {"id": "e3b1", "text": "Delivered client marketing sites on a PHP CMS."},
+        {"id": "e3b2", "text": "Built a booking widget in vanilla JavaScript."},
+        {"id": "e3b3", "text": "Handled client support rotations."},
+        {"id": "e3b4", "text": "Wrote HTML email templates for campaigns."}
+      ]
+    },
+    {
+      "id": "e4",
+      "company": "Webify Agency",
+      "title": "Junior Developer",
+      "start": "2015",
+      "end": "2017",
+      "bullets": [
+        {"id": "e4b1", "text": "Fixed cross-browser CSS bugs across client sites."},
+        {"id": "e4b2", "text": "Maintained WordPress plugins."},
+        {"id": "e4b3", "text": "Sliced design mockups into templates."},
+        {"id": "e4b4", "text": "Wrote weekly status reports for account managers."}
+      ]
+    },
+    {
+      "id": "e5",
+      "company": "QA Partners",
+      "title": "QA Intern",
+      "start": "2014",
+      "end": "2015",
+      "bullets": [
+        {"id": "e5b1", "text": "Executed manual regression test plans."},
+        {"id": "e5b2", "text": "Logged and triaged defects in Jira."},
+        {"id": "e5b3", "text": "Verified fixes across staging environments."},
+        {"id": "e5b4", "text": "Documented test cases for new features."}
+      ]
+    },
+    {
+      "id": "e6",
+      "company": "Campus IT",
+      "title": "IT Support Assistant",
+      "start": "2013",
+      "end": "2014",
+      "bullets": [
+        {"id": "e6b1", "text": "Resolved help-desk tickets for students and staff."},
+        {"id": "e6b2", "text": "Imaged and deployed lab computers."},
+        {"id": "e6b3", "text": "Maintained printer fleets across two buildings."},
+        {"id": "e6b4", "text": "Wrote how-to guides for common issues."}
+      ]
+    }
+  ],
+  "skills": {
+    "languages": [
+      {"id": "s_py", "name": "Python"},
+      {"id": "s_js", "name": "JavaScript"}
+    ],
+    "frameworks": [
+      {"id": "s_react", "name": "React"},
+      {"id": "s_django", "name": "Django"}
+    ]
+  },
+  "education": [
+    {"id": "ed1", "institution": "State University", "degree": "BS Computer Science", "end": "2013"}
+  ]
+}
