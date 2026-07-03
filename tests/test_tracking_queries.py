@@ -516,6 +516,7 @@ def _seeded_engine(job_count: int):
             session.commit()
             session.refresh(job)
             if i % 2:
+                assert job.id is not None
                 session.add(ResumeVersion(job_id=job.id, round=1, fact_check_passed=True))
                 session.add(Application(job_id=job.id, status="ready"))
                 session.commit()
