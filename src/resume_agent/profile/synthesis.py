@@ -9,6 +9,7 @@ because verification anchors each claim to user-authored source text.
 """
 
 import json
+import re
 from typing import Literal
 
 from agno.agent import Agent
@@ -149,3 +150,60 @@ def build_entailment_agent(model_id: str | None = None) -> Runner:
             **retry_kwargs(),
         )
     )
+
+
+_NUMBER = re.compile(r"\d[\d,.]*%?")
+_WORD = re.compile(r"[A-Za-z][A-Za-z0-9+#./-]*")
+_WS = re.compile(r"\s+")
+_SENTENCE_SPLIT = re.compile(r"[.!?:;]\s+|\n+")
+
+
+def _normalize_ws(text: str) -> str:
+    return _WS.sub(" ", text).strip()
+
+
+def _normalize_number(token: str) -> str:
+    return token.replace(",", "").rstrip(".")
+
+
+def _proper_nouns(text: str) -> set[str]:
+    """Capitalized tokens that are not sentence/line-initial (heuristic).
+
+    Sentence-initial words are exempt because English capitalizes them
+    regardless of noun-ness; the entailment pass covers what this misses.
+    """
+    nouns: set[str] = set()
+    for sentence in _SENTENCE_SPLIT.split(text):
+        for match in list(_WORD.finditer(sentence))[1:]:
+            word = match.group()
+            if word[0].isupper():
+                nouns.add(word)
+    return nouns
+
+
+def deterministic_failures(
+    claim: SynthesizedClaim, source_text: str, tech: list[str] | None = None
+) -> list[str]:
+    """Free checks a claim must pass before the entailment judge sees it."""
+    reasons: list[str] = []
+    source_folded = _normalize_ws(source_text).casefold()
+
+    if not claim.support:
+        reasons.append("no supporting excerpt")
+    for excerpt in claim.support:
+        if _normalize_ws(excerpt).casefold() not in source_folded:
+            reasons.append(f"excerpt not found in source: {excerpt[:60]!r}")
+
+    source_numbers = {_normalize_number(t) for t in _NUMBER.findall(source_text)}
+    for token in _NUMBER.findall(claim.text):
+        if _normalize_number(token) not in source_numbers:
+            reasons.append(f"number {token!r} not in source")
+
+    for noun in sorted(_proper_nouns(claim.text)):
+        if noun.casefold() not in source_folded:
+            reasons.append(f"name {noun!r} not in source")
+
+    for token in tech or []:
+        if token.casefold() not in source_folded:
+            reasons.append(f"tech {token!r} not in source")
+    return reasons

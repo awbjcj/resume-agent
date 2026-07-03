@@ -4,6 +4,7 @@ from resume_agent.profile.synthesis import (
     SynthesizedEntry,
     SynthesizedFragment,
     compose_synthesis_input,
+    deterministic_failures,
     profile_skeleton,
 )
 
@@ -66,3 +67,66 @@ def test_synthesized_fragment_models_validate():
         tech=["Kubernetes"],
     )])
     assert fragment.entries[0].claims[0].support == ["latency fell 30%"]
+
+
+_SOURCE = (
+    "Slide 3: The billing rewrite at Acme cut p99 latency 30% across 4 services.\n"
+    "We migrated the pipeline to Kubernetes in 2024."
+)
+
+
+def _claim(text, support=None):
+    return SynthesizedClaim(text=text, support=support or ["cut p99 latency 30%"])
+
+
+def test_supported_claim_passes():
+    claim = _claim("Cut p99 latency 30% across 4 services",
+                   support=["cut p99 latency 30% across 4 services"])
+    assert deterministic_failures(claim, _SOURCE) == []
+
+
+def test_unsupported_number_fails():
+    failures = deterministic_failures(_claim("Cut p99 latency 45%"), _SOURCE)
+    assert any("45%" in reason for reason in failures)
+
+
+def test_unsupported_proper_noun_fails():
+    failures = deterministic_failures(
+        _claim("Migrated the pipeline to Terraform",
+               support=["migrated the pipeline to Kubernetes"]),
+        _SOURCE,
+    )
+    assert any("Terraform" in reason for reason in failures)
+
+
+def test_sentence_initial_capital_is_exempt():
+    claim = _claim("Migrated the pipeline to Kubernetes",
+                   support=["migrated the pipeline to Kubernetes in 2024"])
+    assert deterministic_failures(claim, _SOURCE) == []
+
+
+def test_excerpt_must_be_a_real_substring():
+    claim = SynthesizedClaim(text="Cut latency", support=["latency dropped in half"])
+    failures = deterministic_failures(claim, _SOURCE)
+    assert any("excerpt" in reason for reason in failures)
+
+
+def test_excerpt_whitespace_is_normalized():
+    claim = SynthesizedClaim(
+        text="Cut p99 latency 30%",
+        support=["cut p99   latency\n30%"],
+    )
+    assert deterministic_failures(claim, _SOURCE) == []
+
+
+def test_missing_support_fails():
+    failures = deterministic_failures(SynthesizedClaim(text="Cut latency"), _SOURCE)
+    assert failures == ["no supporting excerpt"]
+
+
+def test_unknown_tech_token_fails():
+    failures = deterministic_failures(
+        _claim("Cut p99 latency 30%"), _SOURCE, tech=["Kubernetes", "Terraform"]
+    )
+    assert any("Terraform" in reason for reason in failures)
+    assert not any("Kubernetes" in reason for reason in failures)
