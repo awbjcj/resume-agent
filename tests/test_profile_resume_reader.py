@@ -27,6 +27,23 @@ def test_reads_docx(tmp_path):
     assert "Analytical Engines Ltd" in text
 
 
+def test_reads_docx_table_cells(tmp_path):
+    from docx import Document
+
+    f = tmp_path / "resume_with_table.docx"
+    doc = Document()
+    doc.add_paragraph("Ada Lovelace")
+    table = doc.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "Analytical Engine Project"
+    table.cell(0, 1).text = "Cut latency 40%"
+    table.cell(1, 0).text = "Notes"
+    table.cell(1, 1).text = "Wrote the first algorithm"
+    doc.save(str(f))
+
+    text = read_document_text(f)
+    assert "Cut latency 40%" in text
+
+
 def test_unsupported_format_raises(tmp_path):
     f = tmp_path / "resume.rtf"
     f.write_text("nope", encoding="utf-8")
