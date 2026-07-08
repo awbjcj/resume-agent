@@ -25,12 +25,14 @@
 ### Task 1: Sources + skeleton API endpoints
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/profile.py`
 - Modify: `src/resume_agent/api/routers/profile.py`
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (regenerated)
 - Test: `tests/api/test_profile_sources.py` (new)
 
 **Interfaces:**
+
 - Consumes (Phase A): `corpus.load_manifest / add_source / update_source / remove_source / _UNSET`, `fragments.fragment_cache_status`, `synthesis.profile_skeleton`, `store.load_facts`.
 - Produces (wire, camelCase): `SourceOut{id, filename, mode, primary, anchor, addedAt, fragmentStatus}`, `SourcePatch{mode?, anchor?, primary?}`, `SkeletonEntryOut{id, kind, label}`; routes `GET/POST /api/profile/sources`, `PATCH/DELETE /api/profile/sources/{doc_id}`, `GET /api/profile/skeleton`.
 
@@ -329,11 +331,13 @@ git commit -m "Serves the profile source corpus over the API with anchor skeleto
 ### Task 2: Build run uses the corpus pipeline
 
 **Files:**
+
 - Modify: `src/resume_agent/services/profile_build.py`
 - Modify: `src/resume_agent/api/routers/profile.py` (`launch_profile_build`)
 - Test: `tests/api/test_profile_build_run.py`
 
 **Interfaces:**
+
 - Consumes: Phase A `build_corpus_profile(..., synthesis_agent, entailment_agent)`, agent builders, `matrix.build_matrix/load_overrides/save_matrix`, `taxonomy.clusters.load_cluster_map`, `corpus.add_source/load_manifest`.
 - Produces: `profile_build.run_corpus_build(reporter, *, profile_dir: Path, github_username: str | None, facts_out: str | Path) -> dict` returning camelCase-keyed report (`experiences`, `projects`, `docStatus`, `conflicts`, `anchorDecisions`, `verificationDrops`, `inferred`, `warnings`). `run_profile_build` is deleted (its only caller was this router).
 
@@ -533,12 +537,14 @@ git commit -m "Runs the web profile build through the corpus pipeline"
 ### Task 3: Web source manager (hooks + component + page swap)
 
 **Files:**
+
 - Create: `web/src/features/profile-sources/use-sources.ts`
 - Create: `web/src/features/profile-sources/SourceManager.tsx`
 - Create: `web/src/features/profile-sources/SourceManager.test.tsx`
 - Modify: `web/src/features/settings/pages/ProfileSettingsPage.tsx` (swap `DocumentManager` → `SourceManager`)
 
 **Interfaces:**
+
 - Consumes: Task 1 endpoints via the regenerated `web/src/lib/api/schema.ts`; `api/getToken/unwrap` from `@/lib/api/client` (same pattern as `use-documents.ts`).
 - Produces: `ProfileSource` type, hooks `useSources() / useUploadSource() / usePatchSource() / useDeleteSource() / useSkeleton()`, `<SourceManager />`. The wizard's `DocumentManager` stays untouched (setup flow still uses `/api/profile/documents`).
 
@@ -568,7 +574,9 @@ export function useSources() {
   return useQuery({
     queryKey: ["profile-sources"],
     queryFn: () =>
-      unwrap(api.GET("/api/profile/sources", {} as never)) as Promise<ProfileSource[]>,
+      unwrap(api.GET("/api/profile/sources", {} as never)) as Promise<
+        ProfileSource[]
+      >,
   });
 }
 
@@ -576,7 +584,9 @@ export function useSkeleton() {
   return useQuery({
     queryKey: ["profile-skeleton"],
     queryFn: () =>
-      unwrap(api.GET("/api/profile/skeleton", {} as never)) as Promise<SkeletonEntry[]>,
+      unwrap(api.GET("/api/profile/skeleton", {} as never)) as Promise<
+        SkeletonEntry[]
+      >,
   });
 }
 
@@ -588,7 +598,9 @@ async function postSource(file: File, mode?: string): Promise<ProfileSource> {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const resp = await fetch(`${window.location.origin}/api/profile/sources`, {
-    method: "POST", body: form, headers,
+    method: "POST",
+    body: form,
+    headers,
   });
   const body = await resp.json();
   if (!resp.ok) throw new Error(body?.error?.message ?? "Upload failed");
@@ -598,7 +610,8 @@ async function postSource(file: File, mode?: string): Promise<ProfileSource> {
 export function useUploadSource() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ file, mode }: { file: File; mode?: string }) => postSource(file, mode),
+    mutationFn: ({ file, mode }: { file: File; mode?: string }) =>
+      postSource(file, mode),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile-sources"] });
       toast.success("Source added");
@@ -610,11 +623,18 @@ export function useUploadSource() {
 export function usePatchSource() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...patch }: { id: string } & Partial<Pick<ProfileSource, "mode" | "anchor" | "primary">>) =>
-      unwrap(api.PATCH("/api/profile/sources/{doc_id}", {
-        params: { path: { doc_id: id } },
-        body: patch,
-      } as never)) as Promise<ProfileSource>,
+    mutationFn: ({
+      id,
+      ...patch
+    }: { id: string } & Partial<
+      Pick<ProfileSource, "mode" | "anchor" | "primary">
+    >) =>
+      unwrap(
+        api.PATCH("/api/profile/sources/{doc_id}", {
+          params: { path: { doc_id: id } },
+          body: patch,
+        } as never),
+      ) as Promise<ProfileSource>,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile-sources"] }),
     onError: (err: Error) => toast.error(err.message),
   });
@@ -624,9 +644,11 @@ export function useDeleteSource() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      unwrap(api.DELETE("/api/profile/sources/{doc_id}", {
-        params: { path: { doc_id: id } },
-      } as never)),
+      unwrap(
+        api.DELETE("/api/profile/sources/{doc_id}", {
+          params: { path: { doc_id: id } },
+        } as never),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile-sources"] }),
     onError: (err: Error) => toast.error(err.message),
   });
@@ -644,10 +666,24 @@ import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   sources: [
-    { id: "r1", filename: "resume.pdf", mode: "literal", primary: true,
-      anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached" },
-    { id: "d1", filename: "deck.pptx", mode: "synthesis", primary: false,
-      anchor: null, addedAt: "2026-07-03", fragmentStatus: "missing" },
+    {
+      id: "r1",
+      filename: "resume.pdf",
+      mode: "literal",
+      primary: true,
+      anchor: null,
+      addedAt: "2026-07-03",
+      fragmentStatus: "cached",
+    },
+    {
+      id: "d1",
+      filename: "deck.pptx",
+      mode: "synthesis",
+      primary: false,
+      anchor: null,
+      addedAt: "2026-07-03",
+      fragmentStatus: "missing",
+    },
   ],
   skeleton: [{ id: "exp1", kind: "experience", label: "Acme — Engineer" }],
   patch: vi.fn(),
@@ -682,7 +718,9 @@ describe("SourceManager", () => {
 
   it("deletes a source", async () => {
     render(<SourceManager />);
-    await userEvent.click(screen.getByRole("button", { name: /remove deck.pptx/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /remove deck.pptx/i }),
+    );
     expect(mocks.remove).toHaveBeenCalledWith("d1");
   });
 });
@@ -744,26 +782,40 @@ export function SourceManager() {
             e.target.value = "";
           }}
         />
-        <Button variant="outline" disabled={upload.isPending}
-          onClick={() => fileInput.current?.click()}>
+        <Button
+          variant="outline"
+          disabled={upload.isPending}
+          onClick={() => fileInput.current?.click()}
+        >
           Add document
         </Button>
       </div>
       <ul className="flex flex-col divide-y rounded-md border">
         {sources.map((source) => (
           <li key={source.id} className="flex flex-wrap items-center gap-3 p-3">
-            <span className="min-w-40 text-sm font-medium">{source.filename}</span>
+            <span className="min-w-40 text-sm font-medium">
+              {source.filename}
+            </span>
             {source.primary ? (
-              <span className="rounded bg-muted px-2 py-0.5 text-xs">primary</span>
+              <span className="rounded bg-muted px-2 py-0.5 text-xs">
+                primary
+              </span>
             ) : (
               <select
                 aria-label={`mode for ${source.filename}`}
                 className="rounded border bg-background p-1 text-xs"
                 value={source.mode}
-                onChange={(e) => patch.mutate({ id: source.id, mode: e.target.value as "literal" | "synthesis" })}
+                onChange={(e) =>
+                  patch.mutate({
+                    id: source.id,
+                    mode: e.target.value as "literal" | "synthesis",
+                  })
+                }
               >
                 {MODES.map((mode) => (
-                  <option key={mode} value={mode}>{mode}</option>
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
                 ))}
               </select>
             )}
@@ -773,12 +825,17 @@ export function SourceManager() {
                 className="rounded border bg-background p-1 text-xs"
                 value={source.anchor ?? ""}
                 onChange={(e) =>
-                  patch.mutate({ id: source.id, anchor: e.target.value || null })
+                  patch.mutate({
+                    id: source.id,
+                    anchor: e.target.value || null,
+                  })
                 }
               >
                 <option value="">auto-anchor</option>
                 {(skeleton ?? []).map((entry) => (
-                  <option key={entry.id} value={entry.id}>{entry.label}</option>
+                  <option key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </option>
                 ))}
               </select>
             ) : null}
@@ -831,11 +888,13 @@ git commit -m "Manages profile corpus sources from the settings page"
 ### Task 4: Build report panel + end-to-end verification
 
 **Files:**
+
 - Create: `web/src/features/profile-sources/BuildReportPanel.tsx`
 - Create: `web/src/features/profile-sources/BuildReportPanel.test.tsx`
 - Modify: `web/src/features/settings/pages/ProfileSettingsPage.tsx`
 
 **Interfaces:**
+
 - Consumes: `useRunStore` from `@/lib/runs/store` (run `result` carries Task 2's camelCase report keys); Task 3's page layout.
 - Produces: `<BuildReportPanel />` rendering the newest completed `profile-build` run's report.
 
@@ -861,17 +920,28 @@ describe("BuildReportPanel", () => {
 
   it("shows anchors, drops, and warnings from the run result", () => {
     useRunStore.getState().upsert({
-      runId: "r1", kind: "profile-build", status: "succeeded",
-      percent: 100, phase: "done", current: 3, total: 3, etaText: null,
+      runId: "r1",
+      kind: "profile-build",
+      status: "succeeded",
+      percent: 100,
+      phase: "done",
+      current: 3,
+      total: 3,
+      etaText: null,
       result: {
-        experiences: 3, projects: 2,
+        experiences: 3,
+        projects: 2,
         anchorDecisions: ["deck-1: +2 bullets on Acme/Engineer"],
-        verificationDrops: ["deck-1: 'Cut latency 45%' — number '45%' not in source"],
+        verificationDrops: [
+          "deck-1: 'Cut latency 45%' — number '45%' not in source",
+        ],
         warnings: ["skill inference failed: boom"],
       },
     });
     render(<BuildReportPanel />);
-    expect(screen.getByText(/\+2 bullets on Acme\/Engineer/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/\+2 bullets on Acme\/Engineer/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/45%/)).toBeInTheDocument();
     expect(screen.getByText(/skill inference failed/)).toBeInTheDocument();
   });
@@ -899,14 +969,24 @@ type BuildReport = {
   warnings?: string[];
 };
 
-function Section({ title, lines, tone }: {
-  title: string; lines: string[]; tone?: "warn";
+function Section({
+  title,
+  lines,
+  tone,
+}: {
+  title: string;
+  lines: string[];
+  tone?: "warn";
 }) {
   if (lines.length === 0) return null;
   return (
     <div>
-      <div className="text-xs font-medium uppercase text-muted-foreground">{title}</div>
-      <ul className={`mt-1 flex flex-col gap-0.5 text-sm ${tone === "warn" ? "text-destructive" : ""}`}>
+      <div className="text-xs font-medium uppercase text-muted-foreground">
+        {title}
+      </div>
+      <ul
+        className={`mt-1 flex flex-col gap-0.5 text-sm ${tone === "warn" ? "text-destructive" : ""}`}
+      >
         {lines.map((line) => (
           <li key={line}>{line}</li>
         ))}
@@ -926,10 +1006,15 @@ export function BuildReportPanel() {
   return (
     <div className="flex flex-col gap-3 rounded-md border p-3">
       <div className="text-sm font-medium">
-        Last build: {report.experiences ?? 0} experiences, {report.projects ?? 0} projects
+        Last build: {report.experiences ?? 0} experiences,{" "}
+        {report.projects ?? 0} projects
       </div>
       <Section title="Anchor decisions" lines={report.anchorDecisions ?? []} />
-      <Section title="Dropped claims" lines={report.verificationDrops ?? []} tone="warn" />
+      <Section
+        title="Dropped claims"
+        lines={report.verificationDrops ?? []}
+        tone="warn"
+      />
       <Section title="Conflicts" lines={report.conflicts ?? []} />
       <Section title="Warnings" lines={report.warnings ?? []} tone="warn" />
     </div>

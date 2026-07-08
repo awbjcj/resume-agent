@@ -20,14 +20,14 @@
 
 ## Source findings this plan is built on (verified 2026-07-07)
 
-| #   | Finding                                                                                                                                                                                                                                                                                                                       | Evidence                                                                       |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| 1   | File-backed engines are a bare `create_engine(url)` — default rollback journal, no explicit busy timeout — while the API runs concurrent writers (RunManager default pool of 2, a per-kind suggestion pool, the request threadpool). Batched ingest (task 2 of the 2026-07-02 plan) holds the write lock longer per txn.        | `src/resume_agent/db.py:38-52`, `api/app.py:95-101`, `api/runs/manager.py:118` |
-| 2   | The agents→`build_corpus_profile`→`save_facts`→`build_matrix`→`save_matrix` orchestration is implemented twice: `cli.py` `profile_build` and `services/profile_build.run_corpus_build`. The API router already calls the service.                                                                                              | `cli.py:118-199`, `services/profile_build.py:10-55`, `api/routers/profile.py:97` |
-| 3   | `extract_fragments` and `extract_synthesis_fragments` are twin ~50-line walks: sha check, manifest bump, meta match → cache hit, error → stale fallback, atomic save, status vocabulary — differing only in meta shape and the produce step.                                                                                     | `profile/fragments.py:140-261`                                                 |
-| 4   | The profile build walks documents serially; a synthesis doc costs up to 4 sequential LLM calls (synthesize → entail → repair → entail). Discovery/tailor already fan out via `gather_isolated` with the semaphore in `acall`. Every profile test fake already implements `arun` (delegating to `run`).                          | `profile/fragments.py`, `profile/synthesis.py:352-382`, `tests/test_profile_*.py` |
-| 5   | `_normalize_job_industries` loads **every** `Job` (archived included) on every extract and rebuilds every row's criteria dict twice; SQLAlchemy's scalar-history equality check bounds the writes, but load/parse/flush-compare is O(table) per discover run.                                                                    | `discovery/pipeline.py:137-193` (sole caller: `run_extract`, pipeline.py:98)   |
-| 6   | `bulk_apply` re-runs the mutation-side N+1: `get_job` (1 query) + `has_progress` (≤4 queries) per job, plus one COMMIT per row via `set_stage`/`archive_job`/`delete_job` — a crash mid-loop leaves a half-applied bulk. `prune_run` has the same shape.                                                                        | `services/board.py:354-407`, `tracking/repository.py:439-449`                  |
+| #   | Finding                                                                                                                                                                                                                                                                                                                  | Evidence                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| 1   | File-backed engines are a bare `create_engine(url)` — default rollback journal, no explicit busy timeout — while the API runs concurrent writers (RunManager default pool of 2, a per-kind suggestion pool, the request threadpool). Batched ingest (task 2 of the 2026-07-02 plan) holds the write lock longer per txn. | `src/resume_agent/db.py:38-52`, `api/app.py:95-101`, `api/runs/manager.py:118`    |
+| 2   | The agents→`build_corpus_profile`→`save_facts`→`build_matrix`→`save_matrix` orchestration is implemented twice: `cli.py` `profile_build` and `services/profile_build.run_corpus_build`. The API router already calls the service.                                                                                        | `cli.py:118-199`, `services/profile_build.py:10-55`, `api/routers/profile.py:97`  |
+| 3   | `extract_fragments` and `extract_synthesis_fragments` are twin ~50-line walks: sha check, manifest bump, meta match → cache hit, error → stale fallback, atomic save, status vocabulary — differing only in meta shape and the produce step.                                                                             | `profile/fragments.py:140-261`                                                    |
+| 4   | The profile build walks documents serially; a synthesis doc costs up to 4 sequential LLM calls (synthesize → entail → repair → entail). Discovery/tailor already fan out via `gather_isolated` with the semaphore in `acall`. Every profile test fake already implements `arun` (delegating to `run`).                   | `profile/fragments.py`, `profile/synthesis.py:352-382`, `tests/test_profile_*.py` |
+| 5   | `_normalize_job_industries` loads **every** `Job` (archived included) on every extract and rebuilds every row's criteria dict twice; SQLAlchemy's scalar-history equality check bounds the writes, but load/parse/flush-compare is O(table) per discover run.                                                            | `discovery/pipeline.py:137-193` (sole caller: `run_extract`, pipeline.py:98)      |
+| 6   | `bulk_apply` re-runs the mutation-side N+1: `get_job` (1 query) + `has_progress` (≤4 queries) per job, plus one COMMIT per row via `set_stage`/`archive_job`/`delete_job` — a crash mid-loop leaves a half-applied bulk. `prune_run` has the same shape.                                                                 | `services/board.py:354-407`, `tracking/repository.py:439-449`                     |
 
 Task order is safest-first. Tasks 3→4 are sequential (4 rewrites 3's produce loop); everything else is independent.
 
@@ -811,7 +811,7 @@ from resume_agent.profile.synthesis import (
 
 (merge with the existing import lines; `synthesize_document`/`extract_profile_facts` stay imported only if still referenced — after this step they are not, so drop them).
 
-2. Change `FragmentProducer`:
+1. Change `FragmentProducer`:
 
 ```python
 @dataclass(frozen=True)
@@ -829,7 +829,7 @@ class FragmentProducer:
     runners: tuple[Any, ...] = ()
 ```
 
-3. In `_walk_fragments`, replace the serial produce loop
+1. In `_walk_fragments`, replace the serial produce loop
 
 ```python
     for item in pending:
@@ -867,7 +867,7 @@ with
             _apply_produced(result, profile_dir, item, res.value)
 ```
 
-4. Rewrite the two public producers:
+1. Rewrite the two public producers:
 
 ```python
 def extract_fragments(
@@ -996,7 +996,7 @@ Note: `IndustryTaxonomy` construction must match its real model — check `taxon
 Run: `.venv/Scripts/python.exe -m pytest tests/test_discovery_pipeline.py -v -k skips_untouched`
 Expected: FAIL — the current full-table walk rewrites `settled.criteria_json["industry"]` to `"Fintech"` (and the signature has no `batch` parameter — a TypeError also counts as the expected failure).
 
-- [ ] **Step 3: Guard the assignment in _prepare_industry_fields**
+- [ ] **Step 3: Guard the assignment in \_prepare_industry_fields**
 
 In `src/resume_agent/discovery/pipeline.py`, change the last two lines of `_prepare_industry_fields` from
 

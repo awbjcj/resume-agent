@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Supporting documents (decks, write-ups, reports) synthesize into coherent, *verified*, fully claimable profile facts, with markitdown as the single document converter.
+**Goal:** Supporting documents (decks, write-ups, reports) synthesize into coherent, _verified_, fully claimable profile facts, with markitdown as the single document converter.
 
 **Architecture:** `read_document_text` delegates to markitdown (structure-preserving markdown, `CONVERTER_VERSION` in the fragment-cache key). The source manifest gains per-doc `mode: literal|synthesis` and `anchor`. Synthesis-mode docs run a mid-tier agent (with the merged literal profile's skeleton in context), then layered verification — deterministic number/name/excerpt checks, then a cheap-tier entailment judge — with one repair round; survivors become ordinary facts flagged `synthesized=true`, excerpts persisted to an evidence sidecar. Merge gains a second phase that appends anchored bullets by fact id.
 
@@ -17,7 +17,7 @@
 - Fact-lock: synthesized facts are claimable **only** because verification checked them against user-authored source text; LLM-authored text is never verification evidence.
 - `ExtensibleModel` compatibility: every new model field needs a default so existing JSON files load unchanged.
 - Atomic writes: use the existing tmp-then-`os.replace` pattern (`fragments._atomic_write`) for any new persisted file.
-- `pypdf` stays a runtime dependency — `render/renderer.py` uses it. Only the *reader's* pdf/docx/pptx deps are replaced.
+- `pypdf` stays a runtime dependency — `render/renderer.py` uses it. Only the _reader's_ pdf/docx/pptx deps are replaced.
 - Model tiers: synthesis agent = `Settings.mid_model`; entailment agent = `Settings.cheap_model` (same pattern as `inference.py` / `merge.py`).
 - Commit messages: end with the `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>` + `Claude-Session: https://claude.ai/code/session_01XuwaqQLRg5q574SxcLmDck` trailers.
 
@@ -26,12 +26,14 @@
 ### Task 1: markitdown conversion + `CONVERTER_VERSION` cache key
 
 **Files:**
+
 - Modify: `pyproject.toml`, `uv.lock` (via uv commands)
 - Modify: `src/resume_agent/profile/resume_reader.py`
 - Modify: `src/resume_agent/profile/fragments.py` (meta gains `converter_version`)
 - Test: `tests/test_profile_resume_reader.py`, `tests/test_profile_fragments.py`
 
 **Interfaces:**
+
 - Produces: `resume_reader.CONVERTER_VERSION: int` (module constant), `SUPPORTED_SUFFIXES` now `{".pdf",".docx",".txt",".md",".pptx",".xlsx",".html"}`, `read_document_text(path) -> str` unchanged signature.
 - Later tasks rely on: fragment meta dict containing `"converter_version"`.
 
@@ -44,7 +46,7 @@ uv add "markitdown[docx,pdf,pptx,xlsx]"
 uv add --group dev python-docx python-pptx openpyxl
 ```
 
-`python-docx`/`python-pptx`/`openpyxl` move to the dev group because tests *build* fixture files with them; production conversion goes through markitdown only. Do NOT remove `pypdf` (used by `render/renderer.py`).
+`python-docx`/`python-pptx`/`openpyxl` move to the dev group because tests _build_ fixture files with them; production conversion goes through markitdown only. Do NOT remove `pypdf` (used by `render/renderer.py`).
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -144,6 +146,7 @@ read_resume_text = read_document_text
 ```
 
 In `src/resume_agent/profile/fragments.py`:
+
 - change the reader import to `from resume_agent.profile.resume_reader import CONVERTER_VERSION, read_document_text`
 - in `_meta_matches`, add a third condition:
 
@@ -183,11 +186,13 @@ git commit -m "Converts all documents through markitdown with a versioned cache 
 ### Task 2: Manifest `mode`/`anchor` fields + `update_source` + CLI flags
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/corpus.py`
 - Modify: `src/resume_agent/cli.py` (`profile_add`, `profile_sources`)
 - Test: `tests/test_profile_corpus.py`, `tests/test_cli_profile.py`
 
 **Interfaces:**
+
 - Consumes: `SUPPORTED_SUFFIXES` from Task 1.
 - Produces: `SourceDoc.mode: Literal["literal","synthesis"]`, `SourceDoc.anchor: str | None`, `default_mode(filename) -> str`, `add_source(profile_dir, file_path, primary=False, mode=None, anchor=None)`, `update_source(profile_dir, ident, *, mode=None, anchor=_UNSET, primary=None) -> SourceDoc | None`, `corpus._UNSET` sentinel. Validation rules: primary must be literal; anchor requires synthesis mode.
 
@@ -508,11 +513,13 @@ git commit -m "Adds per-source mode and anchor routing to the corpus manifest"
 ### Task 3: `FactItem.synthesized` + synthesis models, agents, skeleton
 
 **Files:**
+
 - Modify: `src/resume_agent/models/base.py`
 - Create: `src/resume_agent/profile/synthesis.py`
 - Test: `tests/test_profile_synthesis.py` (new)
 
 **Interfaces:**
+
 - Produces: `FactItem.synthesized: bool = False`; in `synthesis.py`: `SYNTHESIS_PROMPT_VERSION: int`, `SynthesizedClaim{text, support}`, `SynthesizedEntry{kind, anchor_id, title, category, claims, tech, rationale}`, `SynthesizedFragment{entries}`, `ClaimVerdict{index, verdict, reason}`, `ClaimVerdicts{verdicts}`, `profile_skeleton(facts) -> list[dict]`, `compose_synthesis_input(doc_text, skeleton) -> str`, `build_synthesis_agent(model_id=None) -> Runner`, `build_entailment_agent(model_id=None) -> Runner`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -774,10 +781,12 @@ git commit -m "Adds synthesis fragment models, agents, and the anchor skeleton"
 ### Task 4: Deterministic verification pass
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/synthesis.py`
 - Test: `tests/test_profile_synthesis.py`
 
 **Interfaces:**
+
 - Produces: `deterministic_failures(claim: SynthesizedClaim, source_text: str, tech: list[str] | None = None) -> list[str]` — empty list means the claim passes; each string is a human-readable reason.
 
 - [ ] **Step 1: Write the failing tests**
@@ -932,10 +941,12 @@ git commit -m "Verifies synthesized claims deterministically against source text
 ### Task 5: Synthesis orchestration — entailment, repair round, fact conversion
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/synthesis.py`
 - Test: `tests/test_profile_synthesis.py`
 
 **Interfaces:**
+
 - Consumes: Task 3 models/agents, Task 4 `deterministic_failures`, `SourceDoc` (mode/anchor from Task 2), `deterministic_id` from `profile/ids.py`.
 - Produces:
   - `synthesize_document(doc: SourceDoc, doc_text: str, skeleton: list[dict], synthesis_agent: Runner, entailment_agent: Runner) -> tuple[SynthesizedFragment, list[str]]` — verified fragment + dropped-claim reasons (`"<claim text> — <reason>"`).
@@ -1376,11 +1387,13 @@ git commit -m "Orchestrates verified synthesis with one repair round"
 ### Task 6: Synthesis fragment caching + routing in `fragments.py`
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/fragments.py`
 - Modify: `src/resume_agent/profile/corpus.py` (`remove_source` cleans the evidence sidecar)
 - Test: `tests/test_profile_fragments.py`
 
 **Interfaces:**
+
 - Consumes: Task 5's `synthesize_document` / `fragment_to_facts`, `SYNTHESIS_PROMPT_VERSION`; Task 1's `CONVERTER_VERSION`.
 - Produces:
   - `extract_fragments` skips `mode="synthesis"` docs (literal-only, signature unchanged).
@@ -1694,6 +1707,7 @@ git commit -m "Caches synthesis fragments with mode-aware keys and evidence side
 ### Task 7: Anchored merge + build orchestration + CLI report
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/merge.py`
 - Modify: `src/resume_agent/profile/build.py`
 - Modify: `src/resume_agent/cli.py` (`profile_build`)
@@ -1701,6 +1715,7 @@ git commit -m "Caches synthesis fragments with mode-aware keys and evidence side
 - Test: `tests/test_profile_merge.py`, `tests/test_profile_build.py`, `tests/test_cli_profile.py`
 
 **Interfaces:**
+
 - Consumes: Task 5's stub-Experience convention (stub `id` == anchor target id), Task 6's `extract_synthesis_fragments`, Task 3's `profile_skeleton` / agent builders.
 - Produces:
   - `merge.apply_synthesis_fragments(merged: ProfileFacts, fragments: list[tuple[SourceDoc, ProfileFacts]], report: MergeReport) -> tuple[list[str], set[str]]` — (anchor-decision lines, ids of experiences that gained bullets).
