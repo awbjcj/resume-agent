@@ -87,6 +87,7 @@ def test_read_xlsx(tmp_path):
 
     wb = Workbook()
     ws = wb.active
+    assert ws is not None
     ws.append(["Project", "Impact"])
     ws.append(["Pipeline rewrite", "Cut runtime 40%"])
     path = tmp_path / "impact.xlsx"
