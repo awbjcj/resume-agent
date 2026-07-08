@@ -15,7 +15,7 @@ from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
 from resume_agent.gmail.propose import propose_transitions
 from resume_agent.llm_runner import resolve_api_key
 from resume_agent.progress import ProgressReporter
-from resume_agent.profile.store import load_facts, save_facts
+from resume_agent.profile.store import load_facts
 from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.cover_letters import write_cover_letters
 from resume_agent.services.discovery import (
@@ -132,13 +132,8 @@ def profile_build(
     ),
 ) -> None:
     """Build bound facts.json and matrix.json artifacts from the corpus."""
-    from resume_agent.profile.build import build_corpus_profile
     from resume_agent.profile.corpus import migrate_legacy
-    from resume_agent.profile.inference import build_inference_agent
-    from resume_agent.profile.matrix import build_matrix, load_overrides, save_matrix
-    from resume_agent.profile.merge import build_bullet_dedup_agent
-    from resume_agent.profile.synthesis import build_entailment_agent, build_synthesis_agent
-    from resume_agent.taxonomy.clusters import load_cluster_map
+    from resume_agent.services.profile_build import run_corpus_build
 
     settings = get_settings()
     required_models = {settings.cheap_model, settings.mid_model}
@@ -166,36 +161,28 @@ def profile_build(
             f"Migrated legacy resume into the corpus as {migrated.id} (primary)"
         )
 
-    facts, report = build_corpus_profile(
-        dir,
+    report = run_corpus_build(
+        None,
+        profile_dir=Path(dir),
         github_username=cast(str | None, cfg.get("github_username")),
-        dedup_agent=build_bullet_dedup_agent(),
-        inference_agent=build_inference_agent(),
-        synthesis_agent=build_synthesis_agent(),
-        entailment_agent=build_entailment_agent(),
+        facts_out=out,
     )
-    path = save_facts(facts, out)
-    matrix = build_matrix(
-        facts,
-        load_cluster_map(Path(dir) / "cluster_map.json"),
-        load_overrides(Path(dir) / "overrides.yaml"),
-    )
-    save_matrix(matrix, Path(out).with_name("matrix.json"))
     typer.echo(
-        f"Wrote {len(facts.experience)} experiences and {len(facts.projects)} projects to {path}"
+        f"Wrote {report['experiences']} experiences and "
+        f"{report['projects']} projects to {out}"
     )
-    typer.echo(f"Matrix: {len(matrix.rows)} skills")
-    for doc_id, status in report.doc_status.items():
+    typer.echo(f"Matrix: {report['matrixRows']} skills")
+    for doc_id, status in report["docStatus"].items():
         typer.echo(f"  {doc_id}: {status}")
-    for conflict in report.conflicts:
+    for conflict in report["conflicts"]:
         typer.echo(f"  CONFLICT: {conflict}")
-    for name in report.inferred_added:
+    for name in report["inferred"]:
         typer.echo(f"  inferred: {name}")
-    for line in report.anchor_decisions:
+    for line in report["anchorDecisions"]:
         typer.echo(f"  anchor: {line}")
-    for line in report.verification_drops:
+    for line in report["verificationDrops"]:
         typer.echo(f"  DROPPED: {line}")
-    for warning in report.warnings:
+    for warning in report["warnings"]:
         typer.echo(f"  WARNING: {warning}")
 
 

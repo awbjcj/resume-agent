@@ -8,7 +8,7 @@ from resume_agent.profile.store import save_facts
 
 
 def run_corpus_build(
-    reporter,
+    reporter=None,
     *,
     profile_dir: Path,
     github_username: str | None,
@@ -24,7 +24,8 @@ def run_corpus_build(
     )
     from resume_agent.taxonomy.clusters import load_cluster_map
 
-    reporter.begin(3, "Extracting and merging source documents")
+    if reporter is not None:
+        reporter.begin(3, "Extracting and merging source documents")
     facts, report = build_corpus_profile(
         profile_dir,
         github_username=github_username,
@@ -33,19 +34,23 @@ def run_corpus_build(
         synthesis_agent=build_synthesis_agent(),
         entailment_agent=build_entailment_agent(),
     )
-    reporter.step(1, label="Saving facts.json")
+    if reporter is not None:
+        reporter.step(1, label="Saving facts.json")
     save_facts(facts, str(facts_out))
-    reporter.step(2, label="Building skill matrix")
+    if reporter is not None:
+        reporter.step(2, label="Building skill matrix")
     matrix = build_matrix(
         facts,
         load_cluster_map(Path(profile_dir) / "cluster_map.json"),
         load_overrides(Path(profile_dir) / "overrides.yaml"),
     )
     save_matrix(matrix, Path(facts_out).with_name("matrix.json"))
-    reporter.step(3, label="Saved matrix.json")
+    if reporter is not None:
+        reporter.step(3, label="Saved matrix.json")
     return {
         "experiences": len(facts.experience),
         "projects": len(facts.projects),
+        "matrixRows": len(matrix.rows),
         "docStatus": dict(report.doc_status),
         "conflicts": list(report.conflicts),
         "anchorDecisions": list(report.anchor_decisions),

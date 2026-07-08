@@ -201,3 +201,55 @@ def test_profile_build_prints_report(tmp_path, monkeypatch):
     assert "CONFLICT: date conflict" in result.output
     assert "inferred: Mentorship" in result.output
     assert "WARNING: inference warning" in result.output
+
+
+def test_profile_build_delegates_to_the_service(tmp_path, monkeypatch):
+    calls = {}
+
+    def fake_run(reporter, *, profile_dir, github_username, facts_out):
+        calls["reporter"] = reporter
+        calls["github_username"] = github_username
+        calls["facts_out"] = str(facts_out)
+        return {
+            "experiences": 0,
+            "projects": 0,
+            "matrixRows": 0,
+            "docStatus": {},
+            "conflicts": [],
+            "anchorDecisions": [],
+            "verificationDrops": [],
+            "inferred": [],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(
+        cli,
+        "get_settings",
+        lambda: type("S", (), {"cheap_model": "cheap", "mid_model": "mid"})(),
+    )
+    monkeypatch.setattr(cli, "resolve_api_key", lambda model: "sk-test")
+    monkeypatch.setattr(
+        "resume_agent.services.profile_build.run_corpus_build", fake_run
+    )
+
+    sources = _write_sources(tmp_path)
+    profile_dir = tmp_path / "profile"
+    out = profile_dir / "facts.json"
+    result = runner.invoke(
+        cli.app,
+        [
+            "profile",
+            "build",
+            "--sources",
+            str(sources),
+            "--dir",
+            str(profile_dir),
+            "--out",
+            str(out),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls["reporter"] is None
+    assert calls["github_username"] == "ada"
+    assert calls["facts_out"] == str(out)
