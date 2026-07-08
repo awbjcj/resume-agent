@@ -160,6 +160,28 @@ ids are stable choices; incremental additions may point to them but do not rewri
 them.
 _Avoid_: taxonomy cache, classification result
 
+## Profile corpus
+
+**Fragment cache walk**:
+The deep seam over the source manifest that owns per-document caching -- sha
+check, manifest bump, meta match, cache hit, error -> stale fallback, atomic
+save, and the status vocabulary (`cached` / `extracted` / `source-changed` /
+`stale:` / `failed:`). `_walk_fragments`; both extraction modes run through it.
+_Avoid_: extraction loop, cache layer
+
+**Fragment producer**:
+One extraction mode behind the Fragment cache walk: which docs it selects, the
+meta dict that keys their cache entries, and the async produce step
+(doc, text -> Produced). The profile-corpus counterpart of a discovery Producer
+-- the genuine per-mode variation that stays outside the walk.
+_Avoid_: extractor (reserve for the literal-mode agent), handler
+
+**Produced fragment**:
+What a Fragment producer yields for one document: the fragment's `facts`, an
+optional `evidence` sidecar (synthesis only), and optional verification `drops`.
+`Produced` in `profile/fragments.py`.
+_Avoid_: extraction result, payload
+
 ## Board & shortlist filtering
 
 **Board seam**:
@@ -170,7 +192,9 @@ projections (`shortlist_rows`, `pipeline_rows`, `triage_rows`) stay in
 `tracking.queries` and are called directly by both adapters — wrapping them in
 board would add shallow pass-throughs and fight the frontend's rich in-process
 filtering. Adapters cross this seam for mutations; they never re-import
-`tracking.repository` mutation functions.
+`tracking.repository` mutation functions. Bulk actions are transactional: one
+batched load plus `progressed_job_ids` gate, then one commit; `delete_job_row` is
+the unguarded cascade shared with `delete_job` and prune.
 _Avoid_: board service (it is the seam, not a layer), repository (the repository
 is what board guards)
 

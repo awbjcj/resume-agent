@@ -191,6 +191,7 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/profile/corpus.py` | Source registry: manifest + add/remove + legacy migration |
 | `src/resume_agent/profile/matrix.py` | Derived skill matrix + overrides (ban/alias/forbid/category) |
 | `src/resume_agent/profile/synthesis.py` | Verified synthesis: deck → excerpt-backed facts (synthesize → verify → one repair round) |
+| `src/resume_agent/profile/fragments.py` | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis), concurrent per-doc production |
 | `src/resume_agent/discovery/connectors/detect.py` | ATS detection (singleton → L1 → L2) |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation |
 | `src/resume_agent/discovery/scraper/dashboard.py` | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/` |
@@ -247,3 +248,17 @@ aggressiveness determines how many detail fetches are issued.
   predicate (rate-limit/timeout/5xx retry with exponential backoff; auth/schema/parse failures
   surface after one call); agno's own retry is disabled via `retry_kwargs() == {"retries": 0}`.
   A job whose LLM work fails is skipped (left in its prior status) and retried next run.
+- **Profile build fans out per document.** `extract_fragments` /
+  `extract_synthesis_fragments` share one cache walk; production runs concurrently via
+  `gather_isolated` with the permit acquired only in `llm_runner.acall`. The CLI and API both
+  build through `services/profile_build.run_corpus_build` -- the single place the facts+matrix
+  bound-artifact pair is written.
+- **File SQLite runs WAL.** `make_engine` sets `journal_mode=WAL`, `busy_timeout=30000`,
+  and `synchronous=NORMAL` on every file-backed connection so the API's writer threads wait
+  instead of failing immediately with `database is locked`.
+- **Industry normalization is scoped.** `_normalize_job_industries` walks only the
+  just-extracted batch plus rows with a pending `_industry_candidate` or legacy SIC keys --
+  never the whole table.
+- **Board bulk actions are transactional.** `bulk_apply` uses one batched load plus the
+  `progressed_job_ids` gate, then one commit. `delete_job_row` is the unguarded cascade shared
+  with guarded `delete_job` and prune.
