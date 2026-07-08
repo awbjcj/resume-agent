@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sqlmodel import Session
 
+from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import effective_cluster_map, load_matrix, load_overrides
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
@@ -51,8 +52,9 @@ def tailor(
     cluster_map = effective_cluster_map(
         load_cluster_map(profile_dir / "cluster_map.json"), overrides
     )
+    matrix_facts = facts if isinstance(facts, ProfileFacts) else None
     skill_matrix = load_matrix(
-        profile_dir / "matrix.json", facts=facts, cluster_map=cluster_map
+        profile_dir / "matrix.json", facts=matrix_facts, cluster_map=cluster_map
     )
     style_guide = load_style_guide(config.style_guide_path)
     bundle = build_tailor_bundle(config, style_guide=style_guide)
