@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { FileUp, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { FileUp, Star, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,12 +42,14 @@ export function SourceManager() {
   const patch = usePatchSource();
   const remove = useDeleteSource();
   const fileInput = useRef<HTMLInputElement>(null);
+  const [uploadMode, setUploadMode] = useState<(typeof MODES)[number]>("literal");
+  const [uploadAnchor, setUploadAnchor] = useState("");
 
   if (isLoading || !sources) return <Skeleton className="h-32 w-full" />;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-sm font-medium">Source documents</div>
           <p className="text-sm text-muted-foreground">
@@ -62,18 +64,53 @@ export function SourceManager() {
           accept=".pdf,.docx,.txt,.md,.pptx,.xlsx,.html"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) upload.mutate({ file });
+            if (file) {
+              upload.mutate({
+                file,
+                mode: uploadMode,
+                anchor: uploadMode === "synthesis" ? uploadAnchor || null : null,
+              });
+            }
             e.target.value = "";
           }}
         />
-        <Button
-          variant="outline"
-          disabled={upload.isPending}
-          onClick={() => fileInput.current?.click()}
-        >
-          <FileUp data-icon="inline-start" aria-hidden="true" />
-          Add source
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <select
+            aria-label="New source mode"
+            className={nativeSelectClass}
+            value={uploadMode}
+            onChange={(e) => {
+              const mode = e.target.value as (typeof MODES)[number];
+              setUploadMode(mode);
+              if (mode === "literal") setUploadAnchor("");
+            }}
+          >
+            {MODES.map((mode) => (
+              <option key={mode} value={mode}>{mode}</option>
+            ))}
+          </select>
+          {uploadMode === "synthesis" ? (
+            <select
+              aria-label="New source anchor"
+              className={nativeSelectClass}
+              value={uploadAnchor}
+              onChange={(e) => setUploadAnchor(e.target.value)}
+            >
+              <option value="">Auto-anchor</option>
+              {(skeleton ?? []).map((entry) => (
+                <option key={entry.id} value={entry.id}>{entry.label}</option>
+              ))}
+            </select>
+          ) : null}
+          <Button
+            variant="outline"
+            disabled={upload.isPending}
+            onClick={() => fileInput.current?.click()}
+          >
+            <FileUp data-icon="inline-start" aria-hidden="true" />
+            Add source
+          </Button>
+        </div>
       </div>
 
       {sources.length === 0 ? (
@@ -135,17 +172,30 @@ export function SourceManager() {
                     {statusLabel(source.fragmentStatus)}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell>
                   {!source.primary ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Remove ${source.filename}`}
-                      onClick={() => remove.mutate(source.id)}
-                    >
-                      <Trash2 data-icon="inline-start" aria-hidden="true" />
-                      Remove
-                    </Button>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {source.mode === "literal" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Make ${source.filename} primary`}
+                          onClick={() => patch.mutate({ id: source.id, primary: true })}
+                        >
+                          <Star data-icon="inline-start" aria-hidden="true" />
+                          Primary
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Remove ${source.filename}`}
+                        onClick={() => remove.mutate(source.id)}
+                      >
+                        <Trash2 data-icon="inline-start" aria-hidden="true" />
+                        Remove
+                      </Button>
+                    </div>
                   ) : null}
                 </TableCell>
               </TableRow>

@@ -3,6 +3,7 @@ import { useRunStore } from "@/lib/runs/store";
 type BuildReport = {
   experiences?: number;
   projects?: number;
+  docStatus?: Record<string, string>;
   anchorDecisions?: string[];
   verificationDrops?: string[];
   conflicts?: string[];
@@ -32,12 +33,16 @@ export function BuildReportPanel() {
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
   if (!latest?.result) return null;
   const report = latest.result as BuildReport;
+  const docStatus = Object.entries(report.docStatus ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([doc, status]) => `${doc}: ${status}`);
 
   return (
     <div className="flex flex-col gap-3 rounded-md border p-3">
       <div className="text-sm font-medium">
         Last build: {report.experiences ?? 0} experiences, {report.projects ?? 0} projects
       </div>
+      <Section title="Document status" lines={docStatus} />
       <Section title="Anchor decisions" lines={report.anchorDecisions ?? []} />
       <Section title="Dropped claims" lines={report.verificationDrops ?? []} tone="warn" />
       <Section title="Conflicts" lines={report.conflicts ?? []} />

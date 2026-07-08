@@ -59,7 +59,11 @@ export function ProfileSettingsPage() {
           className="ml-auto"
           disabled={building}
           onClick={() =>
-            launch("profile-build", () => launchers.profileBuild(), ["setup-status"])
+            launch("profile-build", () => launchers.profileBuild(), [
+              "setup-status",
+              "profile-sources",
+              "profile-skeleton",
+            ])
           }
         >
           {building ? <Spinner data-icon="inline-start" /> : null}

@@ -19,12 +19,14 @@ describe("BuildReportPanel", () => {
       percent: 100, phase: "done", current: 3, total: 3, etaText: null,
       result: {
         experiences: 3, projects: 2,
+        docStatus: { "resume-1": "cached", "deck-1": "extracted" },
         anchorDecisions: ["deck-1: +2 bullets on Acme/Engineer"],
         verificationDrops: ["deck-1: 'Cut latency 45%' — number '45%' not in source"],
         warnings: ["skill inference failed: boom"],
       },
     });
     render(<BuildReportPanel />);
+    expect(screen.getByText(/deck-1: extracted/)).toBeInTheDocument();
     expect(screen.getByText(/\+2 bullets on Acme\/Engineer/)).toBeInTheDocument();
     expect(screen.getByText(/45%/)).toBeInTheDocument();
     expect(screen.getByText(/skill inference failed/)).toBeInTheDocument();
