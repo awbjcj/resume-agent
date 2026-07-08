@@ -196,14 +196,14 @@ URL and JD text in place rather than dropping the duplicate — the pull summary
 shows `+N added, N upgraded`. Secrets (e.g. Adzuna keys) come from `.env`;
 which boards/sources to hit come from `connectors.yaml`.
 
-| Connector | What it needs |
-| --- | --- |
-| `greenhouse` | Board tokens in `connectors.yaml` |
-| `lever` | Board slugs in `connectors.yaml` |
-| `adzuna` | `ADZUNA_APP_ID` + `ADZUNA_APP_KEY` in `.env` |
-| `remoteok` | Nothing — open API |
-| `linkedin` | Burner credentials in `.env` (same as `scrape`) |
-| `companies` | Careers URLs in `connectors.yaml` — auto-detects Greenhouse, Lever, Ashby, Workday, Tesla, Google |
+| Connector    | What it needs                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------- |
+| `greenhouse` | Board tokens in `connectors.yaml`                                                                 |
+| `lever`      | Board slugs in `connectors.yaml`                                                                  |
+| `adzuna`     | `ADZUNA_APP_ID` + `ADZUNA_APP_KEY` in `.env`                                                      |
+| `remoteok`   | Nothing — open API                                                                                |
+| `linkedin`   | Burner credentials in `.env` (same as `scrape`)                                                   |
+| `companies`  | Careers URLs in `connectors.yaml` — auto-detects Greenhouse, Lever, Ashby, Workday, Tesla, Google |
 
 ```bash
 uv run resume-agent pull [--connectors config/connectors.yaml] [--search config/search.yaml] [--limit 25]
@@ -382,14 +382,14 @@ lazily, so a Claude-only run never touches the OpenAI or Gemini libraries.
 
 ### `config/*.yaml`
 
-| File                   | Controls                                                                                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `profile_sources.yaml` | Path to your resume and your GitHub username.                                                                                                                 |
-| `search.yaml`          | Keywords, titles, locations, and **hard filters** (salary, years of experience, remote policy, sponsorship).                                                  |
+| File                   | Controls                                                                                                                                                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profile_sources.yaml` | Path to your resume and your GitHub username.                                                                                                                                                                                                                              |
+| `search.yaml`          | Keywords, titles, locations, and **hard filters** (salary, years of experience, remote policy, sponsorship).                                                                                                                                                               |
 | `connectors.yaml`      | Which job-board connectors `pull` runs and their parameters (Greenhouse board tokens, Lever slugs, Adzuna country, RemoteOK, LinkedIn on/off, and `companies.urls` for direct ATS/portal URLs — Greenhouse, Lever, Ashby, Workday, Tesla, Google). Secrets stay in `.env`. |
-| `review.yaml`          | The reviewer roster, their weights/model tiers, `max_rounds`, `score_threshold`, optional `length_budget` one-page guidance, and optional `style_guide_path`. |
-| `render.yaml`          | Typst `template_path` and the PDF `output_dir`.                                                                                                               |
-| `style_guide.md`       | Optional house-style prose appended to the resume tailor loop. Governs how resumes are written, never what is claimed. Missing or empty means no change.      |
+| `review.yaml`          | The reviewer roster, their weights/model tiers, `max_rounds`, `score_threshold`, optional `length_budget` one-page guidance, and optional `style_guide_path`.                                                                                                              |
+| `render.yaml`          | Typst `template_path` and the PDF `output_dir`.                                                                                                                                                                                                                            |
+| `style_guide.md`       | Optional house-style prose appended to the resume tailor loop. Governs how resumes are written, never what is claimed. Missing or empty means no change.                                                                                                                   |
 
 Each `*.yaml.example` is annotated — copy it, then edit.
 
@@ -403,10 +403,10 @@ client-secret you download from Google Cloud (see [Gmail setup](#gmail-setup-for
 When the same job is seen by multiple connectors, a **canonical** source always
 wins over an **aggregator** copy:
 
-| Tier | Sources |
-| --- | --- |
+| Tier                            | Sources                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
 | **Canonical** (higher priority) | `greenhouse`, `lever`, `ashby`, `workday`, `tesla`, `google`, `companies`, `url` (hand-pasted) |
-| **Fallback** (lower priority) | `adzuna`, `remoteok`, `linkedin` |
+| **Fallback** (lower priority)   | `adzuna`, `remoteok`, `linkedin`                                                               |
 
 **First-seen-wins** among equal-tier sources — no churn from same-tier re-pulls.
 

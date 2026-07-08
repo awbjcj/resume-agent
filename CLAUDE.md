@@ -63,7 +63,7 @@ builder imports a concrete agno model class directly.
   its `Settings` field (`anthropic_api_key` / `openai_api_key` / `gemini_api_key`
   / `deepseek_api_key`). `relevance.py`'s "no key → return `None`" guard uses it,
   so it is provider-aware.
-- **Lazy SDK imports.** `build_model` imports the agno provider class *inside* its
+- **Lazy SDK imports.** `build_model` imports the agno provider class _inside_ its
   branch, so a Claude-only run never imports `openai` or `google-genai`, and a
   missing optional SDK fails only when that provider is actually selected.
 - **Tiers unchanged.** `model_for_tier` still maps `cheap`/`mid`/`premium` →
@@ -80,6 +80,7 @@ to `build_model` with a lazy import. Nothing else changes.
 ## Core invariants (never break these)
 
 ### Fact-lock
+
 Every bullet on a tailored resume must trace back to a fact in
 `data/profile/facts.json`. The `fact-check` reviewer in `review.yaml` is a
 **hard gate** (not scored) — any unsupported claim fails the round. Agents
@@ -92,20 +93,22 @@ justify bullet or summary claims. Adjacent-tier matches (same ClusterMap theme,
 not same canonical token) are never claimable as the JD's own term.
 
 ### Source priority — upgrade, not drop
+
 When two sources see the same job, the canonical source wins over an aggregator.
 The existing `Job` row is **mutated in place** (same id); user progress — status,
 `Application`, `ResumeVersion`, `CoverLetter` — is never touched.
 
-| Tier | Sources |
-| --- | --- |
+| Tier          | Sources                                                                                                                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Canonical** | `greenhouse`, `lever`, `ashby`, `workday`, `tesla`, `google`, `smartrecruiters`, `workable`, `recruitee`, `personio`, `breezy`, `jazzhr`, `bamboohr`, `companies`, `scrape`, `url`, `manual` |
-| **Fallback** | `adzuna`, `remoteok`, `linkedin` |
+| **Fallback**  | `adzuna`, `remoteok`, `linkedin`                                                                                                                                                             |
 
 Equal-tier re-pulls are no-ops (first-seen-wins). Once a job's status has
 advanced past `raw`, only the apply `url` is upgraded; `jd_text` is frozen so a
 resume already tailored to the old text is not silently re-based.
 
 ### Archive, delete, prune
+
 `Job.archived_at` (orthogonal to `status`) soft-hides a job; every view filters
 `archived_at IS NULL` — including the dedupe lookup (`find_existing`), so an archived
 (trash-binned) duplicate never blocks re-ingesting the same job as a fresh active row.
@@ -174,36 +177,36 @@ aggressiveness determines how many detail fetches are issued.
 
 ## Relevance gates (`text.py`)
 
-| Function | When used |
-| --- | --- |
-| `title_relevance_gate` | Before JD text is available (Workday list rows, Tesla listing state) |
-| `relevance_gate` | Full gate on title + JD; falls back to keyword search when no `role_anchors` are configured |
-| `primary_search_term` | Picks the strongest term to send as `searchText` to Workday / Google; falls back to `role_anchors` if `titles` and `keywords` are empty |
-| `primary_location` | Picks the first configured location for ATS endpoints such as Lever that accept a free-form location filter |
+| Function               | When used                                                                                                                               |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `title_relevance_gate` | Before JD text is available (Workday list rows, Tesla listing state)                                                                    |
+| `relevance_gate`       | Full gate on title + JD; falls back to keyword search when no `role_anchors` are configured                                             |
+| `primary_search_term`  | Picks the strongest term to send as `searchText` to Workday / Google; falls back to `role_anchors` if `titles` and `keywords` are empty |
+| `primary_location`     | Picks the first configured location for ATS endpoints such as Lever that accept a free-form location filter                             |
 
 ---
 
 ## Hot paths (most-edited files)
 
-| Path | Role |
-| --- | --- |
-| `src/resume_agent/llm_runner.py` | `build_model` provider seam + `AgentRunner` adapter |
-| `src/resume_agent/profile/corpus.py` | Source registry: manifest + add/remove + legacy migration |
-| `src/resume_agent/profile/matrix.py` | Derived skill matrix + overrides (ban/alias/forbid/category) |
-| `src/resume_agent/profile/synthesis.py` | Verified synthesis: deck → excerpt-backed facts (synthesize → verify → one repair round) |
-| `src/resume_agent/profile/fragments.py` | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis), concurrent per-doc production |
-| `src/resume_agent/discovery/connectors/detect.py` | ATS detection (singleton → L1 → L2) |
-| `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation |
-| `src/resume_agent/discovery/scraper/dashboard.py` | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/` |
-| `src/resume_agent/discovery/connectors/workday.py` | Workday CXS list → gate → detail |
-| `src/resume_agent/discovery/connectors/tesla.py` | Tesla bespoke JSON portal |
-| `src/resume_agent/discovery/connectors/google.py` | Google Careers JSON API |
-| `src/resume_agent/discovery/connectors/text.py` | Relevance gates + `html_to_text` |
-| `src/resume_agent/discovery/connectors/runner.py` | Pull orchestration: concurrent fetch (bounded by `pull_concurrency`), serial canonical-order ingest, `+N added` telemetry |
-| `src/resume_agent/concurrency.py` | `gather_isolated` — ordered, error-isolated async fan-out |
-| `src/resume_agent/discovery/ingest.py` | `save_or_upgrade`, source-priority logic |
-| `src/resume_agent/tracking/dedup.py` | `compute_dedup_key` — `company|normalized_title` |
-| `tests/test_discovery_ingest.py` | Ingest + dedup + priority tests |
+| Path                                                 | Role                                                                                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| `src/resume_agent/llm_runner.py`                     | `build_model` provider seam + `AgentRunner` adapter                                                                       |
+| `src/resume_agent/profile/corpus.py`                 | Source registry: manifest + add/remove + legacy migration                                                                 |
+| `src/resume_agent/profile/matrix.py`                 | Derived skill matrix + overrides (ban/alias/forbid/category)                                                              |
+| `src/resume_agent/profile/synthesis.py`              | Verified synthesis: deck → excerpt-backed facts (synthesize → verify → one repair round)                                  |
+| `src/resume_agent/profile/fragments.py`              | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis), concurrent per-doc production   |
+| `src/resume_agent/discovery/connectors/detect.py`    | ATS detection (singleton → L1 → L2)                                                                                       |
+| `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation                                                                                   |
+| `src/resume_agent/discovery/scraper/dashboard.py`    | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/`                                                    |
+| `src/resume_agent/discovery/connectors/workday.py`   | Workday CXS list → gate → detail                                                                                          |
+| `src/resume_agent/discovery/connectors/tesla.py`     | Tesla bespoke JSON portal                                                                                                 |
+| `src/resume_agent/discovery/connectors/google.py`    | Google Careers JSON API                                                                                                   |
+| `src/resume_agent/discovery/connectors/text.py`      | Relevance gates + `html_to_text`                                                                                          |
+| `src/resume_agent/discovery/connectors/runner.py`    | Pull orchestration: concurrent fetch (bounded by `pull_concurrency`), serial canonical-order ingest, `+N added` telemetry |
+| `src/resume_agent/concurrency.py`                    | `gather_isolated` — ordered, error-isolated async fan-out                                                                 |
+| `src/resume_agent/discovery/ingest.py`               | `save_or_upgrade`, source-priority logic                                                                                  |
+| `src/resume_agent/tracking/dedup.py`                 | `compute_dedup_key` — `company                                                                                            | normalized_title` |
+| `tests/test_discovery_ingest.py`                     | Ingest + dedup + priority tests                                                                                           |
 
 ---
 
@@ -226,12 +229,12 @@ aggressiveness determines how many detail fetches are issued.
   without notice. Each is isolated to its own module behind `_BACKENDS`; a parse failure records to
   `.failures` and never aborts the pull.
 - **Adzuna enrichment needs a real (non-headless) browser.** The API returns only a truncated snippet,
-  and `redirect_url` is a bot-gated `/land/ad/` click-tracker — bare `httpx` gets `403` and *headless*
+  and `redirect_url` is a bot-gated `/land/ad/` click-tracker — bare `httpx` gets `403` and _headless_
   Chromium is challenged ("suspicious behaviour"); only a non-headless browser follows the redirect to
   the employer/aggregator posting (Dice, Greenhouse, …). So `AdzunaConnector.fetch` (when
   `enrich_details=True`, the default) relevance-gates the snippets, then `enrich_adzuna_jobs` calls
   `browser.render_pages` to drive **one shared visible browser context** over every survivor's
-  `redirect_url` (distinct ads are safe; re-clicking the *same* ad boomerangs to a search page),
+  `redirect_url` (distinct ads are safe; re-clicking the _same_ ad boomerangs to a search page),
   captures each post-redirect `final_url`, and extracts the JD via `enrich_adzuna_job(job, page)`
   (LinkedIn/Greenhouse branches, else JSON-LD → description selectors → whole-page markdown, taking the
   **first** materially-richer candidate in specificity order, with logo `![](…)` images stripped).
