@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import re
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Sequence, cast
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from resume_agent.profile.store import load_facts
 from resume_agent.services.pagination import Page, paginate
@@ -32,16 +32,18 @@ from resume_agent.tracking.repository import (
     application_for_job,
     archive_job,
     delete_job,
+    delete_job_row,
     get_cover_letter,
     get_job,
     get_resume_version,
-    has_progress,
+    job_has_progress,
+    progressed_job_ids,
     restore_job,
     save_application,
     save_job,
     update_application_status,
 )
-from resume_agent.tracking.tables import Application, Job, JobStatus
+from resume_agent.tracking.tables import Application, Job, JobStatus, utcnow
 
 DEFAULT_FACTS = "data/profile/facts.json"
 BoardName = Literal["shortlist", "triage", "pipeline"]
@@ -365,18 +367,24 @@ def bulk_apply(
     target_ids = _target_ids(
         session, board=board, scope=scope, board_filter=board_filter, ids=ids,
     )
+    id_col = cast(Any, Job.id)
+    jobs = {
+        job.id: job
+        for job in session.exec(select(Job).where(id_col.in_(target_ids))).all()
+    }
+    progressed = progressed_job_ids(session)
     affected = 0
     skipped = 0
     reasons: Counter[str] = Counter()
     progress_guarded = action in {"delete", "approve", "setStatus"}
 
     for job_id in target_ids:
-        job = get_job(session, job_id)
+        job = jobs.get(job_id)
         if job is None:
             skipped += 1
             reasons["missing"] += 1
             continue
-        if progress_guarded and has_progress(session, job_id):
+        if progress_guarded and job_has_progress(job, progressed):
             skipped += 1
             reasons["hasProgress"] += 1
             continue
@@ -386,24 +394,27 @@ def bulk_apply(
             continue
 
         if action == "archive":
-            set_archived(session, job_id, True)
+            job.archived_at = utcnow()
+            session.add(job)
         elif action == "restore":
-            set_archived(session, job_id, False)
+            job.archived_at = None
+            session.add(job)
         elif action == "delete":
-            if not delete(session, job_id):
-                skipped += 1
-                reasons["hasProgress"] += 1
-                continue
+            delete_job_row(session, job, commit=False)
         elif action == "approve":
-            set_stage(session, job_id, JobStatus.approved.value)
+            job.status = JobStatus.approved.value
+            session.add(job)
         elif action == "setStatus":
             if status is None:
                 raise ValueError("status is required for setStatus")
-            set_stage(session, job_id, status)
+            job.status = status
+            session.add(job)
         else:
             raise ValueError(f"Unknown bulk action {action!r}")
         affected += 1
 
+    if not dry_run:
+        session.commit()
     return BulkResult(affected=affected, skipped=skipped, reasons=dict(reasons))
 
 

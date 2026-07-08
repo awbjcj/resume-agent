@@ -312,6 +312,19 @@ def restore_job(session: Session, job_id: int) -> Job | None:
     return job
 
 
+def delete_job_row(session: Session, job: Job, *, commit: bool = True) -> None:
+    """Cascade-delete a job's children, then the job itself.
+
+    Unguarded: callers must have already applied the has_progress gate.
+    """
+    for model in (CoverLetter, Application, ResumeVersion):
+        for child in session.exec(select(model).where(model.job_id == job.id)).all():
+            session.delete(child)
+    session.delete(job)
+    if commit:
+        session.commit()
+
+
 def delete_job(session: Session, job_id: int) -> bool:
     """Hard-delete a zero-progress job and its children in one transaction.
 
@@ -323,16 +336,7 @@ def delete_job(session: Session, job_id: int) -> bool:
     job = session.get(Job, job_id)
     if job is None:
         return False
-    # Defensive cascade: the has_progress() guard above already refuses any job
-    # that owns a child row, so normally nothing remains to delete here. Kept as
-    # a belt-and-suspenders sweep — in FK-safe order (CoverLetter/Application
-    # before the ResumeVersion they may reference) — in case that guard ever
-    # narrows and a childed job reaches this path.
-    for model in (CoverLetter, Application, ResumeVersion):
-        for child in session.exec(select(model).where(model.job_id == job_id)).all():
-            session.delete(child)
-    session.delete(job)
-    session.commit()
+    delete_job_row(session, job)
     return True
 
 
@@ -443,7 +447,16 @@ def prune_run(
     now = now or utcnow()
     to_archive, to_expire, skipped = _prune_plan(session, config, now)
     for row in to_archive:
-        archive_job(session, row.job_id)
+        job = session.get(Job, row.job_id)
+        if job is not None:
+            job.archived_at = now
+            session.add(job)
+    session.commit()
+    progressed = progressed_job_ids(session)
     for row in to_expire:
-        delete_job(session, row.job_id)
+        job = session.get(Job, row.job_id)
+        if job is None or job_has_progress(job, progressed):
+            continue
+        delete_job_row(session, job, commit=False)
+    session.commit()
     return _prune_report(to_archive, to_expire, skipped, config, now)

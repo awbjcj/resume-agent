@@ -49,3 +49,42 @@ def test_prune_run_archives_junk_expires_old_and_skips_progress():
         protected_after = get_job(s, _require_id(protected.id))
         assert protected_after is not None      # progress kept
         assert protected_after.archived_at is None
+
+
+def test_prune_archives_share_one_commit_and_timestamp():
+    from sqlmodel import select
+
+    cfg = PruneConfig(enable_low_fit=False, enable_stale=False)
+    with _session() as session:
+        for i in range(3):
+            session.add(
+                Job(
+                    source="greenhouse",
+                    company=f"Junk{i}",
+                    title="Engineer",
+                    jd_text=f"jd {i}",
+                    status=JobStatus.rejected.value,
+                )
+            )
+        session.commit()
+
+        commits = []
+        original_commit = session.commit
+
+        def counting_commit():
+            commits.append(1)
+            original_commit()
+
+        session.commit = counting_commit  # type: ignore[method-assign]
+        try:
+            prune_run(session, cfg)
+        finally:
+            session.commit = original_commit  # type: ignore[method-assign]
+
+        assert len(commits) <= 2
+        stamps = {
+            job.archived_at
+            for job in session.exec(select(Job)).all()
+            if job.archived_at
+        }
+        assert len(stamps) <= 1

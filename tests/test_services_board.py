@@ -143,6 +143,90 @@ def test_delete_refuses_job_with_progress():
         assert board.delete(session, job.id) is False
 
 
+def test_bulk_apply_commits_once():
+    with _session() as session:
+        ids = [
+            _job(
+                session,
+                company=f"Co{i}",
+                title="Engineer",
+                status=JobStatus.shortlisted.value,
+            ).id
+            for i in range(3)
+        ]
+        assert all(job_id is not None for job_id in ids)
+
+        commits = []
+        original_commit = session.commit
+
+        def counting_commit():
+            commits.append(1)
+            original_commit()
+
+        session.commit = counting_commit  # type: ignore[method-assign]
+        try:
+            result = board.bulk_apply(
+                session,
+                board="shortlist",
+                action="approve",
+                scope="ids",
+                board_filter=board.BoardFilter(),
+                ids=[job_id for job_id in ids if job_id is not None],
+                dry_run=False,
+            )
+        finally:
+            session.commit = original_commit  # type: ignore[method-assign]
+
+        assert result.affected == 3
+        assert len(commits) == 1
+
+
+def test_bulk_apply_query_count_is_constant():
+    from sqlalchemy import event
+
+    with _session() as session:
+
+        def _seed(n):
+            ids = []
+            for i in range(n):
+                job = _job(
+                    session,
+                    company=f"Batch{n}Co{i}",
+                    title="Engineer",
+                    status=JobStatus.shortlisted.value,
+                )
+                assert job.id is not None
+                ids.append(job.id)
+            return ids
+
+        def _selects(ids):
+            counts = {"n": 0}
+
+            def _tally(conn, cursor, statement, parameters, context, executemany):
+                if statement.lstrip().upper().startswith("SELECT"):
+                    counts["n"] += 1
+
+            engine = session.get_bind()
+            event.listen(engine, "before_cursor_execute", _tally)
+            try:
+                board.bulk_apply(
+                    session,
+                    board="shortlist",
+                    action="approve",
+                    scope="ids",
+                    board_filter=board.BoardFilter(),
+                    ids=ids,
+                    dry_run=True,
+                )
+            finally:
+                event.remove(engine, "before_cursor_execute", _tally)
+            return counts["n"]
+
+        small = _selects(_seed(2))
+        large = _selects(_seed(10))
+        assert small == large
+
+
 def test_facet_specs_match_board_filter_fields():
     import dataclasses
 
