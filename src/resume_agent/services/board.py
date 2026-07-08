@@ -372,11 +372,11 @@ def bulk_apply(
         job.id: job
         for job in session.exec(select(Job).where(id_col.in_(target_ids))).all()
     }
-    progressed = progressed_job_ids(session)
     affected = 0
     skipped = 0
     reasons: Counter[str] = Counter()
     progress_guarded = action in {"delete", "approve", "setStatus"}
+    progressed = progressed_job_ids(session) if progress_guarded else set()
 
     for job_id in target_ids:
         job = jobs.get(job_id)
