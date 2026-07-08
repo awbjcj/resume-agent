@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
@@ -35,6 +36,18 @@ def _is_memory_sqlite(url: str) -> bool:
     return url in ("sqlite://", "sqlite://:memory:", "sqlite:///:memory:")
 
 
+def _enable_sqlite_write_concurrency(engine: Engine) -> None:
+    """WAL + busy timeout on every connection to a file-backed SQLite DB."""
+
+    @event.listens_for(engine, "connect")
+    def _set_pragmas(dbapi_connection, _connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
+
+
 def make_engine(url: str | None = None) -> Engine:
     resolved = url or get_settings().db_url
     _ensure_sqlite_dir(resolved)
@@ -49,7 +62,10 @@ def make_engine(url: str | None = None) -> Engine:
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
         )
-    return create_engine(resolved, echo=False)
+    engine = create_engine(resolved, echo=False)
+    if resolved.startswith("sqlite"):
+        _enable_sqlite_write_concurrency(engine)
+    return engine
 
 
 def init_db(engine: Engine) -> None:
