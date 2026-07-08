@@ -13,7 +13,7 @@ fourth:
 | # | Item | Origin | Design needed? |
 | --- | --- | --- | --- |
 | 1 | Dedup-key location collision fix | CLAUDE.md follow-up micro-spec | Yes (§2) |
-| 2 | Gmail sync + LinkedIn scrape over HTTP | API-layer deferred list | Yes (§3) |
+| 2 | LinkedIn scrape over HTTP | API-layer deferred list | Yes (§3) |
 | 3 | Cover-letter evals | Eval-harness spec Phase 2+ note | Yes (§4) |
 | 4 | Craft-enrichment ship decision | `2026-07-02-craft-prompt-enrichment.md` Task 5 | No — execute the existing plan verbatim (§5) |
 
@@ -44,19 +44,24 @@ match time. No schema change, no backfill.
     "New York" ↔ "New York City" → compatible; "Austin, TX" ↔ "Detroit, MI" →
     not.
   - "Remote" is its own city: "Remote" ↔ "Austin, TX" → not compatible.
-- `find_existing` (`tracking/repository.py`), dedup_key branch only: fetch **all**
-  non-archived rows matching the key (today: `.first()`) and return the first
-  location-compatible one; if none is compatible, fall through (no match), so the
-  incoming job inserts as a sibling row sharing the dedup_key.
+- `find_existing` (`tracking/repository.py`) gains a `location` parameter (one
+  caller: `discovery/ingest.py`). The guard applies to **three** of the four
+  match branches — identical-JD, dedup_key, and keyless-fingerprint: each fetches
+  all non-archived candidates (today: `.first()`) and returns the first
+  location-compatible one; if none is compatible, fall through, so the incoming
+  job inserts as a sibling row. Only the **URL** branch stays unguarded — an
+  identical URL *is* the same posting. Guarding the identical-JD branch is what
+  actually fixes the motivating Workday case: multi-location reqs share
+  byte-identical JD text and differ only in URL and location, so they collapse at
+  the JD branch before the dedup_key branch is ever reached.
 
 ### What does not change
 
-- URL match and identical-JD (fingerprint-narrowed) match still win first,
-  unconditionally — same URL or byte-identical JD *is* the same posting.
-- `compute_dedup_key`, the keyless fingerprint fallback, and all source-priority
-  upgrade logic are untouched. Upgrades keep working because a canonical source
-  and an aggregator seeing the same posting either share a URL/JD or have
-  compatible city segments.
+- URL match still wins first, unconditionally — an identical URL *is* the same
+  posting.
+- `compute_dedup_key` and all source-priority upgrade logic are untouched.
+  Upgrades keep working because a canonical source and an aggregator seeing the
+  same posting either share a URL or have compatible (or blank) city segments.
 - Existing collapsed rows are not split retroactively; they merely stop absorbing
   future distinct-location pulls.
 
@@ -64,48 +69,54 @@ match time. No schema change, no backfill.
 
 Unit tests for `locations_compatible` (blank sides, state-spelling variants,
 remote, multi-token cities) and ingest tests in `tests/test_discovery_ingest.py`:
-same key + different city inserts a sibling; same key + compatible city upgrades
-in place; archived rows still never block re-ingest.
+same key + different city inserts a sibling; **identical JD + different city**
+inserts a sibling (the Workday case); same key + compatible city upgrades in
+place; archived rows still never block re-ingest.
 
-## 3. Gmail sync + LinkedIn scrape over HTTP
+### Documentation
 
-Both follow the established Run + SSE pattern (`202` + run record; worker in the
+This decision gets an ADR — `docs/adr/0001-dedup-key-plus-location-guard.md`,
+written alongside the code: `dedup_key` is deliberately **not unique** (siblings
+share it); row identity is key + location guard. Rationale: location-in-key was
+rejected because location-string variants across sources would defeat
+source-priority upgrade merging. CONTEXT.md's **Location guard** entry carries
+the domain term.
+
+## 3. LinkedIn scrape over HTTP
+
+Follows the established Run + SSE pattern (`202` + run record; worker in the
 `RunManager` threadpool **opening its own DB session**; progress via
-`GET /api/runs/{id}/events`). Routers stay thin over new `services/` functions.
-Credentials are **CLI-provisioned** — no web OAuth flow; a missing token/session
+`GET /api/runs/{id}/events`). Router stays thin over a `services/` function.
+Credentials are **CLI-provisioned** — no web OAuth flow; a missing session
 fails the run fast with an actionable error.
 
-### Gmail (propose → apply, mirroring the CLI `sync-status` shape)
-
-- `POST /api/gmail/sync` → `202` + run record. Worker:
-  `build_gmail_service()` → `fetch_recent_messages` → `propose_transitions`,
-  reporting progress per email. Proposals are stored in the run **result
-  payload** (no new table): `[{applicationId, label, currentStatus,
-  proposedStatus, evidence}]`. Body accepts optional `maxResults` (default 50).
-- `POST /api/gmail/transitions` with `{transitions: [{applicationId,
-  proposedStatus}]}` → applies via `update_application_status`, returns
-  `{applied: n}`. Synchronous; re-applying a same-status transition is a no-op.
-- Missing/expired OAuth token → error envelope code `gmail_not_configured`,
-  message naming the CLI login step.
-- New service module: `services/gmail_sync.py` (propose + apply use-cases; CLI
-  `sync-status` refactors onto it so both surfaces share one seam).
+**Gmail is out of scope — it already shipped.** During design review we found
+`POST /api/gmail/sync` (`api/routers/runs.py`) already runs the scan as a Run
+and persists proposals as durable `Notification` rows (deduped by `message_id`)
+with accept/dismiss endpoints (`services/notifications.py`) and a web
+notifications feature. The "Deferred (not exposed over HTTP): Gmail sync" line
+in CLAUDE.md is stale; this work item corrects it to name LinkedIn only (and
+removes it entirely once the LinkedIn endpoint ships).
 
 ### LinkedIn
 
-- `POST /api/sources/linkedin/scrape` → `202` + run record. Worker builds the
-  scraper via the existing `build_linkedin_scraper()` and ingests through the
-  same `save_or_upgrade` path as `pull` (fallback-tier source, unchanged).
-  Per-item failures land in the run report and never abort the run.
+- `POST /api/sources/linkedin/scrape` → `202` + run record. **Empty request
+  body** — fully config-driven via `search.yaml` (already editable on the
+  settings page), exact parity with the CLI `linkedin` command and with `pull`.
+  Worker builds the scraper via the existing `build_linkedin_scraper()` and
+  ingests through the same `save_or_upgrade` path as `pull` (fallback-tier
+  source, unchanged). Per-item failures land in the run report and never abort
+  the run.
 - The visible browser window opening on the server host is documented expected
   behavior (local single-user deployment). Missing session/profile → error code
   `linkedin_not_configured`.
 - Service seam: slots into the existing discovery service alongside pull.
 
-### Contract plumbing (both)
+### Contract plumbing
 
 New `CamelModel` schemas; OpenAPI export + `bash scripts/gen_ts_client.sh` regen;
 `tests/api/test_openapi_contract.py` drift gate updated. Tests are offline: the
-Gmail service and the scraper are faked, per repo convention.
+scraper is faked, per repo convention.
 
 ## 4. Cover-letter evals (measure-only)
 
@@ -117,8 +128,12 @@ evals were introduced.
 ### Harness changes
 
 - Case schema gains a `target` discriminator: `"resume"` (default — existing case
-  files untouched) or `"cover_letter"`. The runner branches on it to drive the
-  cover-letter generation path instead of the tailor loop.
+  files untouched) or `"cover_letter"`. For CL cases the runner drives the **full
+  production loop** in-memory — `compose_cover_letter_input` → draft → provenance
+  check → one revise round (mirroring `cover_letter/service.py`) — with the same
+  fixture `ProfileFacts`/`JobCriteria`/JD inputs resume cases use; no DB. `trap_ok`
+  judges the shipped letter; the number of revise-round firings is recorded as a
+  secondary signal.
 - Judge gets a cover-letter rubric: **grounding** (every factual claim traces to
   profile facts), **JD/company specificity** (not a template letter), **tone**
   against the house style guide, and **length band**. Trap detection reuses
@@ -155,8 +170,8 @@ Four workstreams, each independently green under the offline suite
 (`.venv/Scripts/python.exe -m pytest`) and `ruff check`:
 
 1. **Dedup location guard** — smallest, pure offline.
-2. **Gmail/LinkedIn HTTP surface** — offline-tested; contract drift gate covers
-   the new endpoints.
+2. **LinkedIn HTTP surface** — offline-tested; contract drift gate covers the
+   new endpoint; CLAUDE.md deferred line corrected.
 3. **Cover-letter eval harness + cases** — harness changes testable without
    spend.
 4. **One live sitting at the end** — CL baseline run, craft after-runs, and the

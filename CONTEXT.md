@@ -129,6 +129,16 @@ The typed result of the Merge decision, carrying the writes the applier performs
 `Insert`, `Skip`, `UpgradeUrlOnly`, `Rebase`. The applier holds no policy.
 _Avoid_: outcome (reserve IngestOutcome for the inserted/upgraded/skipped tag)
 
+**Location guard**:
+The location-compatibility check inside matching (`find_existing`): a candidate
+row only matches when `locations_compatible` holds — blank on either side is a
+wildcard; otherwise the normalized city segments (text before the first comma)
+must be token-subset-related. Guards the identical-JD, dedup_key, and
+keyless-fingerprint branches; never the URL branch. Splits multi-location
+same-title reqs into sibling rows without changing `compute_dedup_key`.
+_Avoid_: location filter (filtering is a pipeline stage), dedupe rule (the key
+is unchanged; this guards the match)
+
 ## Runs & skill classification
 
 **Run snapshot**:
