@@ -96,7 +96,11 @@ export function PipelineContainer() {
 
   const byStage = useMemo(() => {
     const grouped = new Map<string, PipelineItem[]>();
-    for (const row of rows) grouped.set(row.status, [...(grouped.get(row.status) ?? []), row]);
+    for (const row of rows) {
+      const bucket = grouped.get(row.status);
+      if (bucket) bucket.push(row);
+      else grouped.set(row.status, [row]);
+    }
     return grouped;
   }, [rows]);
 
