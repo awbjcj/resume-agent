@@ -31,10 +31,15 @@ export function useSkeleton() {
   });
 }
 
-async function postSource(file: File, mode?: string): Promise<ProfileSource> {
+async function postSource(
+  file: File,
+  mode?: string,
+  anchor?: string | null,
+): Promise<ProfileSource> {
   const form = new FormData();
   form.append("file", file);
   if (mode) form.append("mode", mode);
+  if (anchor) form.append("anchor", anchor);
   const headers: HeadersInit = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -49,7 +54,15 @@ async function postSource(file: File, mode?: string): Promise<ProfileSource> {
 export function useUploadSource() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ file, mode }: { file: File; mode?: string }) => postSource(file, mode),
+    mutationFn: ({
+      file,
+      mode,
+      anchor,
+    }: {
+      file: File;
+      mode?: string;
+      anchor?: string | null;
+    }) => postSource(file, mode, anchor),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile-sources"] });
       toast.success("Source added");

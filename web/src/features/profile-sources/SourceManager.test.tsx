@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
       anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached" },
     { id: "d1", filename: "deck.pptx", mode: "synthesis", primary: false,
       anchor: null, addedAt: "2026-07-03", fragmentStatus: "missing" },
+    { id: "n1", filename: "notes.md", mode: "literal", primary: false,
+      anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached" },
   ],
   skeleton: [{ id: "exp1", kind: "experience", label: "Acme — Engineer" }],
   patch: vi.fn(),
@@ -30,7 +32,7 @@ describe("SourceManager", () => {
     render(<SourceManager />);
     expect(screen.getByText("resume.pdf")).toBeInTheDocument();
     expect(screen.getByText("deck.pptx")).toBeInTheDocument();
-    expect(screen.getByText(/primary/i)).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /resume\.pdf primary/i })).toBeInTheDocument();
   });
 
   it("changes a source's anchor through the skeleton dropdown", async () => {
@@ -38,6 +40,28 @@ describe("SourceManager", () => {
     const anchorSelect = screen.getByLabelText(/anchor for deck.pptx/i);
     await userEvent.selectOptions(anchorSelect, "exp1");
     expect(mocks.patch).toHaveBeenCalledWith({ id: "d1", anchor: "exp1" });
+  });
+
+  it("uploads with the selected mode and anchor", async () => {
+    const { container } = render(<SourceManager />);
+    await userEvent.selectOptions(screen.getByLabelText(/new source mode/i), "synthesis");
+    await userEvent.selectOptions(screen.getByLabelText(/new source anchor/i), "exp1");
+
+    const input = container.querySelector("input[type=file]") as HTMLInputElement;
+    const file = new File(["deck"], "deck.md", { type: "text/markdown" });
+    await userEvent.upload(input, file);
+
+    expect(mocks.upload).toHaveBeenCalledWith({
+      file,
+      mode: "synthesis",
+      anchor: "exp1",
+    });
+  });
+
+  it("promotes a literal source to primary", async () => {
+    render(<SourceManager />);
+    await userEvent.click(screen.getByRole("button", { name: /make notes.md primary/i }));
+    expect(mocks.patch).toHaveBeenCalledWith({ id: "n1", primary: true });
   });
 
   it("deletes a source", async () => {
