@@ -401,12 +401,14 @@ def fragment_to_facts(
             and anchor is not None
             and anchor["kind"] == "experience"
         ):
+            anchor_id = entry.anchor_id
+            assert anchor_id is not None
             stub = next(
-                (e for e in facts.experience if e.id == entry.anchor_id), None
+                (e for e in facts.experience if e.id == anchor_id), None
             )
             if stub is None:
                 stub = Experience(
-                    id=entry.anchor_id,
+                    id=anchor_id,
                     company=anchor["company"],
                     title=anchor["title"],
                     source_ref=doc.id,
