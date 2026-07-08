@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -53,19 +54,6 @@ def load_fragment(profile_dir: str | Path, doc_id: str) -> ProfileFacts | None:
         return None
 
 
-def _meta_matches(meta_path: Path, sha256: str) -> bool:
-    try:
-        metadata = json.loads(meta_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    return (
-        isinstance(metadata, dict)
-        and metadata.get("sha256") == sha256
-        and metadata.get("prompt_version") == PROMPT_VERSION
-        and metadata.get("converter_version") == CONVERTER_VERSION
-    )
-
-
 def _atomic_write(path: Path, content: str) -> None:
     temporary: Path | None = None
     try:
@@ -88,18 +76,12 @@ def _atomic_write(path: Path, content: str) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def _save(
-    profile_dir: str | Path, doc_id: str, facts: ProfileFacts, sha256: str
-) -> None:
-    fragment_path, meta_path = _paths(profile_dir, doc_id)
-    fragment_path.parent.mkdir(parents=True, exist_ok=True)
-    _atomic_write(fragment_path, facts.model_dump_json(indent=2) + "\n")
-    metadata = {
+def _literal_meta(sha256: str) -> dict:
+    return {
         "sha256": sha256,
         "prompt_version": PROMPT_VERSION,
         "converter_version": CONVERTER_VERSION,
     }
-    _atomic_write(meta_path, json.dumps(metadata, sort_keys=True) + "\n")
 
 
 def _synthesis_meta(doc: SourceDoc, sha256: str) -> dict:
@@ -112,12 +94,18 @@ def _synthesis_meta(doc: SourceDoc, sha256: str) -> dict:
     }
 
 
-def _synthesis_meta_matches(meta_path: Path, doc: SourceDoc, sha256: str) -> bool:
+def _meta_equals(meta_path: Path, expected: dict) -> bool:
     try:
         metadata = json.loads(meta_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    return isinstance(metadata, dict) and metadata == _synthesis_meta(doc, sha256)
+    return metadata == expected
+
+
+def _expected_meta(doc: SourceDoc, sha256: str) -> dict:
+    if doc.mode == "synthesis":
+        return _synthesis_meta(doc, sha256)
+    return _literal_meta(sha256)
 
 
 def fragment_cache_status(profile_dir: str | Path, doc: SourceDoc) -> CacheStatus:
@@ -128,42 +116,100 @@ def fragment_cache_status(profile_dir: str | Path, doc: SourceDoc) -> CacheStatu
         return "stale" if fragment_path.exists() else "missing"
     if observed_sha != doc.sha256:
         return "source-changed"
-    if doc.mode == "synthesis":
-        matches = _synthesis_meta_matches(meta_path, doc, observed_sha)
-    else:
-        matches = _meta_matches(meta_path, observed_sha)
-    if matches and load_fragment(profile_dir, doc.id):
+    if _meta_equals(meta_path, _expected_meta(doc, observed_sha)) and load_fragment(
+        profile_dir, doc.id
+    ):
         return "cached"
     return "stale" if fragment_path.exists() or meta_path.exists() else "missing"
 
 
-def extract_fragments(
-    profile_dir: str | Path, manifest: SourceManifest, agent: Runner
+@dataclass
+class Produced:
+    """What one producer yields for one document."""
+
+    facts: ProfileFacts
+    evidence: dict | None = None
+    drops: list[str] | None = None
+
+
+@dataclass(frozen=True)
+class FragmentProducer:
+    """One extraction mode behind the fragment cache walk."""
+
+    selects: Callable[[SourceDoc], bool]
+    expected_meta: Callable[[SourceDoc, str], dict]
+    produce: Callable[[SourceDoc, str], Produced]
+
+
+@dataclass
+class _Pending:
+    doc: SourceDoc
+    text: str
+    meta: dict
+    source_changed: bool
+
+
+def _record_failure(
+    result: FragmentResult,
+    profile_dir: str | Path,
+    doc: SourceDoc,
+    exc: BaseException,
+) -> None:
+    previous = load_fragment(profile_dir, doc.id)
+    if previous is None:
+        result.status[doc.id] = f"failed: {exc}"
+    else:
+        result.fragments[doc.id] = previous
+        result.status[doc.id] = f"stale: {exc}"
+
+
+def _save_produced(
+    profile_dir: str | Path, doc_id: str, produced: Produced, meta: dict
+) -> None:
+    fragment_path, meta_path = _paths(profile_dir, doc_id)
+    fragment_path.parent.mkdir(parents=True, exist_ok=True)
+    _atomic_write(fragment_path, produced.facts.model_dump_json(indent=2) + "\n")
+    if produced.evidence is not None:
+        _atomic_write(
+            evidence_path(profile_dir, doc_id),
+            json.dumps(produced.evidence, indent=2, sort_keys=True) + "\n",
+        )
+    _atomic_write(meta_path, json.dumps(meta, sort_keys=True) + "\n")
+
+
+def _apply_produced(
+    result: FragmentResult, profile_dir: str | Path, item: _Pending, produced: Produced
+) -> None:
+    _save_produced(profile_dir, item.doc.id, produced, item.meta)
+    result.fragments[item.doc.id] = produced.facts
+    result.status[item.doc.id] = "source-changed" if item.source_changed else "extracted"
+    if produced.drops is not None:
+        result.drops[item.doc.id] = produced.drops
+
+
+def _walk_fragments(
+    profile_dir: str | Path, manifest: SourceManifest, producer: FragmentProducer
 ) -> FragmentResult:
-    """Extract registered documents, reusing valid cached fragments."""
     result = FragmentResult()
     manifest_changed = False
+    pending: list[_Pending] = []
     for doc in manifest.docs:
-        if doc.mode == "synthesis":
+        if not producer.selects(doc):
             continue
         _, meta_path = _paths(profile_dir, doc.id)
         source_path = doc_path(profile_dir, doc)
         try:
             observed_sha = hashlib.sha256(source_path.read_bytes()).hexdigest()
         except OSError as exc:
-            previous = load_fragment(profile_dir, doc.id)
-            if previous is None:
-                result.status[doc.id] = f"failed: {exc}"
-            else:
-                result.fragments[doc.id] = previous
-                result.status[doc.id] = f"stale: {exc}"
+            _record_failure(result, profile_dir, doc, exc)
             continue
 
         source_changed = observed_sha != doc.sha256
         if source_changed:
             doc.sha256 = observed_sha
             manifest_changed = True
-        if _meta_matches(meta_path, observed_sha):
+        expected = producer.expected_meta(doc, observed_sha)
+        if _meta_equals(meta_path, expected):
             cached = load_fragment(profile_dir, doc.id)
             if cached is not None:
                 result.fragments[doc.id] = cached
@@ -172,23 +218,42 @@ def extract_fragments(
 
         try:
             text = read_document_text(source_path)
-            facts = assign_fact_ids(extract_profile_facts(text, agent), doc.id)
         except Exception as exc:
-            previous = load_fragment(profile_dir, doc.id)
-            if previous is None:
-                result.status[doc.id] = f"failed: {exc}"
-            else:
-                result.fragments[doc.id] = previous
-                result.status[doc.id] = f"stale: {exc}"
+            _record_failure(result, profile_dir, doc, exc)
             continue
+        pending.append(_Pending(doc, text, expected, source_changed))
 
-        _save(profile_dir, doc.id, facts, observed_sha)
-        result.fragments[doc.id] = facts
-        result.status[doc.id] = "source-changed" if source_changed else "extracted"
+    for item in pending:
+        try:
+            produced = producer.produce(item.doc, item.text)
+        except Exception as exc:
+            _record_failure(result, profile_dir, item.doc, exc)
+            continue
+        _apply_produced(result, profile_dir, item, produced)
 
     if manifest_changed:
         save_manifest(manifest, profile_dir)
     return result
+
+
+def extract_fragments(
+    profile_dir: str | Path, manifest: SourceManifest, agent: Runner
+) -> FragmentResult:
+    """Extract literal-mode documents, reusing valid cached fragments."""
+
+    def _produce(doc: SourceDoc, text: str) -> Produced:
+        facts = assign_fact_ids(extract_profile_facts(text, agent), doc.id)
+        return Produced(facts=facts)
+
+    return _walk_fragments(
+        profile_dir,
+        manifest,
+        FragmentProducer(
+            selects=lambda doc: doc.mode != "synthesis",
+            expected_meta=lambda doc, sha: _literal_meta(sha),
+            produce=_produce,
+        ),
+    )
 
 
 def extract_synthesis_fragments(
@@ -199,63 +264,20 @@ def extract_synthesis_fragments(
     entailment_agent: Runner,
 ) -> FragmentResult:
     """Synthesize registered synthesis-mode documents, reusing valid caches."""
-    result = FragmentResult()
-    manifest_changed = False
-    for doc in manifest.docs:
-        if doc.mode != "synthesis":
-            continue
-        fragment_path, meta_path = _paths(profile_dir, doc.id)
-        source_path = doc_path(profile_dir, doc)
-        try:
-            observed_sha = hashlib.sha256(source_path.read_bytes()).hexdigest()
-        except OSError as exc:
-            previous = load_fragment(profile_dir, doc.id)
-            if previous is None:
-                result.status[doc.id] = f"failed: {exc}"
-            else:
-                result.fragments[doc.id] = previous
-                result.status[doc.id] = f"stale: {exc}"
-            continue
 
-        source_changed = observed_sha != doc.sha256
-        if source_changed:
-            doc.sha256 = observed_sha
-            manifest_changed = True
-        if _synthesis_meta_matches(meta_path, doc, observed_sha):
-            cached = load_fragment(profile_dir, doc.id)
-            if cached is not None:
-                result.fragments[doc.id] = cached
-                result.status[doc.id] = "cached"
-                continue
-
-        try:
-            text = read_document_text(source_path)
-            fragment, drops = synthesize_document(
-                doc, text, skeleton, synthesis_agent, entailment_agent
-            )
-            facts, evidence = fragment_to_facts(doc, fragment, skeleton)
-        except Exception as exc:
-            previous = load_fragment(profile_dir, doc.id)
-            if previous is None:
-                result.status[doc.id] = f"failed: {exc}"
-            else:
-                result.fragments[doc.id] = previous
-                result.status[doc.id] = f"stale: {exc}"
-            continue
-
-        fragment_path.parent.mkdir(parents=True, exist_ok=True)
-        _atomic_write(fragment_path, facts.model_dump_json(indent=2) + "\n")
-        _atomic_write(
-            evidence_path(profile_dir, doc.id),
-            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+    def _produce(doc: SourceDoc, text: str) -> Produced:
+        fragment, drops = synthesize_document(
+            doc, text, skeleton, synthesis_agent, entailment_agent
         )
-        _atomic_write(
-            meta_path, json.dumps(_synthesis_meta(doc, observed_sha), sort_keys=True) + "\n"
-        )
-        result.fragments[doc.id] = facts
-        result.status[doc.id] = "source-changed" if source_changed else "extracted"
-        result.drops[doc.id] = drops
+        facts, evidence = fragment_to_facts(doc, fragment, skeleton)
+        return Produced(facts=facts, evidence=evidence, drops=drops)
 
-    if manifest_changed:
-        save_manifest(manifest, profile_dir)
-    return result
+    return _walk_fragments(
+        profile_dir,
+        manifest,
+        FragmentProducer(
+            selects=lambda doc: doc.mode == "synthesis",
+            expected_meta=_synthesis_meta,
+            produce=_produce,
+        ),
+    )

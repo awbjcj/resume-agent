@@ -278,3 +278,21 @@ def test_remove_source_deletes_evidence_sidecar(tmp_path):
     assert evidence_path.exists()
     remove_source(profile_dir, doc.id)
     assert not evidence_path.exists()
+
+
+def test_walk_stale_fallback_is_shared_by_both_modes(tmp_path):
+    profile_dir = _setup(tmp_path)
+    manifest = load_manifest(profile_dir)
+    doc_id = manifest.docs[0].id
+    good = ProfileFacts(contact=Contact(name="Ada"))
+    extract_fragments(profile_dir, manifest, _FakeAgent(good))
+
+    (tmp_path / "profile" / "sources" / "resume.txt").write_text(
+        "Ada v2", encoding="utf-8"
+    )
+    result = extract_fragments(
+        profile_dir, load_manifest(profile_dir), _FakeAgent(None, fail=True)
+    )
+
+    assert result.status[doc_id].startswith("stale:")
+    assert result.fragments[doc_id].contact.name == "Ada"
