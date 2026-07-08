@@ -10,6 +10,7 @@ because verification anchors each claim to user-authored source text.
 
 import json
 import re
+import asyncio
 from pathlib import Path
 from typing import Literal
 
@@ -20,6 +21,7 @@ from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
+    acall,
     build_model,
     retry_kwargs,
     use_json_mode_for,
@@ -230,17 +232,21 @@ def _all_claims(
     ]
 
 
-def _verify(
-    fragment: SynthesizedFragment, source_text: str, entailment_agent: Runner
-) -> tuple[dict[tuple[int, int], str], dict[int, dict[str, str]]]:
-    """Returns (claim failures, tech failures).
+def _expect_fragment(content: object) -> SynthesizedFragment:
+    if not isinstance(content, SynthesizedFragment):
+        raise TypeError(
+            f"Expected SynthesizedFragment from agent, got {type(content).__name__}"
+        )
+    return content
 
-    Claim failures are keyed (entry_index, claim_index) -> reason, for every
-    failing claim. Tech failures are an entry-level property — keyed
-    entry_index -> {bad token: reason} — independent of any single claim, so a
-    bad tech token is never tied to (and can't ride along with) whichever
-    claim happens to be first.
-    """
+
+def _deterministic_pass(
+    fragment: SynthesizedFragment, source_text: str
+) -> tuple[
+    dict[tuple[int, int], str],
+    list[tuple[tuple[int, int], SynthesizedClaim]],
+    dict[int, dict[str, str]],
+]:
     failures: dict[tuple[int, int], str] = {}
     pending: list[tuple[tuple[int, int], SynthesizedClaim]] = []
     for entry_index, claim_index, entry, claim in _all_claims(fragment):
@@ -255,16 +261,25 @@ def _verify(
         bad = _tech_failures(entry.tech, source_text)
         if bad:
             tech_failures[entry_index] = bad
+    return failures, pending, tech_failures
 
-    if not pending:
-        return failures, tech_failures
-    payload = json.dumps(
+
+def _entailment_payload(
+    pending: list[tuple[tuple[int, int], SynthesizedClaim]],
+) -> str:
+    return json.dumps(
         [
             {"index": index, "claim": claim.text, "support": claim.support}
             for index, (_, claim) in enumerate(pending)
         ]
     )
-    content = entailment_agent.run(payload).content
+
+
+def _apply_verdicts(
+    content: object,
+    pending: list[tuple[tuple[int, int], SynthesizedClaim]],
+    failures: dict[tuple[int, int], str],
+) -> None:
     if not isinstance(content, ClaimVerdicts):
         raise TypeError(f"Expected ClaimVerdicts from agent, got {type(content).__name__}")
     verdicts = {verdict.index: verdict for verdict in content.verdicts}
@@ -274,6 +289,23 @@ def _verify(
             failures[key] = (
                 verdict.reason if verdict and verdict.reason else "not confirmed by verifier"
             )
+
+
+def _verify(
+    fragment: SynthesizedFragment, source_text: str, entailment_agent: Runner
+) -> tuple[dict[tuple[int, int], str], dict[int, dict[str, str]]]:
+    """Returns (claim failures, tech failures).
+
+    Claim failures are keyed (entry_index, claim_index) -> reason, for every
+    failing claim. Tech failures are an entry-level property — keyed
+    entry_index -> {bad token: reason} — independent of any single claim, so a
+    bad tech token is never tied to (and can't ride along with) whichever
+    claim happens to be first.
+    """
+    failures, pending, tech_failures = _deterministic_pass(fragment, source_text)
+    if pending:
+        content = entailment_agent.run(_entailment_payload(pending)).content
+        _apply_verdicts(content, pending, failures)
     return failures, tech_failures
 
 
@@ -358,11 +390,7 @@ def synthesize_document(
 ) -> tuple[SynthesizedFragment, list[str]]:
     """Synthesize, verify, repair once, drop the rest. Returns (fragment, drops)."""
     content = synthesis_agent.run(compose_synthesis_input(doc_text, skeleton)).content
-    if not isinstance(content, SynthesizedFragment):
-        raise TypeError(
-            f"Expected SynthesizedFragment from agent, got {type(content).__name__}"
-        )
-    fragment = content.model_copy(deep=True)
+    fragment = _expect_fragment(content).model_copy(deep=True)
     _apply_pinned_anchor(fragment, doc)
 
     failures, tech_failures = _verify(fragment, doc_text, entailment_agent)
@@ -370,13 +398,60 @@ def synthesize_document(
         repaired = synthesis_agent.run(
             _repair_prompt(doc_text, skeleton, fragment, failures, tech_failures)
         ).content
-        if not isinstance(repaired, SynthesizedFragment):
-            raise TypeError(
-                f"Expected SynthesizedFragment from agent, got {type(repaired).__name__}"
-            )
-        fragment = repaired.model_copy(deep=True)
+        fragment = _expect_fragment(repaired).model_copy(deep=True)
         _apply_pinned_anchor(fragment, doc)
         failures, tech_failures = _verify(fragment, doc_text, entailment_agent)
+
+    drops = _drop_failed(fragment, failures, tech_failures)
+    return fragment, drops
+
+
+async def _averify(
+    fragment: SynthesizedFragment,
+    source_text: str,
+    entailment_agent: Runner,
+    *,
+    sem: asyncio.Semaphore,
+) -> tuple[dict[tuple[int, int], str], dict[int, dict[str, str]]]:
+    failures, pending, tech_failures = _deterministic_pass(fragment, source_text)
+    if pending:
+        content = (
+            await acall(entailment_agent, _entailment_payload(pending), sem=sem)
+        ).content
+        _apply_verdicts(content, pending, failures)
+    return failures, tech_failures
+
+
+async def asynthesize_document(
+    doc: SourceDoc,
+    doc_text: str,
+    skeleton: list[dict],
+    synthesis_agent: Runner,
+    entailment_agent: Runner,
+    *,
+    sem: asyncio.Semaphore,
+) -> tuple[SynthesizedFragment, list[str]]:
+    """Async sibling of synthesize_document for the fragment fan-out."""
+    content = (
+        await acall(synthesis_agent, compose_synthesis_input(doc_text, skeleton), sem=sem)
+    ).content
+    fragment = _expect_fragment(content).model_copy(deep=True)
+    _apply_pinned_anchor(fragment, doc)
+
+    failures, tech_failures = await _averify(fragment, doc_text, entailment_agent, sem=sem)
+    if failures or tech_failures:
+        repaired = (
+            await acall(
+                synthesis_agent,
+                _repair_prompt(doc_text, skeleton, fragment, failures, tech_failures),
+                sem=sem,
+            )
+        ).content
+        fragment = _expect_fragment(repaired).model_copy(deep=True)
+        _apply_pinned_anchor(fragment, doc)
+        failures, tech_failures = await _averify(
+            fragment, doc_text, entailment_agent, sem=sem
+        )
 
     drops = _drop_failed(fragment, failures, tech_failures)
     return fragment, drops

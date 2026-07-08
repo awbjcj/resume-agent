@@ -1,15 +1,18 @@
 """Per-document extraction fragments cached by content hash and prompt version."""
 
+import asyncio
 import hashlib
 import json
 import os
 import tempfile
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from resume_agent.llm_runner import Runner
+from resume_agent.concurrency import gather_isolated
+from resume_agent.config import get_settings
+from resume_agent.llm_runner import Runner, run_with_cleanup
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.corpus import (
     FRAGMENTS_DIRNAME,
@@ -18,13 +21,13 @@ from resume_agent.profile.corpus import (
     doc_path,
     save_manifest,
 )
-from resume_agent.profile.extractor import PROMPT_VERSION, extract_profile_facts
+from resume_agent.profile.extractor import PROMPT_VERSION, aextract_profile_facts
 from resume_agent.profile.ids import assign_fact_ids
 from resume_agent.profile.resume_reader import CONVERTER_VERSION, read_document_text
 from resume_agent.profile.synthesis import (
     SYNTHESIS_PROMPT_VERSION,
+    asynthesize_document,
     fragment_to_facts,
-    synthesize_document,
 )
 
 CacheStatus = Literal["cached", "stale", "source-changed", "missing"]
@@ -138,7 +141,8 @@ class FragmentProducer:
 
     selects: Callable[[SourceDoc], bool]
     expected_meta: Callable[[SourceDoc, str], dict]
-    produce: Callable[[SourceDoc, str], Produced]
+    produce: Callable[[SourceDoc, str, asyncio.Semaphore], Awaitable[Produced]]
+    runners: tuple[Any, ...] = ()
 
 
 @dataclass
@@ -223,13 +227,27 @@ def _walk_fragments(
             continue
         pending.append(_Pending(doc, text, expected, source_changed))
 
-    for item in pending:
-        try:
-            produced = producer.produce(item.doc, item.text)
-        except Exception as exc:
-            _record_failure(result, profile_dir, item.doc, exc)
-            continue
-        _apply_produced(result, profile_dir, item, produced)
+    if pending:
+        sem = asyncio.Semaphore(get_settings().llm_concurrency)
+        produced_results = asyncio.run(
+            run_with_cleanup(
+                gather_isolated(
+                    pending,
+                    lambda item: producer.produce(item.doc, item.text, sem),
+                ),
+                *producer.runners,
+            )
+        )
+        for item, res in zip(pending, produced_results):
+            if not res.ok or res.value is None:
+                _record_failure(
+                    result,
+                    profile_dir,
+                    item.doc,
+                    res.error if res.error is not None else RuntimeError("produce failed"),
+                )
+                continue
+            _apply_produced(result, profile_dir, item, res.value)
 
     if manifest_changed:
         save_manifest(manifest, profile_dir)
@@ -241,8 +259,8 @@ def extract_fragments(
 ) -> FragmentResult:
     """Extract literal-mode documents, reusing valid cached fragments."""
 
-    def _produce(doc: SourceDoc, text: str) -> Produced:
-        facts = assign_fact_ids(extract_profile_facts(text, agent), doc.id)
+    async def _produce(doc: SourceDoc, text: str, sem: asyncio.Semaphore) -> Produced:
+        facts = assign_fact_ids(await aextract_profile_facts(text, agent, sem=sem), doc.id)
         return Produced(facts=facts)
 
     return _walk_fragments(
@@ -252,6 +270,7 @@ def extract_fragments(
             selects=lambda doc: doc.mode != "synthesis",
             expected_meta=lambda doc, sha: _literal_meta(sha),
             produce=_produce,
+            runners=(agent,),
         ),
     )
 
@@ -265,9 +284,9 @@ def extract_synthesis_fragments(
 ) -> FragmentResult:
     """Synthesize registered synthesis-mode documents, reusing valid caches."""
 
-    def _produce(doc: SourceDoc, text: str) -> Produced:
-        fragment, drops = synthesize_document(
-            doc, text, skeleton, synthesis_agent, entailment_agent
+    async def _produce(doc: SourceDoc, text: str, sem: asyncio.Semaphore) -> Produced:
+        fragment, drops = await asynthesize_document(
+            doc, text, skeleton, synthesis_agent, entailment_agent, sem=sem
         )
         facts, evidence = fragment_to_facts(doc, fragment, skeleton)
         return Produced(facts=facts, evidence=evidence, drops=drops)
@@ -279,5 +298,6 @@ def extract_synthesis_fragments(
             selects=lambda doc: doc.mode == "synthesis",
             expected_meta=_synthesis_meta,
             produce=_produce,
+            runners=(synthesis_agent, entailment_agent),
         ),
     )

@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.profile.corpus import add_source, load_manifest, remove_source
@@ -296,3 +297,57 @@ def test_walk_stale_fallback_is_shared_by_both_modes(tmp_path):
 
     assert result.status[doc_id].startswith("stale:")
     assert result.fragments[doc_id].contact.name == "Ada"
+
+
+def test_synthesis_docs_are_produced_concurrently(tmp_path, monkeypatch):
+    import asyncio as aio
+
+    class _Probe:
+        def __init__(self, content):
+            self._content = content
+            self.active = 0
+            self.max_active = 0
+
+        def run(self, prompt):
+            return _FakeResult(self._content)
+
+        async def arun(self, prompt):
+            self.active += 1
+            self.max_active = max(self.max_active, self.active)
+            await aio.sleep(0.02)
+            self.active -= 1
+            return _FakeResult(self._content)
+
+    monkeypatch.setattr(
+        "resume_agent.profile.fragments.read_document_text",
+        lambda path: "deck bytes " + Path(path).name,
+    )
+    profile_dir = _setup(tmp_path)
+    for name in ("deck-a.pptx", "deck-b.pptx"):
+        deck = tmp_path / name
+        deck.write_bytes(b"deck bytes " + name.encode())
+        add_source(profile_dir, deck, mode="synthesis")
+
+    fragment = SynthesizedFragment(
+        entries=[
+            SynthesizedEntry(
+                kind="project",
+                title="Probe",
+                claims=[SynthesizedClaim(text="did work", support=["deck bytes"])],
+            )
+        ]
+    )
+    synthesis = _Probe(fragment)
+    entailment = _Probe(
+        ClaimVerdicts(verdicts=[ClaimVerdict(index=0, verdict="supported")])
+    )
+    result = extract_synthesis_fragments(
+        profile_dir, load_manifest(profile_dir), [], synthesis, entailment
+    )
+    statuses = {
+        doc.id: result.status.get(doc.id)
+        for doc in load_manifest(profile_dir).docs
+        if doc.mode == "synthesis"
+    }
+    assert all(status == "extracted" for status in statuses.values()), statuses
+    assert synthesis.max_active >= 2

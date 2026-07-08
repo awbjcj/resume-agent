@@ -1,7 +1,9 @@
+import asyncio
+
 from agno.agent import Agent
 
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, use_json_mode_for
+from resume_agent.llm_runner import AgentRunner, Runner, acall, build_model, use_json_mode_for
 from resume_agent.models.profile import ProfileFacts
 
 # Bump whenever _INSTRUCTIONS change so cached fragments re-extract.
@@ -48,6 +50,17 @@ def build_extractor_agent(model_id: str | None = None) -> Runner:
 def extract_profile_facts(resume_text: str, agent: Runner) -> ProfileFacts:
     """Run the agent and return its ProfileFacts, validating the result type."""
     result = agent.run(resume_text)
+    facts = result.content
+    if not isinstance(facts, ProfileFacts):
+        raise TypeError(f"Expected ProfileFacts from agent, got {type(facts).__name__}")
+    return facts
+
+
+async def aextract_profile_facts(
+    resume_text: str, agent: Runner, *, sem: asyncio.Semaphore
+) -> ProfileFacts:
+    """Async sibling of extract_profile_facts for the fragment fan-out."""
+    result = await acall(agent, resume_text, sem=sem)
     facts = result.content
     if not isinstance(facts, ProfileFacts):
         raise TypeError(f"Expected ProfileFacts from agent, got {type(facts).__name__}")
