@@ -349,6 +349,8 @@ def test_industry_normalization_skips_untouched_rows(tmp_path):
         session.refresh(settled)
         session.refresh(pending)
 
+        assert settled.criteria_json is not None
+        assert pending.criteria_json is not None
         assert settled.criteria_json["industry"] == "fintech"
         assert pending.criteria_json["industry"] == "Fintech"
         assert "_industry_candidate" not in pending.criteria_json
