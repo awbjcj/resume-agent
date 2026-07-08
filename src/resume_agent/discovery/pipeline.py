@@ -1,7 +1,9 @@
 import asyncio
 import logging
 from pathlib import Path
+from typing import Any, cast
 
+from sqlalchemy import String
 from sqlmodel import Session, select
 
 from resume_agent.concurrency import gather_isolated
@@ -95,7 +97,9 @@ def run_extract(
             job.criteria_json = criteria.model_dump(mode="json")
             job.status = JobStatus.extracted.value
             session.add(job)
-    _normalize_job_industries(session, industry_classifier, industry_taxonomy_path)
+    _normalize_job_industries(
+        session, industry_classifier, industry_taxonomy_path, batch=jobs
+    )
     session.commit()
 
 
@@ -130,17 +134,34 @@ def _prepare_industry_fields(job: Job, taxonomy: IndustryTaxonomy) -> str | None
     else:
         criteria["industry"] = None
         criteria.pop(_INDUSTRY_RETRY_KEY, None)
-    job.criteria_json = criteria
+    if criteria != job.criteria_json:
+        job.criteria_json = criteria
     return candidate
+
+
+def _industry_scope(session: Session, batch: list[Job]) -> list[Job]:
+    """Rows this pass can change: the current batch plus revisitable rows."""
+    criteria_text = cast(Any, Job.criteria_json).cast(String)
+    revisitable = session.exec(
+        select(Job).where(
+            criteria_text.like(f'%"{_INDUSTRY_RETRY_KEY}"%')
+            | criteria_text.like('%"sic_major"%')
+        )
+    ).all()
+    by_id: dict[int | None, Job] = {job.id: job for job in revisitable}
+    for job in batch:
+        by_id.setdefault(job.id, job)
+    return list(by_id.values())
 
 
 def _normalize_job_industries(
     session: Session,
     classifier: Runner | None,
     taxonomy_path: Path | str,
+    batch: list[Job],
 ) -> None:
     taxonomy = load_industry_taxonomy(taxonomy_path)
-    jobs = list(session.exec(select(Job)).all())
+    jobs = _industry_scope(session, batch)
     unresolved: dict[tuple[str, str], IndustryCandidate] = {}
     company_additions: dict[str, str] = {}
 

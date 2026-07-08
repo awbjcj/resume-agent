@@ -314,6 +314,46 @@ def test_run_extract_keeps_failed_industry_candidate_internal_for_retry(tmp_path
         assert criteria["_industry_candidate"] == "Financial Technology"
 
 
+def test_industry_normalization_skips_untouched_rows(tmp_path):
+    from resume_agent.discovery.pipeline import _normalize_job_industries
+
+    taxonomy_path = tmp_path / "industries.json"
+    save_industry_taxonomy(
+        IndustryTaxonomy(aliases={"fintech": "Fintech"}, companies={}),
+        taxonomy_path,
+    )
+
+    with _session() as session:
+        settled = Job(
+            source="greenhouse",
+            company="OldCo",
+            title="Engineer",
+            jd_text="jd",
+            status="shortlisted",
+            criteria_json={"industry": "fintech"},
+        )
+        pending = Job(
+            source="greenhouse",
+            company="RetryCo",
+            title="Engineer",
+            jd_text="jd",
+            status="shortlisted",
+            criteria_json={"industry": None, "_industry_candidate": "fintech"},
+        )
+        session.add(settled)
+        session.add(pending)
+        session.commit()
+
+        _normalize_job_industries(session, None, taxonomy_path, batch=[])
+        session.commit()
+        session.refresh(settled)
+        session.refresh(pending)
+
+        assert settled.criteria_json["industry"] == "fintech"
+        assert pending.criteria_json["industry"] == "Fintech"
+        assert "_industry_candidate" not in pending.criteria_json
+
+
 def test_run_relevance_rejects_offtarget_keeps_match():
     cfg = SearchConfig(target_role="AI engineering roles")
     judge = _Judge()
