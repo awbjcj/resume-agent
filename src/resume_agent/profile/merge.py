@@ -460,8 +460,10 @@ def apply_synthesis_fragments(
     """
     anchor_decisions: list[str] = []
     touched: set[str] = set()
+    # merged.experience never grows here (fallbacks append to projects, bullets
+    # append to existing roles), so the id index is stable across all docs.
+    by_id = {experience.id: experience for experience in merged.experience}
     for doc, fragment in fragments:
-        by_id = {experience.id: experience for experience in merged.experience}
         for stub in fragment.experience:
             target = by_id.get(stub.id)
             if target is None:
