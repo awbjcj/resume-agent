@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   patch: vi.fn(),
   remove: vi.fn(),
   upload: vi.fn(),
+  replace: vi.fn(),
 }));
 
 vi.mock("./use-sources", () => ({
@@ -23,6 +24,7 @@ vi.mock("./use-sources", () => ({
   useUploadSource: () => ({ mutate: mocks.upload, isPending: false }),
   usePatchSource: () => ({ mutate: mocks.patch, isPending: false }),
   useDeleteSource: () => ({ mutate: mocks.remove, isPending: false }),
+  useReplaceSource: () => ({ mutate: mocks.replace, isPending: false }),
 }));
 
 import { SourceManager } from "./SourceManager";
@@ -68,5 +70,22 @@ describe("SourceManager", () => {
     render(<SourceManager />);
     await userEvent.click(screen.getByRole("button", { name: /remove deck.pptx/i }));
     expect(mocks.remove).toHaveBeenCalledWith("d1");
+  });
+
+  it("replaces the primary resume's file", async () => {
+    const { container } = render(<SourceManager />);
+    await userEvent.click(screen.getByRole("button", { name: /replace resume\.pdf/i }));
+
+    const inputs = container.querySelectorAll("input[type=file]");
+    const replaceInput = inputs[inputs.length - 1] as HTMLInputElement;
+    const file = new File(["resume v2"], "resume-v2.pdf", { type: "application/pdf" });
+    await userEvent.upload(replaceInput, file);
+
+    expect(mocks.replace).toHaveBeenCalledWith({ oldId: "r1", file });
+  });
+
+  it("does not offer replace/remove actions on non-primary sources", () => {
+    render(<SourceManager />);
+    expect(screen.queryByRole("button", { name: /replace deck.pptx/i })).not.toBeInTheDocument();
   });
 });

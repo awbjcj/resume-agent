@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { FileUp, Star, Trash2 } from "lucide-react";
+import { FileUp, RefreshCw, Star, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
 import {
   useDeleteSource,
   usePatchSource,
+  useReplaceSource,
   useSkeleton,
   useSources,
   useUploadSource,
@@ -41,9 +42,12 @@ export function SourceManager() {
   const upload = useUploadSource();
   const patch = usePatchSource();
   const remove = useDeleteSource();
+  const replace = useReplaceSource();
   const fileInput = useRef<HTMLInputElement>(null);
+  const replaceInput = useRef<HTMLInputElement>(null);
   const [uploadMode, setUploadMode] = useState<(typeof MODES)[number]>("literal");
   const [uploadAnchor, setUploadAnchor] = useState("");
+  const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
 
   if (isLoading || !sources) return <Skeleton className="h-32 w-full" />;
 
@@ -72,6 +76,20 @@ export function SourceManager() {
               });
             }
             e.target.value = "";
+          }}
+        />
+        <input
+          ref={replaceInput}
+          type="file"
+          className="hidden"
+          accept=".pdf,.docx,.txt,.md,.pptx,.xlsx,.html"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file && replaceTargetId) {
+              replace.mutate({ oldId: replaceTargetId, file });
+            }
+            e.target.value = "";
+            setReplaceTargetId(null);
           }}
         />
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -173,7 +191,23 @@ export function SourceManager() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {!source.primary ? (
+                  {source.primary ? (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={replace.isPending}
+                        aria-label={`Replace ${source.filename}`}
+                        onClick={() => {
+                          setReplaceTargetId(source.id);
+                          replaceInput.current?.click();
+                        }}
+                      >
+                        <RefreshCw data-icon="inline-start" aria-hidden="true" />
+                        Replace
+                      </Button>
+                    </div>
+                  ) : (
                     <div className="flex flex-wrap justify-end gap-1">
                       {source.mode === "literal" ? (
                         <Button
@@ -196,7 +230,7 @@ export function SourceManager() {
                         Remove
                       </Button>
                     </div>
-                  ) : null}
+                  )}
                 </TableCell>
               </TableRow>
             ))}

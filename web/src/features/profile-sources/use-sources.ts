@@ -35,11 +35,13 @@ async function postSource(
   file: File,
   mode?: string,
   anchor?: string | null,
+  primary?: boolean,
 ): Promise<ProfileSource> {
   const form = new FormData();
   form.append("file", file);
   if (mode) form.append("mode", mode);
   if (anchor) form.append("anchor", anchor);
+  if (primary) form.append("primary", "true");
   const headers: HeadersInit = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -92,6 +94,27 @@ export function useDeleteSource() {
         params: { path: { doc_id: id } },
       } as never)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile-sources"] }),
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
+// Replaces a source's file in place: the new upload takes over as primary,
+// then the doc it displaces is deleted — the two-step swap `add_source` /
+// `remove_source` already support, so no new backend endpoint is needed.
+export function useReplaceSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ oldId, file }: { oldId: string; file: File }) => {
+      const next = await postSource(file, "literal", null, true);
+      await unwrap(api.DELETE("/api/profile/sources/{doc_id}", {
+        params: { path: { doc_id: oldId } },
+      } as never));
+      return next;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile-sources"] });
+      toast.success("Resume replaced");
+    },
     onError: (err: Error) => toast.error(err.message),
   });
 }
