@@ -27,6 +27,7 @@ class Trap(BaseModel):
 class EvalCase(BaseModel):
     id: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
     profile_ref: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
+    target: Literal["resume", "cover_letter"] = "resume"
     jd_text: str
     criteria: JobCriteria | None = None
     traps: list[Trap] = Field(default_factory=list)

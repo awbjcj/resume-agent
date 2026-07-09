@@ -1,5 +1,12 @@
 from evals.schema import Trap
-from evals.textscan import resume_text, term_present, trap_terms_hit
+from evals.textscan import (
+    cover_letter_text,
+    resume_text,
+    term_present,
+    terms_hit,
+    trap_terms_hit,
+)
+from resume_agent.models.cover_letter import CoverLetterContent, CoverLetterParagraph
 from resume_agent.models.profile import Contact
 from resume_agent.models.resume import (
     ResumeContent,
@@ -78,3 +85,46 @@ def test_trap_terms_hit_clean_resume_is_empty():
     ]
 
     assert trap_terms_hit(_resume("Built a REST API"), traps) == []
+
+
+def test_cover_letter_text_covers_greeting_paragraphs_closing():
+    content = CoverLetterContent(
+        contact=Contact(name="Ada"),
+        greeting="Dear Hiring Team,",
+        paragraphs=[CoverLetterParagraph(text="I operate Kubernetes daily.")],
+        closing="Sincerely, Ada",
+    )
+
+    text = cover_letter_text(content)
+
+    assert "dear hiring team" in text
+    assert "kubernetes" in text
+    assert "sincerely" in text
+
+
+def test_terms_hit_finds_forbidden_terms_once():
+    traps = [
+        Trap(
+            id="t1",
+            kind="missing_skill",
+            forbidden_terms=["Kubernetes", "Istio"],
+            description="d",
+            probe_claim="c",
+            probe_provenance="p",
+        )
+    ]
+    content = CoverLetterContent(
+        contact=Contact(name="Ada"),
+        greeting="Hi,",
+        paragraphs=[
+            CoverLetterParagraph(text="Kubernetes here."),
+            CoverLetterParagraph(text="More Kubernetes there."),
+        ],
+        closing="Bye",
+    )
+
+    assert terms_hit(cover_letter_text(content), traps) == ["Kubernetes"]
+
+
+def test_terms_hit_empty_traps_hits_nothing():
+    assert terms_hit("anything at all", []) == []

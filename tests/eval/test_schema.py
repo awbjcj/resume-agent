@@ -84,3 +84,18 @@ def test_load_profile_reads_referenced_file(tmp_path: Path):
 
     assert isinstance(loaded, ProfileFacts)
     assert loaded.contact.name == "Ada"
+
+
+def test_target_defaults_to_resume():
+    case = load_case(Path("evals/cases/case_01_missing_skill.json"))
+
+    assert case.target == "resume"
+
+
+def test_cover_letter_target_roundtrips(tmp_path: Path):
+    data = _case_dict()
+    data["target"] = "cover_letter"
+    path = tmp_path / "case.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    assert load_case(path).target == "cover_letter"

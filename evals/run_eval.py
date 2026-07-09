@@ -85,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     args.config = resolve_config_path(args.config)
     config = load_review_config(args.config)
     cases = load_cases(args.cases)
+    cases = [case for case in cases if case.target == "resume"]
     if args.limit is not None:
         if args.limit <= 0:
             raise ValueError("--limit must be positive")

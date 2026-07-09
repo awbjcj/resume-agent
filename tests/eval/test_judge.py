@@ -4,11 +4,14 @@ from evals.judge import (
     DimensionScore,
     JudgeVerdict,
     build_judge_agent,
+    cl_judge_prompt_hash,
+    compose_cl_judge_input,
     compose_judge_input,
     judge_prompt_hash,
     validate_judge_verdict,
 )
-from resume_agent.models.profile import Contact
+from resume_agent.models.cover_letter import CoverLetterContent
+from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 
 
@@ -76,3 +79,35 @@ def test_build_judge_agent_is_runnable():
 
     assert hasattr(agent, "run")
     assert hasattr(agent, "arun")
+
+
+def test_compose_cl_judge_input_has_grounding_and_style_inputs():
+    content = CoverLetterContent(
+        contact=Contact(name="Ada"),
+        greeting="Hi,",
+        closing="Bye",
+    )
+    profile = ProfileFacts(
+        contact=Contact(name="Ada"),
+        summary="Backend engineer",
+    )
+
+    text = compose_cl_judge_input(
+        content,
+        profile,
+        "the jd",
+        ["grounding", "tone"],
+        "Write crisply.",
+    )
+
+    assert "COVER LETTER UNDER REVIEW (JSON):" in text
+    assert "CANDIDATE PROFILE (JSON):" in text
+    assert "Backend engineer" in text
+    assert "JOB DESCRIPTION:\nthe jd" in text
+    assert "HOUSE STYLE:\nWrite crisply." in text
+    assert "RUBRIC DIMENSIONS:\ngrounding, tone" in text
+
+
+def test_cl_judge_prompt_hash_is_stable_and_distinct():
+    assert cl_judge_prompt_hash() == cl_judge_prompt_hash()
+    assert cl_judge_prompt_hash() != judge_prompt_hash()

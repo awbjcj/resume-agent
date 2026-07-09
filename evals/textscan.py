@@ -2,6 +2,7 @@ import re
 import unicodedata
 
 from evals.schema import Trap
+from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.models.resume import ResumeContent
 
 
@@ -53,8 +54,20 @@ def term_present(text: str, term: str) -> bool:
     return re.search(rf"{left}{re.escape(needle)}{right}", haystack) is not None
 
 
-def trap_terms_hit(content: ResumeContent, traps: list[Trap]) -> list[str]:
-    text = resume_text(content)
+def cover_letter_text(content: CoverLetterContent) -> str:
+    """Return normalized scan text for a complete cover letter."""
+    parts = [
+        content.greeting,
+        *(paragraph.text for paragraph in content.paragraphs),
+        content.closing,
+    ]
+    return unicodedata.normalize(
+        "NFKC", " ".join(part for part in parts if part)
+    ).casefold()
+
+
+def terms_hit(text: str, traps: list[Trap]) -> list[str]:
+    """Return distinct forbidden terms present in text, preserving first-hit order."""
     hits: list[str] = []
     seen: set[str] = set()
     for trap in traps:
@@ -64,3 +77,7 @@ def trap_terms_hit(content: ResumeContent, traps: list[Trap]) -> list[str]:
                 hits.append(term)
                 seen.add(normalized)
     return hits
+
+
+def trap_terms_hit(content: ResumeContent, traps: list[Trap]) -> list[str]:
+    return terms_hit(resume_text(content), traps)
