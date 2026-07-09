@@ -137,7 +137,9 @@ def sort_rows(
             reverse=True,
         )
     if state.sort == "composite":
-        return sorted(rows, key=lambda row: _composite_raw(row, state.preset, now), reverse=True)
+        return sorted(
+            rows, key=lambda row: _composite_raw(row, state.preset, now), reverse=True
+        )
     return sorted(
         rows,
         key=lambda row: (row.fit_score is not None, row.fit_score or 0),
