@@ -11,8 +11,19 @@ The live eval judge (`evals/judge.py`) is trusted only after a one-time human an
 
 ## Record
 
-| date | judge model | prompt sha256 | case | human | judge | abs error |
-| --- | --- | --- | --- | --- | --- | --- |
-| _TBD_ | | | | | | |
+> **Note:** the rows below are a Claude stand-in rating, not a human anchor. Claude
+> read each blinded packet (final resume + JD + rubric, no scores/facts/traps) and
+> scored `output_quality` itself instead of a person doing it, and did so already
+> aware of the judge's scores from the run report — so this does not satisfy the
+> procedure above and must not be used to mark the judge trusted. Re-run this
+> anchor with an actual human rater before relying on `evals/judge.py` output.
 
-**MAE:** _TBD_ · **Trusted:** _no (not yet anchored)_
+| date | judge model | prompt sha256 | case | human (stand-in: Claude) | judge | abs error |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-07-08 | deepseek:deepseek-v4-pro | 64ed837a3ed9c1809441f026ed6581623a7697fd92fc2ed14b5db733c34ce8bd | case_04_seniority_inflation | 15 | 10 | 5 |
+| 2026-07-08 | deepseek:deepseek-v4-pro | 64ed837a3ed9c1809441f026ed6581623a7697fd92fc2ed14b5db733c34ce8bd | case_01_missing_skill | 20 | 20 | 0 |
+| 2026-07-08 | deepseek:deepseek-v4-pro | 64ed837a3ed9c1809441f026ed6581623a7697fd92fc2ed14b5db733c34ce8bd | case_03_inflatable_metric | 35 | 35 | 0 |
+| 2026-07-08 | deepseek:deepseek-v4-pro | 64ed837a3ed9c1809441f026ed6581623a7697fd92fc2ed14b5db733c34ce8bd | case_09_metric_rich | 85 | 90 | 5 |
+| 2026-07-08 | deepseek:deepseek-v4-pro | 64ed837a3ed9c1809441f026ed6581623a7697fd92fc2ed14b5db733c34ce8bd | case_10_keyword_mismatch | 90 | 97 | 7 |
+
+**MAE (stand-in):** 3.4 · **Trusted:** _no (stand-in only — needs a real human anchor per the procedure above)_
