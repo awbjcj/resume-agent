@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.api.routers import runs as runs_router
+from resume_agent.progress import ProgressReporter
 
 
 class InlineExecutor(Executor):
@@ -115,7 +116,8 @@ def test_pull_refresh_disables_skip_known(monkeypatch, tmp_path):
 
 
 def test_linkedin_scrape_launch_returns_run(monkeypatch, tmp_path):
-    def fake_scrape(session, *, reporter=None, **kwargs):
+    def fake_scrape(session, *, reporter: ProgressReporter | None = None, **kwargs):
+        assert reporter is not None
         reporter.begin(1, "x")
         reporter.step(1)
         return {"added": 3, "failures": {}}
