@@ -41,6 +41,22 @@ def compute_dedup_key(company: str | None, title: str | None) -> str | None:
     return f"{_normalize(company)}|{_normalize_title(title)}"
 
 
+def _city_tokens(location: str) -> frozenset[str]:
+    """Tokens of the normalized city segment before the first comma."""
+    return frozenset(_normalize(location.split(",", 1)[0]).split())
+
+
+def locations_compatible(a: str | None, b: str | None) -> bool:
+    """Return whether two locations can identify the same posting location."""
+    if not a or not a.strip() or not b or not b.strip():
+        return True
+    tokens_a = _city_tokens(a)
+    tokens_b = _city_tokens(b)
+    if not tokens_a or not tokens_b:
+        return True
+    return tokens_a <= tokens_b or tokens_b <= tokens_a
+
+
 _WHITESPACE = re.compile(r"\s+")
 
 

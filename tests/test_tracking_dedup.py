@@ -1,4 +1,8 @@
-from resume_agent.tracking.dedup import compute_content_fingerprint, compute_dedup_key
+from resume_agent.tracking.dedup import (
+    compute_content_fingerprint,
+    compute_dedup_key,
+    locations_compatible,
+)
 
 
 def test_abbreviated_titles_collapse_to_same_key():
@@ -23,3 +27,26 @@ def test_fingerprint_differs_for_different_text():
 def test_fingerprint_none_for_blank():
     assert compute_content_fingerprint("   ") is None
     assert compute_content_fingerprint(None) is None
+
+
+def test_locations_blank_either_side_is_wildcard():
+    assert locations_compatible(None, None)
+    assert locations_compatible(None, "Austin, TX")
+    assert locations_compatible("Austin, TX", "")
+    assert locations_compatible("   ", "Detroit, MI")
+
+
+def test_locations_same_city_different_spelling_compatible():
+    assert locations_compatible("Austin, TX", "Austin, Texas, United States")
+    assert locations_compatible("New York", "New York City")
+    assert locations_compatible("Austin", "Austin, TX")
+
+
+def test_locations_different_city_incompatible():
+    assert not locations_compatible("Austin, TX", "Detroit, MI")
+    assert not locations_compatible("New York City", "Boston, MA")
+
+
+def test_remote_is_its_own_city():
+    assert not locations_compatible("Remote", "Austin, TX")
+    assert locations_compatible("Remote", "Remote - US")
