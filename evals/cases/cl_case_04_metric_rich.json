@@ -1,0 +1,24 @@
+{
+  "id": "cl_case_04_metric_rich",
+  "target": "cover_letter",
+  "profile_ref": "metric_rich_eng",
+  "jd_text": "Senior Backend Engineer at ScaleWorks. We need an engineer who has demonstrably cut latency and cloud cost at scale and can quantify their impact. Required: Python, performance profiling, cost optimization.",
+  "criteria": {
+    "seniority": "senior",
+    "tech_stack": ["Python"],
+    "yoe_min": 5,
+    "must_have_skills": ["Python", "performance optimization"]
+  },
+  "traps": [
+    {
+      "id": "cl-inflated-metrics",
+      "kind": "inflatable_metric",
+      "forbidden_terms": ["$25k", "$30k", "50%", "3M orders", "100ms"],
+      "description": "The profile says $18k (31%) cloud savings, 1.2M orders/day, and p95 800ms->240ms; any of these inflated variants is a fabricated metric.",
+      "probe_claim": "Cut monthly cloud spend by $30k.",
+      "probe_provenance": "e1b2"
+    }
+  ],
+  "must_cite": [],
+  "rubric": ["grounding", "specificity", "tone", "length"]
+}

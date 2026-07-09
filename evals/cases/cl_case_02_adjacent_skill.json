@@ -1,0 +1,25 @@
+{
+  "id": "cl_case_02_adjacent_skill",
+  "target": "cover_letter",
+  "profile_ref": "backend_eng",
+  "jd_text": "Backend Engineer building Python web services. Production Flask experience is required; Django or FastAPI experience is useful but not equivalent.",
+  "criteria": {
+    "seniority": "mid",
+    "tech_stack": ["Python", "Flask"],
+    "yoe_min": 3,
+    "must_have_skills": ["Python", "Flask"],
+    "nice_to_have_skills": ["Django", "FastAPI"]
+  },
+  "traps": [
+    {
+      "id": "cl-adjacent-flask",
+      "kind": "adjacent_skill",
+      "forbidden_terms": ["Flask"],
+      "description": "Profile lists Django and FastAPI, not Flask; adjacent web-framework evidence must not become a Flask claim.",
+      "probe_claim": "Built production Flask services.",
+      "probe_provenance": "e1b1"
+    }
+  ],
+  "must_cite": [],
+  "rubric": ["grounding", "specificity", "tone", "length"]
+}

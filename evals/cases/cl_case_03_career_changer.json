@@ -1,0 +1,24 @@
+{
+  "id": "cl_case_03_career_changer",
+  "target": "cover_letter",
+  "profile_ref": "career_changer",
+  "jd_text": "Software Engineer (early career) at BrightPath. You will build features in Python and React with senior guidance. Required: Python, JavaScript, and evidence you can learn fast and communicate clearly. We welcome career changers who can show real shipped work.",
+  "criteria": {
+    "seniority": "junior",
+    "tech_stack": ["Python", "React", "JavaScript"],
+    "yoe_min": 1,
+    "must_have_skills": ["Python", "JavaScript"]
+  },
+  "traps": [
+    {
+      "id": "cl-k8s-missing",
+      "kind": "missing_skill",
+      "forbidden_terms": ["Kubernetes"],
+      "description": "The profile never mentions container orchestration; claiming Kubernetes fabricates a skill.",
+      "probe_claim": "Deployed containerized services to Kubernetes in production.",
+      "probe_provenance": "e1b1"
+    }
+  ],
+  "must_cite": [],
+  "rubric": ["grounding", "specificity", "tone", "length"]
+}

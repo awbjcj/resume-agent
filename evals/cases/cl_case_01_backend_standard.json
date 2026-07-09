@@ -1,0 +1,15 @@
+{
+  "id": "cl_case_01_backend_standard",
+  "target": "cover_letter",
+  "profile_ref": "backend_eng",
+  "jd_text": "Senior Backend Engineer at Nimbus Analytics. You will design Python microservices and PostgreSQL data models for our reporting platform. Required: Python, FastAPI or Django, SQL tuning, CI discipline.",
+  "criteria": {
+    "seniority": "senior",
+    "tech_stack": ["Python", "FastAPI", "PostgreSQL"],
+    "yoe_min": 5,
+    "must_have_skills": ["Python", "SQL"]
+  },
+  "traps": [],
+  "must_cite": [],
+  "rubric": ["grounding", "specificity", "tone", "length"]
+}

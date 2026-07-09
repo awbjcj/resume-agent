@@ -18,6 +18,8 @@ def test_at_least_eight_seed_cases():
 
 def test_each_case_valid_and_grounded():
     for case in load_cases(CASES):
+        if case.target != "resume":
+            continue
         profile = load_profile(case, PROFILES)
         facts_by_id = index_facts(profile)
         valid_ids = set(facts_by_id)
@@ -57,3 +59,29 @@ def test_craft_cases_present():
         "case_11_overlong",
         "case_12_career_changer",
     } <= ids
+
+
+def test_cover_letter_seed_cases_valid_and_grounded():
+    cases = [
+        case
+        for case in load_cases(CASES)
+        if case.target == "cover_letter"
+    ]
+
+    assert len(cases) == 4
+    for case in cases:
+        profile = load_profile(case, PROFILES)
+        facts_by_id = index_facts(profile)
+        assert case.criteria is not None, (
+            f"{case.id}: cover-letter cases must embed criteria"
+        )
+        for trap in case.traps:
+            assert trap.forbidden_terms, (
+                f"{case.id}: trap has no forbidden_terms"
+            )
+            assert trap.probe_provenance in facts_by_id
+            assert any(
+                term_present(trap.probe_claim, term)
+                for term in trap.forbidden_terms
+            )
+        assert case.rubric, f"{case.id}: needs judge rubric dimensions"
