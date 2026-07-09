@@ -42,9 +42,7 @@ def _fixture_dirs(tmp_path: Path) -> tuple[Path, Path]:
     return cases, profiles
 
 
-def test_run_cl_eval_writes_artifact_with_style_metadata(
-    tmp_path, monkeypatch
-):
+def test_run_cl_eval_writes_artifact_with_style_metadata(tmp_path, monkeypatch):
     cases, profiles = _fixture_dirs(tmp_path)
     _write_case(cases, "cl_x", "cover_letter")
     style_guide = tmp_path / "style.md"
@@ -107,9 +105,10 @@ def test_run_cl_eval_writes_artifact_with_style_metadata(
     assert artifact["results"][0]["finalQuality"] == 90
     assert artifact["failures"] == []
     assert "cl judge prompt sha256" in artifact["metadata"]
-    assert artifact["metadata"]["style guide sha256"] == hashlib.sha256(
-        b"Write crisply."
-    ).hexdigest()
+    assert (
+        artifact["metadata"]["style guide sha256"]
+        == hashlib.sha256(b"Write crisply.").hexdigest()
+    )
     assert captured["style_guide"] == "Write crisply."
 
 
@@ -121,6 +120,4 @@ def test_run_cl_eval_ignores_resume_cases(tmp_path):
         ValueError,
         match="no cover-letter eval cases found",
     ):
-        run_cl_eval.main(
-            ["--cases", str(cases), "--profiles", str(profiles)]
-        )
+        run_cl_eval.main(["--cases", str(cases), "--profiles", str(profiles)])

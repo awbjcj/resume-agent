@@ -12,7 +12,16 @@ class _FakeConnector:
 
     def fetch(self, search, limit=None):
         return FetchResult(
-            jobs=[RawJob("linkedin", "https://li/1", "Acme", "Engineer", "Remote", "a real jd")]
+            jobs=[
+                RawJob(
+                    "linkedin",
+                    "https://li/1",
+                    "Acme",
+                    "Engineer",
+                    "Remote",
+                    "a real jd",
+                )
+            ]
         )
 
 
@@ -23,14 +32,16 @@ class _FakeConnectorWithFailure:
         return FetchResult(jobs=[], failures={"https://li/dead": "Error"})
 
 
+def _fail_cli_scrape_setup(_path):
+    raise AssertionError("CLI must delegate scrape setup to the service")
+
+
 def test_scrape_command_ingests_via_connector(tmp_path, monkeypatch):
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
     monkeypatch.setattr(
         cli,
         "load_search_config",
-        lambda path: (_ for _ in ()).throw(
-            AssertionError("CLI must delegate scrape setup to the service")
-        ),
+        _fail_cli_scrape_setup,
         raising=False,
     )
     monkeypatch.setattr(discovery_service, "load_search_config", lambda path: object())
@@ -51,9 +62,7 @@ def test_scrape_command_reports_failed_postings(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli,
         "load_search_config",
-        lambda path: (_ for _ in ()).throw(
-            AssertionError("CLI must delegate scrape setup to the service")
-        ),
+        _fail_cli_scrape_setup,
         raising=False,
     )
     monkeypatch.setattr(discovery_service, "load_search_config", lambda path: object())

@@ -47,9 +47,7 @@ def run_cl_case(
 ) -> CLCaseResult:
     """Run the production cover-letter loop in memory, then measure the result."""
     if case.criteria is None:
-        raise ValueError(
-            f"{case.id}: cover-letter cases must embed criteria"
-        )
+        raise ValueError(f"{case.id}: cover-letter cases must embed criteria")
     usage = UsageCollector()
     draft = MeteredRunner(draft_agent, usage)
     reviser = MeteredRunner(reviser_agent, usage)
@@ -75,15 +73,19 @@ def run_cl_case(
             reviser,
         )
 
-    verdict = MeteredRunner(judge_agent, usage).run(
-        compose_cl_judge_input(
-            content,
-            profile,
-            case.jd_text,
-            case.rubric,
-            style_guide,
+    verdict = (
+        MeteredRunner(judge_agent, usage)
+        .run(
+            compose_cl_judge_input(
+                content,
+                profile,
+                case.jd_text,
+                case.rubric,
+                style_guide,
+            )
         )
-    ).content
+        .content
+    )
     if not isinstance(verdict, JudgeVerdict):
         raise TypeError(
             f"Expected JudgeVerdict from judge, got {type(verdict).__name__}"

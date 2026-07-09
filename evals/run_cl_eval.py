@@ -49,11 +49,7 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_argparser().parse_args(argv)
-    cases = [
-        case
-        for case in load_cases(args.cases)
-        if case.target == "cover_letter"
-    ]
+    cases = [case for case in load_cases(args.cases) if case.target == "cover_letter"]
     if args.limit is not None:
         if args.limit <= 0:
             raise ValueError("--limit must be positive")
@@ -70,12 +66,15 @@ def main(argv: list[str] | None = None) -> int:
         f"cl-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
-    commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-        check=False,
-    ).stdout.strip() or "unknown"
+    commit = (
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
+        or "unknown"
+    )
     metadata = {
         "models": json.dumps(
             (
@@ -90,9 +89,7 @@ def main(argv: list[str] | None = None) -> int:
             sort_keys=True,
         ),
         "cl judge prompt sha256": cl_judge_prompt_hash(),
-        "style guide sha256": hashlib.sha256(
-            (style_guide or "").encode()
-        ).hexdigest(),
+        "style guide sha256": hashlib.sha256((style_guide or "").encode()).hexdigest(),
         "git commit": commit,
     }
 
@@ -112,17 +109,13 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         except Exception as exc:  # noqa: BLE001
-            failures.append(
-                f"{case.id}: {type(exc).__name__}: {exc}"
-            )
+            failures.append(f"{case.id}: {type(exc).__name__}: {exc}")
         finally:
             output.write_text(
                 json.dumps(
                     {
                         "metadata": metadata,
-                        "results": [
-                            result_dict(result) for result in results
-                        ],
+                        "results": [result_dict(result) for result in results],
                         "failures": failures,
                     },
                     indent=2,
@@ -138,9 +131,7 @@ def main(argv: list[str] | None = None) -> int:
             f"revise_rounds={result.revise_rounds}"
         )
     if results:
-        mean_quality = sum(
-            result.final_quality for result in results
-        ) / len(results)
+        mean_quality = sum(result.final_quality for result in results) / len(results)
         print(
             f"mean quality: {mean_quality:.1f} over "
             f"{len(results)} case(s); failures: {len(failures)}"

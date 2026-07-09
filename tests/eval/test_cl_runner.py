@@ -47,18 +47,14 @@ def _letter(text: str, provenance: list[str]) -> CoverLetterContent:
     return CoverLetterContent(
         contact=_profile().contact,
         greeting="Dear team,",
-        paragraphs=[
-            CoverLetterParagraph(text=text, provenance=provenance)
-        ],
+        paragraphs=[CoverLetterParagraph(text=text, provenance=provenance)],
         closing="Sincerely",
     )
 
 
 def test_clean_draft_needs_no_revision():
     case = _case()
-    draft = _StubRunner(
-        [_letter("I build Python FastAPI services.", ["e1b1"])]
-    )
+    draft = _StubRunner([_letter("I build Python FastAPI services.", ["e1b1"])])
     reviser = _StubRunner([])
     judge = _StubRunner([_verdict(case.rubric)])
 
