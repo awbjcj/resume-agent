@@ -75,6 +75,7 @@ def save_or_upgrade(
         incoming.jd_text,
         incoming.dedup_key,
         incoming.content_fingerprint,
+        incoming.location,
     )
     return _apply(session, existing, incoming, decide(existing, incoming), commit)
 

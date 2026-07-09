@@ -219,10 +219,12 @@ aggressiveness determines how many detail fetches are issued.
   speaker notes; images/diagrams are skipped, and an LLM image description is never
   verification evidence (it would punch a hole in fact-lock). Put key numbers in slide
   text or speaker notes so they are extractable.
-- **`dedup_key` drops location.** `compute_dedup_key` is `normalize(company)|normalize_title(title)`.
-  Multi-location same-title Workday reqs (e.g. "Software Engineer" in Austin vs. Detroit at GM)
-  collapse to one job. Flagged as a follow-up micro-spec — fix is adding location to the key or a
-  location-aware secondary check.
+- **`dedup_key` is not unique — location guard.** `compute_dedup_key` stays
+  `normalize(company)|normalize_title(title)`; `find_existing` additionally requires
+  `locations_compatible` (blank = wildcard, else city-token subset) on its identical-JD,
+  dedup_key, and keyless-fingerprint branches (URL match exempt). Multi-location
+  same-title requisitions are sibling rows sharing a dedup_key. See
+  `docs/adr/0001-dedup-key-plus-location-guard.md`.
 - **Workday `appliedFacets` not used.** v1 shapes requests with `searchText` only. Location/category
   facet IDs are tenant-specific (require a separate facets call) and are a later refinement.
 - **Tesla/Google endpoints are reverse-engineered.** They have no public API contract and could change

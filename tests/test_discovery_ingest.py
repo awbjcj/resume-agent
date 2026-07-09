@@ -275,6 +275,158 @@ def test_keyless_near_duplicate_collapses_via_fingerprint():
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
 
 
+def test_same_key_different_city_inserts_sibling():
+    with _session() as s:
+        first = add_job(
+            s,
+            source="workday",
+            jd_text="Build cars. Austin team.",
+            company="GM",
+            title="Software Engineer",
+            location="Austin, TX",
+        )
+        sibling = add_job(
+            s,
+            source="workday",
+            jd_text="Build cars. Detroit team.",
+            company="GM",
+            title="Software Engineer",
+            location="Detroit, MI",
+        )
+
+        assert first is not None and sibling is not None
+        assert first.id != sibling.id
+        assert first.dedup_key == sibling.dedup_key
+
+
+def test_identical_jd_different_city_inserts_sibling():
+    with _session() as s:
+        first = add_job(
+            s,
+            source="workday",
+            jd_text="Same req text",
+            company="GM",
+            title="Software Engineer",
+            location="Austin, TX",
+            url="http://wd/1",
+        )
+        sibling = add_job(
+            s,
+            source="workday",
+            jd_text="Same req text",
+            company="GM",
+            title="Software Engineer",
+            location="Detroit, MI",
+            url="http://wd/2",
+        )
+
+        assert first is not None and sibling is not None
+        assert first.id != sibling.id
+
+
+def test_same_key_compatible_city_upgrades_in_place():
+    with _session() as s:
+        aggregate = add_job(
+            s,
+            source="adzuna",
+            jd_text="snippet",
+            company="GM",
+            title="Software Engineer",
+            location="Austin, TX",
+        )
+        assert aggregate is not None
+
+        upgraded, outcome = save_or_upgrade(
+            s,
+            source="workday",
+            jd_text="full detail text",
+            company="GM",
+            title="Software Engineer",
+            location="Austin, Texas, United States",
+            url="http://wd/1",
+        )
+
+        assert outcome is IngestOutcome.upgraded
+        assert upgraded is not None and upgraded.id == aggregate.id
+
+
+def test_blank_location_still_merges():
+    with _session() as s:
+        aggregate = add_job(
+            s,
+            source="adzuna",
+            jd_text="snippet",
+            company="GM",
+            title="Software Engineer",
+        )
+        assert aggregate is not None
+
+        upgraded, outcome = save_or_upgrade(
+            s,
+            source="workday",
+            jd_text="full detail",
+            company="GM",
+            title="Software Engineer",
+            location="Austin, TX",
+            url="http://wd/1",
+        )
+
+        assert outcome is IngestOutcome.upgraded
+        assert upgraded is not None and upgraded.id == aggregate.id
+
+
+def test_keyless_fingerprint_different_city_inserts_sibling():
+    with _session() as s:
+        first = add_job(
+            s,
+            source="remoteok",
+            jd_text="Build great systems",
+            location="Austin, TX",
+        )
+        sibling = add_job(
+            s,
+            source="remoteok",
+            jd_text="BUILD   GREAT SYSTEMS",
+            location="Detroit, MI",
+        )
+
+        assert first is not None and sibling is not None
+        assert first.id != sibling.id
+
+
+def test_location_guard_scans_past_incompatible_candidate():
+    with _session() as s:
+        austin = add_job(
+            s,
+            source="adzuna",
+            jd_text="Austin snippet",
+            company="GM",
+            title="Software Engineer",
+            location="Austin, TX",
+        )
+        detroit = add_job(
+            s,
+            source="adzuna",
+            jd_text="Detroit snippet",
+            company="GM",
+            title="Software Engineer",
+            location="Detroit, MI",
+        )
+        upgraded, outcome = save_or_upgrade(
+            s,
+            source="workday",
+            jd_text="Detroit full detail",
+            company="GM",
+            title="Software Engineer",
+            location="Detroit, Michigan",
+            url="http://wd/detroit",
+        )
+
+        assert austin is not None and detroit is not None and upgraded is not None
+        assert outcome is IngestOutcome.upgraded
+        assert upgraded.id == detroit.id
+
+
 def test_archived_duplicate_does_not_block_new_active_job():
     with _session() as s:
         archived = add_job(

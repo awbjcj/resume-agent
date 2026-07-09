@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, TypeVar, cast
@@ -6,7 +6,10 @@ from typing import Any, TypeVar, cast
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from resume_agent.tracking.dedup import compute_content_fingerprint
+from resume_agent.tracking.dedup import (
+    compute_content_fingerprint,
+    locations_compatible,
+)
 from resume_agent.tracking.prune import (
     PruneReport,
     PruneRow,
@@ -56,9 +59,17 @@ def find_existing(
     jd_text: str,
     dedup_key: str | None = None,
     content_fingerprint: str | None = None,
+    location: str | None = None,
 ) -> Job | None:
-    """Match for dedupe: URL, then identical JD, then dedup_key, then (keyless) fingerprint."""
+    """Match by URL, JD, key, or keyless fingerprint, with a location guard."""
     archived_col = cast(Any, Job.archived_at)
+
+    def first_compatible(rows: Iterable[Job]) -> Job | None:
+        return next(
+            (row for row in rows if locations_compatible(location, row.location)),
+            None,
+        )
+
     if url:
         by_url = session.exec(
             select(Job).where(Job.url == url, archived_col.is_(None))
@@ -73,22 +84,31 @@ def find_existing(
         conditions = [Job.jd_text == jd_text, archived_col.is_(None)]
         if fingerprint:
             conditions.insert(0, Job.content_fingerprint == fingerprint)
-        by_jd = session.exec(select(Job).where(*conditions)).first()
+        by_jd = first_compatible(
+            session.exec(select(Job).where(*conditions)).all()
+        )
         if by_jd is not None:
             return by_jd
     if dedup_key:
-        by_key = session.exec(
-            select(Job).where(Job.dedup_key == dedup_key, archived_col.is_(None))
-        ).first()
+        by_key = first_compatible(
+            session.exec(
+                select(Job).where(
+                    Job.dedup_key == dedup_key,
+                    archived_col.is_(None),
+                )
+            ).all()
+        )
         if by_key is not None:
             return by_key
     if dedup_key is None and content_fingerprint:
-        return session.exec(
-            select(Job).where(
-                Job.content_fingerprint == content_fingerprint,
-                archived_col.is_(None),
-            )
-        ).first()
+        return first_compatible(
+            session.exec(
+                select(Job).where(
+                    Job.content_fingerprint == content_fingerprint,
+                    archived_col.is_(None),
+                )
+            ).all()
+        )
     return None
 
 
