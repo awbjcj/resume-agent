@@ -8,6 +8,8 @@ honored.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Query, Request
 
 from resume_agent.api.deps import get_run_manager
@@ -28,6 +30,7 @@ from resume_agent.api.schemas.runs import (
     TailorParams,
 )
 from resume_agent.api.schemas.base import Page
+from resume_agent.config import get_settings
 from resume_agent.db import get_session
 from resume_agent.services.cover_letters import write_cover_letters
 from resume_agent.services.discovery import (
@@ -36,6 +39,7 @@ from resume_agent.services.discovery import (
     pull_jobs,
     refresh_jobs,
     reprocess_jobs,
+    scrape_linkedin_jobs,
 )
 from resume_agent.services.tailoring import tailor
 from resume_agent.services.pagination import paginate
@@ -223,6 +227,42 @@ def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manage
         return {"pending": len(pending)}
 
     run_id = mgr.submit("gmailSync", work)
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(record)
+
+
+def _linkedin_ready() -> bool:
+    """Return whether credentials or a persisted browser profile are available."""
+    settings = get_settings()
+    if settings.linkedin_email.strip() and settings.linkedin_password:
+        return True
+    if not settings.linkedin_user_data_dir:
+        return False
+    profile = Path(settings.linkedin_user_data_dir)
+    return profile.is_dir() and any(profile.iterdir())
+
+
+@router.post("/sources/linkedin/scrape", response_model=RunOut, status_code=202)
+def launch_linkedin_scrape(
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    """Scrape LinkedIn; the worker opens a visible browser on the server host."""
+    if not _linkedin_ready():
+        raise ApiException(
+            409,
+            "LINKEDIN_NOT_CONFIGURED",
+            "LinkedIn needs a saved browser profile or configured email and password. "
+            "Run `resume-agent scrape` locally once to create the profile.",
+        )
+    engine = _engine(request)
+
+    def work(reporter):
+        with get_session(engine) as session:
+            return scrape_linkedin_jobs(session, reporter=reporter)
+
+    run_id = mgr.submit("linkedinScrape", work)
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)

@@ -7,9 +7,6 @@ from sqlmodel import select
 from resume_agent.config import load_yaml, get_settings
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.connectors.telemetry import read_runs
-from resume_agent.discovery.ingest import ingest_jobs
-from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
-from resume_agent.discovery.search_config import load_search_config
 from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
 from resume_agent.gmail.propose import propose_transitions
@@ -26,6 +23,7 @@ from resume_agent.services.discovery import (
     pull_jobs,
     refresh_jobs,
     reprocess_jobs,
+    scrape_linkedin_jobs,
 )
 from resume_agent.services.prune import prune as run_prune
 from resume_agent.services.rendering import render_resume_version
@@ -365,18 +363,18 @@ def scrape_cmd(
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Scrape LinkedIn for jobs matching search.yaml and insert them as raw jobs."""
-    config = load_search_config(search)
-    connector = build_linkedin_scraper()
     engine = _engine(db_url)
     with get_session(engine) as session:
-        result = connector.fetch(config, limit=limit)
-        added = ingest_jobs(session, result.jobs)
-    if result.failures:
+        outcome = scrape_linkedin_jobs(session, search_path=search, limit=limit)
+    if outcome["failures"]:
         joined = ", ".join(
-            f"{url} ({reason})" for url, reason in result.failures.items()
+            f"{url} ({reason})"
+            for url, reason in outcome["failures"].items()
         )
-        typer.echo(f"Skipped {len(result.failures)} failed posting(s): {joined}")
-    typer.echo(f"Scrape complete. Added {sum(added.values())} new job(s).")
+        typer.echo(
+            f"Skipped {len(outcome['failures'])} failed posting(s): {joined}"
+        )
+    typer.echo(f"Scrape complete. Added {outcome['added']} new job(s).")
 
 
 @app.command("pull")

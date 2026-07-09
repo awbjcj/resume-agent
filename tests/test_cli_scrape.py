@@ -2,6 +2,7 @@ from typer.testing import CliRunner
 
 from resume_agent import cli
 from resume_agent.discovery.connectors.base import FetchResult, RawJob
+from resume_agent.services import discovery as discovery_service
 
 runner = CliRunner()
 
@@ -24,8 +25,20 @@ class _FakeConnectorWithFailure:
 
 def test_scrape_command_ingests_via_connector(tmp_path, monkeypatch):
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
-    monkeypatch.setattr(cli, "load_search_config", lambda path: object())
-    monkeypatch.setattr(cli, "build_linkedin_scraper", lambda: _FakeConnector())
+    monkeypatch.setattr(
+        cli,
+        "load_search_config",
+        lambda path: (_ for _ in ()).throw(
+            AssertionError("CLI must delegate scrape setup to the service")
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(discovery_service, "load_search_config", lambda path: object())
+    monkeypatch.setattr(
+        discovery_service,
+        "build_linkedin_scraper",
+        lambda: _FakeConnector(),
+    )
 
     result = runner.invoke(cli.app, ["scrape", "--db-url", db_url])
 
@@ -35,8 +48,20 @@ def test_scrape_command_ingests_via_connector(tmp_path, monkeypatch):
 
 def test_scrape_command_reports_failed_postings(tmp_path, monkeypatch):
     db_url = f"sqlite:///{tmp_path / 'jobs.db'}"
-    monkeypatch.setattr(cli, "load_search_config", lambda path: object())
-    monkeypatch.setattr(cli, "build_linkedin_scraper", lambda: _FakeConnectorWithFailure())
+    monkeypatch.setattr(
+        cli,
+        "load_search_config",
+        lambda path: (_ for _ in ()).throw(
+            AssertionError("CLI must delegate scrape setup to the service")
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(discovery_service, "load_search_config", lambda path: object())
+    monkeypatch.setattr(
+        discovery_service,
+        "build_linkedin_scraper",
+        lambda: _FakeConnectorWithFailure(),
+    )
 
     result = runner.invoke(cli.app, ["scrape", "--db-url", db_url])
 

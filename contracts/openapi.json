@@ -7741,6 +7741,53 @@
         "summary": "Add Source Route"
       }
     },
+    "/api/sources/linkedin/scrape": {
+      "post": {
+        "description": "Scrape LinkedIn; the worker opens a visible browser on the server host.",
+        "operationId": "launch_linkedin_scrape_api_sources_linkedin_scrape_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Linkedin Scrape"
+      }
+    },
     "/api/sources/preview": {
       "post": {
         "operationId": "preview_source_route_api_sources_preview_post",

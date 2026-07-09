@@ -45,7 +45,6 @@ logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
 - **In-memory sqlite tests** need a shared connection: `make_engine` gives
   `sqlite://` a `StaticPool` + `check_same_thread=False` so the request threadpool
   sees the schema the lifespan thread created.
-- **Deferred (not exposed over HTTP):** Gmail sync, LinkedIn scrape.
 
 ---
 

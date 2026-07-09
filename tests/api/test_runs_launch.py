@@ -1,4 +1,5 @@
 from concurrent.futures import Executor, Future
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -111,3 +112,71 @@ def test_pull_refresh_disables_skip_known(monkeypatch, tmp_path):
 
     assert response.status_code == 202
     assert captured["skip_known"] is False
+
+
+def test_linkedin_scrape_launch_returns_run(monkeypatch, tmp_path):
+    def fake_scrape(session, *, reporter=None, **kwargs):
+        reporter.begin(1, "x")
+        reporter.step(1)
+        return {"added": 3, "failures": {}}
+
+    monkeypatch.setattr(
+        runs_router,
+        "scrape_linkedin_jobs",
+        fake_scrape,
+        raising=False,
+    )
+    monkeypatch.setattr(runs_router, "_linkedin_ready", lambda: True, raising=False)
+    client = _client(tmp_path)
+
+    with client:
+        response = client.post("/api/sources/linkedin/scrape")
+        run_id = response.json()["runId"] if response.status_code == 202 else ""
+        run = client.get(f"/api/runs/{run_id}").json() if run_id else {}
+
+    assert response.status_code == 202
+    assert run["kind"] == "linkedinScrape"
+    assert run["state"] == "done"
+    assert run["result"] == {"added": 3, "failures": {}}
+
+
+def test_linkedin_scrape_409_when_not_configured(monkeypatch, tmp_path):
+    monkeypatch.setattr(runs_router, "_linkedin_ready", lambda: False, raising=False)
+    client = _client(tmp_path)
+
+    with client:
+        response = client.post("/api/sources/linkedin/scrape")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "LINKEDIN_NOT_CONFIGURED"
+
+
+def test_linkedin_ready_requires_credentials_or_nonempty_profile(
+    monkeypatch, tmp_path
+):
+    profile = tmp_path / "linkedin-profile"
+    profile.mkdir()
+    settings = SimpleNamespace(
+        linkedin_email="",
+        linkedin_password="",
+        linkedin_user_data_dir=str(profile),
+    )
+    monkeypatch.setattr(runs_router, "get_settings", lambda: settings, raising=False)
+
+    assert runs_router._linkedin_ready() is False
+
+    (profile / "Local State").write_text("{}", encoding="utf-8")
+    assert runs_router._linkedin_ready() is True
+
+
+def test_linkedin_ready_rejects_regular_file(monkeypatch, tmp_path):
+    profile_file = tmp_path / "linkedin-profile"
+    profile_file.write_text("not a directory", encoding="utf-8")
+    settings = SimpleNamespace(
+        linkedin_email="",
+        linkedin_password="",
+        linkedin_user_data_dir=str(profile_file),
+    )
+    monkeypatch.setattr(runs_router, "get_settings", lambda: settings, raising=False)
+
+    assert runs_router._linkedin_ready() is False

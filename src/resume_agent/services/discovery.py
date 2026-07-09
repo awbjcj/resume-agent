@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypedDict
 
 import httpx
 from playwright.sync_api import Error as PlaywrightError
@@ -18,10 +19,11 @@ from resume_agent.config import get_settings
 from resume_agent.discovery.connectors.config import load_connectors_config
 from resume_agent.discovery.connectors.registry import build_source_connectors
 from resume_agent.discovery.connectors.runner import PullReport, run_pull
-from resume_agent.discovery.ingest import add_job
+from resume_agent.discovery.ingest import add_job, ingest_jobs
 from resume_agent.discovery.pipeline import discover, reprocess
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
+from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import (
@@ -52,6 +54,11 @@ class RefreshReport:
     totals: dict[str, int]
     status_counts: dict[str, int]
     failures: dict[str, dict[str, str]]
+
+
+class LinkedInScrapeResult(TypedDict):
+    added: int
+    failures: dict[str, str]
 
 
 def _skill_artifacts(
@@ -185,6 +192,28 @@ def pull_jobs(
         finish=finish,
         skip_known=skip_known,
     )
+
+
+def scrape_linkedin_jobs(
+    session: Session,
+    *,
+    search_path: str = DEFAULT_SEARCH,
+    limit: int | None = None,
+    reporter: ProgressReporter | None = None,
+) -> LinkedInScrapeResult:
+    """Scrape LinkedIn in a visible browser and ingest all fetched postings."""
+    search_config = load_search_config(search_path)
+    connector = build_linkedin_scraper()
+    if reporter is not None:
+        reporter.begin(1, "Scraping LinkedIn")
+    result = connector.fetch(search_config, limit=limit)
+    added = ingest_jobs(session, result.jobs)
+    if reporter is not None:
+        reporter.step(1)
+    return {
+        "added": sum(added.values()),
+        "failures": dict(result.failures),
+    }
 
 
 def reprocess_jobs(
