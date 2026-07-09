@@ -19,7 +19,7 @@ PRESETS: dict[str, tuple[float, float, float]] = {
 
 @dataclass
 class FilterState:
-    salary_min: int | None = None
+    salary_min: float | None = None
     remote: set[str] = field(default_factory=set)
     sponsorship: set[str] = field(default_factory=set)
     seniority: set[str] = field(default_factory=set)
@@ -29,7 +29,7 @@ class FilterState:
     region: set[str] = field(default_factory=set)
     city: set[str] = field(default_factory=set)
     company_size: set[str] = field(default_factory=set)
-    fit_min: int | None = None
+    fit_min: float | None = None
     skills: set[str] = field(default_factory=set)
     sort: str = "fit"
     preset: str = "balanced"
@@ -70,7 +70,7 @@ def apply_filters(rows: list[ShortlistRow], state: FilterState) -> list[Shortlis
     return [row for row in rows if _passes(row, state)]
 
 
-def _salary_value(row: ShortlistRow) -> int | None:
+def _salary_value(row: ShortlistRow) -> float | None:
     return row.salary_max if row.salary_max is not None else row.salary_min
 
 

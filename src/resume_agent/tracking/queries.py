@@ -46,8 +46,8 @@ class ShortlistRow:
     fit_score: int | None
     fit_rationale: str | None
     sponsorship_signal: str | None
-    salary_min: int | None
-    salary_max: int | None
+    salary_min: float | None
+    salary_max: float | None
     salary_currency: str | None
     remote_policy: str | None
     seniority: str | None
@@ -84,8 +84,8 @@ class JobDetailRow:
     fit_score: int | None
     fit_rationale: str | None
     sponsorship_signal: str | None
-    salary_min: int | None
-    salary_max: int | None
+    salary_min: float | None
+    salary_max: float | None
     salary_currency: str | None
     remote_policy: str | None
     seniority: str | None
@@ -129,8 +129,8 @@ class PipelineRow:
     critique_json: list[dict] | None
     pdf_path: str | None
     application_status: str | None
-    salary_min: int | None
-    salary_max: int | None
+    salary_min: float | None
+    salary_max: float | None
     remote_policy: str | None
     seniority: str | None
     has_progress: bool = False

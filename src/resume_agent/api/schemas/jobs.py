@@ -22,8 +22,8 @@ class ShortlistItem(CamelModel):
     fit_score: int | None
     fit_rationale: str | None
     sponsorship_signal: str | None
-    salary_min: int | None
-    salary_max: int | None
+    salary_min: float | None
+    salary_max: float | None
     salary_currency: str | None
     remote_policy: str | None
     seniority: str | None
@@ -47,8 +47,8 @@ class PipelineItem(CamelModel):
     critique_json: list[dict] | None
     pdf_path: str | None
     application_status: str | None
-    salary_min: int | None
-    salary_max: int | None
+    salary_min: float | None
+    salary_max: float | None
     remote_policy: str | None
     seniority: str | None
     has_progress: bool
@@ -130,8 +130,8 @@ class JobDetail(CamelModel):
     # modal renders the same covered/required channels as the board card).
     skills: list[SkillTagOut]
     sponsorship_signal: str | None = None
-    salary_min: int | None = None
-    salary_max: int | None = None
+    salary_min: float | None = None
+    salary_max: float | None = None
     salary_currency: str | None = None
     remote_policy: str | None = None
     seniority: str | None = None
