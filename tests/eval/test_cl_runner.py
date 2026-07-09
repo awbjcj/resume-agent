@@ -22,6 +22,9 @@ class _StubRunner:
         self.prompts.append(prompt)
         return SimpleNamespace(content=self._contents.pop(0), metrics=None)
 
+    async def arun(self, prompt):
+        return self.run(prompt)
+
 
 def _profile() -> ProfileFacts:
     return ProfileFacts.model_validate_json(
