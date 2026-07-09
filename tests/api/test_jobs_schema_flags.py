@@ -27,6 +27,35 @@ def test_pipeline_item_exposes_attention_flags_camelcase():
     assert dumped["regressed"] is False
 
 
+def test_pipeline_item_accepts_fractional_hourly_salary():
+    """Hourly-rate JDs (e.g. $41.75/hr) yield fractional salary values.
+
+    These are preserved verbatim from JD extraction, not normalized to
+    annual ints, so the API schema must accept floats.
+    """
+    item = PipelineItem.model_validate(
+        {
+            "job_id": 1,
+            "company": "Acme",
+            "title": "Eng",
+            "status": "tailored",
+            "fit_score": 80,
+            "jd_text": "x",
+            "critique_json": [],
+            "pdf_path": None,
+            "application_status": None,
+            "salary_min": 41.75,
+            "salary_max": 66.75,
+            "remote_policy": None,
+            "seniority": None,
+            "has_progress": True,
+        }
+    )
+    dumped = item.model_dump(by_alias=True)
+    assert dumped["salaryMin"] == 41.75
+    assert dumped["salaryMax"] == 66.75
+
+
 def test_job_detail_exposes_best_version_camelcase():
     detail = JobDetail.model_validate(
         {
