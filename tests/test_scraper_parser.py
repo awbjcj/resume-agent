@@ -166,3 +166,36 @@ def test_parse_detail_meta_missing_fields_are_none():
     assert meta.title is None
     assert meta.company is None
     assert meta.location is None
+
+
+def test_parse_detail_meta_reads_logged_in_page_title_fallback():
+    # The authenticated flagship3 job-details view has no stable topcard
+    # markup (atomic/hashed CSS classes only), but always sets <title> to
+    # "{job title} | {company} | LinkedIn".
+    html = """
+    <html><head><title>Staff Data Engineer | Acme Corp | LinkedIn</title></head>
+    <body><div class="_3bc30ca8 _3b42afd3"><p class="e6590096 _91345936">Staff Data Engineer</p></div></body>
+    </html>
+    """
+    meta = parse_detail_meta(html)
+    assert meta.title == "Staff Data Engineer"
+    assert meta.company == "Acme Corp"
+    assert meta.location is None
+
+
+def test_parse_detail_meta_page_title_with_pipe_in_company_name():
+    html = "<html><head><title>SRE | Foo | Bar | LinkedIn</title></head><body></body></html>"
+    meta = parse_detail_meta(html)
+    assert meta.title == "SRE"
+    assert meta.company == "Foo | Bar"
+
+
+def test_parse_detail_meta_prefers_legacy_topcard_over_page_title():
+    html = (
+        '<html><head><title>Wrong Title | Wrong Co | LinkedIn</title></head>'
+        '<body><h1 class="top-card-layout__title">Staff Data Engineer</h1>'
+        '<a class="topcard__org-name-link">Acme Corp</a></body></html>'
+    )
+    meta = parse_detail_meta(html)
+    assert meta.title == "Staff Data Engineer"
+    assert meta.company == "Acme Corp"

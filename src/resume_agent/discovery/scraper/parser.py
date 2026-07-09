@@ -126,11 +126,30 @@ def parse_job_detail(html: str) -> str:
     return "\n".join(line for line in lines if line)
 
 
+def _title_company_from_page_title(soup: BeautifulSoup) -> tuple[str | None, str | None]:
+    """Fall back to ``<title>Job Title | Company | LinkedIn</title>``.
+
+    The authenticated flagship3 job-details view renders its top card through
+    atomic/hashed CSS classes with no stable selector, so title/company can't
+    be read from markup there the way the legacy public "topcard" layout
+    allows. The page ``<title>`` keeps this stable "title | company | LinkedIn"
+    format in both layouts, so it's used only when the legacy markup is absent.
+    """
+    text = _text(soup.title)
+    if not text:
+        return None, None
+    parts = [part.strip() for part in text.split(" | ")]
+    if len(parts) < 3 or parts[-1] != "LinkedIn":
+        return None, None
+    return parts[0] or None, " | ".join(parts[1:-1]) or None
+
+
 def parse_detail_meta(html: str) -> DetailMeta:
     """Read title/company/location from a LinkedIn job-detail page's top card."""
     soup = BeautifulSoup(html, "html.parser")
-    return DetailMeta(
-        title=_text(soup.select_one("h1.top-card-layout__title")),
-        company=_text(soup.select_one("a.topcard__org-name-link")),
-        location=_text(soup.select_one("span.topcard__flavor--bullet")),
-    )
+    title = _text(soup.select_one("h1.top-card-layout__title"))
+    company = _text(soup.select_one("a.topcard__org-name-link"))
+    location = _text(soup.select_one("span.topcard__flavor--bullet"))
+    if title is None and company is None:
+        title, company = _title_company_from_page_title(soup)
+    return DetailMeta(title=title, company=company, location=location)
