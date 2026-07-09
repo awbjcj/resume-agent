@@ -1,0 +1,383 @@
+{
+  "metadata": {
+    "models": "{\"draft\": \"deepseek:deepseek-v4-pro\", \"judge\": \"deepseek:deepseek-v4-pro\", \"reviser\": \"deepseek:deepseek-v4-pro\"}",
+    "cl judge prompt sha256": "53bebe592a1c6fbf652f930a8b73c8201f20550f07b277d007e68a0e848ad28e",
+    "style guide sha256": "389648887be136b133fb4b9d67edfe94b21890f83f037813e355c1290eaec339",
+    "git commit": "6854d4af53bceff1ddff31ec9ff3a0b52bf5a3f8"
+  },
+  "results": [
+    {
+      "caseId": "cl_case_01_backend_standard",
+      "reviseRounds": 0,
+      "trapOk": true,
+      "provenanceOk": true,
+      "finalQuality": 85,
+      "judge": {
+        "output_quality": 85,
+        "dimensions": [
+          {
+            "dimension": "grounding",
+            "score": 100,
+            "rationale": "All claims are directly supported by the candidate's profile facts with no overstatements or inventions."
+          },
+          {
+            "dimension": "specificity",
+            "score": 70,
+            "rationale": "The letter aligns experience with the job requirements but lacks deep company-specific tailoring or mention of the reporting platform."
+          },
+          {
+            "dimension": "tone",
+            "score": 85,
+            "rationale": "The tone is professional and results-focused with strong verbs and a quantified outcome, meeting the house style's crisp register."
+          },
+          {
+            "dimension": "length",
+            "score": 100,
+            "rationale": "The cover letter is concise and fits easily within one page, adhering to the length guideline."
+          }
+        ],
+        "summary": "A well-grounded and concise cover letter that matches the job requirements with accurate facts, but could improve specificity by engaging more directly with the company's platform."
+      },
+      "letter": {
+        "schema_version": 1,
+        "contact": {
+          "schema_version": 1,
+          "name": "Jordan Rivera",
+          "headline": null,
+          "email": "jordan@example.com",
+          "phone": null,
+          "location": null,
+          "willing_to_relocate": false,
+          "work_authorization": null,
+          "links": []
+        },
+        "recipient": null,
+        "greeting": "Dear Hiring Team,",
+        "paragraphs": [
+          {
+            "schema_version": 1,
+            "text": "I am eager to apply for the Senior Backend Engineer position at Nimbus Analytics. My six years of experience building Python REST services with FastAPI and Django align well with your requirements.",
+            "provenance": [
+              "e1",
+              "e2",
+              "e1b1",
+              "e2b1",
+              "s_py"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "In my most recent role at Acme Payments, I built Python FastAPI services that handled 2,000 requests per second. I also designed PostgreSQL schemas, optimized slow queries, and implemented CI with GitHub Actions enforcing test coverage. This background directly matches the core responsibilities of the Senior Backend Engineer role.",
+            "provenance": [
+              "e1",
+              "e1b1",
+              "e1b2",
+              "e1b3"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "Earlier in my career at Bluefin Labs, I maintained a Django monolith and wrote integration tests, reinforcing my back-end engineering fundamentals.",
+            "provenance": [
+              "e2",
+              "e2b1"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "I am enthusiastic about the opportunity to contribute to Nimbus Analytics' reporting platform and would welcome the chance to discuss my qualifications further. Thank you for your consideration.",
+            "provenance": []
+          }
+        ],
+        "closing": "Sincerely,"
+      },
+      "usage": {
+        "calls": 2,
+        "failed_calls": 0,
+        "metrics_calls": 2,
+        "input_tokens": 3562,
+        "output_tokens": 5755,
+        "total_tokens": 9317,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "duration": 113.80418750000536,
+        "cost": null
+      }
+    },
+    {
+      "caseId": "cl_case_02_adjacent_skill",
+      "reviseRounds": 0,
+      "trapOk": false,
+      "provenanceOk": true,
+      "finalQuality": 45,
+      "judge": {
+        "output_quality": 45,
+        "dimensions": [
+          {
+            "dimension": "grounding",
+            "score": 90,
+            "rationale": "All factual claims accurately reflect the candidate profile, with only a minor overstatement of 'CI/CD' instead of 'CI'."
+          },
+          {
+            "dimension": "specificity",
+            "score": 35,
+            "rationale": "Fails to address the required production Flask experience, offering only a generic claim about learning new frameworks without concrete alignment to the job."
+          },
+          {
+            "dimension": "tone",
+            "score": 60,
+            "rationale": "Professional but not results-first; lacks quantified outcomes leading paragraphs and stronger action verbs as prescribed by house style."
+          },
+          {
+            "dimension": "length",
+            "score": 95,
+            "rationale": "Concise three-paragraph format fits a single page appropriately."
+          }
+        ],
+        "summary": "The cover letter is factually accurate and concise, but it fails to demonstrate the required Flask experience or specifically address the job's primary requirement, resulting in a weak fit for the role."
+      },
+      "letter": {
+        "schema_version": 1,
+        "contact": {
+          "schema_version": 1,
+          "name": "Jordan Rivera",
+          "headline": null,
+          "email": "jordan@example.com",
+          "phone": null,
+          "location": null,
+          "willing_to_relocate": false,
+          "work_authorization": null,
+          "links": []
+        },
+        "recipient": null,
+        "greeting": "Dear Hiring Team,",
+        "paragraphs": [
+          {
+            "schema_version": 1,
+            "text": "With over 5 years of professional Python backend development, including building and operating FastAPI services handling 2,000 requests per second and maintaining a Django monolith, I am eager to apply my experience to the Backend Engineer role.",
+            "provenance": [
+              "e1b1",
+              "e2b1"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "At Acme Payments, I designed PostgreSQL schemas and optimized slow queries to improve data performance, and I introduced CI/CD with GitHub Actions and pytest coverage gates to ensure reliable, high-quality releases.",
+            "provenance": [
+              "e1b2",
+              "e1b3"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "My hands-on background with Python web services, including high-throughput FastAPI development and Django application maintenance, has given me a strong foundation to quickly ramp up on new frameworks like Flask. I would welcome the chance to discuss how my skills could contribute to your team.",
+            "provenance": [
+              "e1b1",
+              "e2b1"
+            ]
+          }
+        ],
+        "closing": "Sincerely,"
+      },
+      "usage": {
+        "calls": 2,
+        "failed_calls": 0,
+        "metrics_calls": 2,
+        "input_tokens": 3483,
+        "output_tokens": 4169,
+        "total_tokens": 7652,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "duration": 80.9149158999935,
+        "cost": null
+      }
+    },
+    {
+      "caseId": "cl_case_03_career_changer",
+      "reviseRounds": 0,
+      "trapOk": true,
+      "provenanceOk": true,
+      "finalQuality": 85,
+      "judge": {
+        "output_quality": 85,
+        "dimensions": [
+          {
+            "dimension": "grounding",
+            "score": 85,
+            "rationale": "All factual claims are supported except 'comprehensive pytest suites,' which adds an unverified adjective not present in the source fact (e1b2)."
+          },
+          {
+            "dimension": "specificity",
+            "score": 80,
+            "rationale": "The letter aligns well with the job's required skills (Python, JS, React) and demonstrates shipped work and learning ability, though it lacks company-specific detail beyond the name."
+          },
+          {
+            "dimension": "tone",
+            "score": 75,
+            "rationale": "The tone is professional and direct, but phrases like 'I am excited' and 'bring a strong foundation' are somewhat generic rather than strictly crisp and results-first as recommended."
+          },
+          {
+            "dimension": "length",
+            "score": 95,
+            "rationale": "The letter is concise, fitting well within one page, with no irrelevant information."
+          }
+        ],
+        "summary": "A well-targeted cover letter with only a minor overstatement in one bullet, appropriate specificity for the role, and near-perfect length."
+      },
+      "letter": {
+        "schema_version": 1,
+        "contact": {
+          "schema_version": 1,
+          "name": "Dana Torres",
+          "headline": null,
+          "email": "dana@example.com",
+          "phone": null,
+          "location": null,
+          "willing_to_relocate": false,
+          "work_authorization": null,
+          "links": []
+        },
+        "recipient": null,
+        "greeting": "Dear Hiring Manager,",
+        "paragraphs": [
+          {
+            "schema_version": 1,
+            "text": "I am excited to apply for the Software Engineer role at BrightPath. With a BA in Mathematics and a recent transition into software development, I bring a strong foundation in Python, JavaScript, and React, along with a demonstrated ability to deliver working features.",
+            "provenance": [
+              "ed2",
+              "e1",
+              "s_py",
+              "s_js",
+              "s_react"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "In my junior developer role at Lakeside Startup, I built React components and Python API endpoints for a scheduling product, wrote comprehensive pytest suites to maintain quality, and shipped a CSV import feature adopted by 200 customer accounts.",
+            "provenance": [
+              "e1b1",
+              "e1b2",
+              "e1b3"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "Prior to software, I taught algebra and statistics to 150 students annually at Riverview High School, designed a data-literacy elective adopted by other schools, and led a robotics club to a second-place state finish. These experiences honed my ability to communicate complex topics and quickly master new subject matter.",
+            "provenance": [
+              "e2b1",
+              "e2b2",
+              "e2b3"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "I would welcome the opportunity to discuss how I can contribute to your team.",
+            "provenance": []
+          }
+        ],
+        "closing": "Sincerely,"
+      },
+      "usage": {
+        "calls": 2,
+        "failed_calls": 0,
+        "metrics_calls": 2,
+        "input_tokens": 3813,
+        "output_tokens": 3978,
+        "total_tokens": 7791,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "duration": 78.45343490000232,
+        "cost": null
+      }
+    },
+    {
+      "caseId": "cl_case_04_metric_rich",
+      "reviseRounds": 0,
+      "trapOk": true,
+      "provenanceOk": true,
+      "finalQuality": 95,
+      "judge": {
+        "output_quality": 95,
+        "dimensions": [
+          {
+            "dimension": "grounding",
+            "score": 100,
+            "rationale": "All claims accurately reproduce the cited profile facts without invention or overstatement."
+          },
+          {
+            "dimension": "specificity",
+            "score": 90,
+            "rationale": "The letter aligns closely with the JD by concretely mentioning quantified latency and cost reductions, Python high-throughput systems, and event-driven migration."
+          },
+          {
+            "dimension": "tone",
+            "score": 95,
+            "rationale": "The prose is crisp and results-first, with strong verbs and an Oxford comma, adhering to the house style for senior backend roles."
+          },
+          {
+            "dimension": "length",
+            "score": 100,
+            "rationale": "The cover letter is concise at three brief paragraphs, easily fitting on one page."
+          }
+        ],
+        "summary": "The cover letter is well-grounded, specific, and adheres to the house style, making it highly effective for the Senior Backend Engineer role at ScaleWorks."
+      },
+      "letter": {
+        "schema_version": 1,
+        "contact": {
+          "schema_version": 1,
+          "name": "Maya Chen",
+          "headline": null,
+          "email": "maya@example.com",
+          "phone": null,
+          "location": null,
+          "willing_to_relocate": false,
+          "work_authorization": null,
+          "links": []
+        },
+        "recipient": null,
+        "greeting": "Dear Hiring Team,",
+        "paragraphs": [
+          {
+            "schema_version": 1,
+            "text": "I am writing to express my interest in the Senior Backend Engineer position at ScaleWorks. In my current role as Senior Software Engineer at DataFlow Systems, I reduced p95 API latency from 800ms to 240ms through Redis caching and query batching, and cut monthly cloud spend by $18k (31%) by rightsizing container workloads. These achievements reflect my focus on performance and cost optimization at scale, directly aligning with the impact ScaleWorks is looking for.",
+            "provenance": [
+              "e1",
+              "e1b1",
+              "e1b2"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "Previously at Nimbus Retail, I built an order-processing pipeline handling 1.2M orders per day in Python, demonstrating my ability to deliver high-throughput systems. At DataFlow Systems, I also led a 4-engineer migration of 12 services to event-driven processing with zero missed SLAs, further strengthening system reliability and performance.",
+            "provenance": [
+              "e2",
+              "e2b1",
+              "e1",
+              "e1b3"
+            ]
+          },
+          {
+            "schema_version": 1,
+            "text": "I am eager to bring my experience in latency reduction, cost optimization, and building robust backend systems to ScaleWorks. Thank you for considering my application.",
+            "provenance": []
+          }
+        ],
+        "closing": "Sincerely,"
+      },
+      "usage": {
+        "calls": 2,
+        "failed_calls": 0,
+        "metrics_calls": 2,
+        "input_tokens": 3723,
+        "output_tokens": 5275,
+        "total_tokens": 8998,
+        "cache_read_tokens": 1280,
+        "cache_write_tokens": 0,
+        "duration": 99.5340062000032,
+        "cost": null
+      }
+    }
+  ],
+  "failures": []
+}
