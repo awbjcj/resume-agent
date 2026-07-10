@@ -69,3 +69,49 @@ def test_add_source_error_maps_to_400(monkeypatch):
 
     assert resp.status_code == 400
     assert resp.json()["error"]["message"] == "nope"
+
+
+def test_patch_source_forwards_present_fields_atomically(monkeypatch):
+    from resume_agent.discovery.connectors.sources import SourceView
+
+    calls = []
+
+    def fake_patch(source_id, **changes):
+        calls.append((source_id, changes))
+        return SourceView(
+            id=source_id,
+            kind="remoteok",
+            type="aggregator",
+            display_name="RemoteOK",
+            enabled=changes.get("enabled", True),
+            pullable=True,
+            detail="aggregator",
+            limit=changes.get("limit"),
+        )
+
+    monkeypatch.setattr(sources_router, "patch_source", fake_patch)
+    client = _client()
+    with client:
+        response = client.patch(
+            "/api/sources/remoteok", json={"enabled": False, "limit": 25}
+        )
+        cleared = client.patch("/api/sources/remoteok", json={"limit": None})
+
+    assert response.status_code == 200
+    assert response.json()["enabled"] is False
+    assert response.json()["limit"] == 25
+    assert cleared.json()["limit"] is None
+    assert calls == [
+        ("remoteok", {"enabled": False, "limit": 25}),
+        ("remoteok", {"limit": None}),
+    ]
+
+
+def test_patch_source_rejects_empty_or_non_positive_changes():
+    client = _client()
+    with client:
+        empty = client.patch("/api/sources/remoteok", json={})
+        invalid = client.patch("/api/sources/remoteok", json={"limit": 0})
+
+    assert empty.status_code == 400
+    assert invalid.status_code == 422
