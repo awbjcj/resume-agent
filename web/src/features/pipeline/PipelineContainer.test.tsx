@@ -220,7 +220,7 @@ describe("PipelineContainer", () => {
     await screen.findByText("No jobs in the pipeline");
     const minFit = screen.getByRole("spinbutton", { name: "Min fit" });
     await user.type(minFit, "65");
-    await user.click(screen.getByRole("button", { name: /apply filters/i }));
+    await user.click(screen.getByRole("button", { name: /^apply$/i }));
 
     await waitFor(() => expect(requestedMinFits.at(-1)).toBe("65"));
   });
