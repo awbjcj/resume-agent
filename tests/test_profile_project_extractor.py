@@ -21,7 +21,10 @@ class FakeAgent:
     def __init__(self, content):
         self.content = content
 
-    async def arun(self, _message):
+    def run(self, prompt):
+        return FakeResult(self.content)
+
+    async def arun(self, prompt):
         return FakeResult(self.content)
 
 

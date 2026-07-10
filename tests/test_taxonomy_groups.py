@@ -26,6 +26,9 @@ class FakeRunner:
             raise content
         return SimpleNamespace(content=content)
 
+    async def arun(self, prompt: str):
+        return self.run(prompt)
+
 
 def assignments(*pairs: tuple[str, str]) -> SkillGroupAssignments:
     return SkillGroupAssignments(
