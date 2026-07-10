@@ -9,7 +9,8 @@ from resume_agent.discovery.connectors.base import (
     board_error,
 )
 from resume_agent.discovery.connectors.breezy import fetch_breezy
-from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats
+from resume_agent.discovery.connectors.config import CompanyUrl
+from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, identify_host
 from resume_agent.discovery.connectors.google import fetch_google
 from resume_agent.discovery.connectors.greenhouse import (
     fetch_greenhouse_board,
@@ -146,10 +147,19 @@ class CompaniesConnector:
     """Pull openings from company careers URLs by auto-detecting their ATS."""
 
     name = "companies"
-    concurrent_fetch = True
 
-    def __init__(self, urls: list[str]):
-        self.urls = urls
+    def __init__(self, urls: list[CompanyUrl | str]):
+        self.urls = [
+            CompanyUrl(url=entry) if isinstance(entry, str) else entry for entry in urls
+        ]
+
+    @property
+    def concurrent_fetch(self) -> bool:
+        """Serialize this connector with other browser users when Tesla is present."""
+        return not any(
+            (target := identify_host(entry.url)) is not None and target.ats == "tesla"
+            for entry in self.urls
+        )
 
     def fetch(
         self,
@@ -159,25 +169,27 @@ class CompaniesConnector:
     ) -> FetchResult:
         return harvest(
             self.urls,
-            lambda url: self._produce(url, search, limit, skip_seen),
+            lambda entry: self._produce(entry, search, limit, skip_seen),
             search=search,
             limit=limit,
-            key=lambda url: url,
+            key=lambda entry: entry.url,
             on_error=_failure_reason,
             skip_seen=skip_seen,
+            unit_limit=lambda entry: entry.limit,
         )
 
     def _produce(
         self,
-        url: str,
+        entry: CompanyUrl,
         search: SearchConfig,
         limit: int | None,
         skip_seen: SkipSeen | None,
     ) -> list[RawJob]:
-        target = detect_ats(url)
+        target = detect_ats(entry.url)
         if target is None:
             raise NoAtsDetected
         backend = _BACKENDS.get(target.ats)
         if backend is None:
             raise UnsupportedAts(target.ats)
-        return backend(target, search, limit, skip_seen=skip_seen)
+        effective_limit = entry.limit if entry.limit is not None else limit
+        return backend(target, search, effective_limit, skip_seen=skip_seen)
