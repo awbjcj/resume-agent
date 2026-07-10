@@ -1,10 +1,19 @@
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from resume_agent.discovery.connectors.config import (
+    AdzunaConfig,
     CompaniesConfig,
     CompanyUrl,
     ConnectorsConfig,
+    GreenhouseBoard,
     GreenhouseConfig,
+    LeverBoard,
+    LinkedInConfig,
+    RemoteOKConfig,
+    ScrapeTarget,
     load_connectors_config,
 )
 
@@ -78,3 +87,43 @@ def test_company_url_accepts_object_form():
 def test_board_enabled_defaults_true_when_absent():
     cfg = GreenhouseConfig.model_validate({"enabled": True, "boards": [{"token": "anthropic"}]})
     assert cfg.boards[0].enabled is True
+
+
+def test_unit_models_accept_optional_positive_limits():
+    assert GreenhouseBoard(token="acme").limit is None
+    assert GreenhouseBoard(token="acme", limit=10).limit == 10
+    assert LeverBoard(token="acme", limit=9).limit == 9
+    assert CompanyUrl(url="https://x.example/careers", limit=5).limit == 5
+    assert ScrapeTarget(url="https://x.example/careers", limit=4).limit == 4
+
+
+def test_singleton_sections_accept_optional_limits():
+    config = ConnectorsConfig.model_validate(
+        {"remoteok": {"limit": 25}, "adzuna": {"limit": 15}}
+    )
+    assert config.remoteok.limit == 25
+    assert config.adzuna.limit == 15
+    assert config.linkedin.limit is None
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        lambda: GreenhouseBoard(token="acme", limit=0),
+        lambda: LeverBoard(token="acme", limit=-1),
+        lambda: CompanyUrl(url="https://x.example", limit=0),
+        lambda: ScrapeTarget(url="https://x.example", limit=0),
+        lambda: RemoteOKConfig(limit=0),
+        lambda: AdzunaConfig(limit=0),
+        lambda: LinkedInConfig(limit=0),
+    ],
+)
+def test_limits_must_be_positive(model):
+    with pytest.raises(ValidationError):
+        model()
+
+
+def test_bare_string_company_urls_still_coerce_with_no_limit():
+    config = CompaniesConfig.model_validate({"urls": ["https://x.example/careers"]})
+    assert config.urls[0].url == "https://x.example/careers"
+    assert config.urls[0].limit is None

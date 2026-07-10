@@ -12,10 +12,11 @@ class _AgentResponse:
 
 
 class _Target:
-    def __init__(self, url, *, enabled=True, label=None):
+    def __init__(self, url, *, enabled=True, label=None, limit=None):
         self.url = url
         self.enabled = enabled
         self.label = label
+        self.limit = limit
 
 
 def _recipe(**overrides):
@@ -142,6 +143,22 @@ def test_limit_stops_additional_detail_fetches(tmp_path):
 
     assert len(result.jobs) == 1
     assert scraper.detail_urls == ["https://acme.com/jobs/1"]
+
+
+def test_per_target_limit_overrides_global_fallback(tmp_path):
+    scraper = _Scraper(
+        list_html=_THREE_JOBS,
+        targets=[
+            _Target("https://alpha.example/careers", label="Alpha", limit=1),
+            _Target("https://beta.example/careers", label="Beta"),
+        ],
+        store_dir=tmp_path,
+        learn_agent=_FakeAgent(_recipe()),
+    )
+
+    result = scraper.fetch(SearchConfig(role_anchors=["Engineer"]), limit=2)
+
+    assert [job.company for job in result.jobs] == ["Alpha", "Beta", "Beta"]
 
 
 def test_inline_recipe_parses_detail_without_navigation(tmp_path):

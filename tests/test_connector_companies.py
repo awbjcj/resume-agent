@@ -3,6 +3,7 @@ import httpx
 import resume_agent.discovery.connectors.companies as companies
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.companies import CompaniesConnector
+from resume_agent.discovery.connectors.config import CompanyUrl
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.search_config import SearchConfig
 
@@ -181,3 +182,64 @@ def test_companies_forwards_skip_seen_to_backend(monkeypatch):
     )
 
     assert captured["skip_seen"] is marker
+
+
+def test_companies_remains_concurrent_without_browser_portals():
+    connector = CompaniesConnector(["https://boards.greenhouse.io/acme"])
+    assert connector.concurrent_fetch is True
+
+
+def test_companies_serializes_when_tesla_is_present():
+    connector = CompaniesConnector(
+        [
+            "https://boards.greenhouse.io/acme",
+            "https://www.tesla.com/careers/search/?site=US",
+        ]
+    )
+    assert connector.concurrent_fetch is False
+
+
+def test_companies_coerces_strings_and_carries_limits():
+    connector = CompaniesConnector(
+        [
+            "https://boards.greenhouse.io/acme",
+            CompanyUrl(url="https://jobs.lever.co/beta", limit=3),
+        ]
+    )
+    assert connector.urls[0].url == "https://boards.greenhouse.io/acme"
+    assert connector.urls[0].limit is None
+    assert connector.urls[1].limit == 3
+
+
+def test_companies_resolves_and_enforces_each_url_limit(monkeypatch):
+    received_limits = []
+
+    def backend(target, search, limit=None, skip_seen=None):
+        received_limits.append(limit)
+        return [
+            RawJob(
+                source="fake",
+                url=f"https://x/{target.token}/{index}",
+                company=target.token,
+                title=f"Engineer {index}",
+                location=None,
+                jd_text="Python",
+            )
+            for index in range(3)
+        ]
+
+    monkeypatch.setattr(
+        companies,
+        "detect_ats",
+        lambda url: AtsTarget("fake", token="alpha" if "alpha" in url else "beta"),
+    )
+    monkeypatch.setitem(companies._BACKENDS, "fake", backend)
+    connector = CompaniesConnector(
+        [
+            CompanyUrl(url="https://alpha.example/careers", limit=1),
+            CompanyUrl(url="https://beta.example/careers"),
+        ]
+    )
+    result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=2)
+    assert received_limits == [1, 2]
+    assert [job.company for job in result.jobs] == ["alpha", "beta", "beta"]

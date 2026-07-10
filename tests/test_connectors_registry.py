@@ -1,8 +1,12 @@
 from typing import Any, cast
 
 from resume_agent.config import Settings
+from resume_agent.discovery.connectors.adzuna import AdzunaConnector
+from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import ConnectorsConfig
 from resume_agent.discovery.connectors.registry import build_connectors, build_source_connectors
+from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
+from resume_agent.discovery.scraper.linkedin import LinkedInScraper
 
 
 def _settings(**kwargs):
@@ -52,12 +56,47 @@ def test_adzuna_skipped_without_credentials():
     assert names == []
 
 
+def test_registry_threads_singleton_limits_to_connectors():
+    cfg = ConnectorsConfig.model_validate(
+        {
+            "remoteok": {"enabled": True, "limit": 11},
+            "adzuna": {"enabled": True, "limit": 12},
+            "linkedin": {"enabled": True, "limit": 13},
+        }
+    )
+    settings = _settings(adzuna_app_id="x", adzuna_app_key="y")
+    connectors = {connector.name: connector for connector in build_connectors(cfg, settings)}
+    remoteok = connectors["remoteok"]
+    adzuna = connectors["adzuna"]
+    linkedin = connectors["linkedin"]
+    assert isinstance(remoteok, RemoteOKConnector)
+    assert isinstance(adzuna, AdzunaConnector)
+    assert isinstance(linkedin, LinkedInScraper)
+    assert remoteok.configured_limit == 11
+    assert adzuna.configured_limit == 12
+    assert linkedin.configured_limit == 13
+
+
 def test_companies_connector_built_when_enabled_with_urls():
     cfg = ConnectorsConfig.model_validate(
         {"companies": {"enabled": True, "urls": ["https://jobs.ashbyhq.com/acme"]}}
     )
     names = [c.name for c in build_connectors(cfg, _settings())]
     assert names == ["companies"]
+
+
+def test_companies_registry_preserves_url_limit():
+    cfg = ConnectorsConfig.model_validate(
+        {
+            "companies": {
+                "enabled": True,
+                "urls": [{"url": "https://jobs.ashbyhq.com/acme", "limit": 7}],
+            }
+        }
+    )
+    connector = build_connectors(cfg, _settings())[0]
+    assert isinstance(connector, CompaniesConnector)
+    assert connector.urls[0].limit == 7
 
 
 def test_companies_skipped_when_enabled_without_urls():

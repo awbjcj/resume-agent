@@ -112,3 +112,89 @@ def test_remove_unknown_raises(tmp_path):
 
     with pytest.raises(svc.SourceError):
         svc.remove_source("greenhouse:ghost", connectors_path=path)
+
+
+def test_set_source_limit_roundtrips_and_clears(tmp_path):
+    path = _write(
+        tmp_path,
+        """
+        greenhouse:
+          enabled: true
+          boards:
+            - token: acme
+        """,
+    )
+    view = svc.set_source_limit("greenhouse:acme", 10, connectors_path=path)
+    assert view.limit == 10
+    assert svc.load_connectors_config(path).greenhouse.boards[0].limit == 10
+
+    view = svc.set_source_limit("greenhouse:acme", None, connectors_path=path)
+    assert view.limit is None
+    assert svc.load_connectors_config(path).greenhouse.boards[0].limit is None
+
+
+def test_set_source_limit_supports_singletons_and_scrape_targets(tmp_path):
+    path = _write(
+        tmp_path,
+        """
+        remoteok: {enabled: true}
+        scrape:
+          enabled: true
+          targets:
+            - url: https://jobs.example/careers
+        """,
+    )
+    assert svc.set_source_limit("remoteok", 25, connectors_path=path).limit == 25
+    scrape_id = svc.scrape_target_id("https://jobs.example/careers")
+    assert svc.set_source_limit(scrape_id, 7, connectors_path=path).limit == 7
+
+
+def test_set_source_limit_rejects_non_positive_values_without_writing(tmp_path):
+    path = _write(tmp_path, "remoteok: {enabled: true}\n")
+    before = (tmp_path / "connectors.yaml").read_text(encoding="utf-8")
+    with pytest.raises(svc.SourceError, match="positive"):
+        svc.set_source_limit("remoteok", 0, connectors_path=path)
+    assert (tmp_path / "connectors.yaml").read_text(encoding="utf-8") == before
+
+
+def test_patch_source_applies_enabled_and_limit_with_one_save(tmp_path, monkeypatch):
+    path = _write(
+        tmp_path,
+        """
+        greenhouse:
+          enabled: true
+          boards:
+            - token: acme
+        """,
+    )
+    writes = 0
+    original_save = svc._save
+
+    def counting_save(*args, **kwargs):
+        nonlocal writes
+        writes += 1
+        return original_save(*args, **kwargs)
+
+    monkeypatch.setattr(svc, "_save", counting_save)
+    view = svc.patch_source(
+        "greenhouse:acme", enabled=False, limit=8, connectors_path=path
+    )
+    assert writes == 1
+    assert view.enabled is False
+    assert view.limit == 8
+
+
+def test_scrape_source_can_be_disabled_and_removed(tmp_path):
+    path = _write(
+        tmp_path,
+        """
+        scrape:
+          enabled: true
+          targets:
+            - url: https://jobs.example/careers
+        """,
+    )
+    source_id = svc.scrape_target_id("https://jobs.example/careers")
+    assert svc.set_source_enabled(source_id, False, connectors_path=path).enabled is False
+    svc.remove_source(source_id, connectors_path=path)
+    assert source_id not in {source.id for source in svc.list_sources(path)}

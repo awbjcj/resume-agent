@@ -37,6 +37,11 @@ def test_linkedin_fetch_respects_limit():
     assert len(_FakeBrowserScraper().fetch(SearchConfig(), limit=1).jobs) == 1
 
 
+def test_linkedin_configured_limit_overrides_global():
+    scraper = _FakeBrowserScraper(configured_limit=1)
+    assert len(scraper.fetch(SearchConfig(), limit=5).jobs) == 1
+
+
 def test_linkedin_fetch_isolates_failed_detail_navigation():
     class _PartiallyDeadScraper(LinkedInScraper):
         def _search_html(self, search):

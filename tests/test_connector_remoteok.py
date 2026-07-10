@@ -49,3 +49,19 @@ def test_connector_filters_by_search():
     result = connector.fetch(SearchConfig(keywords=["react"]))
     assert {j.title for j in result.jobs} == {"Frontend Engineer"}
     assert connector.name == "remoteok"
+
+
+def test_remoteok_configured_limit_overrides_global(monkeypatch):
+    connector = RemoteOKConnector(configured_limit=1)
+    payload = [
+        {
+            "position": f"Engineer {index}",
+            "company": "X",
+            "url": f"http://x/{index}",
+            "description": "Python",
+        }
+        for index in range(3)
+    ]
+    monkeypatch.setattr(connector, "_get_all", lambda: payload)
+    result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=5)
+    assert len(result.jobs) == 1

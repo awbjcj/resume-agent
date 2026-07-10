@@ -118,3 +118,20 @@ def test_fetch_lever_board_pushes_location(monkeypatch):
     fetch_lever_board("acme", SearchConfig(locations=["Remote"]))
 
     assert captured["params"] == {"mode": "json", "location": "Remote"}
+
+
+def test_lever_per_board_limit_overrides_global(monkeypatch):
+    boards = [LeverBoard(token="alpha", limit=1), LeverBoard(token="beta")]
+    connector = LeverConnector(boards)
+    payload = [
+        {
+            "text": f"Engineer {index}",
+            "hostedUrl": f"http://x/{index}",
+            "description": "Python",
+        }
+        for index in range(3)
+    ]
+    monkeypatch.setattr(connector, "_get_board", lambda token, search: payload)
+    result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=2)
+    assert len(result.jobs) == 3
+    assert [job.company for job in result.jobs] == ["alpha", "beta", "beta"]

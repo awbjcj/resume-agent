@@ -92,6 +92,60 @@ def test_harvest_reraises_when_on_error_returns_none():
         )
 
 
+def test_harvest_caps_each_unit_instead_of_the_union():
+    result = harvest(
+        ["a", "b"],
+        lambda unit: [
+            _job(f"{unit} Engineer {index}", url=f"{unit}/{index}")
+            for index in range(3)
+        ],
+        search=_ANCHORED,
+        limit=2,
+        key=str,
+        on_error=lambda exc: None,
+    )
+    assert [job.url for job in result.jobs] == ["a/0", "a/1", "b/0", "b/1"]
+
+
+def test_harvest_unit_limit_overrides_the_global_fallback():
+    result = harvest(
+        ["a", "b"],
+        lambda unit: [
+            _job(f"{unit} Engineer {index}", url=f"{unit}/{index}")
+            for index in range(5)
+        ],
+        search=_ANCHORED,
+        limit=2,
+        key=str,
+        on_error=lambda exc: None,
+        unit_limit=lambda unit: 4 if unit == "a" else None,
+    )
+    assert [job.url for job in result.jobs] == [
+        "a/0",
+        "a/1",
+        "a/2",
+        "a/3",
+        "b/0",
+        "b/1",
+    ]
+
+
+def test_harvest_applies_skip_seen_before_each_unit_cap():
+    result = harvest(
+        ["a", "b"],
+        lambda unit: [
+            _job(f"{unit} Engineer {index}", url=f"{unit}/{index}")
+            for index in range(3)
+        ],
+        search=_ANCHORED,
+        limit=1,
+        key=str,
+        on_error=lambda exc: None,
+        skip_seen=lambda job: job.url in {"a/0", "b/0"},
+    )
+    assert [job.url for job in result.jobs] == ["a/1", "b/1"]
+
+
 def test_gate_and_limit_returns_kept_jobs_and_dropped_count():
     jobs = [_job("AI Engineer"), _job("CDL Driver"), _job("Staff Engineer")]
     kept, filtered = gate_and_limit(jobs, _ANCHORED, limit=None)

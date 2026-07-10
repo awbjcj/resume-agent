@@ -110,3 +110,26 @@ def test_get_board_delegates_to_module_fetcher(monkeypatch):
     conn = gh.GreenhouseConnector([GreenhouseBoard(token="acme")])
     assert conn._get_board("acme") == {"jobs": []}
     assert called["token"] == "acme"
+
+
+def test_greenhouse_per_board_limit_overrides_global(monkeypatch):
+    boards = [
+        GreenhouseBoard(token="alpha", limit=1),
+        GreenhouseBoard(token="beta"),
+    ]
+    connector = GreenhouseConnector(boards)
+    payload = {
+        "jobs": [
+            {
+                "title": f"Engineer {index}",
+                "absolute_url": f"http://x/{index}",
+                "location": {"name": "Remote"},
+                "content": "Python",
+            }
+            for index in range(3)
+        ]
+    }
+    monkeypatch.setattr(connector, "_get_board", lambda token: payload)
+    result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=2)
+    assert len(result.jobs) == 3
+    assert [job.company for job in result.jobs] == ["alpha", "beta", "beta"]

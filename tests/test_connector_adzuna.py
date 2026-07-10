@@ -61,6 +61,27 @@ def test_connector_filters_by_search():
     assert connector.name == "adzuna"
 
 
+def test_adzuna_configured_limit_overrides_global(monkeypatch):
+    connector = AdzunaConnector(
+        "id", "key", enrich_details=False, configured_limit=1
+    )
+    payload = {
+        "results": [
+            {
+                "redirect_url": f"https://a/{index}",
+                "title": f"Engineer {index}",
+                "company": {"display_name": "Acme"},
+                "location": {"display_name": "Remote"},
+                "description": "Python",
+            }
+            for index in range(3)
+        ]
+    }
+    monkeypatch.setattr(connector, "_get_results", lambda search: payload)
+    result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=5)
+    assert len(result.jobs) == 1
+
+
 def test_connector_skips_known_before_enrichment_and_then_applies_limit(monkeypatch):
     payload = {
         "results": [
