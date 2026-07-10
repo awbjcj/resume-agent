@@ -1,6 +1,9 @@
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+
+const CONTROL_LABEL_CLASS =
+  "text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground";
 
 function fitValue(value: string): number {
   if (!value) return 0;
@@ -18,15 +21,26 @@ export function MinFitInput({
   value: number;
   onChange: (value: number) => void;
 }) {
-  const descriptionId = `${id}-description`;
-
   return (
-    <div className="flex flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
-      <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-[0.14em]">
+    <Field className="w-full gap-1.5 sm:w-auto sm:min-w-36 sm:flex-1">
+      <FieldLabel htmlFor={id} className={CONTROL_LABEL_CLASS}>
         Min fit
-      </Label>
-      <div className="flex min-h-10 items-center gap-3">
-        <div className="flex shrink-0 items-center gap-2">
+      </FieldLabel>
+      <div className="flex h-9 items-center gap-2.5">
+        <Slider
+          className="min-w-0 flex-1"
+          aria-label="Minimum fit slider"
+          value={[value]}
+          min={0}
+          max={100}
+          step={1}
+          onValueChange={(nextValue) =>
+            onChange(
+              typeof nextValue === "number" ? nextValue : (nextValue[0] ?? 0),
+            )
+          }
+        />
+        <div className="flex shrink-0 items-center gap-1">
           <Input
             id={id}
             type="number"
@@ -35,27 +49,13 @@ export function MinFitInput({
             step={1}
             inputMode="numeric"
             placeholder="Any"
-            className="h-10 w-20 bg-card text-right tabular-nums"
+            className="h-9 w-16 bg-background px-2 text-right tabular-nums"
             value={value === 0 ? "" : value}
-            aria-describedby={descriptionId}
             onChange={(event) => onChange(fitValue(event.target.value))}
           />
-          <span className="shrink-0 text-sm tabular-nums text-muted-foreground">/ 100</span>
+          <span className="shrink-0 text-xs text-muted-foreground">/100</span>
         </div>
-        <Slider
-          aria-label="Minimum fit slider"
-          value={[value]}
-          min={0}
-          max={100}
-          step={1}
-          onValueChange={(nextValue) =>
-            onChange(typeof nextValue === "number" ? nextValue : (nextValue[0] ?? 0))
-          }
-        />
       </div>
-      <p id={descriptionId} className="text-xs text-muted-foreground">
-        Blank or 0 includes every fit score.
-      </p>
-    </div>
+    </Field>
   );
 }
