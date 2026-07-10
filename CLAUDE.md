@@ -215,6 +215,17 @@ aggressiveness determines how many detail fetches are issued.
 
 ## Known design notes
 
+- **Tailoring is fast by default.** `config/review.yaml.example` materializes as
+  the two-round roster with mid-tier writers and one `MergedPanelReview`
+  advisory call; the premium fact-check gate remains separate. Deep mode uses
+  `config/review_deep.yaml` through CLI `tailor --deep` or API `deep: true`.
+  Advisory critiques are split back into their configured named rows, and each
+  `TailorRound` records draft/panel/revise wall-clock seconds.
+- **Railway is a single-volume, single-owner deployment.** Session cookies and
+  bearer tokens share the API guard; `/app/data` owns DB/config/output/secrets;
+  browser-only sources return explicit degradation failures in cloud. Admin
+  import validates and stages the archive, then uses rollback-safe child swaps
+  because the mounted volume root itself cannot be renamed.
 - **Skill groups are a derived display axis.** `MatrixRow.group` comes from the
   active data root's `taxonomy/skill_groups.json` (token → slug, fixed 13-slug
   vocabulary in `taxonomy/groups.py`). Profile builds classify only missing
