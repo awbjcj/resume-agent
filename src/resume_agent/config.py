@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     api_token: str = (
         ""  # when non-empty, the API requires Authorization: Bearer <token>
     )
+    auth_username: str = ""
+    auth_password_hash: str = ""
+    session_secret: str = ""
+    browser_enabled: bool = True
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
     # Concurrency + retry for LLM fan-out (discovery + tailor).
     llm_concurrency: int = Field(default=8, ge=1)

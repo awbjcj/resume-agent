@@ -819,6 +819,22 @@ def sync_status_cmd(
             typer.echo("Re-run with --apply to apply these transitions.")
 
 
+@app.command("hash-password")
+def hash_password_cmd(
+    password: str = typer.Option(
+        ...,
+        prompt=True,
+        hide_input=True,
+        confirmation_prompt=True,
+        help="Password to hash for AUTH_PASSWORD_HASH.",
+    ),
+) -> None:
+    """Print the PBKDF2 hash used by single-account session auth."""
+    from resume_agent.api.auth import hash_password
+
+    typer.echo(hash_password(password))
+
+
 @app.command("serve")
 def serve_cmd(
     host: str = typer.Option(
