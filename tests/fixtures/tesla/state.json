@@ -1,0 +1,16 @@
+{
+  "listings": [
+    {
+      "id": "1",
+      "title": "Software Engineer",
+      "department": "Software",
+      "region": "Austin, TX"
+    },
+    {
+      "id": "2",
+      "title": "Welder",
+      "department": "Manufacturing",
+      "region": "Fremont, CA"
+    }
+  ]
+}
