@@ -189,7 +189,8 @@ def _atomic_write(path: Path, data: bytes) -> None:
 
 
 def _filename_for(repo: dict, profile_dir: str | Path) -> str:
-    name = repo.get("name") if isinstance(repo.get("name"), str) else "repo"
+    name_value = repo.get("name")
+    name = name_value if isinstance(name_value, str) else "repo"
     slug = _SAFE_REPO_NAME.sub("-", name.casefold()).strip("-") or "repo"
     candidate = f"{GITHUB_DOC_PREFIX}{slug}.md"
     conflict = next(
@@ -261,11 +262,8 @@ def sync_github_sources(
         for item in selected:
             name = item.get("name") if isinstance(item.get("name"), str) else ""
             owner_value = item.get("owner")
-            owner = (
-                owner_value.get("login")
-                if isinstance(owner_value, dict) and isinstance(owner_value.get("login"), str)
-                else username
-            )
+            login = owner_value.get("login") if isinstance(owner_value, dict) else None
+            owner = login if isinstance(login, str) else username
             filename = _filename_for(item, profile_dir)
             if not name or normalize_repo_url(item.get("html_url")) in dossiers:
                 continue

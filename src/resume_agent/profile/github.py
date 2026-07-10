@@ -101,7 +101,7 @@ class GitHubClient:
 
     def fetch_repos(self, username: str) -> list[dict]:
         url: str | None = f"/users/{quote(username, safe='')}/repos"
-        params: dict[str, object] | None = {"per_page": 100, "sort": "updated"}
+        params: dict[str, int | str] | None = {"per_page": 100, "sort": "updated"}
         repos: list[dict] = []
         while url is not None:
             resp = self._client.get(url, params=params)

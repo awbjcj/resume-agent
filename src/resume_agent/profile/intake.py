@@ -30,7 +30,7 @@ def _slug(value: str, fallback: str) -> str:
 
 def _resolve_host(host: str) -> set[str]:
     return {
-        address[0]
+        str(address[0])
         for _family, _type, _proto, _canonname, address in socket.getaddrinfo(
             host, None, type=socket.SOCK_STREAM
         )

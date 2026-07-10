@@ -16,6 +16,7 @@ from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.profile import (
     DocumentOut,
     MatrixOut,
+    MatrixRowOut,
     NoteIn,
     SkeletonEntryOut,
     SourceOut,
@@ -233,7 +234,7 @@ def get_profile_matrix(request: Request):
             SkillGroupOut(slug=slug, label=label)
             for slug, label in SKILL_GROUPS.items()
         ],
-        rows=(matrix.rows if matrix is not None else []),
+        rows=[MatrixRowOut.model_validate(row) for row in matrix.rows] if matrix is not None else [],
     )
 
 

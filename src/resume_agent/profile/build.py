@@ -190,9 +190,9 @@ def build_corpus_profile(
                 github_projects=[
                     repo_to_project(
                         repo,
-                        languages=languages.get(
-                            repo.get("full_name") if isinstance(repo.get("full_name"), str) else ""
-                        ),
+                        languages=languages.get(full_name)
+                        if isinstance((full_name := repo.get("full_name")), str)
+                        else None,
                     )
                     for repo in repos
                 ],
