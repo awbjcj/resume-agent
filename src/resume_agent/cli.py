@@ -328,7 +328,13 @@ def refresh_cmd(
         DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
     ),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
-    limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
+    limit: int | None = typer.Option(
+        None,
+        help=(
+            "Default cap per source unit (board/URL/aggregator); per-source "
+            "limits in connectors.yaml override."
+        ),
+    ),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Pull from connectors then discover the new jobs, in one pass."""
@@ -383,7 +389,13 @@ def pull_cmd(
     connectors_path: str = typer.Option(
         DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
     ),
-    limit: int | None = typer.Option(None, help="Cap postings per connector this run."),
+    limit: int | None = typer.Option(
+        None,
+        help=(
+            "Default cap per source unit (board/URL/aggregator); per-source "
+            "limits in connectors.yaml override."
+        ),
+    ),
     refresh: bool = typer.Option(
         False,
         "--refresh",
