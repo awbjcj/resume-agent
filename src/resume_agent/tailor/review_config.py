@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 
@@ -27,6 +28,9 @@ class ReviewConfig(ExtensibleModel):
     score_threshold: int = 85
     reviewers: list[ReviewerSpec] = Field(default_factory=list)
     match_plan_enabled: bool = False
+    merged_advisory: bool = False
+    tailor_tier: Literal["cheap", "mid", "premium"] = "premium"
+    reviser_tier: Literal["cheap", "mid", "premium"] = "premium"
     early_stop_on_regression: bool = False
     length_budget: LengthBudget = Field(default_factory=LengthBudget)
     style_guide_path: str = "config/style_guide.md"
