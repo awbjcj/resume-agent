@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -16,6 +16,7 @@ const sources = [
     enabled: true,
     pullable: true,
     detail: "anthropic",
+    limit: 10,
   },
   {
     id: "adzuna",
@@ -25,6 +26,7 @@ const sources = [
     enabled: true,
     pullable: false,
     detail: "US - no API key",
+    limit: null,
   },
 ];
 
@@ -78,5 +80,45 @@ describe("SourcesPage", () => {
     expect(screen.getByText("+3 added")).toBeInTheDocument();
     expect(screen.getByText("1 upd")).toBeInTheDocument();
     expect(screen.getByText("8 skip")).toBeInTheDocument();
+  });
+
+  it("shows and commits a per-source limit", async () => {
+    const requests: unknown[] = [];
+    server.use(
+      http.patch("/api/sources/:sourceId", async ({ request }) => {
+        requests.push(await request.json());
+        return HttpResponse.json({ ...sources[0], limit: 25 });
+      }),
+    );
+    render(<SourcesPage />, { wrapper: withQueryClient });
+
+    const input = await screen.findByRole("spinbutton", {
+      name: "Per-pull job limit for Anthropic",
+    });
+    expect(input).toHaveValue(10);
+    fireEvent.change(input, { target: { value: "25" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(requests).toEqual([{ limit: 25 }]));
+  });
+
+  it("restores the canonical limit when a mutation fails", async () => {
+    server.use(
+      http.patch("/api/sources/:sourceId", () =>
+        HttpResponse.json(
+          { error: { code: "SOURCE_ERROR", message: "write failed" } },
+          { status: 500 },
+        ),
+      ),
+    );
+    render(<SourcesPage />, { wrapper: withQueryClient });
+
+    const input = await screen.findByRole("spinbutton", {
+      name: "Per-pull job limit for Anthropic",
+    });
+    fireEvent.change(input, { target: { value: "25" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(input).toHaveValue(10));
   });
 });
