@@ -89,7 +89,7 @@ test("min-fit numeric input applies the server filter", async ({ page }) => {
   const filteredRequest = page.waitForRequest(
     (request) => new URL(request.url()).searchParams.get("minFit") === "65",
   );
-  await page.getByRole("button", { name: /apply filters/i }).click();
+  await page.getByRole("button", { name: /^apply$/i }).click();
 
   await filteredRequest;
   await expect(minFit).toHaveValue("65");
