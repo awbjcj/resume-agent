@@ -1,4 +1,6 @@
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 
@@ -13,6 +15,7 @@ _PAGE = 20  # cxs page size
 _MAX_OFFSET = (
     1000  # safety ceiling: <=51 pages (~1020 rows) even if a tenant ignores searchText
 )
+_FACETS_DIR = Path("data/workday_facets")
 
 
 @dataclass
@@ -30,13 +33,119 @@ def cxs_jobs_url(target: AtsTarget) -> str:
     return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}/jobs"
 
 
-def list_request_body(search: SearchConfig, offset: int) -> dict:
+def list_request_body(
+    search: SearchConfig,
+    offset: int,
+    applied_facets: dict[str, list[str]] | None = None,
+) -> dict:
     return {
-        "appliedFacets": {},
+        "appliedFacets": applied_facets or {},
         "limit": _PAGE,
         "offset": offset,
         "searchText": primary_search_term(search),
     }
+
+
+def _facet_values(node: object):
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _facet_values(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _facet_values(value)
+
+
+def resolve_location_facets(
+    page: dict, locations: list[str]
+) -> dict[str, list[str]]:
+    """Resolve every requested location under location-only facet parameters."""
+    wanted = [location.strip().casefold() for location in locations if location.strip()]
+    facets = page.get("facets")
+    if not wanted or not isinstance(facets, list):
+        return {}
+
+    matched: set[int] = set()
+    applied: dict[str, list[str]] = {}
+    for facet in facets:
+        if not isinstance(facet, dict):
+            continue
+        parameter = facet.get("facetParameter")
+        if not isinstance(parameter, str) or "location" not in parameter.casefold():
+            continue
+        for value in _facet_values(facet.get("values")):
+            descriptor = value.get("descriptor")
+            facet_id = value.get("id")
+            if not isinstance(descriptor, str) or not isinstance(facet_id, str):
+                continue
+            haystack = descriptor.casefold()
+            matching = {
+                index
+                for index, location in enumerate(wanted)
+                if location in haystack or haystack in location
+            }
+            if not matching:
+                continue
+            matched.update(matching)
+            ids = applied.setdefault(parameter, [])
+            if facet_id not in ids:
+                ids.append(facet_id)
+    return applied if len(matched) == len(wanted) else {}
+
+
+def _facet_cache_path(target: AtsTarget, base_dir: str | Path) -> Path:
+    return Path(base_dir) / f"{target.tenant}-{target.site}.json"
+
+
+def _normalized_locations(locations: list[str]) -> list[str]:
+    return sorted(location.strip() for location in locations if location.strip())
+
+
+def load_cached_facets(
+    target: AtsTarget,
+    locations: list[str],
+    base_dir: str | Path = _FACETS_DIR,
+) -> dict[str, list[str]] | None:
+    """Load a matching, well-shaped cache; ``{}`` is a remembered miss."""
+    try:
+        payload = json.loads(
+            _facet_cache_path(target, base_dir).read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict) or payload.get("locations") != _normalized_locations(
+        locations
+    ):
+        return None
+    applied = payload.get("appliedFacets")
+    if not isinstance(applied, dict):
+        return None
+    if not all(
+        isinstance(parameter, str)
+        and isinstance(ids, list)
+        and all(isinstance(facet_id, str) for facet_id in ids)
+        for parameter, ids in applied.items()
+    ):
+        return None
+    return applied
+
+
+def save_cached_facets(
+    target: AtsTarget,
+    locations: list[str],
+    applied: dict[str, list[str]],
+    base_dir: str | Path = _FACETS_DIR,
+) -> None:
+    path = _facet_cache_path(target, base_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "locations": _normalized_locations(locations),
+        "appliedFacets": applied,
+    }
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def parse_list_rows(target: AtsTarget, page: dict) -> list[WorkdayRow]:
@@ -75,21 +184,79 @@ def apply_detail(row: WorkdayRow, detail: dict) -> None:
     row.posted_at = parse_iso_datetime(info.get("startDate"))
 
 
-def _list_pages(target: AtsTarget, search: SearchConfig):
+def _list_page(
+    target: AtsTarget,
+    search: SearchConfig,
+    offset: int,
+    applied_facets: dict[str, list[str]],
+) -> dict:
+    response = httpx.post(
+        cxs_jobs_url(target),
+        json=list_request_body(search, offset, applied_facets),
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def _remember_facets(
+    target: AtsTarget,
+    locations: list[str],
+    applied: dict[str, list[str]],
+    facets_dir: str | Path,
+) -> bool:
+    try:
+        save_cached_facets(target, locations, applied, facets_dir)
+    except OSError:
+        return False
+    return True
+
+
+def _list_pages(
+    target: AtsTarget,
+    search: SearchConfig,
+    facets_dir: str | Path = _FACETS_DIR,
+):
+    locations = [location.strip() for location in search.locations if location.strip()]
+    cached = load_cached_facets(target, locations, facets_dir) if locations else {}
+    applied = cached or {}
     offset = 0
+    page = None
+
+    if locations and cached is None:
+        plain_page = _list_page(target, search, 0, {})
+        resolved = resolve_location_facets(plain_page, locations)
+        if not _remember_facets(target, locations, resolved, facets_dir):
+            resolved = {}
+        if resolved:
+            faceted_page = _list_page(target, search, 0, resolved)
+            if faceted_page.get("jobPostings"):
+                applied = resolved
+                page = faceted_page
+            else:
+                applied = {}
+                _remember_facets(target, locations, {}, facets_dir)
+                page = plain_page
+        else:
+            page = plain_page
+
     while offset <= _MAX_OFFSET:
-        body = list_request_body(search, offset)
-        resp = httpx.post(cxs_jobs_url(target), json=body, timeout=30)
-        resp.raise_for_status()
-        page = resp.json()
+        if page is None:
+            page = _list_page(target, search, offset, applied)
         postings = page.get("jobPostings") or []
         if not postings:
+            if offset == 0 and applied:
+                applied = {}
+                _remember_facets(target, locations, {}, facets_dir)
+                page = None
+                continue
             return
         yield from parse_list_rows(target, page)
         total = page.get("total")
         offset += _PAGE
         if isinstance(total, int) and offset >= total:
             return
+        page = None
 
 
 def _fetch_detail(target: AtsTarget, row: WorkdayRow) -> dict | None:
@@ -106,10 +273,11 @@ def fetch_workday(
     search: SearchConfig,
     limit: int | None = None,
     skip_seen: SkipSeen | None = None,
+    facets_dir: str | Path = _FACETS_DIR,
 ) -> list[RawJob]:
-    """List (request-shaped) -> gate on title/location -> detail-fetch survivors only."""
+    """List with safe location facets, then gate and detail-fetch survivors."""
     return harvest_detailed(
-        _list_pages(target, search),
+        _list_pages(target, search, facets_dir),
         lambda row: _fetch_detail(target, row),
         apply_detail,
         search=search,
