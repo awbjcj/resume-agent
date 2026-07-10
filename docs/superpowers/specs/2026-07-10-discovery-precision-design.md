@@ -44,13 +44,15 @@ limit, skip_seen)` registered in `_BACKENDS`.
   pinned at build time from saved fixture HTML) into list rows: job id, title,
   locations, detail slug (`jobs/results/<id>-<slug>`). Keep a `_MAX_PAGES`
   ceiling. Stop early when a page yields no rows.
-- **Detail (N+1 via `harvest_detailed`):** list rows carry no JD, so reuse the
-  Workday/Tesla seam exactly: `title_relevance_gate` → `skip_seen` → GET the
-  detail page → extract the description sections from its embedded blob →
-  `html_to_markdown`. `limit` short-circuits the detail loop as today.
-- **Detection:** `detect.py` singleton match extends to the new host+path —
-  `www.google.com` + path starting `/about/careers` maps to
-  `AtsTarget("google")` alongside the existing `careers.google.com` rule.
+- **No detail fetch needed (verified 2026-07-10):** the list blob embeds each
+  job's full description — about, responsibilities, and qualifications HTML —
+  plus locations, publish timestamps, and the result total. The connector is
+  list-only: parse rows, `html_to_markdown` the joined description sections,
+  cap to `limit`. Relevance gating stays in the companies `harvest` union as
+  today.
+- **Detection:** already covered — `_SINGLETON_HOSTS` in `detect.py` maps
+  `www.google.com` + `/about/careers/` and `careers.google.com` to
+  `AtsTarget("google")`. No change needed.
 - **Failure isolation:** blob-shape drift raises a parse error that
   `companies._failure_reason` records per-URL (`parse error: …`) — never aborts
   the pull. This stays a reverse-engineered surface; the design note in
