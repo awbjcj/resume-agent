@@ -9,10 +9,9 @@ from resume_agent.discovery.connectors.config import ConnectorsConfig
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
 from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
-from resume_agent.discovery.connectors.sources import company_url_id
+from resume_agent.discovery.connectors.sources import company_url_id, scrape_target_id
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
-from resume_agent.discovery.scraper.recipe_store import host_key
 
 
 @dataclass(frozen=True)
@@ -62,7 +61,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         kind="companies",
         section_enabled=lambda c: c.companies.enabled,
         units=lambda c: [
-            ConnectorUnit(company_url_id(e.url), e.enabled, e.url) for e in c.companies.urls
+            ConnectorUnit(company_url_id(e.url), e.enabled, e) for e in c.companies.urls
         ],
         build=lambda payloads, c, s: CompaniesConnector(payloads),
     ),
@@ -70,7 +69,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         kind="scrape",
         section_enabled=lambda c: c.scrape.enabled,
         units=lambda c: [
-            ConnectorUnit(f"scrape:{host_key(t.url)}", t.enabled, t) for t in c.scrape.targets
+            ConnectorUnit(scrape_target_id(t.url), t.enabled, t) for t in c.scrape.targets
         ],
         build=lambda payloads, c, s: DashboardScraper(payloads),
     ),
@@ -78,14 +77,19 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         kind="remoteok",
         section_enabled=lambda c: c.remoteok.enabled,
         units=lambda c: [ConnectorUnit("remoteok", c.remoteok.enabled, None)],
-        build=lambda payloads, c, s: RemoteOKConnector(),
+        build=lambda payloads, c, s: RemoteOKConnector(
+            configured_limit=c.remoteok.limit
+        ),
     ),
     ConnectorSpec(
         kind="adzuna",
         section_enabled=lambda c: c.adzuna.enabled,
         units=lambda c: [ConnectorUnit("adzuna", c.adzuna.enabled, None)],
         build=lambda payloads, c, s: AdzunaConnector(
-            s.adzuna_app_id, s.adzuna_app_key, c.adzuna.country
+            s.adzuna_app_id,
+            s.adzuna_app_key,
+            c.adzuna.country,
+            configured_limit=c.adzuna.limit,
         ),
         pullable=lambda s: bool(s.adzuna_app_id and s.adzuna_app_key),
     ),
@@ -93,7 +97,9 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         kind="linkedin",
         section_enabled=lambda c: c.linkedin.enabled,
         units=lambda c: [ConnectorUnit("linkedin", c.linkedin.enabled, None)],
-        build=lambda payloads, c, s: build_linkedin_scraper(),
+        build=lambda payloads, c, s: build_linkedin_scraper(
+            configured_limit=c.linkedin.limit
+        ),
     ),
 )
 
