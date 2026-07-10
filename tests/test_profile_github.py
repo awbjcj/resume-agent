@@ -1,4 +1,5 @@
 import httpx
+import pytest
 
 from resume_agent.profile.github import GitHubClient
 
@@ -30,6 +31,31 @@ def test_fetch_repos():
     assert repos[0]["name"] == "engine"
 
 
+def test_fetch_repos_follows_pagination_link():
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = request.url.params.get("page")
+        if page == "2":
+            return httpx.Response(200, json=[{"name": "second"}])
+        return httpx.Response(
+            200,
+            headers={
+                "link": '<https://api.github.com/users/ada/repos?per_page=100&page=2>; rel="next"'
+            },
+            json=[{"name": "first"}],
+        )
+
+    assert [repo["name"] for repo in _client(handler).fetch_repos("ada")] == [
+        "first",
+        "second",
+    ]
+
+
+def test_fetch_repos_rejects_malformed_payload():
+    gh = _client(lambda _request: httpx.Response(200, json={"name": "not-a-list"}))
+    with pytest.raises(ValueError, match="repositories"):
+        gh.fetch_repos("ada")
+
+
 def test_fetch_readme_returns_text():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/repos/ada/engine/readme"
@@ -47,3 +73,29 @@ def test_fetch_readme_missing_returns_none():
 
     gh = _client(handler)
     assert gh.fetch_readme("ada", "engine") is None
+
+
+def test_fetch_root_listing_raw_file_and_languages_validate_boundaries():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raw_path = request.url.raw_path.decode().split("?", 1)[0]
+        if raw_path == "/repos/ada/my%20repo/contents":
+            return httpx.Response(200, json=[{"name": "README file.md", "type": "file"}])
+        if raw_path == "/repos/ada/my%20repo/contents/README%20file.md":
+            assert request.headers["Accept"] == "application/vnd.github.raw"
+            return httpx.Response(200, text="# Readme")
+        if raw_path == "/repos/ada/my%20repo/languages":
+            return httpx.Response(200, json={"Python": 900, "junk": "bad"})
+        return httpx.Response(404)
+
+    gh = _client(handler)
+    assert gh.fetch_root_listing("ada", "my repo") == [
+        {"name": "README file.md", "type": "file"}
+    ]
+    assert gh.fetch_raw_file("ada", "my repo", "README file.md") == "# Readme"
+    assert gh.fetch_languages("ada", "my repo") == {"Python": 900}
+
+
+def test_fetch_root_listing_rejects_non_object_entries():
+    gh = _client(lambda _request: httpx.Response(200, json=["not-an-object"]))
+    with pytest.raises(ValueError, match="contents"):
+        gh.fetch_root_listing("ada", "repo")
