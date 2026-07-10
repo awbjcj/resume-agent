@@ -39,17 +39,21 @@ Pure `httpx`, no browser. Same public shape: `fetch_google(target, search,
 limit, skip_seen)` registered in `_BACKENDS`.
 
 - **List:** `GET https://www.google.com/about/careers/applications/jobs/results`
-  with `q=primary_search_term(search)` and `page=N`. Parse the
-  `AF_initDataCallback` blob that carries job rows (the exact `ds:` key is
-  pinned at build time from saved fixture HTML) into list rows: job id, title,
-  locations, detail slug (`jobs/results/<id>-<slug>`). Keep a `_MAX_PAGES`
-  ceiling. Stop early when a page yields no rows.
+  with `q=primary_search_term(search)` and `page=N`. Parse the `ds:1`
+  `AF_initDataCallback` blob pinned from a saved fixture into list rows: job id,
+  title, locations, descriptions, and publish time. The canonical job URL uses
+  `jobs/results/<id>`; the live portal accepts the stable id-only form, so the
+  presentation slug is deliberately not synthesized. Keep a `_MAX_PAGES`
+  ceiling. A valid empty jobs blob ends paging; a missing or malformed jobs
+  blob raises a parse error so portal drift is not silently reported as an
+  empty result set.
 - **No detail fetch needed (verified 2026-07-10):** the list blob embeds each
   job's full description — about, responsibilities, and qualifications HTML —
   plus locations, publish timestamps, and the result total. The connector is
   list-only: parse rows, `html_to_markdown` the joined description sections,
-  cap to `limit`. Relevance gating stays in the companies `harvest` union as
-  today.
+  cap to `limit`. When a limit is present, page stopping counts relevant,
+  unseen jobs so irrelevant or already-known rows cannot consume the unit's
+  budget; the companies `harvest` gate remains the final backstop.
 - **Detection:** already covered — `_SINGLETON_HOSTS` in `detect.py` maps
   `www.google.com` + `/about/careers/` and `careers.google.com` to
   `AtsTarget("google")`. No change needed.
@@ -57,9 +61,9 @@ limit, skip_seen)` registered in `_BACKENDS`.
   `companies._failure_reason` records per-URL (`parse error: …`) — never aborts
   the pull. This stays a reverse-engineered surface; the design note in
   CLAUDE.md remains true.
-- **Tests:** fixture HTML files (one list page, one detail page) checked into
-  `tests/fixtures/`; parser unit tests + a connector test with `httpx` faked.
-  Offline suite stays network-free.
+- **Tests:** a minimized, live-shaped list callback fixture checked into
+  `tests/fixtures/google/`; parser unit tests (including malformed-blob drift)
+  plus connector tests with `httpx` faked. Offline suite stays network-free.
 
 ## 2. Tesla browser-based connector (`tesla.py`)
 
@@ -67,8 +71,8 @@ limit, skip_seen)` registered in `_BACKENDS`.
 the shared **visible** browser (the Adzuna precedent — headless is challenged
 by Akamai).
 
-- **List:** render the configured Tesla careers URL
-  (`tesla.com/careers/search/…`) via the browser seam; capture the JSON body of
+- **List:** render the canonical Tesla careers search URL
+  (`tesla.com/careers/search/?site=US`) via the browser seam; capture the JSON body of
   the `cua-api/apps/careers/state` response the page itself issues (response
   interception). `parse_listings` is unchanged.
 - **Detail:** for each title-gated, unseen survivor, evaluate an in-page
@@ -76,10 +80,12 @@ by Akamai).
   (same origin, carries the Akamai cookies) and parse with the existing
   `apply_tesla_detail`. `harvest_detailed` still owns gate/limit/skip logic;
   only `_fetch_detail`'s transport changes.
-- **Serialization:** `CompaniesConnector` stays `concurrent_fetch=True`; the
-  browser seam itself owns a process-wide single visible context (as for
-  Adzuna), so a Tesla backend call blocks on that seam's own lock while other
-  httpx backends fetch concurrently.
+- **Serialization:** `CompaniesConnector.concurrent_fetch` is `False` whenever
+  one of its configured URLs is Tesla. This follows the existing runner
+  contract used by Adzuna, LinkedIn, and dashboard scraping: visible-browser
+  connectors are serialized by the runner's browser lock, preventing two
+  persistent contexts from racing the shared profile. HTTP-only connectors
+  continue to fetch concurrently.
 - **UX consequence (accepted):** a pull whose companies list includes Tesla
   pops a browser window and runs slower. Documented in CLAUDE.md next to the
   Adzuna note.
@@ -116,24 +122,28 @@ one careers URL, or one singleton connector (the same granularity as
   `skip_seen` runs before the cap (already true in `gate_and_limit`), so the
   cap fills with new rows and fetched ≈ added.
 - **Surface:** sources config API schemas gain the field (camelCase `limit`),
-  the web Source Manager shows an optional per-source limit input, and
+  the web Source Manager shows an optional per-source limit input for every
+  projected unit, including configured scrape targets, and
   `bash scripts/gen_ts_client.sh` regenerates the contract.
   `tests/api/test_openapi_contract.py` gates drift.
 
 ## 4. Workday location facets (`workday.py`)
 
 - The CXS list response itself carries a `facets` array. On the first page of
-  a pull, match the configured `search.yaml` locations against the facet
-  descriptors (case-insensitive containment on facet value labels) to resolve
-  tenant-specific facet parameter + ID pairs.
+  a pull, match every configured `search.yaml` location against descriptors
+  under location facet parameters only (case-insensitive containment on facet
+  value labels) to resolve tenant-specific facet parameter + ID pairs. A
+  partial match is a miss: applying only some requested locations could hide
+  jobs from the unmatched locations.
 - Cache the resolved mapping per tenant under `data/workday_facets/{tenant}-{site}.json`
   with the source location strings as the cache key — re-resolve when
   `search.yaml` locations change.
 - Subsequent list POSTs include `appliedFacets: {<param>: [ids…]}` alongside
-  `searchText`. Any resolution miss (no facet matches a configured location,
-  malformed facet block) falls back silently to today's searchText-only
-  behavior — never fewer results than the status quo from a mapping failure,
-  and the `_MAX_OFFSET` ceiling stays.
+  `searchText`. Any resolution miss (no facet matches every configured
+  location, malformed facet block), cache I/O failure, or empty first faceted
+  response falls back silently to today's searchText-only behavior — never
+  fewer results than the status quo from a mapping failure, and the
+  `_MAX_OFFSET` ceiling stays.
 - The CLAUDE.md "appliedFacets not used" design note is replaced by a
   description of this behavior.
 - **Tests:** fixture list responses with facet blocks; cases for resolve-hit,

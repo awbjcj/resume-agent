@@ -1,12 +1,32 @@
 # Google + Tesla Connector Rebuild Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** Implement inline, task-by-task, with a red-green-refactor test cycle. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the Google and Tesla connectors work against the live portals: Google via httpx + embedded `AF_initDataCallback` JSON parsing (old API is 404), Tesla via the shared visible Playwright browser (API is Akamai-gated, 403 to any bare HTTP client).
 
 **Architecture:** Both connectors keep their exact `_BACKENDS` dispatch signatures — only the transport and parsing change. Google becomes list-only (the results page embeds full JDs; verified live 2026-07-10). Tesla gets a `TeslaPortal` browser seam: one visible tab captures the state JSON the page itself fetches, then detail fetches run same-origin inside that tab via `page.evaluate`, so `harvest_detailed` keeps owning gate/limit/skip logic. `CompaniesConnector` grows a `concurrent_fetch` property so a Tesla URL serializes the connector with other browser connectors in the pull runner.
 
-**Tech Stack:** Python 3.12, httpx, Playwright (sync API, lazy-imported), pytest (offline — browser and httpx faked).
+**Tech Stack:** Python 3.13, httpx, Playwright (sync API, lazy-imported), pytest (offline — browser and httpx faked).
+
+## Reviewed corrections (authoritative)
+
+- Google parsing is pinned to the live-shaped `ds:1` callback fixture. A valid
+  empty jobs payload returns `[]`; a missing or malformed `ds:1` payload raises
+  `ValueError` so companies failure isolation records portal drift instead of
+  silently ending pagination.
+- Google uses the live portal's valid stable id-only result URL. When `limit` is
+  set, paging stops only after the connector has found that many relevant,
+  unseen rows; off-target and `skip_seen` rows do not consume the cap.
+- Google and Tesla tests load minimized fixtures from
+  `tests/fixtures/google/` and `tests/fixtures/tesla/` instead of relying only
+  on hand-built inline payloads.
+- Tesla follows the repository's browser serialization contract:
+  `CompaniesConnector.concurrent_fetch` becomes false when Tesla is present,
+  and the pull runner's browser lock serializes it with Adzuna, LinkedIn, and
+  dashboard scraping. The portal opens the canonical US search URL because the
+  singleton `AtsTarget` intentionally carries no source URL.
+- Actual adjacent suites are `tests/test_connector_detect.py` and
+  `tests/test_pull_runner_concurrency.py`.
 
 ## Global Constraints
 
@@ -43,6 +63,8 @@ returns HTML containing `<script>AF_initDataCallback({key: 'ds:1', hash: '2', da
 | `src/resume_agent/discovery/connectors/companies.py` | `concurrent_fetch` becomes a property |
 | `tests/test_connector_google.py` | Rewritten for the blob format |
 | `tests/test_connector_tesla.py` | Rewritten for the portal seam |
+| `tests/fixtures/google/results.html` | Minimized live-shaped Google callback |
+| `tests/fixtures/tesla/state.json`, `detail-*.json` | Tesla state/detail payloads |
 | `tests/test_connector_companies.py` | + property tests (if the companies tests live in a differently named file, `grep -l CompaniesConnector tests/*.py` and append there) |
 | `CLAUDE.md` | Design-note updates |
 
@@ -340,7 +362,7 @@ Expected: PASS (all 7)
 
 - [ ] **Step 5: Run the companies + detect suites (dispatch conformance)**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_connector_companies.py tests/test_detect.py -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_connector_companies.py tests/test_connector_detect.py -v`
 (Adjust filenames via `ls tests | grep -i -e companies -e detect` if they differ.)
 Expected: PASS — `fetch_google`'s signature is unchanged.
 
@@ -659,7 +681,7 @@ In `src/resume_agent/discovery/connectors/companies.py`, extend the detect impor
 
 - [ ] **Step 4: Run the companies + runner suites**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_connector_companies.py tests/test_pull_runner.py -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_connector_companies.py tests/test_pull_runner_concurrency.py -v`
 (Locate the runner tests with `grep -l run_pull tests/*.py` if the name differs.)
 Expected: PASS
 
@@ -722,7 +744,7 @@ git commit -m "Documents the rebuilt Google and Tesla portal connectors"
 - [ ] `ruff check` — clean
 - [ ] `git diff main --stat -- contracts/` — empty
 - [ ] **Manual live smoke (optional, network + window):** `resume-agent pull --source <a companies source containing the Google or Tesla URL> --limit 5` — Google rows arrive with full JDs; Tesla pops one window and yields detailed rows
-- [ ] Use superpowers:requesting-code-review before merging
+- [ ] Use the repository code-review-and-quality and code-simplification passes before merging
 
 ## Self-review notes (already applied)
 

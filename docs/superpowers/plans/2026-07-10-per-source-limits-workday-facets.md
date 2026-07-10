@@ -1,12 +1,35 @@
 # Per-Source Limits + Workday Location Facets Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** Implement inline, task-by-task, with a red-green-refactor test cycle. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make job counts per source predictable: every source unit (board, careers URL, aggregator, scrape target) gets its own optional `limit`, the global `--limit` becomes the per-unit fallback (union caps removed), and Workday pulls send tenant-resolved `appliedFacets` for the configured locations.
 
 **Architecture:** The `harvest` seam gates and caps **per unit** instead of on the union, taking a `unit_limit` resolver; connectors pass their unit models' `limit`. Config unit models gain an additive `limit` field (`ExtensibleModel`, so old YAML loads). The Source Manager PATCH grows a `limit` field end-to-end (config → SourceView → API → web input). Workday resolves location facet IDs from the first list response, caches them per tenant under `data/workday_facets/`, and restarts paging faceted; any miss falls back to searchText-only.
 
-**Tech Stack:** Python 3.12, pydantic v2, FastAPI, httpx, React + TanStack Query (web), pytest + vitest.
+**Tech Stack:** Python 3.13, pydantic v2, FastAPI, httpx, React + TanStack Query (web), pytest + vitest.
+
+## Reviewed corrections (authoritative)
+
+- The Source Manager projection and mutations include scrape targets using the
+  registry's stable `scrape:{host}` id; otherwise `ScrapeTarget.limit` would be
+  configurable only by hand and the stated end-to-end surface would be incomplete.
+- The source PATCH is one atomic service mutation and one file replacement when
+  both `enabled` and `limit` are present. Service-level calls reject non-positive
+  limits too; validation is not delegated only to the HTTP schema.
+- Contract generation updates all three committed artifacts:
+  `contracts/openapi.json`, `contracts/ts/api.ts`, and
+  `web/src/lib/api/schema.ts`.
+- LinkedIn receives `configured_limit` through its constructor/builder contract;
+  do not attach an undeclared attribute after construction.
+- Limit inputs have a unique accessible name per source row and reset on a failed
+  mutation. The sources test uses MSW request capture rather than an unspecified
+  request spy.
+- Workday considers only location facet parameters and requires every configured
+  location to match. Partial matches, malformed facets, cache I/O failures, and
+  an empty first faceted page fall back to plain paging. This is required to
+  preserve the “never fewer rows because mapping failed” invariant.
+- Actual test paths are `tests/scraper/test_dashboard.py` and
+  `tests/api/test_sources_router.py`.
 
 **Execution order note:** run this plan after `2026-07-10-google-tesla-connectors.md` — Task 3 here edits the `concurrent_fetch` property that plan introduces in `companies.py`.
 
@@ -31,8 +54,8 @@
 | `src/resume_agent/discovery/scraper/linkedin.py`, `dashboard.py` | configured/per-target limits |
 | `src/resume_agent/discovery/connectors/registry.py` | pass entries + section limits |
 | `src/resume_agent/discovery/connectors/workday.py` | facet resolve + cache + faceted paging |
-| `src/resume_agent/discovery/connectors/sources.py` | `SourceView.limit` |
-| `src/resume_agent/services/sources.py` | `set_source_limit` |
+| `src/resume_agent/discovery/connectors/sources.py` | `SourceView.limit` + scrape projections |
+| `src/resume_agent/services/sources.py` | atomic source patch + limit validation |
 | `src/resume_agent/api/schemas/sources.py`, `api/routers/sources.py` | PATCH `{enabled?, limit?}` |
 | `web/src/features/sources/*` | limit input per source row |
 | `src/resume_agent/cli.py:331,386` | `--limit` help text |
@@ -423,7 +446,7 @@ git commit -m "Wires per-unit limits through greenhouse, lever, and companies"
 - Modify: `src/resume_agent/discovery/connectors/remoteok.py`, `adzuna.py`
 - Modify: `src/resume_agent/discovery/scraper/linkedin.py` (builder + fetch head), `dashboard.py:285-` (per-target budget)
 - Modify: `src/resume_agent/discovery/connectors/registry.py` (pass section limits)
-- Test: `tests/test_connector_remoteok.py`, `tests/test_dashboard_scraper.py` (append; locate exact names with `ls tests | grep -i -e remoteok -e dashboard -e scrape`)
+- Test: `tests/test_connector_remoteok.py`, `tests/scraper/test_dashboard.py` (append)
 
 **Interfaces:**
 
@@ -479,11 +502,11 @@ and as the first line of `fetch`:
 keyword-only params, store `self.configured_limit = configured_limit`, and add
 the same two-line resolution at the top of `fetch`.
 
-`scraper/linkedin.py` — add the parameter to the builder:
-`def build_linkedin_scraper(configured_limit: int | None = None)`, set
-`connector.configured_limit = configured_limit` on the instance it returns
-before returning, and add the same two-line resolution at the top of that
-class's `fetch` (locate with `grep -n "def fetch" src/resume_agent/discovery/scraper/linkedin.py`; default the attribute with a class-level `configured_limit: int | None = None`).
+`scraper/linkedin.py` — add `configured_limit: int | None = None` to
+`LinkedInScraper.__init__`, store it on the instance, add the same two-line
+resolution at the top of `fetch`, and thread it through
+`build_linkedin_scraper(configured_limit: int | None = None)`. Keeping the
+field in the constructor makes the connector contract explicit and testable.
 
 - [ ] **Step 4: Implement the per-target scrape budget**
 
@@ -565,13 +588,13 @@ git commit -m "Resolves configured limits for singleton connectors and scrape ta
 - Modify: `src/resume_agent/services/sources.py` (+ `set_source_limit`, `_apply_limit`)
 - Modify: `src/resume_agent/api/schemas/sources.py` (`SourceOut.limit`, `SourcePatchIn`)
 - Modify: `src/resume_agent/api/routers/sources.py` (PATCH route body)
-- Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (regenerated)
-- Test: `tests/api/test_sources.py`, `tests/test_services_sources.py` (append; confirm names with `ls tests tests/api | grep -i source`)
+- Modify: `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` (regenerated)
+- Test: `tests/api/test_sources_router.py`, `tests/test_services_sources.py` (append)
 
 **Interfaces:**
 
 - Consumes: Task 1's config `limit` fields.
-- Produces: `SourceView.limit: int | None`; `set_source_limit(source_id: str, limit: int | None, connectors_path=...) -> SourceView`; wire `PATCH /api/sources/{source_id}` body `SourcePatchIn {enabled?: bool, limit?: int|null}` — `limit: null` **clears** the per-source limit (present-vs-absent detected via `model_fields_set`). Task 6 (web) calls this.
+- Produces: `SourceView.limit: int | None`; `set_source_limit(source_id: str, limit: int | None, connectors_path=...) -> SourceView`; atomic `patch_source(source_id, *, enabled=UNSET, limit=UNSET, connectors_path=...)`; wire `PATCH /api/sources/{source_id}` body `SourcePatchIn {enabled?: bool, limit?: int|null}` — `limit: null` **clears** the per-source limit (present-vs-absent detected via `model_fields_set`). Task 6 (web) calls this.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -607,7 +630,7 @@ def test_set_source_limit_unknown_source_raises(tmp_path):
         set_source_limit("greenhouse:nope", 5, connectors_path=str(path))
 ```
 
-Append to `tests/api/test_sources.py` (reuse its client fixture and connectors-path monkeypatching):
+Append to `tests/api/test_sources_router.py` (reuse its client fixture and monkeypatch the service seam):
 
 ```python
 def test_patch_source_limit(...):
@@ -626,19 +649,27 @@ def test_patch_source_limit(...):
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_services_sources.py tests/api/test_sources.py -v -k limit`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_services_sources.py tests/api/test_sources_router.py -v -k limit`
 Expected: FAIL (import errors on `set_source_limit`, `KeyError: 'limit'`)
 
 - [ ] **Step 3: Carry limit on SourceView**
 
 In `connectors/sources.py`: add `limit: int | None = None` to the `SourceView`
 dataclass, then populate it in `list_source_views` — `limit=board.limit` for
-both board loops, `limit=entry.limit` for companies, `limit=config.adzuna.limit` /
-`config.remoteok.limit` / `config.linkedin.limit` for the three singleton views.
+both board loops, `limit=entry.limit` for companies, `limit=target.limit` for
+scrape targets, and `limit=config.adzuna.limit` / `config.remoteok.limit` /
+`config.linkedin.limit` for the three singleton views. Add a shared
+`scrape_target_id(url)` helper and use it here and in the registry so the stable
+id cannot drift between projections and pull construction. Because scrape rows
+now appear in Source Manager, extend enable/remove mutations for them too.
 
 - [ ] **Step 4: Add the service mutation**
 
-In `services/sources.py`, after `set_source_enabled`:
+In `services/sources.py`, add the validated `set_source_limit` wrapper shown
+below, include scrape targets in `_apply_limit`, and implement `patch_source`
+to load once, apply every present field, validate `limit is None or limit >= 1`,
+save once, and return one view. The router must call this atomic mutation rather
+than chaining two independently persisted service calls.
 
 ```python
 def set_source_limit(
@@ -694,17 +725,15 @@ In `api/routers/sources.py`, update the import and the PATCH route:
 ```python
 @router.patch("/sources/{source_id}", response_model=SourceOut)
 def patch_source_route(source_id: str, body: SourcePatchIn):
-    view = None
-    if body.enabled is not None:
-        view = _guard(lambda: set_source_enabled(source_id, body.enabled))
-    if "limit" in body.model_fields_set:
-        view = _guard(lambda: set_source_limit(source_id, body.limit))
-    if view is None:
+    changes = body.model_dump(exclude_unset=True)
+    if not changes:
         raise ApiException(400, "VALIDATION_ERROR", "Provide enabled and/or limit.")
-    return SourceOut.model_validate(view)
+    return SourceOut.model_validate(
+        _guard(lambda: patch_source(source_id, **changes))
+    )
 ```
 
-(add `set_source_limit` to the services import; `limit` must be `>= 1` or null —
+(add `patch_source` to the services import; `limit` must be `>= 1` or null —
 add `from pydantic import Field` and use `limit: int | None = Field(default=None, ge=1)`
 in `SourcePatchIn`.)
 
@@ -1147,7 +1176,7 @@ git commit -m "Applies cached tenant location facets to Workday pulls"
 - [ ] `ruff check` — clean
 - [ ] `cd web && npx vitest run` — web suite PASS
 - [ ] `tests/api/test_openapi_contract.py` green after `bash scripts/gen_ts_client.sh` (Task 5 regenerated)
-- [ ] Use superpowers:requesting-code-review before merging
+- [ ] Use the repository code-review-and-quality and code-simplification passes before merging
 
 ## Self-review notes (already applied)
 
