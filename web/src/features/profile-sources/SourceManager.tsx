@@ -24,9 +24,10 @@ const MODES = ["literal", "synthesis"] as const;
 // a real <select> — the anchor/mode editors need native selection behavior
 // (keyboard, userEvent.selectOptions) that a popover-based listbox doesn't give.
 const nativeSelectClass =
-  "h-8 rounded-lg border border-input bg-transparent px-2 text-xs outline-none " +
-  "transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 " +
-  "dark:bg-input/30 dark:hover:bg-input/50";
+  "h-8 rounded-lg border border-input bg-popover px-2 text-xs text-popover-foreground outline-none " +
+  "[color-scheme:light] transition-colors focus-visible:border-ring focus-visible:ring-3 " +
+  "focus-visible:ring-ring/50 dark:[color-scheme:dark]";
+const nativeOptionClass = "bg-popover text-popover-foreground";
 
 const STATUS_VARIANT: Record<string, "secondary" | "outline"> = {
   cached: "secondary",
@@ -104,7 +105,7 @@ export function SourceManager() {
             }}
           >
             {MODES.map((mode) => (
-              <option key={mode} value={mode}>{mode}</option>
+              <option className={nativeOptionClass} key={mode} value={mode}>{mode}</option>
             ))}
           </select>
           {uploadMode === "synthesis" ? (
@@ -114,9 +115,9 @@ export function SourceManager() {
               value={uploadAnchor}
               onChange={(e) => setUploadAnchor(e.target.value)}
             >
-              <option value="">Auto-anchor</option>
+              <option className={nativeOptionClass} value="">Auto-anchor</option>
               {(skeleton ?? []).map((entry) => (
-                <option key={entry.id} value={entry.id}>{entry.label}</option>
+                <option className={nativeOptionClass} key={entry.id} value={entry.id}>{entry.label}</option>
               ))}
             </select>
           ) : null}
@@ -161,7 +162,7 @@ export function SourceManager() {
                       }
                     >
                       {MODES.map((mode) => (
-                        <option key={mode} value={mode}>{mode}</option>
+                        <option className={nativeOptionClass} key={mode} value={mode}>{mode}</option>
                       ))}
                     </select>
                   )}
@@ -176,9 +177,9 @@ export function SourceManager() {
                         patch.mutate({ id: source.id, anchor: e.target.value || null })
                       }
                     >
-                      <option value="">Auto-anchor</option>
+                      <option className={nativeOptionClass} value="">Auto-anchor</option>
                       {(skeleton ?? []).map((entry) => (
-                        <option key={entry.id} value={entry.id}>{entry.label}</option>
+                        <option className={nativeOptionClass} key={entry.id} value={entry.id}>{entry.label}</option>
                       ))}
                     </select>
                   ) : (

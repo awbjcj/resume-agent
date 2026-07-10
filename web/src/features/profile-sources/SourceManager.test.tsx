@@ -37,6 +37,15 @@ describe("SourceManager", () => {
     expect(screen.getByRole("row", { name: /resume\.pdf primary/i })).toBeInTheDocument();
   });
 
+  it("gives native mode options explicit theme colors", () => {
+    render(<SourceManager />);
+    const options = screen.getByLabelText(/mode for deck.pptx/i).querySelectorAll("option");
+    expect(options).not.toHaveLength(0);
+    options.forEach((option) => {
+      expect(option).toHaveClass("bg-popover", "text-popover-foreground");
+    });
+  });
+
   it("changes a source's anchor through the skeleton dropdown", async () => {
     render(<SourceManager />);
     const anchorSelect = screen.getByLabelText(/anchor for deck.pptx/i);
