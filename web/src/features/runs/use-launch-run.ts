@@ -105,4 +105,5 @@ export const launchers = {
   refresh: (opts: PullOptions = {}) =>
     unwrap(api.POST("/api/refresh", { body: { limit: opts.limit ?? null } })),
   profileBuild: () => unwrap(api.POST("/api/profile/build", {} as never)),
+  githubSync: () => unwrap(api.POST("/api/profile/sync-github", {} as never)),
 };

@@ -1,21 +1,26 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   sources: [
     { id: "r1", filename: "resume.pdf", mode: "literal", primary: true,
-      anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached" },
+      anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached", origin: "upload" },
     { id: "d1", filename: "deck.pptx", mode: "synthesis", primary: false,
-      anchor: null, addedAt: "2026-07-03", fragmentStatus: "missing" },
+      anchor: null, addedAt: "2026-07-03", fragmentStatus: "missing", origin: "upload" },
     { id: "n1", filename: "notes.md", mode: "literal", primary: false,
-      anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached" },
+      anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached", origin: "upload" },
+    { id: "g1", filename: "github--repo.md", mode: "project", primary: false,
+      anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached", origin: "github" },
   ],
   skeleton: [{ id: "exp1", kind: "experience", label: "Acme — Engineer" }],
   patch: vi.fn(),
   remove: vi.fn(),
   upload: vi.fn(),
   replace: vi.fn(),
+  addNote: vi.fn(),
+  addUrl: vi.fn(),
+  syncGithub: vi.fn(),
 }));
 
 vi.mock("./use-sources", () => ({
@@ -25,6 +30,9 @@ vi.mock("./use-sources", () => ({
   usePatchSource: () => ({ mutate: mocks.patch, isPending: false }),
   useDeleteSource: () => ({ mutate: mocks.remove, isPending: false }),
   useReplaceSource: () => ({ mutate: mocks.replace, isPending: false }),
+  useAddNote: () => ({ mutate: mocks.addNote, isPending: false }),
+  useAddUrl: () => ({ mutate: mocks.addUrl, isPending: false }),
+  useSyncGithub: () => ({ mutate: mocks.syncGithub, isPending: false }),
 }));
 
 import { SourceManager } from "./SourceManager";
@@ -96,5 +104,42 @@ describe("SourceManager", () => {
   it("does not offer replace/remove actions on non-primary sources", () => {
     render(<SourceManager />);
     expect(screen.queryByRole("button", { name: /replace deck.pptx/i })).not.toBeInTheDocument();
+  });
+
+  it("badges github sources and keeps project mode read-only", () => {
+    render(<SourceManager />);
+    const row = screen.getByRole("row", { name: /github--repo\.md/i });
+    expect(row).toHaveTextContent("GitHub");
+    expect(screen.queryByLabelText(/mode for github--repo\.md/i)).not.toBeInTheDocument();
+  });
+
+  it("submits note and URL intake through labelled dialogs", async () => {
+    const user = userEvent.setup();
+    render(<SourceManager />);
+
+    await user.click(screen.getByRole("button", { name: /add note/i }));
+    await user.type(screen.getByLabelText("Note title"), "On-call");
+    await user.type(screen.getByLabelText("Note text"), "Led the rotation.");
+    await user.click(screen.getByRole("button", { name: /save note/i }));
+    expect(mocks.addNote).toHaveBeenCalledWith(
+      { title: "On-call", text: "Led the rotation." },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    act(() => mocks.addNote.mock.calls[0][1].onSuccess());
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /add url/i })).toBeVisible());
+    await user.click(screen.getByRole("button", { name: /add url/i }));
+    await user.type(screen.getByLabelText("Public URL"), "https://example.com/work");
+    await user.click(screen.getByRole("button", { name: /ingest page/i }));
+    expect(mocks.addUrl).toHaveBeenCalledWith(
+      { url: "https://example.com/work" },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it("launches tracked github sync", async () => {
+    render(<SourceManager />);
+    await userEvent.click(screen.getByRole("button", { name: /sync github/i }));
+    expect(mocks.syncGithub).toHaveBeenCalledTimes(1);
   });
 });

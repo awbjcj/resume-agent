@@ -2,16 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api, getToken, unwrap } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
+import { useActiveRun } from "@/features/runs/use-active-run";
+import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
 
-export type ProfileSource = {
-  id: string;
-  filename: string;
-  mode: "literal" | "synthesis";
-  primary: boolean;
-  anchor: string | null;
-  addedAt: string;
-  fragmentStatus: string;
-};
+export type ProfileSource =
+  components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+export type NoteInput = components["schemas"]["NoteIn"];
+export type UrlInput = components["schemas"]["UrlIn"];
 
 export type SkeletonEntry = { id: string; kind: string; label: string };
 
@@ -96,6 +94,45 @@ export function useDeleteSource() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile-sources"] }),
     onError: (err: Error) => toast.error(err.message),
   });
+}
+
+export function useAddNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NoteInput) =>
+      unwrap(api.POST("/api/profile/sources/note", { body })),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile-sources"] });
+      toast.success("Note added");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
+export function useAddUrl() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UrlInput) =>
+      unwrap(api.POST("/api/profile/sources/url", { body })),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile-sources"] });
+      toast.success("Page added");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
+export function useSyncGithub() {
+  const { launch } = useLaunchRun();
+  const active = useActiveRun("github-sync");
+  return {
+    mutate: () =>
+      void launch("github-sync", launchers.githubSync, ["profile-sources"]),
+    isPending:
+      active?.status === "queued" ||
+      active?.status === "running" ||
+      active?.status === "cancelling",
+  };
 }
 
 // Replaces a source's file in place: the new upload takes over as primary,

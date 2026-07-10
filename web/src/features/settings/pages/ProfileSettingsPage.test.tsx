@@ -7,6 +7,7 @@ import { ProfileSettingsPage } from "./ProfileSettingsPage";
 
 const mocks = vi.hoisted(() => ({
   launch: vi.fn(),
+  save: vi.fn(),
 }));
 
 vi.mock("@/features/profile-sources/BuildReportPanel", () => ({
@@ -15,6 +16,10 @@ vi.mock("@/features/profile-sources/BuildReportPanel", () => ({
 
 vi.mock("@/features/profile-sources/SourceManager", () => ({
   SourceManager: () => <div data-testid="source-manager" />,
+}));
+
+vi.mock("../SkillGroupsPanel", () => ({
+  SkillGroupsPanel: () => <div data-testid="skill-groups" />,
 }));
 
 vi.mock("@/features/runs/use-active-run", () => ({
@@ -30,11 +35,16 @@ vi.mock("@/features/runs/use-launch-run", () => ({
 
 vi.mock("../use-config", () => ({
   useConfig: () => ({
-    data: { githubUsername: null },
+    data: {
+      githubUsername: null,
+      githubRepoAllow: [],
+      githubRepoDeny: [],
+      githubRepoLimit: 20,
+    },
   }),
   useSaveConfig: () => ({
     isPending: false,
-    mutate: vi.fn(),
+    mutate: mocks.save,
   }),
 }));
 
@@ -55,8 +65,28 @@ describe("ProfileSettingsPage", () => {
       expect(mocks.launch).toHaveBeenCalledWith(
         "profile-build",
         expect.any(Function),
-        ["setup-status", "profile-sources", "profile-skeleton"],
+        ["setup-status", "profile-sources", "profile-skeleton", "profile-matrix"],
       ),
+    );
+  });
+
+  it("edits all repo harvest controls and mounts grouped skills", async () => {
+    const user = userEvent.setup();
+    render(<ProfileSettingsPage />, { wrapper: withQueryClient });
+    expect(screen.getByTestId("skill-groups")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/always include repositories/i), "important, fork");
+    await user.type(screen.getByLabelText(/exclude repositories/i), "noise");
+    await user.clear(screen.getByLabelText(/repository limit/i));
+    await user.type(screen.getByLabelText(/repository limit/i), "5");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        githubRepoAllow: ["important", "fork"],
+        githubRepoDeny: ["noise"],
+        githubRepoLimit: 5,
+      }),
     );
   });
 });

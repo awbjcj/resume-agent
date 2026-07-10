@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -15,8 +16,10 @@ import {
   useReplaceSource,
   useSkeleton,
   useSources,
+  useSyncGithub,
   useUploadSource,
 } from "./use-sources";
+import { MaterialIntakeDialogs } from "./MaterialIntakeDialogs";
 
 const MODES = ["literal", "synthesis"] as const;
 
@@ -44,6 +47,7 @@ export function SourceManager() {
   const patch = usePatchSource();
   const remove = useDeleteSource();
   const replace = useReplaceSource();
+  const syncGithub = useSyncGithub();
   const fileInput = useRef<HTMLInputElement>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const [uploadMode, setUploadMode] = useState<(typeof MODES)[number]>("literal");
@@ -58,8 +62,8 @@ export function SourceManager() {
         <div>
           <div className="text-sm font-medium">Source documents</div>
           <p className="text-sm text-muted-foreground">
-            Resumes extract literally; decks and write-ups are synthesized and
-            verified against their own text.
+            Upload files, add direct notes or public pages, and sync GitHub
+            projects into one evidence-backed profile.
           </p>
         </div>
         <input
@@ -94,6 +98,19 @@ export function SourceManager() {
           }}
         />
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <MaterialIntakeDialogs />
+          <Button
+            variant="outline"
+            disabled={syncGithub.isPending}
+            onClick={() => syncGithub.mutate()}
+          >
+            {syncGithub.isPending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <RefreshCw data-icon="inline-start" aria-hidden="true" />
+            )}
+            Sync GitHub
+          </Button>
           <select
             aria-label="New source mode"
             className={nativeSelectClass}
@@ -148,9 +165,16 @@ export function SourceManager() {
           <TableBody>
             {sources.map((source) => (
               <TableRow key={source.id}>
-                <TableCell className="font-medium">{source.filename}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <span>{source.filename}</span>
+                    {source.origin === "github" ? <Badge variant="outline">GitHub</Badge> : null}
+                  </div>
+                </TableCell>
                 <TableCell>
-                  {source.primary ? (
+                  {source.mode === "project" ? (
+                    <Badge variant="secondary">Project</Badge>
+                  ) : source.primary ? (
                     <Badge variant="secondary">Primary</Badge>
                   ) : (
                     <select
@@ -168,7 +192,7 @@ export function SourceManager() {
                   )}
                 </TableCell>
                 <TableCell>
-                  {source.mode === "synthesis" ? (
+                  {source.mode === "synthesis" && source.origin !== "github" ? (
                     <select
                       aria-label={`anchor for ${source.filename}`}
                       className={nativeSelectClass}
@@ -192,7 +216,9 @@ export function SourceManager() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {source.primary ? (
+                  {source.origin === "github" || source.mode === "project" ? (
+                    <span className="block text-right text-xs text-muted-foreground">Synced</span>
+                  ) : source.primary ? (
                     <div className="flex justify-end">
                       <Button
                         variant="ghost"
