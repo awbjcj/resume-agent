@@ -134,8 +134,8 @@ rounds, fewer serial stages, and faster models on the long-output writer calls
   (draft, per-round panel, per-round revise) using `time.monotonic()`.
 - Durations land as an additive field on `TailorRound`
   (`stage_seconds: dict[str, float]`) — `ExtensibleModel` keeps old persisted
-  rounds loadable — and per-job totals surface in the run record result so
-  every future run is measurable for free.
+  rounds loadable — and a per-job total is logged at persist time so every
+  future run is measurable for free (no DB migration).
 
 ## 5. Error handling & invariants
 
