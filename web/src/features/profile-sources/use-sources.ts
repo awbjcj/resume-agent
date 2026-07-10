@@ -106,15 +106,25 @@ export function useReplaceSource() {
   return useMutation({
     mutationFn: async ({ oldId, file }: { oldId: string; file: File }) => {
       const next = await postSource(file, "literal", null, true);
-      await unwrap(api.DELETE("/api/profile/sources/{doc_id}", {
-        params: { path: { doc_id: oldId } },
-      } as never));
+      // add_source dedupes by content hash: replacing with a byte-identical
+      // file returns the same doc as oldId. Deleting it then would wipe out
+      // the only/primary source instead of a no-op replace.
+      if (next.id !== oldId) {
+        await unwrap(api.DELETE("/api/profile/sources/{doc_id}", {
+          params: { path: { doc_id: oldId } },
+        } as never));
+      }
       return next;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile-sources"] });
       toast.success("Resume replaced");
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      // The upload can succeed before a later failure (e.g. the delete step),
+      // leaving the server ahead of the cached list — refresh it either way.
+      qc.invalidateQueries({ queryKey: ["profile-sources"] });
+      toast.error(err.message);
+    },
   });
 }
