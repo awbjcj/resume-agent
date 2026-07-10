@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -24,11 +25,13 @@ from resume_agent.discovery.connectors.sources import (
     SourceView,
     company_url_id,
     list_source_views,
+    scrape_target_id,
 )
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.services.discovery import DEFAULT_CONNECTORS, DEFAULT_SEARCH
 
 _PREVIEW_LIMIT = 50
+_UNSET = object()
 
 
 class SourceError(Exception):
@@ -173,8 +176,41 @@ def set_source_enabled(
     enabled: bool,
     connectors_path: str = DEFAULT_CONNECTORS,
 ) -> SourceView:
+    return patch_source(source_id, enabled=enabled, connectors_path=connectors_path)
+
+
+def set_source_limit(
+    source_id: str,
+    limit: int | None,
+    connectors_path: str = DEFAULT_CONNECTORS,
+) -> SourceView:
+    return patch_source(source_id, limit=limit, connectors_path=connectors_path)
+
+
+def patch_source(
+    source_id: str,
+    *,
+    enabled: bool | object = _UNSET,
+    limit: int | None | object = _UNSET,
+    connectors_path: str = DEFAULT_CONNECTORS,
+) -> SourceView:
+    """Apply all requested source changes to one config snapshot and save once."""
+    if enabled is _UNSET and limit is _UNSET:
+        raise SourceError("Provide enabled and/or limit.")
+    if enabled is not _UNSET and not isinstance(enabled, bool):
+        raise SourceError("enabled must be true or false.")
+    if limit is not _UNSET and (
+        isinstance(limit, bool) or (limit is not None and (not isinstance(limit, int) or limit < 1))
+    ):
+        raise SourceError("limit must be a positive integer or null.")
+
     config = load_connectors_config(connectors_path)
-    if not _apply_enabled(config, source_id, enabled):
+    found = True
+    if enabled is not _UNSET:
+        found = _apply_enabled(config, source_id, cast(bool, enabled))
+    if limit is not _UNSET:
+        found = _apply_limit(config, source_id, cast(int | None, limit)) and found
+    if not found:
         raise SourceError(f"Unknown source '{source_id}'")
     _save(connectors_path, config)
     return _view(config, source_id)
@@ -216,6 +252,41 @@ def _apply_enabled(config: ConnectorsConfig, source_id: str, enabled: bool) -> b
                 config.companies.enabled = True
             entry.enabled = enabled
             return True
+    for target in config.scrape.targets:
+        if scrape_target_id(target.url) == source_id:
+            if enabled:
+                config.scrape.enabled = True
+            target.enabled = enabled
+            return True
+    return False
+
+
+def _apply_limit(config: ConnectorsConfig, source_id: str, limit: int | None) -> bool:
+    if source_id == "adzuna":
+        config.adzuna.limit = limit
+        return True
+    if source_id == "remoteok":
+        config.remoteok.limit = limit
+        return True
+    if source_id == "linkedin":
+        config.linkedin.limit = limit
+        return True
+    for board in config.greenhouse.boards:
+        if f"greenhouse:{board.token}" == source_id:
+            board.limit = limit
+            return True
+    for board in config.lever.boards:
+        if f"lever:{board.token}" == source_id:
+            board.limit = limit
+            return True
+    for entry in config.companies.urls:
+        if company_url_id(entry.url) == source_id:
+            entry.limit = limit
+            return True
+    for target in config.scrape.targets:
+        if scrape_target_id(target.url) == source_id:
+            target.limit = limit
+            return True
     return False
 
 
@@ -238,4 +309,13 @@ def _remove(config: ConnectorsConfig, source_id: str) -> bool:
     config.companies.urls = [
         entry for entry in config.companies.urls if company_url_id(entry.url) != source_id
     ]
-    return len(config.companies.urls) != before
+    if len(config.companies.urls) != before:
+        return True
+
+    before = len(config.scrape.targets)
+    config.scrape.targets = [
+        target
+        for target in config.scrape.targets
+        if scrape_target_id(target.url) != source_id
+    ]
+    return len(config.scrape.targets) != before
