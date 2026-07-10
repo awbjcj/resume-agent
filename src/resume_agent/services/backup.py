@@ -144,3 +144,74 @@ def import_data_root(
     finally:
         shutil.rmtree(stage, ignore_errors=True)
         shutil.rmtree(rollback, ignore_errors=True)
+
+
+def pack_local_checkout(repo_root: Path, out: Path) -> Path:
+    """Pack local mutable paths into the same layout as the mounted data root."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    file_count = 0
+
+    def add_tree(
+        tar: tarfile.TarFile,
+        root: Path,
+        prefix: str,
+        snapshot_dir: Path,
+        *,
+        snapshot_databases: bool,
+    ) -> None:
+        nonlocal file_count
+        for index, path in enumerate(sorted(root.rglob("*"))):
+            relative = path.relative_to(root).as_posix()
+            archive_name = f"{prefix}/{relative}" if prefix else relative
+            if path.is_symlink():
+                raise UnsafeArchiveError(f"local state contains a symlink: {path}")
+            if path.is_dir():
+                tar.add(path, arcname=archive_name, recursive=False)
+                continue
+            if not path.is_file():
+                raise UnsafeArchiveError(f"unsupported local state entry: {path}")
+            if snapshot_databases and path.name.endswith((".db-wal", ".db-shm")):
+                continue
+            if snapshot_databases and path.suffix == ".db":
+                snapshot = snapshot_dir / f"snapshot-{index}.db"
+                sqlite_snapshot(path, snapshot)
+                tar.add(snapshot, arcname=archive_name)
+            else:
+                tar.add(path, arcname=archive_name)
+            file_count += 1
+
+    try:
+        with tempfile.TemporaryDirectory() as temporary, tarfile.open(out, "w:gz") as tar:
+            snapshot_dir = Path(temporary)
+            data_dir = repo_root / "data"
+            if data_dir.is_dir():
+                add_tree(
+                    tar,
+                    data_dir,
+                    "",
+                    snapshot_dir,
+                    snapshot_databases=True,
+                )
+            for name in ("config", "output"):
+                root = repo_root / name
+                if root.is_dir():
+                    tar.add(root, arcname=name, recursive=False)
+                    add_tree(
+                        tar,
+                        root,
+                        name,
+                        snapshot_dir,
+                        snapshot_databases=False,
+                    )
+            env_file = repo_root / ".env"
+            if env_file.is_symlink():
+                raise UnsafeArchiveError(f"local state contains a symlink: {env_file}")
+            if env_file.is_file():
+                tar.add(env_file, arcname=".env")
+                file_count += 1
+        if file_count == 0:
+            raise InvalidArchiveError("local checkout contains no mutable files")
+    except BaseException:
+        out.unlink(missing_ok=True)
+        raise
+    return out

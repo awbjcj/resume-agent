@@ -95,3 +95,48 @@ def test_import_rolls_back_when_install_move_fails(tmp_path, monkeypatch):
     assert (root / "profile" / "facts.json").exists()
     with closing(sqlite3.connect(root / "resume_agent.db")) as connection:
         assert connection.execute("SELECT title FROM job").fetchall() == [("Engineer",)]
+
+
+def test_pack_local_checkout_builds_importable_volume_layout(tmp_path):
+    from resume_agent.services.backup import pack_local_checkout
+
+    repo = tmp_path / "repo"
+    (repo / "data" / "profile").mkdir(parents=True)
+    (repo / "data" / "profile" / "facts.json").write_text("{}", encoding="utf-8")
+    db = repo / "data" / "resume_agent.db"
+    with closing(sqlite3.connect(db)) as connection:
+        connection.execute("CREATE TABLE job (id INTEGER PRIMARY KEY)")
+        connection.commit()
+    (repo / "config").mkdir()
+    (repo / "config" / "search.yaml").write_text("titles: []\n", encoding="utf-8")
+    (repo / "output").mkdir()
+    (repo / "output" / "resume.pdf").write_bytes(b"%PDF")
+    (repo / ".env").write_text("KEY=value\n", encoding="utf-8")
+
+    archive = pack_local_checkout(repo, tmp_path / "seed.tar.gz")
+    restored = tmp_path / "restored"
+    import_data_root(archive, restored)
+
+    assert (restored / "profile" / "facts.json").is_file()
+    assert (restored / "resume_agent.db").is_file()
+    assert (restored / "config" / "search.yaml").is_file()
+    assert (restored / "output" / "resume.pdf").is_file()
+    assert (restored / ".env").is_file()
+
+
+def test_pack_local_checkout_rejects_empty_or_symlinked_state(tmp_path):
+    from resume_agent.services.backup import pack_local_checkout
+
+    repo = tmp_path / "repo"
+    (repo / "data").mkdir(parents=True)
+    with pytest.raises(InvalidArchiveError):
+        pack_local_checkout(repo, tmp_path / "empty.tar.gz")
+
+    target = tmp_path / "outside.txt"
+    target.write_text("secret", encoding="utf-8")
+    try:
+        (repo / "data" / "link.txt").symlink_to(target)
+    except OSError:
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(UnsafeArchiveError):
+        pack_local_checkout(repo, tmp_path / "unsafe.tar.gz")
