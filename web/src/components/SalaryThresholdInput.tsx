@@ -1,5 +1,8 @@
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
+const CONTROL_LABEL_CLASS =
+  "text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground";
 
 export function salarySummary(value: string) {
   const salary = Number(value.trim());
@@ -27,10 +30,10 @@ export function SalaryThresholdInput({
   const descriptionId = `${id}-description`;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-[0.14em]">
+    <Field className="relative w-full gap-1.5 sm:w-32" data-invalid={!valid || undefined}>
+      <FieldLabel htmlFor={id} className={CONTROL_LABEL_CLASS}>
         Min salary (USD)
-      </Label>
+      </FieldLabel>
       <div className="relative">
         <span
           aria-hidden="true"
@@ -44,7 +47,7 @@ export function SalaryThresholdInput({
           min={0}
           step={10000}
           inputMode="numeric"
-          className="h-10 bg-card pl-7 tabular-nums"
+          className="h-9 bg-background pl-7 tabular-nums"
           value={value}
           aria-invalid={!valid}
           aria-describedby={descriptionId}
@@ -53,10 +56,10 @@ export function SalaryThresholdInput({
       </div>
       <p
         id={descriptionId}
-        className={valid ? "text-xs text-muted-foreground" : "text-xs text-destructive"}
+        className={valid ? "sr-only" : "absolute top-full mt-1 text-xs text-destructive"}
       >
         {valid ? salarySummary(value) : "Enter a non-negative annual salary."}
       </p>
-    </div>
+    </Field>
   );
 }
