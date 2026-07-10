@@ -2294,6 +2294,11 @@ export interface components {
              * @default false
              */
             approved: boolean;
+            /**
+             * Deep
+             * @default false
+             */
+            deep: boolean;
             /** Jobids */
             jobIds?: number[] | null;
         };

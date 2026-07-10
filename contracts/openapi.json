@@ -3643,6 +3643,11 @@
             "title": "Approved",
             "type": "boolean"
           },
+          "deep": {
+            "default": false,
+            "title": "Deep",
+            "type": "boolean"
+          },
           "jobIds": {
             "anyOf": [
               {

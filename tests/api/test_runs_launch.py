@@ -71,6 +71,24 @@ def test_tailor_launch_passes_params(monkeypatch, tmp_path):
     assert captured["fail_on_partial"] is True
 
 
+def test_tailor_launch_maps_deep_to_review_path(monkeypatch, tmp_path):
+    review_paths = []
+
+    def fake_tailor(session, *, reporter=None, **kwargs):
+        review_paths.append(kwargs["review_path"])
+        reporter.begin(1, "x")
+        reporter.step(1)
+        return {}
+
+    monkeypatch.setattr(runs_router, "tailor", fake_tailor)
+    client = _client(tmp_path)
+    with client:
+        client.post("/api/tailor", json={"approved": True, "deep": True})
+        client.post("/api/tailor", json={"approved": True})
+
+    assert review_paths == ["config/review_deep.yaml", "config/review.yaml"]
+
+
 def test_reprocess_endpoint_launches_run(monkeypatch, tmp_path):
     def fake_reprocess_jobs(session, *, scopes, reporter=None, **kw):
         return {"shortlisted": 1}

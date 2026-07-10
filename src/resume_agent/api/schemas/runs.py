@@ -53,6 +53,7 @@ class RefreshParams(CamelModel):
 class TailorParams(CamelModel):
     job_ids: list[int] | None = None
     approved: bool = False
+    deep: bool = False
 
 
 class CoverLetterParams(CamelModel):

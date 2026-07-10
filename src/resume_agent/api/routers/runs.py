@@ -41,7 +41,7 @@ from resume_agent.services.discovery import (
     reprocess_jobs,
     scrape_linkedin_jobs,
 )
-from resume_agent.services.tailoring import tailor
+from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP, tailor
 from resume_agent.services.pagination import paginate
 
 router = APIRouter()
@@ -157,6 +157,7 @@ def launch_tailor(
                 session,
                 job_ids=params.job_ids,
                 approved=params.approved,
+                review_path=DEFAULT_REVIEW_DEEP if params.deep else DEFAULT_REVIEW,
                 reporter=reporter,
                 fail_on_partial=True,
             )
