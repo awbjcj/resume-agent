@@ -118,6 +118,8 @@ describe("SourceManager", () => {
     const dossier = screen.getByRole("row", { name: /portfolio-dossier\.md/i });
     expect(dossier).toHaveTextContent("Read-only");
     expect(dossier).not.toHaveTextContent("GitHub");
+    expect(screen.queryByRole("button", { name: /remove github--repo\.md/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove portfolio-dossier\.md/i })).toBeInTheDocument();
   });
 
   it("submits note and URL intake through labelled dialogs", async () => {

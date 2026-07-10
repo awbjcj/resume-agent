@@ -216,9 +216,9 @@ export function SourceManager() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {source.origin === "github" || source.mode === "project" ? (
+                  {source.origin === "github" ? (
                     <span className="block text-right text-xs text-muted-foreground">
-                      {source.origin === "github" ? "Synced" : "Read-only"}
+                      Synced
                     </span>
                   ) : source.primary ? (
                     <div className="flex justify-end">
@@ -237,8 +237,10 @@ export function SourceManager() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap justify-end gap-1">
-                      {source.mode === "literal" ? (
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      {source.mode === "project" ? (
+                        <span className="text-xs text-muted-foreground">Read-only</span>
+                      ) : source.mode === "literal" ? (
                         <Button
                           variant="ghost"
                           size="sm"
