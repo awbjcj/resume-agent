@@ -8,6 +8,7 @@ export const SOURCE_WEIGHT = { must: 3, nice: 2, tech: 1 } as const;
 export const UNTHEMED_ID = "__unthemed__";
 
 export interface Filters {
+  q: string;
   company: string | null;
   seniority: string | null;
   gapsOnly: boolean;
@@ -122,11 +123,13 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
     jobsBySkill.set(edge.skillKey, counts.jobs);
   }
 
+  const q = filters.q.trim().toLowerCase();
   const skills = payload.skills
     .flatMap((node): SkillRow[] => {
       const counts = countsBySkill.get(node.key);
       const coverage = node.coverage ?? (node.covered ? "covered" : "gap");
       if (!counts || (filters.gapsOnly && coverage !== "gap")) return [];
+      if (q && !node.skill.toLowerCase().includes(q)) return [];
       return [
         {
           key: node.key,

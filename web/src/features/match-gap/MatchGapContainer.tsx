@@ -30,6 +30,7 @@ import { useMatchGap, useRefreshClusters } from "./use-match-gap";
 import { useSuggestionRuns } from "./use-suggestion-runs";
 
 const DEFAULT_FILTERS: FilterValue = {
+  q: "",
   company: null,
   seniority: null,
   gapsOnly: false,
@@ -105,7 +106,7 @@ export function MatchGapContainer() {
         <div className="space-y-6">
           <section
             aria-label="Dashboard controls"
-            className="sticky top-0 z-20 flex flex-wrap items-end justify-between gap-4 border-y bg-background/95 px-4 py-4 backdrop-blur sm:px-5"
+            className="sticky top-2 z-20 flex flex-wrap items-end justify-between gap-4 rounded-lg border bg-card/95 p-4 backdrop-blur"
           >
             <Filters
               value={filters}

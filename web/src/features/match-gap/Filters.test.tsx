@@ -7,7 +7,7 @@ describe("Filters", () => {
   it("shows user-facing labels for unfiltered select values", () => {
     render(
       <Filters
-        value={{ company: null, seniority: null, gapsOnly: false, weighting: "essential" }}
+        value={{ q: "", company: null, seniority: null, gapsOnly: false, weighting: "essential" }}
         onChange={() => {}}
         companies={["Stripe"]}
         seniorities={["senior"]}

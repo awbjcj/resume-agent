@@ -12,6 +12,7 @@ import {
 type Payload = components["schemas"]["MatchGapOut"];
 
 const base: Filters = {
+  q: "",
   company: null,
   seniority: null,
   gapsOnly: false,
