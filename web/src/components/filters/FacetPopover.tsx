@@ -88,11 +88,9 @@ export function FacetPopover({
         render={
           <Button
             variant="outline"
-            size={presentation === "field" ? "default" : "sm"}
+            size="sm"
             className={cn(
-              presentation === "field"
-                ? "h-10 w-full justify-between"
-                : "rounded-full",
+              presentation === "field" ? "w-full justify-between" : "rounded-full",
               selected.size > 0 && "border-primary text-primary",
             )}
           />
@@ -107,7 +105,7 @@ export function FacetPopover({
 
       <PopoverContent
         align="start"
-        side={presentation === "field" ? "top" : "bottom"}
+        side="bottom"
         className="max-h-[var(--available-height)] w-80 max-w-[calc(100vw-2rem)] gap-0 overflow-hidden p-0"
       >
         <PopoverHeader className="shrink-0 gap-2 p-4 pb-3">

@@ -29,7 +29,7 @@ function renderFacet({
 }
 
 describe("FacetPopover", () => {
-  it("renders field presentation as a full-width, h-10 trigger", () => {
+  it("renders field presentation as a compact full-width trigger", () => {
     render(
       <FacetPopover
         label="Skills"
@@ -40,7 +40,7 @@ describe("FacetPopover", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Skills" })).toHaveClass("h-10", "w-full");
+    expect(screen.getByRole("button", { name: "Skills" })).toHaveClass("h-9", "w-full");
   });
 
   it("shows its controlled presentation and selected count", () => {
