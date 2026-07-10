@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Dossier"
+  short_description: "Build evidence-backed GitHub project dossiers"
+  default_prompt: "Use $project-dossier to turn a repository into a fact-locked profile dossier."
