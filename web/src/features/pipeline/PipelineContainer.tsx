@@ -24,6 +24,8 @@ import {
 import { useBulkAction } from "@/features/board/use-bulk-action";
 import { useSelection } from "@/features/board/use-selection";
 import { useBulkRun } from "@/features/runs/use-bulk-run";
+import { LaunchDialog } from "@/features/runs/LaunchDialog";
+import { useApprovedLaunchJobs } from "@/features/runs/use-approved-launch-jobs";
 import { emptyFilterState } from "@/lib/filters/types";
 
 import { PipelineStageSection } from "./PipelineStageSection";
@@ -43,6 +45,7 @@ function pipelineFilter() {
 export function PipelineContainer() {
   const [filter, setFilter] = useState(pipelineFilter);
   const [targetStatus, setTargetStatus] = useState("approved");
+  const [launchMode, setLaunchMode] = useState<"tailor" | "coverLetter" | null>(null);
   const [params, setParams] = useSearchParams();
   const [openStages, setOpenStages] = useState(() =>
     openStagesFromParam(params.get("stage")),
@@ -53,6 +56,7 @@ export function PipelineContainer() {
   const { reconcile } = selection;
   const bulk = useBulkAction("pipeline");
   const runs = useBulkRun();
+  const launchJobs = useApprovedLaunchJobs(launchMode !== null);
 
   useEffect(() => {
     reconcile(rows.map((row) => row.jobId), total);
@@ -110,11 +114,11 @@ export function PipelineContainer() {
         sub="Every job by pipeline stage, with its tailored PDF, review critiques, and your application status."
       />
       <div className="mb-5 flex flex-wrap gap-2 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
-        <Button variant="outline" size="sm" onClick={runs.tailorApproved}>
-          Tailor approved
+        <Button variant="outline" size="sm" onClick={() => setLaunchMode("tailor")}>
+          Tailor approved…
         </Button>
-        <Button variant="outline" size="sm" onClick={runs.coverLettersApproved}>
-          Cover letters (approved)
+        <Button variant="outline" size="sm" onClick={() => setLaunchMode("coverLetter")}>
+          Cover letters…
         </Button>
       </div>
       <MetricRow
@@ -216,6 +220,22 @@ export function PipelineContainer() {
         </>
       )}
       {openId && <JobModal jobId={Number(openId)} onClose={closeJob} />}
+      <LaunchDialog
+        mode={launchMode ?? "tailor"}
+        jobs={launchJobs.jobs}
+        open={launchMode !== null}
+        isLoading={launchJobs.isLoading}
+        error={launchJobs.error}
+        onRetry={() => void launchJobs.retry()}
+        onOpenChange={(open) => {
+          if (!open) setLaunchMode(null);
+        }}
+        onLaunch={(jobIds, deep) =>
+          launchMode === "coverLetter"
+            ? runs.coverLettersSelected(jobIds)
+            : runs.tailorSelected(jobIds, deep)
+        }
+      />
     </>
   );
 }

@@ -32,6 +32,32 @@ const pipelineItem = (jobId: number, status: string, title: string) => ({
 });
 
 describe("PipelineContainer", () => {
+  it("opens tailoring with the complete approved-job query", async () => {
+    const requestedStatuses: Array<string | null> = [];
+    server.use(
+      http.get("/api/pipeline", ({ request }) => {
+        const status = new URL(request.url).searchParams.get("status");
+        requestedStatuses.push(status);
+        const approved = status === "approved";
+        return HttpResponse.json({
+          data: approved ? [pipelineItem(7, "approved", "Platform Engineer")] : [],
+          pagination: { page: 1, pageSize: 200, totalItems: approved ? 1 : 0, totalPages: 1 },
+          facets: { status: { approved: 1 } },
+          total: approved ? 1 : 0,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    wrap(<PipelineContainer />);
+    await screen.findByText("No jobs in the pipeline");
+
+    await user.click(screen.getByRole("button", { name: /tailor approved/i }));
+
+    expect(await screen.findByRole("heading", { name: "Tailor resumes" })).toBeInTheDocument();
+    expect(await screen.findByRole("checkbox", { name: /Platform Engineer/ })).toBeChecked();
+    expect(requestedStatuses).toContain("approved");
+  });
+
   it("groups cards by stage", async () => {
     server.use(
       http.get("/api/pipeline", () =>
