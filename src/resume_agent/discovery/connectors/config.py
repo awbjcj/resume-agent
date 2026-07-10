@@ -12,6 +12,7 @@ class GreenhouseBoard(ExtensibleModel):
     token: str
     company: str | None = None
     enabled: bool = True
+    limit: int | None = Field(default=None, ge=1)
 
     def display(self) -> str:
         return self.company or self.token
@@ -26,6 +27,7 @@ class LeverBoard(ExtensibleModel):
     token: str
     company: str | None = None
     enabled: bool = True
+    limit: int | None = Field(default=None, ge=1)
 
     def display(self) -> str:
         return self.company or self.token
@@ -39,20 +41,24 @@ class LeverConfig(ExtensibleModel):
 class AdzunaConfig(ExtensibleModel):
     enabled: bool = False
     country: str = "us"
+    limit: int | None = Field(default=None, ge=1)
 
 
 class RemoteOKConfig(ExtensibleModel):
     enabled: bool = False
+    limit: int | None = Field(default=None, ge=1)
 
 
 class LinkedInConfig(ExtensibleModel):
     enabled: bool = False
+    limit: int | None = Field(default=None, ge=1)
 
 
 class CompanyUrl(ExtensibleModel):
     url: str
     enabled: bool = True
     label: str | None = None
+    limit: int | None = Field(default=None, ge=1)
 
 
 class CompaniesConfig(ExtensibleModel):
@@ -71,6 +77,7 @@ class ScrapeTarget(ExtensibleModel):
     url: str
     enabled: bool = True
     label: str | None = None
+    limit: int | None = Field(default=None, ge=1)
 
     @field_validator("url")
     @classmethod
