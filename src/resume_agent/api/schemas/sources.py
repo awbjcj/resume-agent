@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pydantic import Field
+
 from resume_agent.api.schemas.base import CamelModel
 
 
@@ -13,6 +15,7 @@ class SourceOut(CamelModel):
     enabled: bool
     pullable: bool
     detail: str
+    limit: int | None = None
 
 
 class SourcePreviewIn(CamelModel):
@@ -35,5 +38,6 @@ class AddSourceIn(CamelModel):
     label: str | None = None
 
 
-class SetEnabledIn(CamelModel):
-    enabled: bool
+class SourcePatchIn(CamelModel):
+    enabled: bool | None = None
+    limit: int | None = Field(default=None, ge=1)

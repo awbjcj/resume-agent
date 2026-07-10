@@ -8,7 +8,7 @@ from resume_agent.api.deps import get_settings_dep
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.sources import (
     AddSourceIn,
-    SetEnabledIn,
+    SourcePatchIn,
     SourceOut,
     SourcePreviewIn,
     SourcePreviewOut,
@@ -19,8 +19,8 @@ from resume_agent.services.sources import (
     add_source,
     list_sources,
     preview_source,
+    patch_source,
     remove_source,
-    set_source_enabled,
 )
 
 router = APIRouter()
@@ -49,9 +49,12 @@ def add_source_route(body: AddSourceIn):
 
 
 @router.patch("/sources/{source_id}", response_model=SourceOut)
-def set_enabled_route(source_id: str, body: SetEnabledIn):
+def patch_source_route(source_id: str, body: SourcePatchIn):
+    changes = body.model_dump(exclude_unset=True)
+    if not changes:
+        raise ApiException(400, "VALIDATION_ERROR", "Provide enabled and/or limit.")
     return SourceOut.model_validate(
-        _guard(lambda: set_source_enabled(source_id, body.enabled))
+        _guard(lambda: patch_source(source_id, **changes))
     )
 
 
