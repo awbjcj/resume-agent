@@ -8,7 +8,49 @@ import { Switch } from "@/components/ui/switch";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
 import { useRunStore, type PullRunResult } from "@/lib/runs/store";
 import { AddSourceDialog } from "./AddSourceDialog";
-import { useRemoveSource, useSetEnabled, useSources, type Source } from "./use-sources";
+import {
+  useRemoveSource,
+  useSetEnabled,
+  useSetSourceLimit,
+  useSources,
+  type Source,
+} from "./use-sources";
+
+function LimitInput({ source }: { source: Source }) {
+  const setLimit = useSetSourceLimit();
+  const canonicalValue = source.limit == null ? "" : String(source.limit);
+  const [value, setValue] = useState(canonicalValue);
+
+  const commit = () => {
+    const parsed = value.trim() === "" ? null : Number(value);
+    if (parsed !== null && (!Number.isInteger(parsed) || parsed < 1)) {
+      setValue(canonicalValue);
+      return;
+    }
+    if (parsed === source.limit) return;
+    setLimit.mutate(
+      { id: source.id, limit: parsed },
+      { onError: () => setValue(canonicalValue) },
+    );
+  };
+
+  return (
+    <input
+      type="number"
+      min={1}
+      inputMode="numeric"
+      className="h-7 w-16 rounded border bg-transparent px-1.5 text-right text-xs"
+      placeholder="—"
+      aria-label={`Per-pull job limit for ${source.displayName}`}
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 function SourceRow({
   source,
@@ -26,7 +68,7 @@ function SourceRow({
 
   return (
     <li
-      className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b py-3 last:border-b-0 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto_auto]"
+      className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b py-3 last:border-b-0 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto_auto_auto]"
       aria-disabled={pullDisabled}
     >
       <Checkbox
@@ -42,6 +84,7 @@ function SourceRow({
         </div>
       </div>
       <Badge variant={source.pullable ? "outline" : "secondary"}>{source.kind}</Badge>
+      <LimitInput key={source.limit ?? "none"} source={source} />
       <Switch
         size="sm"
         aria-label={`Enable ${source.displayName}`}

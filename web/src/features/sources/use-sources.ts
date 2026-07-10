@@ -10,6 +10,7 @@ export type Source = {
   enabled: boolean;
   pullable: boolean;
   detail: string;
+  limit: number | null;
 };
 
 export type Preview = {
@@ -52,6 +53,20 @@ export function useSetEnabled() {
         api.PATCH("/api/sources/{source_id}", {
           params: { path: { source_id: id } },
           body: { enabled },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sources"] }),
+  });
+}
+
+export function useSetSourceLimit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, limit }: { id: string; limit: number | null }) =>
+      unwrap(
+        api.PATCH("/api/sources/{source_id}", {
+          params: { path: { source_id: id } },
+          body: { limit },
         }),
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sources"] }),
