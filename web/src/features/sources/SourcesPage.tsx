@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Play, Trash2 } from "lucide-react";
 
-import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -248,12 +247,13 @@ export function SourcesManager() {
 
 export function SourcesPage() {
   return (
-    <div>
-      <PageHeader
-        kicker="Sources"
-        title="Recurring job sources"
-        sub="Manage the boards, careers pages, and feeds that supply the pull pipeline."
-      />
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-lg font-semibold">Sources</h1>
+        <p className="text-sm text-muted-foreground">
+          The boards, careers pages, and feeds that supply the pull pipeline.
+        </p>
+      </header>
       <SourcesManager />
     </div>
   );
