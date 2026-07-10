@@ -146,11 +146,12 @@ host suffix), `tenant` +
 
 `CompaniesConnector.fetch` delegates to the `harvest` seam: for each URL in
 `self.urls` it calls `detect_ats`, looks up the backend in `_BACKENDS`, and calls
-`backend(target, search, limit, skip_seen)`. Any URL that fails detection or whose backend
+`backend(target, search, effective_limit, skip_seen)`. Each `CompanyUrl.limit`
+overrides the global per-unit fallback. Any URL that fails detection or whose backend
 raises `httpx.HTTPError` / a parse error is recorded on the returned
 `FetchResult.failures` (url → reason) — it never aborts the run. The relevance
-gate `harvest` runs over the union is the backstop for backends that don't filter
-server-side.
+gate and cap run per URL; the union is not capped, so one prolific board cannot
+consume another URL's budget.
 
 To add a new backend: write `fetch_<name>(target, search, limit, skip_seen=None) -> list[RawJob]`
 in a new module, add detection logic to `detect.py`, register in `_BACKENDS`.
@@ -164,7 +165,7 @@ single enumeration of connector kinds; adding an ATS appends one `ConnectorSpec`
 Workday boards can have thousands of global listings — pulling all then gating
 locally is infeasible.
 
-1. **POST** `…/wday/cxs/{tenant}/{site}/jobs` with `{"searchText": ..., "limit": 20, "offset": N}` — paginated list, title + location only.
+1. **POST** `…/wday/cxs/{tenant}/{site}/jobs` with `{"searchText": ..., "limit": 20, "offset": N, "appliedFacets": ...}` — paginated list, title + location only. Location facets are tenant-resolved and cached when every configured location matches; misses stay unfaceted.
 2. **`title_relevance_gate`** prunes the list _before_ any detail fetch.
 3. **GET** `…/wday/cxs/{tenant}/{site}{externalPath}` for each survivor → `jobPostingInfo.jobDescription` (HTML → text via `html_to_text`).
 
@@ -198,8 +199,8 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation                                                                                   |
 | `src/resume_agent/discovery/scraper/dashboard.py`    | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/`                                                    |
 | `src/resume_agent/discovery/connectors/workday.py`   | Workday CXS list → gate → detail                                                                                          |
-| `src/resume_agent/discovery/connectors/tesla.py`     | Tesla bespoke JSON portal                                                                                                 |
-| `src/resume_agent/discovery/connectors/google.py`    | Google Careers JSON API                                                                                                   |
+| `src/resume_agent/discovery/connectors/tesla.py`     | Tesla visible-browser portal: state capture + same-origin detail fetches                                                  |
+| `src/resume_agent/discovery/connectors/google.py`    | Google Careers results-page `AF_initDataCallback` parser (list-only)                                                      |
 | `src/resume_agent/discovery/connectors/text.py`      | Relevance gates + `html_to_text`                                                                                          |
 | `src/resume_agent/discovery/connectors/runner.py`    | Pull orchestration: concurrent fetch (bounded by `pull_concurrency`), serial canonical-order ingest, `+N added` telemetry |
 | `src/resume_agent/concurrency.py`                    | `gather_isolated` — ordered, error-isolated async fan-out                                                                 |
@@ -224,11 +225,22 @@ aggressiveness determines how many detail fetches are issued.
   dedup_key, and keyless-fingerprint branches (URL match exempt). Multi-location
   same-title requisitions are sibling rows sharing a dedup_key. See
   `docs/adr/0001-dedup-key-plus-location-guard.md`.
-- **Workday `appliedFacets` not used.** v1 shapes requests with `searchText` only. Location/category
-  facet IDs are tenant-specific (require a separate facets call) and are a later refinement.
-- **Tesla/Google endpoints are reverse-engineered.** They have no public API contract and could change
-  without notice. Each is isolated to its own module behind `_BACKENDS`; a parse failure records to
-  `.failures` and never aborts the pull.
+- **Workday sends location facets when safely resolvable.** The first plain page's
+  location facet descriptors are matched case-insensitively against every configured
+  `search.yaml` location, then cached under `data/workday_facets/{tenant}-{site}.json`.
+  Partial/malformed matches, cache failures, and empty faceted restarts fall back to
+  searchText-only paging. Category/job-family facets remain out of scope.
+- **Tesla/Google portals are reverse-engineered.** Google's `ds:1`
+  `AF_initDataCallback` carries complete list rows and full JDs; a missing or malformed
+  jobs callback raises a per-URL parse failure. Tesla's API is Akamai-gated, so one
+  visible `TeslaPortal` captures state and performs same-origin detail fetches. A
+  companies connector containing Tesla opts out of concurrent fetch and is serialized
+  with other visible-browser connectors by the pull runner. Either portal can change
+  without notice, but its failure never aborts other company URLs.
+- **Limits are per source unit.** Every board, careers URL, aggregator, and scrape
+  target can set an optional positive `limit` in `connectors.yaml` or Source Manager.
+  The global `--limit` is the per-unit fallback; `harvest` gates, skips known rows, and
+  caps each unit independently, never the union.
 - **Adzuna enrichment needs a real (non-headless) browser.** The API returns only a truncated snippet,
   and `redirect_url` is a bot-gated `/land/ad/` click-tracker — bare `httpx` gets `403` and _headless_
   Chromium is challenged ("suspicious behaviour"); only a non-headless browser follows the redirect to
