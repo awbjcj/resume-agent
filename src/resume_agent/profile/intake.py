@@ -8,7 +8,7 @@ import tempfile
 from collections.abc import Callable, Iterable
 from ipaddress import ip_address
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 
@@ -37,11 +37,18 @@ def _resolve_host(host: str) -> set[str]:
     }
 
 
-def _public_url(url: str, resolver: Resolver) -> str:
+def _resolve_public_host(url: str, resolver: Resolver) -> tuple[str, str, int | None]:
+    """Validate scheme/host/credentials and pin one globally-routable address.
+
+    DNS is resolved exactly once per hop here; the caller must connect to the
+    returned ``pinned_ip`` directly (never re-resolve ``host``) or a second,
+    attacker-controlled DNS answer (rebinding) can steer the real request at
+    a private address after this check passed.
+    """
     try:
         parsed = urlsplit(url)
         host = parsed.hostname
-        _ = parsed.port  # force validation of a malformed/out-of-range port
+        port = parsed.port  # also validates a malformed/out-of-range port
     except ValueError as error:
         raise ValueError("a public HTTP(S) URL is required") from error
     if (
@@ -63,12 +70,17 @@ def _public_url(url: str, resolver: Resolver) -> str:
     if not addresses:
         raise ValueError(f"could not resolve public HTTP host {host!r}")
     try:
-        resolved = [ip_address(address) for address in addresses]
+        resolved = sorted((address, ip_address(address)) for address in addresses)
     except ValueError as error:
         raise ValueError("a public HTTP(S) URL is required") from error
-    if any(not address.is_global for address in resolved):
+    if any(not parsed_ip.is_global for _address, parsed_ip in resolved):
         raise ValueError("a public HTTP(S) URL is required")
-    return url
+    return host, resolved[0][0], port
+
+
+def _pin_authority(host: str, port: int | None) -> str:
+    literal = f"[{host}]" if ":" in host else host
+    return f"{literal}:{port}" if port is not None else literal
 
 
 def _stage_and_add(profile_dir: str | Path, filename: str, body: str) -> SourceDoc:
@@ -95,8 +107,19 @@ def _fetch_text(
 ) -> tuple[str, str]:
     current = url
     for redirect_count in range(_MAX_REDIRECTS + 1):
-        _public_url(current, resolver)
-        with client.stream("GET", current, follow_redirects=False) as response:
+        host, pinned_ip, port = _resolve_public_host(current, resolver)
+        parsed = urlsplit(current)
+        pinned_url = urlunsplit(
+            (parsed.scheme, _pin_authority(pinned_ip, port), parsed.path, parsed.query, "")
+        )
+        request = client.build_request(
+            "GET",
+            pinned_url,
+            headers={"Host": _pin_authority(host, port)},
+            extensions={"sni_hostname": host},
+        )
+        response = client.send(request, stream=True, follow_redirects=False)
+        try:
             if response.status_code in _REDIRECTS:
                 location = response.headers.get("location")
                 if not location or redirect_count == _MAX_REDIRECTS:
@@ -124,6 +147,8 @@ def _fetch_text(
                 response.encoding or "utf-8",
                 errors="replace",
             )
+        finally:
+            response.close()
     raise ValueError("too many URL redirects")
 
 

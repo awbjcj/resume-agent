@@ -81,6 +81,29 @@ def test_add_url_source_rejects_unsafe_targets_without_request(tmp_path, url):
     http.close()
 
 
+def test_add_url_source_pins_the_validated_address_against_dns_rebinding(tmp_path):
+    """The real request must hit the resolver's validated IP, never re-resolve
+    the hostname — otherwise a second (attacker-controlled) DNS answer for the
+    same hostname could rebind the connection to a private address after the
+    public-IP check already passed."""
+    profile_dir = profile(tmp_path)
+    seen_hosts: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_hosts.append(request.url.host)
+        assert request.headers["host"] == "example.com"
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            text="<title>Pinned</title><p>Body text.</p>",
+        )
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    add_url_source(profile_dir, "https://example.com/page", client=http, resolver=public_ips)
+    assert seen_hosts == ["93.184.216.34"]
+    http.close()
+
+
 def test_add_url_source_rejects_redirect_to_private_address(tmp_path):
     profile_dir = profile(tmp_path)
     calls = 0
