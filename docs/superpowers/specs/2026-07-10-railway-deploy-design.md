@@ -21,6 +21,8 @@ the API only via the OpenAPI contract) but ship as **one** Railway service.
 | Browser connectors | Disabled in cloud via a `browser_enabled` flag; per-URL failure reasons, never a crash. Local CLI keeps full capability. |
 | Data seed / backup | Authenticated admin export/import endpoints (tar.gz of the data root). |
 | Deploys | GitHub auto-deploy from `main` via Dockerfile. |
+| Data custody | The cloud instance owns the Data root (see ADR 0002). Local browser pulls use the **Round-trip pull**: export → local CLI pull against the snapshot → import back, no cloud mutations in between. |
+| Secrets | Split: **Platform secrets** (AUTH_*, SESSION_SECRET, API_TOKEN, BROWSER_ENABLED) live in Railway env vars; **Operational secrets** (LLM keys, GitHub, Adzuna, LinkedIn) are managed via the existing web Secrets page onto the volume's `.env`. Nothing is shadowed because the two sets are disjoint. |
 
 Out of scope (explicitly): multi-user tenancy, Postgres migration, object
 storage, hybrid local-browser-to-cloud sync (possible phase 2), OAuth.
@@ -83,6 +85,14 @@ guard (keeping its name so all router registrations in `app.py` are untouched):
 
 CSRF: same-origin SPA + `SameSite=Lax` cookie + no cross-site consumers =
 accepted risk for a single-user tool; documented here, no CSRF token machinery.
+
+The SPA shell (static JS, `index.html`) stays public — only `/api` is guarded.
+The shell contains no data; gating it would break the login-page bootstrap for
+zero protection.
+
+Rotation: changing `SESSION_SECRET` invalidates all sessions (the cookie is
+stateless HMAC). Changing the password does not kill existing sessions by
+itself — accepted for one user, documented rather than engineered around.
 
 SSE (`EventSource`) and `<a>` downloads send cookies automatically on same
 origin, so the `?token=` query fallback is no longer needed by the web client
@@ -152,14 +162,24 @@ New router `api/routers/admin.py`, guarded like every other router:
 
 - `GET /api/admin/export` — streams `resume-agent-data-<date>.tar.gz` of the
   data root (which, per §3, contains DB, profile, config, output, .env).
-  Serves as both the seed extractor and the ongoing backup mechanism (manual
-  or a scheduled `curl` from the owner's machine).
+  The WAL-mode SQLite file is NOT tar'd live: export snapshots it with the
+  SQLite backup mechanism (`VACUUM INTO` a temp file) and tars the snapshot in
+  the DB's place, so the archive never contains a torn `.db`/`-wal` pair.
+  Refuses with 409 while any run is active (file artifacts mid-write).
+  Serves as seed extractor, backup mechanism, and the first leg of the
+  Round-trip pull. **The archive contains Operational secrets (`.env`) — treat
+  backups as secret material.**
 - `POST /api/admin/import?confirm=REPLACE` — accepts the same tar.gz
   (multipart), refuses with 409 while any run is active (`RunManager` state),
   refuses without the literal `confirm=REPLACE`, extracts to a temp dir with
   path-traversal guards (reject absolute paths / `..` members), then swaps it
   into place and disposes the SQLAlchemy engine so the new DB file is picked
   up. Destructive by design; the confirm param and auth guard are the safety.
+
+Round-trip pull (the browser-connector workflow, per ADR 0002): export the
+root → unpack locally → run the CLI browser pull against the snapshot →
+import back. Safe because ingest dedupe makes equal-tier re-pulls no-ops;
+the one rule is no cloud mutations between export and re-import.
 
 Seed workflow: deploy → login → `python scripts/pack_data.py` locally (tars
 `data/`, `config/`, `output/`, `.env` into the volume layout) → one `curl`
@@ -170,10 +190,12 @@ upload.
 - Railway service connected to the GitHub repo, auto-deploy on push to `main`,
   Dockerfile builder. Config-as-code in `railway.json` (builder, healthcheck
   path `/api/health`, restart policy).
-- Env vars on Railway: `ANTHROPIC_API_KEY` (+ other provider keys as used),
-  `AUTH_USERNAME`, `AUTH_PASSWORD_HASH`, `SESSION_SECRET`, optional
-  `API_TOKEN`, `BROWSER_ENABLED=false`, `DB_URL` (only if diverging from
-  default). `PORT` is Railway-injected.
+- Env vars on Railway = Platform secrets only: `AUTH_USERNAME`,
+  `AUTH_PASSWORD_HASH`, `SESSION_SECRET`, optional `API_TOKEN`,
+  `BROWSER_ENABLED=false`, `DB_URL` (only if diverging from default). `PORT`
+  is Railway-injected. Operational secrets (LLM/GitHub/Adzuna/LinkedIn keys)
+  are entered through the web Secrets page after first login and live on the
+  volume's `.env` — the two sets are disjoint, so nothing is shadowed.
 - Domain: Railway-provided subdomain initially; custom domain later is a
   dashboard-only change (cookie settings don't care — same origin either way).
 - Long ops need no worker service: RunManager threadpool + SSE already run
@@ -203,12 +225,15 @@ All offline, in the existing suite style (no network, no browser):
 
 - **Single replica + SQLite**: no HA, no managed backups. Mitigated by the
   export endpoint; accepted for a personal tool.
-- **Secrets edited via web UI** write `.env` on the volume, but Railway env
-  vars shadow them — a value set in both places follows the platform var.
-  Documented behavior, not a bug to fix.
-- **Browser connectors in cloud**: permanently degraded by design; the local
-  CLI remains the path for Tesla/Adzuna-enriched/LinkedIn pulls. A phase-2
-  "local pull → cloud ingest" sync endpoint is the upgrade path if this
-  becomes annoying.
+- **Secrets split relies on discipline**: pydantic-settings gives real env
+  vars precedence over `.env`, so setting an Operational secret as a Railway
+  var would silently shadow the web editor. The split (Platform vars vs
+  volume `.env`) keeps the sets disjoint by policy, not by mechanism.
+- **Exports contain Operational secrets** (`.env` travels with the root) —
+  backups are secret material.
+- **Browser connectors in cloud**: permanently degraded by design; the
+  Round-trip pull (export → local CLI pull → import, no cloud mutations in
+  between; ADR 0002) is the workflow for Tesla/Adzuna-enriched/LinkedIn. A
+  phase-2 merge-ingest endpoint is the upgrade path if this becomes annoying.
 - **`?token=` in access logs**: pre-existing trade-off; now mostly obsolete
   for the web client once cookies land.

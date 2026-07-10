@@ -192,6 +192,38 @@ optional `evidence` sidecar (synthesis only), and optional verification `drops`.
 `Produced` in `profile/fragments.py`.
 _Avoid_: extraction result, payload
 
+## Deployment & data custody
+
+**Data root**:
+The single mutable filesystem tree an instance owns — jobs DB, profile corpus,
+runs, mutable config, renders, secrets file. The unit of custody: export and
+import move it whole, never a slice. Exactly one instance is authoritative for
+a data root at a time (the deployed instance, once one exists).
+_Avoid_: data dir (that names a path, not the custody unit), workspace
+
+**Round-trip pull**:
+The sanctioned path for browser-requiring connectors once the cloud instance
+owns the Data root: export the root, run the local browser pull against the
+snapshot, import it back — without mutating the cloud in between. Re-pulls are
+safe because ingest dedupe makes equal-tier duplicates no-ops.
+_Avoid_: sync (nothing merges; the whole root moves), hybrid pull
+
+**Platform secret**:
+Configuration the app cannot manage for itself because it gates getting in or
+booting at all — the owner's login credentials, the session signing key, the
+static API token, capability flags. Lives with the platform (deploy-time env),
+never in the Data root, so it survives a root replace and cannot be locked
+away by the thing it unlocks.
+_Avoid_: system secret, infra config
+
+**Operational secret**:
+A credential the app spends while doing its work — LLM provider keys, GitHub
+token, Adzuna keys, LinkedIn login. Managed through the web Secrets page,
+stored in the Data root, and therefore travels with an export: a backup of the
+root is itself secret material.
+_Avoid_: app secret (too close to Platform secret to scan well), API key (one
+kind, not the category)
+
 ## Board & shortlist filtering
 
 **Board seam**:
