@@ -112,7 +112,9 @@ def add_job_from_url(
     """Fetch a posting URL, auto-extract fields, and add it. Returns None when deduped."""
     try:
         raw = job_from_url(
-            url, agent=build_url_extract_agent(), allow_browser=allow_browser
+            url,
+            agent=build_url_extract_agent(),
+            allow_browser=allow_browser and get_settings().browser_enabled,
         )
     except (httpx.HTTPError, PlaywrightError) as exc:
         raise UrlFetchError(f"Couldn't fetch {url}: {exc}") from exc
@@ -202,6 +204,13 @@ def scrape_linkedin_jobs(
     reporter: ProgressReporter | None = None,
 ) -> LinkedInScrapeResult:
     """Scrape LinkedIn in a visible browser and ingest all fetched postings."""
+    if not get_settings().browser_enabled:
+        return {
+            "added": 0,
+            "failures": {
+                "linkedin": "requires a local browser (browser_enabled=false)"
+            },
+        }
     search_config = load_search_config(search_path)
     connector = build_linkedin_scraper()
     if reporter is not None:

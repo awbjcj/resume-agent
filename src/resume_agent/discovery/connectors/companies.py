@@ -40,6 +40,10 @@ class UnsupportedAts(Exception):
         self.ats = ats
 
 
+class BrowserRequired(Exception):
+    """The detected backend requires a local browser disabled on this instance."""
+
+
 # Adapters: thin, late-bound wrappers so each backend stays monkeypatchable at the
 # module seam and shares one dispatch shape:
 # (target, search, limit, skip_seen) -> RawJob[]. Single-shot backends ignore
@@ -136,6 +140,8 @@ def _failure_reason(exc: Exception) -> str | None:
         return "no known ATS detected"
     if isinstance(exc, UnsupportedAts):
         return f"{exc.ats.title()} recognized, not yet supported"
+    if isinstance(exc, BrowserRequired):
+        return "requires a local browser (browser_enabled=false)"
     if isinstance(exc, httpx.HTTPError):
         return board_error(exc)
     if isinstance(exc, (ValueError, KeyError, TypeError, AttributeError)):
@@ -148,7 +154,13 @@ class CompaniesConnector:
 
     name = "companies"
 
-    def __init__(self, urls: list[CompanyUrl | str]):
+    def __init__(
+        self,
+        urls: list[CompanyUrl | str],
+        *,
+        browser_enabled: bool = True,
+    ):
+        self.browser_enabled = browser_enabled
         self.urls = [
             CompanyUrl(url=entry) if isinstance(entry, str) else entry for entry in urls
         ]
@@ -156,7 +168,7 @@ class CompaniesConnector:
     @property
     def concurrent_fetch(self) -> bool:
         """Serialize this connector with other browser users when Tesla is present."""
-        return not any(
+        return not self.browser_enabled or not any(
             (target := identify_host(entry.url)) is not None and target.ats == "tesla"
             for entry in self.urls
         )
@@ -191,5 +203,7 @@ class CompaniesConnector:
         backend = _BACKENDS.get(target.ats)
         if backend is None:
             raise UnsupportedAts(target.ats)
+        if target.ats == "tesla" and not self.browser_enabled:
+            raise BrowserRequired
         effective_limit = entry.limit if entry.limit is not None else limit
         return backend(target, search, effective_limit, skip_seen=skip_seen)

@@ -3,7 +3,7 @@ from typing import Any, Callable
 
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.adzuna import AdzunaConnector
-from resume_agent.discovery.connectors.base import Connector
+from resume_agent.discovery.connectors.base import Connector, FetchResult
 from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import ConnectorsConfig
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
@@ -12,6 +12,22 @@ from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
 from resume_agent.discovery.connectors.sources import company_url_id, scrape_target_id
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
+
+_BROWSER_DISABLED = "requires a local browser (browser_enabled=false)"
+
+
+class _BrowserDisabledConnector:
+    concurrent_fetch = True
+
+    def __init__(self, name: str, failure_keys: list[str]):
+        self.name = name
+        self.failure_keys = failure_keys
+
+    def fetch(self, search, limit=None, skip_seen=None) -> FetchResult:
+        return FetchResult(
+            jobs=[],
+            failures={key: _BROWSER_DISABLED for key in self.failure_keys},
+        )
 
 
 @dataclass(frozen=True)
@@ -63,7 +79,9 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         units=lambda c: [
             ConnectorUnit(company_url_id(e.url), e.enabled, e) for e in c.companies.urls
         ],
-        build=lambda payloads, c, s: CompaniesConnector(payloads),
+        build=lambda payloads, c, s: CompaniesConnector(
+            payloads, browser_enabled=s.browser_enabled
+        ),
     ),
     ConnectorSpec(
         kind="scrape",
@@ -71,7 +89,13 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         units=lambda c: [
             ConnectorUnit(scrape_target_id(t.url), t.enabled, t) for t in c.scrape.targets
         ],
-        build=lambda payloads, c, s: DashboardScraper(payloads),
+        build=lambda payloads, c, s: (
+            DashboardScraper(payloads)
+            if s.browser_enabled
+            else _BrowserDisabledConnector(
+                "scrape", [target.url for target in payloads]
+            )
+        ),
     ),
     ConnectorSpec(
         kind="remoteok",
@@ -90,6 +114,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
             s.adzuna_app_key,
             c.adzuna.country,
             configured_limit=c.adzuna.limit,
+            enrich_details=s.browser_enabled,
         ),
         pullable=lambda s: bool(s.adzuna_app_id and s.adzuna_app_key),
     ),
@@ -97,8 +122,10 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         kind="linkedin",
         section_enabled=lambda c: c.linkedin.enabled,
         units=lambda c: [ConnectorUnit("linkedin", c.linkedin.enabled, None)],
-        build=lambda payloads, c, s: build_linkedin_scraper(
-            configured_limit=c.linkedin.limit
+        build=lambda payloads, c, s: (
+            build_linkedin_scraper(configured_limit=c.linkedin.limit)
+            if s.browser_enabled
+            else _BrowserDisabledConnector("linkedin", ["linkedin"])
         ),
     ),
 )

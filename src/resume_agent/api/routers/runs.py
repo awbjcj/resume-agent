@@ -236,6 +236,8 @@ def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manage
 def _linkedin_ready() -> bool:
     """Return whether credentials or a persisted browser profile are available."""
     settings = get_settings()
+    if not getattr(settings, "browser_enabled", True):
+        return True
     if settings.linkedin_email.strip() and settings.linkedin_password:
         return True
     if not settings.linkedin_user_data_dir:
