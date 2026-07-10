@@ -5,7 +5,7 @@ import type { FilterState } from "@/lib/filters/types";
 
 export function QuickFilters({ onApply }: { onApply: (patch: Partial<FilterState>) => void }) {
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         Quick prune
       </span>

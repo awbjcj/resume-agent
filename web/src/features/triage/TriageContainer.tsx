@@ -71,12 +71,6 @@ export function TriageContainer() {
         title="Triage Desk"
         sub="Raw and rejected jobs before the shortlist. Archive noise, delete dead-ends, prune in bulk."
       />
-      <div className="mb-5 inline-flex items-center gap-3 rounded-lg border bg-card px-4 py-3 shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
-        <Switch id="show-archived" checked={archived} onCheckedChange={setArchived} />
-        <Label htmlFor="show-archived" className="text-sm font-medium">
-          Show archived
-        </Label>
-      </div>
       <MetricRow
         items={[
           ["Loaded", rows.length.toLocaleString()],
@@ -84,7 +78,16 @@ export function TriageContainer() {
         ]}
       />
       <FilterDesk filter={filter} facets={facets} total={total} onChange={setFilter} />
-      <QuickFilters onApply={(patch) => setFilter({ ...filter, ...patch })} />
+      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <Switch id="show-archived" checked={archived} onCheckedChange={setArchived} />
+          <Label htmlFor="show-archived" className="text-sm font-medium">
+            Show archived
+          </Label>
+        </div>
+        <span aria-hidden className="h-4 w-px bg-border" />
+        <QuickFilters onApply={(patch) => setFilter({ ...filter, ...patch })} />
+      </div>
       {!rows.length ? (
         <EmptyState
           title="Nothing to triage"
