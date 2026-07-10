@@ -82,7 +82,12 @@ def resolve_location_facets(
             matching = {
                 index
                 for index, location in enumerate(wanted)
-                if location in haystack or haystack in location
+                if location == haystack
+                or (
+                    len(location) >= 3
+                    and len(haystack) >= 3
+                    and (location in haystack or haystack in location)
+                )
             }
             if not matching:
                 continue

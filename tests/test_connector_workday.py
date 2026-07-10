@@ -1,4 +1,6 @@
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 
@@ -14,6 +16,11 @@ from resume_agent.discovery.connectors.workday import (
 from resume_agent.discovery.search_config import SearchConfig
 
 TARGET = AtsTarget("workday", tenant="acme", datacenter="wd5", site="Careers")
+FACETED_PAGE = json.loads(
+    (Path(__file__).parent / "fixtures" / "workday" / "faceted-page.json").read_text(
+        encoding="utf-8"
+    )
+)
 
 LIST_PAGE = {
     "total": 2,
@@ -186,3 +193,135 @@ def test_apply_detail_updates_company_name(monkeypatch):
     assert row.company == "acme"
     apply_detail(row, {**DETAIL, "jobPostingInfo": {**DETAIL["jobPostingInfo"], "companyName": "Acme Corp"}})
     assert row.company == "Acme Corp"
+
+
+def test_resolve_location_facets_matches_location_descriptors():
+    assert workday.resolve_location_facets(FACETED_PAGE, ["Austin, TX"]) == {
+        "locations": ["loc-austin"]
+    }
+
+
+def test_resolve_location_facets_requires_every_requested_location():
+    assert workday.resolve_location_facets(
+        FACETED_PAGE, ["Austin, TX", "Boston, MA"]
+    ) == {}
+
+
+def test_resolve_location_facets_ignores_non_location_facets():
+    assert workday.resolve_location_facets(FACETED_PAGE, ["Engineering"]) == {}
+    assert workday.resolve_location_facets(FACETED_PAGE, []) == {}
+
+
+def test_resolve_location_facets_rejects_short_ambiguous_substrings():
+    """A 2-letter wanted location must not fuzzy-match an unrelated descriptor
+    just because it happens to appear inside it (e.g. "us" inside "Austin")."""
+    assert workday.resolve_location_facets(FACETED_PAGE, ["us"]) == {}
+
+
+def test_facet_cache_roundtrip_and_location_invalidation(tmp_path):
+    applied = {"locations": ["loc-austin"]}
+    workday.save_cached_facets(TARGET, ["Austin, TX"], applied, base_dir=tmp_path)
+    assert workday.load_cached_facets(
+        TARGET, ["Austin, TX"], base_dir=tmp_path
+    ) == applied
+    assert (
+        workday.load_cached_facets(TARGET, ["Detroit, MI"], base_dir=tmp_path)
+        is None
+    )
+
+
+def test_fetch_workday_resolves_then_restarts_with_facets(monkeypatch, tmp_path):
+    bodies = []
+
+    def fake_post(url, json, timeout):
+        bodies.append(json)
+        return _Resp(FACETED_PAGE)
+
+    monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", lambda url, timeout: _Resp(DETAIL))
+    jobs = workday.fetch_workday(
+        TARGET,
+        SearchConfig(locations=["Austin, TX"]),
+        facets_dir=tmp_path,
+    )
+    assert bodies == [
+        {
+            "appliedFacets": {},
+            "limit": 20,
+            "offset": 0,
+            "searchText": "",
+        },
+        {
+            "appliedFacets": {"locations": ["loc-austin"]},
+            "limit": 20,
+            "offset": 0,
+            "searchText": "",
+        },
+    ]
+    assert [job.title for job in jobs] == ["Software Engineer"]
+
+
+def test_fetch_workday_cached_miss_stays_plain(monkeypatch, tmp_path):
+    bodies = []
+    workday.save_cached_facets(TARGET, ["Boston, MA"], {}, base_dir=tmp_path)
+
+    def fake_post(url, json, timeout):
+        bodies.append(json)
+        return _Resp(FACETED_PAGE)
+
+    monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", lambda url, timeout: _Resp(DETAIL))
+    jobs = workday.fetch_workday(
+        TARGET,
+        SearchConfig(locations=["Boston, MA"]),
+        facets_dir=tmp_path,
+    )
+    assert len(bodies) == 1
+    assert bodies[0]["appliedFacets"] == {}
+    assert len(jobs) == 1
+
+
+def test_fetch_workday_empty_faceted_restart_reuses_plain_page(
+    monkeypatch, tmp_path
+):
+    bodies = []
+
+    def fake_post(url, json, timeout):
+        bodies.append(json)
+        if json["appliedFacets"]:
+            return _Resp({"total": 0, "jobPostings": []})
+        return _Resp(FACETED_PAGE)
+
+    monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", lambda url, timeout: _Resp(DETAIL))
+    jobs = workday.fetch_workday(
+        TARGET,
+        SearchConfig(locations=["Austin, TX"]),
+        facets_dir=tmp_path,
+    )
+    assert len(bodies) == 2
+    assert [job.title for job in jobs] == ["Software Engineer"]
+    assert workday.load_cached_facets(
+        TARGET, ["Austin, TX"], base_dir=tmp_path
+    ) == {}
+
+
+def test_fetch_workday_cache_write_failure_falls_back_plain(monkeypatch, tmp_path):
+    blocking_file = tmp_path / "not-a-directory"
+    blocking_file.write_text("x", encoding="utf-8")
+    bodies = []
+
+    def fake_post(url, json, timeout):
+        bodies.append(json)
+        return _Resp(FACETED_PAGE)
+
+    monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", lambda url, timeout: _Resp(DETAIL))
+    jobs = workday.fetch_workday(
+        TARGET,
+        SearchConfig(locations=["Austin, TX"]),
+        facets_dir=blocking_file,
+    )
+    assert len(bodies) == 1
+    assert bodies[0]["appliedFacets"] == {}
+    assert len(jobs) == 1
