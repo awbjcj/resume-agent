@@ -63,7 +63,10 @@ class Connector(Protocol):
     name: str
     # Whether fetch() may run on a worker thread alongside other connectors.
     # Browser-driven connectors opt out; they are serialized among themselves.
-    concurrent_fetch: bool = True
+    @property
+    def concurrent_fetch(self) -> bool:
+        """Whether this connector may fetch alongside other connectors."""
+        ...
 
     def fetch(
         self,
