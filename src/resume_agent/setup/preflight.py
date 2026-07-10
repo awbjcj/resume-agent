@@ -9,6 +9,7 @@ _EXAMPLES = (
     "connectors.yaml.example",
     "profile_sources.yaml.example",
     "review.yaml.example",
+    "review_deep.yaml.example",
     "render.yaml.example",
 )
 

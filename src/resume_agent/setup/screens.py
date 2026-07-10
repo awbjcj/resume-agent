@@ -536,6 +536,7 @@ _PLANNED_FILES = (
     ("config/search.yaml", "search criteria"),
     ("config/connectors.yaml", "connectors"),
     ("config/review.yaml", "review roster (from example)"),
+    ("config/review_deep.yaml", "deep review roster (from example)"),
     ("config/render.yaml", "render settings (from example)"),
 )
 

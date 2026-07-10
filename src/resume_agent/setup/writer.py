@@ -36,7 +36,7 @@ def _env_content(state: WizardState, root: Path) -> str:
 
 
 def atomic_write_all(state: WizardState, root: str | Path = ".") -> dict[str, str]:
-    """Write .env + the five config files, each atomically. Returns per-file status.
+    """Write .env + the six config files, each atomically. Returns per-file status.
 
     Content is generated lazily per file so a generator failure (e.g. a missing
     ``.example`` scaffold) degrades to a per-file ``"error: ..."`` status rather
@@ -49,6 +49,7 @@ def atomic_write_all(state: WizardState, root: str | Path = ".") -> dict[str, st
         root / "config" / "search.yaml": lambda: build_search(state),
         root / "config" / "connectors.yaml": lambda: build_connectors(state),
         root / "config" / "review.yaml": lambda: render_from_example(root / "config" / "review.yaml.example"),
+        root / "config" / "review_deep.yaml": lambda: render_from_example(root / "config" / "review_deep.yaml.example"),
         root / "config" / "render.yaml": lambda: render_from_example(root / "config" / "render.yaml.example"),
     }
     report: dict[str, str] = {}

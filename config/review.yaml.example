@@ -1,9 +1,14 @@
-# Reviewer roster, weights, and loop controls (see design spec §5.3).
+# Fast review roster (default): fact-check gate + one merged advisory call.
+# For the full multi-round panel use --deep / review_deep.yaml.
 # Each reviewer's `model_tier` (cheap | mid | premium) resolves to the matching
 # CHEAP_MODEL / MID_MODEL / PREMIUM_MODEL in .env, so a tier inherits whatever
 # LLM provider that model id names (bare = Anthropic; openai:/gemini:/deepseek:).
-max_rounds: 3
+max_rounds: 2
+early_stop_on_regression: true
 score_threshold: 85
+merged_advisory: true
+tailor_tier: mid
+reviser_tier: mid
 style_guide_path: config/style_guide.md
 reviewers:
   - name: fact-check
@@ -21,7 +26,7 @@ reviewers:
   - name: hiring-manager
     gate: false
     weight: 1
-    model_tier: premium
+    model_tier: mid
   - name: concision
     gate: false
     weight: 1

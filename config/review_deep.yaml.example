@@ -1,0 +1,31 @@
+# Full review roster: legacy five-reviewer, three-round behavior.
+# Each model_tier resolves through CHEAP_MODEL / MID_MODEL / PREMIUM_MODEL.
+max_rounds: 3
+score_threshold: 85
+style_guide_path: config/style_guide.md
+reviewers:
+  - name: fact-check
+    gate: true
+    weight: 0
+    model_tier: premium
+  - name: ats-keyword
+    gate: false
+    weight: 1
+    model_tier: mid
+  - name: recruiter
+    gate: false
+    weight: 1
+    model_tier: mid
+  - name: hiring-manager
+    gate: false
+    weight: 1
+    model_tier: premium
+  - name: concision
+    gate: false
+    weight: 1
+    model_tier: mid
+
+length_budget:
+  max_experiences: 4
+  max_bullets_per_role: 5
+  target_total_bullets: 20

@@ -105,7 +105,8 @@ def test_render_from_example_review_round_trips(tmp_path):
     assert [r.name for r in cfg.reviewers] == [
         "fact-check", "ats-keyword", "recruiter", "hiring-manager", "concision"
     ]
-    assert cfg.max_rounds == 3
+    assert cfg.max_rounds == 2
+    assert cfg.merged_advisory is True
 
 
 def test_render_from_example_render_round_trips(tmp_path):
