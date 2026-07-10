@@ -10,5 +10,13 @@ export function useBulkRun() {
       launch("coverLetter", () =>
         unwrap(api.POST("/api/cover-letters", { body: { approved: true } })),
       ),
+    tailorSelected: (jobIds: number[], deep: boolean) =>
+      launch("tailor", () =>
+        unwrap(api.POST("/api/tailor", { body: { jobIds, deep } })),
+      ),
+    coverLettersSelected: (jobIds: number[]) =>
+      launch("coverLetter", () =>
+        unwrap(api.POST("/api/cover-letters", { body: { jobIds } })),
+      ),
   };
 }

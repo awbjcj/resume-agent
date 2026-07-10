@@ -11,9 +11,9 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe("useBulkRun", () => {
-  it("exposes tailorApproved and coverLettersApproved callables", () => {
+  it("exposes selected-job launchers", () => {
     const { result } = renderHook(() => useBulkRun(), { wrapper });
-    expect(typeof result.current.tailorApproved).toBe("function");
-    expect(typeof result.current.coverLettersApproved).toBe("function");
+    expect(typeof result.current.tailorSelected).toBe("function");
+    expect(typeof result.current.coverLettersSelected).toBe("function");
   });
 });
