@@ -1,6 +1,6 @@
 # Skill Groups + Eval Anchoring Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** Implement this plan in-line, task-by-task, with red/green/refactor TDD. Do not delegate plan tasks to subagents. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a fine-grained `group` axis to the skill matrix (fixed 13-slug vocabulary, incremental LLM assignment, override-able), surface it over the API and on the Profile settings page, then anchor the never-run resume eval baseline in one live sitting.
 
@@ -15,8 +15,59 @@
 - API wire format camelCase; schema changes require `bash scripts/gen_ts_client.sh` + green `tests/api/test_openapi_contract.py`
 - Group slugs are validated against the fixed vocabulary everywhere they enter (classifier output, taxonomy file load, overrides); unknown slugs drop, they never propagate
 - `matrix.json` is derived — no migration; rows gain groups on the next build
-- Task 7 is a **LIVE CHECKPOINT** (needs `ANTHROPIC_API_KEY`, spends tokens); Tasks 1–6 must land offline-green first
+- Task 8 is a **LIVE CHECKPOINT** (needs a configured provider key and spends tokens); Tasks 1–7 must land offline-green first
 - Spec: `docs/superpowers/specs/2026-07-10-skill-groups-design.md`
+
+## Correctness Amendments (normative)
+
+These amendments override any conflicting illustrative snippet below.
+
+1. **Scope the taxonomy to the active data root.** `DEFAULT_GROUPS_PATH` remains
+   the default for direct callers, but profile-build and match-gap call sites derive
+   `<data-root>/taxonomy/skill_groups.json` from their injected `profile_dir` /
+   `facts_path`. Tests must never write the repository's real `data/taxonomy` tree.
+2. **Normalize, validate, merge, and atomically persist.** Loads and saves normalize
+   token keys, drop empty/non-string entries and unknown slugs, preserve established
+   assignments (first writer wins), re-read persisted state under an in-process lock,
+   and use a unique sibling temp file plus `os.replace`. Invalid JSON is treated as an
+   empty map; an interrupted write must not corrupt the durable taxonomy.
+3. **Validate classifier echoes exactly.** A response token is accepted only when its
+   raw value is byte-for-byte present in that batch; normalization must not turn an
+   altered or invented echo into an accepted token. `batch_size` must be positive,
+   duplicate assignments are deterministic, unknown slugs drop, and missing/failed
+   assignments remain absent so they retry on the next build.
+4. **Validate every matrix entry point.** `MatrixRow.group`, taxonomy loads, and
+   `Overrides.group` all discard unknown slugs. Overrides are normalized and win over
+   taxonomy values. `overrides.group` is deliberately *not* added to
+   `override_tokens`: the group axis must not expand or mutate match-gap canonical
+   taxonomy, and a group override for a skill absent from facts must not create a row.
+5. **Keep the API rooted and self-describing.** `GET /api/profile/matrix` reads
+   `<request.app.state.data_dir>/profile/matrix.json`, not a process-global path. The
+   response includes ordered `{slug, label}` group definitions from `SKILL_GROUPS` in
+   addition to rows, so the web app does not duplicate the vocabulary. Missing or
+   corrupt matrix data returns `200` with the vocabulary and an empty row list.
+6. **Use generated web types and complete query states.** The matrix hook derives its
+   types from the regenerated OpenAPI schema. The panel uses existing shadcn
+   primitives and the repository's visual language, renders loading, error/retry, and
+   empty states, keeps `Other` visible and last, and is keyboard/screen-reader legible.
+   Do not return `null` for loading or silently collapse fetch errors.
+7. **Regenerate every checked-in contract copy.** API changes update
+   `contracts/openapi.json`, `contracts/ts/api.ts`, and
+   `web/src/lib/api/schema.ts`; on Windows use the repository's direct generation flow
+   if the CRLF-sensitive bash wrapper fails.
+8. **Use focused checks until the final gate.** Each task runs only the smallest red /
+   green test and scoped lint needed to prove it. Full Python, web, lint, contract,
+   and build verification runs once after implementation and again only after a
+   behavior-affecting review refactor.
+9. **Anchor current eval state, do not duplicate it.** The cover-letter baseline is
+   already recorded in `evals/RESULTS.md` at
+   `evals/reports/2026-07-cl-baseline.json`; verify its prompt hash but do not rerun or
+   overwrite it. Task 8 establishes the canonical resume baseline. If an existing
+   current-schema resume report has the same case set, judge model, and prompt hash,
+   it may be promoted to the canonical dated artifact; otherwise run one live resume
+   sitting when a configured provider key is available. Measure missing assignments
+   separately from explicit `other` assignments: missing should be near zero after a
+   successful sitting, while the `other` share is the vocabulary-quality signal.
 
 ## File Structure
 
@@ -912,9 +963,9 @@ git commit -m "Documents the skill-group taxonomy axis"
 
 ---
 
-### Task 8: LIVE CHECKPOINT — anchor the eval baselines and groups
+### Task 8: LIVE CHECKPOINT — anchor the resume baseline and populate groups
 
-**Needs `ANTHROPIC_API_KEY`; spends tokens. Do not run in CI.**
+**Needs a provider key for the configured models; spends tokens. Do not run in CI.**
 
 **Files:**
 
@@ -945,12 +996,11 @@ path. No gate — this is the reference point future prompt changes diff against
 resume-agent profile build
 ```
 
-Then verify: `python -c "import json; rows=json.load(open('data/profile/matrix.json'))['rows']; ungrouped=[r['key'] for r in rows if not r.get('group')]; print(len(rows), 'rows,', len(ungrouped), 'ungrouped:', ungrouped[:10])"`
-
-Acceptance: ungrouped share under ~30% of rows. If it is higher, inspect the
-ungrouped tokens — systematic misses (e.g. a whole family the vocabulary lacks)
-go back as `overrides.yaml` `group:` entries or an instruction tweak; scattered
-one-offs are fine, they are what "Other" is for.
+Then inspect both failure and vocabulary signals: count rows with no group
+(classification did not land) separately from rows explicitly assigned to
+`other`. Acceptance after a successful live build: missing assignments are near
+zero; inspect an `other` share above ~30% for a systematic vocabulary or prompt
+gap. Durable one-off corrections belong in `overrides.yaml` `group:` entries.
 
 - [ ] **Step 4: Commit the artifacts**
 
@@ -966,8 +1016,10 @@ git commit -m "Records the live resume eval baseline"
 - [ ] `.venv/Scripts/python.exe -m pytest -q` — full suite PASS (offline; Tasks 1–7)
 - [ ] `ruff check` — clean
 - [ ] `cd web && npx vitest run` — web suite PASS
+- [ ] `cd web && npm run lint && npm run build` — lint + production build PASS
+- [ ] `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -q` — contract drift PASS
 - [ ] `git diff main -- contracts/` shows only the `/api/profile/matrix` addition
-- [ ] Use superpowers:requesting-code-review before merging
+- [ ] Complete an in-line five-axis self-review and simplification pass before handoff
 
 ## Self-review notes (already applied)
 

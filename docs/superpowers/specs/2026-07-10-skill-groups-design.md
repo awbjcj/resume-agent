@@ -46,6 +46,10 @@ slugs.
 - **Durable taxonomy file:** `data/taxonomy/skill_groups.json` mapping
   canonical skill token → group slug. Loaded/merged/saved like the ClusterMap
   (first-writer-wins on merge; unknown slugs dropped on load).
+  Runtime call sites resolve this path from the active injected data root; tests
+  and alternate app data directories must not fall back to the repository's
+  production `data/` tree. Writes normalize keys, validate values, merge with
+  the latest persisted state, and use an atomic sibling replace.
 - **Incremental classification:** during matrix build, the delta = matrix row
   keys not present in the taxonomy file. Only the delta is sent to the LLM
   (cheap tier), sharded into batches, mirroring the
@@ -59,26 +63,37 @@ slugs.
   precedence position as the existing `category` override. Durable
   corrections belong in `data/profile/overrides.yaml`, consistent with the
   "profile rebuilds regenerate inferred skills" design note.
+- Group overrides do not participate in match-gap canonicalization and cannot
+  create matrix rows. They only decorate rows already derived from profile
+  facts; this keeps the display axis isolated from dynamic match-gap taxonomy.
 - **MatrixRow:** gains `group: str | None = None` (slug; `None` renders as
   `other`). `matrix.json` is a derived artifact — no migration; rows gain
   groups on the next `profile build`.
 
 ## 3. Surfacing
 
-- The profile/matrix API schema exposes `group` (camelCase, additive);
+- The profile/matrix API schema exposes `group` (camelCase, additive) and the
+  ordered slug/label vocabulary used to render it, keeping the backend as the
+  single source of truth for display order and labels. The route resolves the
+  matrix from the request's configured data root and returns an empty row list
+  plus the vocabulary before the first successful build;
   `bash scripts/gen_ts_client.sh` regenerates the contract and the OpenAPI
   drift gate stays green.
 - The Profile skills page groups rows by group (section headers or filter
   chips, matching the page's existing filter idiom), with `other` last and
-  visible so coverage gaps are inspectable.
+  visible so coverage gaps are inspectable. Loading, fetch-error/retry, and
+  empty states are explicit and accessible.
 
 ## 4. Live eval anchoring (checkpoint)
 
-A **LIVE CHECKPOINT** task at the end of the implementation plan (requires
-`ANTHROPIC_API_KEY`, spends tokens):
+A **LIVE CHECKPOINT** task at the end of the implementation plan (requires a
+configured provider key and spends tokens):
 
-- Run the resume eval sitting (`make eval` / `evals/run_eval.py`) and the
-  cover-letter sitting (`evals/run_cl_eval.py`) once against the live judge.
+- The cover-letter baseline already exists at
+  `evals/reports/2026-07-cl-baseline.json`; verify its recorded prompt hash and
+  preserve it. Run the resume eval sitting (`make eval` /
+  `evals/run_eval.py`) once against the live judge unless a current-schema
+  artifact already matches the current case set, judge model, and prompt hash.
 - Record scores + judge prompt hashes in `evals/RESULTS.md` and a dated report
   under `evals/reports/`, establishing the anchored baseline the
   agent-quality roadmap has been missing.

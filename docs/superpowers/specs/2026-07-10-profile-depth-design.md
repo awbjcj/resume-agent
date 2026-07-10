@@ -71,11 +71,20 @@ schema, same `AgentRunner` seam):
 - Fragment caching, meta files, and staleness reuse the existing walk; the
   project-mode meta records its own prompt version
   (`project_prompt_version`) so prompt bumps invalidate only project fragments.
+- The project extraction boundary is closed even though the repository's general
+  fact models preserve forward-compatible extras: undeclared project-document
+  sections are rejected, nested Project/Skill values are projected back to their
+  declared fields, GitHub-origin facts are marked `source=github`, and uploaded
+  dossier facts are marked `source=manual` before deterministic fact ids are
+  assigned.
 
 ### Merge identity
 
 The fragment's `Project` and the metadata `Project` (from `repo_to_project`)
-unify on `repo_url` (fallback: normalized repo name):
+unify on normalized `repo_url` (HTTPS and SSH GitHub remote forms, optional
+`.git`, case, and trailing slash normalize identically; fallback: normalized
+repo name). This identity rule applies while merging literal/project/synthesis
+fragments as well as during metadata enrichment:
 
 - Metadata side fills: `stars`, `forks`, `languages` (byte-weighted full list),
   `topics`, `last_updated`, `is_fork`, `primary_language`, `homepage_url`.
@@ -87,7 +96,9 @@ unify on `repo_url` (fallback: normalized repo name):
 ### Repo selection
 
 - Default: skip forks, skip archived repos, skip repos containing none of the
-  target docs.
+  target docs. Deny always wins. Allowlisted repos bypass fork/archive filters
+  and are prioritized before the bounded newest-repo selection, so a
+  "force-include" cannot be dropped by the cap.
 - Order: newest `pushed_at` first; cap at a configurable limit (default 20).
 - Profile config (config store, `profile` section) gains:
   `github_repo_allow` (force-include, e.g. an authored fork),
@@ -98,12 +109,15 @@ unify on `repo_url` (fallback: normalized repo name):
 - One root contents-listing call; case-insensitive match on:
   `README*` (any extension, incl. `readme.txt`), `CLAUDE.md`, `CONTEXT.md`,
   `AGENT.md`, `AGENTS.md`.
-- Each file truncated at ~30 KB before concatenation.
+- Each file is truncated at 30,000 UTF-8 bytes before concatenation, without
+  splitting a code point; the combined virtual document is also bounded.
 - `GET /repos/{owner}/{repo}/languages` → full language byte map.
 - The virtual doc is deterministic markdown: a header block (repo name, url,
   languages, topics, stars) followed by each harvested file under a labelled
   heading. Deterministic bytes ⇒ unchanged repos produce identical files ⇒
-  fragment-cache hits ⇒ steady-state LLM cost ≈ 0.
+  fragment-cache hits ⇒ steady-state LLM cost ≈ 0. Files, topics, and languages
+  are sorted deterministically, GitHub-safe repo filename characters are
+  preserved to avoid slug collisions, and writes use atomic sibling replace.
 
 ### Sync timing
 
@@ -160,6 +174,10 @@ unify on `repo_url` (fallback: normalized repo name):
   published articles, online resumes.
 - Both create ordinary manifest entries (`origin="upload"`, `mode="literal"`)
   and need no new merge machinery.
+- URL ingestion is a network security boundary: it accepts only credential-free
+  public HTTP(S) targets, rejects non-public resolved addresses, revalidates
+  redirects, bounds redirects and response bytes, and accepts readable text
+  content types only. A failed fetch never registers a source.
 
 ## 6. Error handling
 
@@ -197,6 +215,11 @@ unify on `repo_url` (fallback: normalized repo name):
 - `add_source` frontmatter sniffing → `mode="project"` default.
 - Notes/URL endpoints + CLI; OpenAPI contract regen
   (`tests/api/test_openapi_contract.py` drift gate).
+- Run tracking: standalone GitHub sync is tracked through the existing run/SSE
+  surface; the web source list invalidates when that run completes, not merely
+  when the `202` launch response arrives.
+- Settings: repo allow/deny/limit are editable on the Profile settings page and
+  share the same typed/bounded contract used by API, service, and CLI.
 
 ## 9. Out of scope
 

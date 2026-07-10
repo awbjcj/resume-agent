@@ -1,6 +1,6 @@
 # Profile Depth Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** Implement this plan in-line, task-by-task, with red/green/refactor TDD. Do not delegate plan tasks to subagents. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deepen the profile build: GitHub repos become project-mode corpus source docs (auto-harvested root docs, superseded by skill-generated dossiers), plus quick-add note and URL intake — so tailoring has rich, fact-locked project/skill material.
 
@@ -20,6 +20,73 @@
 - GitHub harvest defaults: skip forks/archived/doc-less repos, newest `pushed_at` first, limit 20, per-file cap 30,000 chars.
 - Network failures degrade to `BuildReport.warnings`; a build never fails because GitHub is down.
 - Commit after each task with a conventional-commit message.
+
+## Correctness Amendments (normative)
+
+These amendments override any conflicting illustrative snippet below.
+
+1. **Treat the new source modes as typed boundaries.** API schemas and form
+   parameters use `SourceMode` / `SourceOrigin`, not unconstrained strings.
+   Dossier sniffing accepts only a leading, UTF-8 frontmatter block with a valid
+   public `http`/`https` repository URL. Dedupe preserves the existing source's
+   ownership; a GitHub sync must never silently retag an upload-origin document.
+2. **Make project extraction structurally closed.** `ProjectDocFacts` forbids
+   undeclared top-level fields, and conversion rebuilds nested `Project` and `Skill`
+   values from declared model fields so `ExtensibleModel(extra="allow")` cannot
+   smuggle employment-like extras into `facts.json`. Auto-harvested facts are marked
+   `Source.github`; dossier-upload facts are `Source.manual`. Tests must prove foreign
+   fields are rejected/stripped and no employment, education, or certification data
+   reaches `ProfileFacts`.
+3. **Use repository identity throughout every merge.** Normalize GitHub HTTPS and
+   SSH remote forms (case, trailing slash, optional `.git`) and use normalized
+   `repo_url` before normalized name in `merge_fragments`, synthesis-project merges,
+   and GitHub metadata enrichment. Update lookup indexes after appending. The result
+   is one Project per repository even when a resume, dossier, and metadata use
+   different display names.
+4. **Validate GitHub responses and manage client ownership.** Paginate repository
+   listing, validate external JSON shapes/types before use, URL-encode content paths,
+   and close only clients created by the application. `github_repo_allow` is truly
+   force-include: allowlisted repos bypass fork/archive filters and are prioritized so
+   the cap cannot silently exclude them; deny still wins. `github_repo_limit` is
+   bounded to `1..100` at API, service, and CLI boundaries.
+5. **Harvest deterministically and atomically.** Preserve GitHub-safe repo filename
+   characters to avoid slug collisions, sort topics/files/languages, enforce the
+   30,000-byte cap without splitting UTF-8, bound the combined virtual document, and
+   write with a unique sibling temp file plus `os.replace`. A changed registered
+   virtual doc keeps its stable source id and is observed as source-changed by the
+   fragment walk. Local dossier supersession is applied even when a later remote call
+   is rate-limited; early rate limits never delete unrelated cached GitHub docs.
+6. **Degrade only expected external failures.** GitHub HTTP/transport, decoding, and
+   malformed-payload failures become `BuildReport.warnings` or per-repo failures;
+   programming errors are not hidden behind blanket `except Exception`. Cached
+   virtual docs remain usable when the network is down.
+7. **Harden URL intake against SSRF and oversized/binary responses.** Accept only
+   public `http`/`https` targets with no credentials, resolve and reject loopback,
+   private, link-local, multicast, reserved, and unspecified addresses, revalidate
+   every redirect, cap redirect count and response bytes, and accept readable text
+   content types only. Tests cover direct private targets and redirects to private
+   targets. API input uses a bounded HTTP URL type; failures create no manifest entry.
+8. **Track asynchronous GitHub sync to completion.** The web action uses the existing
+   run tracker (`github-sync`) and invalidates `profile-sources` only when the run
+   reaches a terminal state. It shows pending state and preserves note/URL form input
+   on mutation failure. Note and URL intake use separate accessible shadcn forms with
+   explicit labels, validation, and loading states; project/GitHub rows stay read-only.
+9. **Expose all profile config controls.** Profile settings includes repo allow, deny,
+   and limit fields, with comma-separated lists normalized on save and a numeric
+   `1..100` limit. API, web, service, and CLI use the same contract.
+10. **Regenerate every checked-in contract copy.** API changes update
+    `contracts/openapi.json`, `contracts/ts/api.ts`, and
+    `web/src/lib/api/schema.ts`; on Windows use the direct generator path if the
+    CRLF-sensitive bash wrapper fails.
+11. **Keep intermediate verification focused.** Replace task-local full-suite commands
+    with the smallest failing/passing test plus scoped lint. Run full Python, web,
+    contract, lint, and production-build gates after both plans are implemented, and
+    rerun affected gates after review refactors.
+12. **Create and validate the dossier skill with the skill tooling.** Initialize the
+    `project-dossier` skill at the plan's specified `.claude/skills/` location, keep
+    its instructions concise and evidence-first, validate its folder with
+    `quick_validate.py`, and do not forward-test with subagents (explicitly prohibited
+    for this implementation).
 
 ---
 
