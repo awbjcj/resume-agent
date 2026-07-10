@@ -193,8 +193,11 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/llm_runner.py`                     | `build_model` provider seam + `AgentRunner` adapter                                                                       |
 | `src/resume_agent/profile/corpus.py`                 | Source registry: manifest + add/remove + legacy migration                                                                 |
 | `src/resume_agent/profile/matrix.py`                 | Derived skill matrix + overrides (ban/alias/forbid/category)                                                              |
+| `src/resume_agent/taxonomy/groups.py`                | Skill-group vocabulary + durable token-to-group taxonomy + delta classifier                                               |
 | `src/resume_agent/profile/synthesis.py`              | Verified synthesis: deck → excerpt-backed facts (synthesize → verify → one repair round)                                  |
-| `src/resume_agent/profile/fragments.py`              | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis), concurrent per-doc production   |
+| `src/resume_agent/profile/fragments.py`              | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis, project), concurrent production  |
+| `src/resume_agent/profile/github_harvest.py`          | Deterministic GitHub project-source selection, materialization, supersession, and cleanup                                  |
+| `src/resume_agent/profile/project_extractor.py`       | Project-only structured extraction that cannot emit employment or education facts                                        |
 | `src/resume_agent/discovery/connectors/detect.py`    | ATS detection (singleton → L1 → L2)                                                                                       |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation                                                                                   |
 | `src/resume_agent/discovery/scraper/dashboard.py`    | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/`                                                    |
@@ -212,6 +215,23 @@ aggressiveness determines how many detail fetches are issued.
 
 ## Known design notes
 
+- **Skill groups are a derived display axis.** `MatrixRow.group` comes from the
+  active data root's `taxonomy/skill_groups.json` (token → slug, fixed 13-slug
+  vocabulary in `taxonomy/groups.py`). Profile builds classify only missing
+  tokens with the cheap tier; failed batches remain absent and retry on the next
+  build. Match-gap refreshes apply the saved map without an LLM, and
+  `overrides.yaml`'s `group:` map wins. Groups never alter `facts.json` or the
+  hard/soft/domain categories used by fact-lock; unassigned rows render as Other.
+- **GitHub depth is two-tier; dossiers win.** `profile/github_harvest.py` writes
+  qualifying repositories' root docs (README files plus CLAUDE, CONTEXT, and
+  AGENTS markdown, capped at 30 KB per file) as deterministic
+  `sources/github--<repo>.md` documents with `origin="github"` and
+  `mode="project"` during build phase 0 and `profile sync-github`. A markdown
+  upload with `repo_url:` frontmatter, such as output from
+  `.claude/skills/project-dossier`, supersedes the auto-document for the same
+  normalized repository URL. `project_extractor.py` can emit exactly one Project
+  plus skills, never Experience or Education. GitHub failures become build
+  warnings; rate-limited harvests stop early without deleting existing sources.
 - **Profile rebuilds regenerate inferred skills.** `profile build` strips and re-derives
   all `inferred=true` skills; durable corrections belong in `data/profile/overrides.yaml`,
   not hand-edits to facts.json.
