@@ -43,6 +43,21 @@ api.use({
   },
 });
 
+api.use({
+  onResponse({ request, response }) {
+    const path = new URL(request.url).pathname;
+    if (
+      response.status === 401 &&
+      path !== "/api/auth/login" &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/login"
+    ) {
+      window.location.assign("/login");
+    }
+    return response;
+  },
+});
+
 type ErrorEnvelope = { error?: { code: string; message: string; details?: unknown } };
 
 /** Unwrap an openapi-fetch result, throwing the API error-envelope message. */

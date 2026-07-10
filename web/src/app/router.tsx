@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "./AppLayout";
 import { BoardSkeleton } from "@/components/skeletons";
 import { SetupGate } from "@/features/setup/SetupGate";
+import { AuthGate } from "@/features/auth/AuthGate";
 
 // Route-level code-splitting: each page (and its heavy deps, e.g. recharts in
 // Analytics) becomes its own chunk, keeping the initial bundle small.
@@ -87,13 +88,17 @@ const SourcesStep = lazy(() =>
 const FinishStep = lazy(() =>
   import("@/features/setup/FinishStep").then((m) => ({ default: m.FinishStep })),
 );
+const LoginPage = lazy(() =>
+  import("@/features/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
+);
 
 const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}</Suspense>;
 
 export const router = createBrowserRouter([
+  { path: "/login", element: page(<LoginPage />) },
   {
     path: "/",
-    element: <SetupGate><AppLayout /></SetupGate>,
+    element: <AuthGate><SetupGate><AppLayout /></SetupGate></AuthGate>,
     children: [
       { index: true, element: page(<DashboardPage />) },
       { path: "shortlist", element: page(<ShortlistPage />) },
@@ -121,7 +126,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/setup",
-    element: page(<SetupWizard />),
+    element: <AuthGate>{page(<SetupWizard />)}</AuthGate>,
     children: [
       { index: true, element: page(<SetupIndexRedirect />) },
       { path: "keys", element: page(<KeysStep />) },

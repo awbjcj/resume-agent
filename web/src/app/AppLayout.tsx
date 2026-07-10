@@ -31,6 +31,7 @@ import { RunPanel } from "@/features/runs/RunPanel";
 import { useRehydrateRuns } from "@/features/runs/use-rehydrate-runs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationsBell } from "@/features/notifications/NotificationsBell";
+import { LogoutButton } from "@/features/auth/LogoutButton";
 
 const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
   { to: "/", label: "Dashboard", end: true, icon: LayoutDashboard },
@@ -125,6 +126,7 @@ export function AppLayout() {
             <RunActions />
             <NotificationsBell />
             <ThemeToggle />
+            <LogoutButton />
           </div>
         </header>
         <RunPanel />
