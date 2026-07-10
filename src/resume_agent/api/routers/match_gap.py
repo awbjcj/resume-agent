@@ -15,6 +15,7 @@ from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
 from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.profile.matrix import (
+    apply_skill_groups,
     build_matrix,
     effective_cluster_map,
     load_overrides,
@@ -24,6 +25,7 @@ from resume_agent.profile.matrix import (
 from resume_agent.profile.store import load_facts
 from resume_agent.services.suggestions import suggestion_statuses
 from resume_agent.taxonomy.clusters import load_cluster_map
+from resume_agent.taxonomy.groups import group_map_path, load_group_map
 from resume_agent.tracking.match_gap import build_demand_graph, profile_skill_tokens
 
 router = APIRouter()
@@ -101,6 +103,11 @@ def refresh_match_gap_clusters(
         matrix = build_matrix(
             facts,
             load_cluster_map(_CLUSTER_PATH),
+            overrides,
+        )
+        apply_skill_groups(
+            matrix,
+            load_group_map(group_map_path(facts_path.parent)),
             overrides,
         )
         save_matrix(matrix, facts_path.with_name("matrix.json"))

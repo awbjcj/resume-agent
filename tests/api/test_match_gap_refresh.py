@@ -19,6 +19,7 @@ from resume_agent.tracking.canonicalize import (
 )
 from resume_agent.tracking.repository import save_job
 from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.taxonomy.groups import group_map_path, save_group_map
 
 
 class _AsyncCanonicalizer:
@@ -141,6 +142,10 @@ def test_refresh_regenerates_matrix_from_bound_facts(monkeypatch, tmp_path):
         skills={"Platforms": [Skill(name="Kubernetes", aliases=["k8s"])]},
     )
     save_facts(facts, facts_path)
+    save_group_map(
+        {"kubernetes": "cloud-infra"},
+        group_map_path(facts_path.parent),
+    )
 
     app = create_app(db_url="sqlite://")
     with TestClient(app) as client:
@@ -150,4 +155,6 @@ def test_refresh_regenerates_matrix_from_bound_facts(monkeypatch, tmp_path):
 
     assert record["state"] == "done"
     assert record["result"]["matrixRegenerated"] is True
-    assert load_matrix(tmp_path / "matrix.json") is not None
+    matrix = load_matrix(tmp_path / "matrix.json")
+    assert matrix is not None
+    assert matrix.rows[0].group == "cloud-infra"
