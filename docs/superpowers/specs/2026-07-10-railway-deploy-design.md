@@ -70,8 +70,9 @@ New module `api/auth.py`:
   `Secure`, `SameSite=Lax`, `Path=/`. A fixed per-process delay on failed
   attempts (e.g. 1s sleep) is sufficient throttling for one account.
 - `POST /api/auth/logout` — clears the cookie.
-- `GET /api/auth/me` — 200 `{username}` with a valid session, 401 otherwise.
-  Unguarded by the main dependency (it *is* the check).
+- `GET /api/auth/me` — always 200 `{username: string|null, authRequired: bool}`.
+  It is unguarded by the main dependency and acts as the SPA's state probe,
+  avoiding a 401 redirect loop while still exposing no protected data.
 
 Guard change in `api/deps.py` — `require_token` becomes the single combined
 guard (keeping its name so all router registrations in `app.py` are untouched):
@@ -107,8 +108,8 @@ Frontend (`web/`):
 - No token storage in JS — the cookie is HttpOnly.
 
 `refresh_app_settings` (`api/deps.py:54`) must preserve the resolved auth
-fields the same way it preserves `api_token`, so a web-settings save cannot
-lock the owner out mid-session.
+fields and `browser_enabled` the same way it preserves `api_token`, so a
+web-settings save cannot lock the owner out or re-enable browsers in cloud.
 
 ## 3. Persistence — one volume, four mutable paths
 
@@ -142,7 +143,8 @@ When false:
   instead of launching a portal. Existing per-URL fail isolation in
   `companies.py` makes this a natural fit.
 - **Scrape connector / learned recipes** (`scraper/dashboard.py`) and the
-  **LinkedIn scraper**: same failure treatment at the connector level.
+  **LinkedIn scraper**: same failure treatment at the connector level; they
+  stay visible in pull results rather than disappearing as non-pullable.
 - **URL-ingest browser fallback** (`url_ingest/browser.py`): HTTP fetch still
   runs; the browser fallback step is skipped with a clear error if the HTTP
   path fails.
@@ -172,9 +174,12 @@ New router `api/routers/admin.py`, guarded like every other router:
 - `POST /api/admin/import?confirm=REPLACE` — accepts the same tar.gz
   (multipart), refuses with 409 while any run is active (`RunManager` state),
   refuses without the literal `confirm=REPLACE`, extracts to a temp dir with
-  path-traversal guards (reject absolute paths / `..` members), then swaps it
-  into place and disposes the SQLAlchemy engine so the new DB file is picked
-  up. Destructive by design; the confirm param and auth guard are the safety.
+  path-traversal guards (reject absolute paths / `..` members and special
+  files), rejects empty/no-file archives, then performs a rollback-safe
+  same-volume child swap. `/app/data` is the mounted volume root and cannot
+  itself be renamed. The SQLAlchemy engine is rebound even if import fails so
+  rollback state remains usable. Destructive by design; the confirm param,
+  auth guard, staging, and rollback are the safety.
 
 Round-trip pull (the browser-connector workflow, per ADR 0002): export the
 root → unpack locally → run the CLI browser pull against the snapshot →

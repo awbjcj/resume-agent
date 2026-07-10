@@ -20,6 +20,54 @@
 - No business logic in routers — routers adapt; policy lives in `services/` or the module the task creates.
 - Session-auth tests MUST build their client as `TestClient(app, base_url="https://testserver")` — the session cookie is `Secure`, and httpx will not send Secure cookies back over plain `http://testserver`.
 
+## Correctness Amendments (authoritative)
+
+These amendments override conflicting snippets below. They reconcile the plan
+with the approved design, current repository contracts, and the failure modes
+of a mounted Railway volume.
+
+1. **Make credential checks timing-uniform.** Login always computes
+   `verify_password()` and compares usernames with `hmac.compare_digest()`;
+   never short-circuit password hashing when the username is wrong. The fixed
+   failure delay is additive and tests prove both bad-user and bad-password
+   paths exercise verification.
+2. **`/api/auth/me` is the public state probe.** It always returns 200 with
+   `{username, authRequired}` so the SPA can distinguish open mode from a
+   missing/expired session without a redirect loop. The design's older 401
+   wording is superseded.
+3. **Preserve every platform-owned runtime setting on web config refresh.** In
+   addition to DB/token/auth fields, preserve `browser_enabled`; otherwise a
+   Secrets-page save would reset Railway's `BROWSER_ENABLED=false` to the local
+   default and launch browsers in cloud.
+4. **Fail closed in the auth gate.** While `/auth/me` is pending render a
+   skeleton; on a non-401/network error render an accessible retry state. Never
+   render protected application children when auth state is unknown. Login
+   forms use `FieldGroup`/`Field`, pending buttons compose `Spinner`, and button
+   icons use `data-icon` without manual sizing.
+5. **Report disabled browser sources instead of dropping them.** Scrape targets
+   and LinkedIn remain in pull results as connector-level failures with
+   `requires a local browser (browser_enabled=false)`. The dedicated LinkedIn
+   scrape endpoint/service returns the same explicit failure and never launches
+   Playwright. Tesla remains isolated per URL; Adzuna remains snippet-only.
+6. **Verify existing symlinks.** `prepare_data_root` accepts an existing symlink
+   only when it resolves to the intended data-root target; a stale or hostile
+   link is an error. Tests cover wrong-target links and idempotence.
+7. **Import is staged and rollback-safe.** Validate every tar member and extract
+   to staging before touching live state; reject empty/no-file archives as
+   `INVALID_ARCHIVE`; then perform a same-volume child swap with a rollback
+   directory because `/app/data` itself is a mount point and cannot be renamed.
+   If any move fails, restore the original root. After disposing the engine, the
+   router recreates/rebinds it in `finally` on success or failure, then refreshes
+   settings only after a successful import.
+8. **Pack only restorable archives.** The local packer rejects symlinks/special
+   files, omits SQLite sidecars, snapshots each `.db`, and never emits an empty
+   seed silently. Tests round-trip its output through `import_data_root`.
+9. **Deployment docs match Windows and Railway reality.** Keep the documented
+   one-volume/no-replicas constraint, ignore all `*.tar.gz` secret backups in
+   Docker context, and give PowerShell-safe build/run/seed examples alongside
+   POSIX examples. The round-trip restore instructions must place archive-root
+   `config/`, `output/`, and `.env` beside local `data/`, not under it.
+
 ---
 
 ### Task 1: Auth primitives + Settings fields + `hash-password` CLI

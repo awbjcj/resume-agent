@@ -42,6 +42,17 @@ rounds, fewer serial stages, and faster models on the long-output writer calls
 9. **Validation:** per-stage timing instrumentation + a live fast-vs-deep spot
    check; full `make eval` comparison deferred until the judge is anchored.
 
+## Correctness clarifications
+
+- Writer/reviser tier values are boundary-validated to `cheap | mid | premium`;
+  a typo must fail config loading instead of silently selecting another model.
+- The launch dialog queries **all** approved jobs across the paginated pipeline,
+  not only rows already loaded on the current board page. It remains open when
+  a launch fails and represents loading, empty, and error states explicitly.
+- The web implementation follows the repository's installed Base UI shadcn
+  primitives and accessibility composition (`Field*`, `DialogDescription`,
+  `Empty`, `Spinner`) rather than the illustrative raw layout below.
+
 ## 1. Config: fast default, deep escape hatch
 
 - `config/review.yaml` (and its `.example`) becomes the **fast roster**:

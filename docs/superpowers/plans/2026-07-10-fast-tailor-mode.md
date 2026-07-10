@@ -21,6 +21,37 @@
 - After changing any API schema: regenerate contracts with `bash scripts/gen_ts_client.sh` and keep `tests/api/test_openapi_contract.py` green.
 - Commit after every task (small, focused commits).
 
+## Correctness Amendments (authoritative)
+
+These amendments override conflicting snippets below. They were added after
+checking the plan against the 2026-07-10 design and the current repository.
+
+1. **Validate new model tiers at the config boundary.** `tailor_tier` and
+   `reviser_tier` are `Literal["cheap", "mid", "premium"]`, not unconstrained
+   strings. Add a regression test that an unknown tier is rejected rather than
+   silently falling through `model_for_tier()` to the mid model.
+2. **Test the real setup interface.** The current tuple is private
+   `resume_agent.setup.preflight._EXAMPLES`; Task 2 must assert against that
+   name (and update `atomic_write_all`'s "five config files" docstring to six).
+3. **Keep one source of truth for config paths.** CLI and API code import
+   `DEFAULT_REVIEW` / `DEFAULT_REVIEW_DEEP` from
+   `services.tailoring`; do not redeclare the strings in `cli.py`.
+4. **The launch dialog must load the complete approved set.** The pipeline is
+   paginated, so deriving launch jobs from `PipelineContainer.rows` silently
+   omits approved jobs on unloaded pages. Add an enabled-on-open query/hook that
+   fetches every `/api/pipeline?status=approved` page (page size 200), expose its
+   loading/error state in the dialog, and disable submit until loading finishes.
+   `LaunchJob.title` is nullable because `PipelineItem.title` is nullable.
+5. **Do not close on a failed launch.** `LaunchDialog.onLaunch` returns
+   `Promise<boolean>` (matching `useBulkRun`); show a composed `Spinner`, disable
+   controls while pending, and close only when it resolves `true`. Tests cover
+   success, false-return retention, loading, empty, and rejected/error states.
+6. **Use the installed Base UI shadcn composition.** Forms use
+   `FieldGroup`/`Field`; related job checkboxes use
+   `FieldSet`/`FieldLegend`; dialogs include `DialogDescription`; empty content
+   uses `Empty`; button icons use `data-icon` with no sizing override; layout
+   uses `gap-*`, not `space-y-*`.
+
 ---
 
 ### Task 1: ReviewConfig gains `merged_advisory`, `tailor_tier`, `reviser_tier`
