@@ -906,8 +906,8 @@ export interface paths {
         delete: operations["remove_source_route_api_sources__source_id__delete"];
         options?: never;
         head?: never;
-        /** Set Enabled Route */
-        patch: operations["set_enabled_route_api_sources__source_id__patch"];
+        /** Patch Source Route */
+        patch: operations["patch_source_route_api_sources__source_id__patch"];
         trace?: never;
     };
     "/api/suggestion-runs": {
@@ -1901,11 +1901,6 @@ export interface components {
             /** Openaiapikey */
             openaiApiKey?: string | null;
         };
-        /** SetEnabledIn */
-        SetEnabledIn: {
-            /** Enabled */
-            enabled: boolean;
-        };
         /** SetupStatusOut */
         SetupStatusOut: {
             /** Complete */
@@ -2013,6 +2008,13 @@ export interface components {
             mode?: string | null;
             /** Primary */
             primary?: boolean | null;
+        };
+        /** SourcePatchIn */
+        SourcePatchIn: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Limit */
+            limit?: number | null;
         };
         /** SourcePreviewIn */
         SourcePreviewIn: {
@@ -2255,6 +2257,8 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            /** Limit */
+            limit?: number | null;
             /** Pullable */
             pullable: boolean;
             /** Type */
@@ -4491,7 +4495,7 @@ export interface operations {
             };
         };
     };
-    set_enabled_route_api_sources__source_id__patch: {
+    patch_source_route_api_sources__source_id__patch: {
         parameters: {
             query?: never;
             header?: {
@@ -4504,7 +4508,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SetEnabledIn"];
+                "application/json": components["schemas"]["SourcePatchIn"];
             };
         };
         responses: {
