@@ -47,7 +47,7 @@ function ToggleGroupItem({
       aria-pressed={selected}
       className={cn(
         buttonVariants({ variant: selected ? "secondary" : "outline", size: "sm" }),
-        "h-8 rounded-full px-3 text-sm",
+        "h-9 rounded-full px-3 text-sm",
         selected && "border-primary/40 text-primary",
         className,
       )}
