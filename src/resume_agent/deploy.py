@@ -19,6 +19,21 @@ def prepare_data_root(
     if defaults_dir is not None and defaults_dir.is_dir() and not config_target.exists():
         shutil.copytree(defaults_dir, config_target)
     config_target.mkdir(exist_ok=True)
+    if defaults_dir is not None and defaults_dir.is_dir():
+        for default in defaults_dir.rglob("*"):
+            if not default.is_file():
+                continue
+            relative = default.relative_to(defaults_dir)
+            tracked_target = config_target / relative
+            if not tracked_target.exists():
+                tracked_target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(default, tracked_target)
+            if default.name.endswith(".example"):
+                runtime_relative = Path(str(relative)[: -len(".example")])
+                runtime_target = config_target / runtime_relative
+                if not runtime_target.exists():
+                    runtime_target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(default, runtime_target)
     (data_root / "output").mkdir(exist_ok=True)
     (data_root / ".env").touch(exist_ok=True)
 

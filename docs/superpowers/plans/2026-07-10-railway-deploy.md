@@ -67,6 +67,11 @@ of a mounted Railway volume.
    Docker context, and give PowerShell-safe build/run/seed examples alongside
    POSIX examples. The round-trip restore instructions must place archive-root
    `config/`, `output/`, and `.env` beside local `data/`, not under it.
+10. **Materialize ignored runtime configs.** A clean Git checkout contains
+    tracked `*.example` files but not user-owned `review.yaml`, `search.yaml`,
+    `render.yaml`, and related runtime files. `prepare_data_root` copies missing
+    defaults on every boot and materializes each missing runtime path from its
+    example without overwriting volume edits.
 
 ---
 

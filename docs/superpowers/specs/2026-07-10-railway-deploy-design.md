@@ -127,6 +127,11 @@ Implementation: `prepare_data_root(app_root: Path, data_root: Path)` in a new
 `src/resume_agent/deploy.py` — pure function, unit-testable against tmp dirs —
 invoked by a tiny `docker/entrypoint.sh`.
 
+Because user-owned runtime YAML files are gitignored, the image may contain
+only their tracked `*.example` forms. Volume preparation materializes a missing
+runtime file from each example and adds newly introduced missing defaults on
+later boots, while never overwriting an existing volume file.
+
 SQLite stays as-is: WAL + busy_timeout already configured in `make_engine`.
 Single replica only (Railway volumes pin to 1 replica) — fine for one user.
 
