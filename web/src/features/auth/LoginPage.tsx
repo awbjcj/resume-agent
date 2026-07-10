@@ -57,6 +57,7 @@ export function LoginPage() {
                   autoComplete="username"
                   value={username}
                   disabled={login.isPending}
+                  aria-invalid={login.isError || undefined}
                   onChange={(event) => setUsername(event.target.value)}
                   required
                 />

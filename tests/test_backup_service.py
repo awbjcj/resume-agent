@@ -50,7 +50,9 @@ def test_import_roundtrip_full_replaces_root(tmp_path):
 
     import_data_root(archive, root)
 
-    assert (root / "profile" / "facts.json").read_text(encoding="utf-8") == '{"facts": []}'
+    assert (root / "profile" / "facts.json").read_text(
+        encoding="utf-8"
+    ) == '{"facts": []}'
     assert not (root / "stray.txt").exists()
 
 
@@ -95,6 +97,35 @@ def test_import_rolls_back_when_install_move_fails(tmp_path, monkeypatch):
     assert (root / "profile" / "facts.json").exists()
     with closing(sqlite3.connect(root / "resume_agent.db")) as connection:
         assert connection.execute("SELECT title FROM job").fetchall() == [("Engineer",)]
+
+
+def test_import_preserves_rollback_directory_when_restore_also_fails(
+    tmp_path, monkeypatch
+):
+    from resume_agent.services import backup
+
+    root, db = _make_root(tmp_path)
+    archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
+    original_move = backup.shutil.move
+
+    def doubly_flaky_move(source, destination):
+        source_path = backup.Path(source)
+        if ".ra-import-stage-" in str(source_path.parent):
+            raise OSError("install failed")
+        if (
+            ".ra-import-rollback-" in str(source_path.parent)
+            and source_path.name == "resume_agent.db"
+        ):
+            raise OSError("restore failed")
+        return original_move(source, destination)
+
+    monkeypatch.setattr(backup.shutil, "move", doubly_flaky_move)
+
+    with pytest.raises(RuntimeError, match="rollback preserved"):
+        import_data_root(archive, root)
+    rollback_dirs = list(root.glob(".ra-import-rollback-*"))
+    assert len(rollback_dirs) == 1
+    assert (rollback_dirs[0] / "resume_agent.db").is_file()
 
 
 def test_pack_local_checkout_builds_importable_volume_layout(tmp_path):

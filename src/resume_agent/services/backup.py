@@ -22,9 +22,10 @@ class InvalidArchiveError(ValueError):
 
 def sqlite_snapshot(db_file: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with closing(sqlite3.connect(db_file)) as source, closing(
-        sqlite3.connect(destination)
-    ) as target:
+    with (
+        closing(sqlite3.connect(db_file)) as source,
+        closing(sqlite3.connect(destination)) as target,
+    ):
         source.backup(target)
 
 
@@ -37,10 +38,11 @@ def _sqlite_file(db_url: str, data_root: Path) -> Path | None:
 
 
 def _is_db_artifact(path: Path, db_file: Path) -> bool:
-    return (
-        path.parent.resolve() == db_file.parent.resolve()
-        and path.name in {db_file.name, f"{db_file.name}-wal", f"{db_file.name}-shm"}
-    )
+    return path.parent.resolve() == db_file.parent.resolve() and path.name in {
+        db_file.name,
+        f"{db_file.name}-wal",
+        f"{db_file.name}-shm",
+    }
 
 
 def export_data_root(data_root: Path, db_url: str, out_dir: Path) -> Path:
@@ -122,11 +124,14 @@ def import_data_root(
     data_root.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".ra-import-stage-", dir=data_root))
     rollback = Path(tempfile.mkdtemp(prefix=".ra-import-rollback-", dir=data_root))
+    preserve_rollback = False
     try:
         _extract_validated(archive, stage)
         if before_swap is not None:
             before_swap()
-        live = [child for child in data_root.iterdir() if child not in {stage, rollback}]
+        live = [
+            child for child in data_root.iterdir() if child not in {stage, rollback}
+        ]
         installed: list[Path] = []
         try:
             for child in live:
@@ -135,15 +140,26 @@ def import_data_root(
                 destination = data_root / child.name
                 shutil.move(child, destination)
                 installed.append(destination)
-        except BaseException:
+        except BaseException as swap_error:
             for child in reversed(installed):
                 _remove(child)
+            restore_errors: list[BaseException] = []
             for child in list(rollback.iterdir()):
-                shutil.move(child, data_root / child.name)
+                try:
+                    shutil.move(child, data_root / child.name)
+                except BaseException as restore_error:
+                    restore_errors.append(restore_error)
+            if restore_errors:
+                preserve_rollback = True
+                raise RuntimeError(
+                    "import failed and rollback could not complete; "
+                    f"rollback preserved at {rollback}"
+                ) from swap_error
             raise
     finally:
         shutil.rmtree(stage, ignore_errors=True)
-        shutil.rmtree(rollback, ignore_errors=True)
+        if not preserve_rollback:
+            shutil.rmtree(rollback, ignore_errors=True)
 
 
 def pack_local_checkout(repo_root: Path, out: Path) -> Path:
@@ -181,7 +197,10 @@ def pack_local_checkout(repo_root: Path, out: Path) -> Path:
             file_count += 1
 
     try:
-        with tempfile.TemporaryDirectory() as temporary, tarfile.open(out, "w:gz") as tar:
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            tarfile.open(out, "w:gz") as tar,
+        ):
             snapshot_dir = Path(temporary)
             data_dir = repo_root / "data"
             if data_dir.is_dir():

@@ -33,11 +33,15 @@ def _refuse_if_running(request: Request) -> None:
 def export_root(request: Request) -> FileResponse:
     _refuse_if_running(request)
     temporary = Path(tempfile.mkdtemp(prefix="ra-export-"))
-    archive = export_data_root(
-        request.app.state.data_dir,
-        request.app.state.db_url,
-        temporary,
-    )
+    try:
+        archive = export_data_root(
+            request.app.state.data_dir,
+            request.app.state.db_url,
+            temporary,
+        )
+    except BaseException:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
     return FileResponse(
         archive,
         media_type="application/gzip",
@@ -59,7 +63,6 @@ def import_root(
             "Import replaces the data root; pass ?confirm=REPLACE",
         )
     _refuse_if_running(request)
-    succeeded = False
     with tempfile.TemporaryDirectory() as temporary:
         archive = Path(temporary) / "import.tar.gz"
         with archive.open("wb") as destination:
@@ -70,7 +73,6 @@ def import_root(
                 request.app.state.data_dir,
                 before_swap=request.app.state.engine.dispose,
             )
-            succeeded = True
         except UnsafeArchiveError as exc:
             raise ApiException(400, "UNSAFE_ARCHIVE", str(exc)) from exc
         except InvalidArchiveError as exc:
@@ -79,9 +81,8 @@ def import_root(
             engine = make_engine(request.app.state.db_url)
             init_db(engine)
             request.app.state.engine = engine
-    if succeeded:
-        refresh_app_settings(
-            request.app,
-            Settings(_env_file=request.app.state.env_path),
-        )
+    refresh_app_settings(
+        request.app,
+        Settings(_env_file=request.app.state.env_path),
+    )
     return {"status": "imported"}

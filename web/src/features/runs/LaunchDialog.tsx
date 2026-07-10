@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,26 +45,35 @@ interface LaunchDialogProps {
   onLaunch: (jobIds: number[], deep: boolean) => Promise<boolean>;
 }
 
-export function LaunchDialog({
+export function LaunchDialog(props: LaunchDialogProps) {
+  const resetKey = [
+    props.open,
+    props.mode,
+    props.isLoading,
+    props.error,
+    ...props.jobs.map((job) => job.jobId),
+  ].join(":");
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <LaunchDialogBody key={resetKey} {...props} />
+    </Dialog>
+  );
+}
+
+function LaunchDialogBody({
   mode,
   jobs,
-  open,
   isLoading = false,
   error = null,
   onRetry,
   onOpenChange,
   onLaunch,
 }: LaunchDialogProps) {
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<number>>(
+    () => new Set(jobs.map((job) => job.jobId)),
+  );
   const [deep, setDeep] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
-
-  useEffect(() => {
-    if (open && !isLoading && !error) {
-      setSelected(new Set(jobs.map((job) => job.jobId)));
-      setDeep(false);
-    }
-  }, [error, isLoading, jobs, open]);
 
   const count = selected.size;
   const submitLabel =
@@ -84,102 +93,100 @@ export function LaunchDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {mode === "tailor" ? "Tailor resumes" : "Write cover letters"}
-          </DialogTitle>
-          <DialogDescription>
-            Choose which approved jobs to process. All jobs start selected.
-          </DialogDescription>
-        </DialogHeader>
+    <DialogContent className="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>
+          {mode === "tailor" ? "Tailor resumes" : "Write cover letters"}
+        </DialogTitle>
+        <DialogDescription>
+          Choose which approved jobs to process. All jobs start selected.
+        </DialogDescription>
+      </DialogHeader>
 
-        {isLoading ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>Loading approved jobs</EmptyTitle>
-              <EmptyDescription>Collecting every pipeline page…</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : error ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>Approved jobs unavailable</EmptyTitle>
-              <EmptyDescription>{error}</EmptyDescription>
-            </EmptyHeader>
-            {onRetry && (
-              <EmptyContent>
-                <Button variant="outline" onClick={onRetry}>Retry</Button>
-              </EmptyContent>
-            )}
-          </Empty>
-        ) : jobs.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>No approved jobs</EmptyTitle>
-              <EmptyDescription>Approve a job before launching this workflow.</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <FieldSet>
-            <FieldLegend variant="label">Approved jobs</FieldLegend>
-            <FieldGroup className="max-h-72 overflow-y-auto pr-1">
-              {jobs.map((job) => {
-                const inputId = `launch-job-${job.jobId}`;
-                return (
-                  <Field key={job.jobId} orientation="horizontal">
-                    <Checkbox
-                      id={inputId}
-                      checked={selected.has(job.jobId)}
-                      disabled={isLaunching}
-                      onCheckedChange={(checked) =>
-                        setSelected((current) => {
-                          const next = new Set(current);
-                          if (checked) next.add(job.jobId);
-                          else next.delete(job.jobId);
-                          return next;
-                        })
-                      }
-                    />
-                    <FieldLabel htmlFor={inputId}>
-                      {job.company ?? "Unknown company"} — {job.title ?? "Untitled role"}
-                    </FieldLabel>
-                  </Field>
-                );
-              })}
-            </FieldGroup>
-          </FieldSet>
-        )}
+      {isLoading ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Loading approved jobs</EmptyTitle>
+            <EmptyDescription>Collecting every pipeline page…</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : error ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Approved jobs unavailable</EmptyTitle>
+            <EmptyDescription>{error}</EmptyDescription>
+          </EmptyHeader>
+          {onRetry && (
+            <EmptyContent>
+              <Button variant="outline" onClick={onRetry}>Retry</Button>
+            </EmptyContent>
+          )}
+        </Empty>
+      ) : jobs.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No approved jobs</EmptyTitle>
+            <EmptyDescription>Approve a job before launching this workflow.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <FieldSet>
+          <FieldLegend variant="label">Approved jobs</FieldLegend>
+          <FieldGroup className="max-h-72 overflow-y-auto pr-1">
+            {jobs.map((job) => {
+              const inputId = `launch-job-${job.jobId}`;
+              return (
+                <Field key={job.jobId} orientation="horizontal">
+                  <Checkbox
+                    id={inputId}
+                    checked={selected.has(job.jobId)}
+                    disabled={isLaunching}
+                    onCheckedChange={(checked) =>
+                      setSelected((current) => {
+                        const next = new Set(current);
+                        if (checked) next.add(job.jobId);
+                        else next.delete(job.jobId);
+                        return next;
+                      })
+                    }
+                  />
+                  <FieldLabel htmlFor={inputId}>
+                    {job.company ?? "Unknown company"} — {job.title ?? "Untitled role"}
+                  </FieldLabel>
+                </Field>
+              );
+            })}
+          </FieldGroup>
+        </FieldSet>
+      )}
 
-        {mode === "tailor" && !unavailable && (
-          <Field orientation="horizontal">
-            <Switch
-              id="deep-review"
-              checked={deep}
-              disabled={isLaunching}
-              onCheckedChange={setDeep}
-            />
-            <div>
-              <FieldLabel htmlFor="deep-review">Deep review</FieldLabel>
-              <FieldDescription>Full review panel; roughly 3–6× slower.</FieldDescription>
-            </div>
-          </Field>
-        )}
+      {mode === "tailor" && !unavailable && (
+        <Field orientation="horizontal">
+          <Switch
+            id="deep-review"
+            checked={deep}
+            disabled={isLaunching}
+            onCheckedChange={setDeep}
+          />
+          <div>
+            <FieldLabel htmlFor="deep-review">Deep review</FieldLabel>
+            <FieldDescription>Full review panel; roughly 3–6× slower.</FieldDescription>
+          </div>
+        </Field>
+      )}
 
-        <DialogFooter>
-          <Button variant="outline" disabled={isLaunching} onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            disabled={unavailable || count === 0 || isLaunching}
-            onClick={submit}
-          >
-            {isLaunching && <Spinner data-icon="inline-start" />}
-            {isLaunching ? "Starting…" : submitLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <DialogFooter>
+        <Button variant="outline" disabled={isLaunching} onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button
+          disabled={unavailable || count === 0 || isLaunching}
+          onClick={submit}
+        >
+          {isLaunching && <Spinner data-icon="inline-start" />}
+          {isLaunching ? "Starting…" : submitLabel}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }

@@ -25,7 +25,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const me = useMe();
   if (me.isPending) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6" aria-label="Checking session">
+      <div
+        className="flex min-h-screen items-center justify-center p-6"
+        aria-label="Checking session"
+        aria-busy="true"
+        role="status"
+      >
         <Skeleton className="h-40 w-full max-w-sm" />
       </div>
     );

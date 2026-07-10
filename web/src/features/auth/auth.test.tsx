@@ -27,9 +27,9 @@ function wrap(ui: ReactNode, initialPath = "/") {
 
 describe("AuthGate", () => {
   it.each([
-    [{ username: null, authRequired: false }, "open mode"],
-    [{ username: "owner", authRequired: true }, "signed in"],
-  ])("renders children in %s", async (state) => {
+    { state: { username: null, authRequired: false }, label: "open mode" },
+    { state: { username: "owner", authRequired: true }, label: "signed in" },
+  ])("renders children in $label", async ({ state }) => {
     server.use(http.get("/api/auth/me", () => HttpResponse.json(state)));
     wrap(<div>App content</div>);
     expect(await screen.findByText("App content")).toBeInTheDocument();

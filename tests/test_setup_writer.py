@@ -11,6 +11,9 @@ def _seed_examples(root):
     (root / "config" / "review.yaml.example").write_text(
         "max_rounds: 3\nscore_threshold: 85\nreviewers: []\n", encoding="utf-8"
     )
+    (root / "config" / "review_deep.yaml.example").write_text(
+        "max_rounds: 3\nscore_threshold: 85\nreviewers: []\n", encoding="utf-8"
+    )
     (root / "config" / "render.yaml.example").write_text(
         "template_path: templates/resume.typ\noutput_dir: output\n", encoding="utf-8"
     )

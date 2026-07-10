@@ -1,5 +1,6 @@
 import io
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -79,3 +80,22 @@ def test_admin_routes_are_guarded(tmp_path):
     )
     with TestClient(app) as client:
         assert client.get("/api/admin/export").status_code == 401
+
+
+def test_export_cleans_temporary_directory_when_build_fails(tmp_path, monkeypatch):
+    from resume_agent.api.routers import admin
+
+    app, _ = _app(tmp_path)
+    temporary = tmp_path / "failed-export"
+    temporary.mkdir()
+    monkeypatch.setattr(admin.tempfile, "mkdtemp", lambda **_: str(temporary))
+    monkeypatch.setattr(
+        admin,
+        "export_data_root",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("export failed")),
+    )
+
+    with TestClient(app) as client, pytest.raises(RuntimeError, match="export failed"):
+        client.get("/api/admin/export")
+
+    assert not temporary.exists()
