@@ -15,6 +15,7 @@ from resume_agent.profile.matrix import (
     SkillMatrix,
     build_matrix,
     build_skill_match_context,
+    apply_skill_groups,
     effective_cluster_map,
     load_matrix,
     load_overrides,
@@ -219,3 +220,38 @@ def test_forced_and_forbidden_aliases_control_match_context():
 def test_load_overrides_missing_is_empty(tmp_path):
     overrides = load_overrides(tmp_path / "overrides.yaml")
     assert overrides.ban == [] and overrides.alias == {}
+
+
+def test_apply_groups_uses_taxonomy_and_alias_aware_override_precedence():
+    matrix = SkillMatrix(
+        rows=[
+            MatrixRow(key="python", display="Python"),
+            MatrixRow(key="kubernetes", display="Kubernetes", aliases=["k8s"]),
+            MatrixRow(key="mystery", display="Mystery"),
+        ]
+    )
+    overrides = Overrides(group={"K8s": "devops-tooling"})
+    apply_skill_groups(
+        matrix,
+        {"python": "languages", "kubernetes": "cloud-infra"},
+        overrides,
+    )
+    assert {row.key: row.group for row in matrix.rows} == {
+        "python": "languages",
+        "kubernetes": "devops-tooling",
+        "mystery": None,
+    }
+
+
+def test_group_validation_drops_unknown_values_without_expanding_override_tokens():
+    matrix = SkillMatrix(
+        rows=[MatrixRow(key="python", display="Python", group="invented")]
+    )
+    overrides = Overrides(
+        group={"Python": "data-ml", "Terraform": "invented"},
+    )
+    assert matrix.rows[0].group is None
+    assert overrides.group == {"python": "data-ml"}
+    assert "python" not in override_tokens(overrides)
+    apply_skill_groups(matrix, {"python": "invented"}, Overrides())
+    assert matrix.rows[0].group is None

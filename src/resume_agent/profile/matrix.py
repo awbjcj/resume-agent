@@ -10,12 +10,13 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.groups import SKILL_GROUPS, sanitize_group_map
 from resume_agent.taxonomy.skills import split_skills
 from resume_agent.tracking.match_gap import normalize_skill
 
@@ -28,10 +29,16 @@ class MatrixRow(ExtensibleModel):
     display: str
     aliases: list[str] = Field(default_factory=list)
     category: Literal["hard", "soft", "domain"] | None = None
+    group: str | None = None
     inferred: bool = False
     evidence_fact_ids: list[str] = Field(default_factory=list)
     strength: float = 0.0
     last_used: str | None = None
+
+    @field_validator("group", mode="before")
+    @classmethod
+    def validate_group(cls, value: object) -> str | None:
+        return value if isinstance(value, str) and value in SKILL_GROUPS else None
 
 
 class SkillMatrix(ExtensibleModel):
@@ -57,6 +64,12 @@ class Overrides(ExtensibleModel):
     alias: dict[str, str] = Field(default_factory=dict)
     forbid_alias: list[list[str]] = Field(default_factory=list)
     category: dict[str, str] = Field(default_factory=dict)
+    group: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("group", mode="before")
+    @classmethod
+    def validate_groups(cls, value: object) -> dict[str, str]:
+        return sanitize_group_map(value)
 
 
 def load_overrides(path: str | Path) -> Overrides:
@@ -357,6 +370,27 @@ def build_matrix(
         canonical_map_sha256=canonical_map_sha256(effective),
         rows=sorted(rows.values(), key=lambda row: (-row.strength, row.key)),
     )
+
+
+def apply_skill_groups(
+    matrix: SkillMatrix,
+    group_of: dict[str, str],
+    overrides: Overrides,
+) -> None:
+    """Decorate existing rows with validated groups; overrides take precedence."""
+    taxonomy = sanitize_group_map(group_of)
+    override_groups = sanitize_group_map(overrides.group)
+    for row in matrix.rows:
+        lookup_keys = [
+            row.key,
+            normalize_skill(row.display),
+            *(normalize_skill(alias) for alias in row.aliases),
+        ]
+        override = next(
+            (override_groups[key] for key in lookup_keys if key in override_groups),
+            None,
+        )
+        row.group = override or taxonomy.get(row.key)
 
 
 def save_matrix(matrix: SkillMatrix, path: str | Path) -> None:
