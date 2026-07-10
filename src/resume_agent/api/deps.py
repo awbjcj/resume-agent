@@ -28,7 +28,7 @@ def require_token(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings_dep),
 ) -> None:
-    """No-op when no api_token is configured; else enforce a bearer match.
+    """Accept a valid session cookie or the existing bearer/query token.
 
     Accepts the token either in the ``Authorization: Bearer`` header or, as a
     fallback for clients that cannot set headers (``EventSource`` SSE, ``<a>``
@@ -37,14 +37,28 @@ def require_token(
     schema for every guarded route. Note: query-param tokens can appear in access
     logs — acceptable for a localhost single-user tool.
     """
-    if not settings.api_token:
+    from resume_agent.api.auth import (
+        SESSION_COOKIE,
+        session_auth_configured,
+        verify_session,
+    )
+
+    session_configured = session_auth_configured(settings)
+    if session_configured and verify_session(
+        request.cookies.get(SESSION_COOKIE, ""), settings
+    ):
         return
-    query_token = request.query_params.get("token")
-    if query_token is not None and hmac.compare_digest(query_token, settings.api_token):
-        return
-    expected = f"Bearer {settings.api_token}"
-    if not hmac.compare_digest(authorization or "", expected):
-        raise ApiException(401, "UNAUTHORIZED", "Missing or invalid bearer token")
+    if settings.api_token:
+        query_token = request.query_params.get("token")
+        if query_token is not None and hmac.compare_digest(
+            query_token, settings.api_token
+        ):
+            return
+        expected = f"Bearer {settings.api_token}"
+        if hmac.compare_digest(authorization or "", expected):
+            return
+    if session_configured or settings.api_token:
+        raise ApiException(401, "UNAUTHORIZED", "Missing or invalid credentials")
 
 
 def get_run_manager(request: Request):
@@ -52,8 +66,12 @@ def get_run_manager(request: Request):
 
 
 def refresh_app_settings(app, fresh: Settings) -> None:
-    """Env-derived settings changed; keep startup-resolved db_url/api_token."""
+    """Keep startup/platform fields when volume-backed settings are refreshed."""
     app.state.settings = fresh.model_copy(update={
         "db_url": app.state.db_url,
         "api_token": app.state.settings.api_token,
+        "auth_username": app.state.settings.auth_username,
+        "auth_password_hash": app.state.settings.auth_password_hash,
+        "session_secret": app.state.settings.session_secret,
+        "browser_enabled": app.state.settings.browser_enabled,
     })

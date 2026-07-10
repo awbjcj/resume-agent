@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from resume_agent.api.deps import get_settings_dep, require_token
 from resume_agent.api.errors import ApiException, install_error_handlers
 from resume_agent.api.routers import analytics as analytics_router
+from resume_agent.api.routers import auth as auth_router
 from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import config as config_router
 from resume_agent.api.routers import cover_letters as cover_letters_router
@@ -104,9 +105,8 @@ def create_app(
     app.dependency_overrides[get_settings_dep] = lambda: app.state.settings
 
     origins = [o.strip() for o in resolved_settings.cors_origins.split(",") if o.strip()]
-    # Auth is a static bearer token in the Authorization header (not cookies), so
-    # allow_credentials stays False — that keeps a wildcard/`*` origin valid instead
-    # of silently breaking credentialed requests (the classic CORS footgun).
+    # Production and Vite's /api proxy are same-origin. Cross-origin cookie auth
+    # remains intentionally disabled so wildcard CORS cannot leak credentials.
     app.add_middleware(
         CORSMiddleware, allow_origins=origins, allow_credentials=False,
         allow_methods=["*"], allow_headers=["*"],
@@ -117,6 +117,7 @@ def create_app(
     # Guard everything except /api/health behind the optional bearer token.
     guarded = [Depends(require_token)]
     app.include_router(health.router, prefix="/api")
+    app.include_router(auth_router.router, prefix="/api")
     app.include_router(boards.router, prefix="/api", dependencies=guarded)
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(resumes.router, prefix="/api", dependencies=guarded)
