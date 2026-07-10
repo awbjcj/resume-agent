@@ -48,6 +48,7 @@ class ScrapeTargetLike(Protocol):
     url: str
     enabled: bool
     label: str | None
+    limit: int | None
 
 
 SkipSeen = Callable[[RawJob], bool]
@@ -297,15 +298,17 @@ class DashboardScraper:
             for target in self.targets:
                 if not getattr(target, "enabled", True):
                     continue
-                if limit is not None and len(jobs) >= limit:
-                    break
                 try:
                     recipe, cards = self._recipe_for(target, search)
                 except Exception as exc:  # noqa: BLE001 - isolate configured targets
                     failures[target.url] = f"{type(exc).__name__}: {exc}"
                     continue
 
+                target_limit = target.limit if target.limit is not None else limit
+                taken = 0
                 for card in cards:
+                    if target_limit is not None and taken >= target_limit:
+                        break
                     if recipe.detail_mode == "link" and card.url is None:
                         key = card.title or target.url
                         failures[key] = "Invalid or missing HTTP(S) detail URL"
@@ -339,8 +342,7 @@ class DashboardScraper:
                         filtered += 1
                         continue
                     jobs.append(row)
-                    if limit is not None and len(jobs) >= limit:
-                        break
+                    taken += 1
             return FetchResult(jobs=jobs, failures=failures, filtered=filtered)
         finally:
             self._close_browser()
