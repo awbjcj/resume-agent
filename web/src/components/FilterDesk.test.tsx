@@ -43,7 +43,7 @@ describe("FilterDesk", () => {
     expect(screen.getByText("Preset")).toBeInTheDocument();
   });
 
-  it("puts Status before the remaining primary controls when status facets exist", () => {
+  it("keeps the filter and sort controls in one ordered group", () => {
     render(
       <FilterDesk
         filter={emptyFilterState()}
@@ -55,16 +55,19 @@ describe("FilterDesk", () => {
 
     const controls = [
       screen.getByRole("button", { name: "Status" }),
+      screen.getByRole("searchbox", { name: "Search" }),
       screen.getByRole("spinbutton", { name: "Min fit" }),
       screen.getByRole("spinbutton", { name: "Min salary (USD)" }),
+      screen.getByRole("combobox", { name: "Posted" }),
       screen.getByRole("combobox", { name: "Sort" }),
-      screen.getByRole("searchbox", { name: "Search" }),
+      screen.getByRole("button", { name: /^apply$/i }),
     ];
 
     controls.slice(1).forEach((control, index) => {
       expect(controls[index].compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING)
         .toBeTruthy();
     });
+    expect(screen.getByRole("button", { name: /^apply$/i })).toHaveClass("sm:ml-auto");
   });
 
   it("keeps only the most recently opened facet panel open", async () => {
@@ -155,7 +158,7 @@ describe("FilterDesk", () => {
 
     expect(onChange).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: /apply filters/i }));
+    await user.click(screen.getByRole("button", { name: /^apply$/i }));
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange.mock.calls[0][0].q).toBe("a");
@@ -184,7 +187,7 @@ describe("FilterDesk", () => {
     expect(screen.getByText("$120k+ / year")).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: /apply filters/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^apply$/i }));
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange.mock.calls[0][0].salaryMin).toBe(120000);
@@ -204,6 +207,6 @@ describe("FilterDesk", () => {
       "aria-invalid",
       "true",
     );
-    expect(screen.getByRole("button", { name: /apply filters/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^apply$/i })).toBeDisabled();
   });
 });
