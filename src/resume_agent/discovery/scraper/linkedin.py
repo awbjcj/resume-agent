@@ -210,6 +210,7 @@ class LinkedInScraper:
         render_timeout_ms: int = 8000,
         email: str = "",
         password: str = "",
+        configured_limit: int | None = None,
     ):
         self.user_data_dir = user_data_dir
         self.headless = headless
@@ -220,6 +221,7 @@ class LinkedInScraper:
         # Burner credentials for automated login; empty falls back to manual.
         self.email = email
         self.password = password
+        self.configured_limit = configured_limit
         self._logged_in = False
         self._playwright: Playwright | None = None
         self._context: BrowserContext | None = None
@@ -342,6 +344,8 @@ class LinkedInScraper:
         limit: int | None = None,
         skip_seen: SkipSeen | None = None,
     ) -> FetchResult:
+        if self.configured_limit is not None:
+            limit = self.configured_limit
         self._geo_cache = {}
         try:
             if limit is not None and limit <= 0:
@@ -415,10 +419,11 @@ class LinkedInScraper:
         return self._content_for_url(card.url, wait_selector=_DETAIL_SELECTOR)
 
 
-def build_linkedin_scraper() -> LinkedInScraper:
+def build_linkedin_scraper(configured_limit: int | None = None) -> LinkedInScraper:
     settings = get_settings()
     return LinkedInScraper(
         user_data_dir=settings.linkedin_user_data_dir,
         email=settings.linkedin_email,
         password=settings.linkedin_password,
+        configured_limit=configured_limit,
     )

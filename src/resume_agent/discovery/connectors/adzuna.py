@@ -211,11 +211,13 @@ class AdzunaConnector:
         country: str = "us",
         *,
         enrich_details: bool = True,
+        configured_limit: int | None = None,
     ):
         self.app_id = app_id
         self.app_key = app_key
         self.country = country
         self.enrich_details = enrich_details
+        self.configured_limit = configured_limit
 
     def fetch(
         self,
@@ -223,6 +225,8 @@ class AdzunaConnector:
         limit: int | None = None,
         skip_seen: SkipSeen | None = None,
     ) -> FetchResult:
+        if self.configured_limit is not None:
+            limit = self.configured_limit
         jobs, filtered = gate_and_limit(
             parse_adzuna(self._get_results(search)), search, limit, skip_seen
         )

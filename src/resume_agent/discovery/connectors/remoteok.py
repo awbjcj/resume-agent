@@ -35,12 +35,17 @@ class RemoteOKConnector:
     name = "remoteok"
     concurrent_fetch = True
 
+    def __init__(self, configured_limit: int | None = None):
+        self.configured_limit = configured_limit
+
     def fetch(
         self,
         search: SearchConfig,
         limit: int | None = None,
         skip_seen: SkipSeen | None = None,
     ) -> FetchResult:
+        if self.configured_limit is not None:
+            limit = self.configured_limit
         jobs, filtered = gate_and_limit(
             parse_remoteok(self._get_all()), search, limit, skip_seen
         )

@@ -92,6 +92,7 @@ class LeverConnector:
             key=lambda board: board.token,
             on_error=http_failure,
             skip_seen=skip_seen,
+            unit_limit=lambda board: board.limit,
         )
 
     def _get_board(self, token: str, search: SearchConfig) -> list:

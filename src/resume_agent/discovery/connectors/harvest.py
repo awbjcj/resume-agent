@@ -1,5 +1,5 @@
 """The harvest seam: fan out over a connector's units, isolate per-unit failures,
-then gate and cap the union.
+then gate and cap each unit.
 
 Five connectors used to copy this loop (reset failures/filtered, iterate, isolate
 ``httpx.HTTPError``, relevance-gate, count filtered, truncate to limit). It now
@@ -51,26 +51,36 @@ def harvest(
     key: Callable[[U], str],
     on_error: Callable[[Exception], str | None],
     skip_seen: SkipSeen | None = None,
+    unit_limit: Callable[[U], int | None] | None = None,
 ) -> FetchResult:
-    """Fan out over ``units``, isolating each unit's failure, then gate and cap.
+    """Fan out, isolate failures, then gate and cap each unit independently.
 
     ``produce`` turns one unit into RawJobs. When it raises, ``on_error`` decides:
     a returned string records ``failures[key(unit)] = reason`` and continues; ``None``
-    re-raises (the connector does not tolerate this failure). ``skip_seen`` drops
-    already-known rows from the union — the backstop for backends whose final
-    identity (canonical url/company) is only known after their own detail fetch.
+    re-raises (the connector does not tolerate this failure). A unit's configured
+    limit overrides the global fallback. ``skip_seen`` runs before each cap.
     """
     jobs: list[RawJob] = []
     failures: dict[str, str] = {}
+    filtered = 0
     for unit in units:
         try:
-            jobs.extend(produce(unit))
+            produced = produce(unit)
         except Exception as exc:  # noqa: BLE001 — on_error decides record vs propagate
             reason = on_error(exc)
             if reason is None:
                 raise
             failures[key(unit)] = reason
-    jobs, filtered = gate_and_limit(jobs, search, limit, skip_seen)
+            continue
+        configured_limit = unit_limit(unit) if unit_limit is not None else None
+        kept, unit_filtered = gate_and_limit(
+            produced,
+            search,
+            configured_limit if configured_limit is not None else limit,
+            skip_seen,
+        )
+        jobs.extend(kept)
+        filtered += unit_filtered
     return FetchResult(jobs=jobs, failures=failures, filtered=filtered)
 
 
