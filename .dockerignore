@@ -1,0 +1,17 @@
+.git
+.venv
+.omc
+.remember
+data
+output
+*.tar.gz
+web/node_modules
+web/dist
+web/test-results
+tests
+evals
+docs
+node_modules
+__pycache__
+*.pyc
+.env
