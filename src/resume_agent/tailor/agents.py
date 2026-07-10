@@ -9,7 +9,7 @@ from resume_agent.llm_runner import (
     use_json_mode_for,
 )
 from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
+from resume_agent.models.review import MergedPanelReview, ReviewCritique
 from resume_agent.tailor.craft import CRAFT_REVIEWERS, CRAFT_WRITER
 from resume_agent.tailor.style_guide import compose_instructions
 
@@ -233,6 +233,53 @@ def build_reviewer_agent(
                 _reviewer_instructions(name, score_bands=score_bands), style_guide
             ),
             output_schema=ReviewCritique,
+            use_json_mode=use_json_mode_for(model),
+            **retry_kwargs(),
+        )
+    )
+
+
+def _merged_advisory_instructions(
+    names: list[str], *, score_bands: bool = False
+) -> list[str]:
+    listed = ", ".join(repr(name) for name in names)
+    instructions = [
+        "Return one MergedPanelReview with exactly one ReviewCritique per "
+        f"configured reviewer, in this order: {listed}. Set every reviewer field exactly.",
+        "Judge each dimension independently against its own rubric; do not let one "
+        "dimension's score bleed into another.",
+        *_COMMON_REVIEWER_INSTRUCTIONS,
+        *([_SCORE_BAND_INSTRUCTION] if score_bands else []),
+    ]
+    for name in names:
+        rubric = [
+            *REVIEWER_INSTRUCTIONS.get(name, _DEFAULT_REVIEWER_INSTRUCTIONS),
+            *CRAFT_REVIEWERS.get(name, []),
+        ]
+        instructions.append(f"Rubric for {name!r}: " + " ".join(rubric))
+    return instructions
+
+
+def build_merged_advisory_agent(
+    names: list[str],
+    model_id: str | None = None,
+    style_guide: str | None = None,
+    *,
+    score_bands: bool = False,
+) -> Runner:
+    model = build_model(
+        model_id or model_for_tier("mid"),
+        cache_system_prompt=_prompt_cache(),
+    )
+    return AgentRunner(
+        Agent(
+            model=model,
+            description="Produce every advisory review dimension for a tailored resume.",
+            instructions=compose_instructions(
+                _merged_advisory_instructions(names, score_bands=score_bands),
+                style_guide,
+            ),
+            output_schema=MergedPanelReview,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
         )

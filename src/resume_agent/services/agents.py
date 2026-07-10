@@ -20,6 +20,7 @@ from resume_agent.discovery.relevance import build_relevance_agent
 from resume_agent.discovery.url_ingest.llm import build_url_extract_agent
 from resume_agent.llm_runner import Runner
 from resume_agent.tailor.agents import (
+    build_merged_advisory_agent,
     build_reviewer_agent,
     build_revision_agent,
     build_reviser_agent,
@@ -27,6 +28,7 @@ from resume_agent.tailor.agents import (
     model_for_tier,
 )
 from resume_agent.tailor.match_plan import build_match_plan_agent
+from resume_agent.tailor.panel import MERGED_ADVISORY
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
 from resume_agent.tracking.match_gap import Canonicalizer
 
@@ -68,16 +70,37 @@ def build_discovery_bundle() -> DiscoveryBundle:
 
 def build_tailor_bundle(config, style_guide: str | None = None) -> TailorBundle:
     reviewers = {}
+    merged = bool(getattr(config, "merged_advisory", False))
     for spec in config.reviewers:
+        if merged and not spec.gate:
+            continue
         reviewers[spec.name] = build_reviewer_agent(
             spec.name,
             model_for_tier(spec.model_tier),
             style_guide=style_guide,
             score_bands=bool(getattr(spec, "score_bands", False)),
         )
+    if merged:
+        advisory_specs = [spec for spec in config.reviewers if not spec.gate]
+        if advisory_specs:
+            reviewers[MERGED_ADVISORY] = build_merged_advisory_agent(
+                [spec.name for spec in advisory_specs],
+                model_for_tier("mid"),
+                style_guide=style_guide,
+                score_bands=any(
+                    bool(getattr(spec, "score_bands", False))
+                    for spec in advisory_specs
+                ),
+            )
     return TailorBundle(
-        tailor=build_tailor_agent(style_guide=style_guide),
-        reviser=build_reviser_agent(style_guide=style_guide),
+        tailor=build_tailor_agent(
+            model_id=model_for_tier(getattr(config, "tailor_tier", "premium")),
+            style_guide=style_guide,
+        ),
+        reviser=build_reviser_agent(
+            model_id=model_for_tier(getattr(config, "reviser_tier", "premium")),
+            style_guide=style_guide,
+        ),
         reviewers=reviewers,
         revision=build_revision_agent(style_guide=style_guide),
         match_plan=(
@@ -104,6 +127,7 @@ __all__ = [
     "build_extract_agent", "build_fit_agent", "build_relevance_agent",
     "build_industry_classifier",
     "build_tailor_agent", "build_reviser_agent", "build_revision_agent", "build_reviewer_agent",
+    "build_merged_advisory_agent",
     "build_match_plan_agent",
     "build_cover_letter_agent", "build_cover_letter_reviser_agent",
     "build_cover_letter_revision_agent",

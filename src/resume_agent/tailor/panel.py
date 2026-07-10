@@ -6,10 +6,25 @@ from typing import Any
 from resume_agent.llm_runner import Runner, acall
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
-from resume_agent.models.review import ReviewCritique
+from resume_agent.models.review import MergedPanelReview, ReviewCritique
 from resume_agent.tailor.length import resume_stats
 from resume_agent.tailor.provenance import resolve_evidence
 from resume_agent.tailor.review_config import ReviewConfig
+
+MERGED_ADVISORY = "advisory-panel"
+
+
+def split_merged_critiques(
+    review: MergedPanelReview, expected: list[str]
+) -> list[ReviewCritique]:
+    """Require exact unique coverage, then restore configured reviewer order."""
+    received = [critique.reviewer for critique in review.critiques]
+    if len(received) != len(set(received)) or sorted(received) != sorted(expected):
+        raise ValueError(
+            f"Merged advisory review must cover exactly {expected!r}, got {received!r}"
+        )
+    by_name = {critique.reviewer: critique for critique in review.critiques}
+    return [by_name[name] for name in expected]
 
 
 def compose_lean_review_input(content: ResumeContent, jd_text: str, stats: str) -> str:
@@ -54,10 +69,41 @@ def run_panel(
     reviewer_agents: Mapping[str, Runner],
 ) -> list[ReviewCritique]:
     """Run configured reviewers with the smallest sufficient input per role."""
-    return [
-        review_one(text, reviewer_agents[name])
-        for name, text in _panel_inputs(content, profile_facts, jd_text, config)
+    if not config.merged_advisory:
+        return [
+            review_one(text, reviewer_agents[name])
+            for name, text in _panel_inputs(content, profile_facts, jd_text, config)
+        ]
+
+    evidence = resolve_evidence(content, profile_facts)
+    critiques = [
+        review_one(
+            compose_evidence_review_input(content, jd_text, evidence),
+            reviewer_agents[spec.name],
+        )
+        for spec in config.reviewers
+        if spec.gate
     ]
+    advisory_names = _advisory_names(config)
+    if advisory_names:
+        result = reviewer_agents[MERGED_ADVISORY].run(
+            compose_lean_review_input(content, jd_text, resume_stats(content))
+        )
+        critiques.extend(_merged_review(result.content, advisory_names))
+    return critiques
+
+
+def _advisory_names(config: ReviewConfig) -> list[str]:
+    return [spec.name for spec in config.reviewers if not spec.gate]
+
+
+def _merged_review(content: Any, expected: list[str]) -> list[ReviewCritique]:
+    if not isinstance(content, MergedPanelReview):
+        raise TypeError(
+            "Expected MergedPanelReview from merged advisory, "
+            f"got {type(content).__name__}"
+        )
+    return split_merged_critiques(content, expected)
 
 
 def _panel_inputs(
@@ -101,11 +147,54 @@ async def arun_panel(
     sem: asyncio.Semaphore,
 ) -> list[ReviewCritique]:
     """Run configured reviewers concurrently; results stay in reviewer order."""
-    inputs = _panel_inputs(content, profile_facts, jd_text, config)
-    outputs = await asyncio.gather(
-        *(areview_one(text, reviewer_agents[name], sem=sem) for name, text in inputs),
-        return_exceptions=True,
-    )
+    if not config.merged_advisory:
+        inputs = _panel_inputs(content, profile_facts, jd_text, config)
+        outputs = await asyncio.gather(
+            *(areview_one(text, reviewer_agents[name], sem=sem) for name, text in inputs),
+            return_exceptions=True,
+        )
+        return _settled_critiques(outputs)
+
+    evidence = resolve_evidence(content, profile_facts)
+    gate_specs = [spec for spec in config.reviewers if spec.gate]
+    advisory_names = _advisory_names(config)
+    calls = [
+        areview_one(
+            compose_evidence_review_input(content, jd_text, evidence),
+            reviewer_agents[spec.name],
+            sem=sem,
+        )
+        for spec in gate_specs
+    ]
+    if advisory_names:
+        calls.append(
+            acall(
+                reviewer_agents[MERGED_ADVISORY],
+                compose_lean_review_input(content, jd_text, resume_stats(content)),
+                sem=sem,
+            )
+        )
+    outputs = await asyncio.gather(*calls, return_exceptions=True)
+    critiques: list[ReviewCritique] = []
+    first_error: BaseException | None = None
+    for index, output in enumerate(outputs):
+        if isinstance(output, BaseException):
+            first_error = first_error or output
+        elif advisory_names and index == len(gate_specs):
+            try:
+                critiques.extend(_merged_review(output.content, advisory_names))
+            except (TypeError, ValueError) as exc:
+                first_error = first_error or exc
+        else:
+            critiques.append(output)
+    if first_error is not None:
+        raise first_error
+    return critiques
+
+
+def _settled_critiques(
+    outputs: list[ReviewCritique | BaseException],
+) -> list[ReviewCritique]:
     critiques: list[ReviewCritique] = []
     first_error: BaseException | None = None
     for output in outputs:

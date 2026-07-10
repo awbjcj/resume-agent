@@ -27,3 +27,9 @@ class ReviewCritique(ExtensibleModel):
     issues: list[ReviewIssue] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
     summary: str | None = None
+
+
+class MergedPanelReview(ExtensibleModel):
+    """One combined advisory call's critique for every configured dimension."""
+
+    critiques: list[ReviewCritique] = Field(default_factory=list)

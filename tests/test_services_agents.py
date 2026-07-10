@@ -34,8 +34,8 @@ def test_tailor_bundle_builds_one_reviewer_per_spec(monkeypatch):
     class Config:
         reviewers = [Spec("a"), Spec("b")]
 
-    monkeypatch.setattr(agents, "build_tailor_agent", lambda style_guide=None: "tailor")
-    monkeypatch.setattr(agents, "build_reviser_agent", lambda style_guide=None: "reviser")
+    monkeypatch.setattr(agents, "build_tailor_agent", lambda model_id=None, style_guide=None: "tailor")
+    monkeypatch.setattr(agents, "build_reviser_agent", lambda model_id=None, style_guide=None: "reviser")
     monkeypatch.setattr(agents, "build_revision_agent", lambda style_guide=None: "revision")
     monkeypatch.setattr(
         agents,
@@ -51,8 +51,8 @@ def test_tailor_bundle_builds_one_reviewer_per_spec(monkeypatch):
 
 def test_tailor_bundle_threads_style_guide_into_all_agents(monkeypatch):
     seen = {}
-    monkeypatch.setattr(agents, "build_tailor_agent", lambda style_guide=None: seen.setdefault("tailor", style_guide))
-    monkeypatch.setattr(agents, "build_reviser_agent", lambda style_guide=None: seen.setdefault("reviser", style_guide))
+    monkeypatch.setattr(agents, "build_tailor_agent", lambda model_id=None, style_guide=None: seen.setdefault("tailor", style_guide))
+    monkeypatch.setattr(agents, "build_reviser_agent", lambda model_id=None, style_guide=None: seen.setdefault("reviser", style_guide))
     monkeypatch.setattr(
         agents,
         "build_revision_agent",
@@ -120,3 +120,61 @@ def test_tailor_bundle_match_plan_defaults_none():
         tailor=_DummyRunner(), reviser=_DummyRunner(), reviewers={}, revision=_DummyRunner()
     )
     assert bundle.match_plan is None
+
+
+def test_tailor_bundle_threads_writer_tiers(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        agents,
+        "build_tailor_agent",
+        lambda model_id=None, style_guide=None: seen.setdefault("tailor", model_id),
+    )
+    monkeypatch.setattr(
+        agents,
+        "build_reviser_agent",
+        lambda model_id=None, style_guide=None: seen.setdefault("reviser", model_id),
+    )
+    monkeypatch.setattr(agents, "build_revision_agent", lambda style_guide=None: "revision")
+    monkeypatch.setattr(
+        agents,
+        "build_reviewer_agent",
+        lambda name, model, style_guide=None, score_bands=False: f"review:{name}",
+    )
+    monkeypatch.setattr(agents, "model_for_tier", lambda tier: f"model:{tier}")
+
+    config = ReviewConfig(
+        tailor_tier="mid",
+        reviser_tier="cheap",
+        reviewers=[ReviewerSpec(name="ats-keyword")],
+    )
+    agents.build_tailor_bundle(config)
+
+    assert seen == {"tailor": "model:mid", "reviser": "model:cheap"}
+
+
+def test_tailor_bundle_builds_one_merged_advisory_agent(monkeypatch):
+    from resume_agent.tailor.panel import MERGED_ADVISORY
+
+    monkeypatch.setattr(agents, "build_tailor_agent", lambda **kwargs: object())
+    monkeypatch.setattr(agents, "build_reviser_agent", lambda **kwargs: object())
+    monkeypatch.setattr(agents, "build_revision_agent", lambda **kwargs: object())
+    monkeypatch.setattr(agents, "build_reviewer_agent", lambda name, *args, **kwargs: name)
+    monkeypatch.setattr(
+        agents,
+        "build_merged_advisory_agent",
+        lambda names, *args, **kwargs: tuple(names),
+    )
+
+    bundle = agents.build_tailor_bundle(
+        ReviewConfig(
+            merged_advisory=True,
+            reviewers=[
+                ReviewerSpec(name="fact-check", gate=True),
+                ReviewerSpec(name="ats-keyword"),
+                ReviewerSpec(name="recruiter"),
+            ],
+        )
+    )
+
+    assert set(bundle.reviewers) == {"fact-check", MERGED_ADVISORY}
+    assert bundle.reviewers[MERGED_ADVISORY] == ("ats-keyword", "recruiter")

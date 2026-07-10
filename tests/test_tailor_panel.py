@@ -183,3 +183,129 @@ def test_arun_panel_settles_reviewers_before_raising():
     with pytest.raises(RuntimeError):
         asyncio.run(go())
     assert "slow:done" in events
+
+
+def test_split_merged_critiques_returns_config_order():
+    from resume_agent.models.review import MergedPanelReview
+    from resume_agent.tailor.panel import split_merged_critiques
+
+    review = MergedPanelReview(
+        critiques=[
+            ReviewCritique(reviewer="recruiter", score=88, passed=True),
+            ReviewCritique(reviewer="ats-keyword", score=82, passed=True),
+        ]
+    )
+
+    result = split_merged_critiques(review, ["ats-keyword", "recruiter"])
+
+    assert [critique.reviewer for critique in result] == ["ats-keyword", "recruiter"]
+
+
+@pytest.mark.parametrize(
+    "names",
+    [
+        ["ats-keyword"],
+        ["ats-keyword", "recruiter", "extra"],
+        ["ats-keyword", "ats-keyword", "recruiter"],
+    ],
+)
+def test_split_merged_critiques_rejects_wrong_coverage(names):
+    from resume_agent.models.review import MergedPanelReview
+    from resume_agent.tailor.panel import split_merged_critiques
+
+    review = MergedPanelReview(
+        critiques=[ReviewCritique(reviewer=name, score=80, passed=True) for name in names]
+    )
+
+    with pytest.raises(ValueError):
+        split_merged_critiques(review, ["ats-keyword", "recruiter"])
+
+
+def test_merged_advisory_instructions_include_each_rubric():
+    from resume_agent.tailor.agents import _merged_advisory_instructions
+
+    text = " ".join(_merged_advisory_instructions(["ats-keyword", "concision"]))
+    assert "'ats-keyword'" in text
+    assert "'concision'" in text
+    assert "keyword" in text.lower()
+    assert "concision" in text.lower()
+
+
+def _merged_config() -> ReviewConfig:
+    return ReviewConfig(
+        merged_advisory=True,
+        reviewers=[
+            ReviewerSpec(name="fact-check", gate=True, weight=0),
+            ReviewerSpec(name="ats-keyword"),
+            ReviewerSpec(name="recruiter"),
+        ],
+    )
+
+
+def test_run_panel_merged_makes_one_lean_advisory_call():
+    from resume_agent.models.review import MergedPanelReview
+    from resume_agent.tailor.panel import MERGED_ADVISORY
+
+    merged = _Agent(
+        MergedPanelReview(
+            critiques=[
+                ReviewCritique(reviewer="recruiter", score=88, passed=True),
+                ReviewCritique(reviewer="ats-keyword", score=82, passed=True),
+            ]
+        )
+    )
+    reviewers = {
+        "fact-check": _Agent(
+            ReviewCritique(reviewer="fact-check", score=100, passed=True)
+        ),
+        MERGED_ADVISORY: merged,
+    }
+
+    critiques = run_panel(_content(), _facts(), "Backend role", _merged_config(), reviewers)
+
+    assert [critique.reviewer for critique in critiques] == [
+        "fact-check",
+        "ats-keyword",
+        "recruiter",
+    ]
+    assert "SUPPORTING FACTS" in reviewers["fact-check"].received
+    assert "RESUME STATS" in merged.received
+    assert "SecretRust" not in merged.received
+
+
+def test_arun_panel_merged_matches_sync_order():
+    import asyncio
+
+    from resume_agent.models.review import MergedPanelReview
+    from resume_agent.tailor.panel import MERGED_ADVISORY, arun_panel
+
+    reviewers = {
+        "fact-check": _Agent(
+            ReviewCritique(reviewer="fact-check", score=100, passed=True)
+        ),
+        MERGED_ADVISORY: _Agent(
+            MergedPanelReview(
+                critiques=[
+                    ReviewCritique(reviewer="ats-keyword", score=82, passed=True),
+                    ReviewCritique(reviewer="recruiter", score=88, passed=True),
+                ]
+            )
+        ),
+    }
+
+    critiques = asyncio.run(
+        arun_panel(
+            _content(),
+            _facts(),
+            "jd",
+            _merged_config(),
+            reviewers,
+            sem=asyncio.Semaphore(8),
+        )
+    )
+
+    assert [critique.reviewer for critique in critiques] == [
+        "fact-check",
+        "ats-keyword",
+        "recruiter",
+    ]
