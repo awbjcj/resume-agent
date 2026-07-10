@@ -11,6 +11,7 @@ from resume_agent.profile.corpus import (
     remove_source,
     save_manifest,
     update_source,
+    frontmatter_repo_url,
 )
 
 
@@ -250,3 +251,53 @@ def test_legacy_manifest_without_mode_loads(tmp_path):
     manifest = load_manifest(profile_dir)
     assert manifest.docs[0].mode == "literal"
     assert manifest.docs[0].anchor is None
+
+
+DOSSIER = b"""---
+repo_url: https://github.com/me/myrepo
+repo_name: myrepo
+---
+# Project: myrepo
+"""
+
+
+def test_dossier_frontmatter_is_validated_and_defaults_to_project_mode(tmp_path):
+    assert frontmatter_repo_url(DOSSIER) == "https://github.com/me/myrepo"
+    assert frontmatter_repo_url(b"---\nrepo_url: file:///etc/passwd\n---\n") is None
+    assert frontmatter_repo_url(b"---\nrepo_url: http://127.0.0.1/repo\n---\n") is None
+    assert frontmatter_repo_url(b"\xff\xfe---") is None
+
+    profile_dir = tmp_path / "profile"
+    add_source(profile_dir, _make_doc(tmp_path), primary=True)
+    dossier = tmp_path / "myrepo-dossier.md"
+    dossier.write_bytes(DOSSIER)
+    doc = add_source(profile_dir, dossier)
+    assert doc.mode == "project"
+    assert doc.origin == "upload"
+
+
+def test_explicit_mode_overrides_dossier_sniff_and_project_rejects_anchor(tmp_path):
+    profile_dir = tmp_path / "profile"
+    add_source(profile_dir, _make_doc(tmp_path), primary=True)
+    dossier = tmp_path / "myrepo-dossier.md"
+    dossier.write_bytes(DOSSIER)
+    assert add_source(profile_dir, dossier, mode="literal").mode == "literal"
+
+    other = tmp_path / "other.md"
+    other.write_bytes(DOSSIER.replace(b"myrepo", b"other"))
+    with pytest.raises(ValueError, match="anchor"):
+        add_source(profile_dir, other, mode="project", anchor="exp1")
+
+
+def test_origin_round_trips_and_dedupe_does_not_retag_upload(tmp_path):
+    profile_dir = tmp_path / "profile"
+    resume = _make_doc(tmp_path)
+    upload = add_source(profile_dir, resume, primary=True)
+    same = add_source(profile_dir, resume, origin="github")
+    assert same.id == upload.id and same.origin == "upload"
+
+    virtual = tmp_path / "github--repo.md"
+    virtual.write_text("# Repository: repo", encoding="utf-8")
+    github_doc = add_source(profile_dir, virtual, mode="project", origin="github")
+    assert github_doc.origin == "github"
+    assert load_manifest(profile_dir).docs[-1].origin == "github"

@@ -5,9 +5,11 @@ import os
 import re
 import shutil
 import tempfile
+from ipaddress import ip_address
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 
@@ -20,7 +22,8 @@ FRAGMENTS_DIRNAME = "fragments"
 
 _SLUG = re.compile(r"[^a-z0-9]+")
 
-SourceMode = Literal["literal", "synthesis"]
+SourceMode = Literal["literal", "synthesis", "project"]
+SourceOrigin = Literal["upload", "github"]
 
 _UNSET: object = object()
 
@@ -38,6 +41,7 @@ class SourceDoc(ExtensibleModel):
     primary: bool = False
     mode: SourceMode = "literal"
     anchor: str | None = None
+    origin: SourceOrigin = "upload"
 
 
 class SourceManifest(ExtensibleModel):
@@ -107,12 +111,55 @@ def _doc_id(filename: str, sha256: str) -> str:
     return f"{slug}-{sha256[:8]}"
 
 
+_FRONTMATTER = re.compile(rb"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?(?:\n|\Z)", re.DOTALL)
+
+
+def _valid_repo_url(value: str) -> bool:
+    try:
+        parsed = urlsplit(value)
+        host = parsed.hostname
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not host
+            or parsed.username is not None
+            or parsed.password is not None
+            or not parsed.path.strip("/")
+        ):
+            return False
+        if host.casefold() == "localhost" or host.casefold().endswith(".localhost"):
+            return False
+        try:
+            return ip_address(host).is_global
+        except ValueError:
+            return True
+    except ValueError:
+        return False
+
+
+def frontmatter_repo_url(data: bytes) -> str | None:
+    """Return a valid public HTTP(S) repo URL from leading YAML frontmatter."""
+    match = _FRONTMATTER.match(data)
+    if match is None:
+        return None
+    try:
+        block = match.group(1).decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    for line in block.splitlines():
+        key, separator, raw_value = line.partition(":")
+        if separator and key.strip() == "repo_url":
+            value = raw_value.strip().strip("'\"")
+            return value if _valid_repo_url(value) else None
+    return None
+
+
 def add_source(
     profile_dir: str | Path,
     file_path: str | Path,
     primary: bool = False,
     mode: SourceMode | None = None,
     anchor: str | None = None,
+    origin: SourceOrigin = "upload",
 ) -> SourceDoc:
     source = Path(file_path)
     suffix = source.suffix.lower()
@@ -122,8 +169,11 @@ def add_source(
             f"Unsupported document format: {suffix or '(none)'} (use {supported})"
         )
 
-    resolved_mode = mode or default_mode(source.name)
     data = source.read_bytes()
+    dossier_mode = source.suffix.lower() == ".md" and frontmatter_repo_url(data) is not None
+    resolved_mode = mode or ("project" if dossier_mode else default_mode(source.name))
+    if anchor is not None and resolved_mode != "synthesis":
+        raise ValueError("anchor requires synthesis mode")
     sha256 = hashlib.sha256(data).hexdigest()
     manifest = load_manifest(profile_dir)
     existing = next((doc for doc in manifest.docs if doc.sha256 == sha256), None)
@@ -133,9 +183,9 @@ def add_source(
             for doc in manifest.docs:
                 doc.primary = doc.id == existing.id
             changed = True
-        if mode is not None and existing.mode != mode:
-            existing.mode = mode
-            if mode == "literal":
+        if (mode is not None or dossier_mode) and existing.mode != resolved_mode:
+            existing.mode = resolved_mode
+            if resolved_mode != "synthesis":
                 existing.anchor = None
             changed = True
         if anchor is not None and existing.anchor != anchor:
@@ -159,6 +209,7 @@ def add_source(
         primary=primary,
         mode=resolved_mode,
         anchor=anchor,
+        origin=origin,
     )
     target_dir = sources_dir(profile_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -231,7 +282,7 @@ def update_source(
         return None
     if mode is not None:
         doc.mode = mode
-        if mode == "literal":
+        if mode != "synthesis":
             doc.anchor = None
     if anchor is not _UNSET:
         doc.anchor = anchor  # type: ignore[assignment]

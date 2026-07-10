@@ -13,6 +13,7 @@ from typing import Any, Literal
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import Runner, run_with_cleanup
+from resume_agent.models.base import Source
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.corpus import (
     FRAGMENTS_DIRNAME,
@@ -23,6 +24,10 @@ from resume_agent.profile.corpus import (
 )
 from resume_agent.profile.extractor import PROMPT_VERSION, aextract_profile_facts
 from resume_agent.profile.ids import assign_fact_ids
+from resume_agent.profile.project_extractor import (
+    PROJECT_PROMPT_VERSION,
+    aextract_project_facts,
+)
 from resume_agent.profile.resume_reader import CONVERTER_VERSION, read_document_text
 from resume_agent.profile.synthesis import (
     SYNTHESIS_PROMPT_VERSION,
@@ -97,6 +102,14 @@ def _synthesis_meta(doc: SourceDoc, sha256: str) -> dict:
     }
 
 
+def _project_meta(sha256: str) -> dict:
+    return {
+        "sha256": sha256,
+        "project_prompt_version": PROJECT_PROMPT_VERSION,
+        "converter_version": CONVERTER_VERSION,
+    }
+
+
 def _meta_equals(meta_path: Path, expected: dict) -> bool:
     try:
         metadata = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -108,6 +121,8 @@ def _meta_equals(meta_path: Path, expected: dict) -> bool:
 def _expected_meta(doc: SourceDoc, sha256: str) -> dict:
     if doc.mode == "synthesis":
         return _synthesis_meta(doc, sha256)
+    if doc.mode == "project":
+        return _project_meta(sha256)
     return _literal_meta(sha256)
 
 
@@ -267,8 +282,32 @@ def extract_fragments(
         profile_dir,
         manifest,
         FragmentProducer(
-            selects=lambda doc: doc.mode != "synthesis",
+            selects=lambda doc: doc.mode == "literal",
             expected_meta=lambda doc, sha: _literal_meta(sha),
+            produce=_produce,
+            runners=(agent,),
+        ),
+    )
+
+
+def extract_project_fragments(
+    profile_dir: str | Path,
+    manifest: SourceManifest,
+    agent: Runner,
+) -> FragmentResult:
+    """Extract project-mode documents through the closed project schema."""
+
+    async def _produce(doc: SourceDoc, text: str, sem: asyncio.Semaphore) -> Produced:
+        source = Source.github if doc.origin == "github" else Source.manual
+        facts = await aextract_project_facts(text, agent, source=source, sem=sem)
+        return Produced(facts=assign_fact_ids(facts, doc.id))
+
+    return _walk_fragments(
+        profile_dir,
+        manifest,
+        FragmentProducer(
+            selects=lambda doc: doc.mode == "project",
+            expected_meta=lambda _doc, sha: _project_meta(sha),
             produce=_produce,
             runners=(agent,),
         ),

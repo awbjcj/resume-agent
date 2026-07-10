@@ -1,10 +1,12 @@
 import json
 from pathlib import Path
 
-from resume_agent.models.profile import Contact, ProfileFacts, Skill
+from resume_agent.models.base import Source
+from resume_agent.models.profile import Contact, ProfileFacts, Project, Skill
 from resume_agent.profile.corpus import add_source, load_manifest, remove_source
 from resume_agent.profile.fragments import (
     extract_fragments,
+    extract_project_fragments,
     extract_synthesis_fragments,
     fragment_cache_status,
     load_fragment,
@@ -351,3 +353,35 @@ def test_synthesis_docs_are_produced_concurrently(tmp_path, monkeypatch):
     }
     assert all(status == "extracted" for status in statuses.values()), statuses
     assert synthesis.max_active >= 2
+
+
+def test_project_walk_is_source_aware_cached_and_skipped_by_literal_walk(tmp_path):
+    from resume_agent.profile.project_extractor import ProjectDocFacts
+
+    profile_dir = _setup(tmp_path)
+    repo = tmp_path / "github--repo.md"
+    repo.write_text("# Repository: repo", encoding="utf-8")
+    project_doc = add_source(profile_dir, repo, mode="project", origin="github")
+    agent = _FakeAgent(
+        ProjectDocFacts(
+            project=Project(name="repo"),
+            skills={"tools": [Skill(name="Docker")]},
+        )
+    )
+
+    literal = extract_fragments(
+        profile_dir,
+        load_manifest(profile_dir),
+        _FakeAgent(ProfileFacts(contact=Contact(name="Ada"))),
+    )
+    assert project_doc.id not in literal.fragments
+
+    first = extract_project_fragments(profile_dir, load_manifest(profile_dir), agent)
+    assert first.status[project_doc.id] == "extracted"
+    assert first.fragments[project_doc.id].projects[0].source == Source.github
+    assert first.fragments[project_doc.id].projects[0].source_ref == project_doc.id
+    assert first.fragments[project_doc.id].skills["tools"][0].source == Source.github
+
+    second = extract_project_fragments(profile_dir, load_manifest(profile_dir), agent)
+    assert second.status[project_doc.id] == "cached"
+    assert agent.calls == 1
