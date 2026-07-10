@@ -48,3 +48,25 @@ def test_review_reviewers_default_roster(client):
     names = [r["name"] for r in body["reviewers"]]
     assert names[0] == "fact-check"
     assert body["reviewers"][0]["gate"] is True
+
+
+def test_profile_repo_filters_round_trip_and_limit_is_bounded(client):
+    response = client.put(
+        "/api/config/profile",
+        json={
+            "githubUsername": "ada",
+            "githubRepoAllow": ["important-fork"],
+            "githubRepoDeny": ["noise"],
+            "githubRepoLimit": 5,
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert client.get("/api/config/profile").json() == {
+        "githubUsername": "ada",
+        "githubRepoAllow": ["important-fork"],
+        "githubRepoDeny": ["noise"],
+        "githubRepoLimit": 5,
+    }
+    assert client.put(
+        "/api/config/profile", json={"githubRepoLimit": 0}
+    ).status_code == 422

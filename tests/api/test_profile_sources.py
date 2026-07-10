@@ -33,6 +33,7 @@ def test_upload_and_list_with_defaults(client):
     body = resp.json()
     assert body["mode"] == "literal"
     assert body["primary"] is True  # first source auto-promotes
+    assert body["origin"] == "upload"
 
     deck = _upload(c, name="deck.md", content=b"Cut latency 30%", mode="synthesis")
     assert deck.status_code == 201
@@ -113,3 +114,50 @@ def test_skeleton_lists_anchor_candidates(client):
     rows = c.get("/api/profile/skeleton").json()
     assert {"id": "exp1", "kind": "experience", "label": "Acme — Engineer"} in rows
     assert {"id": "proj1", "kind": "project", "label": "Engine"} in rows
+
+
+def test_note_and_url_intake_endpoints(client, monkeypatch):
+    c, _ = client
+    _upload(c)
+    note = c.post(
+        "/api/profile/sources/note",
+        json={"title": "On-call", "text": "Led the rotation."},
+    )
+    assert note.status_code == 201, note.text
+    assert note.json()["filename"] == "note--on-call.md"
+    assert note.json()["origin"] == "upload"
+    assert c.post(
+        "/api/profile/sources/note", json={"title": "x", "text": "  "}
+    ).status_code == 422
+
+    import httpx
+    import resume_agent.api.routers.profile as profile_router
+
+    monkeypatch.setattr(
+        profile_router,
+        "add_url_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(httpx.ConnectError("down")),
+    )
+    failed = c.post(
+        "/api/profile/sources/url", json={"url": "https://example.com/page"}
+    )
+    assert failed.status_code == 422
+    assert failed.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_sync_github_launches_tracked_run_and_requires_username(client, monkeypatch):
+    c, _ = client
+    assert c.post("/api/profile/sync-github").status_code == 400
+    c.put("/api/config/profile", json={"githubUsername": "ada"})
+
+    import resume_agent.api.routers.profile as profile_router
+    from resume_agent.profile.github_harvest import HarvestReport
+
+    monkeypatch.setattr(
+        profile_router,
+        "sync_github_sources",
+        lambda *_args, **_kwargs: HarvestReport(written=["github--repo.md"]),
+    )
+    response = c.post("/api/profile/sync-github")
+    assert response.status_code == 202, response.text
+    assert response.json()["kind"] == "github-sync"

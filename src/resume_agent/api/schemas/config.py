@@ -80,6 +80,9 @@ class StyleGuideDoc(CamelModel):
 
 class ProfileConfigDoc(CamelModel):
     github_username: str | None = None
+    github_repo_allow: list[str] = Field(default_factory=list)
+    github_repo_deny: list[str] = Field(default_factory=list)
+    github_repo_limit: int = Field(default=20, ge=1, le=100)
 
 
 DOMAIN_SCHEMAS: dict[str, type[CamelModel]] = {

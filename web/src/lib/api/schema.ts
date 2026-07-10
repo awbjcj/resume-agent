@@ -541,6 +541,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile/matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile Matrix */
+        get: operations["get_profile_matrix_api_profile_matrix_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profile/skeleton": {
         parameters: {
             query?: never;
@@ -576,6 +593,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile/sources/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Note */
+        post: operations["add_note_api_profile_sources_note_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/sources/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Url */
+        post: operations["add_url_api_profile_sources_url_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profile/sources/{doc_id}": {
         parameters: {
             query?: never;
@@ -592,6 +643,23 @@ export interface paths {
         head?: never;
         /** Patch Source */
         patch: operations["patch_source_api_profile_sources__doc_id__patch"];
+        trace?: never;
+    };
+    "/api/profile/sync-github": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Github Sync */
+        post: operations["launch_github_sync_api_profile_sync_github_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/prune": {
@@ -1127,7 +1195,7 @@ export interface components {
             /** File */
             file: string;
             /** Mode */
-            mode?: string | null;
+            mode?: ("literal" | "synthesis" | "project") | null;
             /**
              * Primary
              * @default false
@@ -1463,6 +1531,41 @@ export interface components {
             /** Themes */
             themes: components["schemas"]["ThemeOut"][];
         };
+        /** MatrixOut */
+        MatrixOut: {
+            /**
+             * Generatedat
+             * @default
+             */
+            generatedAt: string;
+            /** Groups */
+            groups?: components["schemas"]["SkillGroupOut"][];
+            /** Rows */
+            rows?: components["schemas"]["MatrixRowOut"][];
+        };
+        /** MatrixRowOut */
+        MatrixRowOut: {
+            /** Category */
+            category?: string | null;
+            /** Display */
+            display: string;
+            /** Group */
+            group?: string | null;
+            /**
+             * Inferred
+             * @default false
+             */
+            inferred: boolean;
+            /** Key */
+            key: string;
+            /** Lastused */
+            lastUsed?: string | null;
+            /**
+             * Strength
+             * @default 0
+             */
+            strength: number;
+        };
         /** ModelsConfigDoc */
         ModelsConfigDoc: {
             /**
@@ -1480,6 +1583,16 @@ export interface components {
              * @default claude-opus-4-8
              */
             premiumModel: string;
+        };
+        /** NoteIn */
+        NoteIn: {
+            /** Text */
+            text: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
         };
         /** NotificationOut */
         NotificationOut: {
@@ -1565,6 +1678,15 @@ export interface components {
         };
         /** ProfileConfigDoc */
         ProfileConfigDoc: {
+            /** Githubrepoallow */
+            githubRepoAllow?: string[];
+            /** Githubrepodeny */
+            githubRepoDeny?: string[];
+            /**
+             * Githubrepolimit
+             * @default 20
+             */
+            githubRepoLimit: number;
             /** Githubusername */
             githubUsername?: string | null;
         };
@@ -1962,6 +2084,13 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** SkillGroupOut */
+        SkillGroupOut: {
+            /** Label */
+            label: string;
+            /** Slug */
+            slug: string;
+        };
         /** SkillNodeOut */
         SkillNodeOut: {
             /**
@@ -2005,7 +2134,7 @@ export interface components {
             /** Anchor */
             anchor?: string | null;
             /** Mode */
-            mode?: string | null;
+            mode?: ("literal" | "synthesis" | "project") | null;
             /** Primary */
             primary?: boolean | null;
         };
@@ -2215,6 +2344,14 @@ export interface components {
             /** Title */
             title: string | null;
         };
+        /** UrlIn */
+        UrlIn: {
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -2240,8 +2377,17 @@ export interface components {
             fragmentStatus: string;
             /** Id */
             id: string;
-            /** Mode */
-            mode: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "literal" | "synthesis" | "project";
+            /**
+             * Origin
+             * @default upload
+             * @enum {string}
+             */
+            origin: "upload" | "github";
             /** Primary */
             primary: boolean;
         };
@@ -3640,6 +3786,37 @@ export interface operations {
             };
         };
     };
+    get_profile_matrix_api_profile_matrix_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_skeleton_api_profile_skeleton_get: {
         parameters: {
             query?: never;
@@ -3737,6 +3914,76 @@ export interface operations {
             };
         };
     };
+    add_note_api_profile_sources_note_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_url_api_profile_sources_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UrlIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_source_api_profile_sources__doc_id__delete: {
         parameters: {
             query?: {
@@ -3794,6 +4041,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["resume_agent__api__schemas__profile__SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_github_sync_api_profile_sync_github_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

@@ -59,7 +59,9 @@ def profile_add(
         DEFAULT_PROFILE_DIR, "--dir", help="Profile data directory."
     ),
     mode: str | None = typer.Option(
-        None, "--mode", help="'literal' or 'synthesis' (default: by file type; .pptx → synthesis)."
+        None,
+        "--mode",
+        help="'literal', 'synthesis', or 'project' (default: .pptx → synthesis; dossier .md → project).",
     ),
     anchor: str | None = typer.Option(
         None, "--anchor", help="Experience/project fact id synthesized entries attach to."
@@ -113,6 +115,76 @@ def profile_sources(
         )
 
 
+@profile_app.command("add-note")
+def profile_add_note(
+    title: str = typer.Argument(..., help="Short note title."),
+    text: str = typer.Argument(..., help="The fact(s) to record."),
+    dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir"),
+) -> None:
+    """Save free text as a literal profile source."""
+    from resume_agent.profile.intake import add_note_source
+
+    try:
+        doc = add_note_source(dir, title, text)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(code=1) from error
+    typer.echo(f"Registered {doc.filename} as {doc.id} mode:{doc.mode}")
+
+
+@profile_app.command("add-url")
+def profile_add_url(
+    url: str = typer.Argument(..., help="Public page to ingest."),
+    dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir"),
+) -> None:
+    """Fetch a public URL and save its readable text as a literal source."""
+    import httpx
+
+    import resume_agent.profile.intake as intake
+
+    try:
+        doc = intake.add_url_source(dir, url)
+    except (httpx.HTTPError, ValueError) as error:
+        typer.echo(f"URL intake failed: {error}")
+        raise typer.Exit(code=1) from error
+    typer.echo(f"Registered {doc.filename} as {doc.id} mode:{doc.mode}")
+
+
+@profile_app.command("sync-github")
+def profile_sync_github(
+    username: str | None = typer.Option(None, "--username"),
+    sources: str = typer.Option(DEFAULT_SOURCES, "--sources"),
+    dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir"),
+) -> None:
+    """Refresh GitHub-derived sources without running a full profile build."""
+    from resume_agent.profile.github_harvest import sync_github_sources
+
+    config = load_yaml(sources) if Path(sources).exists() else {}
+    selected_username = username or cast(str | None, config.get("github_username"))
+    if not selected_username:
+        typer.echo("No GitHub username; pass --username or configure github_username.")
+        raise typer.Exit(code=1)
+    try:
+        report = sync_github_sources(
+            dir,
+            selected_username,
+            allow=tuple(config.get("github_repo_allow") or ()),
+            deny=tuple(config.get("github_repo_deny") or ()),
+            limit=int(config.get("github_repo_limit") or 20),
+        )
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(code=1) from error
+    typer.echo(
+        f"written:{len(report.written)} removed:{len(report.removed)} "
+        f"superseded:{len(report.superseded)} failures:{len(report.failures)}"
+    )
+    for name, reason in sorted(report.failures.items()):
+        typer.echo(f"  FAILED {name}: {reason}")
+    for warning in report.warnings:
+        typer.echo(f"  WARNING: {warning}")
+
+
 @profile_app.command("build")
 def profile_build(
     sources: str = typer.Option(
@@ -164,6 +236,9 @@ def profile_build(
         profile_dir=Path(dir),
         github_username=cast(str | None, cfg.get("github_username")),
         facts_out=out,
+        github_allow=tuple(cfg.get("github_repo_allow") or ()),
+        github_deny=tuple(cfg.get("github_repo_deny") or ()),
+        github_limit=int(cfg.get("github_repo_limit") or 20),
     )
     typer.echo(
         f"Wrote {report['experiences']} experiences and "

@@ -41,6 +41,13 @@ def _configure_build(monkeypatch, facts):
     monkeypatch.setattr(
         "resume_agent.profile.synthesis.build_entailment_agent", lambda: object()
     )
+    monkeypatch.setattr(
+        "resume_agent.profile.project_extractor.build_project_extractor_agent",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        "resume_agent.taxonomy.groups.build_group_classifier_agent", lambda: object()
+    )
 
 
 def test_profile_build_writes_facts(tmp_path, monkeypatch):
@@ -206,10 +213,20 @@ def test_profile_build_prints_report(tmp_path, monkeypatch):
 def test_profile_build_delegates_to_the_service(tmp_path, monkeypatch):
     calls = {}
 
-    def fake_run(reporter, *, profile_dir, github_username, facts_out):
+    def fake_run(
+        reporter,
+        *,
+        profile_dir,
+        github_username,
+        facts_out,
+        github_allow,
+        github_deny,
+        github_limit,
+    ):
         calls["reporter"] = reporter
         calls["github_username"] = github_username
         calls["facts_out"] = str(facts_out)
+        calls["github_options"] = (github_allow, github_deny, github_limit)
         return {
             "experiences": 0,
             "projects": 0,
@@ -253,3 +270,73 @@ def test_profile_build_delegates_to_the_service(tmp_path, monkeypatch):
     assert calls["reporter"] is None
     assert calls["github_username"] == "ada"
     assert calls["facts_out"] == str(out)
+    assert calls["github_options"] == ((), (), 20)
+
+
+def test_profile_add_note_url_and_sync_github_commands(tmp_path, monkeypatch):
+    profile_dir = tmp_path / "profile"
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada", encoding="utf-8")
+    assert runner.invoke(
+        cli.app, ["profile", "add", str(resume), "--dir", str(profile_dir)]
+    ).exit_code == 0
+
+    note = runner.invoke(
+        cli.app,
+        [
+            "profile",
+            "add-note",
+            "On-call",
+            "Led the rotation.",
+            "--dir",
+            str(profile_dir),
+        ],
+    )
+    assert note.exit_code == 0, note.output
+    assert "note--on-call.md" in note.output
+
+    monkeypatch.setattr(
+        "resume_agent.profile.intake.add_url_source",
+        lambda directory, url: __import__(
+            "resume_agent.profile.intake", fromlist=["add_note_source"]
+        ).add_note_source(directory, "fetched", f"content of {url}"),
+    )
+    added_url = runner.invoke(
+        cli.app,
+        ["profile", "add-url", "https://example.com", "--dir", str(profile_dir)],
+    )
+    assert added_url.exit_code == 0, added_url.output
+
+    from resume_agent.profile.github_harvest import HarvestReport
+
+    monkeypatch.setattr(
+        "resume_agent.profile.github_harvest.sync_github_sources",
+        lambda *_args, **_kwargs: HarvestReport(written=["github--repo.md"]),
+    )
+    missing = runner.invoke(
+        cli.app,
+        [
+            "profile",
+            "sync-github",
+            "--sources",
+            str(tmp_path / "missing.yaml"),
+            "--dir",
+            str(profile_dir),
+        ],
+    )
+    assert missing.exit_code == 1
+    synced = runner.invoke(
+        cli.app,
+        [
+            "profile",
+            "sync-github",
+            "--username",
+            "ada",
+            "--sources",
+            str(tmp_path / "missing.yaml"),
+            "--dir",
+            str(profile_dir),
+        ],
+    )
+    assert synced.exit_code == 0, synced.output
+    assert "written:1" in synced.output

@@ -405,6 +405,11 @@
           "mode": {
             "anyOf": [
               {
+                "enum": [
+                  "literal",
+                  "synthesis",
+                  "project"
+                ],
                 "type": "string"
               },
               {
@@ -1433,6 +1438,92 @@
         "title": "MatchGapOut",
         "type": "object"
       },
+      "MatrixOut": {
+        "properties": {
+          "generatedAt": {
+            "default": "",
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SkillGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MatrixRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "title": "MatrixOut",
+        "type": "object"
+      },
+      "MatrixRowOut": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "inferred": {
+            "default": false,
+            "title": "Inferred",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "lastUsed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastused"
+          },
+          "strength": {
+            "default": 0.0,
+            "title": "Strength",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "display"
+        ],
+        "title": "MatrixRowOut",
+        "type": "object"
+      },
       "ModelsConfigDoc": {
         "properties": {
           "cheapModel": {
@@ -1452,6 +1543,27 @@
           }
         },
         "title": "ModelsConfigDoc",
+        "type": "object"
+      },
+      "NoteIn": {
+        "properties": {
+          "text": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "NoteIn",
         "type": "object"
       },
       "NotificationOut": {
@@ -1715,6 +1827,27 @@
       },
       "ProfileConfigDoc": {
         "properties": {
+          "githubRepoAllow": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Githubrepoallow",
+            "type": "array"
+          },
+          "githubRepoDeny": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Githubrepodeny",
+            "type": "array"
+          },
+          "githubRepoLimit": {
+            "default": 20,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Githubrepolimit",
+            "type": "integer"
+          },
           "githubUsername": {
             "anyOf": [
               {
@@ -2934,6 +3067,24 @@
         "title": "SkeletonEntryOut",
         "type": "object"
       },
+      "SkillGroupOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "label"
+        ],
+        "title": "SkillGroupOut",
+        "type": "object"
+      },
       "SkillNodeOut": {
         "properties": {
           "coverage": {
@@ -3045,6 +3196,11 @@
           "mode": {
             "anyOf": [
               {
+                "enum": [
+                  "literal",
+                  "synthesis",
+                  "project"
+                ],
                 "type": "string"
               },
               {
@@ -3666,6 +3822,21 @@
         "title": "TriageItem",
         "type": "object"
       },
+      "UrlIn": {
+        "properties": {
+          "url": {
+            "format": "uri",
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "UrlIn",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -3736,7 +3907,21 @@
             "type": "string"
           },
           "mode": {
+            "enum": [
+              "literal",
+              "synthesis",
+              "project"
+            ],
             "title": "Mode",
+            "type": "string"
+          },
+          "origin": {
+            "default": "upload",
+            "enum": [
+              "upload",
+              "github"
+            ],
+            "title": "Origin",
             "type": "string"
           },
           "primary": {
@@ -6240,6 +6425,52 @@
         "summary": "Delete Document"
       }
     },
+    "/api/profile/matrix": {
+      "get": {
+        "operationId": "get_profile_matrix_api_profile_matrix_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile Matrix"
+      }
+    },
     "/api/profile/skeleton": {
       "get": {
         "operationId": "get_skeleton_api_profile_skeleton_get",
@@ -6394,6 +6625,118 @@
         "summary": "Upload Source"
       }
     },
+    "/api/profile/sources/note": {
+      "post": {
+        "operationId": "add_note_api_profile_sources_note_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/resume_agent__api__schemas__profile__SourceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Note"
+      }
+    },
+    "/api/profile/sources/url": {
+      "post": {
+        "operationId": "add_url_api_profile_sources_url_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UrlIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/resume_agent__api__schemas__profile__SourceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Url"
+      }
+    },
     "/api/profile/sources/{doc_id}": {
       "delete": {
         "operationId": "delete_source_api_profile_sources__doc_id__delete",
@@ -6513,6 +6856,52 @@
           }
         },
         "summary": "Patch Source"
+      }
+    },
+    "/api/profile/sync-github": {
+      "post": {
+        "operationId": "launch_github_sync_api_profile_sync_github_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Github Sync"
       }
     },
     "/api/prune": {

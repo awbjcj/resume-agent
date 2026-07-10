@@ -6,6 +6,7 @@ import re
 import tempfile
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from resume_agent.api.deps import get_run_manager
@@ -14,25 +15,34 @@ from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.profile import (
     DocumentOut,
+    MatrixOut,
+    NoteIn,
     SkeletonEntryOut,
     SourceOut,
     SourcePatch,
+    SkillGroupOut,
+    UrlIn,
 )
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.api.schemas.secrets import LLM_KEY_ENV_VARS
 from resume_agent.profile.corpus import (
     _UNSET,
+    SourceMode,
     add_source,
     load_manifest,
     remove_source,
     update_source,
 )
 from resume_agent.profile.fragments import fragment_cache_status
+from resume_agent.profile.github_harvest import sync_github_sources
+from resume_agent.profile.intake import add_note_source, add_url_source
+from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
 from resume_agent.profile.synthesis import profile_skeleton
 from resume_agent.services import profile_build
 from resume_agent.services.env_config import read_env
 from resume_agent.services.profile_documents import DocumentError, DocumentStore
+from resume_agent.taxonomy.groups import SKILL_GROUPS
 
 router = APIRouter()
 
@@ -97,6 +107,9 @@ def launch_profile_build(request: Request, mgr: RunManager = Depends(get_run_man
         return profile_build.run_corpus_build(
             reporter, profile_dir=profile_dir,
             github_username=github_username, facts_out=facts_out,
+            github_allow=tuple(profile_cfg.github_repo_allow),
+            github_deny=tuple(profile_cfg.github_repo_deny),
+            github_limit=profile_cfg.github_repo_limit,
         )
 
     run_id = mgr.submit("profile-build", work, singleton_key="profile-build")
@@ -118,6 +131,7 @@ def _source_out(profile_dir: Path, doc) -> SourceOut:
         id=doc.id, filename=doc.filename, mode=doc.mode, primary=doc.primary,
         anchor=doc.anchor, added_at=doc.added_at,
         fragment_status=fragment_cache_status(profile_dir, doc),
+        origin=doc.origin,
     )
 
 
@@ -131,7 +145,7 @@ def list_sources(request: Request):
 async def upload_source(
     request: Request,
     file: UploadFile = File(...),
-    mode: str | None = Form(None),
+    mode: SourceMode | None = Form(None),
     anchor: str | None = Form(None),
     primary: bool = Form(False),
 ):
@@ -152,6 +166,75 @@ async def upload_source(
     except ValueError as exc:
         raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
     return _source_out(profile_dir, doc)
+
+
+@router.post("/profile/sources/note", response_model=SourceOut, status_code=201)
+def add_note(payload: NoteIn, request: Request):
+    profile_dir = _profile_dir(request)
+    try:
+        doc = add_note_source(profile_dir, payload.title, payload.text)
+    except ValueError as error:
+        raise ApiException(422, "VALIDATION_ERROR", str(error)) from error
+    return _source_out(profile_dir, doc)
+
+
+@router.post("/profile/sources/url", response_model=SourceOut, status_code=201)
+def add_url(payload: UrlIn, request: Request):
+    profile_dir = _profile_dir(request)
+    try:
+        doc = add_url_source(profile_dir, str(payload.url))
+    except (httpx.HTTPError, ValueError) as error:
+        raise ApiException(422, "VALIDATION_ERROR", f"URL intake failed: {error}") from error
+    return _source_out(profile_dir, doc)
+
+
+@router.post("/profile/sync-github", response_model=RunOut, status_code=202)
+def launch_github_sync(
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    profile_config = request.app.state.config_store.get("profile")
+    if not profile_config.github_username:
+        raise ApiException(
+            400,
+            "SETUP_INCOMPLETE",
+            "Set a GitHub username in Settings > Profile first",
+        )
+    profile_dir = _profile_dir(request)
+
+    def work(_reporter):
+        report = sync_github_sources(
+            profile_dir,
+            profile_config.github_username,
+            allow=tuple(profile_config.github_repo_allow),
+            deny=tuple(profile_config.github_repo_deny),
+            limit=profile_config.github_repo_limit,
+        )
+        return {
+            "written": report.written,
+            "removed": report.removed,
+            "superseded": report.superseded,
+            "failures": report.failures,
+            "warnings": report.warnings,
+        }
+
+    run_id = mgr.submit("github-sync", work, singleton_key="github-sync")
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(record)
+
+
+@router.get("/profile/matrix", response_model=MatrixOut)
+def get_profile_matrix(request: Request):
+    matrix = load_matrix(_profile_dir(request) / "matrix.json")
+    return MatrixOut(
+        generated_at=matrix.generated_at if matrix is not None else "",
+        groups=[
+            SkillGroupOut(slug=slug, label=label)
+            for slug, label in SKILL_GROUPS.items()
+        ],
+        rows=(matrix.rows if matrix is not None else []),
+    )
 
 
 @router.patch("/profile/sources/{doc_id}", response_model=SourceOut)
