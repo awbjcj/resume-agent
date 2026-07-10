@@ -2647,19 +2647,6 @@
         "title": "SecretsUpdate",
         "type": "object"
       },
-      "SetEnabledIn": {
-        "properties": {
-          "enabled": {
-            "title": "Enabled",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "enabled"
-        ],
-        "title": "SetEnabledIn",
-        "type": "object"
-      },
       "SetupStatusOut": {
         "properties": {
           "complete": {
@@ -3079,6 +3066,35 @@
           }
         },
         "title": "SourcePatch",
+        "type": "object"
+      },
+      "SourcePatchIn": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          }
+        },
+        "title": "SourcePatchIn",
         "type": "object"
       },
       "SourcePreviewIn": {
@@ -3760,6 +3776,17 @@
           "kind": {
             "title": "Kind",
             "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
           },
           "pullable": {
             "title": "Pullable",
@@ -7892,7 +7919,7 @@
         "summary": "Remove Source Route"
       },
       "patch": {
-        "operationId": "set_enabled_route_api_sources__source_id__patch",
+        "operationId": "patch_source_route_api_sources__source_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -7924,7 +7951,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SetEnabledIn"
+                "$ref": "#/components/schemas/SourcePatchIn"
               }
             }
           },
@@ -7952,7 +7979,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Set Enabled Route"
+        "summary": "Patch Source Route"
       }
     },
     "/api/suggestion-runs": {
