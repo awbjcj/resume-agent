@@ -20,6 +20,7 @@ from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 from resume_agent.taxonomy.clusters import load_cluster_map
 
 DEFAULT_REVIEW = "config/review.yaml"
+DEFAULT_REVIEW_DEEP = "config/review_deep.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
 
 

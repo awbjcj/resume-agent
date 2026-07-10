@@ -27,7 +27,7 @@ from resume_agent.services.discovery import (
 )
 from resume_agent.services.prune import prune as run_prune
 from resume_agent.services.rendering import render_resume_version
-from resume_agent.services.tailoring import tailor
+from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP, tailor
 from resume_agent.tracking.queries import application_job_pairs
 from resume_agent.tracking.repository import (
     get_job,
@@ -596,9 +596,6 @@ def match_gap_cmd(
         )
 
 
-DEFAULT_REVIEW = "config/review.yaml"
-
-
 @app.command("approve")
 def approve(
     job_id: int = typer.Argument(..., help="Job id to approve for tailoring."),
@@ -623,6 +620,11 @@ def tailor_cmd(
         False, "--approved", help="Tailor all approved jobs."
     ),
     review: str = typer.Option(DEFAULT_REVIEW, help="Path to review.yaml."),
+    deep: bool = typer.Option(
+        False,
+        "--deep",
+        help="Use the full multi-round review roster.",
+    ),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
@@ -636,11 +638,12 @@ def tailor_cmd(
             typer.echo(f"Job #{job_id} not found.")
             raise typer.Exit(code=1)
 
+        review_path = DEFAULT_REVIEW_DEEP if deep and review == DEFAULT_REVIEW else review
         results = tailor(
             session,
             job_ids=[job_id] if job_id is not None else None,
             approved=approved,
-            review_path=review,
+            review_path=review_path,
             facts_path=facts,
             reporter=ProgressReporter("tailor"),
         )
