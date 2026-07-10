@@ -78,6 +78,34 @@ def test_loop_revises_until_gate_passes():
     assert rounds[-1].verdict.passed is True
 
 
+def test_rounds_record_stage_seconds_on_the_round_the_content_enters():
+    config = ReviewConfig(
+        max_rounds=3,
+        score_threshold=80,
+        reviewers=[
+            ReviewerSpec(name="fact-check", gate=True, weight=0),
+            ReviewerSpec(name="ats-keyword"),
+        ],
+    )
+
+    rounds = run_tailor_review(
+        jd_text="Backend role",
+        criteria=JobCriteria(),
+        profile_facts=ProfileFacts(contact=Contact(name="Ada")),
+        config=config,
+        tailor_agent=_ContentAgent(),
+        reviewer_agents={
+            "fact-check": _FactCheck(),
+            "ats-keyword": _Good("ats-keyword"),
+        },
+        reviser_agent=_ContentAgent(),
+    )
+
+    assert rounds[0].stage_seconds.keys() >= {"draft", "panel"}
+    assert rounds[1].stage_seconds.keys() >= {"revise", "panel"}
+    assert all(seconds >= 0 for round_ in rounds for seconds in round_.stage_seconds.values())
+
+
 def test_arun_tailor_review_passes_with_async_agents():
     import asyncio
 
@@ -118,6 +146,7 @@ def test_arun_tailor_review_passes_with_async_agents():
     rounds = asyncio.run(go())
     assert len(rounds) == 1
     assert rounds[0].round_num == 1
+    assert rounds[0].stage_seconds.keys() >= {"draft", "panel"}
 
 
 def test_loop_stops_at_max_rounds_when_never_passing():

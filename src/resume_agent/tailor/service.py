@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import Mapping, Sequence
 
 from sqlmodel import Session
@@ -20,6 +21,8 @@ from resume_agent.tracking.repository import save_job, save_resume_version
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 from resume_agent.taxonomy.clusters import ClusterMap
 
+logger = logging.getLogger(__name__)
+
 
 def _persist_rounds(
     session: Session, job: Job, rounds: list[TailorRound]
@@ -40,6 +43,13 @@ def _persist_rounds(
         versions.append(save_resume_version(session, version))
     job.status = JobStatus.tailored.value
     save_job(session, job)
+    logger.info(
+        "tailor job=%s rounds=%s total_llm_seconds=%.1f stages=%s",
+        job.id,
+        len(rounds),
+        sum(sum(round_.stage_seconds.values()) for round_ in rounds),
+        [round_.stage_seconds for round_ in rounds],
+    )
     return versions
 
 
