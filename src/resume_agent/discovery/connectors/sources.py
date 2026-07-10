@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.config import ConnectorsConfig
 from resume_agent.discovery.connectors.detect import identify_host
+from resume_agent.discovery.scraper.recipe_store import host_key
 
 
 @dataclass(frozen=True)
@@ -19,10 +20,15 @@ class SourceView:
     enabled: bool
     pullable: bool
     detail: str
+    limit: int | None = None
 
 
 def company_url_id(url: str) -> str:
     return "companies:" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:8]
+
+
+def scrape_target_id(url: str) -> str:
+    return f"scrape:{host_key(url)}"
 
 
 def _company_kind(url: str) -> str:
@@ -44,6 +50,7 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
                 enabled=enabled,
                 pullable=enabled,
                 detail=board.token,
+                limit=board.limit,
             )
         )
 
@@ -58,6 +65,7 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
                 enabled=enabled,
                 pullable=enabled,
                 detail=board.token,
+                limit=board.limit,
             )
         )
 
@@ -72,6 +80,22 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
                 enabled=enabled,
                 pullable=enabled,
                 detail=entry.url,
+                limit=entry.limit,
+            )
+        )
+
+    for target in config.scrape.targets:
+        enabled = config.scrape.enabled and target.enabled
+        views.append(
+            SourceView(
+                id=scrape_target_id(target.url),
+                kind="scrape",
+                type="board",
+                display_name=target.label or target.url,
+                enabled=enabled,
+                pullable=enabled,
+                detail=target.url,
+                limit=target.limit,
             )
         )
 
@@ -86,6 +110,7 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
             pullable=config.adzuna.enabled and adzuna_key_set,
             detail=f"{config.adzuna.country.upper()} - "
             f"{'key set' if adzuna_key_set else 'no API key'}",
+            limit=config.adzuna.limit,
         )
     )
     views.append(
@@ -97,6 +122,7 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
             enabled=config.remoteok.enabled,
             pullable=config.remoteok.enabled,
             detail="aggregator",
+            limit=config.remoteok.limit,
         )
     )
     views.append(
@@ -108,6 +134,7 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
             enabled=config.linkedin.enabled,
             pullable=config.linkedin.enabled,
             detail="scraper",
+            limit=config.linkedin.limit,
         )
     )
     return views
