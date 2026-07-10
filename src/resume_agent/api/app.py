@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from resume_agent.api.deps import get_settings_dep, require_token
 from resume_agent.api.errors import ApiException, install_error_handlers
 from resume_agent.api.routers import analytics as analytics_router
+from resume_agent.api.routers import admin as admin_router
 from resume_agent.api.routers import auth as auth_router
 from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import config as config_router
@@ -134,6 +135,7 @@ def create_app(
     app.include_router(profile_router.router, prefix="/api", dependencies=guarded)
     app.include_router(setup_router.router, prefix="/api", dependencies=guarded)
     app.include_router(dashboard_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(admin_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so
     # they take precedence; the catch-all is excluded from the OpenAPI schema so

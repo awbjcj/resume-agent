@@ -1,0 +1,97 @@
+import sqlite3
+import tarfile
+from contextlib import closing
+
+import pytest
+
+from resume_agent.services.backup import (
+    InvalidArchiveError,
+    UnsafeArchiveError,
+    export_data_root,
+    import_data_root,
+    sqlite_snapshot,
+)
+
+
+def _make_root(tmp_path, name="data"):
+    root = tmp_path / name
+    (root / "profile").mkdir(parents=True)
+    (root / "profile" / "facts.json").write_text('{"facts": []}', encoding="utf-8")
+    (root / ".env").write_text("KEY=value\n", encoding="utf-8")
+    db = root / "resume_agent.db"
+    with closing(sqlite3.connect(db)) as connection:
+        connection.execute("CREATE TABLE job (id INTEGER PRIMARY KEY, title TEXT)")
+        connection.execute("INSERT INTO job (title) VALUES ('Engineer')")
+        connection.commit()
+    return root, db
+
+
+def test_sqlite_snapshot_and_export_are_wal_safe(tmp_path):
+    root, db = _make_root(tmp_path)
+    snapshot = tmp_path / "snapshot.db"
+    sqlite_snapshot(db, snapshot)
+    with closing(sqlite3.connect(snapshot)) as connection:
+        assert connection.execute("SELECT title FROM job").fetchall() == [("Engineer",)]
+
+    (root / "resume_agent.db-wal").write_bytes(b"")
+    archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
+    with tarfile.open(archive) as tar:
+        names = tar.getnames()
+    assert "profile/facts.json" in names
+    assert "resume_agent.db" in names
+    assert "resume_agent.db-wal" not in names
+
+
+def test_import_roundtrip_full_replaces_root(tmp_path):
+    root, db = _make_root(tmp_path)
+    archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
+    (root / "profile" / "facts.json").write_text("changed", encoding="utf-8")
+    (root / "stray.txt").write_text("stray", encoding="utf-8")
+
+    import_data_root(archive, root)
+
+    assert (root / "profile" / "facts.json").read_text(encoding="utf-8") == '{"facts": []}'
+    assert not (root / "stray.txt").exists()
+
+
+def test_import_rejects_traversal_and_empty_archives_before_touching_root(tmp_path):
+    root, _ = _make_root(tmp_path)
+    payload = tmp_path / "payload.txt"
+    payload.write_text("bad", encoding="utf-8")
+    evil = tmp_path / "evil.tar.gz"
+    with tarfile.open(evil, "w:gz") as tar:
+        tar.add(payload, arcname="../escape.txt")
+    with pytest.raises(UnsafeArchiveError):
+        import_data_root(evil, root)
+
+    empty = tmp_path / "empty.tar.gz"
+    with tarfile.open(empty, "w:gz"):
+        pass
+    with pytest.raises(InvalidArchiveError):
+        import_data_root(empty, root)
+    assert (root / "profile" / "facts.json").exists()
+
+
+def test_import_rolls_back_when_install_move_fails(tmp_path, monkeypatch):
+    from resume_agent.services import backup
+
+    root, db = _make_root(tmp_path)
+    archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
+    original_move = backup.shutil.move
+    failed = False
+
+    def flaky_move(source, destination):
+        nonlocal failed
+        source_path = backup.Path(source)
+        if not failed and ".ra-import-stage-" in str(source_path.parent):
+            failed = True
+            raise OSError("injected install failure")
+        return original_move(source, destination)
+
+    monkeypatch.setattr(backup.shutil, "move", flaky_move)
+
+    with pytest.raises(OSError, match="injected"):
+        import_data_root(archive, root)
+    assert (root / "profile" / "facts.json").exists()
+    with closing(sqlite3.connect(root / "resume_agent.db")) as connection:
+        assert connection.execute("SELECT title FROM job").fetchall() == [("Engineer",)]
