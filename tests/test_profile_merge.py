@@ -78,6 +78,66 @@ def test_merge_keeps_distinct_github_project():
     assert [p.name for p in merged.projects] == ["from-resume", "totally-different"]
 
 
+def test_project_identity_prefers_repo_url_across_fragment_and_metadata_merges():
+    primary = ProfileFacts(
+        contact=Contact(name="Ada"),
+        projects=[
+            Project(
+                name="Resume Agent CLI",
+                repo_url="https://github.com/me/resume-agent",
+                description="from resume",
+            )
+        ],
+    )
+    dossier = ProfileFacts(
+        contact=Contact(name=""),
+        projects=[
+            Project(
+                name="resume-agent",
+                repo_url="git@github.com:Me/Resume-Agent.git",
+                highlights=["From dossier"],
+            )
+        ],
+    )
+    merged, _ = merge_fragments(
+        [(_doc("resume", primary=True), primary), (_doc("dossier"), dossier)]
+    )
+    enriched = merge_facts(
+        merged,
+        github_projects=[
+            Project(
+                source=Source.github,
+                name="different display",
+                repo_url="ssh://git@github.com/me/resume-agent.git",
+                stars=42,
+                languages=["Python"],
+                topics=["agents"],
+                is_fork=False,
+            )
+        ],
+    )
+    assert len(enriched.projects) == 1
+    project = enriched.projects[0]
+    assert project.description == "from resume"
+    assert project.highlights == ["From dossier"]
+    assert project.stars == 42
+    assert project.languages == ["Python"]
+    assert project.topics == ["agents"]
+    assert project.is_fork is False
+
+
+def test_same_project_name_with_distinct_repo_urls_stays_distinct():
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        projects=[Project(name="tool", repo_url="https://github.com/a/tool")],
+    )
+    merged = merge_facts(
+        facts,
+        github_projects=[Project(name="tool", repo_url="https://github.com/b/tool")],
+    )
+    assert len(merged.projects) == 2
+
+
 def _doc(doc_id, primary=False):
     return SourceDoc(
         id=doc_id,
@@ -366,6 +426,28 @@ def test_unresolvable_anchor_falls_back_to_project():
     fallback = next(p for p in merged.projects if p.synthesized and p.name != "Side tool")
     assert "Cut p99 latency 30%" in fallback.highlights
     assert any("not found" in line for line in decisions)
+
+
+def test_synthesis_project_merges_by_repo_url_when_names_differ():
+    merged = ProfileFacts(
+        contact=Contact(name="Ada"),
+        projects=[
+            Project(name="Tool CLI", repo_url="https://github.com/me/tool")
+        ],
+    )
+    fragment = ProfileFacts(
+        contact=Contact(name=""),
+        projects=[
+            Project(
+                name="tool",
+                repo_url="git@github.com:me/tool.git",
+                highlights=["Synthesized detail"],
+            )
+        ],
+    )
+    apply_synthesis_fragments(merged, [(_deck_doc(), fragment)], MergeReport())
+    assert len(merged.projects) == 1
+    assert merged.projects[0].highlights == ["Synthesized detail"]
 
 
 def test_synthesized_scalars_never_win():

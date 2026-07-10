@@ -1,8 +1,16 @@
 import json
 
+import httpx
 import pytest
 
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_agent.models.profile import (
+    Bullet,
+    Contact,
+    Experience,
+    ProfileFacts,
+    Project,
+    Skill,
+)
 from resume_agent.profile.build import build_corpus_profile, build_profile
 from resume_agent.profile.corpus import add_source
 from resume_agent.profile.inference import InferredSkill, InferredSkills
@@ -262,3 +270,62 @@ def test_corpus_build_skips_synthesis_without_agents(tmp_path):
         profile_dir, github_username=None, extractor_agent=_Extractor()
     )
     assert any("synthesis skipped" in w for w in report.warnings)
+
+
+class _DeadGitHub:
+    def fetch_repos(self, _username):
+        raise httpx.ConnectError("network down")
+
+    def fetch_profile(self, _username):
+        raise httpx.ConnectError("network down")
+
+
+def test_build_includes_project_fragments_and_degrades_github_failures(tmp_path):
+    from resume_agent.profile.project_extractor import ProjectDocFacts
+
+    profile_dir = tmp_path / "profile"
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada", encoding="utf-8")
+    add_source(profile_dir, resume, primary=True)
+    dossier = tmp_path / "tool-dossier.md"
+    dossier.write_text(
+        "---\nrepo_url: https://github.com/me/tool\n---\n# Tool\n",
+        encoding="utf-8",
+    )
+    add_source(profile_dir, dossier)
+
+    facts, report = build_corpus_profile(
+        profile_dir,
+        github_username="me",
+        github_client=_DeadGitHub(),
+        extractor_agent=_FakeAgent(ProfileFacts(contact=Contact(name="Ada"))),
+        project_agent=_FakeAgent(
+            ProjectDocFacts(
+                project=Project(name="Tool", repo_url="https://github.com/me/tool"),
+                skills={"tools": [Skill(name="Python")]},
+            )
+        ),
+    )
+    assert [project.name for project in facts.projects] == ["Tool"]
+    assert facts.skills["tools"][0].name == "Python"
+    assert any("github" in warning.casefold() for warning in report.warnings)
+
+
+def test_build_warns_when_project_agent_is_missing(tmp_path):
+    profile_dir = tmp_path / "profile"
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada", encoding="utf-8")
+    add_source(profile_dir, resume, primary=True)
+    dossier = tmp_path / "tool-dossier.md"
+    dossier.write_text(
+        "---\nrepo_url: https://github.com/me/tool\n---\n# Tool\n",
+        encoding="utf-8",
+    )
+    add_source(profile_dir, dossier)
+
+    _facts, report = build_corpus_profile(
+        profile_dir,
+        github_username=None,
+        extractor_agent=_FakeAgent(ProfileFacts(contact=Contact(name="Ada"))),
+    )
+    assert any("project extraction skipped" in warning for warning in report.warnings)

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import httpx
 from pydantic import Field
 
 from resume_agent.llm_runner import Runner
@@ -7,8 +8,13 @@ from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.corpus import load_manifest
 from resume_agent.profile.extractor import build_extractor_agent, extract_profile_facts
-from resume_agent.profile.fragments import extract_fragments, extract_synthesis_fragments
+from resume_agent.profile.fragments import (
+    extract_fragments,
+    extract_project_fragments,
+    extract_synthesis_fragments,
+)
 from resume_agent.profile.github import GitHubClient
+from resume_agent.profile.github_harvest import HarvestReport, sync_github_sources
 from resume_agent.profile.github_ingest import build_github_profile, repo_to_project
 from resume_agent.profile.inference import apply_inferred, infer_skills
 from resume_agent.profile.merge import (
@@ -67,8 +73,22 @@ def build_corpus_profile(
     inference_agent: Runner | None = None,
     synthesis_agent: Runner | None = None,
     entailment_agent: Runner | None = None,
+    project_agent: Runner | None = None,
+    github_allow: tuple[str, ...] = (),
+    github_deny: tuple[str, ...] = (),
+    github_limit: int = 20,
 ) -> tuple[ProfileFacts, BuildReport]:
     """Build merged, inference-enriched facts from the registered source corpus."""
+    harvest: HarvestReport | None = None
+    if github_username:
+        harvest = sync_github_sources(
+            profile_dir,
+            github_username,
+            client=github_client,
+            allow=github_allow,
+            deny=github_deny,
+            limit=github_limit,
+        )
     manifest = load_manifest(profile_dir)
     if not manifest.docs:
         raise ValueError(
@@ -77,6 +97,12 @@ def build_corpus_profile(
     agent = extractor_agent if extractor_agent is not None else build_extractor_agent()
     extraction = extract_fragments(profile_dir, manifest, agent)
     report = BuildReport(doc_status=extraction.status)
+    if harvest is not None:
+        report.warnings.extend(harvest.warnings)
+        report.warnings.extend(
+            f"GitHub harvest failed for {name}: {reason}"
+            for name, reason in sorted(harvest.failures.items())
+        )
 
     ordered = sorted(manifest.docs, key=lambda doc: not doc.primary)
     primary = ordered[0]
@@ -90,6 +116,21 @@ def build_corpus_profile(
         for doc in ordered
         if doc.id in extraction.fragments
     ]
+    project_docs = [doc for doc in manifest.docs if doc.mode == "project"]
+    if project_docs:
+        if project_agent is None:
+            report.warnings.append(
+                f"project extraction skipped for {len(project_docs)} document(s): "
+                "no project agent configured"
+            )
+        else:
+            projection = extract_project_fragments(profile_dir, manifest, project_agent)
+            report.doc_status.update(projection.status)
+            fragments.extend(
+                (doc, projection.fragments[doc.id])
+                for doc in project_docs
+                if doc.id in projection.fragments
+            )
     merged, merge_report = merge_fragments(fragments, dedup_agent=dedup_agent)
     report.conflicts = merge_report.conflicts
     report.dropped_bullets = merge_report.dropped_bullets
@@ -126,14 +167,30 @@ def build_corpus_profile(
                 report.dropped_bullets = merge_report.dropped_bullets
 
     if github_username:
+        owns_client = github_client is None
         github = github_client if github_client is not None else GitHubClient()
-        profile_data = github.fetch_profile(github_username)
-        repos = github.fetch_repos(github_username)
-        merged = merge_facts(
-            merged,
-            github_projects=[repo_to_project(repo) for repo in repos],
-            github_profile=build_github_profile(profile_data, repos),
-        )
+        try:
+            profile_data = github.fetch_profile(github_username)
+            repos = harvest.repos if harvest is not None else github.fetch_repos(github_username)
+            languages = harvest.languages if harvest is not None else {}
+            merged = merge_facts(
+                merged,
+                github_projects=[
+                    repo_to_project(
+                        repo,
+                        languages=languages.get(
+                            repo.get("full_name") if isinstance(repo.get("full_name"), str) else ""
+                        ),
+                    )
+                    for repo in repos
+                ],
+                github_profile=build_github_profile(profile_data, repos),
+            )
+        except (httpx.HTTPError, OSError, UnicodeError, ValueError, TypeError, KeyError) as error:
+            report.warnings.append(f"GitHub metadata merge skipped: {error}")
+        finally:
+            if owns_client:
+                github.close()
 
     if inference_agent is not None:
         try:

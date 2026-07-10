@@ -22,6 +22,7 @@ from resume_agent.models.profile import (
     Skill,
 )
 from resume_agent.profile.corpus import SourceDoc
+from resume_agent.profile.github_ingest import normalize_repo_url
 from resume_agent.profile.ids import deterministic_id
 from resume_agent.tracking.match_gap import normalize_skill
 
@@ -33,7 +34,26 @@ _ENRICH_FIELDS = (
     "primary_language",
     "homepage_url",
     "last_updated",
+    "is_fork",
+    "languages",
+    "topics",
 )
+
+_PROJECT_SCALARS = (
+    "description",
+    "role",
+    "url",
+    "repo_url",
+    "start",
+    "end",
+    "stars",
+    "forks",
+    "primary_language",
+    "homepage_url",
+    "last_updated",
+    "is_fork",
+)
+_PROJECT_COLLECTIONS = ("tech", "highlights", "languages", "topics")
 
 
 def _norm(name: str) -> str:
@@ -50,6 +70,28 @@ def _enrich(resume_project: Project, github_project: Project) -> None:
                 setattr(resume_project, field, value)
 
 
+def _find_project(projects: list[Project], candidate: Project) -> Project | None:
+    candidate_repo = normalize_repo_url(candidate.repo_url)
+    candidate_name = _norm(candidate.name)
+    if candidate_repo is not None:
+        for project in projects:
+            if normalize_repo_url(project.repo_url) == candidate_repo:
+                return project
+        return next(
+            (
+                project
+                for project in projects
+                if normalize_repo_url(project.repo_url) is None
+                and _norm(project.name) == candidate_name
+            ),
+            None,
+        )
+    return next(
+        (project for project in projects if _norm(project.name) == candidate_name),
+        None,
+    )
+
+
 def merge_facts(
     resume_facts: ProfileFacts,
     github_projects: list[Project] | None = None,
@@ -58,11 +100,10 @@ def merge_facts(
     """Combine resume-derived facts with GitHub-derived facts into one ProfileFacts."""
     merged = resume_facts.model_copy(deep=True)
     if github_projects:
-        by_norm = {_norm(project.name): project for project in merged.projects}
         for gh_project in github_projects:
-            twin = by_norm.get(_norm(gh_project.name))
+            twin = _find_project(merged.projects, gh_project)
             if twin is None:
-                merged.projects.append(gh_project)
+                merged.projects.append(gh_project.model_copy(deep=True))
             else:
                 _enrich(twin, gh_project)
     if github_profile is not None:
@@ -230,6 +271,32 @@ def _merge_entity_list(
         )
 
 
+def _merge_projects(
+    target: list[Project],
+    extra: list[Project],
+    *,
+    doc: SourceDoc,
+    report: MergeReport,
+) -> None:
+    for project in extra:
+        twin = _find_project(target, project)
+        if twin is None:
+            target.append(project.model_copy(deep=True))
+            continue
+        candidate = project
+        if normalize_repo_url(twin.repo_url) == normalize_repo_url(project.repo_url):
+            candidate = project.model_copy(update={"repo_url": twin.repo_url})
+        _merge_record(
+            twin,
+            candidate,
+            scalar_fields=_PROJECT_SCALARS,
+            collection_fields=_PROJECT_COLLECTIONS,
+            label=f"project {twin.name}",
+            doc=doc,
+            report=report,
+        )
+
+
 def _dedup_bullets(
     bullets: list[Bullet], agent: Runner, report: MergeReport
 ) -> list[Bullet]:
@@ -311,29 +378,7 @@ def merge_fragments(
             else:
                 _merge_experience(twin, experience, doc, report)
 
-        _merge_entity_list(
-            merged.projects,
-            fragment.projects,
-            key=lambda project: _norm(project.name),
-            scalar_fields=(
-                "description",
-                "role",
-                "url",
-                "repo_url",
-                "start",
-                "end",
-                "stars",
-                "forks",
-                "primary_language",
-                "homepage_url",
-                "last_updated",
-                "is_fork",
-            ),
-            collection_fields=("tech", "highlights", "languages", "topics"),
-            label=lambda project: f"project {project.name}",
-            doc=doc,
-            report=report,
-        )
+        _merge_projects(merged.projects, fragment.projects, doc=doc, report=report)
         _merge_entity_list(
             merged.education,
             fragment.education,
@@ -497,19 +542,6 @@ def apply_synthesis_fragments(
             anchor_decisions.append(
                 f"{doc.id}: +{appended} bullets on {target.company}/{target.title}"
             )
-        _merge_entity_list(
-            merged.projects,
-            fragment.projects,
-            key=lambda project: _norm(project.name),
-            scalar_fields=(
-                "description", "role", "url", "repo_url", "start", "end",
-                "stars", "forks", "primary_language", "homepage_url",
-                "last_updated", "is_fork",
-            ),
-            collection_fields=("tech", "highlights", "languages", "topics"),
-            label=lambda project: f"project {project.name}",
-            doc=doc,
-            report=report,
-        )
+        _merge_projects(merged.projects, fragment.projects, doc=doc, report=report)
         _merge_skills(merged, fragment.skills, doc, report)
     return anchor_decisions, touched
