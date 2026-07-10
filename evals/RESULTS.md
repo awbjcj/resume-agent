@@ -17,3 +17,21 @@ match-plan default remains unchanged.
 
 No gate: this baseline exists so future cover-letter prompt changes have a
 reference point. **Artifact:** `evals/reports/2026-07-cl-baseline.json`
+
+## 2026-07 resume baseline
+
+| metric                     | value                       |
+| -------------------------- | --------------------------- |
+| mean quality               | 46.0                        |
+| trap_ok (cases with traps) | 12/12                       |
+| provenance_ok              | 12/12                       |
+| judge model                | deepseek:deepseek-v4-pro    |
+| judge prompt sha256        | 64ed837a3ed9c1809441f026ed6581623a7697fd92fc2ed14b5db733c34ce8bd |
+
+No gate: this is the reference point for future resume prompt changes. The
+current-schema, zero-failure 12-case report was promoted after verifying the
+case set, config, style guide, judge model, and judge prompt hashes against the
+current eval harness. **Artifact:** `evals/reports/2026-07-resume-baseline.json`
+
+The live profile checkpoint produced 70 grouped matrix rows: 0 missing
+assignments and 1 explicit `other` assignment (`vFlash`, 1.4%).
