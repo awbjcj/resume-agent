@@ -56,6 +56,33 @@ def test_fetch_repos_rejects_malformed_payload():
         gh.fetch_repos("ada")
 
 
+@pytest.mark.parametrize(
+    "repo",
+    [
+        {"name": 42},
+        {"name": "repo", "fork": "false"},
+        {"name": "repo", "topics": ["python", 7]},
+        {"name": "repo", "stargazers_count": True},
+        {"name": "repo", "owner": {"login": 99}},
+    ],
+)
+def test_fetch_repos_rejects_malformed_consumed_fields(repo):
+    gh = _client(lambda _request: httpx.Response(200, json=[repo]))
+    with pytest.raises(ValueError, match="repository"):
+        gh.fetch_repos("ada")
+
+
+def test_fetch_profile_rejects_malformed_consumed_fields():
+    gh = _client(
+        lambda _request: httpx.Response(
+            200,
+            json={"login": "ada", "followers": "many", "public_repos": 3},
+        )
+    )
+    with pytest.raises(ValueError, match="profile"):
+        gh.fetch_profile("ada")
+
+
 def test_fetch_readme_returns_text():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/repos/ada/engine/readme"

@@ -5,6 +5,64 @@ from resume_agent.config import get_settings
 
 GITHUB_API = "https://api.github.com"
 
+_REPO_OPTIONAL_STRINGS = (
+    "full_name",
+    "html_url",
+    "description",
+    "language",
+    "homepage",
+    "pushed_at",
+    "updated_at",
+)
+_REPO_COUNTS = ("stargazers_count", "forks_count")
+
+
+def _optional_string(payload: dict, field: str, label: str) -> None:
+    value = payload.get(field)
+    if field in payload and value is not None and not isinstance(value, str):
+        raise ValueError(f"GitHub {label} field {field!r} must be a string or null")
+
+
+def _nonnegative_int(payload: dict, field: str, label: str) -> None:
+    value = payload.get(field)
+    if field in payload and (
+        not isinstance(value, int) or isinstance(value, bool) or value < 0
+    ):
+        raise ValueError(f"GitHub {label} field {field!r} must be a non-negative integer")
+
+
+def _validated_profile(payload: dict) -> dict:
+    if not isinstance(payload.get("login"), str) or not payload["login"]:
+        raise ValueError("GitHub profile field 'login' must be a non-empty string")
+    for field in ("bio", "created_at"):
+        _optional_string(payload, field, "profile")
+    for field in ("followers", "public_repos"):
+        _nonnegative_int(payload, field, "profile")
+    return payload
+
+
+def _validated_repo(payload: dict) -> dict:
+    if not isinstance(payload.get("name"), str) or not payload["name"]:
+        raise ValueError("GitHub repository field 'name' must be a non-empty string")
+    for field in _REPO_OPTIONAL_STRINGS:
+        _optional_string(payload, field, "repository")
+    for field in _REPO_COUNTS:
+        _nonnegative_int(payload, field, "repository")
+    for field in ("fork", "archived"):
+        if field in payload and not isinstance(payload[field], bool):
+            raise ValueError(f"GitHub repository field {field!r} must be a boolean")
+    if "topics" in payload and (
+        not isinstance(payload["topics"], list)
+        or not all(isinstance(topic, str) for topic in payload["topics"])
+    ):
+        raise ValueError("GitHub repository field 'topics' must be a list of strings")
+    owner = payload.get("owner")
+    if owner is not None and (
+        not isinstance(owner, dict) or not isinstance(owner.get("login"), str)
+    ):
+        raise ValueError("GitHub repository field 'owner.login' must be a string")
+    return payload
+
 
 class GitHubClient:
     """Thin wrapper over the GitHub REST API. Pass ``client`` to inject a test transport."""
@@ -39,7 +97,7 @@ class GitHubClient:
     def fetch_profile(self, username: str) -> dict:
         resp = self._client.get(f"/users/{username}")
         resp.raise_for_status()
-        return self._object(resp, "profile")
+        return _validated_profile(self._object(resp, "profile"))
 
     def fetch_repos(self, username: str) -> list[dict]:
         url: str | None = f"/users/{quote(username, safe='')}/repos"
@@ -48,7 +106,10 @@ class GitHubClient:
         while url is not None:
             resp = self._client.get(url, params=params)
             resp.raise_for_status()
-            repos.extend(self._objects(resp, "repositories"))
+            repos.extend(
+                _validated_repo(repo)
+                for repo in self._objects(resp, "repositories")
+            )
             next_link = resp.links.get("next", {}).get("url")
             url = next_link if isinstance(next_link, str) else None
             params = None

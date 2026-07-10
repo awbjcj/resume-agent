@@ -46,12 +46,24 @@ def build_profile(
     if not github_username:
         return merge_facts(resume_facts), text
 
-    gh = github_client if github_client is not None else GitHubClient()
-    profile_data = gh.fetch_profile(github_username)
-    repos = gh.fetch_repos(github_username)
-    gh_profile = build_github_profile(profile_data, repos)
-    projects = [repo_to_project(repo) for repo in repos]
-    return merge_facts(resume_facts, github_projects=projects, github_profile=gh_profile), text
+    owns_client = github_client is None
+    github = github_client if github_client is not None else GitHubClient()
+    try:
+        profile_data = github.fetch_profile(github_username)
+        repos = github.fetch_repos(github_username)
+        github_profile = build_github_profile(profile_data, repos)
+        projects = [repo_to_project(repo) for repo in repos]
+        return (
+            merge_facts(
+                resume_facts,
+                github_projects=projects,
+                github_profile=github_profile,
+            ),
+            text,
+        )
+    finally:
+        if owns_client:
+            github.close()
 
 
 class BuildReport(ExtensibleModel):

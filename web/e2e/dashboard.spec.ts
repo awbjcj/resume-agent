@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { mockEmptyRuns } from "./support";
+
 // Hermetic smoke: intercept the API so no backend is required, matching the
 // pattern in e2e/smoke.spec.ts and e2e/setup-wizard.spec.ts.
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/notifications", (route) => route.fulfill({ json: [] }));
+  await mockEmptyRuns(page);
   await page.route("**/api/setup/status", (route) =>
     route.fulfill({
       json: {

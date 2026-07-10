@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -125,13 +126,19 @@ export function useAddUrl() {
 export function useSyncGithub() {
   const { launch } = useLaunchRun();
   const active = useActiveRun("github-sync");
+  const [launching, setLaunching] = useState(false);
+  const runPending =
+    active?.status === "queued" ||
+    active?.status === "running" ||
+    active?.status === "cancelling";
   return {
-    mutate: () =>
-      void launch("github-sync", launchers.githubSync, ["profile-sources"]),
-    isPending:
-      active?.status === "queued" ||
-      active?.status === "running" ||
-      active?.status === "cancelling",
+    mutate: () => {
+      if (launching || runPending) return;
+      setLaunching(true);
+      void launch("github-sync", launchers.githubSync, ["profile-sources"])
+        .finally(() => setLaunching(false));
+    },
+    isPending: launching || runPending,
   };
 }
 

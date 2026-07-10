@@ -111,6 +111,28 @@ def test_build_profile_skips_github_when_no_username(tmp_path):
     assert facts.projects == []
 
 
+def test_build_profile_closes_the_github_client_it_creates(tmp_path, monkeypatch):
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Ada", encoding="utf-8")
+
+    class OwnedGitHub(_FakeGitHub):
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    github = OwnedGitHub()
+    monkeypatch.setattr("resume_agent.profile.build.GitHubClient", lambda: github)
+
+    build_profile(
+        resume_path=resume,
+        github_username="ada",
+        extractor_agent=_FakeAgent(ProfileFacts(contact=Contact(name="Ada"))),
+    )
+
+    assert github.closed
+
+
 def test_build_corpus_profile_merges_fragments(tmp_path):
     profile_dir = tmp_path / "profile"
     (tmp_path / "resume.txt").write_text("Ada resume", encoding="utf-8")

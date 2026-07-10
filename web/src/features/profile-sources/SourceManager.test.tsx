@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
       anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached", origin: "upload" },
     { id: "g1", filename: "github--repo.md", mode: "project", primary: false,
       anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached", origin: "github" },
+    { id: "p1", filename: "portfolio-dossier.md", mode: "project", primary: false,
+      anchor: null, addedAt: "2026-07-03", fragmentStatus: "cached", origin: "upload" },
   ],
   skeleton: [{ id: "exp1", kind: "experience", label: "Acme — Engineer" }],
   patch: vi.fn(),
@@ -110,7 +112,12 @@ describe("SourceManager", () => {
     render(<SourceManager />);
     const row = screen.getByRole("row", { name: /github--repo\.md/i });
     expect(row).toHaveTextContent("GitHub");
+    expect(row).toHaveTextContent("Synced");
     expect(screen.queryByLabelText(/mode for github--repo\.md/i)).not.toBeInTheDocument();
+
+    const dossier = screen.getByRole("row", { name: /portfolio-dossier\.md/i });
+    expect(dossier).toHaveTextContent("Read-only");
+    expect(dossier).not.toHaveTextContent("GitHub");
   });
 
   it("submits note and URL intake through labelled dialogs", async () => {

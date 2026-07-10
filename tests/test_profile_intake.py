@@ -127,3 +127,38 @@ def test_add_url_source_rejects_binary_oversized_and_empty_pages(tmp_path):
             )
     assert len(load_manifest(profile_dir).docs) == 1
     http.close()
+
+
+def test_add_url_source_stops_streaming_at_the_response_limit(tmp_path):
+    profile_dir = profile(tmp_path)
+
+    class CountingStream(httpx.SyncByteStream):
+        def __init__(self):
+            self.yielded = 0
+
+        def __iter__(self):
+            for _ in range(3):
+                self.yielded += 1
+                yield b"x" * 600_000
+
+    stream = CountingStream()
+    http = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                headers={"content-type": "text/plain"},
+                stream=stream,
+            )
+        )
+    )
+
+    with pytest.raises(ValueError, match="too large"):
+        add_url_source(
+            profile_dir,
+            "https://example.com/large",
+            client=http,
+            resolver=public_ips,
+        )
+
+    assert stream.yielded == 2
+    http.close()

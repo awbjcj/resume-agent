@@ -217,7 +217,9 @@ export function SourceManager() {
                 </TableCell>
                 <TableCell>
                   {source.origin === "github" || source.mode === "project" ? (
-                    <span className="block text-right text-xs text-muted-foreground">Synced</span>
+                    <span className="block text-right text-xs text-muted-foreground">
+                      {source.origin === "github" ? "Synced" : "Read-only"}
+                    </span>
                   ) : source.primary ? (
                     <div className="flex justify-end">
                       <Button

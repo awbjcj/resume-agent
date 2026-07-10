@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { mockEmptyRuns } from "./support";
+
 const INCOMPLETE_STATUS = {
   secrets: { anthropicKey: false, anyLlmKey: false },
   profile: { documentCount: 0, hasResume: false, factsBuiltAt: null, githubUsername: null },
@@ -13,6 +15,15 @@ const INCOMPLETE_STATUS = {
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/setup/status", (route) => route.fulfill({ json: INCOMPLETE_STATUS }));
   await page.route("**/api/notifications", (route) => route.fulfill({ json: [] }));
+  await mockEmptyRuns(page);
+  await page.route("**/api/dashboard/summary", (route) =>
+    route.fulfill({
+      json: {
+        statusCounts: {},
+        queues: { triage: 0, approve: 0, tailor: 0, apply: 0 },
+        applied: 0,
+      },
+    }));
   await page.route("**/api/secrets", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/profile/documents", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/config/profile", (route) =>

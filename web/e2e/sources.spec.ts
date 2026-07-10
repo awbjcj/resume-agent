@@ -1,10 +1,13 @@
 import { test, expect } from "@playwright/test";
 
+import { mockEmptyRuns } from "./support";
+
 let configuredLimit = 10;
 
 test.beforeEach(async ({ page }) => {
   configuredLimit = 10;
   await page.route("**/api/notifications", (route) => route.fulfill({ json: [] }));
+  await mockEmptyRuns(page);
   await page.route("**/api/setup/status", (route) =>
     route.fulfill({
       json: {
@@ -15,7 +18,7 @@ test.beforeEach(async ({ page }) => {
         complete: true,
       },
     }));
-  await page.route("**/api/sources", async (route) => {
+  await page.route(/\/api\/sources(?:\/.*)?(?:\?.*)?$/, async (route) => {
     if (route.request().method() === "PATCH") {
       const body = route.request().postDataJSON() as { limit: number | null };
       configuredLimit = body.limit ?? 10;

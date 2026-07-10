@@ -41,7 +41,7 @@ def _public_url(url: str, resolver: Resolver) -> str:
     try:
         parsed = urlsplit(url)
         host = parsed.hostname
-        _port = parsed.port
+        _ = parsed.port  # force validation of a malformed/out-of-range port
     except ValueError as error:
         raise ValueError("a public HTTP(S) URL is required") from error
     if (
@@ -52,21 +52,22 @@ def _public_url(url: str, resolver: Resolver) -> str:
     ):
         raise ValueError("a public HTTP(S) URL is required")
     try:
-        addresses = {host} if ip_address(host) else set()
+        literal_address = ip_address(host)
     except ValueError:
         try:
             addresses = set(resolver(host))
         except OSError as error:
             raise ValueError(f"could not resolve public HTTP host {host!r}") from error
+    else:
+        addresses = {str(literal_address)}
     if not addresses:
         raise ValueError(f"could not resolve public HTTP host {host!r}")
     try:
-        if any(not ip_address(address).is_global for address in addresses):
-            raise ValueError("a public HTTP(S) URL is required")
+        resolved = [ip_address(address) for address in addresses]
     except ValueError as error:
-        if str(error) == "a public HTTP(S) URL is required":
-            raise
         raise ValueError("a public HTTP(S) URL is required") from error
+    if any(not address.is_global for address in resolved):
+        raise ValueError("a public HTTP(S) URL is required")
     return url
 
 
@@ -95,22 +96,34 @@ def _fetch_text(
     current = url
     for redirect_count in range(_MAX_REDIRECTS + 1):
         _public_url(current, resolver)
-        response = client.get(current, follow_redirects=False)
-        if response.status_code in _REDIRECTS:
-            location = response.headers.get("location")
-            if not location or redirect_count == _MAX_REDIRECTS:
-                raise ValueError("too many URL redirects")
-            current = urljoin(current, location)
-            continue
-        response.raise_for_status()
-        content_type = response.headers.get("content-type", "").split(";", 1)[0].casefold()
-        if content_type and not (
-            content_type.startswith("text/") or content_type == "application/xhtml+xml"
-        ):
-            raise ValueError(f"unsupported URL content type: {content_type}")
-        if len(response.content) > _MAX_RESPONSE_BYTES:
-            raise ValueError("URL response is too large")
-        return current, response.text
+        with client.stream("GET", current, follow_redirects=False) as response:
+            if response.status_code in _REDIRECTS:
+                location = response.headers.get("location")
+                if not location or redirect_count == _MAX_REDIRECTS:
+                    raise ValueError("too many URL redirects")
+                current = urljoin(current, location)
+                continue
+            response.raise_for_status()
+            content_type = (
+                response.headers.get("content-type", "").split(";", 1)[0].casefold()
+            )
+            if content_type and not (
+                content_type.startswith("text/")
+                or content_type == "application/xhtml+xml"
+            ):
+                raise ValueError(f"unsupported URL content type: {content_type}")
+            declared_length = response.headers.get("content-length", "")
+            if declared_length.isdigit() and int(declared_length) > _MAX_RESPONSE_BYTES:
+                raise ValueError("URL response is too large")
+            content = bytearray()
+            for chunk in response.iter_bytes():
+                if len(content) + len(chunk) > _MAX_RESPONSE_BYTES:
+                    raise ValueError("URL response is too large")
+                content.extend(chunk)
+            return current, bytes(content).decode(
+                response.encoding or "utf-8",
+                errors="replace",
+            )
     raise ValueError("too many URL redirects")
 
 
