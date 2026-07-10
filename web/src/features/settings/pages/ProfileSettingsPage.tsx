@@ -50,6 +50,9 @@ export function ProfileSettingsPage() {
 
   if (!draft) return <Skeleton className="h-64 w-full" />;
 
+  const parsedLimit = Number(limitText);
+  const limitValid = Number.isInteger(parsedLimit) && parsedLimit >= 1 && parsedLimit <= 100;
+
   const discard = () => {
     setAllowText((data?.githubRepoAllow ?? []).join(", "));
     setDenyText((data?.githubRepoDeny ?? []).join(", "));
@@ -117,10 +120,14 @@ export function ProfileSettingsPage() {
               }
             }}
           />
-          <FieldDescription>Maximum ranked repositories to import, from 1 to 100.</FieldDescription>
+          <FieldDescription>
+            {limitValid
+              ? "Maximum ranked repositories to import, from 1 to 100."
+              : "Enter a whole number from 1 to 100 to save."}
+          </FieldDescription>
         </Field>
       </FieldGroup>
-      <SaveBar dirty={dirty} saving={save.isPending}
+      <SaveBar dirty={dirty} saving={save.isPending} canSave={limitValid}
         onSave={() => save.mutate(draft)} onDiscard={discard} />
       <Separator />
       <div className="flex flex-wrap items-center gap-3">

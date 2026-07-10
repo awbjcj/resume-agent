@@ -2,9 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 export function SaveBar({
-  dirty, saving, onSave, onDiscard,
+  dirty, saving, canSave = true, onSave, onDiscard,
 }: {
-  dirty: boolean; saving: boolean; onSave: () => void; onDiscard: () => void;
+  dirty: boolean; saving: boolean; canSave?: boolean; onSave: () => void; onDiscard: () => void;
 }) {
   if (!dirty) return null;
   return (
@@ -14,7 +14,7 @@ export function SaveBar({
         <Button variant="outline" onClick={onDiscard} disabled={saving}>
           Discard
         </Button>
-        <Button onClick={onSave} disabled={saving}>
+        <Button onClick={onSave} disabled={saving || !canSave}>
           {saving ? <Spinner data-icon="inline-start" /> : null}
           Save changes
         </Button>
