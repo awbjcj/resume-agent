@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -30,6 +32,43 @@ describe("LaunchDialog", () => {
 
     expect(onLaunch).toHaveBeenCalledWith([1], true);
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("does not remount the popup when closing (submit or cancel)", async () => {
+    const user = userEvent.setup();
+    const onLaunch = vi.fn().mockResolvedValue(true);
+
+    function Harness() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          {!open && <div data-testid="closed-marker" />}
+          <LaunchDialog
+            mode="tailor"
+            jobs={jobs}
+            open={open}
+            onOpenChange={setOpen}
+            onLaunch={onLaunch}
+          />
+        </>
+      );
+    }
+    render(<Harness />);
+
+    const popupBefore = document.body.querySelector('[data-slot="dialog-content"]');
+    expect(popupBefore).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /tailor 2 jobs/i }));
+
+    expect(onLaunch).toHaveBeenCalled();
+    expect(await screen.findByTestId("closed-marker")).toBeInTheDocument();
+    // The popup must close by hiding/unmounting the *same* node the library
+    // is animating out, not by React tearing it down and mounting a fresh
+    // one mid-close (which strands the fresh node visible/open with its
+    // selections reset). Confirm no dialog-content node lingers at all, and
+    // that it was never replaced by a distinct, freshly-reset instance.
+    expect(popupBefore).not.toBeNull();
+    expect(document.body.querySelector('[data-slot="dialog-content"]')).toBeNull();
   });
 
   it("stays open when launch creation fails", async () => {

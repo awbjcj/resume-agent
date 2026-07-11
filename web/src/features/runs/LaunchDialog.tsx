@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,8 +46,22 @@ interface LaunchDialogProps {
 }
 
 export function LaunchDialog(props: LaunchDialogProps) {
+  // Bump `openSeq` only on the closed->open transition. Base UI's Dialog
+  // popup stays mounted through its exit animation to play the close
+  // transition; remounting LaunchDialogBody (and the popup inside it) via a
+  // key change at that exact moment strands a freshly-mounted, already-open
+  // popup that never receives the animation-end signal that would hide it,
+  // so it never closes. Reacting only to opening keeps the still-closing
+  // instance untouched while still resetting `selected` on every fresh open.
+  const wasOpenRef = useRef(props.open);
+  const openSeqRef = useRef(0);
+  if (props.open && !wasOpenRef.current) {
+    openSeqRef.current += 1;
+  }
+  wasOpenRef.current = props.open;
+
   const resetKey = [
-    props.open,
+    openSeqRef.current,
     props.mode,
     props.isLoading,
     props.error,
