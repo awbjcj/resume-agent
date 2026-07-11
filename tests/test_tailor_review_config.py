@@ -57,4 +57,4 @@ def test_fast_mode_fields_load_from_yaml(tmp_path):
 
 def test_fast_mode_rejects_unknown_writer_tier():
     with pytest.raises(ValidationError):
-        ReviewConfig(tailor_tier="typo")
+        ReviewConfig(tailor_tier="typo")  # type: ignore[arg-type]

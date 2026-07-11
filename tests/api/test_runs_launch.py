@@ -76,8 +76,8 @@ def test_tailor_launch_maps_deep_to_review_path(monkeypatch, tmp_path):
 
     def fake_tailor(session, *, reporter=None, **kwargs):
         review_paths.append(kwargs["review_path"])
-        reporter.begin(1, "x")
-        reporter.step(1)
+        reporter.begin(1, "x")  # type: ignore[attr-defined]
+        reporter.step(1)  # type: ignore[attr-defined]
         return {}
 
     monkeypatch.setattr(runs_router, "tailor", fake_tailor)
