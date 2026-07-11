@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,15 +53,19 @@ export function LaunchDialog(props: LaunchDialogProps) {
   // popup that never receives the animation-end signal that would hide it,
   // so it never closes. Reacting only to opening keeps the still-closing
   // instance untouched while still resetting `selected` on every fresh open.
-  const wasOpenRef = useRef(props.open);
-  const openSeqRef = useRef(0);
-  if (props.open && !wasOpenRef.current) {
-    openSeqRef.current += 1;
+  const [openState, setOpenState] = useState(() => ({
+    isOpen: props.open,
+    sequence: 0,
+  }));
+  if (props.open !== openState.isOpen) {
+    setOpenState({
+      isOpen: props.open,
+      sequence: props.open ? openState.sequence + 1 : openState.sequence,
+    });
   }
-  wasOpenRef.current = props.open;
 
   const resetKey = [
-    openSeqRef.current,
+    openState.sequence,
     props.mode,
     props.isLoading,
     props.error,
