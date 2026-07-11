@@ -1,6 +1,6 @@
 import asyncio
 import json
-from collections.abc import Mapping
+from collections.abc import Coroutine, Mapping
 from typing import Any
 
 from resume_agent.llm_runner import Runner, acall
@@ -158,7 +158,7 @@ async def arun_panel(
     evidence = resolve_evidence(content, profile_facts)
     gate_specs = [spec for spec in config.reviewers if spec.gate]
     advisory_names = _advisory_names(config)
-    calls = [
+    calls: list[Coroutine[Any, Any, Any]] = [
         areview_one(
             compose_evidence_review_input(content, jd_text, evidence),
             reviewer_agents[spec.name],

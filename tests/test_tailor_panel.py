@@ -31,13 +31,13 @@ class _Result:
 class _Agent:
     def __init__(self, content):
         self._content = content
-        self.received = None
+        self.received: str = ""
 
-    def run(self, prompt):
+    def run(self, prompt: str):
         self.received = prompt
         return _Result(self._content)
 
-    async def arun(self, prompt):
+    async def arun(self, prompt: str):
         return self.run(prompt)
 
 
