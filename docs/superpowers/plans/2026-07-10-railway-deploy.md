@@ -78,12 +78,14 @@ of a mounted Railway volume.
 ### Task 1: Auth primitives + Settings fields + `hash-password` CLI
 
 **Files:**
+
 - Create: `src/resume_agent/api/auth.py`
 - Modify: `src/resume_agent/config.py` (add 4 fields after `api_token`, ~line 34)
 - Modify: `src/resume_agent/cli.py` (add `hash-password` command near `serve_cmd`, ~line 818)
 - Test: `tests/api/test_auth_primitives.py`
 
 **Interfaces:**
+
 - Consumes: `Settings` (`resume_agent.config`).
 - Produces (used by Tasks 2, 4):
   - `Settings.auth_username: str = ""`, `Settings.auth_password_hash: str = ""`, `Settings.session_secret: str = ""`, `Settings.browser_enabled: bool = True`
@@ -322,6 +324,7 @@ git commit -m "feat: session-auth primitives, settings fields, hash-password CLI
 ### Task 2: Auth endpoints + combined guard
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/auth.py`
 - Create: `src/resume_agent/api/routers/auth.py`
 - Modify: `src/resume_agent/api/deps.py` (`require_token` ~line 26, `refresh_app_settings` ~line 54)
@@ -330,6 +333,7 @@ git commit -m "feat: session-auth primitives, settings fields, hash-password CLI
 - Test: `tests/api/test_auth_router.py`
 
 **Interfaces:**
+
 - Consumes (Task 1): `auth.SESSION_COOKIE`, `auth.SESSION_LIFETIME_SECONDS`, `auth.session_auth_configured`, `auth.issue_session`, `auth.verify_session`, `auth.verify_password`; `Settings.auth_*`, `Settings.session_secret`.
 - Produces (used by Task 3 via the regenerated TS schema):
   - `POST /api/auth/login` body `{username, password}` → 200 `{username, authRequired}` + `ra_session` cookie; 401 envelope on bad credentials; 400 `AUTH_NOT_CONFIGURED` when unconfigured.
@@ -671,6 +675,7 @@ git commit -m "feat: session login endpoints + combined cookie-or-bearer guard"
 ### Task 3: Frontend login page + auth gate
 
 **Files:**
+
 - Create: `web/src/features/auth/LoginPage.tsx`
 - Create: `web/src/features/auth/AuthGate.tsx`
 - Create: `web/src/features/auth/LogoutButton.tsx`
@@ -680,6 +685,7 @@ git commit -m "feat: session login endpoints + combined cookie-or-bearer guard"
 - Modify: `web/src/app/AppLayout.tsx` (render `<LogoutButton />` in the nav)
 
 **Interfaces:**
+
 - Consumes (Task 2, via regenerated `web/src/lib/api/schema.ts`): `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` returning `{username: string|null, authRequired: boolean}`.
 - Consumes (existing): `api`, `unwrap` from `@/lib/api/client`; MSW `server` from `@/test/server`; test `wrap` pattern from `web/src/test/a11y.test.tsx`.
 - Produces: `<AuthGate>{children}</AuthGate>` (redirects to `/login` when `authRequired && !username`), `<LoginPage />`, `<LogoutButton />` (renders nothing when auth is not required).
@@ -920,15 +926,19 @@ export function LogoutButton() {
 - [ ] **Step 5: Wire the router, layout, and 401 middleware**
 
 In `web/src/app/router.tsx`:
+
 1. Add imports: `import { AuthGate } from "@/features/auth/AuthGate";` and a lazy login page alongside the other lazy pages:
+
 ```tsx
 const LoginPage = lazy(() =>
   import("@/features/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
 ```
+
 2. In the route array, add a top-level sibling of the AppLayout route (wrap the
-lazy element in `Suspense` exactly the way the file's existing routes do; if the
-file has a wrapping helper, use it, otherwise inline):
+   lazy element in `Suspense` exactly the way the file's existing routes do; if the
+   file has a wrapping helper, use it, otherwise inline):
+
 ```tsx
   {
     path: "/login",
@@ -939,6 +949,7 @@ file has a wrapping helper, use it, otherwise inline):
     ),
   },
 ```
+
 3. Wrap the AppLayout route element: where the root route renders `<AppLayout />` (possibly inside `SetupGate`), wrap the outermost element in `<AuthGate>…</AuthGate>` so auth is checked before setup.
 
 In `web/src/app/AppLayout.tsx`: import `LogoutButton` and render `<LogoutButton />` in the nav/header area (next to the theme toggle if present).
@@ -982,12 +993,14 @@ git commit -m "feat: login page, auth gate, logout, 401 redirect in SPA"
 ### Task 4: `browser_enabled` degradation
 
 **Files:**
+
 - Modify: `src/resume_agent/discovery/connectors/companies.py` (new exception ~line 31; `_failure_reason` ~line 129; `__init__` ~line 151; `_produce` ~line 181)
 - Modify: `src/resume_agent/discovery/connectors/registry.py` (companies/scrape/adzuna/linkedin specs, lines 60-103)
 - Modify: `src/resume_agent/services/discovery.py` (`add_job_from_url` ~line 103)
 - Test: `tests/test_browser_capability.py`
 
 **Interfaces:**
+
 - Consumes (Task 1): `Settings.browser_enabled`.
 - Produces:
   - `companies.BrowserRequired(Exception)`
@@ -1197,11 +1210,13 @@ git commit -m "feat: browser_enabled flag degrades browser connectors per-unit"
 ### Task 5: `prepare_data_root` + container entrypoint
 
 **Files:**
+
 - Create: `src/resume_agent/deploy.py`
 - Create: `docker/entrypoint.sh`
 - Test: `tests/test_deploy_prepare.py`
 
 **Interfaces:**
+
 - Consumes: nothing from other tasks (pure filesystem).
 - Produces (used by Task 8's Dockerfile):
   - `prepare_data_root(app_root: Path, data_root: Path, defaults_dir: Path | None = None) -> None`
@@ -1376,6 +1391,7 @@ git commit -m "feat: volume prep (seed + symlinks) and container entrypoint"
 ### Task 6: Whole-root export/import — service + admin router
 
 **Files:**
+
 - Create: `src/resume_agent/services/backup.py`
 - Create: `src/resume_agent/api/routers/admin.py`
 - Modify: `src/resume_agent/api/app.py` (import block ~line 16, guarded registration ~line 135)
@@ -1383,6 +1399,7 @@ git commit -m "feat: volume prep (seed + symlinks) and container entrypoint"
 - Test: `tests/test_backup_service.py`, `tests/api/test_admin_backup.py`
 
 **Interfaces:**
+
 - Consumes: `app.state.data_dir`, `app.state.db_url`, `app.state.engine`, `app.state.env_path`, `RunManager.list_active()`, `refresh_app_settings` (Task 2 version), `make_engine`/`init_db` (`resume_agent.db`).
 - Produces (used by Task 7):
   - `backup.sqlite_snapshot(db_file: Path, dest: Path) -> None`
@@ -1800,11 +1817,13 @@ git commit -m "feat: whole-root export/import service + admin endpoints"
 ### Task 7: Local seed packer (`pack_local_checkout` + script)
 
 **Files:**
+
 - Modify: `src/resume_agent/services/backup.py` (append one function)
 - Create: `scripts/pack_data.py`
 - Test: `tests/test_backup_service.py` (append tests)
 
 **Interfaces:**
+
 - Consumes (Task 6): `sqlite_snapshot`.
 - Produces: `backup.pack_local_checkout(repo_root: Path, out: Path) -> Path` — tars the local checkout's `data/*` (at archive root, DB via snapshot), `config/` → `config/`, `output/` → `output/`, `.env` → `.env`, i.e. exactly the volume layout `POST /api/admin/import` expects.
 
@@ -1940,12 +1959,14 @@ git commit -m "feat: pack_local_checkout seed tarball + pack_data script"
 ### Task 8: Dockerfile, railway.json, runbook
 
 **Files:**
+
 - Create: `Dockerfile`
 - Create: `.dockerignore`
 - Create: `railway.json`
 - Create: `docs/deploy-railway.md`
 
 **Interfaces:**
+
 - Consumes: `docker/entrypoint.sh` + `python -m resume_agent.deploy` (Task 5), `resume-agent serve --host --port` (`cli.py:820`), `spa_dist_dir()` expecting `<repo_root>/web/dist` (`api/app.py:40-45`), `/api/health` (unauthenticated).
 - Produces: a deployable image + Railway config-as-code + the operator runbook.
 
@@ -2032,7 +2053,7 @@ Note: if `templates/` or `resume-template/` are absent or renamed, check what `r
 
 - [ ] **Step 4: Write `docs/deploy-railway.md`**
 
-```markdown
+````markdown
 # Deploying to Railway
 
 Spec: `docs/superpowers/specs/2026-07-10-railway-deploy-design.md` · ADR 0002.
@@ -2049,18 +2070,19 @@ Single-tenant: one account, one service, one volume.
    with `resume-agent hash-password`; generate the session secret with
    `python -c "import secrets; print(secrets.token_hex(32))"`:
 
-   | Variable | Value |
-   | --- | --- |
-   | `AUTH_USERNAME` | your login name |
-   | `AUTH_PASSWORD_HASH` | output of `resume-agent hash-password` |
-   | `SESSION_SECRET` | 64 hex chars; rotating it logs out every session |
-   | `API_TOKEN` | (optional) bearer for curl/CLI scripts |
-   | `BROWSER_ENABLED` | `false` (already the image default) |
+   | Variable             | Value                                            |
+   | -------------------- | ------------------------------------------------ |
+   | `AUTH_USERNAME`      | your login name                                  |
+   | `AUTH_PASSWORD_HASH` | output of `resume-agent hash-password`           |
+   | `SESSION_SECRET`     | 64 hex chars; rotating it logs out every session |
+   | `API_TOKEN`          | (optional) bearer for curl/CLI scripts           |
+   | `BROWSER_ENABLED`    | `false` (already the image default)              |
 
    Operational secrets (LLM keys, GitHub, Adzuna, LinkedIn) are NOT set here —
    enter them in the web UI under Settings → Keys after first login. They live
    on the volume's `.env`. Setting one as a Railway variable would silently
    shadow the web editor — don't.
+
 4. **Deploy**: push to `main` (or dashboard → Deploy). Wait for the healthcheck.
 5. **Log in** at `https://<app>.up.railway.app`, then enter your LLM keys under
    Settings → Keys.
@@ -2072,6 +2094,7 @@ Single-tenant: one account, one service, one volume.
 curl -H "Authorization: Bearer $API_TOKEN" -F "file=@seed.tar.gz" \
      "https://<app>.up.railway.app/api/admin/import?confirm=REPLACE"
 ```
+````
 
 Import full-replaces the data root and refuses while runs are active (409).
 
@@ -2128,6 +2151,7 @@ docker run --rm -p 8000:8000 -v ra-data:/app/data \
 ```
 
 Then verify from another shell:
+
 - `curl -s http://localhost:8000/api/health` → `{"status":"ok"}`
 - `curl -s http://localhost:8000/` → HTML containing the SPA shell (`<div id="root">`)
 - `curl -s http://localhost:8000/api/pipeline` → 401 envelope
