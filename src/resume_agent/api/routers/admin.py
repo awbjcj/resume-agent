@@ -12,7 +12,7 @@ from starlette.background import BackgroundTask
 
 from resume_agent.api.deps import refresh_app_settings
 from resume_agent.api.errors import ApiException
-from resume_agent.config import Settings
+from resume_agent.config import Settings, get_settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.services.backup import (
     InvalidArchiveError,
@@ -78,9 +78,11 @@ def import_root(
         except InvalidArchiveError as exc:
             raise ApiException(400, "INVALID_ARCHIVE", str(exc)) from exc
         finally:
+            request.app.state.engine.dispose()
             engine = make_engine(request.app.state.db_url)
             init_db(engine)
             request.app.state.engine = engine
+    get_settings.cache_clear()
     refresh_app_settings(
         request.app,
         Settings(_env_file=request.app.state.env_path),  # type: ignore[call-arg]
