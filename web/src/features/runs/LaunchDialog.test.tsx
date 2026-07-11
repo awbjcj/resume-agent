@@ -71,6 +71,35 @@ describe("LaunchDialog", () => {
     expect(document.body.querySelector('[data-slot="dialog-content"]')).toBeNull();
   });
 
+  it("resets selections when reopened", async () => {
+    const user = userEvent.setup();
+
+    function Harness() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>Open launcher</button>
+          <LaunchDialog
+            mode="tailor"
+            jobs={jobs}
+            open={open}
+            onOpenChange={setOpen}
+            onLaunch={vi.fn().mockResolvedValue(true)}
+          />
+        </>
+      );
+    }
+    render(<Harness />);
+
+    await user.click(screen.getByRole("checkbox", { name: /Globex/ }));
+    expect(screen.getByRole("button", { name: /tailor 1 job/i })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    await user.click(screen.getByRole("button", { name: /open launcher/i }));
+
+    expect(screen.getByRole("button", { name: /tailor 2 jobs/i })).toBeEnabled();
+  });
+
   it("stays open when launch creation fails", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
