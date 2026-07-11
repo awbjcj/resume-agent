@@ -1,5 +1,10 @@
+from typing import cast
+
+from sqlmodel import Session
+
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors import companies as companies_module
+from resume_agent.discovery.connectors.adzuna import AdzunaConnector
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import ConnectorsConfig
@@ -46,6 +51,7 @@ def test_registry_reports_disabled_browser_sources_instead_of_dropping_them():
     assert list(scrape.fetch(SearchConfig()).failures.values()) == [REASON]
     assert linkedin.fetch(SearchConfig()).failures == {"linkedin": REASON}
     adzuna = by_name["adzuna"]
+    assert isinstance(adzuna, AdzunaConnector)
     assert adzuna.enrich_details is False
 
 
@@ -94,7 +100,9 @@ def test_url_ingest_ands_caller_flag_with_browser_setting(monkeypatch):
     )
 
     try:
-        discovery.add_job_from_url(None, url="https://example.test/job")
+        discovery.add_job_from_url(
+            cast(Session, None), url="https://example.test/job"
+        )
     except discovery.UrlFetchError:
         pass
 
@@ -115,7 +123,7 @@ def test_linkedin_service_returns_explicit_failure_without_building_scraper(monk
         lambda: (_ for _ in ()).throw(AssertionError("browser scraper constructed")),
     )
 
-    assert discovery.scrape_linkedin_jobs(None) == {
+    assert discovery.scrape_linkedin_jobs(cast(Session, None)) == {
         "added": 0,
         "failures": {"linkedin": REASON},
     }
