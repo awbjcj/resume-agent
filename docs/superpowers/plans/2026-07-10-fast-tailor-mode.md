@@ -57,10 +57,12 @@ checking the plan against the 2026-07-10 design and the current repository.
 ### Task 1: ReviewConfig gains `merged_advisory`, `tailor_tier`, `reviser_tier`
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/review_config.py`
 - Test: `tests/test_tailor_review_config.py`
 
 **Interfaces:**
+
 - Produces: `ReviewConfig.merged_advisory: bool` (default `False`), `ReviewConfig.tailor_tier: str` (default `"premium"`), `ReviewConfig.reviser_tier: str` (default `"premium"`). Later tasks read these via `config.<field>`.
 
 - [ ] **Step 1: Write the failing tests** — append to `tests/test_tailor_review_config.py`:
@@ -115,12 +117,14 @@ git commit -m "feat(tailor): add merged_advisory and writer tier knobs to Review
 ### Task 2: Fast/deep config files + setup wizard registration
 
 **Files:**
+
 - Modify: `config/review.yaml`, `config/review.yaml.example`
 - Create: `config/review_deep.yaml`, `config/review_deep.yaml.example`
 - Modify: `src/resume_agent/setup/preflight.py:5-13` (EXAMPLES tuple), `src/resume_agent/setup/writer.py:48-53` (targets map), `src/resume_agent/setup/screens.py:534-540` (file listing)
 - Test: `tests/test_shipped_review_configs.py` (new)
 
 **Interfaces:**
+
 - Produces: `config/review.yaml` = fast roster (`merged_advisory: true`, `max_rounds: 2`, Sonnet writers); `config/review_deep.yaml` = today's roster. Task 7/8 reference the deep path string `"config/review_deep.yaml"`.
 
 - [ ] **Step 1: Write the failing test** — create `tests/test_shipped_review_configs.py`:
@@ -179,7 +183,7 @@ tailor_tier: mid
 reviser_tier: mid
 reviewers:
   - name: fact-check
-    gate: true            # blocking: any unsupported claim fails the round
+    gate: true # blocking: any unsupported claim fails the round
     weight: 0
     model_tier: premium
   - name: ats-keyword
@@ -232,10 +236,12 @@ git commit -m "feat(config): fast review roster by default, deep roster split ou
 ### Task 3: Writer tier plumbing in `build_tailor_bundle`
 
 **Files:**
+
 - Modify: `src/resume_agent/services/agents.py:69-88`
 - Modify: `tests/test_services_agents.py` (existing lambdas must accept the new kwarg)
 
 **Interfaces:**
+
 - Consumes: `ReviewConfig.tailor_tier` / `reviser_tier` (Task 1); `build_tailor_agent(model_id=None, style_guide=None)` / `build_reviser_agent(model_id=None, style_guide=None)` (already exist in `tailor/agents.py`).
 - Produces: `build_tailor_bundle(config, style_guide)` now passes `model_id=model_for_tier(config.tailor_tier)` to the tailor agent and `model_id=model_for_tier(config.reviser_tier)` to the reviser agent.
 
@@ -313,12 +319,14 @@ git commit -m "feat(tailor): route configured writer tiers into tailor/reviser a
 ### Task 4: `MergedPanelReview` schema, merged agent builder, splitter
 
 **Files:**
+
 - Modify: `src/resume_agent/models/review.py`
 - Modify: `src/resume_agent/tailor/agents.py`
 - Modify: `src/resume_agent/tailor/panel.py`
 - Test: `tests/test_tailor_panel.py`
 
 **Interfaces:**
+
 - Produces:
   - `MergedPanelReview(ExtensibleModel)` with `critiques: list[ReviewCritique]` (in `models/review.py`).
   - `build_merged_advisory_agent(names: list[str], model_id: str | None = None, style_guide: str | None = None, *, score_bands: bool = False) -> Runner` (in `tailor/agents.py`), output schema `MergedPanelReview`.
@@ -473,11 +481,13 @@ git commit -m "feat(tailor): merged advisory reviewer schema, agent builder, spl
 ### Task 5: Merged dispatch in `run_panel`/`arun_panel` + bundle wiring
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/panel.py:49-118`
 - Modify: `src/resume_agent/services/agents.py:69-77`
 - Test: `tests/test_tailor_panel.py`, `tests/test_services_agents.py`
 
 **Interfaces:**
+
 - Consumes: `MERGED_ADVISORY`, `split_merged_critiques`, `build_merged_advisory_agent` (Task 4); `config.merged_advisory` (Task 1).
 - Produces: when `config.merged_advisory` is true, `run_panel`/`arun_panel` issue one lean-input call to `reviewer_agents[MERGED_ADVISORY]` for all non-gate reviewers and return gates-then-advisory critiques (each group in config order). `build_tailor_bundle` builds that agent under the `MERGED_ADVISORY` key. `workflow.py` is NOT modified.
 
@@ -692,11 +702,13 @@ git commit -m "feat(tailor): one merged advisory call replaces per-reviewer fan-
 ### Task 6: Per-stage timing on `TailorRound`
 
 **Files:**
+
 - Modify: `src/resume_agent/tailor/workflow.py`
 - Test: `tests/test_tailor_workflow.py`
 
 **Interfaces:**
-- Produces: `TailorRound.stage_seconds: dict[str, float]` (default `{}`). Keys: `"match_plan"`/`"draft"` on round 1, `"panel"` on every round that ran the panel, `"revise"` on the round *following* a revision (the revise that produced that round's content). `ExtensibleModel` keeps previously persisted rounds loadable.
+
+- Produces: `TailorRound.stage_seconds: dict[str, float]` (default `{}`). Keys: `"match_plan"`/`"draft"` on round 1, `"panel"` on every round that ran the panel, `"revise"` on the round _following_ a revision (the revise that produced that round's content). `ExtensibleModel` keeps previously persisted rounds loadable.
 
 - [ ] **Step 1: Write the failing test** — append to `tests/test_tailor_workflow.py`. The file already defines `_ContentAgent` (tailor/reviser fake), `_FactCheck` (fails round 1, passes round 2), and `_Good(name)` — reuse them:
 
@@ -785,10 +797,12 @@ git commit -m "feat(tailor): record per-stage wall-clock on each review round"
 ### Task 7: CLI `--deep` flag
 
 **Files:**
+
 - Modify: `src/resume_agent/services/tailoring.py:22` (add constant), `src/resume_agent/cli.py:599-651`
 - Test: `tests/test_cli_tailor_deep.py` (new)
 
 **Interfaces:**
+
 - Consumes: `config/review_deep.yaml` (Task 2).
 - Produces: `DEFAULT_REVIEW_DEEP = "config/review_deep.yaml"` in `services/tailoring.py`; `tailor --deep` passes that path as `review_path` (an explicit `--review <path>` still wins).
 
@@ -892,11 +906,13 @@ git commit -m "feat(cli): tailor --deep swaps in the deep review roster"
 ### Task 8: API `deep` param + contract regeneration
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/runs.py:53-56`, `src/resume_agent/api/routers/runs.py:148-177`
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts` (whichever `gen_ts_client.sh` writes)
 - Test: `tests/api/test_runs_launch.py`
 
 **Interfaces:**
+
 - Consumes: `DEFAULT_REVIEW`, `DEFAULT_REVIEW_DEEP` (Task 7).
 - Produces: `TailorParams.deep: bool = False` (wire: `"deep"`); `POST /api/tailor` with `{"deep": true}` runs against `config/review_deep.yaml`. Task 9's web client sees `deep` in the generated schema.
 
@@ -977,21 +993,23 @@ git commit -m "feat(api): deep flag on tailor launch selects the deep review ros
 ### Task 9: Web launchers for selected jobs
 
 **Files:**
+
 - Modify: `web/src/features/runs/use-bulk-run.ts`
 - Test: `web/src/features/runs/use-bulk-run.test.tsx`
 
 **Interfaces:**
+
 - Consumes: regenerated API schema with `deep` + `jobIds` (Task 8).
 - Produces: `useBulkRun()` additionally returns `tailorSelected(jobIds: number[], deep: boolean)` and `coverLettersSelected(jobIds: number[])`, both returning `Promise<boolean>` like the existing launchers. Task 10's dialog calls these.
 
 - [ ] **Step 1: Write the failing test** — extend `use-bulk-run.test.tsx`:
 
 ```tsx
-  it("exposes selected-job launchers", () => {
-    const { result } = renderHook(() => useBulkRun(), { wrapper });
-    expect(typeof result.current.tailorSelected).toBe("function");
-    expect(typeof result.current.coverLettersSelected).toBe("function");
-  });
+it("exposes selected-job launchers", () => {
+  const { result } = renderHook(() => useBulkRun(), { wrapper });
+  expect(typeof result.current.tailorSelected).toBe("function");
+  expect(typeof result.current.coverLettersSelected).toBe("function");
+});
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -1029,23 +1047,29 @@ git commit -m "feat(web): launchers for tailoring/cover-lettering selected jobs"
 ### Task 10: Tailor launch dialog + Pipeline wiring
 
 **Files:**
+
 - Create: `web/src/features/runs/LaunchDialog.tsx`
 - Test: `web/src/features/runs/LaunchDialog.test.tsx` (new)
 - Modify: `web/src/features/pipeline/PipelineContainer.tsx:107-119`, `web/src/features/pipeline/PipelineContainer.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `tailorSelected`/`coverLettersSelected` (Task 9); shadcn `Dialog`, `Checkbox`, `Switch`, `Button` from `web/src/components/ui/`.
 - Produces:
 
 ```tsx
-export interface LaunchJob { jobId: number; company: string | null; title: string }
+export interface LaunchJob {
+  jobId: number;
+  company: string | null;
+  title: string;
+}
 export function LaunchDialog(props: {
   mode: "tailor" | "coverLetter";
-  jobs: LaunchJob[];                       // approved jobs currently loaded
+  jobs: LaunchJob[]; // approved jobs currently loaded
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLaunch: (jobIds: number[], deep: boolean) => void;
-}): JSX.Element
+}): JSX.Element;
 ```
 
 - [ ] **Step 1: Write the failing test** — `LaunchDialog.test.tsx`:
@@ -1065,7 +1089,13 @@ describe("LaunchDialog", () => {
   it("pre-checks all jobs and launches the selected subset with the deep flag", () => {
     const onLaunch = vi.fn();
     render(
-      <LaunchDialog mode="tailor" jobs={jobs} open onOpenChange={() => {}} onLaunch={onLaunch} />,
+      <LaunchDialog
+        mode="tailor"
+        jobs={jobs}
+        open
+        onOpenChange={() => {}}
+        onLaunch={onLaunch}
+      />,
     );
     // Uncheck job 2, flip deep on
     fireEvent.click(screen.getByRole("checkbox", { name: /Globex/ }));
@@ -1076,15 +1106,29 @@ describe("LaunchDialog", () => {
 
   it("hides the deep switch in coverLetter mode", () => {
     render(
-      <LaunchDialog mode="coverLetter" jobs={jobs} open onOpenChange={() => {}} onLaunch={vi.fn()} />,
+      <LaunchDialog
+        mode="coverLetter"
+        jobs={jobs}
+        open
+        onOpenChange={() => {}}
+        onLaunch={vi.fn()}
+      />,
     );
     expect(screen.queryByRole("switch")).toBeNull();
-    expect(screen.getByRole("button", { name: /write 2 cover letters/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /write 2 cover letters/i }),
+    ).toBeEnabled();
   });
 
   it("disables submit when nothing is selected", () => {
     render(
-      <LaunchDialog mode="tailor" jobs={[jobs[0]]} open onOpenChange={() => {}} onLaunch={vi.fn()} />,
+      <LaunchDialog
+        mode="tailor"
+        jobs={[jobs[0]]}
+        open
+        onOpenChange={() => {}}
+        onLaunch={vi.fn()}
+      />,
     );
     fireEvent.click(screen.getByRole("checkbox", { name: /Acme/ }));
     expect(screen.getByRole("button", { name: /tailor/i })).toBeDisabled();
@@ -1105,7 +1149,11 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1118,11 +1166,19 @@ export interface LaunchJob {
 
 const COPY = {
   tailor: { title: "Tailor resumes", verb: "Tailor", noun: "job" },
-  coverLetter: { title: "Write cover letters", verb: "Write", noun: "cover letter" },
+  coverLetter: {
+    title: "Write cover letters",
+    verb: "Write",
+    noun: "cover letter",
+  },
 } as const;
 
 export function LaunchDialog({
-  mode, jobs, open, onOpenChange, onLaunch,
+  mode,
+  jobs,
+  open,
+  onOpenChange,
+  onLaunch,
 }: {
   mode: "tailor" | "coverLetter";
   jobs: LaunchJob[];
@@ -1156,7 +1212,10 @@ export function LaunchDialog({
           {jobs.map((job) => {
             const label = `${job.company ?? "?"} — ${job.title}`;
             return (
-              <label key={job.jobId} className="flex items-center gap-2 text-sm">
+              <label
+                key={job.jobId}
+                className="flex items-center gap-2 text-sm"
+              >
                 <Checkbox
                   aria-label={label}
                   checked={selected.has(job.jobId)}
@@ -1174,19 +1233,28 @@ export function LaunchDialog({
             );
           })}
           {jobs.length === 0 && (
-            <p className="text-sm text-muted-foreground">No approved jobs to process.</p>
+            <p className="text-sm text-muted-foreground">
+              No approved jobs to process.
+            </p>
           )}
         </div>
         {mode === "tailor" && (
           <div className="flex items-center gap-2">
-            <Switch id="deep-review" aria-label="Deep review" checked={deep} onCheckedChange={setDeep} />
+            <Switch
+              id="deep-review"
+              aria-label="Deep review"
+              checked={deep}
+              onCheckedChange={setDeep}
+            />
             <Label htmlFor="deep-review">
               Deep review (full panel, ~3-6x slower)
             </Label>
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             disabled={count === 0}
             onClick={() => {
@@ -1213,14 +1281,20 @@ Expected: PASS.
 - [ ] **Step 5: Wire into `PipelineContainer.tsx`.** The container already has `rows` (all pipeline items) and `runs = useBulkRun()`. Add state and derive approved jobs (check the `PipelineItem` field name for stage/status in `web/src/lib/api/schema.ts` — use the real one):
 
 ```tsx
-  const [launchMode, setLaunchMode] = useState<"tailor" | "coverLetter" | null>(null);
-  const approvedJobs = useMemo(
-    () =>
-      rows
-        .filter((row) => row.status === "approved")
-        .map((row) => ({ jobId: row.jobId, company: row.company, title: row.title })),
-    [rows],
-  );
+const [launchMode, setLaunchMode] = useState<"tailor" | "coverLetter" | null>(
+  null,
+);
+const approvedJobs = useMemo(
+  () =>
+    rows
+      .filter((row) => row.status === "approved")
+      .map((row) => ({
+        jobId: row.jobId,
+        company: row.company,
+        title: row.title,
+      })),
+  [rows],
+);
 ```
 
 Replace the two buttons (lines ~113-118):
@@ -1237,17 +1311,19 @@ Replace the two buttons (lines ~113-118):
 and render the dialog:
 
 ```tsx
-      <LaunchDialog
-        mode={launchMode ?? "tailor"}
-        jobs={approvedJobs}
-        open={launchMode !== null}
-        onOpenChange={(open) => { if (!open) setLaunchMode(null); }}
-        onLaunch={(jobIds, deep) =>
-          launchMode === "coverLetter"
-            ? runs.coverLettersSelected(jobIds)
-            : runs.tailorSelected(jobIds, deep)
-        }
-      />
+<LaunchDialog
+  mode={launchMode ?? "tailor"}
+  jobs={approvedJobs}
+  open={launchMode !== null}
+  onOpenChange={(open) => {
+    if (!open) setLaunchMode(null);
+  }}
+  onLaunch={(jobIds, deep) =>
+    launchMode === "coverLetter"
+      ? runs.coverLettersSelected(jobIds)
+      : runs.tailorSelected(jobIds, deep)
+  }
+/>
 ```
 
 Add a `PipelineContainer.test.tsx` case: clicking "Tailor approved…" renders the dialog title "Tailor resumes" (follow that file's existing render/mock setup).
@@ -1269,6 +1345,7 @@ git commit -m "feat(web): launch dialog for selective tailoring with deep-review
 ### Task 11: Docs + live acceptance evidence
 
 **Files:**
+
 - Modify: `CLAUDE.md` (Known design notes)
 - No new tests (manual evidence step).
 
@@ -1282,6 +1359,27 @@ git commit -m "feat(web): launch dialog for selective tailoring with deep-review
   fact-check gate stays premium in both modes. Deep mode = `config/review_deep.yaml` via
   CLI `tailor --deep` or API `{"deep": true}`. Each `TailorRound` records
   `stage_seconds` (draft/panel/revise wall-clock).
+```
+
+- [ ] **Step 2: Full offline verification**
+
+Run: `.venv/Scripts/python.exe -m pytest -q` and `ruff check` and (from `web/`) `npx vitest run`
+Expected: all green.
+
+- [ ] **Step 3: Live acceptance (requires API key; run with the user).** Pick 2-3 approved jobs, then:
+
+```bash
+.venv/Scripts/python.exe -m resume_agent.cli tailor --job-id <ID>          # fast
+.venv/Scripts/python.exe -m resume_agent.cli tailor --job-id <ID2> --deep  # deep
+```
+
+Read the `tailor job=… total_llm_seconds=…` log lines emitted by `tailor/service.py` (Task 6). **Pass criteria (from spec):** fast median ≤ 90 s per passing job AND ≤ ~50 % of the deep wall-clock; manually eyeball both resumes for quality parity. Record the numbers in the PR/commit message.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add CLAUDE.md
+git commit -m "docs: fast-by-default tailoring notes + acceptance evidence"
 ```
 
 - [ ] **Step 2: Full offline verification**

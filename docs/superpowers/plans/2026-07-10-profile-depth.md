@@ -93,10 +93,12 @@ These amendments override any conflicting illustrative snippet below.
 ### Task 1: Corpus — `origin` field, `project` mode, dossier frontmatter sniff
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/corpus.py`
 - Test: `tests/test_profile_corpus.py`
 
 **Interfaces:**
+
 - Produces: `SourceMode = Literal["literal", "synthesis", "project"]`; `SourceOrigin = Literal["upload", "github"]`; `SourceDoc.origin: SourceOrigin = "upload"`; `add_source(..., origin: SourceOrigin = "upload")`; `frontmatter_repo_url(data: bytes) -> str | None`.
 - Later tasks rely on: `add_source(profile_dir, path, mode="project", origin="github")` and frontmatter sniffing defaulting dossier `.md` files to `mode="project"`.
 
@@ -274,10 +276,12 @@ git commit -m "feat(profile): add source origin field, project mode, dossier fro
 ### Task 2: Project-scoped extractor
 
 **Files:**
+
 - Create: `src/resume_agent/profile/project_extractor.py`
 - Test: `tests/test_profile_project_extractor.py`
 
 **Interfaces:**
+
 - Consumes: `AgentRunner`/`Runner`/`acall`/`build_model`/`use_json_mode_for` from `resume_agent.llm_runner`; `Project`, `Skill`, `Contact`, `ProfileFacts` from `resume_agent.models.profile`.
 - Produces: `PROJECT_PROMPT_VERSION: int`; `class ProjectDocFacts(ExtensibleModel)` with `project: Project` and `skills: dict[str, list[Skill]]`; `build_project_extractor_agent(model_id: str | None = None) -> Runner`; `project_facts_to_profile(doc_facts: ProjectDocFacts) -> ProfileFacts`; `async aextract_project_facts(text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ProfileFacts`.
 
@@ -467,10 +471,12 @@ git commit -m "feat(profile): project-scoped extractor emits one Project + skill
 ### Task 3: Fragment walk — `extract_project_fragments`
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/fragments.py`
 - Test: `tests/test_profile_fragments.py`
 
 **Interfaces:**
+
 - Consumes: `PROJECT_PROMPT_VERSION`, `aextract_project_facts` from Task 2; `_walk_fragments`/`FragmentProducer`/`Produced` (existing internals).
 - Produces: `extract_project_fragments(profile_dir, manifest, agent) -> FragmentResult`; literal walk now selects **only** `mode == "literal"`; `fragment_cache_status` understands project meta.
 
@@ -611,11 +617,13 @@ git commit -m "feat(profile): project-mode fragment walk with own prompt-version
 ### Task 4: GitHubClient additions + byte-weighted languages
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/github.py`
 - Modify: `src/resume_agent/profile/github_ingest.py`
 - Test: `tests/test_profile_github.py`, `tests/test_profile_github_ingest.py`
 
 **Interfaces:**
+
 - Produces: `GitHubClient.fetch_root_listing(owner, repo) -> list[dict]`; `GitHubClient.fetch_raw_file(owner, repo, path) -> str | None`; `GitHubClient.fetch_languages(owner, repo) -> dict[str, int]`; `repo_to_project(repo, languages: dict[str, int] | None = None) -> Project`; `normalize_repo_url(url: str | None) -> str | None` (in `github_ingest.py`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -759,10 +767,12 @@ git commit -m "feat(profile): GitHub contents/languages fetchers + byte-weighted
 ### Task 5: GitHub harvester — `sync_github_sources`
 
 **Files:**
+
 - Create: `src/resume_agent/profile/github_harvest.py`
 - Test: `tests/test_profile_github_harvest.py`
 
 **Interfaces:**
+
 - Consumes: `GitHubClient` (Task 4 methods), `normalize_repo_url`, `add_source`/`load_manifest`/`remove_source`/`sources_dir`/`doc_path`/`frontmatter_repo_url` from corpus.
 - Produces:
   - `GITHUB_DOC_PREFIX = "github--"`
@@ -1179,11 +1189,13 @@ git commit -m "feat(profile): GitHub auto-harvest writes project-mode virtual so
 ### Task 6: Build integration — phase 0 sync, project fragments, resilient metadata merge
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/build.py`
 - Modify: `src/resume_agent/profile/merge.py` (repo_url merge identity)
 - Test: `tests/test_profile_build.py`, `tests/test_profile_merge.py`
 
 **Interfaces:**
+
 - Consumes: `sync_github_sources`/`HarvestReport` (Task 5), `extract_project_fragments` (Task 3), `repo_to_project(repo, languages=...)` + `normalize_repo_url` (Task 4).
 - Produces: `build_corpus_profile(..., project_agent: Runner | None = None, github_allow: tuple[str, ...] = (), github_deny: tuple[str, ...] = (), github_limit: int = 20)` — signature later tasks call. `merge_facts` matches github projects by `repo_url` before name.
 
@@ -1458,6 +1470,7 @@ git commit -m "feat(profile): build phase-0 GitHub sync, project fragments in me
 ### Task 7: Config + service plumbing
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/config.py` (ProfileConfigDoc)
 - Modify: `src/resume_agent/services/profile_build.py`
 - Modify: `src/resume_agent/api/routers/profile.py` (`launch_profile_build` passes config)
@@ -1465,6 +1478,7 @@ git commit -m "feat(profile): build phase-0 GitHub sync, project fragments in me
 - Test: `tests/test_services_sources.py`-style — use `tests/api/test_profile_build_run.py` and `tests/test_cli_profile.py`
 
 **Interfaces:**
+
 - Produces: `ProfileConfigDoc.github_repo_allow: list[str]`, `.github_repo_deny: list[str]`, `.github_repo_limit: int = 20`; `run_corpus_build(..., github_allow: tuple[str, ...] = (), github_deny: tuple[str, ...] = (), github_limit: int = 20)`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1594,10 +1608,12 @@ git commit -m "feat(profile): repo allow/deny/limit config threaded from UI+CLI 
 ### Task 8: Note + URL intake
 
 **Files:**
+
 - Create: `src/resume_agent/profile/intake.py`
 - Test: `tests/test_profile_intake.py`
 
 **Interfaces:**
+
 - Consumes: `add_source` (Task 1), `html_to_text` from `resume_agent.discovery.connectors.text`.
 - Produces: `add_note_source(profile_dir, title: str, text: str) -> SourceDoc`; `add_url_source(profile_dir, url: str, client: httpx.Client | None = None) -> SourceDoc`.
 
@@ -1746,10 +1762,12 @@ git commit -m "feat(profile): quick-add note and URL intake as literal sources"
 ### Task 9: CLI — `sync-github`, `add-note`, `add-url`
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py`
 - Test: `tests/test_cli_profile.py`
 
 **Interfaces:**
+
 - Consumes: `sync_github_sources` (Task 5), `add_note_source`/`add_url_source` (Task 8).
 - Produces: `resume-agent profile sync-github [--username U] [--dir D]`, `profile add-note TITLE TEXT [--dir D]`, `profile add-url URL [--dir D]`.
 
@@ -1873,12 +1891,14 @@ git commit -m "feat(cli): profile sync-github / add-note / add-url commands"
 ### Task 10: API — origin on SourceOut, note/URL endpoints, sync-github run
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/profile.py`
 - Modify: `src/resume_agent/api/routers/profile.py`
 - Test: `tests/api/test_profile_sources.py`
 - Regenerate: `contracts/openapi.json`, `contracts/ts/api.ts`
 
 **Interfaces:**
+
 - Consumes: `add_note_source`/`add_url_source` (Task 8), `sync_github_sources` (Task 5), `RunManager` (existing).
 - Produces: `SourceOut.origin: str`; `POST /api/profile/sources/note {title, text}` → 201 SourceOut; `POST /api/profile/sources/url {url}` → 201 SourceOut; `POST /api/profile/sync-github` → 202 RunOut (singleton `github-sync`).
 
@@ -2053,11 +2073,13 @@ git commit -m "feat(api): source origin, note/url intake endpoints, github sync 
 ### Task 11: Web — origin badge, note/URL intake, GitHub sync button
 
 **Files:**
+
 - Modify: `web/src/features/profile-sources/use-sources.ts`
 - Modify: `web/src/features/profile-sources/SourceManager.tsx`
 - Test: `web/src/features/profile-sources/SourceManager.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `POST /api/profile/sources/note`, `POST /api/profile/sources/url`, `POST /api/profile/sync-github` (Task 10 wire shapes, camelCase).
 - Produces: `ProfileSource.origin: "upload" | "github"`, `ProfileSource.mode` widened to `"literal" | "synthesis" | "project"`; hooks `useAddNote()`, `useAddUrl()`, `useSyncGithub()`.
 
@@ -2073,7 +2095,9 @@ it("badges github-origin sources and hides their mode editor", async () => {
   render(<SourceManager />);
   expect(await screen.findByText("github--myrepo.md")).toBeInTheDocument();
   expect(screen.getByText("GitHub")).toBeInTheDocument();
-  expect(screen.queryByLabelText("mode for github--myrepo.md")).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("mode for github--myrepo.md"),
+  ).not.toBeInTheDocument();
 });
 
 it("adds a note through the intake form", async () => {
@@ -2117,9 +2141,11 @@ export function useAddNote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ title, text }: { title: string; text: string }) =>
-      unwrap(api.POST("/api/profile/sources/note", {
-        body: { title, text },
-      } as never)) as Promise<ProfileSource>,
+      unwrap(
+        api.POST("/api/profile/sources/note", {
+          body: { title, text },
+        } as never),
+      ) as Promise<ProfileSource>,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile-sources"] });
       toast.success("Note added");
@@ -2132,9 +2158,11 @@ export function useAddUrl() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ url }: { url: string }) =>
-      unwrap(api.POST("/api/profile/sources/url", {
-        body: { url },
-      } as never)) as Promise<ProfileSource>,
+      unwrap(
+        api.POST("/api/profile/sources/url", {
+          body: { url },
+        } as never),
+      ) as Promise<ProfileSource>,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile-sources"] });
       toast.success("Page ingested");
@@ -2146,8 +2174,7 @@ export function useAddUrl() {
 export function useSyncGithub() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      unwrap(api.POST("/api/profile/sync-github", {} as never)),
+    mutationFn: () => unwrap(api.POST("/api/profile/sync-github", {} as never)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile-sources"] });
       toast.success("GitHub sync started");
@@ -2165,7 +2192,7 @@ export function useSyncGithub() {
 const MODES = ["literal", "synthesis"] as const;
 ```
 
-2. In the header actions row, add (next to the existing Add source button):
+1. In the header actions row, add (next to the existing Add source button):
 
 ```tsx
 <Button variant="outline" onClick={() => syncGithub.mutate()} disabled={syncGithub.isPending}>
@@ -2179,62 +2206,69 @@ const MODES = ["literal", "synthesis"] as const;
 
 with `const syncGithub = useSyncGithub();`, `const addNote = useAddNote();`, `const addUrl = useAddUrl();` and local state `noteOpen`, `noteTitle`, `noteText`, `urlValue`.
 
-3. Below the header, render the intake row when open:
+1. Below the header, render the intake row when open:
 
 ```tsx
-{noteOpen ? (
-  <div className="flex flex-wrap items-end gap-2 rounded-lg border p-3">
-    <label className="flex flex-col gap-1 text-xs">
-      Note title
-      <input
-        aria-label="Note title"
-        className={nativeSelectClass}
-        value={noteTitle}
-        onChange={(e) => setNoteTitle(e.target.value)}
-      />
-    </label>
-    <label className="flex grow flex-col gap-1 text-xs">
-      Note text
-      <textarea
-        aria-label="Note text"
-        className="min-h-16 rounded-lg border border-input bg-popover p-2 text-xs"
-        value={noteText}
-        onChange={(e) => setNoteText(e.target.value)}
-      />
-    </label>
-    <Button
-      size="sm"
-      disabled={!noteText.trim() || addNote.isPending}
-      onClick={() => {
-        addNote.mutate({ title: noteTitle, text: noteText });
-        setNoteTitle(""); setNoteText(""); setNoteOpen(false);
-      }}
-    >
-      Save note
-    </Button>
-    <label className="flex grow flex-col gap-1 text-xs">
-      Ingest URL
-      <input
-        aria-label="Ingest URL"
-        className={nativeSelectClass}
-        placeholder="https://…"
-        value={urlValue}
-        onChange={(e) => setUrlValue(e.target.value)}
-      />
-    </label>
-    <Button
-      size="sm"
-      variant="outline"
-      disabled={!urlValue.trim() || addUrl.isPending}
-      onClick={() => { addUrl.mutate({ url: urlValue }); setUrlValue(""); }}
-    >
-      Add URL
-    </Button>
-  </div>
-) : null}
+{
+  noteOpen ? (
+    <div className="flex flex-wrap items-end gap-2 rounded-lg border p-3">
+      <label className="flex flex-col gap-1 text-xs">
+        Note title
+        <input
+          aria-label="Note title"
+          className={nativeSelectClass}
+          value={noteTitle}
+          onChange={(e) => setNoteTitle(e.target.value)}
+        />
+      </label>
+      <label className="flex grow flex-col gap-1 text-xs">
+        Note text
+        <textarea
+          aria-label="Note text"
+          className="min-h-16 rounded-lg border border-input bg-popover p-2 text-xs"
+          value={noteText}
+          onChange={(e) => setNoteText(e.target.value)}
+        />
+      </label>
+      <Button
+        size="sm"
+        disabled={!noteText.trim() || addNote.isPending}
+        onClick={() => {
+          addNote.mutate({ title: noteTitle, text: noteText });
+          setNoteTitle("");
+          setNoteText("");
+          setNoteOpen(false);
+        }}
+      >
+        Save note
+      </Button>
+      <label className="flex grow flex-col gap-1 text-xs">
+        Ingest URL
+        <input
+          aria-label="Ingest URL"
+          className={nativeSelectClass}
+          placeholder="https://…"
+          value={urlValue}
+          onChange={(e) => setUrlValue(e.target.value)}
+        />
+      </label>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!urlValue.trim() || addUrl.isPending}
+        onClick={() => {
+          addUrl.mutate({ url: urlValue });
+          setUrlValue("");
+        }}
+      >
+        Add URL
+      </Button>
+    </div>
+  ) : null;
+}
 ```
 
-4. In the Mode cell, github/project docs are read-only:
+1. In the Mode cell, github/project docs are read-only:
 
 ```tsx
 <TableCell>
@@ -2268,10 +2302,12 @@ git commit -m "feat(web): github origin badge, note/url intake, sync button in S
 ### Task 12: Project-dossier skill + CLAUDE.md note
 
 **Files:**
+
 - Create: `.claude/skills/project-dossier/SKILL.md`
 - Modify: `CLAUDE.md` (Known design notes)
 
 **Interfaces:**
+
 - Produces: the dossier format contract that `frontmatter_repo_url` (Task 1) and `dossier_repo_urls` (Task 5) consume.
 
 - [ ] **Step 1: Create `.claude/skills/project-dossier/SKILL.md`**
@@ -2309,28 +2345,34 @@ Then exactly these sections:
 ## Required sections
 
 ### `# Project: <name>`
+
 One-line positioning: what the project is and for whom.
 
 ### `## Summary`
+
 3-6 sentences: the problem, the approach, the user's role, current state
 (shipped/active/archived). Only statements the repo itself supports.
 
 ### `## Tech stack (evidence-backed)`
+
 Bulleted list. Each entry names the technology AND where it is used, e.g.
 `- FastAPI — API layer in src/api/ (12 routers)`. A technology merely
 mentioned in docs but absent from code does NOT belong here.
 
 ### `## Architecture highlights`
+
 3-8 bullets on notable design decisions visible in the code: patterns, seams,
 invariants, performance-relevant structures. Cite the file or module.
 
 ### `## Quantified outcomes`
+
 Only numbers with evidence: benchmark results checked into the repo, test
 counts, coverage reports, commit-visible metrics ("reduced X from A to B",
 linking the commit). If no evidenced numbers exist, write "None evidenced."
 Never estimate.
 
 ### `## Skills demonstrated`
+
 Grouped `category: skill, skill, …` lines. A skill belongs here only if the
 repo contains work that demonstrates it (not aspirations from a roadmap).
 
@@ -2359,7 +2401,32 @@ Append to the "Known design notes" section:
 
 ```markdown
 - **GitHub depth is two-tier; dossiers win.** `profile/github_harvest.py` writes
-  qualifying repos' root docs (README*, CLAUDE/CONTEXT/AGENTS.md, 30KB/file cap) as
+  qualifying repos' root docs (README\
+
+1. **No employment claims.** Never mention employers, job titles, education,
+   or certifications — even if the README does. This dossier describes a
+   project, not a career.
+2. **Verify before you write.** Read the code, don't trust the README:
+   README claims not backed by code are omitted.
+3. **Cite evidence inline** (file paths, commit hashes) for anything
+   quantified or architectural.
+4. **Be complete but honest.** Rich detail helps resume tailoring, but one
+   fabricated claim poisons the fact-lock. When in doubt, leave it out.
+
+## Handoff
+
+Tell the user to add the file to their profile corpus:
+`resume-agent profile add <repo>-dossier.md` (it is auto-detected as a
+project-mode source via the frontmatter), then rebuild the profile.
+```
+
+- [ ] **Step 2: Add a Known design note to `CLAUDE.md`**
+
+Append to the "Known design notes" section:
+
+```markdown
+- **GitHub depth is two-tier; dossiers win.** `profile/github_harvest.py` writes
+  qualifying repos' root docs (README\*, CLAUDE/CONTEXT/AGENTS.md, 30KB/file cap) as
   deterministic `sources/github--<repo>.md` docs (`origin="github"`, `mode="project"`)
   during build phase 0 and `profile sync-github`. A `.md` upload with `repo_url:`
   frontmatter (from the `.claude/skills/project-dossier` skill) supersedes the auto-doc

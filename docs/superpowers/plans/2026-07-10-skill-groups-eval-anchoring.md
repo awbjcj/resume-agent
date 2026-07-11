@@ -38,7 +38,7 @@ These amendments override any conflicting illustrative snippet below.
    assignments remain absent so they retry on the next build.
 4. **Validate every matrix entry point.** `MatrixRow.group`, taxonomy loads, and
    `Overrides.group` all discard unknown slugs. Overrides are normalized and win over
-   taxonomy values. `overrides.group` is deliberately *not* added to
+   taxonomy values. `overrides.group` is deliberately _not_ added to
    `override_tokens`: the group axis must not expand or mutate match-gap canonical
    taxonomy, and a group override for a skill absent from facts must not create a row.
 5. **Keep the API rooted and self-describing.** `GET /api/profile/matrix` reads
@@ -71,15 +71,15 @@ These amendments override any conflicting illustrative snippet below.
 
 ## File Structure
 
-| Path | Role |
-| ---- | ---- |
-| `src/resume_agent/taxonomy/groups.py` | New: vocabulary, taxonomy file IO, classifier |
-| `src/resume_agent/profile/matrix.py` | `MatrixRow.group`, `Overrides.group`, `apply_skill_groups` |
-| `src/resume_agent/services/profile_build.py` | delta-classify + apply during build |
-| `src/resume_agent/api/routers/match_gap.py` | apply groups on the refresh rebuild (no LLM) |
-| `src/resume_agent/api/schemas/profile.py`, `api/routers/profile.py` | `GET /api/profile/matrix` |
-| `web/src/features/settings/use-matrix.ts`, `SkillGroupsPanel.tsx` | grouped skills panel on Profile settings |
-| `evals/RESULTS.md`, `evals/reports/` | live baseline artifacts (Task 7) |
+| Path                                                                | Role                                                       |
+| ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `src/resume_agent/taxonomy/groups.py`                               | New: vocabulary, taxonomy file IO, classifier              |
+| `src/resume_agent/profile/matrix.py`                                | `MatrixRow.group`, `Overrides.group`, `apply_skill_groups` |
+| `src/resume_agent/services/profile_build.py`                        | delta-classify + apply during build                        |
+| `src/resume_agent/api/routers/match_gap.py`                         | apply groups on the refresh rebuild (no LLM)               |
+| `src/resume_agent/api/schemas/profile.py`, `api/routers/profile.py` | `GET /api/profile/matrix`                                  |
+| `web/src/features/settings/use-matrix.ts`, `SkillGroupsPanel.tsx`   | grouped skills panel on Profile settings                   |
+| `evals/RESULTS.md`, `evals/reports/`                                | live baseline artifacts (Task 7)                           |
 
 ---
 
@@ -458,13 +458,13 @@ In `src/resume_agent/profile/matrix.py`:
     group: str | None = None
 ```
 
-2. Add to `Overrides` (after `category`):
+1. Add to `Overrides` (after `category`):
 
 ```python
     group: dict[str, str] = Field(default_factory=dict)
 ```
 
-3. Add the import `from resume_agent.taxonomy.groups import SKILL_GROUPS` and,
+1. Add the import `from resume_agent.taxonomy.groups import SKILL_GROUPS` and,
    after `build_matrix`, the helper:
 
 ```python
@@ -484,7 +484,7 @@ def apply_skill_groups(
         row.group = slug if slug in SKILL_GROUPS else None
 ```
 
-4. Check `override_tokens` in matrix.py (used by the match-gap refresh route):
+1. Check `override_tokens` in matrix.py (used by the match-gap refresh route):
    if it enumerates override keys per field, add `*overrides.group.keys()` to
    its enumeration (line ~151) so group-override tokens also reach cluster
    canonicalization.
@@ -840,33 +840,35 @@ export function SkillGroupsPanel() {
   const buckets = bucket(rows);
   return (
     <section aria-label="Skills by group" className="space-y-4">
-      {GROUP_ORDER.filter(([slug]) => buckets.has(slug)).map(([slug, label]) => {
-        const members = buckets.get(slug)!;
-        return (
-          <div key={slug}>
-            <div className="mb-2 flex items-baseline gap-2">
-              <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                {label}
-              </h4>
-              <span className="text-xs font-medium tabular-nums text-muted-foreground/70">
-                {members.length}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {members.map((row) => (
-                <span
-                  key={row.key}
-                  className="rounded-full border px-2 py-0.5 text-xs"
-                  data-inferred={row.inferred}
-                  title={`strength ${row.strength}${row.lastUsed ? ` · last used ${row.lastUsed}` : ""}`}
-                >
-                  {row.display}
+      {GROUP_ORDER.filter(([slug]) => buckets.has(slug)).map(
+        ([slug, label]) => {
+          const members = buckets.get(slug)!;
+          return (
+            <div key={slug}>
+              <div className="mb-2 flex items-baseline gap-2">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  {label}
+                </h4>
+                <span className="text-xs font-medium tabular-nums text-muted-foreground/70">
+                  {members.length}
                 </span>
-              ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {members.map((row) => (
+                  <span
+                    key={row.key}
+                    className="rounded-full border px-2 py-0.5 text-xs"
+                    data-inferred={row.inferred}
+                    title={`strength ${row.strength}${row.lastUsed ? ` · last used ${row.lastUsed}` : ""}`}
+                  >
+                    {row.display}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        },
+      )}
     </section>
   );
 }
@@ -884,10 +886,24 @@ import { SkillGroupsPanel } from "./SkillGroupsPanel";
 import * as matrixHook from "./use-matrix";
 
 const rows = [
-  { key: "python", display: "Python", category: "hard", group: "languages",
-    inferred: false, strength: 3, lastUsed: "current" },
-  { key: "mystery", display: "Mystery", category: null, group: null,
-    inferred: true, strength: 0.5, lastUsed: null },
+  {
+    key: "python",
+    display: "Python",
+    category: "hard",
+    group: "languages",
+    inferred: false,
+    strength: 3,
+    lastUsed: "current",
+  },
+  {
+    key: "mystery",
+    display: "Mystery",
+    category: null,
+    group: null,
+    inferred: true,
+    strength: 0.5,
+    lastUsed: null,
+  },
 ];
 
 describe("SkillGroupsPanel", () => {
