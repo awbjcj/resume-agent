@@ -2148,6 +2148,30 @@ you want them:
 - Cookie lifetime 30 days; rotate `SESSION_SECRET` to force logout everywhere.
 - Changing `AUTH_PASSWORD_HASH` does not kill live sessions (rotate the secret
   too if you need that).
+
+````
+
+- [ ] **Step 5: Manual verification (requires Docker; skip gracefully if unavailable)**
+
+```bash
+docker build -t resume-agent .
+docker run --rm -p 8000:8000 -v ra-data:/app/data \
+  -e AUTH_USERNAME=owner \
+  -e AUTH_PASSWORD_HASH="$(.venv/Scripts/python.exe -m resume_agent.cli hash-password --password test123)" \
+  -e SESSION_SECRET=devsecret \
+  resume-agent
+````
+
+Then verify from another shell:
+, Breezy, JazzHR, BambooHR, RemoteOK, URL
+  intake): unchanged.
+
+## Session notes
+
+- Cookie lifetime 30 days; rotate `SESSION_SECRET` to force logout everywhere.
+- Changing `AUTH_PASSWORD_HASH` does not kill live sessions (rotate the secret
+  too if you need that).
+
 ```
 
 - [ ] **Step 5: Manual verification (requires Docker; skip gracefully if unavailable)**
