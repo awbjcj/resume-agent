@@ -758,12 +758,19 @@ describe("LoginPage", () => {
     server.use(
       http.post("/api/auth/login", () =>
         HttpResponse.json(
-          { error: { code: "UNAUTHORIZED", message: "Invalid username or password" } },
+          {
+            error: {
+              code: "UNAUTHORIZED",
+              message: "Invalid username or password",
+            },
+          },
           { status: 401 },
         ),
       ),
     );
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     render(
       <QueryClientProvider client={qc}>
         <MemoryRouter initialEntries={["/login"]}>
@@ -811,7 +818,8 @@ export function useMe() {
 export function AuthGate({ children }: { children: ReactNode }) {
   const { data, isLoading } = useMe();
   if (isLoading) return null;
-  if (data?.authRequired && !data.username) return <Navigate to="/login" replace />;
+  if (data?.authRequired && !data.username)
+    return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 ```
@@ -877,7 +885,9 @@ export function LoginPage() {
         </div>
         {login.isError && (
           <p role="alert" className="text-sm text-destructive">
-            {login.error instanceof Error ? login.error.message : "Login failed"}
+            {login.error instanceof Error
+              ? login.error.message
+              : "Login failed"}
           </p>
         )}
         <Button type="submit" className="w-full" disabled={login.isPending}>
@@ -907,7 +917,8 @@ export function LogoutButton() {
   const queryClient = useQueryClient();
   const logout = useMutation({
     mutationFn: () => unwrap(api.POST("/api/auth/logout")),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["auth", "me"] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] }),
   });
   if (!data?.authRequired) return null;
   return (
