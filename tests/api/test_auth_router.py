@@ -119,7 +119,7 @@ def test_login_rejects_bad_credentials_and_unconfigured_mode(tmp_path):
 def test_refresh_preserves_platform_auth_and_browser_fields(tmp_path):
     app = create_app(db_url="sqlite://", env_path=_auth_env(tmp_path))
     with _client(app):
-        refresh_app_settings(app, Settings(_env_file=None))
+        refresh_app_settings(app, Settings(_env_file=None))  # type: ignore[call-arg]
         settings = app.state.settings
         assert settings.auth_username == "owner"
         assert settings.session_secret == "test-secret"

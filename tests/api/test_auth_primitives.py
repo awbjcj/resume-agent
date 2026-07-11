@@ -16,7 +16,7 @@ def _settings(**updates) -> Settings:
         "session_secret": "test-secret",
     }
     values.update(updates)
-    return Settings(_env_file=None, **values)
+    return Settings(_env_file=None, **values)  # type: ignore[call-arg]
 
 
 def test_hash_password_roundtrip_and_random_salt():
@@ -54,4 +54,4 @@ def test_session_roundtrip_expiry_and_tamper_rejection():
 
 
 def test_browser_enabled_defaults_true():
-    assert Settings(_env_file=None).browser_enabled is True
+    assert Settings(_env_file=None).browser_enabled is True  # type: ignore[call-arg]

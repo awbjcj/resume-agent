@@ -10,7 +10,7 @@ REASON = "requires a local browser (browser_enabled=false)"
 
 
 def _settings(**updates) -> Settings:
-    return Settings(_env_file=None, **updates)
+    return Settings(_env_file=None, **updates)  # type: ignore[call-arg]
 
 
 def _config() -> ConnectorsConfig:

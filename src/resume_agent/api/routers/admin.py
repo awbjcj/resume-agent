@@ -83,6 +83,6 @@ def import_root(
             request.app.state.engine = engine
     refresh_app_settings(
         request.app,
-        Settings(_env_file=request.app.state.env_path),
+        Settings(_env_file=request.app.state.env_path),  # type: ignore[call-arg]
     )
     return {"status": "imported"}
