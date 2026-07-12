@@ -58,6 +58,26 @@ test.beforeEach(async ({ page }) => {
           detail: "aggregator",
           limit: null,
         },
+        {
+          id: "ashby:openai",
+          kind: "ashby",
+          type: "board",
+          displayName: "OpenAI",
+          enabled: true,
+          pullable: true,
+          detail: "openai",
+          limit: null,
+        },
+        {
+          id: "workday:12345678",
+          kind: "workday",
+          type: "board",
+          displayName: "General Motors",
+          enabled: true,
+          pullable: true,
+          detail: "https://gm.wd5.myworkdayjobs.com/Careers",
+          limit: null,
+        },
       ],
     });
   });
@@ -67,6 +87,10 @@ test("sources page lists sections and add control", async ({ page }) => {
   await page.goto("/sources");
   await expect(page.getByRole("heading", { name: /Boards & careers pages/i })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add source" })).toBeVisible();
+  await expect(page.getByText("OpenAI", { exact: true })).toBeVisible();
+  await expect(page.getByText("General Motors", { exact: true })).toBeVisible();
+  await expect(page.getByText("ashby", { exact: true })).toBeVisible();
+  await expect(page.getByText("workday", { exact: true })).toBeVisible();
 });
 
 test("source limit commits on blur", async ({ page }) => {

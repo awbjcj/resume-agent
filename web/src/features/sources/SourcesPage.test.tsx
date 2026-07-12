@@ -28,6 +28,36 @@ const sources = [
     detail: "US - no API key",
     limit: null,
   },
+  {
+    id: "ashby:openai",
+    kind: "ashby",
+    type: "board",
+    displayName: "OpenAI",
+    enabled: true,
+    pullable: true,
+    detail: "openai",
+    limit: null,
+  },
+  {
+    id: "workday:12345678",
+    kind: "workday",
+    type: "board",
+    displayName: "General Motors",
+    enabled: true,
+    pullable: true,
+    detail: "https://gm.wd5.myworkdayjobs.com/Careers",
+    limit: null,
+  },
+  {
+    id: "bamboohr:87654321",
+    kind: "bamboohr",
+    type: "board",
+    displayName: "Acme",
+    enabled: false,
+    pullable: false,
+    detail: "https://acme.bamboohr.com/careers",
+    limit: 20,
+  },
 ];
 
 describe("SourcesPage", () => {
@@ -43,6 +73,12 @@ describe("SourcesPage", () => {
       expect(screen.getByText(/Boards & careers pages/i)).toBeInTheDocument(),
     );
     expect(screen.getByText(/Aggregators/i)).toBeInTheDocument();
+    expect(screen.getByText("OpenAI")).toBeInTheDocument();
+    expect(screen.getByText("General Motors")).toBeInTheDocument();
+    expect(screen.getByText("Acme")).toBeInTheDocument();
+    expect(screen.getByText("ashby")).toBeInTheDocument();
+    expect(screen.getByText("workday")).toBeInTheDocument();
+    expect(screen.getByText("bamboohr")).toBeInTheDocument();
   });
 
   it("disables pull controls for non-pullable sources", async () => {
