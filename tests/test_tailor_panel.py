@@ -231,6 +231,25 @@ def test_merged_advisory_instructions_include_each_rubric():
     assert "concision" in text.lower()
 
 
+def test_merged_advisory_instructions_apply_score_bands_per_reviewer():
+    from resume_agent.tailor.agents import (
+        _SCORE_BAND_INSTRUCTION,
+        _merged_advisory_instructions,
+    )
+
+    instructions = _merged_advisory_instructions(
+        ["ats-keyword", "concision"],
+        score_bands={"ats-keyword": True, "concision": False},
+    )
+    by_rubric = {
+        line.split("'")[1]: line
+        for line in instructions
+        if line.startswith("Rubric for")
+    }
+    assert _SCORE_BAND_INSTRUCTION in by_rubric["ats-keyword"]
+    assert _SCORE_BAND_INSTRUCTION not in by_rubric["concision"]
+
+
 def _merged_config() -> ReviewConfig:
     return ReviewConfig(
         merged_advisory=True,
