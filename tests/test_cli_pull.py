@@ -37,7 +37,9 @@ def test_pull_refresh_disables_skip_known(tmp_path, monkeypatch):
 
     def fake_pull_jobs(session, **kwargs):
         captured.update(kwargs)
-        return PullReport(totals={"greenhouse": 0})
+        report = PullReport()
+        report.totals["greenhouse"] = 0
+        return report
 
     monkeypatch.setattr(cli, "pull_jobs", fake_pull_jobs)
     result = runner.invoke(

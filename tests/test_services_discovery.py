@@ -218,7 +218,10 @@ def test_refresh_jobs_discovers_only_pull_changed_raw_jobs(monkeypatch):
     seen = {}
 
     def fake_pull_jobs(session, **kwargs):
-        return PullReport(totals={"manual": 1}, changed_raw_job_ids=[42])
+        report = PullReport()
+        report.totals["manual"] = 1
+        report.changed_raw_job_ids.append(42)
+        return report
 
     def fake_discover_jobs(session, **kwargs):
         seen["job_ids"] = kwargs["job_ids"]
