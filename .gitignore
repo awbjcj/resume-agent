@@ -58,3 +58,5 @@ config/style_guide.md
 skills-lock.json
 scratch_diff.txt
 test-output.txt
+
+*.tar.gz
