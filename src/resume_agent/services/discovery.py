@@ -13,7 +13,7 @@ from typing import TypedDict
 import httpx
 from playwright.sync_api import Error as PlaywrightError
 from sqlalchemy import func, select, text
-from sqlmodel import Session
+from sqlmodel import Session, col
 
 from resume_agent.config import get_settings
 from resume_agent.discovery.connectors.config import load_connectors_config
@@ -83,7 +83,7 @@ def _save_with_active_job_limit(session: Session, **values) -> Job | None:
             session.execute(text("BEGIN IMMEDIATE"))
         active_count = int(
             session.execute(
-                select(func.count()).select_from(Job).where(Job.archived_at.is_(None))
+                select(func.count()).select_from(Job).where(col(Job.archived_at).is_(None))
             ).scalar_one()
         )
         allow_insert = active_count < maximum
