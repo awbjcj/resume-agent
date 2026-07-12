@@ -17,7 +17,9 @@ def load_style_guide(path: str | Path | None) -> str | None:
     """Read optional house-style prose. Missing or empty files are a no-op."""
     if not path:
         return None
-    p = Path(path)
+    from resume_agent.tenancy.paths import resolve_tenant_path
+
+    p = resolve_tenant_path(path)
     if not p.exists():
         return None
     text = p.read_text(encoding="utf-8").strip()

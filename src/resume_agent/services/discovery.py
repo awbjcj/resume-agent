@@ -8,18 +8,22 @@ an optional ProgressReporter passed straight through.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TypedDict
 
 import httpx
 from playwright.sync_api import Error as PlaywrightError
+from sqlalchemy import func, select, text
 from sqlmodel import Session
 
 from resume_agent.config import get_settings
 from resume_agent.discovery.connectors.config import load_connectors_config
 from resume_agent.discovery.connectors.registry import build_source_connectors
 from resume_agent.discovery.connectors.runner import PullReport, run_pull
-from resume_agent.discovery.ingest import add_job, ingest_jobs
+from resume_agent.discovery.ingest import (
+    IngestOutcome,
+    ingest_jobs,
+    save_or_upgrade,
+)
 from resume_agent.discovery.pipeline import discover, reprocess
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
@@ -41,6 +45,12 @@ from resume_agent.services.agents import (
 )
 from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
 from resume_agent.tracking.tables import Job
+from resume_agent.tenancy.limits import (
+    DEFAULT_MAX_ACTIVE_JOBS,
+    active_limit,
+    enforce_active_budget,
+)
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 DEFAULT_SEARCH = "config/search.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
@@ -61,10 +71,32 @@ class LinkedInScrapeResult(TypedDict):
     failures: dict[str, str]
 
 
+class ActiveJobQuotaError(RuntimeError):
+    code = "QUOTA_EXCEEDED"
+
+
+def _save_with_active_job_limit(session: Session, **values) -> Job | None:
+    maximum = active_limit("max_active_jobs", DEFAULT_MAX_ACTIVE_JOBS)
+    allow_insert = True
+    if maximum is not None and maximum > 0:
+        if not session.in_transaction():
+            session.execute(text("BEGIN IMMEDIATE"))
+        active_count = int(
+            session.execute(
+                select(func.count()).select_from(Job).where(Job.archived_at.is_(None))
+            ).scalar_one()
+        )
+        allow_insert = active_count < maximum
+    job, outcome = save_or_upgrade(session, allow_insert=allow_insert, **values)
+    if outcome is IngestOutcome.quota_skipped:
+        raise ActiveJobQuotaError(f"active job limit reached ({maximum})")
+    return job
+
+
 def _skill_artifacts(
     facts_path: str, facts: ProfileFacts
 ) -> tuple[SkillMatrix | None, ClusterMap]:
-    profile_dir = Path(facts_path).parent
+    profile_dir = resolve_tenant_path(facts_path).parent
     overrides = load_overrides(profile_dir / "overrides.yaml")
     cluster_map = effective_cluster_map(
         load_cluster_map(profile_dir / "cluster_map.json"), overrides
@@ -85,7 +117,7 @@ def add_job_from_text(
     location: str | None = None,
 ) -> Job | None:
     """Add a manually-supplied job. Returns None when deduped away."""
-    return add_job(
+    return _save_with_active_job_limit(
         session,
         source="manual",
         jd_text=jd_text,
@@ -110,6 +142,7 @@ def add_job_from_url(
     allow_browser: bool = True,
 ) -> Job | None:
     """Fetch a posting URL, auto-extract fields, and add it. Returns None when deduped."""
+    enforce_active_budget()
     try:
         raw = job_from_url(
             url,
@@ -120,7 +153,7 @@ def add_job_from_url(
         raise UrlFetchError(f"Couldn't fetch {url}: {exc}") from exc
     if raw is None:
         raise UrlFetchError("Couldn't extract a job description from that URL.")
-    return add_job(
+    return _save_with_active_job_limit(
         session,
         source="url",
         jd_text=raw.jd_text,
@@ -141,6 +174,7 @@ def discover_jobs(
     job_ids: set[int] | None = None,
 ) -> dict[str, int]:
     """Run the full discovery funnel; return final status counts."""
+    enforce_active_budget()
     config = load_search_config(search_path)
     facts = load_facts(facts_path)
     matrix, cluster_map = _skill_artifacts(facts_path, facts)
@@ -175,6 +209,7 @@ def pull_jobs(
     relearn: bool = False,
 ) -> PullReport:
     """Run selected or all enabled pullable source connectors and ingest results."""
+    enforce_active_budget()
     search_config = load_search_config(search_path)
     connectors_config = load_connectors_config(connectors_path)
     connectors = build_source_connectors(
@@ -193,6 +228,7 @@ def pull_jobs(
         reporter=reporter,
         finish=finish,
         skip_known=skip_known,
+        max_active_jobs=active_limit("max_active_jobs", DEFAULT_MAX_ACTIVE_JOBS),
     )
 
 
@@ -204,6 +240,7 @@ def scrape_linkedin_jobs(
     reporter: ProgressReporter | None = None,
 ) -> LinkedInScrapeResult:
     """Scrape LinkedIn in a visible browser and ingest all fetched postings."""
+    enforce_active_budget()
     if not get_settings().browser_enabled:
         return {
             "added": 0,
@@ -216,7 +253,11 @@ def scrape_linkedin_jobs(
     if reporter is not None:
         reporter.begin(1, "Scraping LinkedIn")
     result = connector.fetch(search_config, limit=limit)
-    added = ingest_jobs(session, result.jobs)
+    added = ingest_jobs(
+        session,
+        result.jobs,
+        max_active_jobs=active_limit("max_active_jobs", DEFAULT_MAX_ACTIVE_JOBS),
+    )
     if reporter is not None:
         reporter.step(1)
     return {
@@ -235,6 +276,7 @@ def reprocess_jobs(
     reporter: ProgressReporter | None = None,
 ) -> dict[str, int]:
     """Re-run the full funnel over the chosen scopes; returns final status counts."""
+    enforce_active_budget()
     config = load_search_config(search_path)
     facts = load_facts(facts_path)
     matrix, cluster_map = _skill_artifacts(facts_path, facts)

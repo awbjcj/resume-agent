@@ -72,6 +72,15 @@ export async function unwrap<T>(
   return data as T;
 }
 
+/** Mint a purpose-bound capability immediately before a browser download. */
+export async function openDownload(path: string): Promise<void> {
+  const link = await unwrap(
+    api.POST("/api/auth/link-token", { body: { purpose: "download" } }),
+  );
+  const separator = path.includes("?") ? "&" : "?";
+  window.location.assign(`${path}${separator}token=${encodeURIComponent(link.token)}`);
+}
+
 interface PageEnvelope<T> {
   data: T[];
   pagination: { totalPages: number };

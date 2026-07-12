@@ -90,6 +90,25 @@ cp config/connectors.yaml.example      config/connectors.yaml   # only if you'll
 Everything else (the SQLite database, the `output/` and `data/` folders) is
 created automatically on first run.
 
+### Multi-user server
+
+Every file-backed API server uses isolated per-user workspaces. Seed the first
+administrator before its first boot:
+
+```env
+AUTH_USERNAME=owner
+AUTH_PASSWORD_HASH=<output of `uv run resume-agent hash-password`>
+SESSION_SECRET=<long random value>
+```
+
+After signing in, create a single-use invite on the **Admin** page or with
+`resume-agent admin invite`. Members register at `/register`; each receives a
+separate database, profile corpus, configuration, secrets, output, and run
+history. Administrators can set weekly shared-key budgets, active-job caps, and
+concurrent-run caps. Members manage their own keys, tokens, password, and
+workspace export in the web UI. The remote member workflow is web-first; the
+local domain CLI can select an existing workspace with `--user USERNAME`.
+
 ### Gmail setup (for `sync-status`)
 
 `sync-status` reads your inbox **read-only** to propose application-status

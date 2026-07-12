@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_run_manager, get_session
+from resume_agent.api.deps import get_engine, get_run_manager, get_session
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.match_gap import MatchGapOut
@@ -27,6 +25,7 @@ from resume_agent.services.suggestions import suggestion_statuses
 from resume_agent.taxonomy.clusters import load_cluster_map
 from resume_agent.taxonomy.groups import group_map_path, load_group_map
 from resume_agent.tracking.match_gap import build_demand_graph, profile_skill_tokens
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 router = APIRouter()
 
@@ -35,7 +34,7 @@ _CLUSTER_PATH = "data/profile/cluster_map.json"
 
 
 def _facts_or_empty() -> ProfileFacts:
-    if Path(_FACTS_PATH).exists():
+    if resolve_tenant_path(_FACTS_PATH).exists():
         return load_facts(_FACTS_PATH)
     return ProfileFacts(contact=Contact(name=""))
 
@@ -43,9 +42,10 @@ def _facts_or_empty() -> ProfileFacts:
 @router.get("/match-gap", response_model=MatchGapOut)
 def get_match_gap(session: Session = Depends(get_session)):
     facts = _facts_or_empty()
-    profile_dir = Path(_FACTS_PATH).parent
+    facts_path = resolve_tenant_path(_FACTS_PATH)
+    profile_dir = facts_path.parent
     cluster_map = effective_cluster_map(
-        load_cluster_map(_CLUSTER_PATH),
+        load_cluster_map(resolve_tenant_path(_CLUSTER_PATH)),
         load_overrides(profile_dir / "overrides.yaml"),
     )
     graph = build_demand_graph(
@@ -68,7 +68,7 @@ def refresh_match_gap_clusters(
     request: Request,
     mgr: RunManager = Depends(get_run_manager),
 ):
-    engine = request.app.state.engine
+    engine = get_engine(request)
 
     def work(reporter):
         from resume_agent.services.match_gap import refresh_clusters
@@ -77,7 +77,7 @@ def refresh_match_gap_clusters(
             build_incremental_themer_agent,
         )
 
-        facts_path = Path(_FACTS_PATH)
+        facts_path = resolve_tenant_path(_FACTS_PATH)
         overrides = load_overrides(facts_path.with_name("overrides.yaml"))
         extra_tokens = override_tokens(overrides)
         try:
@@ -92,7 +92,7 @@ def refresh_match_gap_clusters(
                 session,
                 canonicalizer=build_incremental_canonicalizer_agent(),
                 themer=build_incremental_themer_agent(),
-                path=_CLUSTER_PATH,
+                path=resolve_tenant_path(_CLUSTER_PATH),
                 reporter=reporter,
                 extra_tokens=extra_tokens,
             )
@@ -102,7 +102,7 @@ def refresh_match_gap_clusters(
 
         matrix = build_matrix(
             facts,
-            load_cluster_map(_CLUSTER_PATH),
+            load_cluster_map(resolve_tenant_path(_CLUSTER_PATH)),
             overrides,
         )
         apply_skill_groups(
@@ -114,9 +114,7 @@ def refresh_match_gap_clusters(
         result["matrixRegenerated"] = True
         return result
 
-    run_id = mgr.submit(
-        "refreshClusters", work, singleton_key="refreshClusters"
-    )
+    run_id = mgr.submit("refreshClusters", work, singleton_key="refreshClusters")
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)

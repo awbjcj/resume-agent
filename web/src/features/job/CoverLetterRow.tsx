@@ -4,7 +4,7 @@ import { CheckCircle2, Download, FileText, Loader2, RotateCcw } from "lucide-rea
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { withTokenParam } from "@/lib/api/client";
+import { openDownload } from "@/lib/api/client";
 import {
   useReviseCoverLetter,
   useSelectCoverLetter,
@@ -74,9 +74,11 @@ export function CoverLetterRow({
           {coverLetter.pdfPath ? (
             <Button size="sm" variant="outline" render={
               <a
-                href={withTokenParam(`/api/cover-letters/${coverLetter.id}/pdf`)}
-                target="_blank"
-                rel="noreferrer"
+                href={`/api/cover-letters/${coverLetter.id}/pdf`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void openDownload(event.currentTarget.href);
+                }}
               >
                 <Download className="size-4" aria-hidden="true" />
                 Download

@@ -11,10 +11,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from resume_agent.api.deps import get_settings_dep, require_token
+from resume_agent.api.deps import (
+    get_download_user_context,
+    get_settings_dep,
+    get_user_context,
+    require_token,
+)
 from resume_agent.api.errors import ApiException, install_error_handlers
 from resume_agent.api.routers import analytics as analytics_router
+from resume_agent.api.routers import account as account_router
 from resume_agent.api.routers import admin as admin_router
+from resume_agent.api.routers import admin_invites as admin_invites_router
+from resume_agent.api.routers import admin_system as admin_system_router
+from resume_agent.api.routers import admin_users as admin_users_router
 from resume_agent.api.routers import auth as auth_router
 from resume_agent.api.routers import boards, health
 from resume_agent.api.routers import config as config_router
@@ -32,11 +41,16 @@ from resume_agent.api.routers import setup as setup_router
 from resume_agent.api.routers import sources as sources_router
 from resume_agent.api.routers import suggestions as suggestions_router
 from resume_agent.api.runs.manager import RunManager
+from resume_agent.api.rate_limit import FailedAttemptLimiter
 from resume_agent.config import Settings, get_settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.progress import RUNS_ROOT
 from resume_agent.services.config_store import YamlConfigStore
 from resume_agent.services.profile_documents import DocumentStore
+from resume_agent.tenancy.bootstrap import build_context, ensure_bootstrapped
+from resume_agent.tenancy.engines import EngineRegistry
+from resume_agent.tenancy.system_db import init_system_db, make_system_engine
+from resume_agent.tenancy.context import current_context
 
 
 def spa_dist_dir() -> Path:
@@ -45,6 +59,10 @@ def spa_dist_dir() -> Path:
     app.py lives at src/resume_agent/api/app.py, so the repo root is parents[3].
     """
     return Path(__file__).resolve().parents[3] / "web" / "dist"
+
+
+def _is_memory_db(db_url: str) -> bool:
+    return db_url in {"sqlite://", "sqlite://:memory:", "sqlite:///:memory:"}
 
 
 def create_app(
@@ -61,7 +79,9 @@ def create_app(
     # or a non-default deployment layout) — read it directly rather than the
     # process-wide get_settings() cache, which is pinned to cwd-relative ".env"
     # and would otherwise leak that file's values into this app instance.
-    settings = Settings(_env_file=Path(env_path)) if env_path is not None else get_settings()  # type: ignore[call-arg]
+    settings = (
+        Settings(_env_file=Path(env_path)) if env_path is not None else get_settings()
+    )  # type: ignore[call-arg]
     resolved_db = db_url or settings.db_url
     resolved_token = settings.api_token if api_token is None else api_token
     resolved_settings = settings.model_copy(
@@ -70,21 +90,60 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        engine = make_engine(resolved_db)
-        init_db(engine)
-        app.state.engine = engine
+        if _is_memory_db(resolved_db):
+            engine = make_engine(resolved_db)
+            init_db(engine)
+            app.state.system_engine = None
+            app.state.engine_registry = None
+            app.state.default_context = None
+            app.state.engine = engine
+        else:
+            system_engine = make_system_engine(app.state.data_dir)
+            try:
+                init_system_db(system_engine)
+                admin = ensure_bootstrapped(
+                    app.state.data_dir, system_engine, app.state.settings
+                )
+                registry = EngineRegistry()
+                context = build_context(
+                    admin,
+                    app.state.data_dir,
+                    app.state.settings,
+                    registry,
+                    system_engine=system_engine,
+                    template_dir=app.state.template_config_dir,
+                )
+            except BaseException:
+                system_engine.dispose()
+                raise
+            app.state.system_engine = system_engine
+            app.state.engine_registry = registry
+            app.state.default_context = context
+            app.state.engine = context.engine
+            for root in (app.state.data_dir / "users").glob("*/runs"):
+                app.state.run_manager.register_root(root)
         app.state.run_manager.recover_interrupted()
         app.state.run_manager.sweep()  # drop stale run records (unbounded otherwise)
         yield
         app.state.run_manager.shutdown()
+        if app.state.engine_registry is not None:
+            app.state.engine_registry.close_all()
+        elif app.state.engine is not None:
+            app.state.engine.dispose()
+        if app.state.system_engine is not None:
+            app.state.system_engine.dispose()
 
     app = FastAPI(title="Resume Agent API", version="0.1.0", lifespan=lifespan)
     app.state.settings = resolved_settings
     app.state.db_url = resolved_db
-    app.state.config_store = YamlConfigStore(config_dir=config_dir or "config")
+    app.state.template_config_dir = Path(config_dir or "config")
+    app.state.config_store = YamlConfigStore(config_dir=app.state.template_config_dir)
     app.state.env_path = Path(env_path) if env_path is not None else Path(".env")
     app.state.data_dir = Path(data_dir or "data")
-    app.state.document_store = DocumentStore(app.state.data_dir / "profile" / "documents")
+    app.state.document_store = DocumentStore(
+        app.state.data_dir / "profile" / "documents"
+    )
+    app.state.login_limiter = FailedAttemptLimiter()
     manager_root = runs_root if runs_root is not None else RUNS_ROOT
     # The in-memory test adapter uses one StaticPool connection shared by every
     # thread, so concurrent sessions cannot safely transact on it. File-backed
@@ -98,32 +157,58 @@ def create_app(
         root=manager_root,
         executor=run_executor,
         kind_workers=(
-            {"suggestion": suggestion_workers}
-            if run_executor is None
-            else None
+            {"suggestion": suggestion_workers} if run_executor is None else None
         ),
     )
-    app.dependency_overrides[get_settings_dep] = lambda: app.state.settings
 
-    origins = [o.strip() for o in resolved_settings.cors_origins.split(",") if o.strip()]
+    def _settings_override() -> Settings:
+        ctx = current_context()
+        return ctx.settings if ctx is not None else app.state.settings
+
+    app.dependency_overrides[get_settings_dep] = _settings_override
+    origins = [
+        o.strip() for o in resolved_settings.cors_origins.split(",") if o.strip()
+    ]
     # Production and Vite's /api proxy are same-origin. Cross-origin cookie auth
     # remains intentionally disabled so wildcard CORS cannot leak credentials.
     app.add_middleware(
-        CORSMiddleware, allow_origins=origins, allow_credentials=False,
-        allow_methods=["*"], allow_headers=["*"],
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     install_error_handlers(app)
 
     # Guard everything except /api/health behind the optional bearer token.
-    guarded = [Depends(require_token)]
+    guarded = [Depends(require_token), Depends(get_user_context)]
     app.include_router(health.router, prefix="/api")
     app.include_router(auth_router.router, prefix="/api")
+    app.include_router(auth_router.link_router, prefix="/api", dependencies=guarded)
+    download_guarded = [Depends(require_token), Depends(get_download_user_context)]
+    app.include_router(
+        account_router.link_router, prefix="/api", dependencies=download_guarded
+    )
+    app.include_router(
+        resumes.link_router, prefix="/api", dependencies=download_guarded
+    )
+    app.include_router(
+        cover_letters_router.link_router,
+        prefix="/api",
+        dependencies=download_guarded,
+    )
+    app.include_router(account_router.router, prefix="/api", dependencies=guarded)
     app.include_router(boards.router, prefix="/api", dependencies=guarded)
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(resumes.router, prefix="/api", dependencies=guarded)
     app.include_router(cover_letters_router.router, prefix="/api", dependencies=guarded)
     app.include_router(prune_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(
+        runs_router.link_router,
+        prefix="/api",
+        dependencies=[Depends(require_token)],
+    )
     app.include_router(runs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(sources_router.router, prefix="/api", dependencies=guarded)
     app.include_router(analytics_router.router, prefix="/api", dependencies=guarded)
@@ -136,6 +221,9 @@ def create_app(
     app.include_router(setup_router.router, prefix="/api", dependencies=guarded)
     app.include_router(dashboard_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(admin_users_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(admin_invites_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(admin_system_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so
     # they take precedence; the catch-all is excluded from the OpenAPI schema so

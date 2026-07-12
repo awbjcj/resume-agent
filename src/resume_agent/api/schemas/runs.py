@@ -29,6 +29,7 @@ class RunOut(CamelModel):
     eta_text: str | None = None
     result: Any | None = None
     error: str | None = None
+    error_code: str | None = None
 
 
 class PullParams(CamelModel):

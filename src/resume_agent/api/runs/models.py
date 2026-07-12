@@ -39,6 +39,8 @@ class RunSnapshot:
     eta_text: str | None
     result: Any | None
     error: str | None
+    user_id: str | None = None
+    error_code: str | None = None
     phase_index: int | None = None
     phase_count: int | None = None
 
@@ -97,11 +99,15 @@ def parse_run_snapshot(run_id: str, raw: object) -> RunSnapshot | None:
     stats = progress_stats(normalized)
     label = raw.get("label")
     error = raw.get("error")
+    user_id = raw.get("user_id")
+    error_code = raw.get("error_code")
     return RunSnapshot(
         run_id=run_id,
         kind=kind.strip(),
         state=state,
-        label=label.strip() if isinstance(label, str) and label.strip() else kind.strip(),
+        label=label.strip()
+        if isinstance(label, str) and label.strip()
+        else kind.strip(),
         current=current,
         total=total,
         created_at=created_at,
@@ -111,6 +117,8 @@ def parse_run_snapshot(run_id: str, raw: object) -> RunSnapshot | None:
         eta_text=stats.eta_text,
         result=raw.get("result"),
         error=error if isinstance(error, str) else None,
+        user_id=user_id if isinstance(user_id, str) else None,
+        error_code=error_code if isinstance(error_code, str) else None,
         phase_index=_optional_positive_int(raw.get("phase_index")),
         phase_count=_optional_positive_int(raw.get("phase_count")),
     )

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 from sqlmodel import Session
 
 from resume_agent.models.profile import ProfileFacts
-from resume_agent.profile.matrix import effective_cluster_map, load_matrix, load_overrides
+from resume_agent.profile.matrix import (
+    effective_cluster_map,
+    load_matrix,
+    load_overrides,
+)
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
@@ -18,13 +21,17 @@ from resume_agent.tailor.style_guide import load_style_guide
 from resume_agent.tracking.repository import get_job, jobs_by_status
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 from resume_agent.taxonomy.clusters import load_cluster_map
+from resume_agent.tenancy.limits import enforce_active_budget
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 DEFAULT_REVIEW = "config/review.yaml"
 DEFAULT_REVIEW_DEEP = "config/review_deep.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
 
 
-def resolve_targets(session: Session, *, job_ids: list[int] | None, approved: bool) -> list[Job]:
+def resolve_targets(
+    session: Session, *, job_ids: list[int] | None, approved: bool
+) -> list[Job]:
     if job_ids:
         found = [get_job(session, jid) for jid in job_ids]
         return [j for j in found if j is not None]
@@ -47,8 +54,9 @@ def tailor(
     if not targets:
         return {}
     config = load_review_config(review_path)
+    enforce_active_budget()
     facts = load_facts(facts_path)
-    profile_dir = Path(facts_path).parent
+    profile_dir = resolve_tenant_path(facts_path).parent
     overrides = load_overrides(profile_dir / "overrides.yaml")
     cluster_map = effective_cluster_map(
         load_cluster_map(profile_dir / "cluster_map.json"), overrides
@@ -60,8 +68,14 @@ def tailor(
     style_guide = load_style_guide(config.style_guide_path)
     bundle = build_tailor_bundle(config, style_guide=style_guide)
     results = tailor_jobs(
-        session, targets, facts, config,
-        bundle.tailor, bundle.reviewers, bundle.reviser, reporter=reporter,
+        session,
+        targets,
+        facts,
+        config,
+        bundle.tailor,
+        bundle.reviewers,
+        bundle.reviser,
+        reporter=reporter,
         match_plan_agent=bundle.match_plan,
         skill_matrix=skill_matrix,
         cluster_map=cluster_map,

@@ -78,6 +78,21 @@ to `build_model` with a lazy import. Nothing else changes.
 
 ## Core invariants (never break these)
 
+### Tenancy context (ADR-0003)
+
+Multi-user state rides a `contextvars.ContextVar` holding the active
+`UserContext` (`tenancy/context.py`). Its set-points are the API dependency,
+`RunManager.submit` (which copies the caller context into its worker), and the
+CLI callback (`--user`). `get_settings()` returns effective request settings or
+environment settings and must never be cached across requests. System tables
+use separate SQLAlchemy metadata and never appear in workspace databases.
+Session cookies and PATs resolve only to that context. Short-lived query tokens
+are purpose-bound to SSE or selected downloads and are never accepted as
+general API authorization. Limits use `NULL = system default` and `0 =
+unlimited`; admins and calls made with a user's own provider key are exempt from
+shared-key budget enforcement. Admin user deletion evicts open workspace
+engines before a staged, rollback-safe removal.
+
 ### Fact-lock
 
 Every bullet on a tailored resume must trace back to a fact in

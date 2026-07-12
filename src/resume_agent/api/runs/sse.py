@@ -22,10 +22,13 @@ def record_to_run(snapshot: RunSnapshot) -> RunOut:
         eta_text=snapshot.eta_text,
         result=snapshot.result,
         error=snapshot.error,
+        error_code=snapshot.error_code,
     )
 
 
-async def run_events(mgr, run_id: str, *, poll_interval: float = 0.5) -> AsyncIterator[dict]:
+async def run_events(
+    mgr, run_id: str, *, poll_interval: float = 0.5
+) -> AsyncIterator[dict]:
     """Yield sse-starlette event dicts until the run reaches a terminal state.
 
     Emits an event whenever the projected RunOut changes, plus a final event on
@@ -36,7 +39,11 @@ async def run_events(mgr, run_id: str, *, poll_interval: float = 0.5) -> AsyncIt
     while True:
         snapshot = mgr.get(run_id)
         if snapshot is None:
-            yield {"data": json.dumps({"state": "error", "error": "run not found", "percent": 0})}
+            yield {
+                "data": json.dumps(
+                    {"state": "error", "error": "run not found", "percent": 0}
+                )
+            }
             return
         run = record_to_run(snapshot)
         payload = run.model_dump(mode="json", by_alias=True)

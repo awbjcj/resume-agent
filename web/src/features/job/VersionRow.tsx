@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { withTokenParam } from "@/lib/api/client";
+import { openDownload } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import {
   useRenderVersion,
@@ -75,9 +75,11 @@ export function VersionRow({
           {version.pdfPath ? (
             <Button size="sm" variant="outline" render={
               <a
-                href={withTokenParam(`/api/resume-versions/${version.id}/pdf`)}
-                target="_blank"
-                rel="noreferrer"
+                href={`/api/resume-versions/${version.id}/pdf`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void openDownload(event.currentTarget.href);
+                }}
               >
                 <Download className="size-4" aria-hidden="true" />
                 Download

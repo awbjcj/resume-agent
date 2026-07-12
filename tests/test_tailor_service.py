@@ -140,9 +140,9 @@ def test_tailor_jobs_runs_jobs_concurrently(monkeypatch):
     import time
 
     monkeypatch.setenv("LLM_CONCURRENCY", "8")
-    from resume_agent.config import get_settings
+    from resume_agent.config import env_settings
 
-    get_settings.cache_clear()
+    env_settings.cache_clear()
 
     config = ReviewConfig(
         max_rounds=1,
@@ -164,7 +164,9 @@ def test_tailor_jobs_runs_jobs_concurrently(monkeypatch):
 
         async def arun(self, prompt):
             await asyncio.sleep(0.05)
-            return _Result(ReviewCritique(reviewer="fact-check", score=100, passed=True))
+            return _Result(
+                ReviewCritique(reviewer="fact-check", score=100, passed=True)
+            )
 
     try:
         with _session() as s:
@@ -194,7 +196,7 @@ def test_tailor_jobs_runs_jobs_concurrently(monkeypatch):
             assert len(results) == 4
         assert elapsed < 0.3
     finally:
-        get_settings.cache_clear()
+        env_settings.cache_clear()
 
 
 def test_tailor_jobs_isolates_a_failing_job():
@@ -265,7 +267,9 @@ def test_tailor_jobs_rejects_unpersisted_job_before_llm_work():
 
     with _session() as s:
         job = Job(
-            source="manual", jd_text="jd", status=JobStatus.approved.value,
+            source="manual",
+            jd_text="jd",
+            status=JobStatus.approved.value,
             criteria_json=JobCriteria().model_dump(mode="json"),
         )
         with pytest.raises(ValueError):

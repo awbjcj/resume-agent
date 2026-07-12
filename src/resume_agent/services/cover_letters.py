@@ -13,6 +13,7 @@ from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.agents import build_cover_letter_bundle
 from resume_agent.services.tailoring import resolve_targets
+from resume_agent.tenancy.limits import enforce_active_budget
 
 DEFAULT_FACTS = "data/profile/facts.json"
 
@@ -36,6 +37,7 @@ def write_cover_letters(
     targets = resolve_targets(session, job_ids=job_ids, approved=approved)
     if not targets:
         return []
+    enforce_active_budget()
     facts = load_facts(facts_path)
     bundle = build_cover_letter_bundle()
     results: list[CoverLetterResult] = []
@@ -52,8 +54,10 @@ def write_cover_letters(
         export_job_artifacts(session, job.id)
         results.append(
             CoverLetterResult(
-                job_id=job.id, cover_letter_id=cover.id,
-                fact_check_passed=cover.fact_check_passed, pdf_path=str(path),
+                job_id=job.id,
+                cover_letter_id=cover.id,
+                fact_check_passed=cover.fact_check_passed,
+                pdf_path=str(path),
             )
         )
         if reporter:

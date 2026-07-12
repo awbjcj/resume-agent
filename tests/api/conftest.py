@@ -9,8 +9,11 @@ dir unless the test already pinned ``runs_root`` itself.
 """
 
 import pytest
+from fastapi.testclient import TestClient
 
 from resume_agent.api import app as app_module
+from resume_agent.api.app import create_app
+from resume_agent.api.auth import hash_password
 from resume_agent.api.runs.manager import RunManager
 
 
@@ -21,3 +24,27 @@ def _isolate_runs_root(tmp_path, monkeypatch):
         return RunManager(*args, **kwargs)
 
     monkeypatch.setattr(app_module, "RunManager", factory)
+
+
+@pytest.fixture
+def mu_app(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text(
+        "AUTH_USERNAME=owner\n"
+        f"AUTH_PASSWORD_HASH={hash_password('owner-password', iterations=1000)}\n"
+        "SESSION_SECRET=test-session-secret\n",
+        encoding="utf-8",
+    )
+    return create_app(
+        db_url=f"sqlite:///{(tmp_path / 'data' / 'ignored.db').as_posix()}",
+        env_path=env,
+        data_dir=tmp_path / "data",
+        runs_root=tmp_path / "legacy-runs",
+        config_dir=tmp_path / "templates",
+    )
+
+
+@pytest.fixture
+def mu_client(mu_app):
+    with TestClient(mu_app, base_url="https://testserver") as client:
+        yield client

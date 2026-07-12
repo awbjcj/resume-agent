@@ -26,6 +26,7 @@ class PullReport:
     totals: dict[str, int] = field(default_factory=dict)
     upgraded: dict[str, int] = field(default_factory=dict)
     skipped: dict[str, int] = field(default_factory=dict)
+    quota_skipped: dict[str, int] = field(default_factory=dict)
     failures: dict[str, dict[str, str]] = field(default_factory=dict)
     changed_raw_job_ids: list[int] = field(default_factory=list)
 
@@ -64,6 +65,7 @@ def _pull_result(report: PullReport) -> dict[str, object]:
         "totals": report.totals,
         "upgraded": report.upgraded,
         "skipped": report.skipped,
+        "quotaSkipped": report.quota_skipped,
         "failures": report.failures,
     }
 
@@ -104,6 +106,7 @@ def run_pull(
     reporter: ProgressReporter | None = None,
     finish: bool = True,
     skip_known: bool = True,
+    max_active_jobs: int | None = None,
 ) -> PullReport:
     """Fetch every connector concurrently, then ingest serially in canonical
     (connector-list) order, isolating each connector's failures.
@@ -134,7 +137,9 @@ def run_pull(
             continue
         result = fetched.value
         try:
-            summary = ingest_jobs_with_outcomes(session, result.jobs)
+            summary = ingest_jobs_with_outcomes(
+                session, result.jobs, max_active_jobs=max_active_jobs
+            )
             added_count = summary.added.get(connector.name, sum(summary.added.values()))
             upgraded_count = summary.upgraded.get(
                 connector.name, sum(summary.upgraded.values())
@@ -145,6 +150,10 @@ def run_pull(
             report.totals[connector.name] = added_count
             report.upgraded[connector.name] = upgraded_count
             report.skipped[connector.name] = skipped_count
+            quota_count = summary.quota_skipped.get(
+                connector.name, sum(summary.quota_skipped.values())
+            )
+            report.quota_skipped[connector.name] = quota_count
             report.changed_raw_job_ids.extend(summary.changed_raw_job_ids)
             added_total += added_count
             if result.failures:

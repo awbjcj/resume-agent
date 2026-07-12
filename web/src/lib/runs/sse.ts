@@ -1,4 +1,4 @@
-import { withTokenParam } from "@/lib/api/client";
+import { api, getToken, unwrap, withTokenParam } from "@/lib/api/client";
 import { useRunStore, type PullRunResult, type RunRecord } from "./store";
 
 /** Map a backend run state to the store projection. */
@@ -31,9 +31,17 @@ export function watchRun(
   onDone?: (run: RunRecord) => void,
   onTransportError?: () => void,
 ): () => void {
-  const source = new EventSource(withTokenParam(`/api/runs/${runId}/events`));
+  let source: EventSource | null = null;
+  let closed = false;
 
-  source.onmessage = (e) => {
+  const connect = (token?: string) => {
+    if (closed) return;
+    const base = `/api/runs/${runId}/events`;
+    const url = token ? `${base}?token=${encodeURIComponent(token)}` : withTokenParam(base);
+    const eventSource = new EventSource(url);
+    source = eventSource;
+
+  eventSource.onmessage = (e) => {
     let data: {
       state?: string;
       percent?: number;
@@ -65,17 +73,30 @@ export function watchRun(
     };
     useRunStore.getState().upsert(run);
     if (state === "done" || state === "error" || state === "cancelled") {
-      source.close();
+      eventSource.close();
       onDone?.(run);
       // Let the finished bar linger briefly, then clear it.
       setTimeout(() => useRunStore.getState().remove(runId), 4000);
     }
   };
 
-  source.onerror = () => {
-    source.close();
+  eventSource.onerror = () => {
+    eventSource.close();
     onTransportError?.();
   };
 
-  return () => source.close();
+  };
+
+  if (getToken()) {
+    connect();
+  } else {
+    void unwrap(api.POST("/api/auth/link-token", { body: { purpose: "sse" } }))
+      .then((link) => connect(link.token))
+      .catch(() => connect());
+  }
+
+  return () => {
+    closed = true;
+    source?.close();
+  };
 }

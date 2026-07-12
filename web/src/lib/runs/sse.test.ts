@@ -1,5 +1,7 @@
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { server } from "@/test/server";
 import { watchRun } from "./sse";
 import { useRunStore, type RunRecord } from "./store";
 
@@ -20,14 +22,22 @@ describe("watchRun", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubGlobal("EventSource", FakeEventSource);
+    FakeEventSource.current = undefined as never;
     useRunStore.setState({ runs: {} });
+    server.use(
+      http.post("/api/auth/link-token", () =>
+        HttpResponse.json({ token: "sse-link", expiresInSeconds: 60 }),
+      ),
+    );
   });
 
-  it("passes the terminal run record to the completion callback", () => {
+  it("passes the terminal run record to the completion callback", async () => {
     let completed: RunRecord | undefined;
     watchRun("r1", "tailor", (run) => {
       completed = run;
     });
+    await vi.waitFor(() => expect(FakeEventSource.current).toBeDefined());
+    expect(FakeEventSource.current.url).toContain("token=sse-link");
 
     FakeEventSource.current.onmessage?.({
       data: JSON.stringify({
@@ -44,8 +54,9 @@ describe("watchRun", () => {
     expect(completed?.result).toEqual({ jobs: [{ jobId: 1, versionCount: 3 }] });
   });
 
-  it("represents an acknowledged cancellation request as cancelling", () => {
+  it("represents an acknowledged cancellation request as cancelling", async () => {
     watchRun("r1", "tailor");
+    await vi.waitFor(() => expect(FakeEventSource.current).toBeDefined());
 
     FakeEventSource.current.onmessage?.({
       data: JSON.stringify({ state: "cancelling", label: "Cancelling", percent: 20 }),
@@ -54,8 +65,9 @@ describe("watchRun", () => {
     expect(useRunStore.getState().runs.r1.status).toBe("cancelling");
   });
 
-  it("maps a pending backend record to queued", () => {
+  it("maps a pending backend record to queued", async () => {
     watchRun("r1", "suggestion");
+    await vi.waitFor(() => expect(FakeEventSource.current).toBeDefined());
 
     FakeEventSource.current.onmessage?.({
       data: JSON.stringify({ state: "pending", label: "Queued" }),
@@ -64,9 +76,10 @@ describe("watchRun", () => {
     expect(useRunStore.getState().runs.r1.status).toBe("queued");
   });
 
-  it("reports a transport error without marking the backend run failed", () => {
+  it("reports a transport error without marking the backend run failed", async () => {
     const onTransportError = vi.fn();
     watchRun("r1", "pull", undefined, onTransportError);
+    await vi.waitFor(() => expect(FakeEventSource.current).toBeDefined());
 
     FakeEventSource.current.onerror?.();
 

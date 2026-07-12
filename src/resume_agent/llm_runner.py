@@ -67,7 +67,11 @@ class AgentRunner:
         settings = get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
-                return self._agent.run(prompt)
+                response = self._agent.run(prompt)
+                from resume_agent.tenancy.usage import record_call
+
+                record_call(self._agent, response)
+                return response
             except Exception as exc:
                 if attempt >= settings.llm_retries or not is_transient(exc):
                     raise
@@ -78,7 +82,11 @@ class AgentRunner:
         settings = get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
-                return await self._agent.arun(prompt)
+                response = await self._agent.arun(prompt)
+                from resume_agent.tenancy.usage import record_call
+
+                record_call(self._agent, response)
+                return response
             except Exception as exc:
                 if attempt >= settings.llm_retries or not is_transient(exc):
                     raise

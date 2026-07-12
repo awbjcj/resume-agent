@@ -13,7 +13,10 @@ DEFAULT_RENDER = "config/render.yaml"
 
 
 def _load_config(path: str) -> RenderConfig:
-    return load_render_config(path) if Path(path).exists() else RenderConfig()
+    from resume_agent.tenancy.paths import resolve_tenant_path
+
+    resolved = resolve_tenant_path(path)
+    return load_render_config(resolved) if resolved.exists() else RenderConfig()
 
 
 def render_resume_version(

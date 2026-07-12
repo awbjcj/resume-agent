@@ -7,7 +7,9 @@ from resume_agent.models.profile import ProfileFacts
 
 def save_facts(facts: ProfileFacts, path: str | Path) -> Path:
     """Atomically write ProfileFacts to an indented JSON file."""
-    destination = Path(path)
+    from resume_agent.tenancy.paths import resolve_tenant_path
+
+    destination = resolve_tenant_path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
@@ -40,10 +42,15 @@ def load_facts(path: str | Path) -> ProfileFacts:
     The returned model is shared across callers — treat it as read-only.
     save_facts() replaces the file atomically, which bumps the key.
     """
-    resolved = Path(path).resolve()
+    from resume_agent.tenancy.paths import resolve_tenant_path
+
+    resolved = resolve_tenant_path(path).resolve()
     stat = resolved.stat()
     cached = _FACTS_CACHE.get(resolved)
-    if cached is not None and (cached[0], cached[1]) == (stat.st_mtime_ns, stat.st_size):
+    if cached is not None and (cached[0], cached[1]) == (
+        stat.st_mtime_ns,
+        stat.st_size,
+    ):
         return cached[2]
     facts = ProfileFacts.model_validate_json(resolved.read_text(encoding="utf-8"))
     _FACTS_CACHE[resolved] = (stat.st_mtime_ns, stat.st_size, facts)

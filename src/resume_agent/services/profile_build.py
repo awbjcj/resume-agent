@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from resume_agent.profile.store import save_facts
+from resume_agent.tenancy.limits import enforce_active_budget
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 
 def run_corpus_build(
@@ -19,6 +21,9 @@ def run_corpus_build(
 ) -> dict:
     if not 1 <= github_limit <= 100:
         raise ValueError("github repo limit must be between 1 and 100")
+    enforce_active_budget()
+    profile_dir = resolve_tenant_path(profile_dir)
+    facts_out = resolve_tenant_path(facts_out)
     from resume_agent.profile.build import build_corpus_profile
     from resume_agent.profile.inference import build_inference_agent
     from resume_agent.profile.matrix import (

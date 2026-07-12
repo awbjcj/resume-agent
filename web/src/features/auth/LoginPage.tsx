@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -78,11 +78,12 @@ export function LoginPage() {
               </Field>
             </FieldGroup>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex-col gap-3">
             <Button className="w-full" type="submit" disabled={login.isPending}>
               {login.isPending && <Spinner data-icon="inline-start" />}
               {login.isPending ? "Signing in…" : "Sign in"}
             </Button>
+            <Button variant="link" render={<Link to="/register">Create an account with an invite</Link>} />
           </CardFooter>
         </form>
       </Card>

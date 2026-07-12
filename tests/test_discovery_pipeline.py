@@ -148,7 +148,9 @@ class _IndustryRunner:
 
 class _IndustryExtractAgent:
     def run(self, prompt):
-        industry = "Financial Technology" if "fintech" in prompt else "Self-Driving Cars"
+        industry = (
+            "Financial Technology" if "fintech" in prompt else "Self-Driving Cars"
+        )
         return _Result(_extract(industry=industry))
 
     async def arun(self, prompt):
@@ -181,14 +183,20 @@ def test_run_extract_classifies_one_unseen_delta_and_persists_canonical_names(tm
         save_job(
             session,
             Job(
-                source="x", company="Stripe, Inc.", jd_text="fintech role", title="A",
+                source="x",
+                company="Stripe, Inc.",
+                jd_text="fintech role",
+                title="A",
                 status=JobStatus.raw.value,
             ),
         )
         save_job(
             session,
             Job(
-                source="x", company="Waymo LLC", jd_text="cars role", title="B",
+                source="x",
+                company="Waymo LLC",
+                jd_text="cars role",
+                title="B",
                 status=JobStatus.raw.value,
             ),
         )
@@ -226,7 +234,10 @@ def test_run_extract_warm_taxonomy_makes_zero_classifier_calls_and_updates_all_s
         save_job(
             session,
             Job(
-                source="x", company="Stripe", jd_text="old", title="Old",
+                source="x",
+                company="Stripe",
+                jd_text="old",
+                title="Old",
                 status=JobStatus.tailored.value,
                 criteria_json={
                     "industry": "Financial Technology",
@@ -238,7 +249,10 @@ def test_run_extract_warm_taxonomy_makes_zero_classifier_calls_and_updates_all_s
         save_job(
             session,
             Job(
-                source="x", company="Stripe, Inc.", jd_text="fintech role", title="New",
+                source="x",
+                company="Stripe, Inc.",
+                jd_text="fintech role",
+                title="New",
                 status=JobStatus.raw.value,
             ),
         )
@@ -296,7 +310,10 @@ def test_run_extract_keeps_failed_industry_candidate_internal_for_retry(tmp_path
         save_job(
             session,
             Job(
-                source="x", company="Stripe", jd_text="fintech role", title="A",
+                source="x",
+                company="Stripe",
+                jd_text="fintech role",
+                title="A",
                 status=JobStatus.raw.value,
             ),
         )
@@ -362,11 +379,21 @@ def test_run_relevance_rejects_offtarget_keeps_match():
     with _session() as s:
         save_job(
             s,
-            Job(source="x", jd_text="build systems", title="AI Engineer", status=JobStatus.raw.value),
+            Job(
+                source="x",
+                jd_text="build systems",
+                title="AI Engineer",
+                status=JobStatus.raw.value,
+            ),
         )
         save_job(
             s,
-            Job(source="x", jd_text="drive a truck", title="CDL Driver", status=JobStatus.raw.value),
+            Job(
+                source="x",
+                jd_text="drive a truck",
+                title="CDL Driver",
+                status=JobStatus.raw.value,
+            ),
         )
         rejected_count = run_relevance(s, cfg, judge)
         assert rejected_count == 1
@@ -382,7 +409,10 @@ def test_run_relevance_rejects_offtarget_keeps_match():
 def test_run_relevance_noop_when_no_target_and_no_titles():
     cfg = SearchConfig()
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="jd", title="Whatever", status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(source="x", jd_text="jd", title="Whatever", status=JobStatus.raw.value),
+        )
         assert run_relevance(s, cfg, _Judge()) == 0
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
 
@@ -390,7 +420,10 @@ def test_run_relevance_noop_when_no_target_and_no_titles():
 def test_run_relevance_noop_when_titles_are_blank():
     cfg = SearchConfig(titles=["", "   "])
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="jd", title="Whatever", status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(source="x", jd_text="jd", title="Whatever", status=JobStatus.raw.value),
+        )
         assert run_relevance(s, cfg, _Judge()) == 0
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
 
@@ -398,7 +431,12 @@ def test_run_relevance_noop_when_titles_are_blank():
 def test_run_relevance_noop_when_agent_none():
     cfg = SearchConfig(target_role="AI roles")
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="jd", title="CDL Driver", status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(
+                source="x", jd_text="jd", title="CDL Driver", status=JobStatus.raw.value
+            ),
+        )
         assert run_relevance(s, cfg, None) == 0
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
 
@@ -413,7 +451,12 @@ def test_run_relevance_keeps_job_on_agent_error():
 
     cfg = SearchConfig(target_role="AI roles")
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="jd", title="CDL Driver", status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(
+                source="x", jd_text="jd", title="CDL Driver", status=JobStatus.raw.value
+            ),
+        )
         assert run_relevance(s, cfg, _Boom()) == 0
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
 
@@ -422,9 +465,9 @@ def test_run_extract_runs_concurrently_and_isolates_failures(monkeypatch):
     import time
 
     monkeypatch.setenv("LLM_CONCURRENCY", "8")
-    from resume_agent.config import get_settings
+    from resume_agent.config import env_settings
 
-    get_settings.cache_clear()
+    env_settings.cache_clear()
 
     class _SlowExtract:
         def run(self, prompt):
@@ -442,8 +485,11 @@ def test_run_extract_runs_concurrently_and_isolates_failures(monkeypatch):
         with _session() as s:
             for i in range(5):
                 add_job(
-                    s, source="manual", jd_text=("boom" if i == 2 else f"jd{i}"),
-                    title=f"T{i}", company=f"C{i}",
+                    s,
+                    source="manual",
+                    jd_text=("boom" if i == 2 else f"jd{i}"),
+                    title=f"T{i}",
+                    company=f"C{i}",
                 )
             t0 = time.perf_counter()
             run_extract(s, _SlowExtract())
@@ -455,7 +501,7 @@ def test_run_extract_runs_concurrently_and_isolates_failures(monkeypatch):
             assert len(raw) == 1
         assert elapsed < 0.2
     finally:
-        get_settings.cache_clear()
+        env_settings.cache_clear()
 
 
 def test_discover_extracts_filters_scores_and_shortlists():
@@ -491,7 +537,11 @@ def test_discover_reports_progress_done(tmp_path):
     with _session() as s:
         add_job(s, source="manual", jd_text="good role, will sponsor")
         discover(
-            s, cfg, facts, _ExtractAgent(), _FitAgent(),
+            s,
+            cfg,
+            facts,
+            _ExtractAgent(),
+            _FitAgent(),
             reporter=ProgressReporter("discover", tmp_path),
         )
     rec = read_progress("discover", tmp_path)
@@ -505,11 +555,19 @@ def test_run_score_reports_phase_three(tmp_path):
     with _session() as s:
         save_job(
             s,
-            Job(source="x", jd_text="jd", title="Eng", status=JobStatus.filtered.value,
-                criteria_json={}),
+            Job(
+                source="x",
+                jd_text="jd",
+                title="Eng",
+                status=JobStatus.filtered.value,
+                criteria_json={},
+            ),
         )
         run_score(
-            s, facts, _LocationFitAgent(), aliases_path=tmp_path / "a.json",
+            s,
+            facts,
+            _LocationFitAgent(),
+            aliases_path=tmp_path / "a.json",
             reporter=ProgressReporter("discover", tmp_path),
         )
     rec = read_progress("discover", tmp_path)
@@ -531,12 +589,8 @@ def test_run_score_builds_context_from_each_jobs_criteria(tmp_path):
             return self.run(prompt)
 
     agent = _CapturingFitAgent()
-    matrix = SkillMatrix(
-        rows=[MatrixRow(key="flask", display="Flask", strength=2.0)]
-    )
-    cluster_map = ClusterMap(
-        theme_of={"flask": "web", "fastapi": "web"}
-    )
+    matrix = SkillMatrix(rows=[MatrixRow(key="flask", display="Flask", strength=2.0)])
+    cluster_map = ClusterMap(theme_of={"flask": "web", "fastapi": "web"})
     with _session() as session:
         save_job(
             session,
@@ -580,12 +634,12 @@ def test_discover_commits_once_per_stage(monkeypatch):
     assert commits["n"] == 3
 
 
-
 class _LocationFitAgent:
     def run(self, prompt):
         return _Result(
             FitScore(
-                score=88, rationale="ok",
+                score=88,
+                rationale="ok",
                 location=FitLocation(city="Austin", region="TX", country="USA"),
             )
         )
@@ -600,7 +654,9 @@ def test_run_score_preserves_canonical_industry_and_writes_location(tmp_path):
         save_job(
             s,
             Job(
-                source="x", jd_text="jd", title="Eng",
+                source="x",
+                jd_text="jd",
+                title="Eng",
                 status=JobStatus.filtered.value,
                 criteria_json={
                     "industry": "Autonomous Driving",
@@ -629,7 +685,9 @@ def test_run_score_refreshes_aliases_when_canonicalizer_given(tmp_path):
         save_job(
             s,
             Job(
-                source="x", jd_text="jd", title="Eng",
+                source="x",
+                jd_text="jd",
+                title="Eng",
                 status=JobStatus.filtered.value,
                 criteria_json={"must_have_skills": ["k8s"]},
             ),
@@ -681,8 +739,14 @@ class _OneBadFitAgent:
 def test_run_extract_skips_failed_job_and_persists_the_rest():
     """One job with unparseable LLM output must not discard the whole stage."""
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="good role", title="A", status=JobStatus.raw.value))
-        save_job(s, Job(source="x", jd_text="boom role", title="B", status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(source="x", jd_text="good role", title="A", status=JobStatus.raw.value),
+        )
+        save_job(
+            s,
+            Job(source="x", jd_text="boom role", title="B", status=JobStatus.raw.value),
+        )
 
         run_extract(s, _OneBadExtractAgent())  # must not raise
 
@@ -695,8 +759,14 @@ def test_run_extract_skips_failed_job_and_persists_the_rest():
 def test_run_extract_skips_job_when_agent_returns_wrong_type():
     """A raw-str fallback (isinstance guard -> TypeError) is also isolated."""
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="good role", title="A", status=JobStatus.raw.value))
-        save_job(s, Job(source="x", jd_text="boom role", title="B", status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(source="x", jd_text="good role", title="A", status=JobStatus.raw.value),
+        )
+        save_job(
+            s,
+            Job(source="x", jd_text="boom role", title="B", status=JobStatus.raw.value),
+        )
 
         run_extract(s, _RawStrExtractAgent())  # must not raise
 
@@ -709,16 +779,28 @@ def test_run_score_skips_failed_job_and_persists_the_rest(tmp_path):
     with _session() as s:
         save_job(
             s,
-            Job(source="x", jd_text="good", title="A", status=JobStatus.filtered.value,
-                criteria_json={}),
+            Job(
+                source="x",
+                jd_text="good",
+                title="A",
+                status=JobStatus.filtered.value,
+                criteria_json={},
+            ),
         )
         save_job(
             s,
-            Job(source="x", jd_text="boom", title="B", status=JobStatus.filtered.value,
-                criteria_json={}),
+            Job(
+                source="x",
+                jd_text="boom",
+                title="B",
+                status=JobStatus.filtered.value,
+                criteria_json={},
+            ),
         )
 
-        run_score(s, facts, _OneBadFitAgent(), aliases_path=tmp_path / "a.json")  # must not raise
+        run_score(
+            s, facts, _OneBadFitAgent(), aliases_path=tmp_path / "a.json"
+        )  # must not raise
 
         shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
         filtered = jobs_by_status(s, JobStatus.filtered.value)
@@ -740,12 +822,13 @@ def test_discover_isolates_a_single_unparseable_job():
         assert counts.get(JobStatus.raw.value, 0) == 1  # bad job parked for retry
 
 
-
 def test_filter_and_relevance_set_reject_category():
     cfg = SearchConfig(sponsorship_required=True, target_role="AI engineering roles")
     facts = ProfileFacts(contact=Contact(name="Ada"))
     with _session() as s:
-        add_job(s, source="manual", jd_text="bad role, nosponsor here", title="AI Engineer")
+        add_job(
+            s, source="manual", jd_text="bad role, nosponsor here", title="AI Engineer"
+        )
         add_job(s, source="manual", jd_text="drive a truck", title="CDL Driver")
         discover(s, cfg, facts, _ExtractAgent(), _FitAgent(), _Judge())
         rejected = jobs_by_status(s, JobStatus.rejected.value)
@@ -757,17 +840,35 @@ def test_reprocess_shortlisted_rescores_and_skips_progress():
     cfg = SearchConfig()  # no relevance target -> relevance gate is a no-op
     facts = ProfileFacts(contact=Contact(name="Ada"))
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="jd a", title="Eng",
-                        status=JobStatus.shortlisted.value, fit_score=10, criteria_json={}))
-        save_job(s, Job(source="x", jd_text="jd b", title="Eng",
-                        status=JobStatus.tailored.value, fit_score=10, criteria_json={}))
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="jd a",
+                title="Eng",
+                status=JobStatus.shortlisted.value,
+                fit_score=10,
+                criteria_json={},
+            ),
+        )
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="jd b",
+                title="Eng",
+                status=JobStatus.tailored.value,
+                fit_score=10,
+                criteria_json={},
+            ),
+        )
 
         counts = reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
 
         shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
         tailored = jobs_by_status(s, JobStatus.tailored.value)
-        assert shortlisted[0].fit_score == 90       # re-scored
-        assert tailored[0].fit_score == 10           # progress-guarded, untouched
+        assert shortlisted[0].fit_score == 90  # re-scored
+        assert tailored[0].fit_score == 10  # progress-guarded, untouched
         assert counts[JobStatus.shortlisted.value] == 1
 
 
@@ -775,10 +876,26 @@ def test_reprocess_rejected_relevance_only():
     cfg = SearchConfig()
     facts = ProfileFacts(contact=Contact(name="Ada"))
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="jd r", title="Eng",
-                        status=JobStatus.rejected.value, reject_category="relevance"))
-        save_job(s, Job(source="x", jd_text="jd f", title="Eng",
-                        status=JobStatus.rejected.value, reject_category="filtered"))
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="jd r",
+                title="Eng",
+                status=JobStatus.rejected.value,
+                reject_category="relevance",
+            ),
+        )
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="jd f",
+                title="Eng",
+                status=JobStatus.rejected.value,
+                reject_category="filtered",
+            ),
+        )
 
         reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["rejected:relevance"])
 
@@ -790,19 +907,38 @@ def test_reprocess_rejected_relevance_only():
 
 def test_reprocess_unknown_scope_raises():
     import pytest
+
     with _session() as s:
         with pytest.raises(ValueError):
-            reprocess(s, SearchConfig(), ProfileFacts(contact=Contact(name="Ada")),
-                      _ExtractAgent(), _FitAgent(), ["bogus"])
+            reprocess(
+                s,
+                SearchConfig(),
+                ProfileFacts(contact=Contact(name="Ada")),
+                _ExtractAgent(),
+                _FitAgent(),
+                ["bogus"],
+            )
 
 
 def test_reprocess_only_touches_scoped_jobs():
     cfg = SearchConfig()
     facts = ProfileFacts(contact=Contact(name="Ada"))
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="jd s", title="Eng",
-                        status=JobStatus.shortlisted.value, fit_score=10, criteria_json={}))
-        save_job(s, Job(source="x", jd_text="jd raw", title="Eng", status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="jd s",
+                title="Eng",
+                status=JobStatus.shortlisted.value,
+                fit_score=10,
+                criteria_json={},
+            ),
+        )
+        save_job(
+            s,
+            Job(source="x", jd_text="jd raw", title="Eng", status=JobStatus.raw.value),
+        )
 
         reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
 
@@ -815,7 +951,10 @@ def test_reprocess_empty_scope_processes_nothing():
     cfg = SearchConfig()
     facts = ProfileFacts(contact=Contact(name="Ada"))
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="jd raw", title="Eng", status=JobStatus.raw.value))
+        save_job(
+            s,
+            Job(source="x", jd_text="jd raw", title="Eng", status=JobStatus.raw.value),
+        )
         reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
         assert len(jobs_by_status(s, JobStatus.raw.value)) == 1
         assert not jobs_by_status(s, JobStatus.shortlisted.value)
@@ -825,9 +964,18 @@ def test_reprocess_clears_stale_fit_when_now_rejected():
     cfg = SearchConfig(sponsorship_required=True)
     facts = ProfileFacts(contact=Contact(name="Ada"))
     with _session() as s:
-        save_job(s, Job(source="x", jd_text="bad role, nosponsor here", title="Eng",
-                        status=JobStatus.shortlisted.value, fit_score=88,
-                        fit_rationale="old rationale", criteria_json={"stale": 1}))
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="bad role, nosponsor here",
+                title="Eng",
+                status=JobStatus.shortlisted.value,
+                fit_score=88,
+                fit_rationale="old rationale",
+                criteria_json={"stale": 1},
+            ),
+        )
 
         reprocess(s, cfg, facts, _ExtractAgent(), _FitAgent(), ["shortlisted"])
 

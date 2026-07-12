@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from pydantic.alias_generators import to_camel
 
-from resume_agent.api.deps import refresh_app_settings
+from resume_agent.api.deps import get_env_path, refresh_app_settings
 from resume_agent.api.schemas.secrets import (
     SECRET_FIELDS,
     ModelsConfigDoc,
@@ -16,8 +16,11 @@ from resume_agent.services.env_config import read_env, write_env_updates
 
 router = APIRouter()
 
-_MODEL_ENV = {"cheap_model": "CHEAP_MODEL", "mid_model": "MID_MODEL",
-              "premium_model": "PREMIUM_MODEL"}
+_MODEL_ENV = {
+    "cheap_model": "CHEAP_MODEL",
+    "mid_model": "MID_MODEL",
+    "premium_model": "PREMIUM_MODEL",
+}
 
 
 def _statuses(env_path) -> list[SecretStatus]:
@@ -32,25 +35,26 @@ def _statuses(env_path) -> list[SecretStatus]:
 
 @router.get("/secrets", response_model=list[SecretStatus])
 def get_secrets(request: Request):
-    return _statuses(request.app.state.env_path)
+    return _statuses(get_env_path(request))
 
 
 @router.put("/secrets", response_model=list[SecretStatus])
 def put_secrets(body: SecretsUpdate, request: Request):
     provided = body.model_dump(exclude_unset=True)
     updates = {SECRET_FIELDS[f]: (v or "") for f, v in provided.items()}
-    fresh = write_env_updates(updates, request.app.state.env_path)
+    env_path = get_env_path(request)
+    fresh = write_env_updates(updates, env_path)
     refresh_app_settings(request.app, fresh)
-    return _statuses(request.app.state.env_path)
+    return _statuses(env_path)
 
 
 @router.get("/config/models", response_model=ModelsConfigDoc)
 def get_models(request: Request):
-    env = read_env(request.app.state.env_path)
+    env = read_env(get_env_path(request))
     defaults = ModelsConfigDoc()
-    return ModelsConfigDoc(**{
-        f: env.get(var) or getattr(defaults, f) for f, var in _MODEL_ENV.items()
-    })
+    return ModelsConfigDoc(
+        **{f: env.get(var) or getattr(defaults, f) for f, var in _MODEL_ENV.items()}
+    )
 
 
 @router.put("/config/models", response_model=ModelsConfigDoc)
@@ -61,6 +65,6 @@ def put_models(body: ModelsConfigDoc, request: Request):
     # a previously-configured value with the schema default.
     provided = body.model_dump(exclude_unset=True)
     updates = {_MODEL_ENV[f]: v for f, v in provided.items()}
-    fresh = write_env_updates(updates, request.app.state.env_path)
+    fresh = write_env_updates(updates, get_env_path(request))
     refresh_app_settings(request.app, fresh)
     return get_models(request)

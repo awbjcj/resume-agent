@@ -10,7 +10,6 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 import re
 from typing import Any, Literal, Sequence, cast
 
@@ -18,6 +17,7 @@ from sqlmodel import Session, select
 
 from resume_agent.profile.store import load_facts
 from resume_agent.services.pagination import Page, paginate
+from resume_agent.tenancy.paths import resolve_tenant_path
 from resume_agent.tracking.queries import (
     PipelineRow,
     ShortlistRow,
@@ -94,8 +94,8 @@ class FacetSpec:
     field that selects on it. The single statement of the facet vocabulary —
     _row_value, _passes_filter, and board_facets all derive from this table."""
 
-    key: str          # camelCase wire key (facet payload + filter query param)
-    row_attr: str     # attribute on the row DTO
+    key: str  # camelCase wire key (facet payload + filter query param)
+    row_attr: str  # attribute on the row DTO
     filter_attr: str  # field name on BoardFilter
     skip_unset_rows: bool = False  # rows without the value pass the filter
 
@@ -149,7 +149,9 @@ def _row_text(row: Any) -> str:
 
 
 def _row_skill_tokens(row: Any) -> set[str]:
-    return {_normalize_token(tag.name) for tag in getattr(row, "skills", []) if tag.name}
+    return {
+        _normalize_token(tag.name) for tag in getattr(row, "skills", []) if tag.name
+    }
 
 
 def _aware(dt: datetime) -> datetime:
@@ -201,7 +203,11 @@ def _apply_board_filter(rows: list[Any], f: BoardFilter) -> list[Any]:
 
 def _posted_sort_value(row: Any) -> datetime:
     posted_at = getattr(row, "posted_at", None)
-    return _aware(posted_at) if posted_at is not None else datetime.min.replace(tzinfo=timezone.utc)
+    return (
+        _aware(posted_at)
+        if posted_at is not None
+        else datetime.min.replace(tzinfo=timezone.utc)
+    )
 
 
 def _salary_sort_value(row: Any) -> int:
@@ -216,9 +222,13 @@ def _sort_rows(rows: list[Any], sort: str) -> list[Any]:
     if sort == "recency":
         return sorted(rows, key=_posted_sort_value, reverse=True)
     if sort == "company":
-        return sorted(rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower()))
+        return sorted(
+            rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower())
+        )
     if sort == "stage":
-        return sorted(rows, key=lambda r: (getattr(r, "status", ""), (r.company or "").lower()))
+        return sorted(
+            rows, key=lambda r: (getattr(r, "status", ""), (r.company or "").lower())
+        )
     return rows
 
 
@@ -253,7 +263,9 @@ def board_facets(rows: list[Any]) -> Facets:
 
 
 def _by_fit_desc(rows):
-    return sorted(rows, key=lambda r: (r.fit_score is not None, r.fit_score or -1), reverse=True)
+    return sorted(
+        rows, key=lambda r: (r.fit_score is not None, r.fit_score or -1), reverse=True
+    )
 
 
 def _board_rows(
@@ -264,7 +276,8 @@ def _board_rows(
     facts_path: str = DEFAULT_FACTS,
 ) -> list[Any]:
     if board == "shortlist":
-        facts = load_facts(facts_path) if Path(facts_path).exists() else None
+        resolved_facts = resolve_tenant_path(facts_path)
+        facts = load_facts(resolved_facts) if resolved_facts.exists() else None
         rows = shortlist_rows(session, facts=facts)
     elif board == "pipeline":
         rows = pipeline_rows(session)
@@ -293,48 +306,82 @@ def list_board(
 
 
 def list_shortlist(
-    session: Session, *, board_filter: BoardFilter | None = None,
-    min_fit: int | None = None, sort: str = "fit",
-    page: int = 1, page_size: int = 50, facts_path: str = DEFAULT_FACTS,
+    session: Session,
+    *,
+    board_filter: BoardFilter | None = None,
+    min_fit: int | None = None,
+    sort: str = "fit",
+    page: int = 1,
+    page_size: int = 50,
+    facts_path: str = DEFAULT_FACTS,
 ) -> Page[ShortlistRow]:
     f = board_filter or BoardFilter(min_fit=min_fit, sort=sort)
     return list_board(
-        session, "shortlist", board_filter=f, page=page,
-        page_size=page_size, facts_path=facts_path,
+        session,
+        "shortlist",
+        board_filter=f,
+        page=page,
+        page_size=page_size,
+        facts_path=facts_path,
     ).page
 
 
-def get_job_detail(
-    session: Session, job_id: int, *, facts_path: str = DEFAULT_FACTS
-):
+def get_job_detail(session: Session, job_id: int, *, facts_path: str = DEFAULT_FACTS):
     """Full detail read-model for one job."""
-    facts = load_facts(facts_path) if Path(facts_path).exists() else None
+    resolved_facts = resolve_tenant_path(facts_path)
+    facts = load_facts(resolved_facts) if resolved_facts.exists() else None
     return job_detail_row(session, job_id, facts=facts)
 
 
 def list_pipeline(
-    session: Session, *, status: str | None = None, min_fit: int | None = None,
-    q: str | None = None, sort: str = "stage", page: int = 1, page_size: int = 50,
+    session: Session,
+    *,
+    status: str | None = None,
+    min_fit: int | None = None,
+    q: str | None = None,
+    sort: str = "stage",
+    page: int = 1,
+    page_size: int = 50,
     board_filter: BoardFilter | None = None,
 ) -> Page[PipelineRow]:
     f = board_filter or BoardFilter(
-        status=(status,) if status else (), min_fit=min_fit, q=q, sort=sort,
+        status=(status,) if status else (),
+        min_fit=min_fit,
+        q=q,
+        sort=sort,
     )
     return list_board(
-        session, "pipeline", board_filter=f, page=page, page_size=page_size,
+        session,
+        "pipeline",
+        board_filter=f,
+        page=page,
+        page_size=page_size,
     ).page
 
 
 def list_triage(
-    session: Session, *, archived: bool = False, status: str | None = None,
-    min_fit: int | None = None, sort: str = "fit", page: int = 1, page_size: int = 50,
+    session: Session,
+    *,
+    archived: bool = False,
+    status: str | None = None,
+    min_fit: int | None = None,
+    sort: str = "fit",
+    page: int = 1,
+    page_size: int = 50,
     board_filter: BoardFilter | None = None,
 ) -> Page[TriageRow]:
     f = board_filter or BoardFilter(
-        status=(status,) if status else (), min_fit=min_fit, sort=sort, archived=archived,
+        status=(status,) if status else (),
+        min_fit=min_fit,
+        sort=sort,
+        archived=archived,
     )
     return list_board(
-        session, "triage", board_filter=f, page=page, page_size=page_size,
+        session,
+        "triage",
+        board_filter=f,
+        page=page,
+        page_size=page_size,
     ).page
 
 
@@ -365,7 +412,11 @@ def bulk_apply(
     dry_run: bool = True,
 ) -> BulkResult:
     target_ids = _target_ids(
-        session, board=board, scope=scope, board_filter=board_filter, ids=ids,
+        session,
+        board=board,
+        scope=scope,
+        board_filter=board_filter,
+        ids=ids,
     )
     id_col = cast(Any, Job.id)
     jobs = {
@@ -420,6 +471,7 @@ def bulk_apply(
 
 # --- mutations (preserve current job/application semantics) ---------------
 
+
 def set_stage(session: Session, job_id: int, status: str) -> Job | None:
     job = get_job(session, job_id)
     if job is None:
@@ -441,7 +493,9 @@ def upsert_application(
 ) -> Application:
     existing = application_for_job(session, job_id)
     if existing is None or existing.id is None:
-        return save_application(session, Application(job_id=job_id, status=status, notes=notes))
+        return save_application(
+            session, Application(job_id=job_id, status=status, notes=notes)
+        )
     updated = update_application_status(session, existing.id, status, notes)
     assert updated is not None  # existing.id was just confirmed present
     return updated

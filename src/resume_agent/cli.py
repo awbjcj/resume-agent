@@ -5,6 +5,7 @@ import typer
 from sqlmodel import select
 
 from resume_agent.config import load_yaml, get_settings
+from resume_agent.admin_cli import admin_app
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.connectors.telemetry import read_runs
 from resume_agent.gmail.classify import classify_email
@@ -41,6 +42,21 @@ from resume_agent.tracking.tables import Job, JobStatus
 app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
 profile_app = typer.Typer(help="Build and manage your fact-lock profile.")
 app.add_typer(profile_app, name="profile")
+app.add_typer(admin_app, name="admin")
+
+
+@app.callback()
+def _main(
+    user: str | None = typer.Option(
+        None,
+        "--user",
+        help="Workspace username on a multi-user data root (default: first admin).",
+    ),
+) -> None:
+    from resume_agent.tenancy.local import activate_local_context
+
+    activate_local_context(Path("data"), user)
+
 
 DEFAULT_SOURCES = "config/profile_sources.yaml"
 DEFAULT_FACTS = "data/profile/facts.json"
@@ -64,7 +80,9 @@ def profile_add(
         help="'literal', 'synthesis', or 'project' (default: .pptx → synthesis; dossier .md → project).",
     ),
     anchor: str | None = typer.Option(
-        None, "--anchor", help="Experience/project fact id synthesized entries attach to."
+        None,
+        "--anchor",
+        help="Experience/project fact id synthesized entries attach to.",
     ),
 ) -> None:
     """Register a source document in the profile corpus."""
@@ -94,9 +112,7 @@ def profile_remove(
 
 
 @profile_app.command("sources")
-def profile_sources(
-    dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir")
-) -> None:
+def profile_sources(dir: str = typer.Option(DEFAULT_PROFILE_DIR, "--dir")) -> None:
     """List registered source documents and fragment cache status."""
     from resume_agent.profile.corpus import load_manifest
     from resume_agent.profile.fragments import fragment_cache_status
@@ -227,9 +243,7 @@ def profile_build(
     cfg = load_yaml(sources) if Path(sources).exists() else {}
     migrated = migrate_legacy(dir, cast(str | None, cfg.get("resume_path")))
     if migrated is not None:
-        typer.echo(
-            f"Migrated legacy resume into the corpus as {migrated.id} (primary)"
-        )
+        typer.echo(f"Migrated legacy resume into the corpus as {migrated.id} (primary)")
 
     report = run_corpus_build(
         None,
@@ -449,12 +463,9 @@ def scrape_cmd(
         outcome = scrape_linkedin_jobs(session, search_path=search, limit=limit)
     if outcome["failures"]:
         joined = ", ".join(
-            f"{url} ({reason})"
-            for url, reason in outcome["failures"].items()
+            f"{url} ({reason})" for url, reason in outcome["failures"].items()
         )
-        typer.echo(
-            f"Skipped {len(outcome['failures'])} failed posting(s): {joined}"
-        )
+        typer.echo(f"Skipped {len(outcome['failures'])} failed posting(s): {joined}")
     typer.echo(f"Scrape complete. Added {outcome['added']} new job(s).")
 
 
@@ -638,7 +649,9 @@ def tailor_cmd(
             typer.echo(f"Job #{job_id} not found.")
             raise typer.Exit(code=1)
 
-        review_path = DEFAULT_REVIEW_DEEP if deep and review == DEFAULT_REVIEW else review
+        review_path = (
+            DEFAULT_REVIEW_DEEP if deep and review == DEFAULT_REVIEW else review
+        )
         results = tailor(
             session,
             job_ids=[job_id] if job_id is not None else None,

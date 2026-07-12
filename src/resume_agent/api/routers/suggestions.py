@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Query, Request
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_run_manager, get_session
+from resume_agent.api.deps import get_engine, get_run_manager, get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run
@@ -35,6 +35,8 @@ from resume_agent.services.suggestions import (
     suggestion_fingerprint,
 )
 from resume_agent.tracking.match_gap import profile_skill_tokens
+from resume_agent.tenancy.context import current_context
+from resume_agent.config import get_settings
 
 router = APIRouter()
 
@@ -43,16 +45,27 @@ _FACTS_PATH = "data/profile/facts.json"
 _CLUSTER_PATH = "data/profile/cluster_map.json"
 
 
+def _artifact_paths() -> tuple[str, str]:
+    context = current_context()
+    if context is None:
+        return _FACTS_PATH, _CLUSTER_PATH
+    return (
+        str(context.paths.profile_dir / "facts.json"),
+        str(context.paths.profile_dir / "cluster_map.json"),
+    )
+
+
 def _resolve_context(
     session: Session,
     *,
     kind: SuggestionKind,
     key: str,
 ) -> tuple[SuggestionContext, ProfileFacts]:
+    facts_path, cluster_path = _artifact_paths()
     facts, graph = load_suggestion_graph(
         session,
-        facts_path=_FACTS_PATH,
-        cluster_path=_CLUSTER_PATH,
+        facts_path=facts_path,
+        cluster_path=cluster_path,
     )
     try:
         return resolve_suggestion_context(graph, kind=kind, key=key), facts
@@ -92,13 +105,14 @@ def launch_generate(
     mgr: RunManager = Depends(get_run_manager),
 ):
     context, _facts = _resolve_context(session, kind=params.kind, key=params.key)
+    facts_path, cluster_path = _artifact_paths()
     run_id = submit_suggestion_run(
         mgr,
-        engine=request.app.state.engine,
-        github_token=request.app.state.settings.github_token,
+        engine=get_engine(request),
+        github_token=get_settings().github_token,
         context=context,
-        facts_path=_FACTS_PATH,
-        cluster_path=_CLUSTER_PATH,
+        facts_path=facts_path,
+        cluster_path=cluster_path,
     )
     record = mgr.get(run_id)
     assert record is not None
@@ -112,10 +126,11 @@ def launch_suggestion_runs(
     session: Session = Depends(get_session),
     mgr: RunManager = Depends(get_run_manager),
 ):
+    facts_path, cluster_path = _artifact_paths()
     _facts, graph = load_suggestion_graph(
         session,
-        facts_path=_FACTS_PATH,
-        cluster_path=_CLUSTER_PATH,
+        facts_path=facts_path,
+        cluster_path=cluster_path,
     )
     results: list[SuggestionRunAcceptedOut | SuggestionRunNotFoundOut] = []
     seen_inputs: set[tuple[str, str]] = set()
@@ -147,11 +162,11 @@ def launch_suggestion_runs(
         seen_targets.add(identity)
         run_id = submit_suggestion_run(
             mgr,
-            engine=request.app.state.engine,
-            github_token=request.app.state.settings.github_token,
+            engine=get_engine(request),
+            github_token=get_settings().github_token,
             context=context,
-            facts_path=_FACTS_PATH,
-            cluster_path=_CLUSTER_PATH,
+            facts_path=facts_path,
+            cluster_path=cluster_path,
         )
         results.append(
             SuggestionRunAcceptedOut(

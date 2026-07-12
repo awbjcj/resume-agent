@@ -9,15 +9,16 @@ honored.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypedDict
 
 from fastapi import APIRouter, Depends, Query, Request
 
-from resume_agent.api.deps import get_run_manager
+from resume_agent.api.deps import get_engine, get_run_manager, get_sse_user_context
 from resume_agent.api.errors import ApiException
 from resume_agent.api.mappers import to_page
 from sse_starlette.sse import EventSourceResponse
 
-from resume_agent.api.runs.manager import RunManager
+from resume_agent.api.runs.manager import RunManager, RunQuotaError
 from resume_agent.api.runs.sse import record_to_run, run_events
 from resume_agent.api.schemas.runs import (
     AddJobUrlParams,
@@ -43,12 +44,59 @@ from resume_agent.services.discovery import (
 )
 from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP, tailor
 from resume_agent.services.pagination import paginate
+from resume_agent.tenancy.context import current_context
+from resume_agent.tenancy.limits import DEFAULT_MAX_CONCURRENT_RUNS, active_limit
 
 router = APIRouter()
+link_router = APIRouter()
 
 
 def _engine(request: Request):
-    return request.app.state.engine
+    return get_engine(request)
+
+
+class _WorkspaceArgs(TypedDict):
+    search_path: str
+    facts_path: str
+
+
+def _workspace_args() -> _WorkspaceArgs:
+    context = current_context()
+    if context is None:
+        return {
+            "search_path": "config/search.yaml",
+            "facts_path": "data/profile/facts.json",
+        }
+    return {
+        "search_path": str(context.paths.config_dir / "search.yaml"),
+        "facts_path": str(context.paths.profile_dir / "facts.json"),
+    }
+
+
+def _submit(
+    mgr: RunManager, kind: str, work, *, singleton_key: str | None = None
+) -> str:
+    context = current_context()
+    try:
+        return mgr.submit(
+            kind,
+            work,
+            singleton_key=singleton_key,
+            user_id=context.user_id if context is not None else None,
+            max_concurrent=active_limit(
+                "max_concurrent_runs", DEFAULT_MAX_CONCURRENT_RUNS
+            ),
+        )
+    except RunQuotaError as error:
+        raise ApiException(429, error.code, str(error)) from error
+
+
+def _owned_record(mgr: RunManager, run_id: str):
+    record = mgr.get(run_id)
+    context = current_context()
+    if record is None or (context is not None and record.user_id != context.user_id):
+        raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
+    return record
 
 
 @router.post("/discover", response_model=RunOut, status_code=202)
@@ -61,9 +109,13 @@ def launch_discover(
 
     def work(reporter):
         with get_session(engine) as session:
-            return {"statusCounts": discover_jobs(session, reporter=reporter)}
+            return {
+                "statusCounts": discover_jobs(
+                    session, reporter=reporter, **_workspace_args()
+                )
+            }
 
-    run_id = mgr.submit("discover", work)
+    run_id = _submit(mgr, "discover", work)
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -82,11 +134,11 @@ def launch_reprocess(
         with get_session(engine) as session:
             return {
                 "statusCounts": reprocess_jobs(
-                    session, scopes=scopes, reporter=reporter
+                    session, scopes=scopes, reporter=reporter, **_workspace_args()
                 )
             }
 
-    run_id = mgr.submit("reprocess", work)
+    run_id = _submit(mgr, "reprocess", work)
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -103,7 +155,20 @@ def launch_refresh(
 
     def work(reporter):
         with get_session(engine) as session:
-            report = refresh_jobs(session, limit=limit, reporter=reporter)
+            paths = _workspace_args()
+            context = current_context()
+            report = refresh_jobs(
+                session,
+                limit=limit,
+                reporter=reporter,
+                connectors_path=str(context.paths.config_dir / "connectors.yaml")
+                if context is not None
+                else "config/connectors.yaml",
+                telemetry_path=str(context.workspace / "connector_runs.json")
+                if context is not None
+                else "data/connector_runs.json",
+                **paths,
+            )
             return {
                 "pulled": report.pulled,
                 "totals": report.totals,
@@ -111,7 +176,7 @@ def launch_refresh(
                 "failures": report.failures,
             }
 
-    run_id = mgr.submit("refresh", work)
+    run_id = _submit(mgr, "refresh", work, singleton_key="refresh")
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -125,8 +190,16 @@ def launch_pull(
 
     def work(reporter):
         with get_session(engine) as session:
+            context = current_context()
             report = pull_jobs(
                 session,
+                search_path=_workspace_args()["search_path"],
+                connectors_path=str(context.paths.config_dir / "connectors.yaml")
+                if context is not None
+                else "config/connectors.yaml",
+                telemetry_path=str(context.workspace / "connector_runs.json")
+                if context is not None
+                else "data/connector_runs.json",
                 limit=params.limit,
                 source_ids=params.source_ids,
                 reporter=reporter,
@@ -139,7 +212,7 @@ def launch_pull(
                 "failures": report.failures,
             }
 
-    run_id = mgr.submit("pull", work)
+    run_id = _submit(mgr, "pull", work, singleton_key="pull")
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -153,11 +226,18 @@ def launch_tailor(
 
     def work(reporter):
         with get_session(engine) as session:
+            context = current_context()
             results = tailor(
                 session,
                 job_ids=params.job_ids,
                 approved=params.approved,
-                review_path=DEFAULT_REVIEW_DEEP if params.deep else DEFAULT_REVIEW,
+                review_path=str(
+                    context.paths.config_dir
+                    / ("review_deep.yaml" if params.deep else "review.yaml")
+                )
+                if context is not None
+                else (DEFAULT_REVIEW_DEEP if params.deep else DEFAULT_REVIEW),
+                facts_path=_workspace_args()["facts_path"],
                 reporter=reporter,
                 fail_on_partial=True,
             )
@@ -172,7 +252,7 @@ def launch_tailor(
                 ]
             }
 
-    run_id = mgr.submit("tailor", work)
+    run_id = _submit(mgr, "tailor", work)
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -193,6 +273,7 @@ def launch_cover_letters(
                 job_ids=params.job_ids,
                 approved=params.approved,
                 reporter=reporter,
+                facts_path=_workspace_args()["facts_path"],
             )
             return {
                 "coverLetters": [
@@ -205,7 +286,7 @@ def launch_cover_letters(
                 ]
             }
 
-    run_id = mgr.submit("coverLetter", work)
+    run_id = _submit(mgr, "coverLetter", work)
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -227,7 +308,7 @@ def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manage
         reporter.step(1)
         return {"pending": len(pending)}
 
-    run_id = mgr.submit("gmailSync", work)
+    run_id = _submit(mgr, "gmailSync", work, singleton_key="gmailSync")
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -263,9 +344,13 @@ def launch_linkedin_scrape(
 
     def work(reporter):
         with get_session(engine) as session:
-            return scrape_linkedin_jobs(session, reporter=reporter)
+            return scrape_linkedin_jobs(
+                session,
+                reporter=reporter,
+                search_path=_workspace_args()["search_path"],
+            )
 
-    run_id = mgr.submit("linkedinScrape", work)
+    run_id = _submit(mgr, "linkedinScrape", work, singleton_key="linkedinScrape")
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -295,7 +380,7 @@ def launch_add_from_url(
         reporter.step(1)
         return {"jobId": job_id, "duplicate": duplicate}
 
-    run_id = mgr.submit("addJobUrl", work)
+    run_id = _submit(mgr, "addJobUrl", work)
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
@@ -307,14 +392,20 @@ def list_runs(
     page_size: int = Query(100, alias="pageSize", ge=1, le=200),
     mgr: RunManager = Depends(get_run_manager),
 ):
-    return to_page(paginate(mgr.list_active(), page=page, page_size=page_size), RunOut)
+    context = current_context()
+    return to_page(
+        paginate(
+            mgr.list_active(user_id=context.user_id if context is not None else None),
+            page=page,
+            page_size=page_size,
+        ),
+        RunOut,
+    )
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)
 def get_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
-    record = mgr.get(run_id)
-    if record is None:
-        raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
+    record = _owned_record(mgr, run_id)
     return record_to_run(record)
 
 
@@ -322,17 +413,18 @@ def get_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
 def cancel_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
     """Request cooperative cancellation. The worker stops at its next progress
     checkpoint; the run then settles into the ``cancelled`` terminal state."""
-    record = mgr.get(run_id)
-    if record is None:
-        raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
+    record = _owned_record(mgr, run_id)
     mgr.request_cancel(run_id)
     record = mgr.get(run_id)
     assert record is not None
     return record_to_run(record)
 
 
-@router.get("/runs/{run_id}/events")
-async def stream_run(run_id: str, mgr: RunManager = Depends(get_run_manager)):
-    if mgr.get(run_id) is None:
-        raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
+@link_router.get("/runs/{run_id}/events")
+async def stream_run(
+    run_id: str,
+    mgr: RunManager = Depends(get_run_manager),
+    _context=Depends(get_sse_user_context),
+):
+    _owned_record(mgr, run_id)
     return EventSourceResponse(run_events(mgr, run_id))

@@ -1,0 +1,56 @@
+from resume_agent.config import Settings
+from resume_agent.tenancy.workspace import (
+    effective_settings,
+    provision_workspace,
+    workspace_paths,
+)
+
+
+def test_workspace_paths_include_all_tenant_roots(tmp_path):
+    paths = workspace_paths(tmp_path, "abc123def456")
+    assert paths.root == tmp_path / "users" / "abc123def456"
+    assert paths.db_url == f"sqlite:///{paths.db_file.as_posix()}"
+    assert paths.profile_dir == paths.root / "profile"
+    assert paths.config_dir == paths.root / "config"
+    assert paths.secrets_env == paths.root / "secrets.env"
+    assert paths.runs_root == paths.root / "runs"
+
+
+def test_provision_copies_every_example_without_overwriting(tmp_path):
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "search.yaml.example").write_text("first\n", encoding="utf-8")
+    (templates / "render.yaml.example").write_text("render\n", encoding="utf-8")
+    (templates / "style_guide.md.example").write_text("style\n", encoding="utf-8")
+
+    paths = provision_workspace(
+        tmp_path / "data", "abc123def456", template_dir=templates
+    )
+    assert (paths.config_dir / "search.yaml").read_text(encoding="utf-8") == "first\n"
+    assert (paths.config_dir / "render.yaml").is_file()
+    assert (paths.config_dir / "style_guide.md").is_file()
+    (paths.config_dir / "search.yaml").write_text("edited\n", encoding="utf-8")
+    provision_workspace(tmp_path / "data", "abc123def456", template_dir=templates)
+    assert (paths.config_dir / "search.yaml").read_text(encoding="utf-8") == "edited\n"
+
+
+def test_effective_settings_tracks_user_owned_provider_keys(tmp_path):
+    paths = provision_workspace(tmp_path, "abc123def456", template_dir=tmp_path)
+    paths.secrets_env.write_text(
+        "ANTHROPIC_API_KEY=user-anthropic\n"
+        "GITHUB_TOKEN=user-github\n"
+        "SESSION_SECRET=attacker\n"
+        "DB_URL=sqlite:///attacker.db\n",
+        encoding="utf-8",
+    )
+    base = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        anthropic_api_key="server-anthropic",
+        session_secret="platform-secret",
+    )
+    overlay = effective_settings(base, paths)
+    assert overlay.settings.anthropic_api_key == "user-anthropic"
+    assert overlay.settings.github_token == "user-github"
+    assert overlay.settings.session_secret == "platform-secret"
+    assert overlay.settings.db_url == paths.db_url
+    assert overlay.own_key_providers == frozenset({"anthropic"})

@@ -6,6 +6,8 @@ import {
   Kanban,
   LayoutDashboard,
   Settings,
+  CircleUserRound,
+  ShieldCheck,
   Sparkles,
   Target,
   type LucideIcon,
@@ -32,6 +34,7 @@ import { useRehydrateRuns } from "@/features/runs/use-rehydrate-runs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationsBell } from "@/features/notifications/NotificationsBell";
 import { LogoutButton } from "@/features/auth/LogoutButton";
+import { useMe } from "@/features/auth/AuthGate";
 
 const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
   { to: "/", label: "Dashboard", end: true, icon: LayoutDashboard },
@@ -44,6 +47,7 @@ const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
 
 export function AppLayout() {
   useRehydrateRuns();
+  const me = useMe();
   return (
     <SidebarProvider>
       <Sidebar className="border-r border-sidebar-border/80 bg-sidebar/95">
@@ -102,6 +106,20 @@ export function AppLayout() {
                     }
                   />
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className="h-10 rounded-lg px-3 text-[0.95rem]"
+                    render={<NavLink to="/account"><CircleUserRound className="size-4" aria-hidden="true" /><span>Account</span></NavLink>}
+                  />
+                </SidebarMenuItem>
+                {me.data?.role === "admin" && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      className="h-10 rounded-lg px-3 text-[0.95rem]"
+                      render={<NavLink to="/admin"><ShieldCheck className="size-4" aria-hidden="true" /><span>Admin</span></NavLink>}
+                    />
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

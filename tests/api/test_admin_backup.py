@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from resume_agent.api.app import create_app
+from resume_agent.api.auth import hash_password
 from resume_agent.tracking.tables import Job
 
 
@@ -14,7 +15,22 @@ def _app(tmp_path):
     (data_root / "profile").mkdir()
     (data_root / "profile" / "facts.json").write_text("{}", encoding="utf-8")
     db_url = f"sqlite:///{(data_root / 'resume_agent.db').as_posix()}"
-    return create_app(db_url=db_url, data_dir=data_root), data_root
+    env = tmp_path / ".env"
+    env.write_text(
+        "AUTH_USERNAME=owner\n"
+        f"AUTH_PASSWORD_HASH={hash_password('owner-password')}\n"
+        "SESSION_SECRET=test-secret\n",
+        encoding="utf-8",
+    )
+    return create_app(db_url=db_url, data_dir=data_root, env_path=env), data_root
+
+
+def _login(client):
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "owner", "password": "owner-password"},
+    )
+    assert response.status_code == 200
 
 
 def _add_job(app, title):
@@ -34,6 +50,7 @@ def _add_job(app, title):
 def test_export_then_import_restores_database(tmp_path):
     app, _ = _app(tmp_path)
     with TestClient(app) as client:
+        _login(client)
         _add_job(app, "Engineer")
         exported = client.get("/api/admin/export")
         assert exported.status_code == 200
@@ -50,6 +67,7 @@ def test_export_then_import_restores_database(tmp_path):
 def test_import_safety_gates_and_engine_survives_bad_archive(tmp_path, monkeypatch):
     app, _ = _app(tmp_path)
     with TestClient(app) as client:
+        _login(client)
         assert (
             client.post(
                 "/api/admin/import",
@@ -73,10 +91,18 @@ def test_import_safety_gates_and_engine_survives_bad_archive(tmp_path, monkeypat
 def test_admin_routes_are_guarded(tmp_path):
     data_root = tmp_path / "data"
     data_root.mkdir()
+    env = tmp_path / ".env"
+    env.write_text(
+        "AUTH_USERNAME=owner\n"
+        f"AUTH_PASSWORD_HASH={hash_password('owner-password')}\n"
+        "SESSION_SECRET=test-secret\n",
+        encoding="utf-8",
+    )
     app = create_app(
         db_url=f"sqlite:///{(data_root / 'resume_agent.db').as_posix()}",
         data_dir=data_root,
         api_token="secret",
+        env_path=env,
     )
     with TestClient(app) as client:
         assert client.get("/api/admin/export").status_code == 401
@@ -96,6 +122,7 @@ def test_export_cleans_temporary_directory_when_build_fails(tmp_path, monkeypatc
     )
 
     with TestClient(app) as client, pytest.raises(RuntimeError, match="export failed"):
+        _login(client)
         client.get("/api/admin/export")
 
     assert not temporary.exists()

@@ -14,6 +14,7 @@ so callables here are closures created by the run router with their own engine.
 from __future__ import annotations
 
 import json
+import contextvars
 import threading
 import time
 import uuid
@@ -35,6 +36,7 @@ from resume_agent.progress import (
     clear_progress,
     read_progress,
 )
+from resume_agent.tenancy.context import current_context
 
 RunFn = Callable[[ProgressReporter], object]
 
@@ -46,6 +48,10 @@ class RunCancelled(Exception):
     worker stops cleanly between units of work rather than being killed
     mid-network-call. Caught by the runner, which stamps a ``cancelled`` record.
     """
+
+
+class RunQuotaError(RuntimeError):
+    code = "QUOTA_EXCEEDED"
 
 
 class RunProgressReporter(ProgressReporter):
@@ -60,11 +66,13 @@ class RunProgressReporter(ProgressReporter):
         root: Path | str,
         *,
         created_at: str | None = None,
+        user_id: str | None = None,
         cancel_check: Callable[[], bool] | None = None,
     ) -> None:
         super().__init__(run_id, root=root)
         self.kind = kind
         self.created_at = created_at or _now()
+        self.user_id = user_id
         self._cancel_check = cancel_check
 
     def _raise_if_cancelled(self) -> None:
@@ -91,6 +99,7 @@ class RunProgressReporter(ProgressReporter):
             phase_count=phase_count,
             kind=self.kind,
             created_at=self.created_at,
+            user_id=self.user_id,
             **extra,
         )
 
@@ -100,10 +109,21 @@ class RunProgressReporter(ProgressReporter):
 
     def done(self, *, error: str | None = None, **extra: object) -> None:
         self._raise_if_cancelled()
-        super().done(error=error, kind=self.kind, **extra)
+        super().done(
+            error=error,
+            kind=self.kind,
+            created_at=self.created_at,
+            user_id=self.user_id,
+            **extra,
+        )
 
     def cancelled(self, **extra: object) -> None:
-        super().cancelled(kind=self.kind, **extra)
+        super().cancelled(
+            kind=self.kind,
+            created_at=self.created_at,
+            user_id=self.user_id,
+            **extra,
+        )
 
 
 class RunManager:
@@ -134,6 +154,16 @@ class RunManager:
         self._futures: dict[str, Future] = {}
         self._singleton_lock = threading.RLock()
         self._active_singletons: dict[str, str] = {}
+        self._roots: set[Path] = {self.root}
+        self._run_roots: dict[str, Path] = {}
+
+    def register_root(self, root: Path | str) -> None:
+        resolved = Path(root)
+        with self._singleton_lock:
+            self._roots.add(resolved)
+            if resolved.is_dir():
+                for path in resolved.glob("*.json"):
+                    self._run_roots.setdefault(path.stem, resolved)
 
     def request_cancel(self, run_id: str) -> bool:
         """Flag a run for cooperative cancellation.
@@ -149,7 +179,9 @@ class RunManager:
         self._cancel_requested.add(run_id)
         future = self._futures.get(run_id)
         if future is not None and future.cancel():
-            record.update(state="cancelled", label="Cancelled", error=None, updated_at=_now())
+            record.update(
+                state="cancelled", label="Cancelled", error=None, updated_at=_now()
+            )
             self._write(run_id, record)
             self._cancel_requested.discard(run_id)
             return True
@@ -160,16 +192,48 @@ class RunManager:
     def is_cancel_requested(self, run_id: str) -> bool:
         return run_id in self._cancel_requested
 
-    def create(self, kind: str) -> str:
+    def create(
+        self,
+        kind: str,
+        *,
+        user_id: str | None = None,
+        storage_root: Path | str | None = None,
+    ) -> str:
         run_id = uuid.uuid4().hex
         created_at = _now()
+        context = current_context()
+        root = (
+            Path(storage_root)
+            if storage_root is not None
+            else (context.paths.runs_root if context is not None else self.root)
+        )
+        self.register_root(root)
+        with self._singleton_lock:
+            self._run_roots[run_id] = root
+        owner_id = (
+            user_id
+            if user_id is not None
+            else (context.user_id if context is not None else None)
+        )
         # Seed a terminal-less "pending" record so GET works before work begins.
-        self._write(run_id, {
-            "process": run_id, "kind": kind, "state": "pending",
-            "label": "Queued", "current": 0, "total": 0,
-            "created_at": created_at, "started_at": created_at,
-            "result": None, "error": None, "updated_at": created_at,
-        })
+        self._write(
+            run_id,
+            {
+                "process": run_id,
+                "kind": kind,
+                "state": "pending",
+                "label": "Queued",
+                "current": 0,
+                "total": 0,
+                "created_at": created_at,
+                "started_at": created_at,
+                "result": None,
+                "error": None,
+                "error_code": None,
+                "user_id": owner_id,
+                "updated_at": created_at,
+            },
+        )
         return run_id
 
     def reporter(self, run_id: str, kind: str) -> RunProgressReporter:
@@ -177,8 +241,11 @@ class RunManager:
         return RunProgressReporter(
             run_id,
             kind,
-            self.root,
-            created_at=str(record.get("created_at") or record.get("started_at") or _now()),
+            self._root_for(run_id),
+            created_at=str(
+                record.get("created_at") or record.get("started_at") or _now()
+            ),
+            user_id=record.get("user_id"),
             cancel_check=lambda: self.is_cancel_requested(run_id),
         )
 
@@ -188,20 +255,39 @@ class RunManager:
         fn: RunFn,
         *,
         singleton_key: str | None = None,
+        user_id: str | None = None,
+        max_concurrent: int | None = None,
     ) -> str:
         with self._singleton_lock:
-            if singleton_key is not None:
-                active_id = self._active_singletons.get(singleton_key)
+            ctx = current_context()
+            owner_id = user_id or (ctx.user_id if ctx is not None else None)
+            effective_singleton = (
+                f"{owner_id}:{singleton_key}"
+                if owner_id is not None and singleton_key is not None
+                else singleton_key
+            )
+            if effective_singleton is not None:
+                active_id = self._active_singletons.get(effective_singleton)
                 if active_id is not None:
                     snapshot = self.get(active_id)
                     if snapshot is not None and snapshot.state in ACTIVE_RUN_STATES:
                         return active_id
-                    self._active_singletons.pop(singleton_key, None)
+                    self._active_singletons.pop(effective_singleton, None)
 
-            run_id = self.create(kind)
+            if (
+                owner_id is not None
+                and max_concurrent is not None
+                and max_concurrent > 0
+            ):
+                active_count = len(self.list_active(user_id=owner_id))
+                if active_count >= max_concurrent:
+                    raise RunQuotaError(
+                        f"{active_count} runs already active (limit {max_concurrent})"
+                    )
+            run_id = self.create(kind, user_id=owner_id)
             reporter = self.reporter(run_id, kind)
-            if singleton_key is not None:
-                self._active_singletons[singleton_key] = run_id
+            if effective_singleton is not None:
+                self._active_singletons[effective_singleton] = run_id
 
             def _runner() -> None:
                 try:
@@ -210,19 +296,26 @@ class RunManager:
                 except RunCancelled:  # cooperative stop — terminal but not a failure
                     reporter.cancelled()
                 except Exception as exc:  # noqa: BLE001 — surface any failure as run error
-                    reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
-                except BaseException as exc:  # interpreter exit/interrupt: still stamp, then re-raise
+                    reporter.done(
+                        error=f"{type(exc).__name__}: {exc}",
+                        error_code=getattr(exc, "code", None),
+                        result=None,
+                    )
+                except (
+                    BaseException
+                ) as exc:  # interpreter exit/interrupt: still stamp, then re-raise
                     reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
                     raise
                 finally:
                     self._cancel_requested.discard(run_id)
 
+            submission_context = contextvars.copy_context()
             executor = self._kind_executors.get(kind, self.executor)
             try:
-                future = executor.submit(_runner)
+                future = executor.submit(submission_context.run, _runner)
             except BaseException as exc:
-                if singleton_key is not None:
-                    self._active_singletons.pop(singleton_key, None)
+                if effective_singleton is not None:
+                    self._active_singletons.pop(effective_singleton, None)
                 record = self._read_record(run_id)
                 if record is not None:
                     record.update(
@@ -239,34 +332,48 @@ class RunManager:
                 with self._singleton_lock:
                     self._futures.pop(run_id, None)
                     if (
-                        singleton_key is not None
-                        and self._active_singletons.get(singleton_key) == run_id
+                        effective_singleton is not None
+                        and self._active_singletons.get(effective_singleton) == run_id
                     ):
-                        self._active_singletons.pop(singleton_key, None)
+                        self._active_singletons.pop(effective_singleton, None)
 
             future.add_done_callback(release)
         return run_id
 
+    def _root_for(self, run_id: str) -> Path:
+        with self._singleton_lock:
+            root = self._run_roots.get(run_id)
+            roots = tuple(self._roots)
+        if root is not None:
+            return root
+        for candidate in roots:
+            if (candidate / f"{run_id}.json").is_file():
+                with self._singleton_lock:
+                    self._run_roots[run_id] = candidate
+                return candidate
+        return self.root
+
     def _read_record(self, run_id: str) -> dict | None:
-        return read_progress(run_id, root=self.root)
+        return read_progress(run_id, root=self._root_for(run_id))
 
     def get(self, run_id: str) -> RunSnapshot | None:
         return parse_run_snapshot(run_id, self._read_record(run_id))
 
-    def list_active(self) -> list[RunSnapshot]:
-        if not self.root.exists():
-            return []
+    def list_active(self, user_id: str | None = None) -> list[RunSnapshot]:
+        with self._singleton_lock:
+            roots = tuple(self._roots)
         snapshots = [
             snapshot
-            for path in self.root.glob("*.json")
+            for root in roots
+            if root.exists()
+            for path in root.glob("*.json")
             if (snapshot := self.get(path.stem)) is not None
             and snapshot.state in ACTIVE_RUN_STATES
+            and (user_id is None or snapshot.user_id == user_id)
         ]
         return sorted(snapshots, key=lambda item: (item.created_at, item.run_id))
 
     def recover_interrupted(self) -> int:
-        if not self.root.exists():
-            return 0
         recovered = 0
         for snapshot in self.list_active():
             record = self._read_record(snapshot.run_id)
@@ -283,7 +390,9 @@ class RunManager:
         return recovered
 
     def clear(self, run_id: str) -> None:
-        clear_progress(run_id, root=self.root)
+        clear_progress(run_id, root=self._root_for(run_id))
+        with self._singleton_lock:
+            self._run_roots.pop(run_id, None)
 
     def sweep(self, *, max_age_seconds: float = 86_400) -> int:
         """Delete run records whose file is older than max_age (default 1 day).
@@ -292,17 +401,22 @@ class RunManager:
         directory grows unbounded on a long-lived server. Called on app startup.
         Returns the number of files removed.
         """
-        if not self.root.exists():
-            return 0
         cutoff = time.time() - max_age_seconds
         removed = 0
-        for path in self.root.glob("*.json"):
-            try:
-                if path.stat().st_mtime < cutoff:
-                    path.unlink(missing_ok=True)
-                    removed += 1
-            except OSError:
+        with self._singleton_lock:
+            roots = tuple(self._roots)
+        for root in roots:
+            if not root.exists():
                 continue
+            for path in root.glob("*.json"):
+                try:
+                    if path.stat().st_mtime < cutoff:
+                        path.unlink(missing_ok=True)
+                        with self._singleton_lock:
+                            self._run_roots.pop(path.stem, None)
+                        removed += 1
+                except OSError:
+                    continue
         return removed
 
     def shutdown(self) -> None:
@@ -310,7 +424,9 @@ class RunManager:
             executor.shutdown(wait=False)
 
     def _write(self, run_id: str, record: dict) -> None:
-        atomic_write_text(self.root / f"{run_id}.json", json.dumps(record, indent=2))
+        atomic_write_text(
+            self._root_for(run_id) / f"{run_id}.json", json.dumps(record, indent=2)
+        )
 
 
 def _now() -> str:

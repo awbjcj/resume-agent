@@ -30,14 +30,14 @@ def test_resolve_api_key_reads_provider_specific_setting(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "ok")
     monkeypatch.setenv("GEMINI_API_KEY", "gk")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "dk")
-    from resume_agent.config import get_settings
+    from resume_agent.config import env_settings
 
-    get_settings.cache_clear()
+    env_settings.cache_clear()
     assert resolve_api_key("claude-opus-4-8") == "ak"
     assert resolve_api_key("openai:gpt-5.4-mini") == "ok"
     assert resolve_api_key("gemini:gemini-2.0-flash") == "gk"
     assert resolve_api_key("deepseek:deepseek-chat") == "dk"
-    get_settings.cache_clear()
+    env_settings.cache_clear()
 
 
 def test_build_model_anthropic_branch():
@@ -50,18 +50,14 @@ def test_build_model_anthropic_branch():
 
 
 def test_build_model_sets_cache_system_prompt_for_anthropic():
-    model = build_model(
-        "claude-test", api_key="sk-test", cache_system_prompt=True
-    )
+    model = build_model("claude-test", api_key="sk-test", cache_system_prompt=True)
     assert model.cache_system_prompt is True
 
 
 def test_build_model_cache_defaults_off_and_other_providers_ignore_it():
     assert build_model("claude-test", api_key="sk-test").cache_system_prompt is False
     assert (
-        build_model(
-            "openai:gpt-test", api_key="sk-test", cache_system_prompt=True
-        ).id
+        build_model("openai:gpt-test", api_key="sk-test", cache_system_prompt=True).id
         == "gpt-test"
     )
 
@@ -251,11 +247,11 @@ def test_retry_kwargs_disables_agno_retry_regardless_of_settings(monkeypatch):
     # always off, independent of llm_retries/llm_retry_delay.
     monkeypatch.setenv("LLM_RETRIES", "5")
     monkeypatch.setenv("LLM_RETRY_DELAY", "3")
-    from resume_agent.config import get_settings
+    from resume_agent.config import env_settings
     from resume_agent.llm_runner import retry_kwargs
 
-    get_settings.cache_clear()
+    env_settings.cache_clear()
     try:
         assert retry_kwargs() == {"retries": 0}
     finally:
-        get_settings.cache_clear()
+        env_settings.cache_clear()

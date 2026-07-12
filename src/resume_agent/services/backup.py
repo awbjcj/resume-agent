@@ -48,26 +48,30 @@ def _is_db_artifact(path: Path, db_file: Path) -> bool:
 def export_data_root(data_root: Path, db_url: str, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     archive = out_dir / f"resume-agent-data-{date.today().isoformat()}.tar.gz"
-    db_file = _sqlite_file(db_url, data_root)
+    configured_db = _sqlite_file(db_url, data_root)
+    db_files = {path.resolve() for path in data_root.rglob("*.db") if path.is_file()}
+    if configured_db is not None and configured_db.is_file():
+        db_files.add(configured_db.resolve())
     with tempfile.TemporaryDirectory() as temporary:
-        snapshot = None
-        if db_file is not None and db_file.is_file():
-            snapshot = Path(temporary) / db_file.name
+        snapshots: list[tuple[Path, Path]] = []
+        for index, db_file in enumerate(sorted(db_files)):
+            snapshot = Path(temporary) / f"{index}-{db_file.name}"
             sqlite_snapshot(db_file, snapshot)
+            snapshots.append((db_file, snapshot))
         with tarfile.open(archive, "w:gz") as tar:
             for path in sorted(data_root.rglob("*")):
                 if path.is_symlink():
                     raise UnsafeArchiveError(f"data root contains a symlink: {path}")
                 if not (path.is_file() or path.is_dir()):
                     raise UnsafeArchiveError(f"unsupported data-root entry: {path}")
-                if db_file is not None and _is_db_artifact(path, db_file):
+                if any(_is_db_artifact(path, db_file) for db_file in db_files):
                     continue
                 tar.add(
                     path,
                     arcname=path.relative_to(data_root).as_posix(),
                     recursive=False,
                 )
-            if snapshot is not None and db_file is not None:
+            for db_file, snapshot in snapshots:
                 tar.add(
                     snapshot,
                     arcname=db_file.relative_to(data_root.resolve()).as_posix(),

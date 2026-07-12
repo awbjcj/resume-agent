@@ -155,7 +155,9 @@ def test_extraction_schema_within_anthropic_limits():
             walk(sub)
 
     walk(schema)
-    assert counts["optional"] == 0, f"optional params must be 0, got {counts['optional']}"
+    assert counts["optional"] == 0, (
+        f"optional params must be 0, got {counts['optional']}"
+    )
     assert counts["union"] <= 16, f"union params must be <=16, got {counts['union']}"
 
 
@@ -187,27 +189,35 @@ def test_extract_coerces_null_list_fields_to_empty():
 
 def test_build_extract_agent_is_agent(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    assert isinstance(build_extract_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner)
+    assert isinstance(
+        build_extract_agent(model_id="claude-haiku-4-5-20251001"), AgentRunner
+    )
 
 
 def test_build_extract_agent_disables_agno_retry(monkeypatch):
     # agno's own retry is off (retries=0) — AgentRunner retries transient
     # failures itself, behind the is_transient predicate.
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    from resume_agent.config import get_settings
+    from resume_agent.config import env_settings
 
-    get_settings.cache_clear()
+    env_settings.cache_clear()
     try:
         runner = build_extract_agent(model_id="claude-haiku-4-5-20251001")
         agent = runner._agent  # AgentRunner wraps the agno Agent
         assert agent.retries == 0
     finally:
-        get_settings.cache_clear()
+        env_settings.cache_clear()
 
 
 def test_instructions_mention_new_fields():
     joined = " ".join(_INSTRUCTIONS).lower()
-    for needle in ["seniority", "employment type", "tech stack", "industry", "company size"]:
+    for needle in [
+        "seniority",
+        "employment type",
+        "tech stack",
+        "industry",
+        "company size",
+    ]:
         assert needle in joined
 
 

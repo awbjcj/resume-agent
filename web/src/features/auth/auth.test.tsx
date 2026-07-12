@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { server } from "@/test/server";
 import { AuthGate } from "./AuthGate";
 import { LoginPage } from "./LoginPage";
+import { RegisterPage } from "./RegisterPage";
 import { LogoutButton } from "./LogoutButton";
 
 function wrap(ui: ReactNode, initialPath = "/") {
@@ -99,5 +100,36 @@ describe("LogoutButton", () => {
     wrap(<LogoutButton />);
     expect(await screen.findByText("App content").catch(() => null)).toBeNull();
     expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
+  });
+});
+
+describe("RegisterPage", () => {
+  it("submits invite registration and signs the user in", async () => {
+    let registered = false;
+    server.use(
+      http.post("/api/auth/register", () => {
+        registered = true;
+        return HttpResponse.json(
+          { username: "alice", role: "user", authRequired: true },
+          { status: 201 },
+        );
+      }),
+      http.post("/api/auth/login", () =>
+        HttpResponse.json({ username: "alice", role: "user", authRequired: true }),
+      ),
+    );
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/register"]}>
+          <RegisterPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await user.type(screen.getByLabelText(/^username$/i), "alice");
+    await user.type(screen.getByLabelText(/^password$/i), "long-alice-password");
+    await user.type(screen.getByLabelText(/invite code/i), "inv_example");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    expect(registered).toBe(true);
   });
 });

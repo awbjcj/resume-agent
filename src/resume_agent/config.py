@@ -49,14 +49,28 @@ class Settings(BaseSettings):
 
 
 @lru_cache
-def get_settings() -> Settings:
-    """Cached singleton accessor used across the app."""
+def env_settings() -> Settings:
+    """Cached process settings used when no tenant context is active."""
     return Settings()
+
+
+def get_settings() -> Settings:
+    """Return the active tenant's effective settings, else process settings."""
+    from resume_agent.tenancy.context import current_context
+
+    context = current_context()
+    return context.settings if context is not None else env_settings()
+
+
+# Compatibility for existing tests/callers while they migrate to env_settings.
+get_settings.cache_clear = env_settings.cache_clear  # type: ignore[attr-defined]
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
     """Load a YAML config file, requiring a mapping at the top level."""
-    p = Path(path)
+    from resume_agent.tenancy.paths import resolve_tenant_path
+
+    p = resolve_tenant_path(path)
     with p.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):

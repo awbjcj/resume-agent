@@ -15,6 +15,7 @@ from pydantic import Field, model_validator
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.profile.resume_reader import SUPPORTED_SUFFIXES
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 MANIFEST_NAME = "sources.json"
 SOURCES_DIRNAME = "sources"
@@ -50,7 +51,9 @@ class SourceManifest(ExtensibleModel):
     @model_validator(mode="after")
     def validate_docs(self) -> "SourceManifest":
         if self.docs and sum(doc.primary for doc in self.docs) != 1:
-            raise ValueError("a non-empty source manifest must have exactly one primary")
+            raise ValueError(
+                "a non-empty source manifest must have exactly one primary"
+            )
         for doc in self.docs:
             if doc.primary and doc.mode != "literal":
                 raise ValueError(f"primary source {doc.id} must use literal mode")
@@ -60,7 +63,7 @@ class SourceManifest(ExtensibleModel):
 
 
 def sources_dir(profile_dir: str | Path) -> Path:
-    return Path(profile_dir) / SOURCES_DIRNAME
+    return resolve_tenant_path(profile_dir) / SOURCES_DIRNAME
 
 
 def doc_path(profile_dir: str | Path, doc: SourceDoc) -> Path:
@@ -68,7 +71,7 @@ def doc_path(profile_dir: str | Path, doc: SourceDoc) -> Path:
 
 
 def _manifest_path(profile_dir: str | Path) -> Path:
-    return Path(profile_dir) / MANIFEST_NAME
+    return resolve_tenant_path(profile_dir) / MANIFEST_NAME
 
 
 def load_manifest(profile_dir: str | Path) -> SourceManifest:
@@ -111,7 +114,9 @@ def _doc_id(filename: str, sha256: str) -> str:
     return f"{slug}-{sha256[:8]}"
 
 
-_FRONTMATTER = re.compile(rb"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?(?:\n|\Z)", re.DOTALL)
+_FRONTMATTER = re.compile(
+    rb"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?(?:\n|\Z)", re.DOTALL
+)
 
 
 def _valid_repo_url(value: str) -> bool:
@@ -170,7 +175,9 @@ def add_source(
         )
 
     data = source.read_bytes()
-    dossier_mode = source.suffix.lower() == ".md" and frontmatter_repo_url(data) is not None
+    dossier_mode = (
+        source.suffix.lower() == ".md" and frontmatter_repo_url(data) is not None
+    )
     resolved_mode = mode or ("project" if dossier_mode else default_mode(source.name))
     if anchor is not None and resolved_mode != "synthesis":
         raise ValueError("anchor requires synthesis mode")
@@ -233,7 +240,11 @@ def remove_source(
 ) -> SourceDoc | None:
     manifest = load_manifest(profile_dir)
     doc = next(
-        (candidate for candidate in manifest.docs if ident in (candidate.id, candidate.filename)),
+        (
+            candidate
+            for candidate in manifest.docs
+            if ident in (candidate.id, candidate.filename)
+        ),
         None,
     )
     if doc is None:
@@ -252,7 +263,7 @@ def remove_source(
         replacement.primary = True
     save_manifest(manifest, profile_dir)
 
-    fragments = Path(profile_dir) / FRAGMENTS_DIRNAME
+    fragments = resolve_tenant_path(profile_dir) / FRAGMENTS_DIRNAME
     for stale in (
         fragments / f"{doc.id}.json",
         fragments / f"{doc.id}.meta.json",
@@ -293,7 +304,9 @@ def update_source(
     return doc
 
 
-def migrate_legacy(profile_dir: str | Path, resume_path: str | None) -> SourceDoc | None:
+def migrate_legacy(
+    profile_dir: str | Path, resume_path: str | None
+) -> SourceDoc | None:
     """Register the legacy configured resume as the primary source once."""
     if load_manifest(profile_dir).docs:
         return None

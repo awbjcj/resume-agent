@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from sqlmodel import Session
@@ -20,6 +19,7 @@ from resume_agent.services.suggestions import (
 from resume_agent.suggestions.agents import build_formatter_agent, build_search_agent
 from resume_agent.taxonomy.clusters import load_cluster_map
 from resume_agent.tracking.match_gap import DemandGraph, build_demand_graph
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 
 def load_suggestion_graph(
@@ -28,9 +28,10 @@ def load_suggestion_graph(
     facts_path: str,
     cluster_path: str,
 ) -> tuple[ProfileFacts, DemandGraph]:
+    resolved_facts = resolve_tenant_path(facts_path)
     facts = (
-        load_facts(facts_path)
-        if Path(facts_path).exists()
+        load_facts(resolved_facts)
+        if resolved_facts.exists()
         else ProfileFacts(contact=Contact(name=""))
     )
     graph = build_demand_graph(

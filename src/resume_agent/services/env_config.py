@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from resume_agent.config import Settings, get_settings
+from resume_agent.config import Settings, env_settings
 from resume_agent.setup.env_writer import format_env, merge_env, parse_env
 
 DEFAULT_ENV_PATH = Path(".env")
@@ -37,5 +37,5 @@ def write_env_updates(
     tmp = p.with_suffix(p.suffix + ".tmp")
     tmp.write_text(format_env(merged), encoding="utf-8")
     os.replace(tmp, p)
-    get_settings.cache_clear()
+    env_settings.cache_clear()
     return Settings(_env_file=p)  # type: ignore[call-arg]

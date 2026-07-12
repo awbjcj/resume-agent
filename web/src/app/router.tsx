@@ -91,25 +91,37 @@ const FinishStep = lazy(() =>
 const LoginPage = lazy(() =>
   import("@/features/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
+const RegisterPage = lazy(() =>
+  import("@/features/auth/RegisterPage").then((m) => ({ default: m.RegisterPage })),
+);
+const AccountPage = lazy(() =>
+  import("@/features/account/AccountPage").then((m) => ({ default: m.AccountPage })),
+);
+const AdminPage = lazy(() =>
+  import("@/features/admin/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
 
 const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}</Suspense>;
 
 export const router = createBrowserRouter([
   { path: "/login", element: page(<LoginPage />) },
+  { path: "/register", element: page(<RegisterPage />) },
   {
     path: "/",
-    element: <AuthGate><SetupGate><AppLayout /></SetupGate></AuthGate>,
+    element: <AuthGate><AppLayout /></AuthGate>,
     children: [
-      { index: true, element: page(<DashboardPage />) },
-      { path: "shortlist", element: page(<ShortlistPage />) },
-      { path: "pipeline", element: page(<PipelinePage />) },
-      { path: "triage", element: page(<TriagePage />) },
-      { path: "analytics", element: page(<AnalyticsPage />) },
-      { path: "match-gap", element: page(<MatchGapPage />) },
+      { index: true, element: <SetupGate>{page(<DashboardPage />)}</SetupGate> },
+      { path: "shortlist", element: <SetupGate>{page(<ShortlistPage />)}</SetupGate> },
+      { path: "pipeline", element: <SetupGate>{page(<PipelinePage />)}</SetupGate> },
+      { path: "triage", element: <SetupGate>{page(<TriagePage />)}</SetupGate> },
+      { path: "analytics", element: <SetupGate>{page(<AnalyticsPage />)}</SetupGate> },
+      { path: "match-gap", element: <SetupGate>{page(<MatchGapPage />)}</SetupGate> },
+      { path: "account", element: page(<AccountPage />) },
+      { path: "admin", element: page(<AdminPage />) },
       { path: "sources", element: <Navigate to="/settings/sources" replace /> },
       {
         path: "settings",
-        element: page(<SettingsLayout />),
+        element: <SetupGate>{page(<SettingsLayout />)}</SetupGate>,
         children: [
           { index: true, element: <Navigate to="/settings/profile" replace /> },
           { path: "profile", element: page(<ProfileSettingsPage />) },

@@ -16,7 +16,7 @@ from resume_agent.api.schemas.jobs import (
 )
 from resume_agent.api.schemas.runs import AddJobTextRequest
 from resume_agent.services import board
-from resume_agent.services.discovery import add_job_from_text
+from resume_agent.services.discovery import ActiveJobQuotaError, add_job_from_text
 from resume_agent.tracking.repository import get_job
 from resume_agent.tracking.tables import ApplicationStatus, JobStatus
 
@@ -40,7 +40,9 @@ def patch_job(job_id: int, patch: JobPatch, session: Session = Depends(get_sessi
     if patch.status is not None:
         valid = {s.value for s in JobStatus}
         if patch.status not in valid:
-            raise ApiException(422, "VALIDATION_ERROR", f"Unknown status '{patch.status}'")
+            raise ApiException(
+                422, "VALIDATION_ERROR", f"Unknown status '{patch.status}'"
+            )
         if board.set_stage(session, job_id, patch.status) is None:
             raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     if patch.archived is not None:
@@ -50,7 +52,9 @@ def patch_job(job_id: int, patch: JobPatch, session: Session = Depends(get_sessi
 
 
 @router.delete("/jobs/{job_id}", status_code=204)
-def delete_job_endpoint(job_id: int, session: Session = Depends(get_session)) -> Response:
+def delete_job_endpoint(
+    job_id: int, session: Session = Depends(get_session)
+) -> Response:
     if get_job(session, job_id) is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     if not board.delete(session, job_id):
@@ -107,18 +111,31 @@ def upsert_application(
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     valid = {s.value for s in ApplicationStatus}
     if body.status not in valid:
-        raise ApiException(422, "VALIDATION_ERROR", f"Unknown application status '{body.status}'")
-    app_row = board.upsert_application(session, job_id, status=body.status, notes=body.notes)
+        raise ApiException(
+            422, "VALIDATION_ERROR", f"Unknown application status '{body.status}'"
+        )
+    app_row = board.upsert_application(
+        session, job_id, status=body.status, notes=body.notes
+    )
     return ApplicationOut.model_validate(app_row)
 
 
 @router.post("/jobs", response_model=JobDetail, status_code=201)
 def create_manual_job(body: AddJobTextRequest, session: Session = Depends(get_session)):
-    job = add_job_from_text(
-        session, jd_text=body.jd_text, url=body.url,
-        company=body.company, title=body.title, location=body.location,
-    )
+    try:
+        job = add_job_from_text(
+            session,
+            jd_text=body.jd_text,
+            url=body.url,
+            company=body.company,
+            title=body.title,
+            location=body.location,
+        )
+    except ActiveJobQuotaError as error:
+        raise ApiException(429, error.code, str(error)) from error
     if job is None:
-        raise ApiException(409, "CONFLICT", "Duplicate job (same URL or JD already present)")
+        raise ApiException(
+            409, "CONFLICT", "Duplicate job (same URL or JD already present)"
+        )
     assert job.id is not None
     return _job_detail_response(session, job.id)

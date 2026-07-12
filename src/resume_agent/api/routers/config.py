@@ -13,12 +13,13 @@ from resume_agent.api.schemas.config import (
     StyleGuideDoc,
 )
 from resume_agent.services.config_store import ConfigStore
+from resume_agent.api.deps import get_config_store
 
 router = APIRouter()
 
 
 def _store(request: Request) -> ConfigStore:
-    return request.app.state.config_store
+    return get_config_store(request)
 
 
 @router.get("/config/search", response_model=SearchConfigDoc)

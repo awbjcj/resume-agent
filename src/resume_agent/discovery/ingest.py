@@ -4,7 +4,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Iterable
 
-from sqlmodel import Session
+from sqlalchemy import func, select
+from sqlmodel import Session, col
 
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.merge import (
@@ -25,6 +26,7 @@ class IngestOutcome(str, Enum):
     inserted = "inserted"
     upgraded = "upgraded"
     skipped = "skipped"
+    quota_skipped = "quota_skipped"
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,7 @@ class IngestCounts:
     added: dict[str, int]
     upgraded: dict[str, int]
     skipped: dict[str, int]
+    quota_skipped: dict[str, int]
     changed_raw_job_ids: list[int]
 
 
@@ -58,6 +61,7 @@ def save_or_upgrade(
     location: str | None = None,
     posted_at: datetime | None = None,
     commit: bool = True,
+    allow_insert: bool = True,
 ) -> tuple[Job | None, IngestOutcome]:
     """Insert a new job, upgrade an existing one from a higher-tier source, or skip."""
     incoming = IncomingJob.clean(
@@ -77,7 +81,10 @@ def save_or_upgrade(
         incoming.content_fingerprint,
         incoming.location,
     )
-    return _apply(session, existing, incoming, decide(existing, incoming), commit)
+    action = decide(existing, incoming)
+    if isinstance(action, Insert) and not allow_insert:
+        return None, IngestOutcome.quota_skipped
+    return _apply(session, existing, incoming, action, commit)
 
 
 def _apply(
@@ -140,13 +147,25 @@ def add_job(
     return job
 
 
-def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> IngestCounts:
+def ingest_jobs_with_outcomes(
+    session: Session,
+    raw_jobs: Iterable[RawJob],
+    *,
+    max_active_jobs: int | None = None,
+) -> IngestCounts:
     """Insert/upgrade RawJobs and return separate insert/upgrade counts per incoming source."""
     added: Counter[str] = Counter()
     upgraded: Counter[str] = Counter()
     skipped: Counter[str] = Counter()
+    quota_skipped: Counter[str] = Counter()
     changed_raw_job_ids: list[int] = []
     seen_changed_raw: set[int] = set()
+    remaining: int | None = None
+    if max_active_jobs is not None and max_active_jobs > 0:
+        active = session.execute(
+            select(func.count()).select_from(Job).where(col(Job.archived_at).is_(None))
+        ).scalar_one()
+        remaining = max(max_active_jobs - int(active), 0)
     for raw in raw_jobs:
         if not raw.jd_text.strip():
             continue
@@ -160,8 +179,11 @@ def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> I
             location=raw.location,
             posted_at=raw.posted_at,
             commit=False,
+            allow_insert=remaining is None or remaining > 0,
         )
         if outcome is IngestOutcome.inserted:
+            if remaining is not None:
+                remaining -= 1
             added[raw.source] += 1
             if job is not None and job.id is not None:
                 seen_changed_raw.add(job.id)
@@ -178,15 +200,25 @@ def ingest_jobs_with_outcomes(session: Session, raw_jobs: Iterable[RawJob]) -> I
                 changed_raw_job_ids.append(job.id)
         elif outcome is IngestOutcome.skipped:
             skipped[raw.source] += 1
+        elif outcome is IngestOutcome.quota_skipped:
+            quota_skipped[raw.source] += 1
     session.commit()
     return IngestCounts(
         added=dict(added),
         upgraded=dict(upgraded),
         skipped=dict(skipped),
+        quota_skipped=dict(quota_skipped),
         changed_raw_job_ids=changed_raw_job_ids,
     )
 
 
-def ingest_jobs(session: Session, raw_jobs: Iterable[RawJob]) -> dict[str, int]:
+def ingest_jobs(
+    session: Session,
+    raw_jobs: Iterable[RawJob],
+    *,
+    max_active_jobs: int | None = None,
+) -> dict[str, int]:
     """Backward-compatible insert counts; upgrades are intentionally not new adds."""
-    return ingest_jobs_with_outcomes(session, raw_jobs).added
+    return ingest_jobs_with_outcomes(
+        session, raw_jobs, max_active_jobs=max_active_jobs
+    ).added

@@ -5,14 +5,22 @@ from __future__ import annotations
 import re
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
-from resume_agent.api.deps import get_run_manager
+from resume_agent.api.deps import (
+    get_config_store,
+    get_document_store,
+    get_env_path,
+    get_profile_dir,
+    get_run_manager,
+)
 from resume_agent.api.errors import ApiException
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run
+from resume_agent.api.schemas.config import ProfileConfigDoc
 from resume_agent.api.schemas.profile import (
     DocumentOut,
     MatrixOut,
@@ -49,7 +57,7 @@ router = APIRouter()
 
 
 def _docs(request: Request) -> DocumentStore:
-    return request.app.state.document_store
+    return get_document_store(request)
 
 
 @router.get("/profile/documents", response_model=list[DocumentOut])
@@ -86,28 +94,36 @@ def launch_profile_build(request: Request, mgr: RunManager = Depends(get_run_man
     # deterministic regardless of the developer's real env. Any configured LLM
     # key satisfies this — profile build uses Settings.mid_model, which may
     # select a non-Anthropic provider (see llm_runner.split_provider).
-    env = read_env(request.app.state.env_path)
+    env = read_env(get_env_path(request))
     if not any(env.get(k) for k in LLM_KEY_ENV_VARS):
-        raise ApiException(400, "SETUP_INCOMPLETE",
-                           "No LLM API key is set — add one in Settings > API Keys")
+        raise ApiException(
+            400,
+            "SETUP_INCOMPLETE",
+            "No LLM API key is set — add one in Settings > API Keys",
+        )
     profile_dir = _profile_dir(request)
     manifest = load_manifest(profile_dir)
     if not manifest.docs:
         resume_path = _docs(request).latest_resume_path()
         if resume_path is None:
-            raise ApiException(400, "SETUP_INCOMPLETE",
-                               "Upload a resume document before building the profile")
+            raise ApiException(
+                400,
+                "SETUP_INCOMPLETE",
+                "Upload a resume document before building the profile",
+            )
         # One-time migration mirroring the CLI's migrate_legacy: the wizard's
         # newest resume becomes the corpus primary.
         add_source(profile_dir, resume_path, primary=True)
-    profile_cfg = request.app.state.config_store.get("profile")
+    profile_cfg = cast(ProfileConfigDoc, get_config_store(request).get("profile"))
     github_username = profile_cfg.github_username
-    facts_out = request.app.state.data_dir / "profile" / "facts.json"
+    facts_out = get_profile_dir(request) / "facts.json"
 
     def work(reporter):
         return profile_build.run_corpus_build(
-            reporter, profile_dir=profile_dir,
-            github_username=github_username, facts_out=facts_out,
+            reporter,
+            profile_dir=profile_dir,
+            github_username=github_username,
+            facts_out=facts_out,
             github_allow=tuple(profile_cfg.github_repo_allow),
             github_deny=tuple(profile_cfg.github_repo_deny),
             github_limit=profile_cfg.github_repo_limit,
@@ -124,13 +140,17 @@ _UNSAFE_CHARS = re.compile(r"[^A-Za-z0-9._-]")
 
 
 def _profile_dir(request: Request) -> Path:
-    return request.app.state.data_dir / "profile"
+    return get_profile_dir(request)
 
 
 def _source_out(profile_dir: Path, doc) -> SourceOut:
     return SourceOut(
-        id=doc.id, filename=doc.filename, mode=doc.mode, primary=doc.primary,
-        anchor=doc.anchor, added_at=doc.added_at,
+        id=doc.id,
+        filename=doc.filename,
+        mode=doc.mode,
+        primary=doc.primary,
+        anchor=doc.anchor,
+        added_at=doc.added_at,
         fragment_status=fragment_cache_status(profile_dir, doc),
         origin=doc.origin,
     )
@@ -161,8 +181,11 @@ async def upload_source(
             staged = Path(scratch) / name
             staged.write_bytes(content)
             doc = add_source(
-                profile_dir, staged, primary=primary,
-                mode=mode, anchor=anchor,  # type: ignore[arg-type]
+                profile_dir,
+                staged,
+                primary=primary,
+                mode=mode,
+                anchor=anchor,  # type: ignore[arg-type]
             )
     except ValueError as exc:
         raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
@@ -185,7 +208,9 @@ def add_url(payload: UrlIn, request: Request):
     try:
         doc = add_url_source(profile_dir, str(payload.url))
     except (httpx.HTTPError, ValueError) as error:
-        raise ApiException(422, "VALIDATION_ERROR", f"URL intake failed: {error}") from error
+        raise ApiException(
+            422, "VALIDATION_ERROR", f"URL intake failed: {error}"
+        ) from error
     return _source_out(profile_dir, doc)
 
 
@@ -194,8 +219,9 @@ def launch_github_sync(
     request: Request,
     mgr: RunManager = Depends(get_run_manager),
 ):
-    profile_config = request.app.state.config_store.get("profile")
-    if not profile_config.github_username:
+    profile_config = cast(ProfileConfigDoc, get_config_store(request).get("profile"))
+    github_username = profile_config.github_username
+    if not github_username:
         raise ApiException(
             400,
             "SETUP_INCOMPLETE",
@@ -206,7 +232,7 @@ def launch_github_sync(
     def work(_reporter):
         report = sync_github_sources(
             profile_dir,
-            profile_config.github_username,
+            github_username,
             allow=tuple(profile_config.github_repo_allow),
             deny=tuple(profile_config.github_repo_deny),
             limit=profile_config.github_repo_limit,
@@ -234,7 +260,9 @@ def get_profile_matrix(request: Request):
             SkillGroupOut(slug=slug, label=label)
             for slug, label in SKILL_GROUPS.items()
         ],
-        rows=[MatrixRowOut.model_validate(row) for row in matrix.rows] if matrix is not None else [],
+        rows=[MatrixRowOut.model_validate(row) for row in matrix.rows]
+        if matrix is not None
+        else [],
     )
 
 
@@ -244,8 +272,11 @@ def patch_source(doc_id: str, payload: SourcePatch, request: Request):
     anchor = payload.anchor if "anchor" in payload.model_fields_set else _UNSET
     try:
         doc = update_source(
-            profile_dir, doc_id, mode=payload.mode,  # type: ignore[arg-type]
-            anchor=anchor, primary=payload.primary,
+            profile_dir,
+            doc_id,
+            mode=payload.mode,  # type: ignore[arg-type]
+            anchor=anchor,
+            primary=payload.primary,
         )
     except ValueError as exc:
         raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
