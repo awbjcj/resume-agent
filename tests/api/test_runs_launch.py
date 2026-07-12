@@ -200,3 +200,19 @@ def test_linkedin_ready_rejects_regular_file(monkeypatch, tmp_path):
     monkeypatch.setattr(runs_router, "get_settings", lambda: settings, raising=False)
 
     assert runs_router._linkedin_ready() is False
+
+
+def test_linkedin_ready_false_when_browser_disabled(monkeypatch, tmp_path):
+    """A saved profile or credentials never make LinkedIn ready without a browser."""
+    profile = tmp_path / "linkedin-profile"
+    profile.mkdir()
+    (profile / "Local State").write_text("{}", encoding="utf-8")
+    settings = SimpleNamespace(
+        browser_enabled=False,
+        linkedin_email="user@example.com",
+        linkedin_password="secret",
+        linkedin_user_data_dir=str(profile),
+    )
+    monkeypatch.setattr(runs_router, "get_settings", lambda: settings, raising=False)
+
+    assert runs_router._linkedin_ready() is False

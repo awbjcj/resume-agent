@@ -237,7 +237,7 @@ def _linkedin_ready() -> bool:
     """Return whether credentials or a persisted browser profile are available."""
     settings = get_settings()
     if not getattr(settings, "browser_enabled", True):
-        return True
+        return False
     if settings.linkedin_email.strip() and settings.linkedin_password:
         return True
     if not settings.linkedin_user_data_dir:
