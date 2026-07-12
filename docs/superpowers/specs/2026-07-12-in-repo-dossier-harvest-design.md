@@ -18,14 +18,14 @@ into one virtual doc per repo, and the project extraction schema
 
 ## Decision summary
 
-| Decision | Choice |
-| --- | --- |
-| Multi-project shape | Multiple dossier files, each describing exactly one project; the one-project `ProjectDocFacts` schema is untouched |
-| Detection | Root-listing filename match `*dossier*.md` (case-insensitive), confirmed by valid `repo_url:` frontmatter after fetch |
-| Frontmatter validation | Dossier `repo_url` must normalize (via `normalize_repo_url`) to the harvested repo's own URL; mismatches are skipped with a warning |
-| README virtual doc | Replaced: if ≥1 valid dossier is found, `github--<repo>.md` is not written and an existing one is removed; zero valid dossiers → README doc exactly as today |
+| Decision                   | Choice                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Multi-project shape        | Multiple dossier files, each describing exactly one project; the one-project `ProjectDocFacts` schema is untouched                                                       |
+| Detection                  | Root-listing filename match `*dossier*.md` (case-insensitive), confirmed by valid `repo_url:` frontmatter after fetch                                                    |
+| Frontmatter validation     | Dossier `repo_url` must normalize (via `normalize_repo_url`) to the harvested repo's own URL; mismatches are skipped with a warning                                      |
+| README virtual doc         | Replaced: if ≥1 valid dossier is found, `github--<repo>.md` is not written and an existing one is removed; zero valid dossiers → README doc exactly as today             |
 | Manual-upload supersession | Unchanged repo-level key: an uploaded dossier with the repo's URL removes ALL github-origin docs for that repo (README doc and harvested dossiers) and blocks re-harvest |
-| Limits | 30 KB per dossier (existing `_MAX_FILE_BYTES`), max 5 dossiers per repo (alphabetical by filename), repo root only; overflow → `HarvestReport.warnings` |
+| Limits                     | 30 KB per dossier (existing `_MAX_FILE_BYTES`), max 5 dossiers per repo (alphabetical by filename), repo root only; overflow → `HarvestReport.warnings`                  |
 
 ## Behavior
 
@@ -34,8 +34,10 @@ into one virtual doc per repo, and the project extraction schema
 For each selected repo, partition the root listing:
 
 - Entries matching `*dossier*.md` (case-insensitive) are dossier candidates.
-- README/CONTEXT picks (`_pick_doc_entries`) are computed as today but only
-  used when no valid dossier survives validation.
+- README/CONTEXT picks (`_pick_doc_entries`) are computed exactly as today but
+  only used when no valid dossier survives validation. Dossier discovery must
+  not remove a name such as `README-dossier.md` from this fallback set; doing
+  so would violate the zero-valid-dossier compatibility guarantee.
 
 Fetch at most 5 candidates in deterministic alphabetical (casefolded) order.
 If more than 5 match, record a warning naming the skipped files. A fetched
@@ -50,7 +52,10 @@ Each valid dossier becomes its own source doc:
 - Filename `github--<repo>--<dossier-slug>.md`, where `dossier-slug` is the
   dossier filename stem sanitized by the existing `_SAFE_REPO_NAME` rule;
   filename conflicts with non-github docs resolve via the existing sha1-suffix
-  scheme.
+  scheme. If two dossier names sanitize to the same slug, every member of that
+  collision group receives an identity-derived sha1 suffix based on the
+  original filename. Re-sync must allocate the same names so one candidate can
+  never overwrite another.
 - Content is the dossier file **verbatim** (it already carries frontmatter),
   truncated to 30 KB with `_truncate_utf8`; written atomically only when
   changed, so unchanged dossiers keep their sha and hit the fragment cache.
@@ -120,3 +125,5 @@ Extend `tests/` github-harvest coverage with fixture-driven cases:
 6. Manual upload for the repo → all harvested docs (README + dossiers)
    removed, repo skipped on re-sync.
 7. Rate-limit mid-repo → cached dossier docs preserved.
+8. Two dossier filenames that sanitize to the same stem → two stable, distinct
+   source filenames; neither dossier is overwritten.

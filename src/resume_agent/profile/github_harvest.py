@@ -27,6 +27,7 @@ _MAX_FILE_BYTES = 30_000
 _MAX_DOC_BYTES = 120_000
 _SAFE_REPO_NAME = re.compile(r"[^a-z0-9._-]+")
 _CONTEXT_DOC_NAMES = frozenset({"claude.md", "context.md", "agent.md", "agents.md"})
+_MAX_DOSSIERS = 5
 
 
 @dataclass
@@ -91,6 +92,26 @@ def _pick_doc_entries(listing: list[dict]) -> list[str]:
         and (name.casefold().startswith("readme") or name.casefold() in _CONTEXT_DOC_NAMES)
     ]
     return sorted(names, key=lambda name: (not name.casefold().startswith("readme"), name.casefold()))
+
+
+def _is_dossier_name(name: str) -> bool:
+    folded = name.casefold()
+    return folded.endswith(".md") and "dossier" in folded
+
+
+def _pick_dossier_entries(listing: list[dict]) -> tuple[list[str], list[str]]:
+    """Return selected and overflow root dossier files in stable order."""
+    names = sorted(
+        (
+            name
+            for entry in listing
+            if entry.get("type") == "file"
+            and isinstance((name := entry.get("name")), str)
+            and _is_dossier_name(name)
+        ),
+        key=lambda name: (name.casefold(), name),
+    )
+    return names[:_MAX_DOSSIERS], names[_MAX_DOSSIERS:]
 
 
 def _truncate_utf8(value: str, limit: int) -> str:
@@ -188,11 +209,18 @@ def _atomic_write(path: Path, data: bytes) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def _filename_for(repo: dict, profile_dir: str | Path) -> str:
-    name_value = repo.get("name")
-    name = name_value if isinstance(name_value, str) else "repo"
-    slug = _SAFE_REPO_NAME.sub("-", name.casefold()).strip("-") or "repo"
-    candidate = f"{GITHUB_DOC_PREFIX}{slug}.md"
+def _slug(value: object, fallback: str) -> str:
+    name = value if isinstance(value, str) else fallback
+    return _SAFE_REPO_NAME.sub("-", name.casefold()).strip("-") or fallback
+
+
+def _unique_filename(
+    candidate: str,
+    identity: str,
+    profile_dir: str | Path,
+    *,
+    force_suffix: bool = False,
+) -> str:
     conflict = next(
         (
             doc
@@ -201,11 +229,54 @@ def _filename_for(repo: dict, profile_dir: str | Path) -> str:
         ),
         None,
     )
-    if conflict is None:
+    if conflict is None and not force_suffix:
         return candidate
-    identity = normalize_repo_url(repo.get("html_url")) or name.casefold()
     suffix = hashlib.sha1(identity.encode("utf-8")).hexdigest()[:8]
-    return f"{GITHUB_DOC_PREFIX}{slug}-{suffix}.md"
+    stem, _, _extension = candidate.rpartition(".md")
+    return f"{stem}-{suffix}.md"
+
+
+def _filename_for(repo: dict, profile_dir: str | Path) -> str:
+    slug = _slug(repo.get("name"), "repo")
+    identity = normalize_repo_url(repo.get("html_url")) or slug
+    return _unique_filename(f"{GITHUB_DOC_PREFIX}{slug}.md", identity, profile_dir)
+
+
+def _dossier_filename(
+    repo: dict,
+    entry: str,
+    profile_dir: str | Path,
+    *,
+    force_suffix: bool = False,
+) -> str:
+    repo_slug = _slug(repo.get("name"), "repo")
+    entry_slug = _slug(Path(entry).stem, "dossier")
+    identity = f"{normalize_repo_url(repo.get('html_url')) or repo_slug}#{entry}"
+    return _unique_filename(
+        f"{GITHUB_DOC_PREFIX}{repo_slug}--{entry_slug}.md",
+        identity,
+        profile_dir,
+        force_suffix=force_suffix,
+    )
+
+
+def _github_docs_for(profile_dir: str | Path, repo_url: str | None) -> set[str]:
+    """Return GitHub-origin source filenames belonging to one repository."""
+    if repo_url is None:
+        return set()
+    names: set[str] = set()
+    for doc in load_manifest(profile_dir).docs:
+        if doc.origin != "github":
+            continue
+        try:
+            doc_url = normalize_repo_url(
+                frontmatter_repo_url(doc_path(profile_dir, doc).read_bytes())
+            )
+        except OSError:
+            continue
+        if doc_url == repo_url:
+            names.add(doc.filename)
+    return names
 
 
 def _remove_local_superseded(
@@ -225,6 +296,27 @@ def _remove_local_superseded(
         remove_source(profile_dir, doc.id, purge=True)
         report.superseded.append(doc.filename)
         report.removed.append(doc.filename)
+
+
+def _write_source(
+    profile_dir: str | Path,
+    filename: str,
+    data: bytes,
+    repo_name: str,
+    report: HarvestReport,
+    kept: set[str],
+) -> None:
+    target = sources_dir(profile_dir) / filename
+    if not target.exists() or target.read_bytes() != data:
+        _atomic_write(target, data)
+        report.written.append(filename)
+    kept.add(filename)
+    if not any(doc.filename == filename for doc in load_manifest(profile_dir).docs):
+        created = add_source(profile_dir, target, mode="project", origin="github")
+        if created.origin != "github" or created.filename != filename:
+            target.unlink(missing_ok=True)
+            report.failures[repo_name] = "virtual document duplicated an upload source"
+            kept.discard(filename)
 
 
 def sync_github_sources(
@@ -264,18 +356,42 @@ def sync_github_sources(
             owner_value = item.get("owner")
             login = owner_value.get("login") if isinstance(owner_value, dict) else None
             owner = login if isinstance(login, str) else username
-            filename = _filename_for(item, profile_dir)
-            if not name or normalize_repo_url(item.get("html_url")) in dossiers:
+            repo_url = normalize_repo_url(item.get("html_url"))
+            if not name or repo_url in dossiers:
                 continue
             try:
-                wanted = _pick_doc_entries(github.fetch_root_listing(owner, name))
-                files: list[tuple[str, str]] = []
-                for entry in wanted:
+                listing = github.fetch_root_listing(owner, name)
+                dossier_entries, overflow = _pick_dossier_entries(listing)
+                for skipped in overflow:
+                    report.warnings.append(
+                        f"{name}: dossier {skipped} skipped "
+                        f"(max {_MAX_DOSSIERS} per repo)"
+                    )
+                dossier_files: list[tuple[str, str]] = []
+                for entry in dossier_entries:
                     text = github.fetch_raw_file(owner, name, entry)
-                    if text is not None:
-                        files.append((entry, text))
-                if not files:
-                    continue
+                    if text is None:
+                        continue
+                    entry_url = normalize_repo_url(
+                        frontmatter_repo_url(text.encode("utf-8"))
+                    )
+                    if entry_url is None:
+                        continue
+                    if entry_url != repo_url:
+                        report.warnings.append(
+                            f"{name}: dossier {entry} targets a different "
+                            "repository; skipped"
+                        )
+                        continue
+                    dossier_files.append((entry, text))
+                files: list[tuple[str, str]] = []
+                if not dossier_files:
+                    for entry in _pick_doc_entries(listing):
+                        text = github.fetch_raw_file(owner, name, entry)
+                        if text is not None:
+                            files.append((entry, text))
+                    if not files:
+                        continue
                 languages = github.fetch_languages(owner, name)
             except httpx.HTTPStatusError as error:
                 if _is_rate_limited(error):
@@ -283,30 +399,46 @@ def sync_github_sources(
                     stopped_early = True
                     break
                 report.failures[name] = str(error)
-                kept.add(filename)
+                kept |= _github_docs_for(profile_dir, repo_url)
                 continue
             except (httpx.HTTPError, OSError, UnicodeError, ValueError) as error:
                 report.failures[name] = str(error)
-                kept.add(filename)
+                kept |= _github_docs_for(profile_dir, repo_url)
                 continue
 
             full_name = item.get("full_name")
             report.languages[
                 full_name if isinstance(full_name, str) else f"{owner}/{name}"
             ] = languages
-            data = render_virtual_doc(item, files, languages).encode("utf-8")
-            target = sources_dir(profile_dir) / filename
-            if not target.exists() or target.read_bytes() != data:
-                _atomic_write(target, data)
-                report.written.append(filename)
-            kept.add(filename)
-            manifest = load_manifest(profile_dir)
-            if not any(doc.filename == filename for doc in manifest.docs):
-                created = add_source(profile_dir, target, mode="project", origin="github")
-                if created.origin != "github" or created.filename != filename:
-                    target.unlink(missing_ok=True)
-                    report.failures[name] = "virtual document duplicated an upload source"
-                    kept.discard(filename)
+            if dossier_files:
+                slug_counts: dict[str, int] = {}
+                for entry, _text in dossier_files:
+                    entry_slug = _slug(Path(entry).stem, "dossier")
+                    slug_counts[entry_slug] = slug_counts.get(entry_slug, 0) + 1
+                for entry, text in dossier_files:
+                    entry_slug = _slug(Path(entry).stem, "dossier")
+                    _write_source(
+                        profile_dir,
+                        _dossier_filename(
+                            item,
+                            entry,
+                            profile_dir,
+                            force_suffix=slug_counts[entry_slug] > 1,
+                        ),
+                        _truncate_utf8(text, _MAX_FILE_BYTES).encode("utf-8"),
+                        name,
+                        report,
+                        kept,
+                    )
+            else:
+                _write_source(
+                    profile_dir,
+                    _filename_for(item, profile_dir),
+                    render_virtual_doc(item, files, languages).encode("utf-8"),
+                    name,
+                    report,
+                    kept,
+                )
 
         if not stopped_early:
             for doc in list(load_manifest(profile_dir).docs):

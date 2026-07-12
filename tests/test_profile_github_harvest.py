@@ -5,6 +5,10 @@ from resume_agent.profile.fragments import fragment_cache_status
 from resume_agent.profile.github import GitHubClient
 from resume_agent.profile.github_harvest import (
     GITHUB_DOC_PREFIX,
+    _dossier_filename,
+    _github_docs_for,
+    _pick_doc_entries,
+    _pick_dossier_entries,
     render_virtual_doc,
     select_repos,
     sync_github_sources,
@@ -57,6 +61,294 @@ def standard_handler(repos: list[dict], readme: str = "# readme"):
         return httpx.Response(404)
 
     return handler
+
+
+DOSSIER = "---\nrepo_url: https://github.com/me/{repo}\n---\n# Project: {name}\n"
+
+
+def mono_handler(repos: list[dict], files: dict[str, str]):
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/users/me/repos":
+            return httpx.Response(200, json=repos)
+        if path.endswith("/contents"):
+            return httpx.Response(
+                200, json=[{"name": name, "type": "file"} for name in files]
+            )
+        for name, text in files.items():
+            if path.endswith(f"/contents/{name.replace(' ', '%20')}") or path.endswith(
+                f"/contents/{name}"
+            ):
+                return httpx.Response(200, text=text)
+        if path.endswith("/languages"):
+            return httpx.Response(200, json={"Python": 100})
+        return httpx.Response(404)
+
+    return handler
+
+
+def dossier(repo_name: str, project: str) -> str:
+    return DOSSIER.format(repo=repo_name, name=project)
+
+
+def listing(*names: str) -> list[dict]:
+    return [{"name": name, "type": "file"} for name in names]
+
+
+def test_pick_dossier_entries_matches_caps_and_sorts():
+    selected, overflow = _pick_dossier_entries(
+        listing(
+            "README.md",
+            "zeta-dossier.md",
+            "Alpha-Dossier.md",
+            "dossier-notes.md",
+            "b-dossier.md",
+            "c-dossier.md",
+            "d-dossier.md",
+            "dossier.txt",
+            "CHANGELOG.md",
+        )
+    )
+    assert selected == [
+        "Alpha-Dossier.md",
+        "b-dossier.md",
+        "c-dossier.md",
+        "d-dossier.md",
+        "dossier-notes.md",
+    ]
+    assert overflow == ["zeta-dossier.md"]
+
+
+def test_pick_dossier_entries_ignores_directories():
+    selected, overflow = _pick_dossier_entries(
+        [{"name": "x-dossier.md", "type": "dir"}]
+    )
+    assert selected == [] and overflow == []
+
+
+def test_pick_doc_entries_keeps_existing_readme_fallback_behavior():
+    names = _pick_doc_entries(listing("README.md", "readme-dossier.md", "claude.md"))
+    assert names == ["readme-dossier.md", "README.md", "claude.md"]
+
+
+def test_dossier_filename_slugs_and_dodges_upload_conflicts(tmp_path):
+    profile_dir = profile(tmp_path)
+    value = repo("My.Repo")
+    assert (
+        _dossier_filename(value, "API Gateway-dossier.md", profile_dir)
+        == "github--my.repo--api-gateway-dossier.md"
+    )
+    conflict = tmp_path / "github--my.repo--api-gateway-dossier.md"
+    conflict.write_text("upload", encoding="utf-8")
+    add_source(profile_dir, conflict)
+    resolved = _dossier_filename(value, "API Gateway-dossier.md", profile_dir)
+    assert resolved.startswith("github--my.repo--api-gateway-dossier-")
+    assert resolved != "github--my.repo--api-gateway-dossier.md"
+
+
+def test_dossier_filename_keeps_sanitized_stem_collisions_distinct(tmp_path):
+    profile_dir = profile(tmp_path)
+    value = repo("mono")
+    first = _dossier_filename(
+        value, "api dossier.md", profile_dir, force_suffix=True
+    )
+    second = _dossier_filename(
+        value, "api-dossier.md", profile_dir, force_suffix=True
+    )
+    assert first.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-")
+    assert second.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-")
+    assert second != first
+    upper = _dossier_filename(value, "API-Dossier.md", profile_dir, force_suffix=True)
+    lower = _dossier_filename(value, "api-dossier.md", profile_dir, force_suffix=True)
+    assert upper != lower
+
+
+def test_github_docs_for_matches_by_frontmatter_url(tmp_path):
+    profile_dir = profile(tmp_path)
+    gh, http = github(standard_handler([repo("mine"), repo("other")]))
+    sync_github_sources(profile_dir, "me", client=gh)
+    http.close()
+    assert _github_docs_for(profile_dir, "github.com/me/mine") == {
+        f"{GITHUB_DOC_PREFIX}mine.md"
+    }
+    assert _github_docs_for(profile_dir, None) == set()
+
+
+def test_dossiers_replace_readme_doc_and_yield_one_doc_each(tmp_path):
+    profile_dir = profile(tmp_path)
+    plain, plain_http = github(standard_handler([repo("mono")]))
+    sync_github_sources(profile_dir, "me", client=plain)
+    plain_http.close()
+
+    gh, http = github(
+        mono_handler(
+            [repo("mono")],
+            {
+                "README.md": "# readme",
+                "api-dossier.md": dossier("mono", "API Gateway"),
+                "ui-dossier.md": dossier("mono", "UI Dashboard"),
+            },
+        )
+    )
+    report = sync_github_sources(profile_dir, "me", client=gh)
+    filenames = {
+        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+    }
+    assert filenames == {
+        f"{GITHUB_DOC_PREFIX}mono--api-dossier.md",
+        f"{GITHUB_DOC_PREFIX}mono--ui-dossier.md",
+    }
+    assert f"{GITHUB_DOC_PREFIX}mono.md" in report.removed
+    docs = [doc for doc in load_manifest(profile_dir).docs if doc.origin == "github"]
+    assert all(doc.mode == "project" for doc in docs)
+    assert "me/mono" in report.languages
+
+    again = sync_github_sources(profile_dir, "me", client=gh)
+    assert again.written == []
+    http.close()
+
+
+def test_dossier_without_frontmatter_falls_back_to_readme(tmp_path):
+    profile_dir = profile(tmp_path)
+    gh, http = github(
+        mono_handler(
+            [repo("mono")],
+            {"README.md": "# readme", "notes-dossier.md": "# just notes"},
+        )
+    )
+    sync_github_sources(profile_dir, "me", client=gh)
+    filenames = {
+        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+    }
+    assert filenames == {f"{GITHUB_DOC_PREFIX}mono.md"}
+    content = (
+        profile_dir / "sources" / f"{GITHUB_DOC_PREFIX}mono.md"
+    ).read_text(encoding="utf-8")
+    assert "notes-dossier" not in content
+    http.close()
+
+
+def test_foreign_repo_url_dossier_skipped_with_warning(tmp_path):
+    profile_dir = profile(tmp_path)
+    gh, http = github(
+        mono_handler(
+            [repo("mono")],
+            {
+                "README.md": "# readme",
+                "stolen-dossier.md": dossier("elsewhere", "X"),
+            },
+        )
+    )
+    report = sync_github_sources(profile_dir, "me", client=gh)
+    filenames = {
+        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+    }
+    assert filenames == {f"{GITHUB_DOC_PREFIX}mono.md"}
+    assert any("stolen-dossier.md" in warning for warning in report.warnings)
+    http.close()
+
+
+def test_dossier_overflow_warns_and_keeps_first_five(tmp_path):
+    profile_dir = profile(tmp_path)
+    files = {"README.md": "# readme"}
+    for letter in "abcdef":
+        files[f"{letter}-dossier.md"] = dossier("mono", letter)
+    gh, http = github(mono_handler([repo("mono")], files))
+    report = sync_github_sources(profile_dir, "me", client=gh)
+    github_docs = [doc for doc in load_manifest(profile_dir).docs if doc.origin == "github"]
+    assert len(github_docs) == 5
+    assert not any("f-dossier" in doc.filename for doc in github_docs)
+    assert any("f-dossier.md" in warning for warning in report.warnings)
+    http.close()
+
+
+def test_per_repo_failure_keeps_previous_dossier_docs(tmp_path):
+    profile_dir = profile(tmp_path)
+    gh, http = github(
+        mono_handler(
+            [repo("mono")], {"api-dossier.md": dossier("mono", "API Gateway")}
+        )
+    )
+    sync_github_sources(profile_dir, "me", client=gh)
+    http.close()
+
+    def failing(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/users/me/repos":
+            return httpx.Response(200, json=[repo("mono")])
+        return httpx.Response(500)
+
+    broken, broken_http = github(failing)
+    report = sync_github_sources(profile_dir, "me", client=broken)
+    assert "mono" in report.failures
+    assert report.removed == []
+    filenames = {
+        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+    }
+    assert filenames == {f"{GITHUB_DOC_PREFIX}mono--api-dossier.md"}
+    broken_http.close()
+
+
+def test_dossier_content_written_verbatim_and_capped(tmp_path):
+    profile_dir = profile(tmp_path)
+    text = dossier("mono", "API Gateway") + "x" * 40_000
+    gh, http = github(mono_handler([repo("mono")], {"api-dossier.md": text}))
+    sync_github_sources(profile_dir, "me", client=gh)
+    written = (
+        profile_dir / "sources" / f"{GITHUB_DOC_PREFIX}mono--api-dossier.md"
+    ).read_bytes()
+    assert written.startswith(b"---\nrepo_url: https://github.com/me/mono")
+    assert len(written) <= 30_000
+    http.close()
+
+
+def test_sanitized_dossier_stem_collisions_write_distinct_stable_docs(tmp_path):
+    profile_dir = profile(tmp_path)
+    gh, http = github(
+        mono_handler(
+            [repo("mono")],
+            {
+                "api dossier.md": dossier("mono", "API One"),
+                "api-dossier.md": dossier("mono", "API Two"),
+            },
+        )
+    )
+    first = sync_github_sources(profile_dir, "me", client=gh)
+    filenames = sorted(
+        doc.filename for doc in load_manifest(profile_dir).docs if doc.origin == "github"
+    )
+    assert len(filenames) == 2
+    assert filenames[0] != filenames[1]
+    assert all(name.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-") for name in filenames)
+    assert len(first.written) == 2
+    assert sync_github_sources(profile_dir, "me", client=gh).written == []
+    http.close()
+
+
+def test_uploaded_dossier_supersedes_all_harvested_repo_docs(tmp_path):
+    profile_dir = profile(tmp_path)
+    gh, http = github(
+        mono_handler(
+            [repo("mono")],
+            {
+                "api-dossier.md": dossier("mono", "API Gateway"),
+                "ui-dossier.md": dossier("mono", "UI Dashboard"),
+            },
+        )
+    )
+    sync_github_sources(profile_dir, "me", client=gh)
+    assert sum(doc.origin == "github" for doc in load_manifest(profile_dir).docs) == 2
+
+    upload = tmp_path / "mine-dossier.md"
+    upload.write_text(dossier("mono", "Authoritative"), encoding="utf-8")
+    add_source(profile_dir, upload)
+
+    report = sync_github_sources(profile_dir, "me", client=gh)
+    assert sorted(report.superseded) == [
+        f"{GITHUB_DOC_PREFIX}mono--api-dossier.md",
+        f"{GITHUB_DOC_PREFIX}mono--ui-dossier.md",
+    ]
+    assert not any(doc.origin == "github" for doc in load_manifest(profile_dir).docs)
+    http.close()
 
 
 def test_select_repos_force_includes_before_cap_and_deny_wins():

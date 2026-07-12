@@ -240,7 +240,11 @@ aggressiveness determines how many detail fetches are issued.
   `mode="project"` during build phase 0 and `profile sync-github`. A markdown
   upload with `repo_url:` frontmatter, such as output from
   `.claude/skills/project-dossier`, supersedes the auto-document for the same
-  normalized repository URL. `project_extractor.py` can emit exactly one Project
+  normalized repository URL. Harvest also discovers root files named
+  `*dossier*.md` (max 5 per repo, 30 KB each) whose `repo_url` frontmatter
+  matches the repo; each becomes its own `github--<repo>--<stem>.md` project
+  source and replaces that repo's README virtual doc. Manual uploads still
+  supersede all harvested docs for the repo. `project_extractor.py` can emit exactly one Project
   plus skills, never Experience or Education. GitHub failures become build
   warnings; rate-limited harvests stop early without deleting existing sources.
 - **Profile rebuilds regenerate inferred skills.** `profile build` strips and re-derives

@@ -25,6 +25,11 @@ Write `<repo-name>-dossier.md` at the repository root, or at the location the
 user requests. Start with this frontmatter. `repo_url` is the stable identity
 resume-agent uses to supersede an auto-harvested GitHub source:
 
+When the repository contains multiple distinct projects (a monorepo), write
+one `<project-slug>-dossier.md` per project at the repository root. Every
+dossier uses the same `repo_url` (the repository's canonical URL); each file
+describes exactly one project in its `# Project:` section.
+
 ```yaml
 ---
 repo_url: <canonical HTTPS repository URL derived from git remote get-url origin>
@@ -89,3 +94,10 @@ resume-agent profile build
 
 The `repo_url` frontmatter makes the upload a project source and lets it replace
 the shallower auto-harvested document for that repository.
+
+Committing dossiers to the repository root also works without the manual
+`profile add`: `resume-agent profile sync-github` discovers root files named
+`*dossier*.md` (up to 5 per repository, 30 KB each), validates their
+`repo_url` frontmatter, and ingests each as its own project source, replacing
+the auto-harvested README document. A manual upload still overrides
+everything harvested for that repository.

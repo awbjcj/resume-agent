@@ -26,11 +26,13 @@
 ### Task 1: Dossier candidate selection from the root listing
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/github_harvest.py` (near `_pick_doc_entries`, line ~85)
 - Test: `tests/test_profile_github_harvest.py`
 
 **Interfaces:**
-- Produces: `_MAX_DOSSIERS: int = 5`; `_is_dossier_name(name: str) -> bool`; `_pick_dossier_entries(listing: list[dict]) -> tuple[list[str], list[str]]` returning `(selected, overflow)` — both alphabetical by casefolded name, `selected` capped at `_MAX_DOSSIERS`. Also modifies `_pick_doc_entries` to exclude dossier-named files.
+
+- Produces: `_MAX_DOSSIERS: int = 5`; `_is_dossier_name(name: str) -> bool`; `_pick_dossier_entries(listing: list[dict]) -> tuple[list[str], list[str]]` returning `(selected, overflow)` — both deterministically alphabetical by casefolded name (then original spelling), `selected` capped at `_MAX_DOSSIERS`. `_pick_doc_entries` remains unchanged so zero valid dossiers preserve today's fallback behavior exactly.
 - Consumes: existing `_CONTEXT_DOC_NAMES`, listing dicts shaped `{"name": str, "type": "file"}`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -79,9 +81,9 @@ def test_pick_dossier_entries_ignores_directories():
     assert selected == [] and overflow == []
 
 
-def test_pick_doc_entries_excludes_dossier_names():
+def test_pick_doc_entries_keeps_existing_readme_fallback_behavior():
     names = _pick_doc_entries(listing("README.md", "readme-dossier.md", "claude.md"))
-    assert names == ["README.md", "claude.md"]
+    assert names == ["readme-dossier.md", "README.md", "claude.md"]
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -105,21 +107,9 @@ def _is_dossier_name(name: str) -> bool:
     return folded.endswith(".md") and "dossier" in folded
 ```
 
-Replace `_pick_doc_entries` and add `_pick_dossier_entries`:
+Leave `_pick_doc_entries` unchanged and add `_pick_dossier_entries`:
 
 ```python
-def _pick_doc_entries(listing: list[dict]) -> list[str]:
-    names = [
-        name
-        for entry in listing
-        if entry.get("type") == "file"
-        and isinstance((name := entry.get("name")), str)
-        and not _is_dossier_name(name)
-        and (name.casefold().startswith("readme") or name.casefold() in _CONTEXT_DOC_NAMES)
-    ]
-    return sorted(names, key=lambda name: (not name.casefold().startswith("readme"), name.casefold()))
-
-
 def _pick_dossier_entries(listing: list[dict]) -> tuple[list[str], list[str]]:
     """Return (selected, overflow) dossier-named root files, alphabetical and capped."""
     names = sorted(
@@ -130,7 +120,7 @@ def _pick_dossier_entries(listing: list[dict]) -> tuple[list[str], list[str]]:
             and isinstance((name := entry.get("name")), str)
             and _is_dossier_name(name)
         ),
-        key=str.casefold,
+        key=lambda name: (name.casefold(), name),
     )
     return names[:_MAX_DOSSIERS], names[_MAX_DOSSIERS:]
 ```
@@ -153,11 +143,13 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 2: Dossier filenames and conservative failure keep-set
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/github_harvest.py` (`_filename_for`, line ~191)
 - Test: `tests/test_profile_github_harvest.py`
 
 **Interfaces:**
-- Produces: `_unique_filename(candidate: str, identity: str, profile_dir) -> str` (shared conflict resolution); `_dossier_filename(repo: dict, entry: str, profile_dir) -> str` → `github--<repo-slug>--<entry-stem-slug>.md`; `_github_docs_for(profile_dir, repo_url: str | None) -> set[str]` → filenames of github-origin docs whose frontmatter `repo_url` normalizes to `repo_url`.
+
+- Produces: `_unique_filename(candidate: str, identity: str, profile_dir, *, force_suffix: bool = False) -> str` (shared deterministic conflict resolution); `_dossier_filename(repo: dict, entry: str, profile_dir, *, force_suffix: bool = False) -> str` → `github--<repo-slug>--<entry-stem-slug>.md`, with stable suffixes based on the original entry name when sanitized dossier stems collide; `_github_docs_for(profile_dir, repo_url: str | None) -> set[str]` → filenames of github-origin docs whose frontmatter `repo_url` normalizes to `repo_url`.
 - Consumes: `_SAFE_REPO_NAME`, `GITHUB_DOC_PREFIX`, `load_manifest`, `doc_path`, `frontmatter_repo_url`, `normalize_repo_url` (all already imported).
 
 - [ ] **Step 1: Write the failing tests**
@@ -192,6 +184,20 @@ def test_github_docs_for_matches_by_frontmatter_url(tmp_path):
         f"{GITHUB_DOC_PREFIX}mine.md"
     }
     assert _github_docs_for(profile_dir, None) == set()
+
+
+def test_dossier_filename_keeps_sanitized_stem_collisions_distinct(tmp_path):
+    profile_dir = profile(tmp_path)
+    value = repo("mono")
+    first = _dossier_filename(
+        value, "api dossier.md", profile_dir, force_suffix=True
+    )
+    second = _dossier_filename(
+        value, "api-dossier.md", profile_dir, force_suffix=True
+    )
+    assert first.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-")
+    assert second.startswith(f"{GITHUB_DOC_PREFIX}mono--api-dossier-")
+    assert second != first
 ```
 
 Note: `normalize_repo_url` (in `src/resume_agent/profile/github_ingest.py`) strips scheme and casefolds, so `"https://github.com/me/mine"` → `"github.com/me/mine"` — the expected value above is exact.
@@ -212,7 +218,13 @@ def _slug(value: object, fallback: str) -> str:
     return _SAFE_REPO_NAME.sub("-", name.casefold()).strip("-") or fallback
 
 
-def _unique_filename(candidate: str, identity: str, profile_dir: str | Path) -> str:
+def _unique_filename(
+    candidate: str,
+    identity: str,
+    profile_dir: str | Path,
+    *,
+    force_suffix: bool = False,
+) -> str:
     conflict = next(
         (
             doc
@@ -221,7 +233,7 @@ def _unique_filename(candidate: str, identity: str, profile_dir: str | Path) -> 
         ),
         None,
     )
-    if conflict is None:
+    if conflict is None and not force_suffix:
         return candidate
     suffix = hashlib.sha1(identity.encode("utf-8")).hexdigest()[:8]
     stem, _, _ = candidate.rpartition(".md")
@@ -234,12 +246,21 @@ def _filename_for(repo: dict, profile_dir: str | Path) -> str:
     return _unique_filename(f"{GITHUB_DOC_PREFIX}{slug}.md", identity, profile_dir)
 
 
-def _dossier_filename(repo: dict, entry: str, profile_dir: str | Path) -> str:
+def _dossier_filename(
+    repo: dict,
+    entry: str,
+    profile_dir: str | Path,
+    *,
+    force_suffix: bool = False,
+) -> str:
     repo_slug = _slug(repo.get("name"), "repo")
     entry_slug = _slug(Path(entry).stem, "dossier")
-    identity = f"{normalize_repo_url(repo.get('html_url')) or repo_slug}#{entry_slug}"
+    identity = f"{normalize_repo_url(repo.get('html_url')) or repo_slug}#{entry}"
     return _unique_filename(
-        f"{GITHUB_DOC_PREFIX}{repo_slug}--{entry_slug}.md", identity, profile_dir
+        f"{GITHUB_DOC_PREFIX}{repo_slug}--{entry_slug}.md",
+        identity,
+        profile_dir,
+        force_suffix=force_suffix,
     )
 
 
@@ -280,10 +301,12 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 3: Harvest-loop integration — fetch, validate, replace, keep
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/github_harvest.py` (`sync_github_sources`, lines ~259-315)
 - Test: `tests/test_profile_github_harvest.py`
 
 **Interfaces:**
+
 - Consumes: `_pick_dossier_entries` (Task 1), `_dossier_filename` / `_github_docs_for` (Task 2), existing `_truncate_utf8`, `_atomic_write`, `render_virtual_doc`, `add_source`, `sources_dir`.
 - Produces: `_write_source(profile_dir, filename: str, data: bytes, repo_name: str, report: HarvestReport, kept: set[str]) -> None` — shared write+register block used by both README and dossier paths. Dossier docs registered `mode="project"`, `origin="github"`, verbatim content capped at `_MAX_FILE_BYTES`.
 
@@ -526,13 +549,23 @@ Then rewrite the per-repo body of the `for item in selected:` loop:
 
             full_name = item.get("full_name")
             report.languages[
-                full_name if isinstance(full_name, str) else f"{owner}/{name}"
+            full_name if isinstance(full_name, str) else f"{owner}/{name}"
             ] = languages
             if dossier_files:
+                slug_counts: dict[str, int] = {}
+                for entry, _text in dossier_files:
+                    entry_slug = _slug(Path(entry).stem, "dossier")
+                    slug_counts[entry_slug] = slug_counts.get(entry_slug, 0) + 1
                 for entry, text in dossier_files:
+                    entry_slug = _slug(Path(entry).stem, "dossier")
                     _write_source(
                         profile_dir,
-                        _dossier_filename(item, entry, profile_dir),
+                        _dossier_filename(
+                            item,
+                            entry,
+                            profile_dir,
+                            force_suffix=slug_counts[entry_slug] > 1,
+                        ),
                         _truncate_utf8(text, _MAX_FILE_BYTES).encode("utf-8"),
                         name,
                         report,
@@ -550,6 +583,7 @@ Then rewrite the per-repo body of the `for item in selected:` loop:
 ```
 
 Notes for the implementer:
+
 - The old `filename = _filename_for(item, profile_dir)` pre-computation and `kept.add(filename)` failure lines are replaced by `kept |= _github_docs_for(profile_dir, repo_url)`, which conservatively keeps README **and** dossier docs from prior syncs (both carry `repo_url` frontmatter).
 - The trailing cleanup loop (`doc.origin == "github" and doc.filename not in kept` → remove) is untouched; it is what deletes the stale `github--<repo>.md` when dossiers now exist, and stale dossier docs when a dossier is deleted upstream.
 - `_remove_local_superseded` and `dossier_repo_urls` are untouched.
@@ -573,9 +607,11 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 4: Upload supersession covers harvested dossier docs
 
 **Files:**
+
 - Test: `tests/test_profile_github_harvest.py` (behavioral regression only — no production change expected)
 
 **Interfaces:**
+
 - Consumes: `mono_handler`/`dossier` helpers (Task 3), existing `dossier_repo_urls` / `_remove_local_superseded` code paths.
 
 - [ ] **Step 1: Write the test**
@@ -628,10 +664,12 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 5: project-dossier skill monorepo clause and developer docs
 
 **Files:**
+
 - Modify: `.claude/skills/project-dossier/SKILL.md`
 - Modify: `CLAUDE.md` (Known design notes → "GitHub depth is two-tier; dossiers win" bullet)
 
 **Interfaces:**
+
 - Consumes: behavior shipped in Tasks 1-3 (root-only discovery, `*dossier*.md` naming, shared `repo_url`).
 
 - [ ] **Step 1: Update SKILL.md**
