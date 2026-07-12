@@ -3,13 +3,19 @@ from typing import Any, Callable
 
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.adzuna import AdzunaConnector
+from resume_agent.discovery.connectors.ashby import AshbyConnector
 from resume_agent.discovery.connectors.base import Connector, FetchResult
 from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import ConnectorsConfig
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
 from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
-from resume_agent.discovery.connectors.sources import company_url_id, scrape_target_id
+from resume_agent.discovery.connectors.sources import (
+    NATIVE_URL_KINDS,
+    company_url_id,
+    native_url_id,
+    scrape_target_id,
+)
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
 
@@ -56,12 +62,27 @@ class ConnectorSpec:
     pullable: Callable[[Settings], bool] = field(default=lambda settings: True)
 
 
+def _native_url_spec(kind: str) -> ConnectorSpec:
+    return ConnectorSpec(
+        kind=kind,
+        section_enabled=lambda c: getattr(c, kind).enabled,
+        units=lambda c: [
+            ConnectorUnit(native_url_id(kind, board.url), board.enabled, board)
+            for board in getattr(c, kind).boards
+        ],
+        build=lambda payloads, c, s: _named(
+            CompaniesConnector(payloads, browser_enabled=s.browser_enabled), kind
+        ),
+    )
+
+
 CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
     ConnectorSpec(
         kind="greenhouse",
         section_enabled=lambda c: c.greenhouse.enabled,
         units=lambda c: [
-            ConnectorUnit(f"greenhouse:{b.token}", b.enabled, b) for b in c.greenhouse.boards
+            ConnectorUnit(f"greenhouse:{b.token}", b.enabled, b)
+            for b in c.greenhouse.boards
         ],
         build=lambda payloads, c, s: GreenhouseConnector(payloads),
     ),
@@ -73,6 +94,15 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         ],
         build=lambda payloads, c, s: LeverConnector(payloads),
     ),
+    ConnectorSpec(
+        kind="ashby",
+        section_enabled=lambda c: c.ashby.enabled,
+        units=lambda c: [
+            ConnectorUnit(f"ashby:{b.token}", b.enabled, b) for b in c.ashby.boards
+        ],
+        build=lambda payloads, c, s: AshbyConnector(payloads),
+    ),
+    *(_native_url_spec(kind) for kind in NATIVE_URL_KINDS),
     ConnectorSpec(
         kind="companies",
         section_enabled=lambda c: c.companies.enabled,
@@ -87,7 +117,8 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
         kind="scrape",
         section_enabled=lambda c: c.scrape.enabled,
         units=lambda c: [
-            ConnectorUnit(scrape_target_id(t.url), t.enabled, t) for t in c.scrape.targets
+            ConnectorUnit(scrape_target_id(t.url), t.enabled, t)
+            for t in c.scrape.targets
         ],
         build=lambda payloads, c, s: (
             DashboardScraper(payloads)
