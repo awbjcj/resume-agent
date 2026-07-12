@@ -27,3 +27,9 @@ The live eval judge (`evals/judge.py`) is trusted only after a one-time human an
 | 2026-07-08 | deepseek:deepseek-v4-pro | 64ed837a3ed9c1809441f026ed6581623a7697fd92fc2ed14b5db733c34ce8bd | case_10_keyword_mismatch | 90 | 97 | 7 |
 
 **MAE (stand-in):** 3.4 · **Trusted:** _no (stand-in only — needs a real human anchor per the procedure above)_
+
+> **2026-07-11:** both judge prompts gained band anchors (90/75/60 quality
+> bands) and explicit resume/cover-letter craft standards distilled from
+> resume-writing playbooks, so `judge_prompt_hash()` and
+> `cl_judge_prompt_hash()` changed. The rows above belong to the previous
+> prompt hash; the anchor procedure must be re-run against the new prompts.
