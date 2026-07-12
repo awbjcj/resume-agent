@@ -12,10 +12,12 @@ import yaml
 from resume_agent.config import Settings, get_settings
 from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import (
+    AshbyBoard,
     CompanyUrl,
     ConnectorsConfig,
     GreenhouseBoard,
     LeverBoard,
+    NativeUrlBoard,
     load_connectors_config,
 )
 from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats
@@ -25,6 +27,8 @@ from resume_agent.discovery.connectors.sources import (
     SourceView,
     company_url_id,
     list_source_views,
+    native_url_id,
+    NATIVE_URL_KINDS,
     scrape_target_id,
 )
 from resume_agent.discovery.search_config import load_search_config
@@ -152,7 +156,9 @@ def add_source(
         if any(board.token == target.token for board in config.greenhouse.boards):
             raise SourceError(f"Greenhouse board '{target.token}' is already a source.")
         config.greenhouse.enabled = True
-        config.greenhouse.boards.append(GreenhouseBoard(token=target.token, company=label))
+        config.greenhouse.boards.append(
+            GreenhouseBoard(token=target.token, company=label)
+        )
         new_id = f"greenhouse:{target.token}"
     elif target.ats == "lever" and target.token:
         if any(board.token == target.token for board in config.lever.boards):
@@ -160,6 +166,19 @@ def add_source(
         config.lever.enabled = True
         config.lever.boards.append(LeverBoard(token=target.token, company=label))
         new_id = f"lever:{target.token}"
+    elif target.ats == "ashby" and target.token:
+        if any(board.token == target.token for board in config.ashby.boards):
+            raise SourceError(f"Ashby board '{target.token}' is already a source.")
+        config.ashby.enabled = True
+        config.ashby.boards.append(AshbyBoard(token=target.token, company=label))
+        new_id = f"ashby:{target.token}"
+    elif target.ats in NATIVE_URL_KINDS:
+        section = getattr(config, target.ats)
+        if any(board.url == url for board in section.boards):
+            raise SourceError(f"This {target.ats.title()} board is already a source.")
+        section.enabled = True
+        section.boards.append(NativeUrlBoard(url=url, company=label))
+        new_id = native_url_id(target.ats, url)
     else:
         if any(entry.url == url for entry in config.companies.urls):
             raise SourceError("This URL is already a source.")
@@ -200,7 +219,8 @@ def patch_source(
     if enabled is not _UNSET and not isinstance(enabled, bool):
         raise SourceError("enabled must be true or false.")
     if limit is not _UNSET and (
-        isinstance(limit, bool) or (limit is not None and (not isinstance(limit, int) or limit < 1))
+        isinstance(limit, bool)
+        or (limit is not None and (not isinstance(limit, int) or limit < 1))
     ):
         raise SourceError("limit must be a positive integer or null.")
 
@@ -246,6 +266,20 @@ def _apply_enabled(config: ConnectorsConfig, source_id: str, enabled: bool) -> b
                 config.lever.enabled = True
             board.enabled = enabled
             return True
+    for board in config.ashby.boards:
+        if f"ashby:{board.token}" == source_id:
+            if enabled:
+                config.ashby.enabled = True
+            board.enabled = enabled
+            return True
+    for kind in NATIVE_URL_KINDS:
+        section = getattr(config, kind)
+        for board in section.boards:
+            if native_url_id(kind, board.url) == source_id:
+                if enabled:
+                    section.enabled = True
+                board.enabled = enabled
+                return True
     for entry in config.companies.urls:
         if company_url_id(entry.url) == source_id:
             if enabled:
@@ -279,6 +313,15 @@ def _apply_limit(config: ConnectorsConfig, source_id: str, limit: int | None) ->
         if f"lever:{board.token}" == source_id:
             board.limit = limit
             return True
+    for board in config.ashby.boards:
+        if f"ashby:{board.token}" == source_id:
+            board.limit = limit
+            return True
+    for kind in NATIVE_URL_KINDS:
+        for board in getattr(config, kind).boards:
+            if native_url_id(kind, board.url) == source_id:
+                board.limit = limit
+                return True
     for entry in config.companies.urls:
         if company_url_id(entry.url) == source_id:
             entry.limit = limit
@@ -293,7 +336,9 @@ def _apply_limit(config: ConnectorsConfig, source_id: str, limit: int | None) ->
 def _remove(config: ConnectorsConfig, source_id: str) -> bool:
     before = len(config.greenhouse.boards)
     config.greenhouse.boards = [
-        board for board in config.greenhouse.boards if f"greenhouse:{board.token}" != source_id
+        board
+        for board in config.greenhouse.boards
+        if f"greenhouse:{board.token}" != source_id
     ]
     if len(config.greenhouse.boards) != before:
         return True
@@ -305,9 +350,29 @@ def _remove(config: ConnectorsConfig, source_id: str) -> bool:
     if len(config.lever.boards) != before:
         return True
 
+    before = len(config.ashby.boards)
+    config.ashby.boards = [
+        board for board in config.ashby.boards if f"ashby:{board.token}" != source_id
+    ]
+    if len(config.ashby.boards) != before:
+        return True
+
+    for kind in NATIVE_URL_KINDS:
+        section = getattr(config, kind)
+        before = len(section.boards)
+        section.boards = [
+            board
+            for board in section.boards
+            if native_url_id(kind, board.url) != source_id
+        ]
+        if len(section.boards) != before:
+            return True
+
     before = len(config.companies.urls)
     config.companies.urls = [
-        entry for entry in config.companies.urls if company_url_id(entry.url) != source_id
+        entry
+        for entry in config.companies.urls
+        if company_url_id(entry.url) != source_id
     ]
     if len(config.companies.urls) != before:
         return True
