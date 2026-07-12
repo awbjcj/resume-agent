@@ -15,6 +15,8 @@ replica, and one owner login.
    .venv\Scripts\python.exe -m resume_agent.cli hash-password --password "choose-a-password"
    python -c "import secrets; print(secrets.token_hex(32))"
    ```
+   .venv\Scripts\python.exe -m resume_agent.cli hash-password --password "Wjj20140665!"
+   python -c "import secrets; print(secrets.token_hex(32))"
 
 4. Add Railway variables:
 
