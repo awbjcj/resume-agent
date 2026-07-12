@@ -31,6 +31,24 @@ def scrape_target_id(url: str) -> str:
     return f"scrape:{host_key(url)}"
 
 
+NATIVE_URL_KINDS = (
+    "workday",
+    "tesla",
+    "google",
+    "smartrecruiters",
+    "workable",
+    "recruitee",
+    "personio",
+    "breezy",
+    "jazzhr",
+    "bamboohr",
+)
+
+
+def native_url_id(kind: str, url: str) -> str:
+    return f"{kind}:" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:8]
+
+
 def _company_kind(url: str) -> str:
     target = identify_host(url)
     return target.ats if target is not None else "companies"
@@ -68,6 +86,38 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
                 limit=board.limit,
             )
         )
+
+    for board in config.ashby.boards:
+        enabled = config.ashby.enabled and board.enabled
+        views.append(
+            SourceView(
+                id=f"ashby:{board.token}",
+                kind="ashby",
+                type="board",
+                display_name=board.display(),
+                enabled=enabled,
+                pullable=enabled,
+                detail=board.token,
+                limit=board.limit,
+            )
+        )
+
+    for kind in NATIVE_URL_KINDS:
+        section = getattr(config, kind)
+        for board in section.boards:
+            enabled = section.enabled and board.enabled
+            views.append(
+                SourceView(
+                    id=native_url_id(kind, board.url),
+                    kind=kind,
+                    type="board",
+                    display_name=board.display(),
+                    enabled=enabled,
+                    pullable=enabled,
+                    detail=board.url,
+                    limit=board.limit,
+                )
+            )
 
     for entry in config.companies.urls:
         enabled = config.companies.enabled and entry.enabled
