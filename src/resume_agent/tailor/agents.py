@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from agno.agent import Agent
 
 from resume_agent.config import get_settings
@@ -240,8 +242,9 @@ def build_reviewer_agent(
 
 
 def _merged_advisory_instructions(
-    names: list[str], *, score_bands: bool = False
+    names: list[str], *, score_bands: Mapping[str, bool] | None = None
 ) -> list[str]:
+    bands = score_bands or {}
     listed = ", ".join(repr(name) for name in names)
     instructions = [
         "Return one MergedPanelReview with exactly one ReviewCritique per "
@@ -249,10 +252,10 @@ def _merged_advisory_instructions(
         "Judge each dimension independently against its own rubric; do not let one "
         "dimension's score bleed into another.",
         *_COMMON_REVIEWER_INSTRUCTIONS,
-        *([_SCORE_BAND_INSTRUCTION] if score_bands else []),
     ]
     for name in names:
         rubric = [
+            *([_SCORE_BAND_INSTRUCTION] if bands.get(name, False) else []),
             *REVIEWER_INSTRUCTIONS.get(name, _DEFAULT_REVIEWER_INSTRUCTIONS),
             *CRAFT_REVIEWERS.get(name, []),
         ]
@@ -265,7 +268,7 @@ def build_merged_advisory_agent(
     model_id: str | None = None,
     style_guide: str | None = None,
     *,
-    score_bands: bool = False,
+    score_bands: Mapping[str, bool] | None = None,
 ) -> Runner:
     model = build_model(
         model_id or model_for_tier("mid"),

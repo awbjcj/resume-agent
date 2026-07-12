@@ -87,10 +87,10 @@ def build_tailor_bundle(config, style_guide: str | None = None) -> TailorBundle:
                 [spec.name for spec in advisory_specs],
                 model_for_tier("mid"),
                 style_guide=style_guide,
-                score_bands=any(
-                    bool(getattr(spec, "score_bands", False))
+                score_bands={
+                    spec.name: bool(getattr(spec, "score_bands", False))
                     for spec in advisory_specs
-                ),
+                },
             )
     return TailorBundle(
         tailor=build_tailor_agent(
