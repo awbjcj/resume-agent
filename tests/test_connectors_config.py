@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from resume_agent.discovery.connectors.config import (
     AdzunaConfig,
+    AshbyBoard,
     CompaniesConfig,
     CompanyUrl,
     ConnectorsConfig,
@@ -22,6 +23,7 @@ def test_defaults_are_all_disabled():
     cfg = ConnectorsConfig()
     assert cfg.greenhouse.enabled is False
     assert cfg.lever.enabled is False
+    assert cfg.ashby.enabled is False
     assert cfg.adzuna.enabled is False
     assert cfg.remoteok.enabled is False
     assert cfg.linkedin.enabled is False
@@ -46,7 +48,9 @@ def test_lever_board_company_defaults_to_token():
 
 
 def test_board_company_defaults_to_token():
-    cfg = ConnectorsConfig.model_validate({"greenhouse": {"boards": [{"token": "acme"}]}})
+    cfg = ConnectorsConfig.model_validate(
+        {"greenhouse": {"boards": [{"token": "acme"}]}}
+    )
     board = cfg.greenhouse.boards[0]
     assert board.company is None
     assert board.display() == "acme"
@@ -66,9 +70,12 @@ def test_companies_loads_urls():
     assert cfg.companies.urls == [CompanyUrl(url="https://careers.acme.com")]
 
 
-def test_example_file_has_companies_section():
+def test_example_file_uses_native_sections_and_keeps_companies_for_backcompat():
     cfg = load_connectors_config(Path("config/connectors.yaml.example"))
-    assert cfg.companies.urls
+    assert cfg.workday.boards
+    assert cfg.tesla.boards
+    assert cfg.google.boards
+    assert cfg.companies.urls == []
 
 
 def test_company_url_accepts_bare_string_for_backcompat():
@@ -78,14 +85,19 @@ def test_company_url_accepts_bare_string_for_backcompat():
 
 def test_company_url_accepts_object_form():
     cfg = CompaniesConfig.model_validate(
-        {"enabled": True, "urls": [{"url": "https://x.co", "enabled": False, "label": "X"}]}
+        {
+            "enabled": True,
+            "urls": [{"url": "https://x.co", "enabled": False, "label": "X"}],
+        }
     )
     assert cfg.urls[0].enabled is False
     assert cfg.urls[0].label == "X"
 
 
 def test_board_enabled_defaults_true_when_absent():
-    cfg = GreenhouseConfig.model_validate({"enabled": True, "boards": [{"token": "anthropic"}]})
+    cfg = GreenhouseConfig.model_validate(
+        {"enabled": True, "boards": [{"token": "anthropic"}]}
+    )
     assert cfg.boards[0].enabled is True
 
 
@@ -93,6 +105,7 @@ def test_unit_models_accept_optional_positive_limits():
     assert GreenhouseBoard(token="acme").limit is None
     assert GreenhouseBoard(token="acme", limit=10).limit == 10
     assert LeverBoard(token="acme", limit=9).limit == 9
+    assert AshbyBoard(token="acme", limit=8).limit == 8
     assert CompanyUrl(url="https://x.example/careers", limit=5).limit == 5
     assert ScrapeTarget(url="https://x.example/careers", limit=4).limit == 4
 
@@ -111,6 +124,7 @@ def test_singleton_sections_accept_optional_limits():
     [
         lambda: GreenhouseBoard(token="acme", limit=0),
         lambda: LeverBoard(token="acme", limit=-1),
+        lambda: AshbyBoard(token="acme", limit=0),
         lambda: CompanyUrl(url="https://x.example", limit=0),
         lambda: ScrapeTarget(url="https://x.example", limit=0),
         lambda: RemoteOKConfig(limit=0),
