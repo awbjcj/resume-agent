@@ -17,9 +17,16 @@ _DRAFT_INSTRUCTIONS = [
     "control emphasis but cannot establish a candidate claim.",
     "Copy contact values exactly. Set recipient only when the job data identifies one; otherwise use "
     "null. Use a professional generic greeting when no person's name is supported.",
-    "Write 3-4 short body paragraphs: a role-specific opening, one or two evidence paragraphs, and a "
-    "brief close expressing interest. Avoid generic praise, keyword stuffing, and claims about the company "
-    "that the job description does not support.",
+    "Write 3-4 short body paragraphs totaling roughly 250-400 words: a role-specific opening, one or two "
+    "evidence paragraphs, and a brief close. Avoid generic praise, keyword stuffing, and claims about the "
+    "company that the job description does not support.",
+    "Never open with 'I am writing to apply' or a restatement of the posting. Open with the strongest "
+    "truthful connection between the candidate's evidence and the role's stated needs, in one or two "
+    "sentences.",
+    "Build each evidence paragraph around one stated job need, answered with a specific cited profile "
+    "fact and its outcome; prefer the job's own terminology when the underlying fact genuinely matches it.",
+    "Close with confident, specific interest in this role and a clear forward step. Avoid passive or "
+    "needy closers such as 'I look forward to hearing from you' or 'available at your convenience'.",
     "Every factual sentence must be supported by profile facts. Each paragraph's provenance list must "
     "contain only the ids of the specific profile records or nested facts used in that paragraph.",
     "Never invent or inflate employers, titles, dates, skills, ownership, metrics, projects, motivation, "
