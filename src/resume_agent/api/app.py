@@ -80,8 +80,10 @@ def create_app(
     # process-wide get_settings() cache, which is pinned to cwd-relative ".env"
     # and would otherwise leak that file's values into this app instance.
     settings = (
-        Settings(_env_file=Path(env_path)) if env_path is not None else get_settings()
-    )  # type: ignore[call-arg]
+        Settings(_env_file=Path(env_path))  # type: ignore[call-arg]
+        if env_path is not None
+        else get_settings()
+    )
     resolved_db = db_url or settings.db_url
     resolved_token = settings.api_token if api_token is None else api_token
     resolved_settings = settings.model_copy(
