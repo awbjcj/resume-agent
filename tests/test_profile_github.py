@@ -7,6 +7,12 @@ from resume_agent.profile.github import GitHubClient
 def _client(handler) -> GitHubClient:
     transport = httpx.MockTransport(handler)
     http = httpx.Client(transport=transport, base_url="https://api.github.com")
+    return GitHubClient(token="", client=http)
+
+
+def _auth_client(handler) -> GitHubClient:
+    transport = httpx.MockTransport(handler)
+    http = httpx.Client(transport=transport, base_url="https://api.github.com")
     return GitHubClient(token="t", client=http)
 
 
@@ -29,6 +35,51 @@ def test_fetch_repos():
     gh = _client(handler)
     repos = gh.fetch_repos("ada")
     assert repos[0]["name"] == "engine"
+
+
+def test_fetch_repos_authenticated_owner_uses_user_repos_for_private():
+    """The token's own private repos are only visible via /user/repos."""
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        if request.url.path == "/user":
+            return httpx.Response(200, json={"login": "ada"})
+        if request.url.path == "/user/repos":
+            assert request.url.params.get("affiliation") == "owner"
+            return httpx.Response(200, json=[{"name": "secret", "fork": False}])
+        return httpx.Response(404)
+
+    repos = _auth_client(handler).fetch_repos("ada")
+    assert [repo["name"] for repo in repos] == ["secret"]
+    assert "/user/repos" in seen
+    assert "/users/ada/repos" not in seen
+
+
+def test_fetch_repos_authenticated_other_user_uses_public_endpoint():
+    """A token whose login differs from the target only sees that user's public repos."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/user":
+            return httpx.Response(200, json={"login": "bob"})
+        if request.url.path == "/users/ada/repos":
+            return httpx.Response(200, json=[{"name": "pub"}])
+        return httpx.Response(404)
+
+    assert [repo["name"] for repo in _auth_client(handler).fetch_repos("ada")] == ["pub"]
+
+
+def test_fetch_repos_authenticated_identity_unknown_falls_back_to_public():
+    """A failed /user probe means identity is unconfirmed → public endpoint."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/user":
+            return httpx.Response(403, json={"message": "bad token"})
+        if request.url.path == "/users/ada/repos":
+            return httpx.Response(200, json=[{"name": "pub"}])
+        return httpx.Response(404)
+
+    assert [repo["name"] for repo in _auth_client(handler).fetch_repos("ada")] == ["pub"]
 
 
 def test_fetch_repos_follows_pagination_link():

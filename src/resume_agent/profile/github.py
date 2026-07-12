@@ -76,6 +76,8 @@ class GitHubClient:
             if self._token:
                 headers["Authorization"] = f"Bearer {self._token}"
             self._client = httpx.Client(base_url=GITHUB_API, headers=headers, timeout=20.0)
+        self._login: str | None = None
+        self._login_resolved = False
 
     @staticmethod
     def _object(response: httpx.Response, label: str) -> dict:
@@ -99,9 +101,32 @@ class GitHubClient:
         resp.raise_for_status()
         return _validated_profile(self._object(resp, "profile"))
 
+    def _authenticated_login(self) -> str | None:
+        """Return the token owner's login, or None when it can't be confirmed."""
+        if not self._login_resolved:
+            self._login_resolved = True
+            resp = self._client.get("/user")
+            if resp.status_code == 200:
+                payload = resp.json()
+                login = payload.get("login") if isinstance(payload, dict) else None
+                self._login = login if isinstance(login, str) and login else None
+        return self._login
+
     def fetch_repos(self, username: str) -> list[dict]:
-        url: str | None = f"/users/{quote(username, safe='')}/repos"
-        params: dict[str, int | str] | None = {"per_page": 100, "sort": "updated"}
+        # /users/{username}/repos is public-only; a repo the token owns but keeps
+        # private is visible only through the authenticated-user endpoint. Use it
+        # only once the token's login is confirmed to match the requested user.
+        login = self._authenticated_login() if self._token else None
+        if login is not None and login.casefold() == username.casefold():
+            url: str | None = "/user/repos"
+            params: dict[str, int | str] | None = {
+                "per_page": 100,
+                "sort": "updated",
+                "affiliation": "owner",
+            }
+        else:
+            url = f"/users/{quote(username, safe='')}/repos"
+            params = {"per_page": 100, "sort": "updated"}
         repos: list[dict] = []
         while url is not None:
             resp = self._client.get(url, params=params)
