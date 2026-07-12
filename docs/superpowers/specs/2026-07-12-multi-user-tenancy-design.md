@@ -1,7 +1,7 @@
 # Multi-User Tenancy — Design
 
 **Date:** 2026-07-12
-**Status:** Approved
+**Status:** Approved with pre-implementation correctness amendments
 **Scope:** Expand resume-agent from a single-account tool to a small-group
 multi-user system: invitation-code registration, admin/user roles, per-user
 LLM budgets and resource quotas, user-specific tokens/links, per-user
@@ -36,6 +36,76 @@ role-less invites, role-equivalent PATs, web-UI-only remote members,
 self-service export + admin-only delete, shipped limit defaults, failed-attempt
 rate limiting, admin budget exemption.
 
+### Pre-implementation correctness amendments (2026-07-12)
+
+The implementation-plan audit against the current runtime found several
+places where the original snippets would violate this design. These
+amendments are normative and take precedence over optimistic snippets in the
+three plans:
+
+1. **Multi-user really is always on for file-backed apps.** Every file-backed
+   server boot initializes `system.db`; an empty user table without both seed
+   credentials is a startup error. Only the explicit in-memory SQLite test
+   adapter retains the legacy single-user path. There is no credential-based
+   fallback that can silently start a production server in legacy mode.
+2. **The request seam covers every tenant resource, not only SQL sessions.**
+   `UserContext` carries the Workspace paths, workspace engine, shared system
+   engine, effective settings, and own-key provider provenance. Request
+   resource adapters resolve config stores, document stores, secrets files,
+   profile/output/taxonomy paths, and direct engine/settings access from the
+   active context. No guarded router may read a mutable tenant resource from
+   process-global `app.state`.
+3. **Workspace provisioning is template-complete and self-healing.** It copies
+   every supported `config/*.example` artifact without overwriting user edits,
+   and `build_context` idempotently provisions missing directories so a crash
+   after registration cannot leave a permanently unusable account.
+4. **Legacy adoption is a recoverable transaction.** A journal records each
+   child move; failures roll moved children back when possible and otherwise
+   leave a deterministic resumable journal. Bootstrap distinguishes an empty
+   user table from a corrupted non-empty/no-admin table and never seeds a new
+   admin merely because the admin query returned no row.
+5. **Authentication inputs are constrained at the API boundary.** Usernames
+   use a stable normalized, path/header-safe syntax; passwords and token names
+   have explicit length bounds; limit values are non-negative. Password hashes
+   remain backward-compatible with existing PBKDF2 strings but new/verified
+   weak hashes are upgraded to the current iteration policy. Session signing
+   mixes the complete password hash, and the cookie's `Secure` flag follows
+   the effective HTTPS scheme so localhost HTTP CLI login remains usable.
+6. **Link tokens are capabilities, not general authentication.** Normal guarded
+   routes accept only a session cookie or header PAT. A link token is accepted
+   only by an explicitly link-enabled SSE/download dependency and only when
+   its signed purpose and authenticated user own the requested resource. An
+   `sse` token can never authorize `/api/jobs`, mutations, or a download.
+7. **Usage accounting covers sync and async calls.** Recording lives in the
+   successful return path of `AgentRunner.run` and `AgentRunner.arun`, which
+   are the actual common seam; `acall` alone misses synchronous calls. The
+   system engine and own-key provenance come from `UserContext`, never a
+   process-global recorder or cwd-derived `env_settings()` comparison, so
+   multiple app instances cannot cross-write usage.
+8. **All run operations are tenant-scoped.** Run JSON lives in the submitting
+   user's Workspace `runs/`; singleton keys include the user id; list/get/SSE/
+   cancel and recovery enforce ownership; persisted failures carry a typed
+   `errorCode` as well as human text. Foreign run ids return 404.
+9. **Quota checks preserve their stated semantics.** Job-cap tests cover both
+   inserts and upgrades at the cap, archived rows do not count, and per-user
+   pull singletons prevent concurrent same-user batches from racing the cap.
+10. **User deletion and root import are failure-atomic.** Deletion first checks
+    all guards, evicts handles, quarantines the Workspace by rename, commits
+    credential cleanup/user deletion, then removes the quarantine; failures
+    restore it rather than using `ignore_errors=True`. Whole-root import closes
+    every engine once, validates/rebuilds before declaring success, and keeps
+    the existing rollback archive if restoration fails.
+11. **Admin/account UI follows the existing generated client and design
+    system.** React 19 + React Router 7 + the installed base-nova shadcn
+    components are used with loading/error/empty states, accessible dialogs,
+    responsive layouts, and role-gated routes. Raw fetch helpers, bare form
+    markup, and `window.confirm` reference snippets are not implementation
+    contracts.
+12. **The local domain CLI rebases paths as well as settings.** Default
+    `data/...` and `config/...` arguments map into the selected Workspace;
+    explicit user-supplied paths remain untouched. Activating a context alone
+    is insufficient because the current CLI passes many literal paths.
+
 ---
 
 ## 2. Data layout & tenancy core
@@ -53,7 +123,8 @@ data/
 ```
 
 - **`UserContext`** is the single new seam: the authenticated `User` row, the
-  workspace paths, a per-user SQLModel engine, and an **effective `Settings`**
+  typed workspace paths, a per-user SQLModel engine, the shared system engine,
+  own-key provider provenance, and an **effective `Settings`**
   (server settings overlaid with the user's `secrets.env`, config dir, and
   data paths). The auth dependency resolves it per request; routers and
   services stop reading `app.state.engine` / global `data/` / `config/` and
@@ -63,8 +134,8 @@ data/
   eviction for a small group; all engines closed on shutdown.
 - **Run workers** already open their own DB sessions; run submission captures
   the submitting user's context (engine + paths) so workers never touch the
-  request session. Run records gain a `user_id`; `/api/runs` lists only the
-  caller's runs.
+  request session. Run records live under the owner's Workspace, gain a
+  `user_id`, and every list/get/SSE/cancel operation enforces ownership.
 - **The job DB schema does not change.** Isolation is by file, not by column,
   so `tracking/queries.py` and every invariant (fact-lock, source priority,
   dedup, archive/prune) are untouched.
@@ -80,7 +151,8 @@ request), the RunManager worker wrapper (per background run), and the CLI
 entrypoint (per invocation). `get_settings()` returns the active context's
 effective Settings when one is set and falls back to env-derived settings
 otherwise (tests, legacy local mode) — so the 36 domain-layer call sites do
-not change. `llm_runner.acall` reads the active user id to record usage.
+not change. `AgentRunner.run` / `AgentRunner.arun` read the active context to
+record usage.
 Crossing an `asyncio.run` or threadpool boundary must capture and restore the
 context explicitly; that capture is part of the seam's contract, and tests
 assert isolation under concurrent mixed-user requests.
@@ -126,10 +198,11 @@ Flows:
   rolls; success resets the counter. In-memory only (single process); resets
   on restart, which matches the threat model. No lockout flag on the user row
   — an attacker must not be able to lock the real user out durably.
-- **Link tokens:** SSE (`EventSource`) and `<a>` downloads cannot set headers,
+- **Link tokens:** SSE (`EventSource`) and selected `<a>` downloads cannot set headers,
   so `POST /api/auth/link-token` mints a short-lived (~10 min) signed
-  `user_id:purpose:expiry` token accepted only via `?token=`. This replaces
-  the static shared `api_token`, which is removed.
+  `user_id:purpose:expiry` capability accepted only via `?token=` on the
+  matching purpose-bound route. It is never part of general request auth.
+  This replaces the static shared `api_token`, which is removed.
 - **Bootstrap:** whenever the `users` table is empty (fresh deploy or legacy
   adoption), `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` are **required** and seed
   the admin row; the server refuses to start without them. Registration is
@@ -144,8 +217,8 @@ Flows:
 
 **Token budgets (shared-key users only):**
 
-- **Recording** at the one seam every LLM call passes through:
-  `llm_runner.acall` appends a `UsageEvent` to `system.db` (own short
+- **Recording** at the one seam every production LLM call passes through:
+  `AgentRunner.run` / `AgentRunner.arun` append a `UsageEvent` to `system.db` (own short
   session; WAL absorbs concurrent writers). Weighted totals mirror
   vsda-deep-agent (input + output weighted; cache reads discounted).
 - **Enforcement is per phase, not per call:** when a run phase starts (pull
