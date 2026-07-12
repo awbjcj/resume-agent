@@ -9,7 +9,7 @@ from resume_agent.discovery.connectors.base import (
     board_error,
 )
 from resume_agent.discovery.connectors.breezy import fetch_breezy
-from resume_agent.discovery.connectors.config import CompanyUrl
+from resume_agent.discovery.connectors.config import CompanyUrl, NativeUrlBoard
 from resume_agent.discovery.connectors.detect import (
     AtsTarget,
     detect_ats,
@@ -160,7 +160,7 @@ class CompaniesConnector:
 
     def __init__(
         self,
-        urls: list[CompanyUrl | str],
+        urls: list[CompanyUrl | NativeUrlBoard | str],
         *,
         browser_enabled: bool = True,
     ):
@@ -196,7 +196,7 @@ class CompaniesConnector:
 
     def _produce(
         self,
-        entry: CompanyUrl,
+        entry: CompanyUrl | NativeUrlBoard,
         search: SearchConfig,
         limit: int | None,
         skip_seen: SkipSeen | None,
@@ -211,9 +211,10 @@ class CompaniesConnector:
             raise BrowserRequired
         effective_limit = entry.limit if entry.limit is not None else limit
         jobs = backend(target, search, effective_limit, skip_seen=skip_seen)
-        if entry.label:
+        label = entry.label if isinstance(entry, CompanyUrl) else entry.company
+        if label:
             # The configured source label is the user's canonical company name.
             # ATS payloads commonly return a lowercase account/token instead.
             for job in jobs:
-                job.company = entry.label
+                job.company = label
         return jobs
