@@ -8,6 +8,42 @@
 
 **Tech Stack:** Python 3.12, FastAPI, typer + httpx (CLI), React 18 + TypeScript (SPA, existing `web/` Vite app), pytest offline, vitest.
 
+## Correctness amendments (audit before implementation)
+
+These corrections are normative and override later reference snippets:
+
+- Use the actual stack: Python **3.13+**, React **19**, React Router **7**, and
+  the installed base-nova shadcn system. Build UI with the generated API
+  client/React Query and existing components; the raw-fetch/bare-markup/
+  `window.confirm` snippets are reference logic only.
+- Admin schemas validate roles, password/token lengths, expiry ranges, and
+  limits (`ge=0`). The user response includes `lastActiveAt`; auth updates it
+  with a bounded cadence so the promised admin column is real.
+- Deletion is failure-atomic: validate guards, evict the workspace engine,
+  rename the Workspace to a quarantine path, delete/revoke user credentials in
+  one system transaction, then remove the quarantine. Restore it on failure;
+  never commit the user deletion first or hide `rmtree` failure with
+  `ignore_errors=True`.
+- Account usage applies the same rolling seven-day cutoff to shared-key and
+  own-key totals. Export filenames use the validated username, and export
+  tests assert no sibling/system files or traversal names are present.
+- The sync `httpx.Client(ASGITransport(...))` test snippet is invalid in current
+  httpx because ASGITransport is async-only. Test the CLI with a
+  `TestClient`-backed client/protocol. Cache credentials atomically with
+  owner-only permissions where supported, store the minted token id, and make
+  `admin logout` revoke that PAT before removing local credentials when the
+  server is reachable.
+- Add TDD component tests before both Register and Account implementations,
+  not only a single Account render test. Cover error/loading/empty states,
+  one-time secret copy, password flow, responsive admin actions, accessible
+  AlertDialog deletion, route-level admin denial, and nav gating.
+- Whole-root export snapshots every SQLite database and omits WAL/SHM
+  sidecars. Import closes each engine once, preserves rollback data on restore
+  failure, rebuilds and validates the imported tenancy before returning 200,
+  and does not rely on a process-global usage recorder.
+- Contract regeneration and broad backend/web/browser verification occur once
+  after all three plans; task-level checks remain the smallest RED/GREEN proof.
+
 ## Global Constraints
 
 - **Strict TDD** (superpowers:test-driven-development): every task writes its failing test first and runs it to observe RED before any implementation code; implementation is the minimum to reach GREEN. Never reorder these steps (SPA tasks: component test before wiring the route).
