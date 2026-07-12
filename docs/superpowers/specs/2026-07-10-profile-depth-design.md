@@ -149,6 +149,7 @@ fragments as well as during metadata enrichment:
   and fixed sections: `# Project: <name>`, `## Summary`,
   `## Tech stack (evidence-backed)`, `## Architecture highlights`,
   `## Quantified outcomes`, `## Skills demonstrated`.
+
 - Skill rules (the extraction contract): only claims verifiable from the repo's
   code, docs, or git history; no employment/education claims; quantified
   outcomes must cite their evidence (file, benchmark, commit); tech stack items
@@ -206,8 +207,8 @@ fragments as well as during metadata enrichment:
   (fork/archived/no-docs skips, cap, allow/deny), doc truncation, deterministic
   virtual-doc bytes, delist removal, dossier-supersede, rate-limit early stop.
 - Project-mode extraction with a fake agent: schema restriction (single Project
-  + skills only; foreign sections rejected/dropped), fact-id assignment,
-  fragment cache meta round-trip.
+  - skills only; foreign sections rejected/dropped), fact-id assignment,
+    fragment cache meta round-trip.
 - Manifest: `origin` field round-trip, `project` mode validation (primary stays
   literal, anchor rejected).
 - Merge identity: fragment Project + metadata Project unify by `repo_url`; no

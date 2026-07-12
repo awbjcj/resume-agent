@@ -12,17 +12,17 @@ the API only via the OpenAPI contract) but ship as **one** Railway service.
 
 ## Decisions (from brainstorming)
 
-| Question | Decision |
-| --- | --- |
-| Tenancy | Single user (the owner). No multi-tenant schema work. |
-| Auth | One account: username + password (env-configured), HttpOnly signed session cookie. Existing `api_token` bearer stays for CLI/scripts. |
-| Persistence | SQLite + one Railway volume. No Postgres, no object storage. |
-| Topology | One service; FastAPI serves the built SPA (already implemented in `create_app`). |
-| Browser connectors | Disabled in cloud via a `browser_enabled` flag; per-URL failure reasons, never a crash. Local CLI keeps full capability. |
-| Data seed / backup | Authenticated admin export/import endpoints (tar.gz of the data root). |
-| Deploys | GitHub auto-deploy from `main` via Dockerfile. |
-| Data custody | The cloud instance owns the Data root (see ADR 0002). Local browser pulls use the **Round-trip pull**: export → local CLI pull against the snapshot → import back, no cloud mutations in between. |
-| Secrets | Split: **Platform secrets** (AUTH_*, SESSION_SECRET, API_TOKEN, BROWSER_ENABLED) live in Railway env vars; **Operational secrets** (LLM keys, GitHub, Adzuna, LinkedIn) are managed via the existing web Secrets page onto the volume's `.env`. Nothing is shadowed because the two sets are disjoint. |
+| Question           | Decision                                                                                                                                                                                                                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenancy            | Single user (the owner). No multi-tenant schema work.                                                                                                                                                                                                                                                    |
+| Auth               | One account: username + password (env-configured), HttpOnly signed session cookie. Existing `api_token` bearer stays for CLI/scripts.                                                                                                                                                                    |
+| Persistence        | SQLite + one Railway volume. No Postgres, no object storage.                                                                                                                                                                                                                                             |
+| Topology           | One service; FastAPI serves the built SPA (already implemented in `create_app`).                                                                                                                                                                                                                         |
+| Browser connectors | Disabled in cloud via a `browser_enabled` flag; per-URL failure reasons, never a crash. Local CLI keeps full capability.                                                                                                                                                                                 |
+| Data seed / backup | Authenticated admin export/import endpoints (tar.gz of the data root).                                                                                                                                                                                                                                   |
+| Deploys            | GitHub auto-deploy from `main` via Dockerfile.                                                                                                                                                                                                                                                           |
+| Data custody       | The cloud instance owns the Data root (see ADR 0002). Local browser pulls use the **Round-trip pull**: export → local CLI pull against the snapshot → import back, no cloud mutations in between.                                                                                                        |
+| Secrets            | Split: **Platform secrets** (AUTH\_\*, SESSION_SECRET, API_TOKEN, BROWSER_ENABLED) live in Railway env vars; **Operational secrets** (LLM keys, GitHub, Adzuna, LinkedIn) are managed via the existing web Secrets page onto the volume's `.env`. Nothing is shadowed because the two sets are disjoint. |
 
 Out of scope (explicitly): multi-user tenancy, Postgres migration, object
 storage, hybrid local-browser-to-cloud sync (possible phase 2), OAuth.
@@ -116,12 +116,12 @@ web-settings save cannot lock the owner out or re-enable browsers in cloud.
 Railway allows one volume per service. Mount it at `/app/data`. The app has
 four mutable filesystem roots; the entrypoint brings them all onto the volume:
 
-| Path | Handling |
-| --- | --- |
-| `data/` | The volume mount point itself. Holds the SQLite DB (`db_url` default already `sqlite:///data/resume_agent.db`), profile corpus/facts, runs, workday facets, scraper recipes. |
-| `output/` | Symlink `/app/output → /app/data/output` (created if missing). |
+| Path      | Handling                                                                                                                                                                                                                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data/`   | The volume mount point itself. Holds the SQLite DB (`db_url` default already `sqlite:///data/resume_agent.db`), profile corpus/facts, runs, workday facets, scraper recipes.                                                                                      |
+| `output/` | Symlink `/app/output → /app/data/output` (created if missing).                                                                                                                                                                                                    |
 | `config/` | Symlink `/app/config → /app/data/config`. **First boot:** seed `data/config/` from the repo's default config files (shipped in the image at `/app/config.defaults/`). Existing files are never overwritten — Source Manager / web-settings edits survive deploys. |
-| `.env` | Symlink `/app/.env → /app/data/.env` (seeded empty). The web secrets editor writes through it and persists. Real Railway env vars still take precedence over `.env` values (pydantic-settings precedence), so platform-managed secrets win. |
+| `.env`    | Symlink `/app/.env → /app/data/.env` (seeded empty). The web secrets editor writes through it and persists. Real Railway env vars still take precedence over `.env` values (pydantic-settings precedence), so platform-managed secrets win.                       |
 
 Implementation: `prepare_data_root(app_root: Path, data_root: Path)` in a new
 `src/resume_agent/deploy.py` — pure function, unit-testable against tmp dirs —
