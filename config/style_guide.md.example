@@ -16,8 +16,26 @@ Delete this comment and write freely below. Missing or empty file = no change.
 
 Write in a crisp, results-first register suitable for senior software roles.
 
+Tone and voice:
+
 - Lead every experience bullet with a quantified outcome, then the action.
-- Prefer strong verbs like built, shipped, and scaled.
-- Foreground systems and infrastructure work for backend roles.
+- Prefer strong ownership verbs (built, shipped, scaled, led, designed) over
+  participation verbs (contributed to, assisted with, helped).
+- Write changes as before-to-after ("cut deploy time from 2 hours to 15
+  minutes") instead of bare percentages when the source fact has both numbers.
+- No empty self-praise ("results-driven", "team player", "detail-oriented")
+  and no objective statements about what I'm seeking.
+
+Emphasis and structure:
+
+- Foreground systems and infrastructure work for backend roles; name the
+  concrete technologies inside bullets, not just the skills list.
+- Give the most recent role the most bullets; compress roles older than five
+  years to one or two lines each.
 - Keep it to one page; cut hobby projects unless they show a required skill.
+
+Conventions:
+
 - Use American spelling and the Oxford comma.
+- Spell out a metric's scale on first use (users, requests/second, dollars);
+  abbreviate only well-known units (ms, TB, ARR).
