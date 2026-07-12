@@ -71,6 +71,7 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
 
     for entry in config.companies.urls:
         enabled = config.companies.enabled and entry.enabled
+        target = identify_host(entry.url)
         views.append(
             SourceView(
                 id=company_url_id(entry.url),
@@ -79,7 +80,12 @@ def list_source_views(config: ConnectorsConfig, settings: Settings) -> list[Sour
                 display_name=entry.label or entry.url,
                 enabled=enabled,
                 pullable=enabled,
-                detail=entry.url,
+                # Known ATS sources use the same compact board identity as the
+                # dedicated Greenhouse and Lever rows. Keep the URL only for
+                # generic careers pages where there is no canonical token.
+                detail=target.token
+                if target is not None and target.token
+                else entry.url,
                 limit=entry.limit,
             )
         )

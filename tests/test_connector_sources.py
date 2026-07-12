@@ -73,6 +73,7 @@ def test_list_source_views_covers_boards_and_aggregators():
     company_id = company_url_id("https://jobs.ashbyhq.com/openai")
     assert by_id[company_id].kind == "ashby"
     assert by_id[company_id].display_name == "OpenAI"
+    assert by_id[company_id].detail == "openai"
     assert by_id["adzuna"].type == "aggregator"
     assert "key set" in by_id["adzuna"].detail
     assert by_id["adzuna"].pullable is True
