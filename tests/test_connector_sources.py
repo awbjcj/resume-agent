@@ -26,6 +26,10 @@ def _cfg():
                 "enabled": True,
                 "boards": [{"token": "zoox", "company": "Zoox", "enabled": False}],
             },
+            "ashby": {
+                "enabled": True,
+                "boards": [{"token": "openai", "company": "OpenAI"}],
+            },
             "companies": {
                 "enabled": True,
                 "urls": [{"url": "https://jobs.ashbyhq.com/openai", "label": "OpenAI"}],
@@ -70,6 +74,8 @@ def test_list_source_views_covers_boards_and_aggregators():
         detail="anthropic",
     )
     assert by_id["lever:zoox"].enabled is False
+    assert by_id["ashby:openai"].display_name == "OpenAI"
+    assert by_id["ashby:openai"].detail == "openai"
     company_id = company_url_id("https://jobs.ashbyhq.com/openai")
     assert by_id[company_id].kind == "ashby"
     assert by_id[company_id].display_name == "OpenAI"

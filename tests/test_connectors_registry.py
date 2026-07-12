@@ -4,7 +4,10 @@ from resume_agent.config import Settings
 from resume_agent.discovery.connectors.adzuna import AdzunaConnector
 from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import ConnectorsConfig
-from resume_agent.discovery.connectors.registry import build_connectors, build_source_connectors
+from resume_agent.discovery.connectors.registry import (
+    build_connectors,
+    build_source_connectors,
+)
 from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
 from resume_agent.discovery.scraper.linkedin import LinkedInScraper
 
@@ -65,7 +68,9 @@ def test_registry_threads_singleton_limits_to_connectors():
         }
     )
     settings = _settings(adzuna_app_id="x", adzuna_app_key="y")
-    connectors = {connector.name: connector for connector in build_connectors(cfg, settings)}
+    connectors = {
+        connector.name: connector for connector in build_connectors(cfg, settings)
+    }
     remoteok = connectors["remoteok"]
     adzuna = connectors["adzuna"]
     linkedin = connectors["linkedin"]
@@ -83,6 +88,28 @@ def test_companies_connector_built_when_enabled_with_urls():
     )
     names = [c.name for c in build_connectors(cfg, _settings())]
     assert names == ["companies"]
+
+
+def test_url_based_native_connector_keeps_its_ats_identity():
+    cfg = ConnectorsConfig.model_validate(
+        {
+            "workday": {
+                "enabled": True,
+                "boards": [
+                    {
+                        "url": "https://acme.wd5.myworkdayjobs.com/Careers",
+                        "company": "Acme",
+                    }
+                ],
+            }
+        }
+    )
+
+    aggregate = build_connectors(cfg, _settings())
+    per_source = build_source_connectors(cfg, _settings())
+
+    assert [connector.name for connector in aggregate] == ["workday"]
+    assert per_source[0].name.startswith("workday:")
 
 
 def test_companies_registry_preserves_url_limit():
@@ -118,7 +145,14 @@ def test_companies_ordered_with_ats_sources_before_aggregators():
     )
     settings = _settings(adzuna_app_id="x", adzuna_app_key="y")
     names = [c.name for c in build_connectors(cfg, settings)]
-    assert names == ["greenhouse", "lever", "companies", "remoteok", "adzuna", "linkedin"]
+    assert names == [
+        "greenhouse",
+        "lever",
+        "companies",
+        "remoteok",
+        "adzuna",
+        "linkedin",
+    ]
 
 
 def _full_cfg():
@@ -126,7 +160,10 @@ def _full_cfg():
         {
             "greenhouse": {
                 "enabled": True,
-                "boards": [{"token": "anthropic"}, {"token": "scaleai", "enabled": False}],
+                "boards": [
+                    {"token": "anthropic"},
+                    {"token": "scaleai", "enabled": False},
+                ],
             },
             "companies": {
                 "enabled": True,
@@ -140,10 +177,16 @@ def _full_cfg():
 
 
 def test_build_source_connectors_is_one_per_enabled_entry():
-    names = [connector.name for connector in build_source_connectors(_full_cfg(), _settings())]
+    names = [
+        connector.name
+        for connector in build_source_connectors(_full_cfg(), _settings())
+    ]
     assert names == [
         "greenhouse:anthropic",
-        "companies:" + __import__("hashlib").sha1(b"https://jobs.ashbyhq.com/openai").hexdigest()[:8],
+        "companies:"
+        + __import__("hashlib")
+        .sha1(b"https://jobs.ashbyhq.com/openai")
+        .hexdigest()[:8],
         "remoteok",
     ]
 
@@ -175,6 +218,23 @@ def test_spec_table_is_the_single_enumeration():
 
     kinds = [spec.kind for spec in CONNECTOR_SPECS]
     assert kinds == [
-        "greenhouse", "lever", "companies", "scrape", "remoteok", "adzuna", "linkedin",
+        "greenhouse",
+        "lever",
+        "ashby",
+        "workday",
+        "tesla",
+        "google",
+        "smartrecruiters",
+        "workable",
+        "recruitee",
+        "personio",
+        "breezy",
+        "jazzhr",
+        "bamboohr",
+        "companies",
+        "scrape",
+        "remoteok",
+        "adzuna",
+        "linkedin",
     ]  # canonical dedup order
     assert len(set(kinds)) == len(kinds)
