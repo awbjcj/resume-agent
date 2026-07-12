@@ -8,6 +8,43 @@
 
 **Tech Stack:** Python 3.12, FastAPI, SQLModel (workspace DB) + plain SQLAlchemy 2.x ORM (system DB), pydantic-settings, typer, pytest (offline — no network, no API keys).
 
+## Correctness amendments (audit before implementation)
+
+These corrections are part of the plan and override later reference snippets:
+
+- Use the repository runtime contract (Python **3.13+**), not the stale 3.12
+  label above.
+- Every file-backed `create_app` boots multi-user and refuses an empty user
+  table without seed credentials. The only legacy boot is the in-memory
+  SQLite test adapter; do not key production mode on whether credentials
+  happen to be present.
+- Expand `UserContext` to carry typed `WorkspacePaths`, `system_engine`, and
+  `own_key_providers`. `build_context` must provision the Workspace
+  idempotently before opening its engine.
+- Provision every supported `config/*.example` target, not the four-name list;
+  direct reliance on `python-dotenv` must either be declared or replaced by
+  the repository's existing env parser.
+- Legacy adoption needs a journal plus rollback/resume behavior. The simple
+  sequence of `shutil.move` calls is not the rollback-safe child swap promised
+  by the design. Bootstrap checks whether **any users** exist separately from
+  finding an admin; a non-empty/no-admin database is an error, not a reason to
+  seed another account.
+- Add request-scoped resource adapters for engine, settings, `YamlConfigStore`,
+  `DocumentStore`, secrets/env path, and Workspace data/profile paths. Convert
+  every guarded router currently reading tenant data through `app.state`
+  (`config`, `profile`, `secrets`, `setup`, `runs`, `match_gap`, and
+  `suggestions`). Merely leaving `app.state.engine` pointed at the seed admin is
+  a cross-tenant data leak after Plan 2 authenticates a different user.
+- Store run records under each Workspace `runs/`, register/recover all roots,
+  and capture the context on submit. Preserve the legacy root only for the
+  in-memory adapter and existing direct `RunManager` unit tests.
+- CLI activation must rebase default `data/...` and `config/...` command
+  arguments into the selected Workspace while preserving explicit paths.
+  Context-aware `get_settings()` alone does not fix literal CLI paths.
+- Intermediate verification stays focused per task. Do not run the full suite
+  after Tasks 2 and 8 as the optimistic text suggests; save it for the final
+  verification phase requested by the user.
+
 ## Global Constraints
 
 - **Strict TDD** (superpowers:test-driven-development): every task writes its failing test first and runs it to observe RED before any implementation code; implementation is the minimum to reach GREEN. Never reorder these steps.
