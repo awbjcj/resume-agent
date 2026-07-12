@@ -10,7 +10,11 @@ from resume_agent.discovery.connectors.base import (
 )
 from resume_agent.discovery.connectors.breezy import fetch_breezy
 from resume_agent.discovery.connectors.config import CompanyUrl
-from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, identify_host
+from resume_agent.discovery.connectors.detect import (
+    AtsTarget,
+    detect_ats,
+    identify_host,
+)
 from resume_agent.discovery.connectors.google import fetch_google
 from resume_agent.discovery.connectors.greenhouse import (
     fetch_greenhouse_board,
@@ -206,4 +210,10 @@ class CompaniesConnector:
         if target.ats == "tesla" and not self.browser_enabled:
             raise BrowserRequired
         effective_limit = entry.limit if entry.limit is not None else limit
-        return backend(target, search, effective_limit, skip_seen=skip_seen)
+        jobs = backend(target, search, effective_limit, skip_seen=skip_seen)
+        if entry.label:
+            # The configured source label is the user's canonical company name.
+            # ATS payloads commonly return a lowercase account/token instead.
+            for job in jobs:
+                job.company = entry.label
+        return jobs
