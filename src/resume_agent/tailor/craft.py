@@ -22,11 +22,28 @@ CRAFT_WRITER = [
     "original order.",
     "When a cited fact names the same thing the job names, prefer the job's "
     "exact term (a fact stating Amazon Web Services experience may be written "
-    "as AWS). Cover a must-have skill both as a skills-section entry and inside "
-    "one supporting bullet when the evidence exists.",
+    "as AWS); never relabel an adjacent or merely similar activity as the "
+    "job's own term. Cover a must-have skill both as a skills-section entry "
+    "and inside one supporting bullet when the evidence exists.",
+    "When a cited fact supplies both endpoints of a change, write it as "
+    "before-to-after (reduced p95 latency from 500ms to 200ms) rather than a "
+    "bare percentage; a number persuades only with its baseline or scale "
+    "context. Keep each bullet to one claim and at most three numbers.",
+    "Name the specific technologies, tools, or methods inside a bullet when "
+    "the cited fact names them; a job-critical skill shown in working context "
+    "outweighs the same token sitting only in the skills list.",
+    "Order the skills section by this job's priorities: must-have skills "
+    "first, then supporting skills. Cut low-signal entries (default office "
+    "tools, tech irrelevant to this role) before cutting anything the job "
+    "asks for.",
+    "Give the most recent and most role-relevant positions the largest bullet "
+    "share; compress older or off-target roles to one or two bullets instead "
+    "of trimming every role evenly.",
     "Keep the summary to at most three lines aimed at this role: seniority, the "
     "strongest matching skills, and one signature outcome, each supported by "
-    "facts cited elsewhere in the resume.",
+    "facts cited elsewhere in the resume. Never fill it with empty self-praise "
+    "such as 'results-driven', 'team player', or 'detail-oriented', and never "
+    "state what the candidate is seeking.",
     "Prefer concrete nouns and numbers over adjectives, delete filler words, "
     "and keep each bullet under roughly thirty words.",
 ]
@@ -35,6 +52,9 @@ CRAFT_MATCH_PLAN = [
     "Plan coverage for every must-have requirement before any nice-to-have, "
     "and for each requirement prefer the strongest evidence: quantified "
     "outcomes over plain statements, recent over old, direct over transferable.",
+    "Read the JD's own emphasis signals: a requirement it repeats, lists "
+    "first, or marks required outranks one marked preferred, bonus, or a "
+    "plus; weight coverage planning accordingly.",
 ]
 
 CRAFT_REVIEWERS: dict[str, list[str]] = {
@@ -45,6 +65,10 @@ CRAFT_REVIEWERS: dict[str, list[str]] = {
         "nice-to-have coverage.",
         "Check that the summary or most recent title visibly aligns with the "
         "job's role name and seniority when the underlying evidence supports it.",
+        "Treat a near-synonym of a JD term as weak coverage when the evidence "
+        "would support the exact term ('risk mitigation' where the job says "
+        "'risk management'); suggest the exact term. Flag a term repeated far "
+        "beyond natural use as stuffing rather than coverage.",
     ],
     "recruiter": [
         "Apply a six-second scan standard: the summary, first role, and its "
@@ -52,6 +76,9 @@ CRAFT_REVIEWERS: dict[str, list[str]] = {
         "resume whose best material sits below the top third scans poorly.",
         "Bullet lead words carry the scan: flag bullets that open with weak, "
         "generic, or duty phrasing instead of a strong verb or outcome.",
+        "Flag empty self-praise in the summary ('results-driven', 'team "
+        "player', 'detail-oriented') and any statement of what the candidate "
+        "is seeking; summary lines must read as evidence, not adjectives.",
     ],
     "hiring-manager": [
         "Reward concrete scale signals such as users, throughput, data volume, "
@@ -65,5 +92,8 @@ CRAFT_REVIEWERS: dict[str, list[str]] = {
         "Flag any bullet over roughly thirty words, any bullet opened by a "
         "weak verb or passive construction, and any repeated verb or "
         "duplicated evidence across bullets.",
+        "Flag filler words and empty intensifiers (various, numerous, "
+        "successfully, effectively), bullets packing more than three numbers, "
+        "and any bullet carrying more than one distinct claim.",
     ],
 }
