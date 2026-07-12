@@ -121,6 +121,7 @@ def import_data_root(
     before_swap: Callable[[], None] | None = None,
 ) -> None:
     """Stage, then full-replace volume children with rollback on move failure."""
+    data_root = data_root.resolve()
     data_root.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".ra-import-stage-", dir=data_root))
     rollback = Path(tempfile.mkdtemp(prefix=".ra-import-rollback-", dir=data_root))

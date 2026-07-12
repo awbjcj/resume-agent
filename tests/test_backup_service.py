@@ -56,6 +56,21 @@ def test_import_roundtrip_full_replaces_root(tmp_path):
     assert not (root / "stray.txt").exists()
 
 
+def test_import_with_relative_data_root_does_not_move_rollback_into_itself(
+    tmp_path, monkeypatch
+):
+    root, db = _make_root(tmp_path)
+    archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
+    (root / "stray.txt").write_text("stray", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    import_data_root(archive, root.relative_to(tmp_path))
+
+    assert (root / "profile" / "facts.json").is_file()
+    assert not (root / "stray.txt").exists()
+    assert not list(root.glob(".ra-import-rollback-*"))
+
+
 def test_import_rejects_traversal_and_empty_archives_before_touching_root(tmp_path):
     root, _ = _make_root(tmp_path)
     payload = tmp_path / "payload.txt"
