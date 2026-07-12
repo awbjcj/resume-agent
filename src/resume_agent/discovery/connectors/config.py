@@ -38,6 +38,36 @@ class LeverConfig(ExtensibleModel):
     boards: list[LeverBoard] = Field(default_factory=list)
 
 
+class AshbyBoard(ExtensibleModel):
+    token: str
+    company: str | None = None
+    enabled: bool = True
+    limit: int | None = Field(default=None, ge=1)
+
+    def display(self) -> str:
+        return self.company or self.token
+
+
+class AshbyConfig(ExtensibleModel):
+    enabled: bool = False
+    boards: list[AshbyBoard] = Field(default_factory=list)
+
+
+class NativeUrlBoard(ExtensibleModel):
+    url: str
+    company: str | None = None
+    enabled: bool = True
+    limit: int | None = Field(default=None, ge=1)
+
+    def display(self) -> str:
+        return self.company or self.url
+
+
+class NativeUrlConfig(ExtensibleModel):
+    enabled: bool = False
+    boards: list[NativeUrlBoard] = Field(default_factory=list)
+
+
 class AdzunaConfig(ExtensibleModel):
     enabled: bool = False
     country: str = "us"
@@ -113,6 +143,17 @@ class ScrapeConfig(ExtensibleModel):
 class ConnectorsConfig(ExtensibleModel):
     greenhouse: GreenhouseConfig = Field(default_factory=GreenhouseConfig)
     lever: LeverConfig = Field(default_factory=LeverConfig)
+    ashby: AshbyConfig = Field(default_factory=AshbyConfig)
+    workday: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    tesla: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    google: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    smartrecruiters: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    workable: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    recruitee: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    personio: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    breezy: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    jazzhr: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
+    bamboohr: NativeUrlConfig = Field(default_factory=NativeUrlConfig)
     adzuna: AdzunaConfig = Field(default_factory=AdzunaConfig)
     remoteok: RemoteOKConfig = Field(default_factory=RemoteOKConfig)
     linkedin: LinkedInConfig = Field(default_factory=LinkedInConfig)

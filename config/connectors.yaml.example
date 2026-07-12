@@ -16,6 +16,13 @@ lever:
     - token: palantir
       company: Palantir
 
+# Ashby boards. token = the jobs.ashbyhq.com/<token> slug.
+ashby:
+  enabled: true
+  boards:
+    - token: openai
+      company: OpenAI
+
 adzuna:
   enabled: true
   country: us
@@ -26,13 +33,10 @@ remoteok:
 linkedin:
   enabled: false
 
-# Company careers pages — paste any careers URL and the connector auto-detects
-# the ATS or bespoke portal and fetches matching openings.
+# URL-addressed native ATS connectors. Add Source writes recognized URLs into
+# the matching section and never into the generic companies compatibility list.
 #
 # Supported backends:
-#   Greenhouse  — boards.greenhouse.io/<token> or pages that embed a Greenhouse board
-#   Lever       — jobs.lever.co/<token>
-#   Ashby       — jobs.ashbyhq.com/<token>
 #   Workday     — <tenant>.<dc>.myworkdayjobs.com/<site>  (uses CXS JSON API)
 #   Tesla       — www.tesla.com/careers  (bespoke JSON portal)
 #   Google      — careers.google.com/...  (bespoke JSON API)
@@ -47,17 +51,38 @@ linkedin:
 # When a URL does not directly reveal the ATS, the connector fetches the page
 # and scans it for embedded Greenhouse / Lever / Ashby / Workday markers.
 #
-# Workday, Tesla, and Google are "canonical" sources — when they re-find a job
+# These are "canonical" sources — when they re-find a job
 # already ingested from an aggregator (Adzuna, RemoteOK, LinkedIn), the stored
 # URL and JD text are upgraded in place. User progress is never reset.
-companies:
+workday:
   enabled: false
-  urls:
-    - https://jobs.ashbyhq.com/openai                          # Ashby
-    - https://jobs.lever.co/woven-by-toyota                    # Lever
-    - https://generalmotors.wd5.myworkdayjobs.com/Careers_GM   # Workday
-    - https://www.tesla.com/careers                            # Tesla (singleton)
-    - https://careers.google.com/jobs/results/                 # Google (singleton)
+  boards:
+    - url: https://generalmotors.wd5.myworkdayjobs.com/Careers_GM
+      company: General Motors
+
+tesla:
+  enabled: false
+  boards:
+    - url: https://www.tesla.com/careers
+      company: Tesla
+
+google:
+  enabled: false
+  boards:
+    - url: https://careers.google.com/jobs/results/
+      company: Google
+
+smartrecruiters: {enabled: false, boards: []}
+workable: {enabled: false, boards: []}
+recruitee: {enabled: false, boards: []}
+personio: {enabled: false, boards: []}
+breezy: {enabled: false, boards: []}
+jazzhr: {enabled: false, boards: []}
+bamboohr: {enabled: false, boards: []}
+
+# Backward-compatible storage for older configurations. New recognized sources
+# are not added here.
+companies: {enabled: false, urls: []}
 
 # Opt-in browser scraper for company-owned boards with no supported ATS.
 # It opens an isolated visible browser, learns one selector recipe per host,
