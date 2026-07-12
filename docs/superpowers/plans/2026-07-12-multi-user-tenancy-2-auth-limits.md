@@ -8,6 +8,48 @@
 
 **Tech Stack:** Python 3.12, FastAPI, SQLAlchemy ORM (system DB), pytest offline, existing pbkdf2 helpers in `api/auth.py`.
 
+## Correctness amendments (audit before implementation)
+
+These corrections are normative and override later reference snippets:
+
+- Use Python **3.13+** and validate usernames, passwords, PAT names, invite
+  parameters, and non-negative limits with typed boundary schemas. New PBKDF2
+  hashes use the strengthened iteration policy while old hashes remain
+  verifiable and are upgraded after successful authentication.
+- Session signatures mix the complete password hash. Cookie `Secure` follows
+  the effective HTTPS scheme (including trusted proxy scheme) so the documented
+  localhost HTTP admin CLI can exchange login for a PAT.
+- Registration records every failed outcome in the limiter, catches concurrent
+  username uniqueness conflicts as `USERNAME_TAKEN`, atomically consumes only
+  a still-valid/non-revoked invite, and remains recoverable if Workspace
+  provisioning is interrupted (`build_context` self-heals provisioning).
+- General request auth is **session -> header PAT only**. Remove query-token
+  handling from `get_user_context`. Add a separate purpose-bound link
+  dependency only to SSE/download routes; verify purpose, user status, and
+  resource ownership. Replace the draft test that lets an `sse` token call
+  `/api/jobs` with tests proving that request is rejected.
+- Resolve all tenant resources through Plan 1 adapters. Isolation tests cover
+  config, secrets, profile documents/files, setup status, suggestions/match-gap,
+  jobs, and every run action, not only `GET /api/jobs`.
+- Record usage after successful returns from both `AgentRunner.run` and
+  `AgentRunner.arun`; `acall` is not the common seam. Use
+  `ctx.system_engine` and `ctx.own_key_providers`, not a module-global engine or
+  cwd `env_settings()` comparison. Add multi-app isolation and failed-write
+  tests.
+- Budget failures persist `errorCode=BUDGET_EXCEEDED`; quota failures persist
+  or return `QUOTA_EXCEEDED` as appropriate. Budget guards cover every public
+  phase that can reach an LLM, including synchronous suggestion/profile/
+  extraction paths, without double-charging calls.
+- Per-user run ownership applies to list/get/SSE/cancel/recovery, singleton
+  keys are namespaced by user, and files live in the Workspace `runs/` root.
+  Foreign ids return 404.
+- Job-cap tests cover archived rows and the promised "upgrades still apply"
+  behavior. The same-user pull singleton prevents two pull batches from racing
+  the cap.
+- Regenerate contracts only after all Plan 2 endpoints and typed error fields
+  are complete. On Windows use the repository's direct Python +
+  `openapi-typescript` fallback if the CRLF-sensitive bash wrapper fails.
+
 ## Global Constraints
 
 - **Strict TDD** (superpowers:test-driven-development): every task writes its failing test first and runs it to observe RED before any implementation code; implementation is the minimum to reach GREEN. Never reorder these steps.
