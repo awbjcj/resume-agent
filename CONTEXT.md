@@ -195,11 +195,19 @@ _Avoid_: extraction result, payload
 ## Deployment & data custody
 
 **Data root**:
-The single mutable filesystem tree an instance owns — jobs DB, profile corpus,
-runs, mutable config, renders, secrets file. The unit of custody: export and
-import move it whole, never a slice. Exactly one instance is authoritative for
-a data root at a time (the deployed instance, once one exists).
-_Avoid_: data dir (that names a path, not the custody unit), workspace
+The single mutable filesystem tree an instance owns — `system.db` plus every
+user's Workspace under `users/`. The unit of custody: export and import move
+it whole, never a slice. Exactly one instance is authoritative for a data
+root at a time (the deployed instance, once one exists).
+_Avoid_: data dir (that names a path, not the custody unit)
+
+**Workspace**:
+One user's tree under `users/<user_id>/` inside the Data root — their jobs DB,
+profile corpus, mutable config, operational secrets, renders, and run logs.
+The unit of tenancy isolation (by file, never by row); a UserContext binds a
+request or CLI invocation to exactly one Workspace.
+_Avoid_: user data root (custody belongs to the Data root, not the slice),
+home dir
 
 **Round-trip pull**:
 The sanctioned path for browser-requiring connectors once the cloud instance
