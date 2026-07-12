@@ -84,6 +84,21 @@ def test_fetches_detected_ashby(monkeypatch):
     ]
 
 
+def test_configured_label_is_canonical_company_name(monkeypatch):
+    _patch(
+        monkeypatch,
+        detect=lambda url: AtsTarget("ashby", "openai"),
+        ashby=lambda token: _ASHBY,
+    )
+    conn = CompaniesConnector(
+        [CompanyUrl(url="https://jobs.ashbyhq.com/openai", label="OpenAI")]
+    )
+
+    result = conn.fetch(SearchConfig(keywords=["retrieval"]))
+
+    assert [job.company for job in result.jobs] == ["OpenAI"]
+
+
 def test_undetectable_url_recorded_and_isolated(monkeypatch):
     def detect(url):
         return AtsTarget("greenhouse", "acme") if "acme" in url else None
