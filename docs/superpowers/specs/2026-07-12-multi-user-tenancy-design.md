@@ -27,7 +27,14 @@ modeled on vsda-deep-agent's user management and deep-agents-ui's admin panel.
 engine registry + one shared `system.db` for auth/budgets. Rejected: row-level
 tenancy (`user_id` columns — contradicts the per-user-database requirement and
 poisons every query with a tenant filter) and app-instance-per-user (N
-RunManagers in memory, fragmented cross-cutting concerns).
+RunManagers in memory, fragmented cross-cutting concerns). Context reaches the
+domain layer via a contextvar — see ADR-0003 and §2.
+
+Grilling session 2026-07-12 resolved: contextvar propagation (ADR-0003),
+Data root / Workspace glossary split (CONTEXT.md), seed-only bootstrap,
+role-less invites, role-equivalent PATs, web-UI-only remote members,
+self-service export + admin-only delete, shipped limit defaults, failed-attempt
+rate limiting, admin budget exemption.
 
 ---
 
@@ -63,6 +70,20 @@ data/
   dedup, archive/prune) are untouched.
 - The CLI constructs a local `UserContext` directly (no HTTP) — one seam, two
   adapters, same as the existing services architecture.
+- **`user_id` is an opaque short hex id** (e.g. `uuid4().hex[:12]`), used as
+  the Workspace directory name. Usernames are display/login identity and can
+  be renamed without touching paths.
+
+**Context propagation (ADR-0003):** a `contextvars.ContextVar` holds the
+active `UserContext`. Exactly three set-points: the API auth dependency (per
+request), the RunManager worker wrapper (per background run), and the CLI
+entrypoint (per invocation). `get_settings()` returns the active context's
+effective Settings when one is set and falls back to env-derived settings
+otherwise (tests, legacy local mode) — so the 36 domain-layer call sites do
+not change. `llm_runner.acall` reads the active user id to record usage.
+Crossing an `asyncio.run` or threadpool boundary must capture and restore the
+context explicitly; that capture is part of the seam's contract, and tests
+assert isolation under concurrent mixed-user requests.
 
 ## 3. Auth, registration, and tokens
 
@@ -73,7 +94,10 @@ New tables in `system.db` (SQLModel, same `init_db` pattern):
   limit overrides (`weekly_token_budget`, `max_active_jobs`,
   `max_concurrent_runs` — NULL = system default), timestamps.
 - **`InviteCode`**: hashed single-use code, `created_by`, `expires_at`,
-  `used_by` / `used_at`, `revoked_at`.
+  `used_by` / `used_at`, `revoked_at`. Codes are `inv_`-prefixed random
+  secrets shown once at mint, stored hashed (symmetric with PATs). Codes are
+  **role-less** — every registration mints `role=user`; promotion is a
+  separate explicit `set-role`. Default expiry 14 days, overridable at mint.
 - **`ApiToken`**: user_id, name, sha256-hashed token, `created_at`,
   `last_used_at`, `revoked_at`.
 - **`UsageEvent`**: append-only per-LLM-call usage log (user_id, ts, provider,
@@ -88,10 +112,20 @@ Flows:
 - **Login/session:** stateless HMAC cookie retained, payload becomes
   `user_id:expiry`; the signature mixes in a fragment of the user's password
   hash so a password change (or admin reset) invalidates that user's sessions
-  with no server-side session table.
+  with no server-side session table. Cookie attributes: `HttpOnly`,
+  `SameSite=Lax`, `Secure` when served over HTTPS.
 - **Personal access tokens:** `rat_`-prefixed random secrets shown once,
-  stored hashed; sent as `Authorization: Bearer`. Request auth resolves
-  session cookie → PAT → 401.
+  stored hashed; sent as `Authorization: Bearer` — **header-only, never
+  accepted via query param** (link tokens are query-only; the two surfaces do
+  not overlap). PATs are **role-equivalent**: a PAT is the user, so an
+  admin's PAT can call `/api/admin/*`. No scoped tokens for a trusted small
+  group. Request auth resolves session cookie → PAT → 401.
+- **Rate limiting:** in-process fixed-window throttle on *failed* attempts at
+  the two unauthenticated endpoints (`login`, `register`): 10 failures per
+  (username, client IP) per 15 minutes → 429 `RATE_LIMITED` until the window
+  rolls; success resets the counter. In-memory only (single process); resets
+  on restart, which matches the threat model. No lockout flag on the user row
+  — an attacker must not be able to lock the real user out durably.
 - **Link tokens:** SSE (`EventSource`) and `<a>` downloads cannot set headers,
   so `POST /api/auth/link-token` mints a short-lived (~10 min) signed
   `user_id:purpose:expiry` token accepted only via `?token=`. This replaces
@@ -100,7 +134,11 @@ Flows:
   adoption), `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` are **required** and seed
   the admin row; the server refuses to start without them. Registration is
   invite-only, so an instance with no admin would otherwise be permanently
-  locked out.
+  locked out. The env pair is **seed-only**: it is read exactly once, when
+  the table is empty; thereafter `system.db` is the sole credential
+  authority and the env values are ignored. **Behavior change:** rotating
+  `AUTH_PASSWORD_HASH` no longer rotates the admin password once users exist
+  — the admin changes it on the Account page like everyone else.
 
 ## 4. Budgets, quotas, and enforcement points
 
@@ -119,6 +157,13 @@ Flows:
   effective key came from the user's `secrets.env` rather than server env,
   usage is still recorded (`own_key=true`, for visibility) but never counted
   against the budget.
+- **Admin exemption:** admins are exempt from budget *enforcement* but fully
+  *recorded* (their usage appears in the aggregate view). Same mechanics as
+  the own-key exemption — record always, enforce conditionally — one code
+  path, two exemption reasons. Resource quotas still apply to admins.
+- **Recording never breaks the call:** a failed `UsageEvent` write logs a
+  warning and the LLM result still returns; accounting is best-effort,
+  enforcement reads whatever was recorded.
 
 **Resource quotas (all users, own key or not):**
 
@@ -130,7 +175,16 @@ Flows:
   This is also the fairness lever for the process-global `llm_concurrency`
   semaphore, which stays shared.
 - Defaults live in `system_settings` (admin-editable); per-user override
-  columns on `User` win when set.
+  columns on `User` win when set. `NULL` override = use the system default;
+  `0` = unlimited (explicit escape hatch).
+
+**Shipped defaults:**
+
+| Limit | Default | Sizing rationale |
+| --- | --- | --- |
+| `weekly_token_budget` | 10M weighted tokens/week | Dozens of tailors + daily discovery scoring with headroom; catches a runaway loop before it is a three-digit bill |
+| `max_active_jobs` | 2,000 non-archived jobs | Guards disk/query latency, not behavior — well above a serious pipeline |
+| `max_concurrent_runs` | 2 per user | One long pull + one tailor; protects the shared `llm_concurrency` pool and the single Playwright browser |
 
 ## 5. Admin API, CLI, and web UI
 
@@ -139,8 +193,11 @@ over auth):
 
 - Users: list (with usage summary + limits), set-role, set-limits,
   reset-password, disable/enable, delete. Delete refuses when the target is
-  the last admin; deleting removes the workspace directory and requires an
-  explicit confirmation flag.
+  the last admin **or has in-flight runs**; deleting evicts and closes the
+  user's engine from the registry *before* removing the Workspace directory
+  (open SQLite handles block directory removal on Windows), and requires an
+  explicit confirmation flag. Deletion is admin-only — no self-service
+  account deletion.
 - Invites: mint (`--expires` optional), list active/used, revoke.
 - System: get/set default budgets and quotas; aggregate usage view.
 - Existing import/export admin endpoints stay, now operating on the whole
@@ -162,7 +219,11 @@ mints a PAT (named `cli`) via the PAT endpoint and caches it at
   `AdminPanel` / `UserManagementSidebar` pattern from deep-agents-ui restyled
   to the existing SPA.
 - **Account page** (every user): change password, mint/revoke PATs (secret
-  shown once), own usage meter.
+  shown once), own usage meter, and **self-service export** —
+  `GET /api/account/export` streams a `tar.gz` of the caller's own Workspace
+  (same archive mechanics as the admin export, scoped to one Workspace).
+  Caveat stated in the UI: the archive contains the user's `secrets.env`, so
+  it is itself secret material.
 - **Register page**: username / password / invite code, linked from login.
 - All API additions ride the existing contract pipeline (camelCase schemas →
   `contracts/openapi.json` → generated TS client); the drift gate covers them.
@@ -183,7 +244,12 @@ legacy content (`profile/` or the DB file) but no `system.db`:
 **Local CLI compatibility:** the domain CLI (`pull`, `tailor`, `render`, …)
 keeps working locally by constructing a `UserContext` directly. Resolution:
 legacy-shaped root → behave exactly as today; multi-user root → default to
-the sole admin's workspace, `--user <username>` to select another.
+the sole admin's workspace, `--user <username>` to select another. This is an
+**operator affordance** (the server host, or a local snapshot/export), not
+how group members interact: remote members are **web-UI-only** — there is no
+remote-driving transport for the domain CLI; PATs exist for scripting the
+HTTP API directly and for the admin CLI. If a remote domain CLI is ever
+wanted, the admin-CLI transport pattern generalizes.
 
 **Railway:** unchanged topology — one service, one volume. `/app/data` holds
 `system.db` + `users/`. Server-level LLM keys stay in service env vars;
@@ -201,6 +267,7 @@ Typed codes through the existing `ApiException` envelope:
 | `QUOTA_EXCEEDED` (429) | Concurrent-run cap hit (job cap reports in run summary instead) |
 | `FORBIDDEN` (403) | Non-admin on `/api/admin/*` |
 | `USER_DISABLED` | Auth succeeds but account is disabled |
+| `RATE_LIMITED` (429) | Failed-attempt throttle on `login` / `register` |
 
 Budget/quota failures inside runs surface as failed run records with the same
 codes so the SPA renders them distinctly.
@@ -209,11 +276,16 @@ codes so the SPA renders them distinctly.
 
 - Auth: register/consume-invite atomicity (two concurrent registrations, one
   code), session invalidation on password change, PAT revocation, link-token
-  expiry and purpose scoping.
+  expiry and purpose scoping, failed-attempt rate limiter (window roll +
+  reset on success), seed-only bootstrap (env rotation ignored once users
+  exist).
 - Tenancy isolation: two seeded users; every list endpoint returns only the
-  owner's rows; one user's run/SSE stream is inaccessible to the other.
-- Budgets/quotas: synthetic `UsageEvent` rows + faked agents; own-key
-  exemption; job-cap ingest behavior; concurrent-run rejection.
+  owner's rows; one user's run/SSE stream is inaccessible to the other;
+  contextvar isolation under concurrent mixed-user requests (ADR-0003).
+- Budgets/quotas: synthetic `UsageEvent` rows + faked agents; own-key and
+  admin exemptions; job-cap ingest behavior; concurrent-run rejection;
+  failed usage write does not fail the call.
+- Self-export: archive contains exactly the caller's Workspace, nothing else.
 - Migration: legacy-shaped temp root → boot → admin seeded, children swapped,
   re-boot is a no-op; unset env credentials → clean startup refusal.
 - Admin CLI: exercised against the app via `TestClient`-backed transport.

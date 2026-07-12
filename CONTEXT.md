@@ -216,12 +216,46 @@ snapshot, import it back — without mutating the cloud in between. Re-pulls are
 safe because ingest dedupe makes equal-tier duplicates no-ops.
 _Avoid_: sync (nothing merges; the whole root moves), hybrid pull
 
+**UserContext**:
+The binding of one authenticated user to their Workspace and effective
+settings for the duration of exactly one request, background run, or CLI
+invocation. The unit the tenancy seam passes around; nothing user-scoped is
+resolved outside one.
+_Avoid_: session (a session is one way a UserContext gets established), tenant
+
+**Budget**:
+A user's rolling 7-day weighted-token allowance against the shared provider
+keys. Recorded always; enforced only for non-admin users on shared keys, and
+checked when a phase starts, not per call.
+_Avoid_: quota (quotas cap resources, budgets cap spend), token limit
+
+**Quota**:
+A per-user resource cap that applies to everyone regardless of key or role —
+active-job count, concurrent runs. Protects the shared instance, not the bill.
+_Avoid_: budget, rate limit (rate limiting is auth brute-force protection)
+
+**Personal access token (PAT)**:
+A long-lived, revocable, role-equivalent bearer secret a user mints for
+scripting the API; shown once, stored hashed, header-only. The PAT *is* the
+user.
+_Avoid_: API token (that named the removed static shared secret), key
+
+**Link token**:
+A short-lived signed token carried in a query param for surfaces that cannot
+send headers (SSE, downloads); scoped to a user and a purpose.
+_Avoid_: query token, download token (purpose-specific names hide the concept)
+
+**Invite code**:
+A single-use, expiring, role-less registration secret minted by an admin;
+consuming it is the only way to create an account.
+_Avoid_: invitation link (it is a code, not a URL), signup token
+
 **Platform secret**:
 Configuration the app cannot manage for itself because it gates getting in or
-booting at all — the owner's login credentials, the session signing key, the
-static API token, capability flags. Lives with the platform (deploy-time env),
-never in the Data root, so it survives a root replace and cannot be locked
-away by the thing it unlocks.
+booting at all — the first-admin seed credentials (read once, then inert),
+the session signing key, capability flags. Lives with the platform
+(deploy-time env), never in the Data root, so it survives a root replace and
+cannot be locked away by the thing it unlocks.
 _Avoid_: system secret, infra config
 
 **Operational secret**:
