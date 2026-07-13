@@ -261,6 +261,15 @@ class RunManager:
         with self._singleton_lock:
             ctx = current_context()
             owner_id = user_id or (ctx.user_id if ctx is not None else None)
+            if max_concurrent is None and ctx is not None and owner_id == ctx.user_id:
+                from resume_agent.tenancy.limits import (
+                    DEFAULT_MAX_CONCURRENT_RUNS,
+                    active_limit,
+                )
+
+                max_concurrent = active_limit(
+                    "max_concurrent_runs", DEFAULT_MAX_CONCURRENT_RUNS
+                )
             effective_singleton = (
                 f"{owner_id}:{singleton_key}"
                 if owner_id is not None and singleton_key is not None

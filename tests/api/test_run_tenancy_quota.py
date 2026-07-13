@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 
 from resume_agent.api.auth import hash_password
 from resume_agent.api.runs.manager import RunManager, RunQuotaError
-from resume_agent.tenancy.context import new_user_id
+from resume_agent.config import Settings
+from resume_agent.tenancy.context import UserContext, new_user_id, use_context
 from resume_agent.tenancy.system_db import User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_agent.tenancy.workspace import WorkspacePaths, provision_workspace
 
 
 def _add_user(app, username: str, password: str) -> None:
@@ -56,6 +57,33 @@ def test_run_quota_and_singletons_are_namespaced_by_user(tmp_path):
     with pytest.raises(RunQuotaError):
         manager.submit("tailor", blocker, user_id="u1", max_concurrent=1)
     assert len(manager.list_active(user_id="u1")) == 1
+    release.set()
+    manager.shutdown()
+
+
+def test_direct_submissions_inherit_active_context_quota(tmp_path, monkeypatch):
+    manager = RunManager(root=tmp_path, executor=ThreadPoolExecutor(max_workers=2))
+    release = threading.Event()
+    context = UserContext(
+        user_id="abc123def456",
+        username="alice",
+        role="user",
+        paths=WorkspacePaths(tmp_path / "users" / "alice"),
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        engine=None,
+        system_engine=None,
+        own_key_providers=frozenset(),
+    )
+    monkeypatch.setattr("resume_agent.tenancy.limits.active_limit", lambda *_args: 1)
+
+    def blocker(_reporter):
+        release.wait(timeout=5)
+        return {}
+
+    with use_context(context):
+        manager.submit("suggestion", blocker)
+        with pytest.raises(RunQuotaError):
+            manager.submit("profile-build", blocker)
     release.set()
     manager.shutdown()
 
