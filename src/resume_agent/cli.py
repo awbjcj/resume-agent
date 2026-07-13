@@ -83,6 +83,12 @@ DEFAULT_FACTS = "data/profile/facts.json"
 DEFAULT_PROFILE_DIR = "data/profile"
 
 
+def _tenant_cli_path(path: str | Path) -> Path:
+    from resume_agent.tenancy.paths import resolve_tenant_path
+
+    return resolve_tenant_path(path)
+
+
 @profile_app.command("add")
 def profile_add(
     file: str = typer.Argument(
@@ -195,7 +201,8 @@ def profile_sync_github(
     """Refresh GitHub-derived sources without running a full profile build."""
     from resume_agent.profile.github_harvest import sync_github_sources
 
-    config = load_yaml(sources) if Path(sources).exists() else {}
+    sources_path = _tenant_cli_path(sources)
+    config = load_yaml(sources_path) if sources_path.exists() else {}
     selected_username = username or cast(str | None, config.get("github_username"))
     if not selected_username:
         typer.echo("No GitHub username; pass --username or configure github_username.")
@@ -251,25 +258,28 @@ def profile_build(
             f"Missing API key for configured model(s): {', '.join(missing_models)}"
         )
         raise typer.Exit(code=1)
-    if Path(out).resolve() != (Path(dir) / "facts.json").resolve():
+    out_path = _tenant_cli_path(out)
+    profile_dir = _tenant_cli_path(dir)
+    sources_path = _tenant_cli_path(sources)
+    if out_path.resolve() != (profile_dir / "facts.json").resolve():
         typer.echo("--out must be <dir>/facts.json so facts and matrix stay bound")
         raise typer.Exit(code=1)
-    if Path(out).exists() and not refresh:
+    if out_path.exists() and not refresh:
         typer.echo(
             f"{out} already exists. Use --refresh to rebuild (this discards manual edits)."
         )
         raise typer.Exit(code=1)
 
-    cfg = load_yaml(sources) if Path(sources).exists() else {}
-    migrated = migrate_legacy(dir, cast(str | None, cfg.get("resume_path")))
+    cfg = load_yaml(sources_path) if sources_path.exists() else {}
+    migrated = migrate_legacy(profile_dir, cast(str | None, cfg.get("resume_path")))
     if migrated is not None:
         typer.echo(f"Migrated legacy resume into the corpus as {migrated.id} (primary)")
 
     report = run_corpus_build(
         None,
-        profile_dir=Path(dir),
+        profile_dir=profile_dir,
         github_username=cast(str | None, cfg.get("github_username")),
-        facts_out=out,
+        facts_out=out_path,
         github_allow=tuple(cfg.get("github_repo_allow") or ()),
         github_deny=tuple(cfg.get("github_repo_deny") or ()),
         github_limit=int(cfg.get("github_repo_limit") or 20),
@@ -447,7 +457,7 @@ def refresh_cmd(
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Pull from connectors then discover the new jobs, in one pass."""
-    if not Path(connectors_path).exists():
+    if not _tenant_cli_path(connectors_path).exists():
         typer.echo(
             f"No connectors config found at {connectors_path}. "
             "Copy config/connectors.yaml.example to config/connectors.yaml and edit it."
@@ -515,7 +525,7 @@ def pull_cmd(
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run every enabled connector, dedupe into raw jobs, and report per-source counts."""
-    if not Path(connectors_path).exists():
+    if not _tenant_cli_path(connectors_path).exists():
         typer.echo(
             f"No connectors config found at {connectors_path}. "
             "Copy config/connectors.yaml.example to config/connectors.yaml and edit it."
@@ -576,7 +586,7 @@ def match_gap_cmd(
     from resume_agent.taxonomy.clusters import load_cluster_map
 
     profile_facts = load_facts(facts)
-    profile_dir = Path(facts).parent
+    profile_dir = _tenant_cli_path(facts).parent
     cluster_path = profile_dir / "cluster_map.json"
     overrides = load_overrides(profile_dir / "overrides.yaml")
     cluster_map = effective_cluster_map(load_cluster_map(cluster_path), overrides)

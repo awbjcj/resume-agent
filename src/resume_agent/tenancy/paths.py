@@ -19,6 +19,8 @@ def resolve_tenant_path(path: Path | str) -> Path:
         "config": context.paths.config_dir,
         "output": context.paths.output_dir,
     }
+    if any(candidate == base or candidate.is_relative_to(base) for base in mappings.values()):
+        return candidate
     head, separator, tail = normalized.partition("/")
     base = mappings.get(head)
     if base is None:
