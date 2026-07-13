@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { JobTable } from "./JobTable";
 
 const rows = [
-  { jobId: 1, company: "Acme", title: "Eng", fitScore: 22, source: "adzuna", status: "rejected" },
+  { jobId: 1, company: "Acme", title: "Eng", fitScore: 22, source: "greenhouse_jobs", location: "New York, NY", status: "rejected" },
   { jobId: 2, company: "Globex", title: "PM", fitScore: 40, source: "lever", status: "rejected" },
 ];
 
@@ -20,6 +20,8 @@ describe("JobTable", () => {
       />,
     );
     expect(screen.getByText("Acme")).toBeInTheDocument();
+    expect(screen.getByText("Greenhouse Jobs")).toBeInTheDocument();
+    expect(screen.getByText("New York, NY")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("checkbox")[1]);
     expect(onToggle).toHaveBeenCalled();
   });

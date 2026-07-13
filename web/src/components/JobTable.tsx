@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { StatusBadge } from "@/components/StatusBadge";
 import {
   Table,
   TableBody,
@@ -23,6 +24,13 @@ type Row = {
   url?: string | null;
 };
 
+function sourceLabel(source: string | undefined): string {
+  if (!source) return "—";
+  return source
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 export function JobTable({
   rows,
   selection,
@@ -42,18 +50,27 @@ export function JobTable({
 }) {
   const ordered = rows.map((row) => row.jobId);
   return (
-    <Table>
+    <Table className="min-w-[64rem] table-fixed">
+      <colgroup>
+        <col className="w-11" />
+        <col className="w-72" />
+        <col className="w-20" />
+        <col className="w-32" />
+        <col className="w-52" />
+        <col className="w-36" />
+        {actions && <col className="w-40" />}
+      </colgroup>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-8">
+          <TableHead>
             <Checkbox
               aria-label="Select all loaded jobs"
               checked={allChecked}
               onCheckedChange={(value) => onToggleAll?.(Boolean(value))}
             />
           </TableHead>
-          <TableHead>Company · Title</TableHead>
-          <TableHead className="text-right">Fit</TableHead>
+          <TableHead>Role</TableHead>
+          <TableHead className="text-center">Fit</TableHead>
           <TableHead>Source</TableHead>
           <TableHead>Location</TableHead>
           <TableHead>Status</TableHead>
@@ -83,16 +100,47 @@ export function JobTable({
                 }}
               />
             </TableCell>
+            <TableCell className="min-w-0">
+              <button
+                type="button"
+                className="block w-full min-w-0 rounded-sm text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+                onClick={() => onOpen(row.jobId)}
+              >
+                <div className="truncate font-medium" title={row.title ?? undefined}>
+                  {row.title ?? "Untitled role"}
+                </div>
+                <div
+                  className="truncate text-xs text-muted-foreground"
+                  title={row.company ?? undefined}
+                >
+                  {row.company ?? "Unknown company"}
+                </div>
+              </button>
+            </TableCell>
+            <TableCell className="text-center" onClick={() => onOpen(row.jobId)}>
+              <Badge variant="secondary" className="min-w-9 justify-center tabular-nums">
+                {row.fitScore ?? "—"}
+              </Badge>
+            </TableCell>
+            <TableCell className="min-w-0" onClick={() => onOpen(row.jobId)}>
+              <Badge
+                variant="outline"
+                className="max-w-full font-normal"
+                title={row.source ?? undefined}
+              >
+                <span className="truncate">{sourceLabel(row.source)}</span>
+              </Badge>
+            </TableCell>
+            <TableCell
+              className="min-w-0 truncate text-muted-foreground"
+              title={row.location ?? undefined}
+              onClick={() => onOpen(row.jobId)}
+            >
+              {row.location ?? "—"}
+            </TableCell>
             <TableCell onClick={() => onOpen(row.jobId)}>
-              <span className="font-medium">{row.company ?? "—"}</span>
-              <span className="text-muted-foreground"> · {row.title ?? "—"}</span>
+              {row.status ? <StatusBadge status={row.status} /> : "—"}
             </TableCell>
-            <TableCell className="text-right" onClick={() => onOpen(row.jobId)}>
-              <Badge variant="secondary">{row.fitScore ?? "no score"}</Badge>
-            </TableCell>
-            <TableCell onClick={() => onOpen(row.jobId)}>{row.source ?? "—"}</TableCell>
-            <TableCell onClick={() => onOpen(row.jobId)}>{row.location ?? "—"}</TableCell>
-            <TableCell onClick={() => onOpen(row.jobId)}>{row.status ?? "—"}</TableCell>
             {actions && (
               <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                 <div className="flex justify-end gap-1">{actions(row)}</div>
