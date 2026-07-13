@@ -103,6 +103,28 @@ def test_admin_invites_defaults_usage_and_failure_safe_delete(mu_app, mu_client)
     assert not workspace.exists()
 
 
+def test_delete_restores_user_and_workspace_when_cleanup_fails(
+    mu_app, mu_client, monkeypatch
+):
+    from resume_agent.api.routers import admin_users
+
+    alice_id = _add_user(mu_app)
+    workspace = mu_app.state.data_dir / "users" / alice_id
+    assert _login(mu_client).status_code == 200
+
+    def fail_cleanup(_path):
+        raise OSError("injected cleanup failure")
+
+    monkeypatch.setattr(admin_users.shutil, "rmtree", fail_cleanup)
+    response = mu_client.delete(f"/api/admin/users/{alice_id}?confirm=DELETE")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "DELETE_CLEANUP_FAILED"
+    assert workspace.is_dir()
+    with Session(mu_app.state.system_engine) as session:
+        assert session.get(User, alice_id) is not None
+
+
 def test_account_password_usage_and_export(mu_app, mu_client):
     assert _login(mu_client).status_code == 200
     assert mu_client.get("/api/account/usage").json()["weightedTotal"] == 0

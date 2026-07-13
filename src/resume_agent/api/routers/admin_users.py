@@ -134,7 +134,9 @@ def delete_user(
         raise ApiException(409, "RUNS_ACTIVE", "The user has active runs")
     paths = workspace_paths(request.app.state.data_dir, user_id)
     tombstone = paths.root.with_name(f".{user_id}.deleting-{uuid.uuid4().hex}")
-    with Session(request.app.state.system_engine) as session:
+    user_values: dict[str, object]
+    token_values: list[dict[str, object]]
+    with Session(request.app.state.system_engine, expire_on_commit=False) as session:
         user = session.get(User, user_id)
         if user is None:
             raise ApiException(404, "NOT_FOUND", "No such user")
@@ -143,6 +145,21 @@ def delete_user(
         request.app.state.engine_registry.evict(user_id)
         if paths.root.exists():
             paths.root.rename(tombstone)
+        user_values = {
+            column.name: getattr(user, column.name) for column in User.__table__.columns
+        }
+        tokens = (
+            session.execute(select(ApiToken).where(ApiToken.user_id == user_id))
+            .scalars()
+            .all()
+        )
+        token_values = [
+            {
+                column.name: getattr(token, column.name)
+                for column in ApiToken.__table__.columns
+            }
+            for token in tokens
+        ]
         try:
             session.execute(delete(ApiToken).where(ApiToken.user_id == user_id))
             session.delete(user)
@@ -152,5 +169,19 @@ def delete_user(
             if tombstone.exists() and not paths.root.exists():
                 tombstone.rename(paths.root)
             raise
-    shutil.rmtree(tombstone, ignore_errors=True)
+    try:
+        shutil.rmtree(tombstone)
+    except OSError as error:
+        if tombstone.exists() and not paths.root.exists():
+            tombstone.rename(paths.root)
+        with Session(request.app.state.system_engine) as recovery:
+            if recovery.get(User, user_id) is None:
+                recovery.add(User(**user_values))
+                recovery.add_all(ApiToken(**values) for values in token_values)
+                recovery.commit()
+        raise ApiException(
+            500,
+            "DELETE_CLEANUP_FAILED",
+            "Workspace cleanup failed; the user and workspace were restored",
+        ) from error
     return {"status": "deleted"}
