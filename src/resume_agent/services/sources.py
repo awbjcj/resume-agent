@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -36,6 +37,21 @@ from resume_agent.services.discovery import DEFAULT_CONNECTORS, DEFAULT_SEARCH
 
 _PREVIEW_LIMIT = 50
 _UNSET = object()
+_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+_HOST_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
+
+_TOKEN_URLS = {
+    "greenhouse": "https://job-boards.greenhouse.io/{token}",
+    "lever": "https://jobs.lever.co/{token}",
+    "ashby": "https://jobs.ashbyhq.com/{token}",
+    "smartrecruiters": "https://jobs.smartrecruiters.com/{token}",
+    "workable": "https://apply.workable.com/{token}",
+    "recruitee": "https://{token}.recruitee.com",
+    "breezy": "https://{token}.breezy.hr",
+    "jazzhr": "https://{token}.applytojob.com",
+    "bamboohr": "https://{token}.bamboohr.com/careers",
+}
+_SUBDOMAIN_PROVIDERS = {"recruitee", "personio", "breezy", "jazzhr", "bamboohr"}
 
 
 class SourceError(Exception):
@@ -91,28 +107,107 @@ def _preview_connector(target: AtsTarget, url: str):
     return CompaniesConnector([url])
 
 
+def _connection_url(
+    *,
+    provider: str,
+    url: str | None = None,
+    token: str | None = None,
+    tenant: str | None = None,
+    datacenter: str | None = None,
+    site: str | None = None,
+    country: str = "com",
+) -> str:
+    """Turn a provider-native connection recipe into its canonical public board URL."""
+    if provider == "auto":
+        normalized = (url or "").strip()
+        if not normalized.startswith(("https://", "http://")):
+            raise SourceError("Enter an absolute http(s) careers URL.")
+        return normalized
+
+    if provider == "workday":
+        parts = {
+            "tenant": (tenant or "").strip(),
+            "datacenter": (datacenter or "").strip(),
+            "site": (site or "").strip(),
+        }
+        if not all(parts.values()):
+            raise SourceError("Workday requires tenant, data center, and career site.")
+        if not _HOST_SLUG.fullmatch(parts["tenant"]) or not _HOST_SLUG.fullmatch(
+            parts["datacenter"]
+        ):
+            raise SourceError("Workday tenant and data center must be URL-safe slugs.")
+        if not _SLUG.fullmatch(parts["site"]):
+            raise SourceError("Workday career site must be a URL-safe path segment.")
+        return (
+            f"https://{parts['tenant']}.{parts['datacenter']}.myworkdayjobs.com/"
+            f"{parts['site']}"
+        )
+
+    normalized_token = (token or "").strip()
+    token_pattern = _HOST_SLUG if provider in _SUBDOMAIN_PROVIDERS else _SLUG
+    if not token_pattern.fullmatch(normalized_token):
+        allowed = "letters, numbers, and hyphens"
+        if provider not in _SUBDOMAIN_PROVIDERS:
+            allowed += " or underscores"
+        raise SourceError(f"Company token must contain only {allowed}.")
+    if provider == "personio":
+        if country not in {"com", "de"}:
+            raise SourceError("Personio country must be com or de.")
+        return f"https://{normalized_token}.jobs.personio.{country}"
+    template = _TOKEN_URLS.get(provider)
+    if template is None:
+        raise SourceError(f"Unknown source provider '{provider}'.")
+    return template.format(token=normalized_token)
+
+
 def preview_source(
-    url: str,
+    url: str | None = None,
     label: str | None = None,
     search_path: str = DEFAULT_SEARCH,
+    provider: str = "auto",
+    token: str | None = None,
+    tenant: str | None = None,
+    datacenter: str | None = None,
+    site: str | None = None,
+    country: str = "com",
 ) -> SourcePreview:
-    target = detect_ats(url)
+    try:
+        resolved_url = _connection_url(
+            provider=provider,
+            url=url,
+            token=token,
+            tenant=tenant,
+            datacenter=datacenter,
+            site=site,
+            country=country,
+        )
+    except SourceError as exc:
+        return SourcePreview(ok=False, url=url or "", error=str(exc))
+
+    target = detect_ats(resolved_url)
     if target is None:
         return SourcePreview(
             ok=False,
-            url=url,
+            url=resolved_url,
             error="Could not detect a known ATS behind this URL.",
+        )
+    if provider != "auto" and target.ats != provider:
+        return SourcePreview(
+            ok=False,
+            url=resolved_url,
+            kind=target.ats,
+            error=f"The connection resolved as {target.ats}, not {provider}.",
         )
 
     try:
-        result = _preview_connector(target, url).fetch(
+        result = _preview_connector(target, resolved_url).fetch(
             load_search_config(search_path),
             limit=_PREVIEW_LIMIT,
         )
     except Exception as exc:  # noqa: BLE001 - preview returns errors instead of raising.
         return SourcePreview(
             ok=False,
-            url=url,
+            url=resolved_url,
             kind=target.ats,
             token=target.token or None,
             error=f"Could not reach this source: {type(exc).__name__}",
@@ -122,7 +217,7 @@ def preview_source(
         reason = "; ".join(result.failures.values())
         return SourcePreview(
             ok=False,
-            url=url,
+            url=resolved_url,
             kind=target.ats,
             token=target.token or None,
             error=reason,
@@ -130,7 +225,7 @@ def preview_source(
 
     return SourcePreview(
         ok=True,
-        url=url,
+        url=resolved_url,
         kind=target.ats,
         token=target.token or None,
         label=label,
@@ -139,13 +234,45 @@ def preview_source(
 
 
 def add_source(
-    url: str,
+    url: str | None = None,
     label: str | None = None,
     connectors_path: str = DEFAULT_CONNECTORS,
+    search_path: str = DEFAULT_SEARCH,
+    provider: str = "auto",
+    token: str | None = None,
+    tenant: str | None = None,
+    datacenter: str | None = None,
+    site: str | None = None,
+    country: str = "com",
 ) -> SourceView:
-    preview = preview_source(url, label=label)
+    if (
+        provider == "auto"
+        and search_path == DEFAULT_SEARCH
+        and token is None
+        and tenant is None
+        and datacenter is None
+        and site is None
+        and country == "com"
+    ):
+        # Preserve the original service call shape for CLI/internal callers and
+        # their test doubles. API requests pass their tenant-specific search path.
+        preview = preview_source(url, label=label)
+    else:
+        preview = preview_source(
+            url,
+            label=label,
+            search_path=search_path,
+            provider=provider,
+            token=token,
+            tenant=tenant,
+            datacenter=datacenter,
+            site=site,
+            country=country,
+        )
     if not preview.ok:
         raise SourceError(preview.error or "Could not validate this source.")
+
+    url = preview.url
 
     config = load_connectors_config(connectors_path)
     target = detect_ats(url)
