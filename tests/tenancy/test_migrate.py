@@ -24,6 +24,33 @@ def test_adoption_moves_legacy_children_and_env(tmp_path):
     assert not (root / migrate.ADOPTION_JOURNAL).exists()
 
 
+def test_adoption_replaces_empty_provisioned_workspace_directories(tmp_path):
+    root = _legacy_root(tmp_path)
+    (root / "config").mkdir()
+    (root / "config" / "connectors.yaml").write_text("{}", encoding="utf-8")
+    workspace = root / "users" / "abc123def456"
+    (workspace / "config").mkdir(parents=True)
+
+    migrate.adopt_legacy_root(root, "abc123def456")
+
+    assert (workspace / "config" / "connectors.yaml").is_file()
+    assert not (root / "config").exists()
+
+
+def test_migrated_root_ignores_recreated_compatibility_paths(tmp_path):
+    root = tmp_path / "data"
+    root.mkdir()
+    (root / "system.db").write_bytes(b"system")
+    (root / "config").mkdir()
+    (root / "output").mkdir()
+    (root / ".env").touch()
+
+    assert migrate.is_legacy_root(root) is False
+
+    (root / "resume_agent.db").write_bytes(b"legacy")
+    assert migrate.is_legacy_root(root) is True
+
+
 def test_adoption_rolls_back_completed_moves_on_failure(tmp_path, monkeypatch):
     root = _legacy_root(tmp_path)
     real_move = shutil.move
