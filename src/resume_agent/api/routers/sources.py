@@ -53,17 +53,19 @@ def list_sources_route(
 def preview_source_route(request: Request, body: SourcePreviewIn):
     _, search_path = _config_paths(request)
     return SourcePreviewOut.model_validate(
-        preview_source(body.url, label=body.label, search_path=search_path)
+        preview_source(**body.model_dump(), search_path=search_path)
     )
 
 
 @router.post("/sources", response_model=SourceOut, status_code=201)
 def add_source_route(request: Request, body: AddSourceIn):
-    connectors_path, _ = _config_paths(request)
+    connectors_path, search_path = _config_paths(request)
     return SourceOut.model_validate(
         _guard(
             lambda: add_source(
-                body.url, label=body.label, connectors_path=connectors_path
+                **body.model_dump(),
+                connectors_path=connectors_path,
+                search_path=search_path,
             )
         )
     )
