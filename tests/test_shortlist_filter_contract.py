@@ -64,6 +64,7 @@ def row_from_wire(d: dict) -> ShortlistRow:
         job_id=fields["job_id"],
         company=fields.get("company"),
         title=fields.get("title"),
+        source=fields.get("source", "test"),
         location=fields.get("location"),
         fit_score=fields.get("fit_score"),
         fit_rationale=fields.get("fit_rationale"),

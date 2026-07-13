@@ -38,6 +38,7 @@ def _row(
         job_id=job_id,
         company="C",
         title="T",
+        source="test",
         location="L",
         fit_score=fit,
         fit_rationale="r",
