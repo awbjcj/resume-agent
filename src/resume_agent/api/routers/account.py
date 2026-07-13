@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import shutil
+import sqlite3
 import tempfile
 import uuid
+from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -44,6 +46,28 @@ from resume_agent.tenancy.workspace import workspace_paths
 
 router = APIRouter(prefix="/account", tags=["account"])
 link_router = APIRouter(prefix="/account", tags=["account"])
+
+
+def _validate_workspace_stage(stage: Path) -> None:
+    database = stage / "resume_agent.db"
+    if not database.is_file():
+        raise InvalidArchiveError("workspace archive is missing resume_agent.db")
+    try:
+        with closing(
+            sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True)
+        ) as connection:
+            if connection.execute("PRAGMA quick_check").fetchone() != ("ok",):
+                raise InvalidArchiveError("workspace database failed integrity check")
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            }
+    except sqlite3.Error as exc:
+        raise InvalidArchiveError("workspace database is not valid SQLite") from exc
+    if "jobs" not in tables:
+        raise InvalidArchiveError("workspace database is missing the jobs table")
 
 
 @router.post("/tokens", status_code=201)
@@ -174,6 +198,7 @@ def import_workspace(
             import_data_root(
                 archive,
                 paths.root,
+                validate_staged=_validate_workspace_stage,
                 before_swap=lambda: registry.evict(context.user_id),
                 after_swap=lambda: registry.get(context.user_id, paths.db_url),
             )

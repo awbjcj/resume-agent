@@ -8,10 +8,12 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from sqlmodel import Session
+from sqlalchemy import func, select, text
+from sqlmodel import Session, col
 
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.ingest import IngestOutcome, save_or_upgrade
+from resume_agent.tracking.tables import Job
 
 _COLUMNS = ("title", "company", "url", "location", "jd_text", "posted_at")
 _MISSING_JD = (
@@ -57,12 +59,24 @@ def _rows(filename: str, data: bytes) -> list[object]:
 
 
 def import_jobs_file(
-    session: Session, filename: str, data: bytes
+    session: Session,
+    filename: str,
+    data: bytes,
+    *,
+    max_active_jobs: int | None = None,
 ) -> JobsImportReport:
     rows = _rows(filename, data)
     if len(rows) > _MAX_ROWS:
         raise InvalidJobsFileError(f"file exceeds the {_MAX_ROWS} row limit")
     report = JobsImportReport()
+    remaining: int | None = None
+    if max_active_jobs is not None and max_active_jobs > 0:
+        if not session.in_transaction():
+            session.execute(text("BEGIN IMMEDIATE"))
+        active = session.execute(
+            select(func.count()).select_from(Job).where(col(Job.archived_at).is_(None))
+        ).scalar_one()
+        remaining = max(max_active_jobs - int(active), 0)
     for row_number, raw in enumerate(rows, start=1):
         if not isinstance(raw, dict):
             report.errors.append((row_number, "row must be an object"))
@@ -86,9 +100,12 @@ def import_jobs_file(
             location=values["location"] or None,
             posted_at=parse_iso_datetime(values["posted_at"] or None),
             commit=False,
+            allow_insert=remaining is None or remaining > 0,
         )
         if outcome is IngestOutcome.inserted:
             report.added += 1
+            if remaining is not None:
+                remaining -= 1
         elif outcome is IngestOutcome.upgraded:
             report.upgraded += 1
         else:

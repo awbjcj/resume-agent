@@ -122,6 +122,26 @@ describe("PipelineContainer", () => {
     expect(screen.getByRole("link", { name: "Open posting" })).toBeInTheDocument();
   });
 
+  it("selects every job in a stage from the list header checkbox", async () => {
+    localStorage.setItem("pipeline-view", "list");
+    server.use(http.get("/api/pipeline", () => HttpResponse.json({
+      data: [
+        pipelineItem(9, "tailored", "Operator"),
+        pipelineItem(10, "tailored", "Architect"),
+      ],
+      pagination: { page: 1, pageSize: 50, totalItems: 2, totalPages: 1 },
+      facets: { status: { tailored: 2 } }, total: 2,
+    })));
+    const user = userEvent.setup();
+    wrap(<PipelineContainer />);
+    const selectAll = await screen.findByRole("checkbox", { name: "Select all loaded jobs" });
+
+    await user.click(selectAll);
+
+    expect(screen.getByRole("checkbox", { name: /Select tailored Co Operator/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Select tailored Co Architect/ })).toBeChecked();
+  });
+
   it("puts the tailored stage before every other status", async () => {
     server.use(
       http.get("/api/pipeline", () =>

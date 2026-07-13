@@ -37,6 +37,21 @@ function announceCompletion(run: import("@/lib/runs/store").RunRecord) {
   toast.success(`${run.kind} completed`);
 }
 
+function removeSupersededArtifactFailures(kind: string, meta?: RunMeta): void {
+  const metaKey = kind === "revise" ? "versionId" : kind === "coverLetterRevise" ? "coverLetterId" : null;
+  if (!metaKey || meta?.[metaKey] == null) return;
+  const store = useRunStore.getState();
+  for (const run of Object.values(store.runs)) {
+    if (
+      run.kind === kind &&
+      run.status === "failed" &&
+      run.meta?.[metaKey] === meta[metaKey]
+    ) {
+      store.remove(run.runId);
+    }
+  }
+}
+
 export function useLaunchRun() {
   const qc = useQueryClient();
   const launch = async (
@@ -47,6 +62,7 @@ export function useLaunchRun() {
   ): Promise<boolean> => {
     try {
       const run = (await call()) as RunOut;
+      removeSupersededArtifactFailures(kind, meta);
       useRunStore.getState().upsert({
         runId: run.runId,
         kind,

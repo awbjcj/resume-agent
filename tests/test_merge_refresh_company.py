@@ -1,14 +1,16 @@
+from typing import Any
+
 from sqlmodel import select
 
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.ingest import IngestOutcome, save_or_upgrade
-from resume_agent.discovery.merge import IncomingJob, RefreshCompany, Skip, decide
+from resume_agent.discovery.merge import IncomingJob, RefreshCompany, RefreshText, Skip, decide
 from resume_agent.tracking.dedup import compute_dedup_key
 from resume_agent.tracking.tables import Job, JobStatus
 
 
 def _existing(company="acmecorp", **overrides):
-    values = dict(
+    values: dict[str, Any] = dict(
         source="greenhouse",
         url="https://x.test/1",
         company=company,
@@ -23,7 +25,7 @@ def _existing(company="acmecorp", **overrides):
 
 
 def _incoming(**overrides):
-    values = dict(
+    values: dict[str, Any] = dict(
         source="greenhouse",
         url="https://x.test/1",
         company="Acme Corp",
@@ -65,6 +67,43 @@ def test_save_refreshes_company_and_key_atomically():
     assert outcome is IngestOutcome.upgraded
     assert job is not None and job.company == "Acme Corp"
     assert job.dedup_key == compute_dedup_key("Acme Corp", "Platform Engineer")
+
+
+def test_richer_text_refreshes_company_and_key_atomically():
+    richer = " ".join(["Build systems with distributed services and production ownership"] * 8)
+    action = decide(_existing(), _incoming(jd_text=richer))
+    assert isinstance(action, RefreshText)
+    assert action.updates["company"] == "Acme Corp"
+    assert action.updates["dedup_key"] == compute_dedup_key(
+        "Acme Corp", "Platform Engineer"
+    )
+
+
+def test_richer_text_company_refresh_skips_on_identity_collision():
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    with get_session(engine) as session:
+        session.add(_existing())
+        session.add(
+            _existing(company="Acme Corp", url="https://x.test/2", jd_text="Other text")
+        )
+        session.commit()
+        job, outcome = save_or_upgrade(
+            session,
+            source="greenhouse",
+            url="https://x.test/1",
+            company="Acme Corp",
+            stale_company="acmecorp",
+            title="Platform Engineer",
+            location="Austin",
+            jd_text=" ".join(
+                ["Build systems with distributed services and production ownership"] * 8
+            ),
+        )
+        stale = session.exec(select(Job).where(Job.company == "acmecorp")).one()
+    assert job is None
+    assert outcome is IngestOutcome.skipped
+    assert stale.jd_text == "Build systems"
 
 
 def test_save_skips_rename_that_collides_with_live_row():

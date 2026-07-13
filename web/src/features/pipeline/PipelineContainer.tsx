@@ -212,6 +212,11 @@ export function PipelineContainer() {
               onSelect={(row) =>
                 selection.toggle(row.jobId, loadedIds.indexOf(row.jobId), false, loadedIds)
               }
+              onToggleAll={(checked) =>
+                checked
+                  ? selection.selectPage(byStage.get(stage)!.map((row) => row.jobId))
+                  : selection.clear()
+              }
               onOpen={(row) => openJob(row.jobId)}
               view={view}
               actions={(row) => <JobQuickActions jobId={row.jobId} url={row.url} />}

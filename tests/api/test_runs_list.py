@@ -32,3 +32,51 @@ def test_list_runs_rejects_invalid_page_size(tmp_path):
         response = client.get("/api/runs", params={"pageSize": 0})
 
     assert response.status_code == 422
+
+
+def test_list_runs_includes_failed_revision_for_durable_retry(tmp_path):
+    app = create_app(
+        db_url="sqlite://", runs_root=tmp_path, env_path=tmp_path / "missing.env"
+    )
+    with TestClient(app) as client:
+        run_id = app.state.run_manager.create(
+            "revise",
+            meta={"versionId": 5, "jobId": 3, "instruction": "shorter"},
+        )
+        app.state.run_manager.reporter(run_id, "revise").done(error="provider failed")
+
+        response = client.get("/api/runs")
+
+    assert response.status_code == 200
+    runs = response.json()["data"]
+    assert len(runs) == 1
+    assert runs[0]["runId"] == run_id
+    assert runs[0]["kind"] == "revise"
+    assert runs[0]["state"] == "error"
+    assert runs[0]["error"] == "provider failed"
+    assert runs[0]["meta"] == {
+        "versionId": 5,
+        "jobId": 3,
+        "instruction": "shorter",
+    }
+
+
+def test_list_runs_only_rehydrates_the_latest_revision_attempt(tmp_path):
+    app = create_app(
+        db_url="sqlite://", runs_root=tmp_path, env_path=tmp_path / "missing.env"
+    )
+    with TestClient(app) as client:
+        failed_id = app.state.run_manager.create(
+            "revise", meta={"versionId": 5, "jobId": 3, "instruction": "shorter"}
+        )
+        app.state.run_manager.reporter(failed_id, "revise").done(error="first failed")
+        retry_id = app.state.run_manager.create(
+            "revise", meta={"versionId": 5, "jobId": 3, "instruction": "shorter"}
+        )
+
+        active = client.get("/api/runs").json()["data"]
+        app.state.run_manager.reporter(retry_id, "revise").done(result={"versionId": 6})
+        completed = client.get("/api/runs").json()["data"]
+
+    assert [run["runId"] for run in active] == [retry_id]
+    assert completed == []

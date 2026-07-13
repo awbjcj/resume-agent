@@ -38,7 +38,9 @@ export function useRehydrateRuns(): void {
             result: run.result as Record<string, unknown> | null,
             meta: (run.meta as Record<string, unknown> | null) ?? null,
           });
-          trackRun({ runId: run.runId, kind: run.kind });
+          if (["pending", "running", "cancelling"].includes(run.state)) {
+            trackRun({ runId: run.runId, kind: run.kind });
+          }
         }
       })
       .catch(() => undefined);

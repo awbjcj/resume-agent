@@ -22,6 +22,7 @@ type PipelineStageSectionProps = {
   onOpenChange: (open: boolean) => void;
   isSelected: (jobId: number) => boolean;
   onSelect: (row: PipelineItem) => void;
+  onToggleAll: (checked: boolean) => void;
   onOpen: (row: PipelineItem) => void;
   view: ViewMode;
   actions: (row: PipelineItem) => ReactNode;
@@ -34,6 +35,7 @@ export function PipelineStageSection({
   onOpenChange,
   isSelected,
   onSelect,
+  onToggleAll,
   onOpen,
   view,
   actions,
@@ -65,6 +67,8 @@ export function PipelineStageSection({
             rows={rows}
             selection={{ isSelected }}
             onToggle={(id) => { const row = rows.find((item) => item.jobId === id); if (row) onSelect(row); }}
+            onToggleAll={onToggleAll}
+            allChecked={rows.every((row) => isSelected(row.jobId))}
             onOpen={(id) => { const row = rows.find((item) => item.jobId === id); if (row) onOpen(row); }}
             actions={(row) => actions(row as PipelineItem)}
           /></div> : <div className="grid grid-cols-1 gap-4 pt-4 xl:grid-cols-2 2xl:grid-cols-3">

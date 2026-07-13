@@ -92,4 +92,36 @@ describe("useLaunchRun", () => {
       reReview: true,
     });
   });
+
+  it("removes a superseded revision failure when its retry launches", async () => {
+    useRunStore.getState().upsert({
+      runId: "failed-r1",
+      kind: "revise",
+      status: "failed",
+      percent: 0,
+      phase: "Failed",
+      current: 0,
+      total: 0,
+      etaText: null,
+      error: "provider failed",
+      meta: { versionId: 5, jobId: 3, instruction: "shorter" },
+    });
+    const qc = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useLaunchRun(), { wrapper });
+
+    await act(() =>
+      result.current.launch(
+        "revise",
+        async () => ({ runId: "retry-r2", kind: "revise" }),
+        ["job"],
+        { versionId: 5, jobId: 3, instruction: "shorter" },
+      ),
+    );
+
+    expect(useRunStore.getState().runs["failed-r1"]).toBeUndefined();
+    expect(useRunStore.getState().runs["retry-r2"]?.status).toBe("running");
+  });
 });

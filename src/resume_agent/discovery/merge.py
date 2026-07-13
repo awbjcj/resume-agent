@@ -152,6 +152,11 @@ def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
             updates["location"] = incoming.location
         if incoming.posted_at is not None:
             updates["posted_at"] = incoming.posted_at
+        if "company" in updates or "title" in updates:
+            updates["dedup_key"] = compute_dedup_key(
+                updates.get("company", existing.company),
+                updates.get("title", existing.title),
+            )
         return RefreshText(updates=updates)
 
     if source_rank(incoming.source) >= source_rank(existing.source):

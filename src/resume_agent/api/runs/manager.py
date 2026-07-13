@@ -402,6 +402,47 @@ class RunManager:
         ]
         return sorted(snapshots, key=lambda item: (item.created_at, item.run_id))
 
+    def list_rehydratable(self, user_id: str | None = None) -> list[RunSnapshot]:
+        """Return active runs plus failed revisions whose metadata enables retry."""
+        with self._singleton_lock:
+            roots = tuple(self._roots)
+        snapshots = [
+            snapshot
+            for root in roots
+            if root.exists()
+            for path in root.glob("*.json")
+            if (snapshot := self.get(path.stem)) is not None
+            and (user_id is None or snapshot.user_id == user_id)
+        ]
+        visible = {
+            snapshot.run_id: snapshot
+            for snapshot in snapshots
+            if snapshot.state in ACTIVE_RUN_STATES
+        }
+        latest_revision: dict[tuple[str, object], RunSnapshot] = {}
+        for snapshot in snapshots:
+            meta_key = (
+                "versionId"
+                if snapshot.kind == "revise"
+                else "coverLetterId"
+                if snapshot.kind == "coverLetterRevise"
+                else None
+            )
+            artifact_id = snapshot.meta.get(meta_key) if snapshot.meta and meta_key else None
+            if meta_key is None or artifact_id is None:
+                continue
+            key = (snapshot.kind, artifact_id)
+            previous = latest_revision.get(key)
+            if previous is None or (snapshot.created_at, snapshot.run_id) > (
+                previous.created_at,
+                previous.run_id,
+            ):
+                latest_revision[key] = snapshot
+        for snapshot in latest_revision.values():
+            if snapshot.state.value == "error":
+                visible[snapshot.run_id] = snapshot
+        return sorted(visible.values(), key=lambda item: (item.created_at, item.run_id))
+
     def recover_interrupted(self) -> int:
         recovered = 0
         for snapshot in self.list_active():

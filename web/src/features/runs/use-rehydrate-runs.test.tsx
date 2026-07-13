@@ -102,3 +102,33 @@ it("retries the active-run list once after a transient failure", async () => {
 
   await waitFor(() => expect(attempts).toBe(2));
 });
+
+it("rehydrates a failed revision without tracking a terminal run", async () => {
+  server.use(
+    http.get("/api/runs", () =>
+      HttpResponse.json({
+        data: [{
+          runId: "failed-revision",
+          kind: "revise",
+          state: "error",
+          label: "Failed",
+          percent: 0,
+          current: 0,
+          total: 0,
+          etaText: null,
+          result: null,
+          error: "provider failed",
+          meta: { versionId: 5, jobId: 3, instruction: "shorter" },
+        }],
+        pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+      }),
+    ),
+  );
+
+  renderHook(() => useRehydrateRuns());
+
+  await waitFor(() =>
+    expect(useRunStore.getState().runs["failed-revision"]?.status).toBe("failed"),
+  );
+  expect(mocks.trackRun).not.toHaveBeenCalled();
+});

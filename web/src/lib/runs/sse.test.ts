@@ -86,4 +86,20 @@ describe("watchRun", () => {
     expect(onTransportError).toHaveBeenCalledOnce();
     expect(useRunStore.getState().runs.r1).toBeUndefined();
   });
+
+  it("retains a failed revision so its retry instruction remains available", async () => {
+    watchRun("r1", "revise");
+    await vi.waitFor(() => expect(FakeEventSource.current).toBeDefined());
+
+    FakeEventSource.current.onmessage?.({
+      data: JSON.stringify({ state: "error", label: "Failed", error: "provider failed" }),
+    } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(4000);
+
+    expect(useRunStore.getState().runs.r1).toMatchObject({
+      kind: "revise",
+      status: "failed",
+      error: "provider failed",
+    });
+  });
 });

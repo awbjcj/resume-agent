@@ -20,6 +20,7 @@ from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.api.schemas.runs import AddJobTextRequest
 from resume_agent.services import board
 from resume_agent.services.discovery import ActiveJobQuotaError, add_job_from_text
+from resume_agent.tenancy.limits import DEFAULT_MAX_ACTIVE_JOBS, active_limit
 from resume_agent.tracking.repository import get_job
 from resume_agent.tracking.tables import ApplicationStatus, JobStatus
 
@@ -38,7 +39,12 @@ def import_jobs_endpoint(
 
     try:
         data = read_upload(file, max_bytes=10 * 1024 * 1024)
-        report = import_jobs_file(session, file.filename or "", data)
+        report = import_jobs_file(
+            session,
+            file.filename or "",
+            data,
+            max_active_jobs=active_limit("max_active_jobs", DEFAULT_MAX_ACTIVE_JOBS),
+        )
     except UploadTooLargeError as exc:
         raise ApiException(413, "UPLOAD_TOO_LARGE", str(exc)) from exc
     except UnsupportedJobsFormatError as exc:

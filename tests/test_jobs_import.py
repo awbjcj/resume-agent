@@ -33,3 +33,11 @@ def test_json_import_adds_and_deduplicates():
         second = import_jobs_file(session, "jobs.json", JSON)
     assert first.added == 1
     assert second.skipped == 1
+
+
+def test_import_respects_active_job_limit_across_rows():
+    rows = b'[{"jd_text":"first"},{"jd_text":"second"}]'
+    with get_session(_engine()) as session:
+        report = import_jobs_file(session, "jobs.json", rows, max_active_jobs=1)
+    assert report.added == 1
+    assert report.skipped == 1

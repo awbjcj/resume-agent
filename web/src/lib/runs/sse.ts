@@ -75,8 +75,11 @@ export function watchRun(
     if (state === "done" || state === "error" || state === "cancelled") {
       eventSource.close();
       onDone?.(run);
-      // Let the finished bar linger briefly, then clear it.
-      setTimeout(() => useRunStore.getState().remove(runId), 4000);
+      // Failed revision metadata contains the original instruction used by the
+      // durable retry UI. Other terminal notifications only linger briefly.
+      if (!(state === "error" && ["revise", "coverLetterRevise"].includes(kind))) {
+        setTimeout(() => useRunStore.getState().remove(runId), 4000);
+      }
     }
   };
 

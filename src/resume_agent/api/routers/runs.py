@@ -548,7 +548,9 @@ def list_runs(
     context = current_context()
     return to_page(
         paginate(
-            mgr.list_active(user_id=context.user_id if context is not None else None),
+            mgr.list_rehydratable(
+                user_id=context.user_id if context is not None else None
+            ),
             page=page,
             page_size=page_size,
         ),

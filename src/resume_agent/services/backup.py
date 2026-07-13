@@ -122,6 +122,7 @@ def import_data_root(
     archive: Path,
     data_root: Path,
     *,
+    validate_staged: Callable[[Path], None] | None = None,
     before_swap: Callable[[], None] | None = None,
     after_swap: Callable[[], None] | None = None,
 ) -> None:
@@ -133,6 +134,8 @@ def import_data_root(
     preserve_rollback = False
     try:
         _extract_validated(archive, stage)
+        if validate_staged is not None:
+            validate_staged(stage)
         if before_swap is not None:
             before_swap()
         live = [

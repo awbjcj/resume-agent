@@ -185,6 +185,28 @@ def test_account_import_rejects_invalid_archive(mu_client):
     assert response.json()["error"]["code"] == "INVALID_ARCHIVE"
 
 
+def test_account_import_rejects_archive_without_workspace_database(mu_client):
+    assert _login(mu_client).status_code == 200
+    created = mu_client.post("/api/jobs", json={"jdText": "keep this role"})
+    assert created.status_code == 201
+    job_id = created.json()["id"]
+    payload = io.BytesIO()
+    with tarfile.open(fileobj=payload, mode="w:gz") as archive:
+        note = b"not a workspace database"
+        info = tarfile.TarInfo("profile/note.txt")
+        info.size = len(note)
+        archive.addfile(info, io.BytesIO(note))
+
+    response = mu_client.post(
+        "/api/account/import?confirm=REPLACE",
+        files={"file": ("workspace.tar.gz", payload.getvalue(), "application/gzip")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_ARCHIVE"
+    assert mu_client.get(f"/api/jobs/{job_id}").status_code == 200
+
+
 def test_whole_root_export_is_admin_only_and_snapshots_all_databases(mu_app, mu_client):
     _add_user(mu_app)
     assert _login(mu_client, "alice", "alice-password").status_code == 200
@@ -210,3 +232,27 @@ def test_active_job_limit_applies_to_manual_ingest(mu_app, mu_client):
     blocked = mu_client.post("/api/jobs", json={"jdText": "second role"})
     assert blocked.status_code == 429
     assert blocked.json()["error"]["code"] == "QUOTA_EXCEEDED"
+
+
+def test_active_job_limit_applies_to_file_import(mu_app, mu_client):
+    assert _login(mu_client).status_code == 200
+    owner_id = mu_app.state.default_context.user_id
+    assert mu_client.patch(
+        f"/api/admin/users/{owner_id}", json={"maxActiveJobs": 1}
+    ).status_code == 200
+    assert mu_client.post("/api/jobs", json={"jdText": "existing role"}).status_code == 201
+
+    imported = mu_client.post(
+        "/api/jobs/import",
+        files={
+            "file": (
+                "jobs.json",
+                b'[{"title":"Extra role","jd_text":"new imported role"}]',
+                "application/json",
+            )
+        },
+    )
+
+    assert imported.status_code == 200
+    assert imported.json()["added"] == 0
+    assert imported.json()["skipped"] == 1

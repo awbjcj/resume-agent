@@ -85,11 +85,20 @@ def save_or_upgrade(
         incoming.location,
     )
     action = decide(existing, incoming)
+    refreshed_key: str | None = None
+    changes_identity = False
+    if isinstance(action, RefreshCompany):
+        refreshed_key = action.dedup_key
+        changes_identity = True
+    elif isinstance(action, RefreshText) and "dedup_key" in action.updates:
+        refreshed_key = action.updates["dedup_key"]
+        changes_identity = True
     if (
-        isinstance(action, RefreshCompany)
+        changes_identity
         and existing is not None
+        and refreshed_key != existing.dedup_key
         and company_rename_collides(
-            session, existing=existing, dedup_key=action.dedup_key
+            session, existing=existing, dedup_key=refreshed_key
         )
     ):
         action = Skip()
