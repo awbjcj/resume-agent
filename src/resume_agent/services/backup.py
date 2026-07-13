@@ -123,8 +123,9 @@ def import_data_root(
     data_root: Path,
     *,
     before_swap: Callable[[], None] | None = None,
+    after_swap: Callable[[], None] | None = None,
 ) -> None:
-    """Stage, then full-replace volume children with rollback on move failure."""
+    """Stage and replace the root, retaining rollback until validation succeeds."""
     data_root = data_root.resolve()
     data_root.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".ra-import-stage-", dir=data_root))
@@ -145,6 +146,8 @@ def import_data_root(
                 destination = data_root / child.name
                 shutil.move(child, destination)
                 installed.append(destination)
+            if after_swap is not None:
+                after_swap()
         except BaseException as swap_error:
             for child in reversed(installed):
                 _remove(child)

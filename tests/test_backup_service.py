@@ -114,6 +114,21 @@ def test_import_rolls_back_when_install_move_fails(tmp_path, monkeypatch):
         assert connection.execute("SELECT title FROM job").fetchall() == [("Engineer",)]
 
 
+def test_import_rolls_back_when_post_swap_validation_fails(tmp_path):
+    root, db = _make_root(tmp_path)
+    archive = export_data_root(root, f"sqlite:///{db.as_posix()}", tmp_path / "out")
+    (root / "profile" / "facts.json").write_text("current", encoding="utf-8")
+
+    def reject_replacement():
+        raise RuntimeError("replacement database is invalid")
+
+    with pytest.raises(RuntimeError, match="replacement database is invalid"):
+        import_data_root(archive, root, after_swap=reject_replacement)
+
+    assert (root / "profile" / "facts.json").read_text(encoding="utf-8") == "current"
+    assert not list(root.glob(".ra-import-rollback-*"))
+
+
 def test_import_preserves_rollback_directory_when_restore_also_fails(
     tmp_path, monkeypatch
 ):
