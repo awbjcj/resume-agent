@@ -78,8 +78,10 @@ def import_root(
         with archive.open("wb") as destination:
             shutil.copyfileobj(file.file, destination)
         was_multiuser = request.app.state.system_engine is not None
+        runtime_disposed = False
 
         def dispose_all() -> None:
+            nonlocal runtime_disposed
             registry = request.app.state.engine_registry
             if registry is not None:
                 registry.close_all()
@@ -87,19 +89,10 @@ def import_root(
                 request.app.state.system_engine.dispose()
             if not was_multiuser and request.app.state.engine is not None:
                 request.app.state.engine.dispose()
+            runtime_disposed = True
 
-        try:
-            import_data_root(
-                archive,
-                request.app.state.data_dir,
-                before_swap=dispose_all,
-            )
-        except UnsafeArchiveError as exc:
-            raise ApiException(400, "UNSAFE_ARCHIVE", str(exc)) from exc
-        except InvalidArchiveError as exc:
-            raise ApiException(400, "INVALID_ARCHIVE", str(exc)) from exc
-        finally:
-            dispose_all()
+        def rebuild_runtime() -> None:
+            nonlocal runtime_disposed
             if was_multiuser:
                 from resume_agent.tenancy.bootstrap import (
                     build_context,
@@ -112,21 +105,26 @@ def import_root(
                 )
 
                 system_engine = make_system_engine(request.app.state.data_dir)
-                init_system_db(system_engine)
-                admin = ensure_bootstrapped(
-                    request.app.state.data_dir,
-                    system_engine,
-                    request.app.state.settings,
-                )
                 registry = EngineRegistry()
-                context = build_context(
-                    admin,
-                    request.app.state.data_dir,
-                    request.app.state.settings,
-                    registry,
-                    system_engine=system_engine,
-                    template_dir=request.app.state.template_config_dir,
-                )
+                try:
+                    init_system_db(system_engine)
+                    admin = ensure_bootstrapped(
+                        request.app.state.data_dir,
+                        system_engine,
+                        request.app.state.settings,
+                    )
+                    context = build_context(
+                        admin,
+                        request.app.state.data_dir,
+                        request.app.state.settings,
+                        registry,
+                        system_engine=system_engine,
+                        template_dir=request.app.state.template_config_dir,
+                    )
+                except BaseException:
+                    registry.close_all()
+                    system_engine.dispose()
+                    raise
                 request.app.state.system_engine = system_engine
                 request.app.state.engine_registry = registry
                 request.app.state.default_context = context
@@ -135,6 +133,23 @@ def import_root(
                 engine = make_engine(request.app.state.db_url)
                 init_db(engine)
                 request.app.state.engine = engine
+            runtime_disposed = False
+
+        try:
+            import_data_root(
+                archive,
+                request.app.state.data_dir,
+                before_swap=dispose_all,
+                after_swap=rebuild_runtime,
+            )
+        except UnsafeArchiveError as exc:
+            raise ApiException(400, "UNSAFE_ARCHIVE", str(exc)) from exc
+        except InvalidArchiveError as exc:
+            raise ApiException(400, "INVALID_ARCHIVE", str(exc)) from exc
+        except BaseException:
+            if runtime_disposed:
+                rebuild_runtime()
+            raise
         env_settings.cache_clear()
     refresh_app_settings(
         request.app,
