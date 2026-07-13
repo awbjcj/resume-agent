@@ -22,7 +22,7 @@ def _add_user(app, username: str, password: str):
         user_id,
         template_dir=app.state.template_config_dir,
     )
-    return user
+    return user_id
 
 
 def _login(client, username: str, password: str):
@@ -72,3 +72,21 @@ def test_config_secrets_and_documents_are_isolated(mu_app, mu_client):
     assert [
         row["filename"] for row in mu_client.get("/api/profile/documents").json()
     ] == ["alice.md"]
+
+
+def test_new_user_sources_are_loaded_from_their_workspace(mu_app, mu_client):
+    alice_id = _add_user(mu_app, "alice", "alice-password")
+    alice_connectors = (
+        mu_app.state.data_dir / "users" / alice_id / "config" / "connectors.yaml"
+    )
+    alice_connectors.write_text(
+        "remoteok:\n  enabled: true\n",
+        encoding="utf-8",
+    )
+
+    _login(mu_client, "alice", "alice-password")
+
+    response = mu_client.get("/api/sources")
+    assert response.status_code == 200
+    remoteok = next(source for source in response.json() if source["id"] == "remoteok")
+    assert remoteok["enabled"] is True

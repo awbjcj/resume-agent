@@ -41,7 +41,9 @@ def test_preview_endpoint(monkeypatch):
     monkeypatch.setattr(
         sources_router,
         "preview_source",
-        lambda url, label=None: SourcePreview(ok=True, url=url, kind="ashby", role_count=7),
+        lambda url, label=None, search_path=None: SourcePreview(
+            ok=True, url=url, kind="ashby", role_count=7
+        ),
     )
 
     client = _client()
@@ -76,7 +78,7 @@ def test_patch_source_forwards_present_fields_atomically(monkeypatch):
 
     calls = []
 
-    def fake_patch(source_id, **changes):
+    def fake_patch(source_id, connectors_path=None, **changes):
         calls.append((source_id, changes))
         return SourceView(
             id=source_id,
