@@ -45,17 +45,37 @@ app.add_typer(profile_app, name="profile")
 app.add_typer(admin_app, name="admin")
 
 
+_NO_LOCAL_CONTEXT_COMMANDS = {"serve", "admin"}
+
+
 @app.callback()
 def _main(
+    ctx: typer.Context,
     user: str | None = typer.Option(
         None,
         "--user",
         help="Workspace username on a multi-user data root (default: first admin).",
     ),
 ) -> None:
-    from resume_agent.tenancy.local import activate_local_context
+    if ctx.invoked_subcommand in _NO_LOCAL_CONTEXT_COMMANDS:
+        # `serve` bootstraps its own admin/context per-request via the API app's
+        # lifespan (ensure_bootstrapped); `admin` talks to a *deployed* instance
+        # over HTTP and never touches a local data root. Activating a local
+        # context here would require an admin to already exist, which is exactly
+        # what `serve`'s first run is bootstrapping.
+        return
+    from resume_agent.tenancy.context import activate, deactivate
+    from resume_agent.tenancy.local import resolve_local_context
 
-    activate_local_context(Path("data"), user)
+    context = resolve_local_context(Path("data"), user)
+    if context is not None:
+        token = activate(context)
+        # Scope activation to this invocation only (ctx.call_on_close runs after
+        # the subcommand finishes, success or error) — otherwise the contextvar
+        # stays set process-wide, which is invisible in normal CLI use (the
+        # process exits right after) but silently contaminates every later test
+        # in the same pytest run once a local admin exists.
+        ctx.call_on_close(lambda: deactivate(token))
 
 
 DEFAULT_SOURCES = "config/profile_sources.yaml"

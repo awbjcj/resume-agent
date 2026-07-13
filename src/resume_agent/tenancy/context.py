@@ -66,5 +66,9 @@ def activate(context: UserContext) -> contextvars.Token[UserContext | None]:
     return _current.set(context)
 
 
+def deactivate(token: contextvars.Token[UserContext | None]) -> None:
+    _current.reset(token)
+
+
 def new_user_id() -> str:
     return uuid.uuid4().hex[:12]
