@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 
 from resume_agent.api.schemas.base import CamelModel
@@ -18,9 +20,34 @@ class SourceOut(CamelModel):
     limit: int | None = None
 
 
-class SourcePreviewIn(CamelModel):
-    url: str
+SourceProvider = Literal[
+    "auto",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "workday",
+    "smartrecruiters",
+    "workable",
+    "recruitee",
+    "personio",
+    "breezy",
+    "jazzhr",
+    "bamboohr",
+]
+
+
+class SourceConnectionIn(CamelModel):
+    provider: SourceProvider = "auto"
+    url: str | None = None
+    token: str | None = None
+    tenant: str | None = None
+    datacenter: str | None = None
+    site: str | None = None
+    country: Literal["com", "de"] = "com"
     label: str | None = None
+
+class SourcePreviewIn(SourceConnectionIn):
+    pass
 
 
 class SourcePreviewOut(CamelModel):
@@ -33,9 +60,8 @@ class SourcePreviewOut(CamelModel):
     error: str | None = None
 
 
-class AddSourceIn(CamelModel):
-    url: str
-    label: str | None = None
+class AddSourceIn(SourceConnectionIn):
+    pass
 
 
 class SourcePatchIn(CamelModel):

@@ -134,6 +134,26 @@
       },
       "AddSourceIn": {
         "properties": {
+          "country": {
+            "default": "com",
+            "enum": [
+              "com",
+              "de"
+            ],
+            "title": "Country",
+            "type": "string"
+          },
+          "datacenter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datacenter"
+          },
           "label": {
             "anyOf": [
               {
@@ -145,14 +165,70 @@
             ],
             "title": "Label"
           },
-          "url": {
-            "title": "Url",
+          "provider": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "greenhouse",
+              "lever",
+              "ashby",
+              "workday",
+              "smartrecruiters",
+              "workable",
+              "recruitee",
+              "personio",
+              "breezy",
+              "jazzhr",
+              "bamboohr"
+            ],
+            "title": "Provider",
             "type": "string"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "tenant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
-        "required": [
-          "url"
-        ],
         "title": "AddSourceIn",
         "type": "object"
       },
@@ -3891,6 +3967,26 @@
       },
       "SourcePreviewIn": {
         "properties": {
+          "country": {
+            "default": "com",
+            "enum": [
+              "com",
+              "de"
+            ],
+            "title": "Country",
+            "type": "string"
+          },
+          "datacenter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datacenter"
+          },
           "label": {
             "anyOf": [
               {
@@ -3902,14 +3998,70 @@
             ],
             "title": "Label"
           },
-          "url": {
-            "title": "Url",
+          "provider": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "greenhouse",
+              "lever",
+              "ashby",
+              "workday",
+              "smartrecruiters",
+              "workable",
+              "recruitee",
+              "personio",
+              "breezy",
+              "jazzhr",
+              "bamboohr"
+            ],
+            "title": "Provider",
             "type": "string"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "tenant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
-        "required": [
-          "url"
-        ],
         "title": "SourcePreviewIn",
         "type": "object"
       },

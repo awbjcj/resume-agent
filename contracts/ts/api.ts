@@ -1485,10 +1485,30 @@ export interface components {
         };
         /** AddSourceIn */
         AddSourceIn: {
+            /**
+             * Country
+             * @default com
+             * @enum {string}
+             */
+            country: "com" | "de";
+            /** Datacenter */
+            datacenter?: string | null;
             /** Label */
             label?: string | null;
+            /**
+             * Provider
+             * @default auto
+             * @enum {string}
+             */
+            provider: "auto" | "greenhouse" | "lever" | "ashby" | "workday" | "smartrecruiters" | "workable" | "recruitee" | "personio" | "breezy" | "jazzhr" | "bamboohr";
+            /** Site */
+            site?: string | null;
+            /** Tenant */
+            tenant?: string | null;
+            /** Token */
+            token?: string | null;
             /** Url */
-            url: string;
+            url?: string | null;
         };
         /** AdminUser */
         AdminUser: {
@@ -2741,10 +2761,30 @@ export interface components {
         };
         /** SourcePreviewIn */
         SourcePreviewIn: {
+            /**
+             * Country
+             * @default com
+             * @enum {string}
+             */
+            country: "com" | "de";
+            /** Datacenter */
+            datacenter?: string | null;
             /** Label */
             label?: string | null;
+            /**
+             * Provider
+             * @default auto
+             * @enum {string}
+             */
+            provider: "auto" | "greenhouse" | "lever" | "ashby" | "workday" | "smartrecruiters" | "workable" | "recruitee" | "personio" | "breezy" | "jazzhr" | "bamboohr";
+            /** Site */
+            site?: string | null;
+            /** Tenant */
+            tenant?: string | null;
+            /** Token */
+            token?: string | null;
             /** Url */
-            url: string;
+            url?: string | null;
         };
         /** SourcePreviewOut */
         SourcePreviewOut: {
