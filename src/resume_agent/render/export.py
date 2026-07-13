@@ -25,7 +25,9 @@ def job_slug(job: Job) -> str:
 
 
 def job_dir(base: str | Path, job: Job) -> Path:
-    return Path(base) / job_slug(job)
+    from resume_agent.tenancy.paths import resolve_tenant_path
+
+    return resolve_tenant_path(base) / job_slug(job)
 
 
 def _origin(value: str | None, fallback: str) -> str:

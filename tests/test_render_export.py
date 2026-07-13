@@ -4,6 +4,7 @@ from pathlib import Path
 from sqlmodel import Session
 
 from resume_agent.db import init_db, make_engine
+from resume_agent.config import Settings
 from resume_agent.render.export import (
     build_manifest,
     cover_letter_pdf_name,
@@ -20,6 +21,8 @@ from resume_agent.tracking.repository import (
     save_resume_version,
 )
 from resume_agent.tracking.tables import Application, CoverLetter, Job, ResumeVersion
+from resume_agent.tenancy.context import UserContext, use_context
+from resume_agent.tenancy.workspace import WorkspacePaths
 
 
 def test_job_slug_and_version_filenames():
@@ -32,6 +35,24 @@ def test_job_slug_and_version_filenames():
     assert resume_pdf_name(version) == "resume-v7-revision.pdf"
     assert resume_json_name(version) == "resume-v7-revision.content.json"
     assert cover_letter_pdf_name(cover) == "cover-letter-v3-draft.pdf"
+
+
+def test_job_dir_rebases_default_output_into_active_workspace(tmp_path):
+    paths = WorkspacePaths(tmp_path / "users" / "alice")
+    context = UserContext(
+        user_id="abc123def456",
+        username="alice",
+        role="user",
+        paths=paths,
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        engine=None,
+        system_engine=None,
+        own_key_providers=frozenset(),
+    )
+    job = Job(id=42, source="manual", company="Acme", title="Engineer")
+
+    with use_context(context):
+        assert job_dir("output", job).is_relative_to(paths.output_dir)
 
 
 def test_build_manifest_shape():

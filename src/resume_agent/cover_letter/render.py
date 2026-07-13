@@ -7,6 +7,7 @@ from sqlmodel import Session
 from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.render.export import cover_letter_pdf_name, export_job_artifacts, job_dir
 from resume_agent.tracking.repository import get_cover_letter, get_job, save_cover_letter
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 TEMPLATE = "templates/cover_letter.typ"
 RenderFn = Callable[[CoverLetterContent, str | Path, str | Path], Path]
@@ -41,7 +42,9 @@ def render_cover_letter(
         return None
     job = get_job(session, cover.job_id)
     content = CoverLetterContent.model_validate(cover.content_json or {})
-    out_dir = job_dir(output_dir, job) if job is not None else Path(output_dir)
+    out_dir = (
+        job_dir(output_dir, job) if job is not None else resolve_tenant_path(output_dir)
+    )
     out_path = out_dir / cover_letter_pdf_name(cover)
 
     render_fn(content, out_path, template_path)
