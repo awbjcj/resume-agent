@@ -19,6 +19,9 @@ _LEGACY_CHILDREN = (
     "workday_facets",
     "taxonomy",
 )
+_STRONG_LEGACY_CHILDREN = tuple(
+    child for child in _LEGACY_CHILDREN if child not in {"config", "output"}
+)
 
 
 class AdoptionError(RuntimeError):
@@ -27,6 +30,8 @@ class AdoptionError(RuntimeError):
 
 def is_legacy_root(data_root: Path | str) -> bool:
     root = Path(data_root)
+    if (root / "system.db").is_file():
+        return any((root / child).exists() for child in _STRONG_LEGACY_CHILDREN)
     return (
         any((root / child).exists() for child in _LEGACY_CHILDREN)
         or (root / ".env").is_file()
@@ -66,7 +71,10 @@ def adopt_legacy_root(data_root: Path | str, admin_id: str) -> list[str]:
             source = root / operation["source"]
             target = workspace / operation["target"]
             if source.exists() and target.exists():
-                raise AdoptionError(f"refusing to overwrite existing {target}")
+                if target.is_dir() and not any(target.iterdir()):
+                    target.rmdir()
+                else:
+                    raise AdoptionError(f"refusing to overwrite existing {target}")
             if source.exists():
                 shutil.move(str(source), str(target))
                 operation["done"] = True
