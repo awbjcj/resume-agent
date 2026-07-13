@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/lib/api/client";
+import type { SourceConnection } from "./source-connection";
 
 export type Source = {
   id: string;
@@ -30,16 +31,16 @@ export function useSources() {
   });
 }
 
-export function previewSource(url: string, label?: string | null): Promise<Preview> {
+export function previewSource(body: SourceConnection): Promise<Preview> {
   return unwrap(
-    api.POST("/api/sources/preview", { body: { url, label: label ?? null } }),
+    api.POST("/api/sources/preview", { body }),
   ) as Promise<Preview>;
 }
 
 export function useAddSource() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { url: string; label?: string | null }) =>
+    mutationFn: (body: SourceConnection) =>
       unwrap(api.POST("/api/sources", { body })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sources"] }),
   });
