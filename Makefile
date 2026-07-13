@@ -8,8 +8,12 @@ PORT ?= 8000
 WEB_HOST ?= localhost
 WEB_PORT ?= 5173
 PYTEST_ARGS ?= tests/api -v
+RAILWAY_URL ?= https://resume-agent.up.railway.app
+API_TOKEN ?= $(shell sed -n 's/^API_TOKEN=//p' .env 2>/dev/null)
+BACKUP_DIR ?= backups
+SEED_FILE ?= seed.tar.gz
 
-.PHONY: help setup setup-browser api web dev test test-api test-py test-web lint lint-py lint-web build build-web preview verify eval openapi client kill-port
+.PHONY: help setup setup-browser api web dev test test-api test-py test-web lint lint-py lint-web build build-web preview verify eval openapi client kill-port backup-remote seed
 
 help:
 	@echo "Common targets:"
@@ -26,10 +30,14 @@ help:
 	@echo ""
 	@echo "  make kill-port      Free PORT if an orphaned dev server is holding it"
 	@echo ""
+	@echo "  make backup-remote  Export the deployed Railway data/config/.env archive into backups/"
+	@echo "  make seed           Back up remote, then push local data/config/.env to Railway (full replace)"
+	@echo ""
 	@echo "Overrides:"
 	@echo "  make api PORT=8080"
 	@echo "  make web WEB_PORT=3000"
 	@echo "  make test-api PYTEST_ARGS=\"tests/api/test_app_health.py -v\""
+	@echo "  make seed RAILWAY_URL=https://your-app.up.railway.app API_TOKEN=..."
 
 setup:
 	$(UV) sync
@@ -87,3 +95,20 @@ openapi:
 
 client:
 	bash scripts/gen_ts_client.sh
+
+backup-remote:
+	@test -n "$(RAILWAY_URL)" || (echo "RAILWAY_URL is required, e.g. make backup-remote RAILWAY_URL=https://your-app.up.railway.app" && exit 1)
+	@test -n "$(API_TOKEN)" || (echo "API_TOKEN is required (set it in .env or pass API_TOKEN=...)" && exit 1)
+	mkdir -p $(BACKUP_DIR)
+	curl -sf -H "Authorization: Bearer $(API_TOKEN)" \
+		-o "$(BACKUP_DIR)/backup-$$(date +%Y-%m-%d-%H%M%S).tar.gz" \
+		"$(RAILWAY_URL)/api/admin/export"
+	@echo "Saved remote backup to $(BACKUP_DIR)/"
+
+seed: backup-remote
+	@test -n "$(RAILWAY_URL)" || (echo "RAILWAY_URL is required, e.g. make seed RAILWAY_URL=https://your-app.up.railway.app" && exit 1)
+	@test -n "$(API_TOKEN)" || (echo "API_TOKEN is required (set it in .env or pass API_TOKEN=...)" && exit 1)
+	$(UV) run python scripts/pack_data.py --out $(SEED_FILE)
+	curl -sf -H "Authorization: Bearer $(API_TOKEN)" -F "file=@$(SEED_FILE)" \
+		"$(RAILWAY_URL)/api/admin/import?confirm=REPLACE"
+	@echo "Seeded $(RAILWAY_URL) from local data ($(SEED_FILE)); prior remote state backed up to $(BACKUP_DIR)/"
