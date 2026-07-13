@@ -12,7 +12,11 @@ from resume_agent.tenancy.system_db import User, init_system_db, make_system_eng
 
 
 def _settings(**updates):
-    values = {"auth_username": "owner", "auth_password_hash": "pbkdf2:1:aa:bb"}
+    values = {
+        "auth_username": "owner",
+        "auth_password_hash": "pbkdf2:1:aa:bb",
+        "session_secret": "test-session-secret",
+    }
     values.update(updates)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]
 
@@ -51,4 +55,13 @@ def test_nonempty_database_without_admin_is_rejected(tmp_path):
         session.commit()
     with pytest.raises(BootstrapError, match="no admin"):
         ensure_bootstrapped(root, engine, _settings())
+    engine.dispose()
+
+
+def test_empty_database_requires_session_secret(tmp_path):
+    root = tmp_path / "data"
+    engine = make_system_engine(root)
+    init_system_db(engine)
+    with pytest.raises(BootstrapError, match="SESSION_SECRET"):
+        ensure_bootstrapped(root, engine, _settings(session_secret=""))
     engine.dispose()

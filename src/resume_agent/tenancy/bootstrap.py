@@ -34,9 +34,14 @@ def ensure_bootstrapped(
             .first()
         )
         if user_count == 0:
-            if not settings.auth_username or not settings.auth_password_hash:
+            if (
+                not settings.auth_username
+                or not settings.auth_password_hash
+                or not settings.session_secret
+            ):
                 raise BootstrapError(
-                    "users table is empty; AUTH_USERNAME and AUTH_PASSWORD_HASH are required"
+                    "users table is empty; AUTH_USERNAME, AUTH_PASSWORD_HASH, "
+                    "and SESSION_SECRET are required"
                 )
             admin = User(
                 id=new_user_id(),
