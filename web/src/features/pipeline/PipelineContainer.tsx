@@ -23,6 +23,9 @@ import {
 } from "@/features/board/use-board-query";
 import { useBulkAction } from "@/features/board/use-bulk-action";
 import { useSelection } from "@/features/board/use-selection";
+import { BoardViewToggle } from "@/features/board/BoardViewToggle";
+import { JobQuickActions } from "@/features/board/JobQuickActions";
+import { useViewMode } from "@/features/board/use-view-mode";
 import { useBulkRun } from "@/features/runs/use-bulk-run";
 import { LaunchDialog } from "@/features/runs/LaunchDialog";
 import { useApprovedLaunchJobs } from "@/features/runs/use-approved-launch-jobs";
@@ -57,6 +60,7 @@ export function PipelineContainer() {
   const bulk = useBulkAction("pipeline");
   const runs = useBulkRun();
   const launchJobs = useApprovedLaunchJobs(launchMode !== null);
+  const [view, setView] = useViewMode("pipeline-view");
 
   useEffect(() => {
     reconcile(rows.map((row) => row.jobId), total);
@@ -120,6 +124,7 @@ export function PipelineContainer() {
         <Button variant="outline" size="sm" onClick={() => setLaunchMode("coverLetter")}>
           Cover letters…
         </Button>
+        <div className="ml-auto"><BoardViewToggle view={view} onChange={setView} /></div>
       </div>
       <MetricRow
         items={[
@@ -208,6 +213,8 @@ export function PipelineContainer() {
                 selection.toggle(row.jobId, loadedIds.indexOf(row.jobId), false, loadedIds)
               }
               onOpen={(row) => openJob(row.jobId)}
+              view={view}
+              actions={(row) => <JobQuickActions jobId={row.jobId} url={row.url} />}
             />
           ))}
           {hasNextPage && (

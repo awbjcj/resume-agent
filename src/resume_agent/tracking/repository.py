@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, TypeVar, cast
 
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from resume_agent.tracking.dedup import (
     compute_content_fingerprint,
@@ -110,6 +110,44 @@ def find_existing(
             ).all()
         )
     return None
+
+
+def company_rename_collides(
+    session: Session,
+    *,
+    existing: Job,
+    dedup_key: str | None,
+) -> bool:
+    """Return whether a rename would take another live row's identity."""
+    return company_rename_collision(
+        session, existing=existing, dedup_key=dedup_key
+    ) is not None
+
+
+def company_rename_collision(
+    session: Session,
+    *,
+    existing: Job,
+    dedup_key: str | None,
+) -> Job | None:
+    """Find the live compatible row holding a proposed company identity."""
+    if dedup_key is None:
+        return None
+    candidates = session.exec(
+        select(Job).where(
+            col(Job.dedup_key) == dedup_key,
+            col(Job.id) != existing.id,
+            col(Job.archived_at).is_(None),
+        )
+    ).all()
+    return next(
+        (
+            candidate
+            for candidate in candidates
+            if locations_compatible(candidate.location, existing.location)
+        ),
+        None,
+    )
 
 
 def status_counts(session: Session) -> dict[str, int]:

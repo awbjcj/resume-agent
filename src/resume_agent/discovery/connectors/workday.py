@@ -184,8 +184,12 @@ def apply_detail(row: WorkdayRow, detail: dict) -> None:
         row.url = info["externalUrl"]
     if info.get("location"):
         row.location = info["location"]
-    if info.get("companyName"):
-        row.company = info["companyName"]
+    info_company = info.get("companyName")
+    if isinstance(info_company, str) and info_company.strip():
+        company = info_company.strip()
+        if row.company and company.casefold() != row.company.casefold():
+            row.stale_company = row.stale_company or row.company
+        row.company = company
     row.posted_at = parse_iso_datetime(info.get("startDate"))
 
 

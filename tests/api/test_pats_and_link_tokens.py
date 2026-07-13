@@ -83,3 +83,16 @@ def test_download_link_is_purpose_bound(mu_client):
 
     assert mu_client.get(f"/api/account/export?token={download}").status_code == 200
     assert mu_client.get(f"/api/account/export?token={sse}").status_code == 401
+
+
+def test_admin_export_accepts_an_admin_download_link(mu_client):
+    _login(mu_client)
+    token = mu_client.post(
+        "/api/auth/link-token", json={"purpose": "download"}
+    ).json()["token"]
+    mu_client.cookies.clear()
+
+    response = mu_client.get(f"/api/admin/export?token={token}")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/gzip"

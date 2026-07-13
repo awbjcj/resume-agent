@@ -35,6 +35,7 @@ class ShortlistItem(CamelModel):
     location_country: str | None = None
     location_region: str | None = None
     location_city: str | None = None
+    url: str | None = None
 
 
 class PipelineItem(CamelModel):
@@ -54,6 +55,7 @@ class PipelineItem(CamelModel):
     has_progress: bool
     needs_attention: bool = False
     regressed: bool = False
+    url: str | None = None
 
 
 class TriageItem(CamelModel):
@@ -68,6 +70,7 @@ class TriageItem(CamelModel):
     archived_at: datetime | None
     has_progress: bool
     reject_reason: str | None = None
+    url: str | None = None
 
 
 class ResumeVersionOut(CamelModel):
@@ -160,6 +163,18 @@ class ApplicationUpsert(CamelModel):
 class ReviseRequest(CamelModel):
     instruction: str
     re_review: bool = False
+
+
+class JobsImportError(CamelModel):
+    row: int
+    reason: str
+
+
+class JobsImportReportOut(CamelModel):
+    added: int
+    upgraded: int
+    skipped: int
+    errors: list[JobsImportError]
 
 
 class PruneOverrides(CamelModel):

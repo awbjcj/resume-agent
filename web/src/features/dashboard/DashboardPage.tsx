@@ -11,6 +11,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { AddUrlDialog } from "@/features/runs/AddUrlDialog";
+import { ImportJobsButton } from "@/features/runs/ImportJobsDialog";
 import { DiscoverDialog, PullDialog } from "@/features/runs/RunLaunchDialogs";
 
 import { ActionQueue } from "./ActionQueue";
@@ -51,6 +52,7 @@ export function DashboardPage() {
         <PullDialog />
         <DiscoverDialog />
         <AddUrlDialog />
+        <ImportJobsButton />
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">

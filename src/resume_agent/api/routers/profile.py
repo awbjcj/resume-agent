@@ -18,6 +18,7 @@ from resume_agent.api.deps import (
     get_run_manager,
 )
 from resume_agent.api.errors import ApiException
+from resume_agent.api.uploads import UploadTooLargeError, read_upload_async
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.config import ProfileConfigDoc
@@ -71,7 +72,10 @@ async def upload_document(
     file: UploadFile = File(...),
     doc_type: str = Form(..., alias="docType"),
 ):
-    content = await file.read()
+    try:
+        content = await read_upload_async(file, max_bytes=_MAX_SOURCE_BYTES)
+    except UploadTooLargeError as exc:
+        raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
     try:
         record = _docs(request).add(file.filename or "upload", content, doc_type)
     except DocumentError as exc:
@@ -170,9 +174,10 @@ async def upload_source(
     anchor: str | None = Form(None),
     primary: bool = Form(False),
 ):
-    content = await file.read()
-    if len(content) > _MAX_SOURCE_BYTES:
-        raise ApiException(422, "VALIDATION_ERROR", "File exceeds the 15 MB limit")
+    try:
+        content = await read_upload_async(file, max_bytes=_MAX_SOURCE_BYTES)
+    except UploadTooLargeError as exc:
+        raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
     name = _UNSAFE_CHARS.sub("_", Path(file.filename or "upload").name) or "upload"
     profile_dir = _profile_dir(request)
     try:

@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/account/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Workspace */
+        post: operations["import_workspace_api_account_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/password": {
         parameters: {
             query?: never;
@@ -517,8 +534,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revise Cover Letter Endpoint */
-        post: operations["revise_cover_letter_endpoint_api_cover_letters__cover_letter_id__revise_post"];
+        /** Launch Cover Letter Revise */
+        post: operations["launch_cover_letter_revise_api_cover_letters__cover_letter_id__revise_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -638,6 +655,40 @@ export interface paths {
         put?: never;
         /** Launch Add From Url */
         post: operations["launch_add_from_url_api_jobs_from_url_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Jobs Endpoint */
+        post: operations["import_jobs_endpoint_api_jobs_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/import-urls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Import Urls */
+        post: operations["launch_import_urls_api_jobs_import_urls_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1100,8 +1151,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revise Endpoint */
-        post: operations["revise_endpoint_api_resume_versions__version_id__revise_post"];
+        /** Launch Resume Revise */
+        post: operations["launch_resume_revise_api_resume_versions__version_id__revise_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1567,8 +1618,23 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Body_import_jobs_endpoint_api_jobs_import_post */
+        Body_import_jobs_endpoint_api_jobs_import_post: {
+            /** File */
+            file: string;
+        };
         /** Body_import_root_api_admin_import_post */
         Body_import_root_api_admin_import_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_import_workspace_api_account_import_post */
+        Body_import_workspace_api_account_import_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_launch_import_urls_api_jobs_import_urls_post */
+        Body_launch_import_urls_api_jobs_import_urls_post: {
             /** File */
             file: string;
         };
@@ -1935,6 +2001,24 @@ export interface components {
             /** Status */
             status?: string | null;
         };
+        /** JobsImportError */
+        JobsImportError: {
+            /** Reason */
+            reason: string;
+            /** Row */
+            row: number;
+        };
+        /** JobsImportReportOut */
+        JobsImportReportOut: {
+            /** Added */
+            added: number;
+            /** Errors */
+            errors: components["schemas"]["JobsImportError"][];
+            /** Skipped */
+            skipped: number;
+            /** Upgraded */
+            upgraded: number;
+        };
         /** LengthBudget */
         LengthBudget: {
             /**
@@ -2155,6 +2239,8 @@ export interface components {
             status: string;
             /** Title */
             title: string | null;
+            /** Url */
+            url?: string | null;
         };
         /** ProfileConfigDoc */
         ProfileConfigDoc: {
@@ -2422,6 +2508,10 @@ export interface components {
             kind: string;
             /** Label */
             label: string;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
             /** Percent */
             percent: number;
             /** Result */
@@ -2570,6 +2660,8 @@ export interface components {
             sponsorshipSignal: string | null;
             /** Title */
             title: string | null;
+            /** Url */
+            url?: string | null;
         };
         /** SkeletonEntryOut */
         SkeletonEntryOut: {
@@ -2886,6 +2978,8 @@ export interface components {
             status: string;
             /** Title */
             title: string | null;
+            /** Url */
+            url?: string | null;
         };
         /** UrlIn */
         UrlIn: {
@@ -2998,6 +3092,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_workspace_api_account_import_post: {
+        parameters: {
+            query?: {
+                confirm?: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_workspace_api_account_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -4296,7 +4429,7 @@ export interface operations {
             };
         };
     };
-    revise_cover_letter_endpoint_api_cover_letters__cover_letter_id__revise_post: {
+    launch_cover_letter_revise_api_cover_letters__cover_letter_id__revise_post: {
         parameters: {
             query?: never;
             header?: {
@@ -4314,12 +4447,12 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CoverLetterOut"];
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */
@@ -4534,6 +4667,76 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AddJobUrlParams"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_jobs_endpoint_api_jobs_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_jobs_endpoint_api_jobs_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobsImportReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_import_urls_api_jobs_import_urls_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_launch_import_urls_api_jobs_import_urls_post"];
             };
         };
         responses: {
@@ -5607,7 +5810,7 @@ export interface operations {
             };
         };
     };
-    revise_endpoint_api_resume_versions__version_id__revise_post: {
+    launch_resume_revise_api_resume_versions__version_id__revise_post: {
         parameters: {
             query?: never;
             header?: {
@@ -5625,12 +5828,12 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ResumeVersionOut"];
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

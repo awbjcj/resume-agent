@@ -17,7 +17,7 @@ import {
   useSkeleton,
   useSources,
   useSyncGithub,
-  useUploadSource,
+  useUploadSources,
 } from "./use-sources";
 import { MaterialIntakeDialogs } from "./MaterialIntakeDialogs";
 
@@ -43,7 +43,7 @@ function statusLabel(status: string): string {
 export function SourceManager() {
   const { data: sources, isLoading } = useSources();
   const { data: skeleton } = useSkeleton();
-  const upload = useUploadSource();
+  const upload = useUploadSources();
   const patch = usePatchSource();
   const remove = useDeleteSource();
   const replace = useReplaceSource();
@@ -57,7 +57,21 @@ export function SourceManager() {
   if (isLoading || !sources) return <Skeleton className="h-32 w-full" />;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      className="flex flex-col gap-4"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        const files = Array.from(event.dataTransfer.files);
+        if (files.length) {
+          void upload.uploadAll(
+            files,
+            uploadMode,
+            uploadMode === "synthesis" ? uploadAnchor || null : null,
+          );
+        }
+      }}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-sm font-medium">Source documents</div>
@@ -69,16 +83,17 @@ export function SourceManager() {
         <input
           ref={fileInput}
           type="file"
+          multiple
           className="hidden"
           accept=".pdf,.docx,.txt,.md,.pptx,.xlsx,.html"
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              upload.mutate({
-                file,
-                mode: uploadMode,
-                anchor: uploadMode === "synthesis" ? uploadAnchor || null : null,
-              });
+            const files = Array.from(e.target.files ?? []);
+            if (files.length) {
+              void upload.uploadAll(
+                files,
+                uploadMode,
+                uploadMode === "synthesis" ? uploadAnchor || null : null,
+              );
             }
             e.target.value = "";
           }}
@@ -140,7 +155,6 @@ export function SourceManager() {
           ) : null}
           <Button
             variant="outline"
-            disabled={upload.isPending}
             onClick={() => fileInput.current?.click()}
           >
             <FileUp data-icon="inline-start" aria-hidden="true" />

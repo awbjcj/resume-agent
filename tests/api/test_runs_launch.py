@@ -1,4 +1,5 @@
-from concurrent.futures import Executor, Future
+from concurrent.futures import Executor, Future, ThreadPoolExecutor
+from threading import Event
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -19,9 +20,12 @@ class InlineExecutor(Executor):
 
 
 def _client(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("", encoding="utf-8")
     return TestClient(
         create_app(
-            db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path
+            db_url="sqlite://", run_executor=InlineExecutor(), runs_root=tmp_path,
+            env_path=env,
         )
     )
 
@@ -50,6 +54,85 @@ def test_get_unknown_run_404(tmp_path):
     client = _client(tmp_path)
     with client:
         assert client.get("/api/runs/deadbeef").status_code == 404
+
+
+def test_resume_revise_launches_a_durable_artifact_run(monkeypatch, tmp_path):
+    monkeypatch.setattr(runs_router, "get_resume_version", lambda _session, version_id: SimpleNamespace(id=version_id, job_id=3))
+    monkeypatch.setattr(runs_router, "revise_resume_version", lambda _session, _version_id, _instruction, **_kw: SimpleNamespace(id=42, job_id=3))
+    with _client(tmp_path) as client:
+        response = client.post("/api/resume-versions/5/revise", json={"instruction": "shorter", "reReview": False})
+        assert response.status_code == 202
+        run = client.get(f"/api/runs/{response.json()['runId']}").json()
+    assert run["kind"] == "revise"
+    assert run["meta"] == {"versionId": 5, "jobId": 3, "instruction": "shorter", "reReview": False}
+    assert run["result"] == {"versionId": 42, "jobId": 3}
+
+
+def test_cover_letter_revise_launches_a_durable_artifact_run(monkeypatch, tmp_path):
+    monkeypatch.setattr(runs_router, "get_cover_letter", lambda _session, cover_id: SimpleNamespace(id=cover_id, job_id=8))
+    monkeypatch.setattr(runs_router, "revise_cover_letter_version", lambda _session, _cover_id, _instruction, **_kw: SimpleNamespace(id=77, job_id=8))
+    with _client(tmp_path) as client:
+        response = client.post("/api/cover-letters/5/revise", json={"instruction": "warmer", "reReview": False})
+        assert response.status_code == 202
+        run = client.get(f"/api/runs/{response.json()['runId']}").json()
+    assert run["kind"] == "coverLetterRevise"
+    assert run["meta"] == {"coverLetterId": 5, "jobId": 8, "instruction": "warmer"}
+    assert run["result"] == {"coverLetterId": 77, "jobId": 8}
+
+
+def test_duplicate_resume_revise_returns_conflict_with_active_run(
+    monkeypatch, tmp_path
+):
+    started = Event()
+    release = Event()
+    executor = ThreadPoolExecutor(max_workers=1)
+    env = tmp_path / ".env"
+    env.write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        runs_router,
+        "get_resume_version",
+        lambda _session, version_id: SimpleNamespace(id=version_id, job_id=3),
+    )
+
+    def wait_to_revise(*_args, **_kwargs):
+        started.set()
+        assert release.wait(timeout=5)
+        return SimpleNamespace(id=42, job_id=3)
+
+    monkeypatch.setattr(runs_router, "revise_resume_version", wait_to_revise)
+    client = TestClient(
+        create_app(
+            db_url="sqlite://",
+            run_executor=executor,
+            runs_root=tmp_path,
+            env_path=env,
+        )
+    )
+
+    try:
+        with client:
+            first = client.post(
+                "/api/resume-versions/5/revise",
+                json={"instruction": "shorter", "reReview": False},
+            )
+            assert first.status_code == 202
+            assert started.wait(timeout=5)
+
+            duplicate = client.post(
+                "/api/resume-versions/5/revise",
+                json={"instruction": "warmer", "reReview": False},
+            )
+
+            assert duplicate.status_code == 409
+            assert duplicate.json()["error"] == {
+                "code": "CONFLICT",
+                "message": "A revision is already running for this item",
+                "details": {"runId": first.json()["runId"]},
+            }
+            release.set()
+    finally:
+        release.set()
+        executor.shutdown(wait=True)
 
 
 def test_tailor_launch_passes_params(monkeypatch, tmp_path):
@@ -216,3 +299,37 @@ def test_linkedin_ready_false_when_browser_disabled(monkeypatch, tmp_path):
     monkeypatch.setattr(runs_router, "get_settings", lambda: settings, raising=False)
 
     assert runs_router._linkedin_ready() is False
+
+
+def test_import_urls_launch_isolates_failures(monkeypatch, tmp_path):
+    def fake_add(session, *, url, **kw):
+        if "bad" in url:
+            raise ValueError("no reader for host")
+        return SimpleNamespace(id=1)
+
+    monkeypatch.setattr(runs_router, "add_job_from_url", fake_add)
+    body = (
+        b"https://ok.test/a\n# comment\n\nhttps://bad.test/b\n"
+        b"not-a-url\nhttps://ok.test/c\n"
+    )
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/api/jobs/import-urls",
+            files={"file": ("urls.txt", body, "text/plain")},
+        )
+        assert response.status_code == 202
+        run = client.get(f"/api/runs/{response.json()['runId']}").json()
+    assert run["kind"] == "importUrls"
+    assert run["result"]["added"] == 2
+    assert "https://bad.test/b" in run["result"]["failures"]
+    assert "not-a-url" in run["result"]["failures"]
+
+
+def test_import_urls_rejects_empty_file(tmp_path):
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/api/jobs/import-urls",
+            files={"file": ("urls.txt", b"# nothing\n", "text/plain")},
+        )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "NO_URLS"

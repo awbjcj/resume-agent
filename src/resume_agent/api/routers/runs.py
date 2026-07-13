@@ -11,14 +11,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, UploadFile
 
 from resume_agent.api.deps import get_engine, get_run_manager, get_sse_user_context
 from resume_agent.api.errors import ApiException
+from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.api.mappers import to_page
 from sse_starlette.sse import EventSourceResponse
 
-from resume_agent.api.runs.manager import RunManager, RunQuotaError
+from resume_agent.api.runs.manager import RunManager, RunQuotaError, RunSingletonConflict
+from resume_agent.api.schemas.jobs import ReviseRequest
 from resume_agent.api.runs.sse import record_to_run, run_events
 from resume_agent.api.schemas.runs import (
     AddJobUrlParams,
@@ -34,6 +36,7 @@ from resume_agent.api.schemas.base import Page
 from resume_agent.config import get_settings
 from resume_agent.db import get_session
 from resume_agent.services.cover_letters import write_cover_letters
+from resume_agent.services.cover_letter_revision import revise_cover_letter_version
 from resume_agent.services.discovery import (
     add_job_from_url,
     discover_jobs,
@@ -44,6 +47,8 @@ from resume_agent.services.discovery import (
 )
 from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP, tailor
 from resume_agent.services.pagination import paginate
+from resume_agent.services.revision import revise_resume_version
+from resume_agent.tracking.repository import get_cover_letter, get_resume_version
 from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.limits import DEFAULT_MAX_CONCURRENT_RUNS, active_limit
 
@@ -74,7 +79,13 @@ def _workspace_args() -> _WorkspaceArgs:
 
 
 def _submit(
-    mgr: RunManager, kind: str, work, *, singleton_key: str | None = None
+    mgr: RunManager,
+    kind: str,
+    work,
+    *,
+    singleton_key: str | None = None,
+    singleton_conflict: str = "join",
+    meta: dict[str, object] | None = None,
 ) -> str:
     context = current_context()
     try:
@@ -82,11 +93,20 @@ def _submit(
             kind,
             work,
             singleton_key=singleton_key,
+            singleton_conflict=singleton_conflict,
+            meta=meta,
             user_id=context.user_id if context is not None else None,
             max_concurrent=active_limit(
                 "max_concurrent_runs", DEFAULT_MAX_CONCURRENT_RUNS
             ),
         )
+    except RunSingletonConflict as error:
+        raise ApiException(
+            409,
+            error.code,
+            "A revision is already running for this item",
+            details={"runId": error.run_id},
+        ) from error
     except RunQuotaError as error:
         raise ApiException(429, error.code, str(error)) from error
 
@@ -97,6 +117,139 @@ def _owned_record(mgr: RunManager, run_id: str):
     if record is None or (context is not None and record.user_id != context.user_id):
         raise ApiException(404, "NOT_FOUND", f"Run {run_id} not found")
     return record
+
+
+@router.post("/resume-versions/{version_id}/revise", response_model=RunOut, status_code=202)
+def launch_resume_revise(
+    version_id: int,
+    body: ReviseRequest,
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    engine = _engine(request)
+    with get_session(engine) as session:
+        parent = get_resume_version(session, version_id)
+        if parent is None:
+            raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
+        job_id = parent.job_id
+
+    def work(reporter):
+        reporter.begin(1, f"Revising resume version #{version_id}")
+        with get_session(engine) as session:
+            context = current_context()
+            child = revise_resume_version(
+                session,
+                version_id,
+                body.instruction,
+                re_review=body.re_review,
+                review_path=str(context.paths.config_dir / "review.yaml") if context else "config/review.yaml",
+                facts_path=_workspace_args()["facts_path"],
+            )
+        reporter.step(1)
+        return {"versionId": child.id if child else None, "jobId": child.job_id if child else job_id}
+
+    meta = {"versionId": version_id, "jobId": job_id, "instruction": body.instruction, "reReview": body.re_review}
+    run_id = _submit(mgr, "revise", work, singleton_key=f"revise:{version_id}", singleton_conflict="raise", meta=meta)
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(record)
+
+
+@router.post("/cover-letters/{cover_letter_id}/revise", response_model=RunOut, status_code=202)
+def launch_cover_letter_revise(
+    cover_letter_id: int,
+    body: ReviseRequest,
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    engine = _engine(request)
+    with get_session(engine) as session:
+        parent = get_cover_letter(session, cover_letter_id)
+        if parent is None:
+            raise ApiException(404, "NOT_FOUND", f"Cover letter #{cover_letter_id} not found")
+        job_id = parent.job_id
+
+    def work(reporter):
+        reporter.begin(1, f"Revising cover letter #{cover_letter_id}")
+        with get_session(engine) as session:
+            child = revise_cover_letter_version(
+                session,
+                cover_letter_id,
+                body.instruction,
+                facts_path=_workspace_args()["facts_path"],
+            )
+        reporter.step(1)
+        return {"coverLetterId": child.id if child else None, "jobId": child.job_id if child else job_id}
+
+    meta = {"coverLetterId": cover_letter_id, "jobId": job_id, "instruction": body.instruction}
+    run_id = _submit(mgr, "coverLetterRevise", work, singleton_key=f"cover-letter-revise:{cover_letter_id}", singleton_conflict="raise", meta=meta)
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(record)
+
+
+@router.post("/jobs/import-urls", response_model=RunOut, status_code=202)
+def launch_import_urls(
+    file: UploadFile,
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    try:
+        raw = read_upload(file, max_bytes=2 * 1024 * 1024).decode("utf-8")
+    except UploadTooLargeError as exc:
+        raise ApiException(413, "UPLOAD_TOO_LARGE", str(exc)) from exc
+    except UnicodeDecodeError as exc:
+        raise ApiException(400, "INVALID_FILE", "URL list must be UTF-8") from exc
+    lines = [
+        line.strip()
+        for line in raw.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    if not lines:
+        raise ApiException(400, "NO_URLS", "The file contains no URL entries")
+    if len(lines) > 10_000:
+        raise ApiException(400, "TOO_MANY_URLS", "URL list exceeds 10,000 lines")
+    valid_urls = [
+        line for line in lines if line.startswith(("http://", "https://"))
+    ]
+    invalid_lines = [line for line in lines if line not in valid_urls]
+    engine = _engine(request)
+    allow_browser = get_settings().browser_enabled
+
+    def work(reporter):
+        reporter.begin(len(lines), "Importing job URLs")
+        added = 0
+        duplicates = 0
+        failures = {line: "Invalid URL: expected http(s)" for line in invalid_lines}
+        current = 0
+        for line in invalid_lines:
+            current += 1
+            reporter.step(current, label=line)
+        for url in valid_urls:
+            reporter.checkpoint()
+            try:
+                with get_session(engine) as session:
+                    job = add_job_from_url(
+                        session, url=url, allow_browser=allow_browser
+                    )
+                if job is None:
+                    duplicates += 1
+                else:
+                    added += 1
+            except Exception as error:  # noqa: BLE001 - isolate each URL
+                failures[url] = f"{type(error).__name__}: {error}"
+            current += 1
+            reporter.step(current, label=url)
+        return {
+            "added": added,
+            "duplicates": duplicates,
+            "failures": failures,
+        }
+
+    run_id = _submit(mgr, "importUrls", work)
+    record = mgr.get(run_id)
+    assert record is not None
+    return record_to_run(record)
 
 
 @router.post("/discover", response_model=RunOut, status_code=202)

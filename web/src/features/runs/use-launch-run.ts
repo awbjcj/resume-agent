@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { api, unwrap } from "@/lib/api/client";
 import { useRunStore } from "@/lib/runs/store";
+import type { RunMeta } from "@/lib/runs/store";
 import { trackRun } from "@/lib/runs/tracker";
 
 type RunOut = { runId: string; kind: string };
@@ -42,6 +43,7 @@ export function useLaunchRun() {
     kind: string,
     call: () => Promise<unknown>,
     invalidate: string[] = DEFAULT_INVALIDATE,
+    meta?: RunMeta,
   ): Promise<boolean> => {
     try {
       const run = (await call()) as RunOut;
@@ -54,9 +56,12 @@ export function useLaunchRun() {
         current: 0,
         total: 0,
         etaText: null,
+        meta,
       });
-      trackRun({ runId: run.runId, kind }, (completed) => {
-        invalidate.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      trackRun({ runId: run.runId, kind }, async (completed) => {
+        await Promise.all(
+          invalidate.map((key) => qc.invalidateQueries({ queryKey: [key] })),
+        );
         announceCompletion(completed);
       });
       return true;

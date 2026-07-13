@@ -10,6 +10,7 @@ import { ApplicationEditor } from "@/features/job/ApplicationEditor";
 import { CoverLettersTab } from "@/features/job/CoverLettersTab";
 import { StageManager } from "@/features/job/StageManager";
 import { VersionRow } from "@/features/job/VersionRow";
+import { RevisionRunPlaceholders } from "@/features/job/RevisionRunPlaceholders";
 import { useJobDetail } from "@/features/job/use-job-detail";
 import { JdBody } from "./JdBody";
 
@@ -152,6 +153,11 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
                             }
                           />
                         ))}
+                        <RevisionRunPlaceholders
+                          jobId={jobId}
+                          kind="revise"
+                          label="Resume revision"
+                        />
                       </ul>
                     </TabsContent>
 

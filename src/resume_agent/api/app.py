@@ -197,6 +197,9 @@ def create_app(
         account_router.link_router, prefix="/api", dependencies=download_guarded
     )
     app.include_router(
+        admin_router.link_router, prefix="/api", dependencies=download_guarded
+    )
+    app.include_router(
         resumes.link_router, prefix="/api", dependencies=download_guarded
     )
     app.include_router(

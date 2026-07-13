@@ -17,6 +17,22 @@ green.
 4. Company display names: resolve from ATS payloads, heal on re-pull,
    backfill via CLI.
 
+### Correctness clarifications (2026-07-13 repository audit)
+
+- Background-run artifact metadata is durable server state exposed on `RunOut`,
+  so revision placeholders, retries, and completion highlighting survive reload.
+- Per-user restore validates a newly bound workspace engine after the staged
+  swap and restores/rebinds the previous workspace on failure.
+- New uploads are bounded. CSV/JSON validation errors and invalid URL-list lines
+  are isolated and reported at row/line granularity.
+- Destructive imports use a typed `REPLACE` confirmation dialog that stays open
+  when the server refuses or rejects the archive.
+- Workday's supported payload field is `jobPostingInfo.companyName`. The current
+  Ashby posting payload contains no organization title, so Ashby uses configured
+  label then token rather than inventing a name.
+- Company fallback provenance is never overwritten by a later configured label,
+  and organic/backfill rename paths share one collision predicate.
+
 ---
 
 ## Workstream 1 — Board quick actions + view toggle
@@ -202,7 +218,8 @@ Precedence for a job's `company`:
 
 - Greenhouse: fetch the board's `name` from the board API (one extra
   request per board per pull, cached for the pull).
-- Ashby: organization title from the job-board payload.
+- Ashby: configured label when present, otherwise the board token (the current
+  posting payload does not expose an organization title).
 - Workday: posting-info company field when present, else tenant.
 - SmartRecruiters, Recruitee, Breezy, Personio: already resolve from
   payloads — unchanged.

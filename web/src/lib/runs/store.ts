@@ -7,6 +7,15 @@ export type PullRunResult = {
   failures?: Record<string, Record<string, string>>;
 };
 
+export type RunMeta = {
+  jobId?: number;
+  versionId?: number;
+  coverLetterId?: number;
+  instruction?: string;
+  reReview?: boolean;
+  [key: string]: unknown;
+};
+
 export interface RunRecord {
   runId: string;
   kind: string;
@@ -18,6 +27,7 @@ export interface RunRecord {
   etaText: string | null;
   error?: string;
   result?: PullRunResult | Record<string, unknown> | null;
+  meta?: RunMeta | null;
   subject?: { kind: "skill" | "theme"; key: string };
   /** Epoch ms of the last upsert for this run — client-side only. */
   updatedAt?: number;

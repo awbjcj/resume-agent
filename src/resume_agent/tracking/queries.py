@@ -60,6 +60,7 @@ class ShortlistRow:
     location_region: str | None = None
     location_city: str | None = None
     is_us: bool = False
+    url: str | None = None
 
 
 @dataclass
@@ -116,6 +117,7 @@ class TriageRow:
     archived_at: datetime | None
     has_progress: bool
     reject_reason: str | None = None
+    url: str | None = None
 
 
 @dataclass
@@ -136,6 +138,7 @@ class PipelineRow:
     has_progress: bool = False
     needs_attention: bool = False
     regressed: bool = False
+    url: str | None = None
 
 
 def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> list[SkillTag]:
@@ -196,6 +199,7 @@ def _shortlist_row(job: Job, tokens: set[str], aliases: dict[str, str]) -> Short
         location_region=loc.get("region"),
         location_city=loc.get("city"),
         is_us=bool(loc.get("is_us")),
+        url=job.url,
     )
 
 
@@ -339,6 +343,7 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 has_progress=job_has_progress(job, progressed),
                 needs_attention=best.no_clean_round,
                 regressed=best.regressed,
+                url=job.url,
             )
         )
     return rows
@@ -377,6 +382,7 @@ def _triage_row(job: Job, progressed: set[int]) -> TriageRow:
         archived_at=job.archived_at,
         has_progress=job_has_progress(job, progressed),
         reject_reason=job.reject_reason,
+        url=job.url,
     )
 
 

@@ -43,6 +43,7 @@ class RunSnapshot:
     error_code: str | None = None
     phase_index: int | None = None
     phase_count: int | None = None
+    meta: dict[str, Any] | None = None
 
 
 def _aware_datetime(value: object) -> datetime | None:
@@ -101,6 +102,8 @@ def parse_run_snapshot(run_id: str, raw: object) -> RunSnapshot | None:
     error = raw.get("error")
     user_id = raw.get("user_id")
     error_code = raw.get("error_code")
+    raw_meta = raw.get("meta")
+    meta = dict(raw_meta) if isinstance(raw_meta, Mapping) else None
     return RunSnapshot(
         run_id=run_id,
         kind=kind.strip(),
@@ -121,4 +124,5 @@ def parse_run_snapshot(run_id: str, raw: object) -> RunSnapshot | None:
         error_code=error_code if isinstance(error_code, str) else None,
         phase_index=_optional_positive_int(raw.get("phase_index")),
         phase_count=_optional_positive_int(raw.get("phase_count")),
+        meta=meta,
     )

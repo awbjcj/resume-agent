@@ -30,6 +30,7 @@ it("fetches every active page, refreshes the store, and tracks each run", async 
         etaText: null,
         result: null,
         error: null,
+        meta: page === 1 ? { versionId: 5, jobId: 3, instruction: "shorter" } : null,
       };
       return HttpResponse.json({
         data: [item],
@@ -52,6 +53,11 @@ it("fetches every active page, refreshes the store, and tracks each run", async 
 
   await waitFor(() => expect(mocks.trackRun).toHaveBeenCalledTimes(2));
   expect(useRunStore.getState().runs.r1.phase).toBe("Page 1");
+  expect(useRunStore.getState().runs.r1.meta).toEqual({
+    versionId: 5,
+    jobId: 3,
+    instruction: "shorter",
+  });
   expect(useRunStore.getState().runs.r2.percent).toBe(20);
   expect(mocks.trackRun).toHaveBeenCalledWith({ runId: "r1", kind: "pull" });
   expect(mocks.trackRun).toHaveBeenCalledWith({ runId: "r2", kind: "pull" });

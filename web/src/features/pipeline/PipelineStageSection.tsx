@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ChevronDownIcon } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -7,6 +8,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { JobTable } from "@/components/JobTable";
+import type { ViewMode } from "@/features/board/use-view-mode";
 
 import { PipelineCard } from "./PipelineCard";
 import { pipelineStageLabel } from "./pipeline-stages";
@@ -20,6 +23,8 @@ type PipelineStageSectionProps = {
   isSelected: (jobId: number) => boolean;
   onSelect: (row: PipelineItem) => void;
   onOpen: (row: PipelineItem) => void;
+  view: ViewMode;
+  actions: (row: PipelineItem) => ReactNode;
 };
 
 export function PipelineStageSection({
@@ -30,6 +35,8 @@ export function PipelineStageSection({
   isSelected,
   onSelect,
   onOpen,
+  view,
+  actions,
 }: PipelineStageSectionProps) {
   const countLabel = `${rows.length.toLocaleString()} ${rows.length === 1 ? "job" : "jobs"}`;
 
@@ -54,7 +61,13 @@ export function PipelineStageSection({
           />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="grid grid-cols-1 gap-4 pt-4 xl:grid-cols-2 2xl:grid-cols-3">
+          {view === "list" ? <div className="pt-4"><JobTable
+            rows={rows}
+            selection={{ isSelected }}
+            onToggle={(id) => { const row = rows.find((item) => item.jobId === id); if (row) onSelect(row); }}
+            onOpen={(id) => { const row = rows.find((item) => item.jobId === id); if (row) onOpen(row); }}
+            actions={(row) => actions(row as PipelineItem)}
+          /></div> : <div className="grid grid-cols-1 gap-4 pt-4 xl:grid-cols-2 2xl:grid-cols-3">
             {rows.map((row) => (
               <PipelineCard
                 key={row.jobId}
@@ -62,9 +75,10 @@ export function PipelineStageSection({
                 selected={isSelected(row.jobId)}
                 onSelect={() => onSelect(row)}
                 onOpen={() => onOpen(row)}
+                footer={actions(row)}
               />
             ))}
-          </div>
+          </div>}
         </CollapsibleContent>
       </Collapsible>
     </section>

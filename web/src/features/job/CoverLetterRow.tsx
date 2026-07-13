@@ -1,14 +1,21 @@
 import { useState } from "react";
-import { CheckCircle2, Download, FileText, Loader2, RotateCcw } from "lucide-react";
+import { CheckCircle2, Download, FileText, Loader2, RotateCcw, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { openDownload } from "@/lib/api/client";
+import { useRunStore } from "@/lib/runs/store";
 import {
   useReviseCoverLetter,
   useSelectCoverLetter,
 } from "./use-job-mutations";
+import {
+  ACTIVE_RUN_STATUSES,
+  latestArtifactRun,
+  runCreatedArtifact,
+} from "./artifact-runs";
 
 export type CoverLetterItem = {
   id: number;
@@ -33,19 +40,39 @@ export function CoverLetterRow({
 }) {
   const [instruction, setInstruction] = useState("");
   const revise = useReviseCoverLetter(jobId);
+  const runs = useRunStore((state) => state.runs);
+  const reviseRun = latestArtifactRun(
+    runs,
+    "coverLetterRevise",
+    "coverLetterId",
+    coverLetter.id,
+  );
+  const reviseActive =
+    reviseRun !== undefined && ACTIVE_RUN_STATUSES.includes(reviseRun.status);
+  const justCreated = runCreatedArtifact(
+    runs,
+    "coverLetterRevise",
+    "coverLetterId",
+    coverLetter.id,
+  );
   const select = useSelectCoverLetter(jobId);
   const applied = appliedId === coverLetter.id;
   const origin = coverLetter.origin ?? "draft";
   const isRevision = origin === "revision";
 
   return (
-    <li className="rounded-xl border bg-background/70 p-3">
+    <li
+      className={`rounded-xl border bg-background/70 p-3 ${
+        justCreated ? "ring-2 ring-primary/40" : ""
+      }`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge variant={isRevision ? "secondary" : "outline"}>
               {isRevision ? "Revision" : "Draft"}
             </Badge>
+            {justCreated ? <Badge>Just created</Badge> : null}
             <Badge variant={coverLetter.factCheckPassed ? "outline" : "destructive"}>
               {coverLetter.factCheckPassed ? "Fact-check passed" : "Fact-check failed"}
             </Badge>
@@ -98,16 +125,16 @@ export function CoverLetterRow({
           onChange={(event) => setInstruction(event.target.value)}
           placeholder="Revise this cover letter"
           aria-label="Cover letter revision instruction"
+          disabled={reviseActive}
         />
         <Button
           size="sm"
-          disabled={!instruction.trim() || revise.isPending}
-          onClick={() =>
-            revise.mutate(
-              { coverLetterId: coverLetter.id, instruction },
-              { onSuccess: () => setInstruction("") },
-            )
-          }
+          disabled={!instruction.trim() || revise.isPending || reviseActive}
+          onClick={() => {
+            const nextInstruction = instruction.trim();
+            setInstruction("");
+            revise.mutate({ coverLetterId: coverLetter.id, instruction: nextInstruction });
+          }}
         >
           {revise.isPending ? (
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -117,6 +144,38 @@ export function CoverLetterRow({
           Revise
         </Button>
       </div>
+      {reviseRun && reviseActive ? (
+        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+          <Spinner data-icon="inline-start" />
+          Cover-letter revision in progress
+        </p>
+      ) : null}
+      {reviseRun?.status === "failed" ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-destructive" role="alert">
+          <span>Revision failed: {reviseRun.error ?? "unknown error"}</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              revise.mutate({
+                coverLetterId: coverLetter.id,
+                instruction: reviseRun.meta?.instruction ?? "",
+              })
+            }
+          >
+            <RotateCcw data-icon="inline-start" />
+            Retry
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Dismiss revision error"
+            onClick={() => useRunStore.getState().remove(reviseRun.runId)}
+          >
+            <X aria-hidden="true" />
+          </Button>
+        </div>
+      ) : null}
     </li>
   );
 }

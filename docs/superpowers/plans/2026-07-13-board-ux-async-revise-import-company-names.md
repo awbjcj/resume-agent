@@ -29,6 +29,54 @@ openapi-typescript contract generation.
 - Never touch `jd_text`, status, Application, ResumeVersion, or CoverLetter from any W4 rename path.
 - No new dependencies.
 
+## Correctness Amendments (2026-07-13 repository audit)
+
+These amendments override conflicting snippets later in the plan. They were
+validated against the current repository before implementation.
+
+- Extend current surfaces instead of recreating them: `JobTable.test.tsx` and
+  `GET /api/account/export` already exist. Task 10 adds the missing import path
+  and strengthens round-trip tests; it does not add another export router.
+- Revision singleton conflicts use the public error code `CONFLICT`, as the
+  design specifies, with `details.runId`. The router-level 409 envelope must be
+  tested with a held run; a manager-only test is insufficient API proof.
+- Reload-safe revision UI requires artifact metadata to be persisted in the
+  server run record and projected through `RunOut`. Client-only zustand metadata
+  disappears on reload, so Task 9 must rehydrate `meta` from `GET /api/runs` and
+  must implement the promised pending placeholder, failure retry, and completed
+  child highlight (not only an inline spinner).
+- Workspace import must use `workspace_paths(data_dir, user_id)`, evict the
+  caller's engine before the swap, initialize/validate a fresh engine after the
+  swap, and rebind the rolled-back workspace if validation fails. Merely
+  evicting before `import_data_root` can leave the caller with an unvalidated or
+  unbound database.
+- New multipart paths use bounded reads/copies. CSV/JSON rows validate scalar
+  field types and invalid dates per row; malformed rows become report errors
+  instead of aborting the whole import. URL-list imports preserve invalid lines
+  as per-line failures rather than silently dropping them.
+- Admin/workspace replacement uses a real typed destructive-confirm dialog and
+  keeps it open on server failure so the verbatim envelope message is visible.
+  Inline inputs alone do not satisfy the approved interaction.
+- Board query invalidation awaits all matching prefixes. Archive Undo is itself
+  error-handled and reports a failed restore; no floating rejected promise.
+- View toggles use the installed Base UI `ToggleGroup`, preserve unrelated URL
+  parameters, and use replace navigation for a presentation preference. Links
+  remain semantic anchors styled with `buttonVariants`; Base UI `Button`
+  `render={<a>}` incorrectly forces `role=button`.
+- Workday already reads `jobPostingInfo.companyName` (not `company`); Task 18
+  adds fallback provenance (`stale_company`) without regressing that behavior.
+  Ashby's current posting payload has no organization field, so configured
+  label/token remains the supported precedence.
+- Configured company labels preserve the connector's deepest fallback
+  provenance (`job.stale_company or job.company`). Rename collision detection is
+  one shared DB helper used by organic heal and CLI backfill, including the
+  exact compatible live keeper in conflict reports; do not duplicate predicates.
+- Backfill covers every configured source unit that exposes a label/token pair,
+  including detected `companies` and native Workday entries, and compares token
+  names literally/case-insensitively (not wildcard `ILIKE`).
+- The duplicate/corrupted preliminary Task 19 block has been removed; the single
+  complete Task 19 below is authoritative.
+
 ---
 
 ## Workstream 1 — Board quick actions + view toggle
@@ -1414,7 +1462,7 @@ git commit -m "feat(web): revise as tracked background run with inline pending/e
 
 ## Workstream 3 — Import/export surfaces
 
-### Task 10: Account workspace export/import endpoints
+### Task 10: Complete account workspace round-trip import
 
 **Files:**
 
@@ -1423,8 +1471,13 @@ git commit -m "feat(web): revise as tracked background run with inline pending/e
 
 **Interfaces:**
 
-- Consumes: `export_data_root(data_root, db_url, out_dir) -> Path`, `import_data_root(archive, data_root, *, before_swap=None, after_swap=None)` (both in `services/backup.py`); `current_context()` (`context.workspace: Path`, `context.paths.db_url: str`); `RunManager.list_active(user_id=...)`; `request.app.state.engine_registry.evict(user_id)`; download auth via the existing link-token dependency (`get_sse_user_context` pattern with `link_purpose="download"`).
-- Produces: `GET /api/account/export` (FileResponse tar.gz of the caller's workspace, registered on a `link_router` exported from account.py and included in `app.py` exactly like `resumes.link_router`) and `POST /api/account/import` (multipart `file`, `confirm=REPLACE` query; 400 without confirm; 409 code `RUNS_ACTIVE` while the caller has active runs; 400 code `INVALID_ARCHIVE` on validation failure). Both 400 with code `NO_WORKSPACE` when no `UserContext` is active (single-user mode uses the admin surface).
+- Consumes: the existing `GET /api/account/export` link-token surface,
+  `import_data_root(...)`, `workspace_paths(...)`, caller-scoped active runs, and
+  `EngineRegistry.evict/get` for validated swap and rollback rebinding.
+- Produces: `POST /api/account/import` (multipart `file`, `confirm=REPLACE`;
+  400 without confirm, 409 `RUNS_ACTIVE`, bounded upload, 400
+  `INVALID_ARCHIVE`/`UNSAFE_ARCHIVE`). The already-registered export router is
+  covered by the round-trip tests but is not recreated.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2710,9 +2763,11 @@ git commit -m "feat: RefreshCompany heal with dedup-key recompute + collision sk
 - Produces: precedence **configured label/company → payload-resolved name → raw token**, and `stale_company` set to the token form whenever the final company differs from it:
   - `fetch_greenhouse_board_name(token) -> str | None` — `GET https://boards-api.greenhouse.io/v1/boards/{token}` → `payload.get("name")`; any `httpx.HTTPError` or missing key → `None` (resolution is best-effort decoration, never a Unit failure).
   - `GreenhouseConnector` resolves the name once per board when `board.company` is unset; emitted jobs get `company=resolved or token`, `stale_company=token` when `company != token`.
-  - Workday detail parsing: use `jobPostingInfo.get("company")` when a non-empty string, else `target.tenant`; `stale_company=target.tenant` when the final value differs.
-  - `CompaniesConnector.fetch` label override records the overwritten value: `job.stale_company = job.company` before `job.company = label` (when they differ).
-  - Ashby is explicitly out of scope: its job-board payload carries no organization name (fixture `tests/fixtures/ashby/job_board.json` has only `apiVersion`/`jobs`).
+  - Workday detail parsing: use `jobPostingInfo.get("companyName")` when a non-empty string, else `target.tenant`; `stale_company=target.tenant` when the final value differs.
+  - `CompaniesConnector.fetch` label override preserves deepest fallback
+    provenance: `job.stale_company = job.stale_company or job.company` before
+    `job.company = label` (when they differ).
+  - Ashby payload resolution is out of scope: its job-board payload carries no organization name, so configured label/token precedence remains supported.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2823,7 +2878,7 @@ with:
 `workday.py` (at the detail-application site around line 164 where `company=target.tenant` is set): read the posting-info company first —
 
 ```python
-        info_company = job_posting_info.get("company")
+        info_company = job_posting_info.get("companyName")
         company = (
             info_company.strip()
             if isinstance(info_company, str) and info_company.strip()
@@ -2870,55 +2925,9 @@ git commit -m "feat: resolve company display names (label > payload > token)"
 
 **Interfaces:**
 
-- Consumes: `load_connectors_config(path)`, `compute_dedup_key`, `locations_compatible`, the collision rule from Task 17 (re-implemented DB-side here; keep the exact same predicate), `fetch_greenhouse_board_name` (Task 18).
-- Produces:
-
-```python
-@dataclass(frozen=True)
-class CompanyFixReport:
-    renamed: dict[str, int]          # token -> rows renamed
-    conflicts: list[tuple[int, int]] # (kept_row_id, skipped_row_id) pairs
-    unresolved: list[str]            # tokens with no label and no resolvable name
-
-def fix_company_names(
-    session: Session,
-    config: ConnectorsConfig,
-    *,
-    dry_run: bool = False,
-    resolve: Callable[[str], str | None] | None = None,  # injected for tests; defaults to fetch_greenhouse_board_name
-) -> CompanyFixReport
-```
-
-              job.company = label
-
-````
-
-- [ ] **Step 4: Run connector suites**
-
-Run: `.venv/Scripts/python.exe -m pytest tests/test_company_resolution.py tests/test_connector_greenhouse.py tests/test_connector_workday.py tests/test_connector_companies.py -v`
-(Adjust to the actual connector test filenames — `ls tests | grep -i -E "greenhouse|workday|companies"`.)
-Expected: PASS; fix any existing workday/companies fixtures that now assert `company == tenant`.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/resume_agent/discovery/connectors/greenhouse.py src/resume_agent/discovery/connectors/workday.py src/resume_agent/discovery/connectors/companies.py tests/test_company_resolution.py
-git commit -m "feat: resolve company display names (label > payload > token)"
-````
-
----
-
-### Task 19: `resume-agent fix-company-names` backfill CLI
-
-**Files:**
-
-- Create: `src/resume_agent/services/company_fix.py`
-- Modify: `src/resume_agent/cli.py`
-- Test: `tests/test_company_fix.py` (new)
-
-**Interfaces:**
-
-- Consumes: `load_connectors_config(path)`, `compute_dedup_key`, `locations_compatible`, the collision rule from Task 17 (re-implemented DB-side here; keep the exact same predicate), `fetch_greenhouse_board_name` (Task 18).
+- Consumes: `load_connectors_config(path)`, the shared DB-bound rename/collision
+  helper from Task 17, connector target detection for configured native/company
+  URLs, and `fetch_greenhouse_board_name` (Task 18).
 - Produces:
 
 ```python

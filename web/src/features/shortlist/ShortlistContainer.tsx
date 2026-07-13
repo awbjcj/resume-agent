@@ -6,6 +6,7 @@ import { BulkPreviewButton } from "@/components/BulkPreviewButton";
 import { EmptyState } from "@/components/EmptyState";
 import { FilterDesk } from "@/components/FilterDesk";
 import { JobCard } from "@/components/JobCard";
+import { JobTable } from "@/components/JobTable";
 import { JobModal } from "@/components/JobModal";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
@@ -17,6 +18,9 @@ import {
 } from "@/features/board/use-board-query";
 import { useBulkAction } from "@/features/board/use-bulk-action";
 import { useSelection } from "@/features/board/use-selection";
+import { BoardViewToggle } from "@/features/board/BoardViewToggle";
+import { JobQuickActions } from "@/features/board/JobQuickActions";
+import { useViewMode } from "@/features/board/use-view-mode";
 
 import { useApprove } from "./use-approve";
 import { useBoardFilters } from "./use-board-filters";
@@ -29,6 +33,7 @@ export function ShortlistContainer() {
   const { reconcile } = selection;
   const bulk = useBulkAction("shortlist");
   const approve = useApprove();
+  const [view, setView] = useViewMode("shortlist-view");
   const [params, setParams] = useSearchParams();
 
   useEffect(() => {
@@ -79,6 +84,9 @@ export function ShortlistContainer() {
         ]}
       />
       <FilterDesk filter={filters} facets={facets} total={total} onChange={setFilters} />
+      <div className="mb-5 flex justify-end">
+        <BoardViewToggle view={view} onChange={setView} />
+      </div>
       {!rows.length ? (
         <EmptyState
           title={total === 0 ? "Nothing shortlisted yet" : "No jobs loaded"}
@@ -117,7 +125,7 @@ export function ShortlistContainer() {
               }
             />
           </BulkActionBar>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+          {view === "cards" ? <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
             {rows.map((row) => (
               <JobCard
                 key={row.jobId}
@@ -129,13 +137,24 @@ export function ShortlistContainer() {
                 }
                 onOpen={() => openJob(row.jobId)}
                 footer={
-                  <Button className="w-full" onClick={() => approve.mutate(row.jobId)}>
-                    Approve for tailoring
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button className="flex-1" onClick={() => approve.mutate(row.jobId)}>Approve for tailoring</Button>
+                    <JobQuickActions jobId={row.jobId} url={row.url} />
+                  </div>
                 }
               />
             ))}
-          </div>
+          </div> : (
+            <JobTable
+              rows={rows}
+              selection={selection}
+              onToggle={selection.toggle}
+              onOpen={openJob}
+              onToggleAll={(checked) => checked ? selection.selectPage(loadedIds) : selection.clear()}
+              allChecked={rows.every((row) => selection.isSelected(row.jobId))}
+              actions={(row) => <><Button size="sm" onClick={() => approve.mutate(row.jobId)}>Approve</Button><JobQuickActions jobId={row.jobId} url={row.url} /></>}
+            />
+          )}
           {hasNextPage && (
             <div className="mt-5 flex justify-center">
               <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>

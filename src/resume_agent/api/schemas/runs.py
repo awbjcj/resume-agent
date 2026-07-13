@@ -30,6 +30,7 @@ class RunOut(CamelModel):
     result: Any | None = None
     error: str | None = None
     error_code: str | None = None
+    meta: dict[str, Any] | None = None
 
 
 class PullParams(CamelModel):

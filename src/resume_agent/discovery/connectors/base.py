@@ -38,6 +38,7 @@ class RawJob:
     location: str | None
     jd_text: str
     posted_at: datetime | None = None
+    stale_company: str | None = None
 
 
 SkipSeen = Callable[[RawJob], bool]

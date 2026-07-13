@@ -140,6 +140,51 @@ def test_account_password_usage_and_export(mu_app, mu_client):
     assert _login(mu_client, password="new-owner-password").status_code == 200
 
 
+def test_account_import_requires_confirmation(mu_client):
+    assert _login(mu_client).status_code == 200
+
+    response = mu_client.post(
+        "/api/account/import",
+        files={"file": ("workspace.tar.gz", b"not-an-archive", "application/gzip")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "CONFIRM_REQUIRED"
+
+
+def test_account_workspace_export_import_round_trip(mu_client):
+    assert _login(mu_client).status_code == 200
+    exported = mu_client.get("/api/account/export")
+    assert exported.status_code == 200
+
+    imported = mu_client.post(
+        "/api/account/import?confirm=REPLACE",
+        files={
+            "file": (
+                "workspace.tar.gz",
+                exported.content,
+                "application/gzip",
+            )
+        },
+    )
+
+    assert imported.status_code == 200
+    assert imported.json() == {"status": "imported"}
+    assert mu_client.get("/api/account/usage").status_code == 200
+
+
+def test_account_import_rejects_invalid_archive(mu_client):
+    assert _login(mu_client).status_code == 200
+
+    response = mu_client.post(
+        "/api/account/import?confirm=REPLACE",
+        files={"file": ("workspace.tar.gz", b"invalid", "application/gzip")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_ARCHIVE"
+
+
 def test_whole_root_export_is_admin_only_and_snapshots_all_databases(mu_app, mu_client):
     _add_user(mu_app)
     assert _login(mu_client, "alice", "alice-password").status_code == 200

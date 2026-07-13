@@ -36,6 +36,7 @@ export function useRehydrateRuns(): void {
             etaText: run.etaText ?? null,
             error: run.error ?? undefined,
             result: run.result as Record<string, unknown> | null,
+            meta: (run.meta as Record<string, unknown> | null) ?? null,
           });
           trackRun({ runId: run.runId, kind: run.kind });
         }

@@ -8,27 +8,12 @@ from sqlmodel import Session
 
 from resume_agent.api.deps import get_session
 from resume_agent.api.errors import ApiException
-from resume_agent.api.schemas.jobs import ApplicationOut, CoverLetterOut, ReviseRequest
+from resume_agent.api.schemas.jobs import ApplicationOut
 from resume_agent.services.board import select_cover_letter
-from resume_agent.services.cover_letter_revision import revise_cover_letter_version
 from resume_agent.tracking.repository import get_cover_letter
 
 router = APIRouter()
 link_router = APIRouter()
-
-
-@router.post("/cover-letters/{cover_letter_id}/revise", response_model=CoverLetterOut)
-def revise_cover_letter_endpoint(
-    cover_letter_id: int, body: ReviseRequest, session: Session = Depends(get_session)
-):
-    cover_letter = revise_cover_letter_version(
-        session, cover_letter_id, body.instruction
-    )
-    if cover_letter is None:
-        raise ApiException(
-            404, "NOT_FOUND", f"Cover letter #{cover_letter_id} not found"
-        )
-    return CoverLetterOut.model_validate(cover_letter)
 
 
 @router.post(

@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -9,14 +11,17 @@ export function PipelineCard({
   onOpen,
   selected,
   onSelect,
+  footer,
 }: {
   row: PipelineItem;
   onOpen: () => void;
   selected?: boolean;
   onSelect?: (checked: boolean) => void;
+  footer?: ReactNode;
 }) {
   return (
-    <Card className="min-w-0 flex-row items-start gap-3 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
+    <Card className="min-w-0 flex-col gap-4 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
+      <div className="flex items-start gap-3">
       {onSelect && (
         <div className="pt-1">
           <Checkbox
@@ -49,6 +54,8 @@ export function PipelineCard({
           {cleanJobDescriptionText(row.jdText)}
         </p>
       </button>
+      </div>
+      {footer && <div className="mt-auto flex justify-end gap-1 border-t pt-4">{footer}</div>}
     </Card>
   );
 }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlmodel import Session
 
 from resume_agent.api.deps import get_session
@@ -13,7 +13,10 @@ from resume_agent.api.schemas.jobs import (
     ApplicationUpsert,
     JobDetail,
     JobPatch,
+    JobsImportError,
+    JobsImportReportOut,
 )
+from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.api.schemas.runs import AddJobTextRequest
 from resume_agent.services import board
 from resume_agent.services.discovery import ActiveJobQuotaError, add_job_from_text
@@ -21,6 +24,33 @@ from resume_agent.tracking.repository import get_job
 from resume_agent.tracking.tables import ApplicationStatus, JobStatus
 
 router = APIRouter()
+
+
+@router.post("/jobs/import", response_model=JobsImportReportOut)
+def import_jobs_endpoint(
+    file: UploadFile, session: Session = Depends(get_session)
+) -> JobsImportReportOut:
+    from resume_agent.services.jobs_import import (
+        InvalidJobsFileError,
+        UnsupportedJobsFormatError,
+        import_jobs_file,
+    )
+
+    try:
+        data = read_upload(file, max_bytes=10 * 1024 * 1024)
+        report = import_jobs_file(session, file.filename or "", data)
+    except UploadTooLargeError as exc:
+        raise ApiException(413, "UPLOAD_TOO_LARGE", str(exc)) from exc
+    except UnsupportedJobsFormatError as exc:
+        raise ApiException(400, "UNSUPPORTED_FORMAT", str(exc)) from exc
+    except InvalidJobsFileError as exc:
+        raise ApiException(400, "INVALID_FILE", str(exc)) from exc
+    return JobsImportReportOut(
+        added=report.added,
+        upgraded=report.upgraded,
+        skipped=report.skipped,
+        errors=[JobsImportError(row=row, reason=reason) for row, reason in report.errors],
+    )
 
 
 def _job_detail_response(session: Session, job_id: int) -> JobDetail:

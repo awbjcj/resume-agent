@@ -72,6 +72,38 @@ export function useUploadSource() {
   });
 }
 
+export function useUploadSources() {
+  const qc = useQueryClient();
+  const uploadAll = async (
+    files: File[],
+    mode?: string,
+    anchor?: string | null,
+  ): Promise<{ ok: number; failed: [string, string][] }> => {
+    let ok = 0;
+    const failed: [string, string][] = [];
+    for (const file of files) {
+      try {
+        await postSource(file, mode, anchor);
+        ok += 1;
+      } catch (error) {
+        failed.push([file.name, (error as Error).message]);
+      }
+    }
+    await qc.invalidateQueries({ queryKey: ["profile-sources"] });
+    if (failed.length === 0) {
+      toast.success(`${ok} file(s) added`);
+    } else {
+      toast.warning(
+        `${ok} added, ${failed.length} failed: ${failed
+          .map(([name]) => name)
+          .join(", ")}`,
+      );
+    }
+    return { ok, failed };
+  };
+  return { uploadAll };
+}
+
 export function usePatchSource() {
   const qc = useQueryClient();
   return useMutation({

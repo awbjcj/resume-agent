@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMe } from "@/features/auth/AuthGate";
 import { api, unwrap } from "@/lib/api/client";
+import { DataArchiveCard } from "@/features/account/DataArchiveCard";
 
 export function AdminPage() {
   const me = useMe();
@@ -49,6 +50,14 @@ export function AdminPage() {
           </CardContent>
         </Card>
       </div>
+      <DataArchiveCard
+        title="System backup"
+        description="Export or replace the complete server data root, including every workspace."
+        exportLabel="Export all data"
+        exportPath="/api/admin/export"
+        importPath="/api/admin/import"
+        successMessage="Data imported"
+      />
       <Card>
         <CardHeader><CardTitle>Users</CardTitle><CardDescription>Authorization is enforced by the API; these controls only call protected admin endpoints.</CardDescription></CardHeader>
         <CardContent>

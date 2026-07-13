@@ -4,7 +4,12 @@ from threading import Barrier, Event, Lock
 
 import pytest
 
-from resume_agent.api.runs.manager import RunCancelled, RunManager, RunProgressReporter
+from resume_agent.api.runs.manager import (
+    RunCancelled,
+    RunManager,
+    RunProgressReporter,
+    RunSingletonConflict,
+)
 from resume_agent.api.runs.models import RunState, parse_run_snapshot
 from resume_agent.progress import ProgressReporter
 
@@ -352,6 +357,37 @@ def test_submit_singleton_does_not_deadlock_with_inline_executor(tmp_path):
     second = mgr.submit("refreshClusters", lambda _reporter: {}, singleton_key="clusters")
 
     assert first != second
+
+
+def test_submit_can_raise_for_an_active_singleton_and_persists_meta(tmp_path):
+    release = Event()
+    started = Event()
+    mgr = RunManager(root=tmp_path)
+
+    def work(_reporter):
+        started.set()
+        release.wait(timeout=2)
+        return {}
+
+    first = mgr.submit(
+        "revise",
+        work,
+        singleton_key="revise:5",
+        singleton_conflict="raise",
+        meta={"versionId": 5, "instruction": "tighter"},
+    )
+    assert started.wait(timeout=1)
+    with pytest.raises(RunSingletonConflict) as error:
+        mgr.submit(
+            "revise",
+            lambda _reporter: {},
+            singleton_key="revise:5",
+            singleton_conflict="raise",
+        )
+    assert error.value.run_id == first
+    assert mgr.get(first).meta == {"versionId": 5, "instruction": "tighter"}  # type: ignore[union-attr]
+    release.set()
+    mgr.shutdown()
 
 
 def test_submit_failure_leaves_a_terminal_record_not_a_ghost_active_run(tmp_path):

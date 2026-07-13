@@ -32,6 +32,11 @@ router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(_require_admin_when_multiuser)],
 )
+link_router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(_require_admin_when_multiuser)],
+)
 
 
 def _refuse_if_running(request: Request) -> None:
@@ -39,7 +44,7 @@ def _refuse_if_running(request: Request) -> None:
         raise ApiException(409, "RUNS_ACTIVE", "Refusing while runs are active")
 
 
-@router.get("/export")
+@link_router.get("/export")
 def export_root(request: Request) -> FileResponse:
     _refuse_if_running(request)
     temporary = Path(tempfile.mkdtemp(prefix="ra-export-"))

@@ -19,9 +19,11 @@ import {
 } from "@/features/board/use-board-query";
 import { useBulkAction } from "@/features/board/use-bulk-action";
 import { useSelection } from "@/features/board/use-selection";
+import { JobQuickActions } from "@/features/board/JobQuickActions";
 import { useBoardFilters } from "@/features/shortlist/use-board-filters";
 
 import { QuickFilters } from "./QuickFilters";
+import { ImportJobsButton } from "@/features/runs/ImportJobsDialog";
 
 export function TriageContainer() {
   const [archived, setArchived] = useState(false);
@@ -87,6 +89,7 @@ export function TriageContainer() {
         </div>
         <span aria-hidden className="h-4 w-px bg-border" />
         <QuickFilters onApply={(patch) => setFilter({ ...filter, ...patch })} />
+        <ImportJobsButton />
       </div>
       {!rows.length ? (
         <EmptyState
@@ -135,6 +138,14 @@ export function TriageContainer() {
             onOpen={openJob}
             onToggleAll={(checked) => (checked ? selection.selectPage(loadedIds) : selection.clear())}
             allChecked={allLoadedSelected}
+            actions={(row) => (
+              <JobQuickActions
+                jobId={row.jobId}
+                url={row.url}
+                archived={archived}
+                allowDelete
+              />
+            )}
           />
           {hasNextPage && (
             <div className="mt-5 flex justify-center">

@@ -54,6 +54,14 @@ class RunQuotaError(RuntimeError):
     code = "QUOTA_EXCEEDED"
 
 
+class RunSingletonConflict(RuntimeError):
+    code = "CONFLICT"
+
+    def __init__(self, run_id: str):
+        super().__init__("A run is already active for this item")
+        self.run_id = run_id
+
+
 class RunProgressReporter(ProgressReporter):
     """ProgressReporter variant that preserves the run kind on every write and
     is the cooperative-cancellation checkpoint: ``begin``/``step`` raise
@@ -68,12 +76,14 @@ class RunProgressReporter(ProgressReporter):
         created_at: str | None = None,
         user_id: str | None = None,
         cancel_check: Callable[[], bool] | None = None,
+        meta: dict[str, object] | None = None,
     ) -> None:
         super().__init__(run_id, root=root)
         self.kind = kind
         self.created_at = created_at or _now()
         self.user_id = user_id
         self._cancel_check = cancel_check
+        self.meta = meta
 
     def _raise_if_cancelled(self) -> None:
         if self._cancel_check is not None and self._cancel_check():
@@ -100,6 +110,7 @@ class RunProgressReporter(ProgressReporter):
             kind=self.kind,
             created_at=self.created_at,
             user_id=self.user_id,
+            meta=self.meta,
             **extra,
         )
 
@@ -114,6 +125,7 @@ class RunProgressReporter(ProgressReporter):
             kind=self.kind,
             created_at=self.created_at,
             user_id=self.user_id,
+            meta=self.meta,
             **extra,
         )
 
@@ -122,6 +134,7 @@ class RunProgressReporter(ProgressReporter):
             kind=self.kind,
             created_at=self.created_at,
             user_id=self.user_id,
+            meta=self.meta,
             **extra,
         )
 
@@ -198,6 +211,7 @@ class RunManager:
         *,
         user_id: str | None = None,
         storage_root: Path | str | None = None,
+        meta: dict[str, object] | None = None,
     ) -> str:
         run_id = uuid.uuid4().hex
         created_at = _now()
@@ -232,6 +246,7 @@ class RunManager:
                 "error_code": None,
                 "user_id": owner_id,
                 "updated_at": created_at,
+                "meta": meta,
             },
         )
         return run_id
@@ -247,6 +262,7 @@ class RunManager:
             ),
             user_id=record.get("user_id"),
             cancel_check=lambda: self.is_cancel_requested(run_id),
+            meta=record.get("meta") if isinstance(record.get("meta"), dict) else None,
         )
 
     def submit(
@@ -257,6 +273,8 @@ class RunManager:
         singleton_key: str | None = None,
         user_id: str | None = None,
         max_concurrent: int | None = None,
+        singleton_conflict: str = "join",
+        meta: dict[str, object] | None = None,
     ) -> str:
         with self._singleton_lock:
             ctx = current_context()
@@ -280,6 +298,8 @@ class RunManager:
                 if active_id is not None:
                     snapshot = self.get(active_id)
                     if snapshot is not None and snapshot.state in ACTIVE_RUN_STATES:
+                        if singleton_conflict == "raise":
+                            raise RunSingletonConflict(active_id)
                         return active_id
                     self._active_singletons.pop(effective_singleton, None)
 
@@ -293,7 +313,7 @@ class RunManager:
                     raise RunQuotaError(
                         f"{active_count} runs already active (limit {max_concurrent})"
                     )
-            run_id = self.create(kind, user_id=owner_id)
+            run_id = self.create(kind, user_id=owner_id, meta=meta)
             reporter = self.reporter(run_id, kind)
             if effective_singleton is not None:
                 self._active_singletons[effective_singleton] = run_id

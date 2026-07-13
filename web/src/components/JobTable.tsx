@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -18,6 +20,7 @@ type Row = {
   location?: string | null;
   status?: string;
   postedAt?: string | null;
+  url?: string | null;
 };
 
 export function JobTable({
@@ -27,6 +30,7 @@ export function JobTable({
   onOpen,
   onToggleAll,
   allChecked,
+  actions,
 }: {
   rows: Row[];
   selection: { isSelected: (id: number) => boolean };
@@ -34,6 +38,7 @@ export function JobTable({
   onOpen: (id: number) => void;
   onToggleAll?: (checked: boolean) => void;
   allChecked?: boolean;
+  actions?: (row: Row) => ReactNode;
 }) {
   const ordered = rows.map((row) => row.jobId);
   return (
@@ -52,6 +57,7 @@ export function JobTable({
           <TableHead>Source</TableHead>
           <TableHead>Location</TableHead>
           <TableHead>Status</TableHead>
+          {actions && <TableHead className="text-right">Actions</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -87,6 +93,11 @@ export function JobTable({
             <TableCell onClick={() => onOpen(row.jobId)}>{row.source ?? "—"}</TableCell>
             <TableCell onClick={() => onOpen(row.jobId)}>{row.location ?? "—"}</TableCell>
             <TableCell onClick={() => onOpen(row.jobId)}>{row.status ?? "—"}</TableCell>
+            {actions && (
+              <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+                <div className="flex justify-end gap-1">{actions(row)}</div>
+              </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>

@@ -34,6 +34,7 @@ describe("TriageContainer", () => {
               postedAt: null,
               archivedAt: null,
               hasProgress: false,
+              url: "https://example.test/job/3",
             },
           ],
           pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
@@ -52,5 +53,8 @@ describe("TriageContainer", () => {
     await waitFor(() =>
       expect(screen.getByRole("status", { name: /1 selected/i })).toBeInTheDocument(),
     );
+    expect(screen.getByRole("link", { name: "Open posting" })).toHaveAttribute("href", "https://example.test/job/3");
+    expect(screen.getByRole("button", { name: "Archive job" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete job" })).toBeInTheDocument();
   });
 });

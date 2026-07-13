@@ -556,6 +556,36 @@ def pull_cmd(
     typer.echo(f"Pull complete. Added {sum(report.totals.values())} new job(s).")
 
 
+@app.command("fix-company-names")
+def fix_company_names_cmd(
+    connectors_path: str = typer.Option(
+        DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report without writing."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
+) -> None:
+    """Rename token companies from configured or resolved display names."""
+    from resume_agent.discovery.connectors.config import load_connectors_config
+    from resume_agent.services.company_fix import fix_company_names
+
+    if not _tenant_cli_path(connectors_path).exists():
+        typer.echo(f"No connectors config found at {connectors_path}.")
+        raise typer.Exit(code=1)
+    config = load_connectors_config(connectors_path)
+    engine = _engine(db_url)
+    with get_session(engine) as session:
+        report = fix_company_names(session, config, dry_run=dry_run)
+    for token, count in sorted(report.renamed.items()):
+        qualifier = "would be " if dry_run else ""
+        typer.echo(f"{token}: {count} row(s) {qualifier}renamed")
+    for kept, skipped in report.conflicts:
+        typer.echo(
+            f"CONFLICT: row #{skipped} skipped (identity held by #{kept})"
+        )
+    for token in report.unresolved:
+        typer.echo(f"unresolved: {token} (no display name)")
+
+
 @app.command("sources")
 def sources_cmd() -> None:
     """Show each connector's last run: when, jobs added, and last error."""

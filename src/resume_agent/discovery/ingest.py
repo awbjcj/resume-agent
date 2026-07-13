@@ -14,11 +14,12 @@ from resume_agent.discovery.merge import (
     MergeAction,
     Rebase,
     RefreshText,
+    RefreshCompany,
     Skip,
     UpgradeUrlOnly,
     decide,
 )
-from resume_agent.tracking.repository import find_existing
+from resume_agent.tracking.repository import company_rename_collides, find_existing
 from resume_agent.tracking.tables import Job, JobStatus
 
 
@@ -62,6 +63,7 @@ def save_or_upgrade(
     posted_at: datetime | None = None,
     commit: bool = True,
     allow_insert: bool = True,
+    stale_company: str | None = None,
 ) -> tuple[Job | None, IngestOutcome]:
     """Insert a new job, upgrade an existing one from a higher-tier source, or skip."""
     incoming = IncomingJob.clean(
@@ -72,6 +74,7 @@ def save_or_upgrade(
         title=title,
         location=location,
         posted_at=posted_at,
+        stale_company=stale_company,
     )
     existing = find_existing(
         session,
@@ -82,6 +85,14 @@ def save_or_upgrade(
         incoming.location,
     )
     action = decide(existing, incoming)
+    if (
+        isinstance(action, RefreshCompany)
+        and existing is not None
+        and company_rename_collides(
+            session, existing=existing, dedup_key=action.dedup_key
+        )
+    ):
+        action = Skip()
     if isinstance(action, Insert) and not allow_insert:
         return None, IngestOutcome.quota_skipped
     return _apply(session, existing, incoming, action, commit)
@@ -119,6 +130,9 @@ def _apply(
     elif isinstance(action, (Rebase, RefreshText)):
         for field, value in action.updates.items():
             setattr(existing, field, value)
+    elif isinstance(action, RefreshCompany):
+        existing.company = action.company
+        existing.dedup_key = action.dedup_key
     return _persist(session, existing, commit), IngestOutcome.upgraded
 
 
@@ -178,6 +192,7 @@ def ingest_jobs_with_outcomes(
             title=raw.title,
             location=raw.location,
             posted_at=raw.posted_at,
+            stale_company=raw.stale_company,
             commit=False,
             allow_insert=remaining is None or remaining > 0,
         )

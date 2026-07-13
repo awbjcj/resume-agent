@@ -38,6 +38,7 @@ class IncomingJob:
     title: str | None = None
     location: str | None = None
     posted_at: datetime | None = None
+    stale_company: str | None = None
 
     @classmethod
     def clean(
@@ -50,6 +51,7 @@ class IncomingJob:
         title: str | None = None,
         location: str | None = None,
         posted_at: datetime | None = None,
+        stale_company: str | None = None,
     ) -> "IncomingJob":
         return cls(
             source=source,
@@ -59,6 +61,7 @@ class IncomingJob:
             title=_clean(title),
             location=_clean(location),
             posted_at=posted_at,
+            stale_company=_clean(stale_company),
         )
 
     @property
@@ -102,7 +105,15 @@ class RefreshText:
     updates: dict[str, Any]
 
 
-MergeAction = Insert | Skip | UpgradeUrlOnly | Rebase | RefreshText
+@dataclass(frozen=True)
+class RefreshCompany:
+    """Replace a stale company token and its identity key atomically."""
+
+    company: str
+    dedup_key: str | None
+
+
+MergeAction = Insert | Skip | UpgradeUrlOnly | Rebase | RefreshText | RefreshCompany
 
 
 _TEXT_REFRESH_FROZEN = {JobStatus.tailored.value, JobStatus.rendered.value}
@@ -144,6 +155,19 @@ def decide(existing: Job | None, incoming: IncomingJob) -> MergeAction:
         return RefreshText(updates=updates)
 
     if source_rank(incoming.source) >= source_rank(existing.source):
+        if (
+            incoming.company
+            and incoming.stale_company
+            and existing.company
+            and existing.company.strip().casefold()
+            == incoming.stale_company.casefold()
+            and incoming.company.strip().casefold()
+            != existing.company.strip().casefold()
+        ):
+            return RefreshCompany(
+                company=incoming.company,
+                dedup_key=compute_dedup_key(incoming.company, existing.title),
+            )
         return Skip()
 
     # Higher-tier source from here.

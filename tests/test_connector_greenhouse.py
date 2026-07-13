@@ -130,6 +130,7 @@ def test_greenhouse_per_board_limit_overrides_global(monkeypatch):
         ]
     }
     monkeypatch.setattr(connector, "_get_board", lambda token: payload)
+    monkeypatch.setattr(connector, "_get_board_name", lambda token: None)
     result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=2)
     assert len(result.jobs) == 3
     assert [job.company for job in result.jobs] == ["alpha", "beta", "beta"]

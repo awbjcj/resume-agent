@@ -552,6 +552,20 @@
         "title": "BoardPage[TriageItem]",
         "type": "object"
       },
+      "Body_import_jobs_endpoint_api_jobs_import_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_jobs_endpoint_api_jobs_import_post",
+        "type": "object"
+      },
       "Body_import_root_api_admin_import_post": {
         "properties": {
           "file": {
@@ -564,6 +578,34 @@
           "file"
         ],
         "title": "Body_import_root_api_admin_import_post",
+        "type": "object"
+      },
+      "Body_import_workspace_api_account_import_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_workspace_api_account_import_post",
+        "type": "object"
+      },
+      "Body_launch_import_urls_api_jobs_import_urls_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_launch_import_urls_api_jobs_import_urls_post",
         "type": "object"
       },
       "Body_upload_document_api_profile_documents_post": {
@@ -1679,6 +1721,55 @@
         "title": "JobPatch",
         "type": "object"
       },
+      "JobsImportError": {
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "row": {
+            "title": "Row",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row",
+          "reason"
+        ],
+        "title": "JobsImportError",
+        "type": "object"
+      },
+      "JobsImportReportOut": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/JobsImportError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "upgraded": {
+            "title": "Upgraded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "upgraded",
+          "skipped",
+          "errors"
+        ],
+        "title": "JobsImportReportOut",
+        "type": "object"
+      },
       "LengthBudget": {
         "properties": {
           "maxBulletsPerRole": {
@@ -2239,6 +2330,17 @@
               }
             ],
             "title": "Title"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "required": [
@@ -2917,6 +3019,18 @@
             "title": "Label",
             "type": "string"
           },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
           "percent": {
             "title": "Percent",
             "type": "integer"
@@ -3509,6 +3623,17 @@
               }
             ],
             "title": "Title"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "required": [
@@ -4415,6 +4540,17 @@
               }
             ],
             "title": "Title"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "required": [
@@ -4703,6 +4839,79 @@
           }
         },
         "summary": "Export Workspace",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/import": {
+      "post": {
+        "operationId": "import_workspace_api_account_import_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "confirm",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Confirm",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_workspace_api_account_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Import Workspace Api Account Import Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Workspace",
         "tags": [
           "account"
         ]
@@ -6739,7 +6948,7 @@
     },
     "/api/cover-letters/{cover_letter_id}/revise": {
       "post": {
-        "operationId": "revise_cover_letter_endpoint_api_cover_letters__cover_letter_id__revise_post",
+        "operationId": "launch_cover_letter_revise_api_cover_letters__cover_letter_id__revise_post",
         "parameters": [
           {
             "in": "path",
@@ -6778,11 +6987,11 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CoverLetterOut"
+                  "$ref": "#/components/schemas/RunOut"
                 }
               }
             },
@@ -6799,7 +7008,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Revise Cover Letter Endpoint"
+        "summary": "Launch Cover Letter Revise"
       }
     },
     "/api/dashboard/summary": {
@@ -7145,6 +7354,118 @@
           }
         },
         "summary": "Launch Add From Url"
+      }
+    },
+    "/api/jobs/import": {
+      "post": {
+        "operationId": "import_jobs_endpoint_api_jobs_import_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_jobs_endpoint_api_jobs_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsImportReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Jobs Endpoint"
+      }
+    },
+    "/api/jobs/import-urls": {
+      "post": {
+        "operationId": "launch_import_urls_api_jobs_import_urls_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_launch_import_urls_api_jobs_import_urls_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Import Urls"
       }
     },
     "/api/jobs/{job_id}": {
@@ -9132,7 +9453,7 @@
     },
     "/api/resume-versions/{version_id}/revise": {
       "post": {
-        "operationId": "revise_endpoint_api_resume_versions__version_id__revise_post",
+        "operationId": "launch_resume_revise_api_resume_versions__version_id__revise_post",
         "parameters": [
           {
             "in": "path",
@@ -9171,11 +9492,11 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResumeVersionOut"
+                  "$ref": "#/components/schemas/RunOut"
                 }
               }
             },
@@ -9192,7 +9513,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Revise Endpoint"
+        "summary": "Launch Resume Revise"
       }
     },
     "/api/runs": {

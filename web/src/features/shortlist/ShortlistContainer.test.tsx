@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { server } from "@/test/server";
 import { ShortlistContainer } from "./ShortlistContainer";
@@ -19,6 +19,7 @@ const wrap = (ui: ReactNode) => {
 };
 
 describe("ShortlistContainer", () => {
+  beforeEach(() => localStorage.clear());
   it("shows empty state when no rows", async () => {
     server.use(
       http.get("/api/shortlist", () =>
@@ -61,6 +62,17 @@ describe("ShortlistContainer", () => {
     expect(screen.getByText(/Acme/)).toBeInTheDocument();
     // fit score 81 renders (also appears as the single-row "Avg fit" metric)
     expect(screen.getAllByText("81").length).toBeGreaterThan(0);
+  });
+
+  it("switches to a list while retaining row actions", async () => {
+    localStorage.setItem("shortlist-view", "list");
+    server.use(http.get("/api/shortlist", () => HttpResponse.json({
+      data: [{ jobId: 8, company: "Acme", title: "Designer", fitScore: 70, skills: [], url: "https://example.test/8" }],
+      pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 }, facets: {}, total: 1,
+    })));
+    wrap(<ShortlistContainer />);
+    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open posting" })).toBeInTheDocument();
   });
 
   it("keeps the open facet scope stable after filtered results finish loading", async () => {

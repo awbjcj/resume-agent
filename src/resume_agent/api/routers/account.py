@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from starlette.background import BackgroundTask
 from resume_agent.api import auth
 from resume_agent.api.deps import get_settings_dep
 from resume_agent.api.errors import ApiException
+from resume_agent.api.uploads import UploadTooLargeError, copy_upload
 from resume_agent.api.schemas.account import (
     AccountUsage,
     PasswordChangeRequest,
@@ -24,7 +25,12 @@ from resume_agent.api.schemas.account import (
     TokenList,
 )
 from resume_agent.config import Settings
-from resume_agent.services.backup import export_data_root
+from resume_agent.services.backup import (
+    InvalidArchiveError,
+    UnsafeArchiveError,
+    export_data_root,
+    import_data_root,
+)
 from resume_agent.tenancy.context import require_context
 from resume_agent.tenancy.limits import (
     DEFAULT_WEEKLY_TOKEN_BUDGET,
@@ -137,6 +143,53 @@ def export_workspace(request: Request) -> FileResponse:
         filename=f"workspace-{context.username}-{date.today().isoformat()}.tar.gz",
         background=BackgroundTask(shutil.rmtree, temporary, ignore_errors=True),
     )
+
+
+@router.post("/import")
+def import_workspace(
+    request: Request,
+    file: UploadFile,
+    confirm: str = "",
+) -> dict[str, str]:
+    if confirm != "REPLACE":
+        raise ApiException(
+            400,
+            "CONFIRM_REQUIRED",
+            "Import replaces your workspace; pass ?confirm=REPLACE",
+        )
+    context = require_context()
+    if request.app.state.run_manager.list_active(user_id=context.user_id):
+        raise ApiException(409, "RUNS_ACTIVE", "Refusing while your runs are active")
+    registry = request.app.state.engine_registry
+    if registry is None:
+        raise ApiException(
+            400, "NO_WORKSPACE", "Workspace import requires multi-user mode"
+        )
+    paths = workspace_paths(request.app.state.data_dir, context.user_id)
+
+    with tempfile.TemporaryDirectory(prefix="ra-workspace-import-") as temporary:
+        archive = Path(temporary) / "import.tar.gz"
+        try:
+            copy_upload(file, archive, max_bytes=256 * 1024 * 1024)
+            import_data_root(
+                archive,
+                paths.root,
+                before_swap=lambda: registry.evict(context.user_id),
+                after_swap=lambda: registry.get(context.user_id, paths.db_url),
+            )
+        except UploadTooLargeError as exc:
+            raise ApiException(413, "UPLOAD_TOO_LARGE", str(exc)) from exc
+        except UnsafeArchiveError as exc:
+            raise ApiException(400, "UNSAFE_ARCHIVE", str(exc)) from exc
+        except InvalidArchiveError as exc:
+            raise ApiException(400, "INVALID_ARCHIVE", str(exc)) from exc
+        except BaseException:
+            # The staged swap has restored the old workspace. Rebind it so the
+            # next request never inherits a disposed engine.
+            registry.evict(context.user_id)
+            registry.get(context.user_id, paths.db_url)
+            raise
+    return {"status": "imported"}
 
 
 @router.get("/usage")

@@ -216,5 +216,7 @@ class CompaniesConnector:
             # The configured source label is the user's canonical company name.
             # ATS payloads commonly return a lowercase account/token instead.
             for job in jobs:
+                if job.company and job.company.casefold() != label.casefold():
+                    job.stale_company = job.stale_company or job.company
                 job.company = label
         return jobs

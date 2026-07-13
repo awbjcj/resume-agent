@@ -23,4 +23,20 @@ describe("JobTable", () => {
     fireEvent.click(screen.getAllByRole("checkbox")[1]);
     expect(onToggle).toHaveBeenCalled();
   });
+
+  it("renders an optional actions column without opening the row", () => {
+    const onOpen = vi.fn();
+    render(
+      <JobTable
+        rows={rows}
+        selection={{ isSelected: () => false }}
+        onToggle={vi.fn()}
+        onOpen={onOpen}
+        actions={(row) => <button type="button">Archive {row.jobId}</button>}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Archive 1" }));
+    expect(screen.getByText("Actions")).toBeInTheDocument();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
 });

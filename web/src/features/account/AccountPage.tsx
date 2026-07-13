@@ -11,6 +11,7 @@ import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, openDownload, unwrap } from "@/lib/api/client";
 import { useMe } from "@/features/auth/AuthGate";
+import { DataArchiveCard } from "./DataArchiveCard";
 
 export function AccountPage() {
   const me = useMe();
@@ -65,6 +66,14 @@ export function AccountPage() {
           </CardContent>
         </Card>
       </div>
+      <DataArchiveCard
+        title="My workspace data"
+        description="Export your workspace for a local browser pull, then import it back without touching anyone else's data. The archive contains operational secrets."
+        exportLabel="Export my data"
+        exportPath="/api/account/export"
+        importPath="/api/account/import"
+        successMessage="Workspace imported"
+      />
       <Card>
         <CardHeader><CardTitle>Personal access tokens</CardTitle><CardDescription>Use PATs for automation. A token is shown once when created.</CardDescription></CardHeader>
         <CardContent className="space-y-4">

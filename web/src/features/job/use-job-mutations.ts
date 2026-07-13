@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api, unwrap } from "@/lib/api/client";
+import { useLaunchRun } from "@/features/runs/use-launch-run";
 
 function invalidateBoards(qc: ReturnType<typeof useQueryClient>, jobId: number) {
   qc.invalidateQueries({ queryKey: ["job", jobId] });
@@ -59,19 +60,28 @@ export function useRenderVersion(jobId: number) {
 }
 
 export function useReviseVersion(jobId: number) {
-  const qc = useQueryClient();
+  const { launch } = useLaunchRun();
   return useMutation({
-    mutationFn: (vars: { versionId: number; instruction: string; reReview?: boolean }) =>
-      unwrap(
-        api.POST("/api/resume-versions/{version_id}/revise", {
-          params: { path: { version_id: vars.versionId } },
-          body: {
-            instruction: vars.instruction,
-            reReview: vars.reReview ?? false,
-          },
-        }),
-      ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
+    mutationFn: (vars: { versionId: number; instruction: string; reReview?: boolean }) => {
+      const reReview = vars.reReview ?? false;
+      return launch(
+        "revise",
+        () =>
+          unwrap(
+            api.POST("/api/resume-versions/{version_id}/revise", {
+              params: { path: { version_id: vars.versionId } },
+              body: { instruction: vars.instruction, reReview },
+            }),
+          ),
+        ["job"],
+        {
+          versionId: vars.versionId,
+          jobId,
+          instruction: vars.instruction,
+          reReview,
+        },
+      );
+    },
   });
 }
 
@@ -89,16 +99,21 @@ export function useSelectResume(jobId: number) {
 }
 
 export function useReviseCoverLetter(jobId: number) {
-  const qc = useQueryClient();
+  const { launch } = useLaunchRun();
   return useMutation({
     mutationFn: (vars: { coverLetterId: number; instruction: string }) =>
-      unwrap(
-        api.POST("/api/cover-letters/{cover_letter_id}/revise", {
-          params: { path: { cover_letter_id: vars.coverLetterId } },
-          body: { instruction: vars.instruction, reReview: false },
-        }),
+      launch(
+        "coverLetterRevise",
+        () =>
+          unwrap(
+            api.POST("/api/cover-letters/{cover_letter_id}/revise", {
+              params: { path: { cover_letter_id: vars.coverLetterId } },
+              body: { instruction: vars.instruction, reReview: false },
+            }),
+          ),
+        ["job"],
+        { coverLetterId: vars.coverLetterId, jobId, instruction: vars.instruction },
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["job", jobId] }),
   });
 }
 

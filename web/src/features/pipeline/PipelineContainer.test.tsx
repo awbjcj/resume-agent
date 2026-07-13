@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { server } from "@/test/server";
 import { PipelineContainer } from "./PipelineContainer";
@@ -32,6 +32,7 @@ const pipelineItem = (jobId: number, status: string, title: string) => ({
 });
 
 describe("PipelineContainer", () => {
+  beforeEach(() => localStorage.clear());
   it("opens tailoring with the complete approved-job query", async () => {
     const requestedStatuses: Array<string | null> = [];
     server.use(
@@ -107,6 +108,18 @@ describe("PipelineContainer", () => {
     expect(screen.getByText(/Remote eligible Mid/)).toBeInTheDocument();
     expect(screen.queryByText(/corporate/)).not.toBeInTheDocument();
     expect(screen.queryByText(/laptop/)).not.toBeInTheDocument();
+  });
+
+  it("renders quick actions in per-stage list view", async () => {
+    localStorage.setItem("pipeline-view", "list");
+    server.use(http.get("/api/pipeline", () => HttpResponse.json({
+      data: [{ ...pipelineItem(9, "tailored", "Operator"), url: "https://example.test/9" }],
+      pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 },
+      facets: { status: { tailored: 1 } }, total: 1,
+    })));
+    wrap(<PipelineContainer />);
+    expect(await screen.findByRole("button", { name: "Archive job" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open posting" })).toBeInTheDocument();
   });
 
   it("puts the tailored stage before every other status", async () => {

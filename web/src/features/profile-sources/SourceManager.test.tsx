@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   skeleton: [{ id: "exp1", kind: "experience", label: "Acme — Engineer" }],
   patch: vi.fn(),
   remove: vi.fn(),
-  upload: vi.fn(),
+  uploadAll: vi.fn(),
   replace: vi.fn(),
   addNote: vi.fn(),
   addUrl: vi.fn(),
@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./use-sources", () => ({
   useSources: () => ({ data: mocks.sources, isLoading: false }),
   useSkeleton: () => ({ data: mocks.skeleton }),
-  useUploadSource: () => ({ mutate: mocks.upload, isPending: false }),
+  useUploadSources: () => ({ uploadAll: mocks.uploadAll }),
   usePatchSource: () => ({ mutate: mocks.patch, isPending: false }),
   useDeleteSource: () => ({ mutate: mocks.remove, isPending: false }),
   useReplaceSource: () => ({ mutate: mocks.replace, isPending: false }),
@@ -72,11 +72,7 @@ describe("SourceManager", () => {
     const file = new File(["deck"], "deck.md", { type: "text/markdown" });
     await userEvent.upload(input, file);
 
-    expect(mocks.upload).toHaveBeenCalledWith({
-      file,
-      mode: "synthesis",
-      anchor: "exp1",
-    });
+    expect(mocks.uploadAll).toHaveBeenCalledWith([file], "synthesis", "exp1");
   });
 
   it("promotes a literal source to primary", async () => {
