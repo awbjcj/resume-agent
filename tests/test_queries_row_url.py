@@ -19,8 +19,10 @@ def test_board_rows_and_schemas_expose_posting_url():
             )
         )
         session.commit()
-        assert triage_rows(session)[0].url.endswith("/jobs/1")
-        assert pipeline_rows(session)[0].url.endswith("/jobs/1")
+        triage_url = triage_rows(session)[0].url
+        pipeline_url = pipeline_rows(session)[0].url
+        assert triage_url is not None and triage_url.endswith("/jobs/1")
+        assert pipeline_url is not None and pipeline_url.endswith("/jobs/1")
         # A raw job is not shortlisted, but the DTO contract is still covered below.
         assert shortlist_rows(session) == []
 

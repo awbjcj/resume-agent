@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlmodel import select
 
 from resume_agent.db import get_session, init_db, make_engine
@@ -16,7 +18,7 @@ CONFIG = ConnectorsConfig.model_validate(
 
 
 def _job(company, url, **overrides):
-    values = dict(
+    values: dict[str, Any] = dict(
         source="greenhouse",
         url=url,
         company=company,

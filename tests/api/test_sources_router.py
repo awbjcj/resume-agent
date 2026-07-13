@@ -41,8 +41,8 @@ def test_preview_endpoint(monkeypatch):
     monkeypatch.setattr(
         sources_router,
         "preview_source",
-        lambda url, label=None, search_path=None: SourcePreview(
-            ok=True, url=url, kind="ashby", role_count=7
+        lambda url, label=None, **kwargs: SourcePreview(
+            ok=True, url=url or "", kind="ashby", role_count=7
         ),
     )
 
@@ -55,6 +55,58 @@ def test_preview_endpoint(monkeypatch):
 
     assert body["ok"] is True
     assert body["roleCount"] == 7
+
+
+def test_preview_endpoint_forwards_native_provider_recipe(monkeypatch):
+    from resume_agent.services.sources import SourcePreview
+
+    calls = []
+
+    def fake_preview(**kwargs):
+        calls.append(kwargs)
+        return SourcePreview(
+            ok=True,
+            url="https://jobs.ashbyhq.com/acme",
+            kind="ashby",
+            token="acme",
+            role_count=3,
+        )
+
+    monkeypatch.setattr(sources_router, "preview_source", fake_preview)
+    client = _client()
+    with client:
+        response = client.post(
+            "/api/sources/preview",
+            json={"provider": "ashby", "token": "acme", "label": "Acme"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["url"] == "https://jobs.ashbyhq.com/acme"
+    assert calls[0]["provider"] == "ashby"
+    assert calls[0]["token"] == "acme"
+    assert calls[0]["search_path"].endswith("search.yaml")
+
+
+def test_native_provider_requires_its_connection_parameters(monkeypatch):
+    from resume_agent.services.sources import SourcePreview
+
+    monkeypatch.setattr(
+        sources_router,
+        "preview_source",
+        lambda **kwargs: SourcePreview(
+            ok=False,
+            url="",
+            error="Company token must contain only letters, numbers, and hyphens.",
+        ),
+    )
+    client = _client()
+    with client:
+        response = client.post(
+            "/api/sources/preview", json={"provider": "greenhouse"}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is False
 
 
 def test_add_source_error_maps_to_400(monkeypatch):

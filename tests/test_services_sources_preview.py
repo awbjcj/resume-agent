@@ -49,6 +49,65 @@ def test_preview_counts_roles_from_test_fetch(monkeypatch):
     assert preview.role_count == 1
 
 
+@pytest.mark.parametrize(
+    ("provider", "kwargs", "expected"),
+    [
+        ("greenhouse", {"token": "acme"}, "https://job-boards.greenhouse.io/acme"),
+        ("personio", {"token": "acme", "country": "de"}, "https://acme.jobs.personio.de"),
+        (
+            "workday",
+            {"tenant": "acme", "datacenter": "wd5", "site": "Careers"},
+            "https://acme.wd5.myworkdayjobs.com/Careers",
+        ),
+    ],
+)
+def test_provider_recipe_builds_canonical_board_url(provider, kwargs, expected):
+    assert svc._connection_url(provider=provider, **kwargs) == expected
+
+
+def test_preview_native_provider_uses_real_connector_fetch(monkeypatch):
+    seen = {}
+
+    class FakeConnector:
+        def fetch(self, search, limit=None):
+            seen["limit"] = limit
+            return FetchResult(jobs=[])
+
+    def fake_connector(target, url):
+        seen["target"] = target
+        seen["url"] = url
+        return FakeConnector()
+
+    monkeypatch.setattr(svc, "_preview_connector", fake_connector)
+    monkeypatch.setattr(svc, "load_search_config", lambda path: object())
+
+    preview = svc.preview_source(provider="ashby", token="acme")
+
+    assert preview.ok is True
+    assert seen["target"] == AtsTarget("ashby", "acme")
+    assert seen["url"] == "https://jobs.ashbyhq.com/acme"
+    assert seen["limit"] == 50
+
+
+def test_preview_rejects_unsafe_provider_token_before_fetch(monkeypatch):
+    monkeypatch.setattr(
+        svc,
+        "detect_ats",
+        lambda _url: pytest.fail("invalid recipes must not reach detection"),
+    )
+
+    preview = svc.preview_source(provider="greenhouse", token="../internal")
+
+    assert preview.ok is False
+    assert "letters, numbers, and hyphens" in (preview.error or "")
+
+
+def test_path_provider_allows_underscore_in_company_token():
+    assert svc._connection_url(provider="greenhouse", token="acme_jobs") == (
+        "https://job-boards.greenhouse.io/acme_jobs"
+    )
+
+
 def test_add_source_requires_successful_preview(tmp_path, monkeypatch):
     path = tmp_path / "connectors.yaml"
     path.write_text(
@@ -58,7 +117,7 @@ def test_add_source_requires_successful_preview(tmp_path, monkeypatch):
     monkeypatch.setattr(
         svc,
         "preview_source",
-        lambda url, label=None: svc.SourcePreview(
+        lambda url, label=None, **kwargs: svc.SourcePreview(
             ok=False, url=url, error="preview failed"
         ),
     )

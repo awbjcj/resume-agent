@@ -14,7 +14,8 @@ def _client():
 
 def _seed(app, **kw):
     with get_session(app.state.engine) as session:
-        job = Job(source="manual", jd_text="x", **kw)
+        source = kw.pop("source", "manual")
+        job = Job(source=source, jd_text="x", **kw)
         session.add(job)
         session.commit()
         session.refresh(job)
@@ -24,12 +25,21 @@ def _seed(app, **kw):
 def test_pipeline_returns_paginated_envelope():
     client = _client()
     with client:  # triggers lifespan -> engine
-        _seed(client.app, status=JobStatus.tailored.value, fit_score=80, company="Acme")
+        _seed(
+            client.app,
+            status=JobStatus.tailored.value,
+            fit_score=80,
+            company="Acme",
+            source="greenhouse",
+            location="Boston, MA",
+        )
         resp = client.get("/api/pipeline?pageSize=10")
         body = resp.json()
     assert resp.status_code == 200
     assert body["pagination"]["pageSize"] == 10
     assert body["data"][0]["company"] == "Acme"
+    assert body["data"][0]["source"] == "greenhouse"
+    assert body["data"][0]["location"] == "Boston, MA"
     assert "fitScore" in body["data"][0]
     assert body["total"] == 1
     assert body["facets"]["status"]["tailored"] == 1
@@ -119,11 +129,14 @@ def test_shortlist_item_exposes_facet_fields():
             status=JobStatus.shortlisted.value,
             fit_score=70,
             company="Acme",
+            source="lever",
             location="New York, NY, US",
         )
         body = client.get("/api/shortlist").json()
     assert body["data"], "expected one shortlisted row"
     item = body["data"][0]
+    assert item["source"] == "lever"
+    assert item["location"] == "New York, NY, US"
     for key in (
         "locationCountry",
         "locationRegion",
