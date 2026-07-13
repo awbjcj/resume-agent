@@ -1,7 +1,10 @@
 # Board UX, Async Revise, Import Surfaces, Company Display Names — Design
 
-Date: 2026-07-12
+Date: 2026-07-12 (grilled and consolidated 2026-07-13)
 Status: Approved
+Related: ADR-0001 (dedup identity), ADR-0003 (tenancy), ADR-0004
+(company rename semantics), CONTEXT.md (Workspace export, Round-trip
+pull)
 
 One UX-maturity pass over the web app, packaged as four independent
 workstreams. They share almost no code; plan tasks must be independently
@@ -78,9 +81,16 @@ they are reachable on touch and never shift layout.
   highlight it on completion.
 - **409 same-artifact guard:** submitting a revise while a revise run is
   already active for the same artifact (resume version id, or cover
-  letter id) returns 409 (error envelope, code `CONFLICT`). Different
-  artifacts and different jobs may revise concurrently. The guard checks the RunManager's active runs; it must be
-  enforced server-side because clients cannot know about runs launched
+  letter id) returns 409 (error envelope, code `CONFLICT`, with the
+  active run id in `details` so the client can offer to watch it).
+  Different artifacts and different jobs may revise concurrently.
+  Implementation: `RunManager.submit` gains an opt-in
+  `singleton_conflict="raise"` mode (default `"join"` preserves existing
+  kinds' idempotent-join behavior); revise submits with
+  `singleton_key=f"revise:{version_id}"` (cover-letter analog) in raise
+  mode. Join semantics are wrong here because a second revise with a
+  *different instruction* would silently discard that instruction. The
+  guard is server-side because clients cannot know about runs launched
   before a page reload.
 
 ### Web
@@ -115,9 +125,12 @@ retry is always safe.
   short-lived query-token flow (bearer headers cannot ride an `<a>` tag;
   query tokens stay purpose-bound to selected downloads per ADR-0003).
 - **Import:** file picker → `POST /api/admin/import` (multipart) behind a
-  destructive-confirm dialog — user types `IMPORT` to proceed; copy states
-  it replaces the deployment's data. Staged-validation failures surface
-  verbatim in the dialog.
+  destructive-confirm dialog — user types `REPLACE` to proceed (matching
+  the endpoint's existing `confirm=REPLACE` parameter); copy states it
+  replaces the deployment's data. Staged-validation failures surface
+  verbatim in the dialog. The endpoint already refuses while runs are
+  active (`_refuse_if_running`) — no new guard needed; the UI surfaces
+  that 409 as "wait for runs to finish".
 
 ### 3b. Per-user workspace export/import (new API + UI)
 
@@ -128,9 +141,20 @@ retry is always safe.
 - Both reuse `services/backup.py` scoped to the workspace root resolved
   from `UserContext`. System tables (users, PATs, budgets, invites) are
   never part of these archives; identity and limits are untouched.
-- Import returns **409** while the caller has any active run — swapping a
-  workspace directory under a running worker is the one real hazard.
+- Import returns **409** while the caller has any active run
+  (`RunManager.list_active(user_id=...)`) — swapping a workspace
+  directory under a running worker is the one real hazard.
 - UI on the Account page with the same typed-confirm pattern as 3a.
+- This is **Workspace export** in the domain language (see CONTEXT.md):
+  user-content portability, never a custody transfer — the Data root
+  remains the admin custody unit. Named use-case: the **per-user
+  Round-trip pull** — a user exports their workspace, runs a local
+  browser pull (LinkedIn, Tesla, scrape) against the snapshot, and
+  imports it back, making browser-only sources usable per-user on the
+  cloud deployment without an admin moving anyone else's data. Re-pulls
+  stay safe because equal-tier duplicates are ingest no-ops.
+- A Workspace holds Operational secrets, so the archive is secret
+  material — same handling as the admin export.
 
 ### 3c. Profile documents bulk upload (no new API)
 
@@ -149,6 +173,11 @@ retry is always safe.
     JSON: an array of objects with the same keys.
   - Rows flow through `save_or_upgrade` with `source="manual"` — dedup,
     the location guard, and source-priority apply unchanged.
+  - A row without non-blank `jd_text` is **rejected with a per-row
+    error** naming the fix ("jd_text is required; use the URL-list
+    import for postings you only have links for") — never silently
+    skipped, never auto-routed to the URL pipeline (a sync endpoint that
+    sometimes spawns a background run is two contracts on one path).
   - Response reports added/upgraded/skipped counts plus per-row errors
     (row number + reason). No LLM work; scoring happens on the next
     discover.
@@ -180,19 +209,33 @@ Precedence for a job's `company`:
 - Lever, JazzHR, BambooHR: payloads carry no organization name; keep
   configured-label-or-token. No guessing — if the payload doesn't say,
   we don't invent a prettier name.
+- A failed name lookup (e.g. the Greenhouse board-name request errors)
+  falls back to the token and never fails the Unit — resolution is
+  best-effort decoration, not part of the fetch contract.
 
 ### Heal on re-pull
 
 - Today an equal-tier duplicate is a pure no-op (Skip), so a corrected
   label never reaches existing rows.
-- The pure merge-decision layer gains one narrow action
-  (`RefreshCompany`): when the match is otherwise a Skip **and** the
-  incoming company differs **and** the existing row's company equals that
-  source's token (case-insensitive), refresh `company`.
+- **Data path:** `RawJob` and `IncomingJob` gain
+  `stale_company: str | None` — the fallback name the connector would
+  have used before resolution (token, tenant, or previous label), set
+  only when the connector resolved a better name. The merge decision
+  stays pure; the token knowledge rides the job like every other field.
+- **Decision:** `decide` gains one narrow action (`RefreshCompany`):
+  when the match is otherwise a Skip **and** `incoming.company` differs
+  **and** the existing row's company case-insensitively equals
+  `incoming.stale_company`, refresh `company`.
 - Because `dedup_key` embeds `normalize(company)`, the refresh recomputes
-  `dedup_key` (and any company-derived fingerprint) atomically with the
-  rename — otherwise the same posting re-ingests as a "new" job on the
-  next pull.
+  `dedup_key` atomically with the rename — otherwise the same posting
+  re-ingests as a "new" job on the next pull. (`content_fingerprint` is
+  JD-only; nothing else derives from company.)
+- **Collision rule:** after `decide` proposes `RefreshCompany`, the
+  DB-bound layer (`save_or_upgrade`, which already owns DB-bound
+  matching per ADR-0001) checks whether another non-archived row already
+  holds the target `dedup_key` with a compatible location. If so, the
+  refresh downgrades to Skip and the row keeps its token name — never
+  auto-merge; duplicates are a human decision. See ADR-0004.
 - Status, `Application`, `ResumeVersion`, `CoverLetter`, and `jd_text`
   are untouched; the frozen-JD rule is not violated.
 
@@ -202,8 +245,9 @@ Precedence for a job's `company`:
   `resume-agent fix-company-names [--dry-run]`.
 - Walks configured source units, maps token → label/resolved name, and
   updates rows whose company matches the token (same dedup-key recompute
-  rules). Reports per-source update counts; `--dry-run` prints without
-  writing.
+  and skip-on-collision rules; conflicts are **reported** per pair so
+  duplicates can be resolved by hand). Reports per-source update counts;
+  `--dry-run` prints without writing.
 - Web users get the organic heal on every pull; the CLI covers archived
   history.
 
@@ -225,9 +269,11 @@ faked; connectors against fixture JSON).
   active run, staged rollback on invalid archive) and jobs import
   (CSV/JSON parsing, per-row errors, dedup pass-through, URL-list run);
   vitest for the admin/account cards and the import dialog routing.
-- **W4:** pytest with fixture payloads for each resolving backend, the
-  `RefreshCompany` merge action (including dedup-key recompute), and the
-  backfill command via the CLI test harness.
+- **W4:** pytest with fixture payloads for each resolving backend
+  (including lookup-failure fallback), the `RefreshCompany` merge action
+  (stale_company trigger, dedup-key recompute, skip-on-collision
+  downgrade), and the backfill command (updates, conflict reporting,
+  --dry-run) via the CLI test harness.
 
 ## Out of scope
 

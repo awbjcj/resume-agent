@@ -211,10 +211,22 @@ home dir
 
 **Round-trip pull**:
 The sanctioned path for browser-requiring connectors once the cloud instance
-owns the Data root: export the root, run the local browser pull against the
-snapshot, import it back — without mutating the cloud in between. Re-pulls are
-safe because ingest dedupe makes equal-tier duplicates no-ops.
-_Avoid_: sync (nothing merges; the whole root moves), hybrid pull
+owns the Data root: export, run the local browser pull against the snapshot,
+import it back — without mutating the cloud in between. Admins round-trip the
+whole Data root; a user round-trips their own slice via Workspace export.
+Re-pulls are safe because ingest dedupe makes equal-tier duplicates no-ops.
+_Avoid_: sync (nothing merges; a whole custody unit moves), hybrid pull
+
+**Workspace export**:
+User-content portability of exactly one Workspace — the archive of a user's
+slice, exportable and importable by that user without admin custody ever
+changing hands. Distinct from Data root export: it carries no system tables
+and claims no authority over the instance; importing one replaces only the
+caller's Workspace, staged and rollback-safe, refused while the caller has an
+active run. Because a Workspace holds Operational secrets, the archive is
+secret material.
+_Avoid_: self-export (names the actor, not the unit), backup (a backup is the
+Data root), partial export (it is complete for its Workspace)
 
 **UserContext**:
 The binding of one authenticated user to their Workspace and effective
