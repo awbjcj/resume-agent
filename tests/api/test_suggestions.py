@@ -65,7 +65,7 @@ def _wait_for_run(client, run_id):
 
 def test_get_returns_empty_envelope_for_valid_uncached_target(monkeypatch, tmp_path):
     _configure(monkeypatch, tmp_path)
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
     with TestClient(app) as client:
         _seed_job(app.state.engine)
         response = client.get(
@@ -79,7 +79,7 @@ def test_get_returns_empty_envelope_for_valid_uncached_target(monkeypatch, tmp_p
 
 def test_unknown_targets_use_standard_not_found_envelope(monkeypatch, tmp_path):
     _configure(monkeypatch, tmp_path)
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
     with TestClient(app) as client:
         _seed_job(app.state.engine)
         get_response = client.get(
@@ -99,7 +99,7 @@ def test_unknown_targets_use_standard_not_found_envelope(monkeypatch, tmp_path):
 
 def test_generate_rejects_browser_supplied_context(monkeypatch, tmp_path):
     _configure(monkeypatch, tmp_path)
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
     with TestClient(app) as client:
         _seed_job(app.state.engine)
         response = client.post(
@@ -135,7 +135,7 @@ def test_generate_skill_then_get_cached_suggestion(monkeypatch, tmp_path):
         ),
     )
 
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
     with TestClient(app) as client:
         _seed_job(app.state.engine)
         launched = client.post(
@@ -163,7 +163,7 @@ def test_theme_cache_becomes_stale_when_demanding_jobs_change(monkeypatch, tmp_p
         lambda: _Agent(SuggestionDraft(bridge="Theme bridge")),
     )
 
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
     with TestClient(app) as client:
         _seed_job(app.state.engine)
         launched = client.post(
@@ -191,7 +191,7 @@ def test_suggestion_runs_dedupe_and_report_not_found_per_target(monkeypatch, tmp
         lambda: _Agent(SuggestionDraft(bridge="Bridge")),
     )
     monkeypatch.setattr(run_module, "verify_repo", lambda *_args, **_kwargs: None)
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
 
     with TestClient(app) as client:
         _seed_job(app.state.engine)

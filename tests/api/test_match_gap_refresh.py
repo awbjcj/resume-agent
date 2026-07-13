@@ -88,7 +88,7 @@ def test_refresh_clusters_run_completes(monkeypatch, tmp_path):
     monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(tmp_path / "cluster_map.json"))
 
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
     with TestClient(app) as client:
         _seed_job(app)
         response = client.post("/api/match-gap/refresh-clusters")
@@ -115,7 +115,7 @@ def test_refresh_cluster_launches_are_coalesced_while_active(monkeypatch, tmp_pa
     monkeypatch.setattr(router_mod, "_FACTS_PATH", str(tmp_path / "facts.json"))
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(tmp_path / "cluster_map.json"))
 
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
     with TestClient(app) as client:
         _seed_job(app)
         first = client.post("/api/match-gap/refresh-clusters").json()["runId"]
@@ -124,6 +124,7 @@ def test_refresh_cluster_launches_are_coalesced_while_active(monkeypatch, tmp_pa
         release.set()
         assert _wait_for_terminal(client, first)["state"] == "done"
         third = client.post("/api/match-gap/refresh-clusters").json()["runId"]
+        assert _wait_for_terminal(client, third)["state"] == "done"
 
     assert third != first
 
@@ -147,7 +148,7 @@ def test_refresh_regenerates_matrix_from_bound_facts(monkeypatch, tmp_path):
         group_map_path(facts_path.parent),
     )
 
-    app = create_app(db_url="sqlite://")
+    app = create_app(db_url="sqlite://", runs_root=tmp_path)
     with TestClient(app) as client:
         _seed_job(app)
         response = client.post("/api/match-gap/refresh-clusters")
