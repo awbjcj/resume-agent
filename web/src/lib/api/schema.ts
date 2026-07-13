@@ -2215,6 +2215,8 @@ export interface components {
             jdText: string;
             /** Jobid */
             jobId: number;
+            /** Location */
+            location: string | null;
             /**
              * Needsattention
              * @default false
@@ -2235,6 +2237,8 @@ export interface components {
             salaryMin: number | null;
             /** Seniority */
             seniority: string | null;
+            /** Source */
+            source: string;
             /** Status */
             status: string;
             /** Title */
@@ -2656,6 +2660,8 @@ export interface components {
             seniority: string | null;
             /** Skills */
             skills: components["schemas"]["SkillTagOut"][];
+            /** Source */
+            source: string;
             /** Sponsorshipsignal */
             sponsorshipSignal: string | null;
             /** Title */

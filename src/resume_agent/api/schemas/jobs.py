@@ -18,6 +18,7 @@ class ShortlistItem(CamelModel):
     job_id: int
     company: str | None
     title: str | None
+    source: str
     location: str | None
     fit_score: int | None
     fit_rationale: str | None
@@ -42,6 +43,8 @@ class PipelineItem(CamelModel):
     job_id: int
     company: str | None
     title: str | None
+    source: str
+    location: str | None
     status: str
     fit_score: int | None
     jd_text: str

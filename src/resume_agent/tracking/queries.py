@@ -42,6 +42,7 @@ class ShortlistRow:
     job_id: int
     company: str | None
     title: str | None
+    source: str
     location: str | None
     fit_score: int | None
     fit_rationale: str | None
@@ -125,6 +126,8 @@ class PipelineRow:
     job_id: int
     company: str | None
     title: str | None
+    source: str
+    location: str | None
     status: str
     fit_score: int | None
     jd_text: str
@@ -181,6 +184,7 @@ def _shortlist_row(job: Job, tokens: set[str], aliases: dict[str, str]) -> Short
         job_id=job_id,
         company=job.company,
         title=job.title,
+        source=job.source,
         location=job.location,
         fit_score=job.fit_score,
         fit_rationale=job.fit_rationale,
@@ -325,6 +329,8 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 job_id=job_id,
                 company=job.company,
                 title=job.title,
+                source=job.source,
+                location=job.location,
                 status=job.status,
                 fit_score=job.fit_score,
                 jd_text=clean_job_description_text(job.jd_text),

@@ -2251,6 +2251,17 @@
             "title": "Jobid",
             "type": "integer"
           },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
           "needsAttention": {
             "default": false,
             "title": "Needsattention",
@@ -2316,6 +2327,10 @@
             ],
             "title": "Seniority"
           },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -2347,6 +2362,8 @@
           "jobId",
           "company",
           "title",
+          "source",
+          "location",
           "status",
           "fitScore",
           "jdText",
@@ -3602,6 +3619,10 @@
             "title": "Skills",
             "type": "array"
           },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
           "sponsorshipSignal": {
             "anyOf": [
               {
@@ -3640,6 +3661,7 @@
           "jobId",
           "company",
           "title",
+          "source",
           "location",
           "fitScore",
           "fitRationale",
