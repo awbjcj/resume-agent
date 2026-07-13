@@ -15,22 +15,24 @@ replica, and one owner login.
    .venv\Scripts\python.exe -m resume_agent.cli hash-password --password "choose-a-password"
    python -c "import secrets; print(secrets.token_hex(32))"
    ```
+
    .venv\Scripts\python.exe -m resume_agent.cli hash-password --password "Wjj20140665!"
    python -c "import secrets; print(secrets.token_hex(32))"
 
 4. Add Railway variables:
 
-   | Variable | Value |
-   | --- | --- |
-   | `AUTH_USERNAME` | Owner login name |
-   | `AUTH_PASSWORD_HASH` | Output from `hash-password` |
-   | `SESSION_SECRET` | The generated 64-character secret |
-   | `API_TOKEN` | Optional bearer token for scripts |
-   | `BROWSER_ENABLED` | `false` (also the image default) |
+   | Variable             | Value                             |
+   | -------------------- | --------------------------------- |
+   | `AUTH_USERNAME`      | Owner login name                  |
+   | `AUTH_PASSWORD_HASH` | Output from `hash-password`       |
+   | `SESSION_SECRET`     | The generated 64-character secret |
+   | `API_TOKEN`          | Optional bearer token for scripts |
+   | `BROWSER_ENABLED`    | `false` (also the image default)  |
 
    Add LLM, GitHub, Adzuna, and LinkedIn secrets after login under Settings →
    Keys. They persist in the volume-backed `.env`. Do not also set those in
    Railway, because platform environment variables take precedence.
+
 5. Deploy and sign in at the Railway-provided domain.
 
 ## Seed data

@@ -61,11 +61,13 @@ These corrections are part of the plan and override later reference snippets:
 ### Task 1: UserContext + contextvar
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/__init__.py` (empty)
 - Create: `src/resume_agent/tenancy/context.py`
 - Test: `tests/tenancy/__init__.py` (empty), `tests/tenancy/test_context.py`
 
 **Interfaces:**
+
 - Produces: `UserContext` (frozen dataclass: `user_id: str`, `username: str`, `role: str`, `workspace: Path`, `settings: Settings`, `engine: Engine`), `current_context() -> UserContext | None`, `require_context() -> UserContext`, `use_context(ctx)` (context manager), `activate(ctx)` (process-lifetime set, for the CLI), `new_user_id() -> str`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -273,12 +275,14 @@ git commit -m "Adds UserContext contextvar seam (ADR-0003)"
 ### Task 2: get_settings() consults the active context
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py:51-54`
 - Modify: `src/resume_agent/api/routers/admin.py:85` (`get_settings.cache_clear()` call site)
 - Modify: `src/resume_agent/services/env_config.py:40` (same)
 - Test: `tests/tenancy/test_settings_overlay.py`
 
 **Interfaces:**
+
 - Consumes: `current_context()` from Task 1.
 - Produces: `env_settings() -> Settings` (lru_cached, the no-context fallback — replaces the old cached `get_settings` for cache-clearing purposes); `get_settings() -> Settings` keeps its signature but returns `ctx.settings` when a context is active. **Every existing caller of `get_settings()` is untouched.**
 
@@ -359,10 +363,12 @@ git commit -m "Routes get_settings() through the active UserContext"
 ### Task 3: WorkspacePaths, provisioning, and the effective-Settings overlay
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/workspace.py`
 - Test: `tests/tenancy/test_workspace.py`
 
 **Interfaces:**
+
 - Consumes: `Settings` from `resume_agent.config`.
 - Produces:
   - `WorkspacePaths` (frozen dataclass over `root: Path`) with properties `db_file`, `db_url` (str, `sqlite:///` + posix path), `profile_dir`, `config_dir`, `secrets_env`, `output_dir`, `runs_root`.
@@ -567,10 +573,12 @@ git commit -m "Adds Workspace layout, provisioning, and effective-Settings overl
 ### Task 4: system.db — SystemBase, User table, engine helpers
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/system_db.py`
 - Test: `tests/tenancy/test_system_db.py`
 
 **Interfaces:**
+
 - Consumes: `_enable_sqlite_write_concurrency` from `resume_agent.db` (reuse the WAL pragmas).
 - Produces:
   - `SystemBase` (SQLAlchemy `DeclarativeBase` with **its own metadata** — deliberately not SQLModel).
@@ -727,10 +735,12 @@ git commit -m "Adds system.db with isolated metadata and the User table"
 ### Task 5: EngineRegistry
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/engines.py`
 - Test: `tests/tenancy/test_engines.py`
 
 **Interfaces:**
+
 - Consumes: `make_engine`, `init_db` from `resume_agent.db`.
 - Produces: `EngineRegistry` with `get(user_id: str, db_url: str) -> Engine` (lazy create + `init_db` once, cached), `evict(user_id: str) -> None` (dispose + drop — the delete-user precondition), `close_all() -> None` (shutdown).
 
@@ -849,10 +859,12 @@ git commit -m "Adds per-user workspace EngineRegistry"
 ### Task 6: Legacy-root adoption
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/migrate.py`
 - Test: `tests/tenancy/test_migrate.py`
 
 **Interfaces:**
+
 - Produces: `is_legacy_root(data_root: Path) -> bool`, `adopt_legacy_root(data_root: Path, admin_id: str) -> list[str]` (returns moved child names), `AdoptionError(RuntimeError)`.
 - Consumed by Task 7's bootstrap.
 
@@ -1020,10 +1032,12 @@ git commit -m "Adds resumable legacy-root adoption into the admin workspace"
 ### Task 7: Bootstrap — seed admin, adopt, build the default context
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/bootstrap.py`
 - Test: `tests/tenancy/test_bootstrap.py`
 
 **Interfaces:**
+
 - Consumes: Tasks 3-6 (`workspace_paths`, `provision_workspace`, `effective_settings`, `User`, `init_system_db`, `make_system_engine`, `is_legacy_root`, `adopt_legacy_root`, `EngineRegistry`), `new_user_id` from Task 1, `hash-format` password hashes verbatim from `Settings.auth_password_hash`.
 - Produces:
   - `BootstrapError(RuntimeError)`
@@ -1222,12 +1236,14 @@ git commit -m "Adds seed-only bootstrap and the server UserContext constructor"
 ### Task 8: App wiring — multi-user boot, context dependency, run propagation
 
 **Files:**
+
 - Modify: `src/resume_agent/api/app.py` (lifespan, guarded dependencies)
 - Modify: `src/resume_agent/api/deps.py` (`get_session`, new `get_user_context`)
 - Modify: `src/resume_agent/api/runs/manager.py:220-236` (`submit` context capture)
 - Test: `tests/api/test_multi_user_boot.py`, extend `tests/tenancy/test_context.py` coverage via a RunManager test in `tests/api/test_multi_user_boot.py`
 
 **Interfaces:**
+
 - Consumes: everything from Tasks 1-7.
 - Produces:
   - `create_app` boots **multi-user** when the resolved DB is file-backed AND (`data_root/system.db` exists OR both `auth_username`/`auth_password_hash` are set). In-memory SQLite always boots legacy (test substrate). Multi-user boot: `app.state.system_engine`, `app.state.engine_registry`, `app.state.default_context` (the sole admin's `UserContext` — transitional identity until Plan 2's per-user auth), and `app.state.engine` pointing at the admin workspace engine so unconverted `app.state.engine` call sites (`runs.py:51`, `match_gap.py:71`, `suggestions.py:97,150`, `admin.py`) keep working against the right DB. Legacy boot: exactly today's behavior with `system_engine`/`engine_registry`/`default_context` set to `None`.
@@ -1462,12 +1478,14 @@ git commit -m "Boots multi-user apps through UserContext with run propagation"
 ### Task 9: CLI workspace resolution + docs
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/local.py`
 - Modify: `src/resume_agent/cli.py` (root `@app.callback()`)
 - Modify: `CLAUDE.md` (tenancy section)
 - Test: `tests/tenancy/test_local.py`
 
 **Interfaces:**
+
 - Consumes: Tasks 1-7.
 - Produces: `resolve_local_context(data_root: Path, username: str | None) -> UserContext | None` — `None` on a legacy root (env fallback = today's behavior); on a multi-user root builds the named user's (or sole first admin's) context. `activate_local_context(...)` wraps it with `activate()`. CLI gains a global `--user` option.
 
@@ -1637,6 +1655,24 @@ Expected: green (CLI tests, if any invoke the typer app, hit the legacy path in 
 
 Append to `CLAUDE.md` under "Core invariants" a new subsection:
 
+```markdown
+### Tenancy context (ADR-0003)
+
+Multi-user state rides a `contextvars.ContextVar` holding the active
+`UserContext` (`tenancy/context.py`). Exactly three set-points: the API
+dependency `get_user_context`, `RunManager.submit` (copies the caller's
+context into the worker), and the CLI callback (`--user`). `get_settings()`
+returns the context's effective settings, else env settings — never cache
+its result across requests. With no context, behavior is the legacy
+single-user path (tests, legacy roots). System tables (`tenancy/system_db.py`)
+use their own SQLAlchemy metadata so they never leak into workspace DBs.
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/resume_agent/tenancy/local.py src/resume_agent/cli.py tests/tenancy/test_local.py CLAUDE.md
+git commit -m "Resolves CLI workspace context on multi-user data roots"
 ```markdown
 ### Tenancy context (ADR-0003)
 

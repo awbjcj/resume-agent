@@ -12,16 +12,16 @@ modeled on vsda-deep-agent's user management and deep-agents-ui's admin panel.
 
 ## 1. Requirements (decided with the user)
 
-| Decision | Choice |
-| --- | --- |
-| Limits | Per-user LLM token budgets **and** per-user job/run quotas (no seat cap) |
-| LLM keys | Hybrid — shared server keys (budget-enforced) by default; a user-supplied provider key exempts that user's calls from the budget |
-| Registration | Single-use, admin-minted invitation codes; no email verification step |
-| Roles | Two: `admin` and `user` |
-| Tokens | User-scoped session cookie + revocable personal access tokens (PATs) + short-lived signed link tokens for SSE/downloads; the static shared `api_token` is removed |
-| Isolation | Full per-user workspace: SQLite DB, profile corpus, config YAMLs, output, runs, non-LLM secrets |
-| Admin CLI | Thin HTTP client over an admin API (the same API powers the admin web UI) |
-| Migration | Multi-user always (no mode flag); existing env credentials seed the first admin; the existing `data/` contents become that admin's workspace |
+| Decision     | Choice                                                                                                                                                            |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Limits       | Per-user LLM token budgets **and** per-user job/run quotas (no seat cap)                                                                                          |
+| LLM keys     | Hybrid — shared server keys (budget-enforced) by default; a user-supplied provider key exempts that user's calls from the budget                                  |
+| Registration | Single-use, admin-minted invitation codes; no email verification step                                                                                             |
+| Roles        | Two: `admin` and `user`                                                                                                                                           |
+| Tokens       | User-scoped session cookie + revocable personal access tokens (PATs) + short-lived signed link tokens for SSE/downloads; the static shared `api_token` is removed |
+| Isolation    | Full per-user workspace: SQLite DB, profile corpus, config YAMLs, output, runs, non-LLM secrets                                                                   |
+| Admin CLI    | Thin HTTP client over an admin API (the same API powers the admin web UI)                                                                                         |
+| Migration    | Multi-user always (no mode flag); existing env credentials seed the first admin; the existing `data/` contents become that admin's workspace                      |
 
 **Chosen architecture (Approach A):** request-scoped `UserContext` + per-user
 engine registry + one shared `system.db` for auth/budgets. Rejected: row-level
@@ -192,7 +192,7 @@ Flows:
   not overlap). PATs are **role-equivalent**: a PAT is the user, so an
   admin's PAT can call `/api/admin/*`. No scoped tokens for a trusted small
   group. Request auth resolves session cookie → PAT → 401.
-- **Rate limiting:** in-process fixed-window throttle on *failed* attempts at
+- **Rate limiting:** in-process fixed-window throttle on _failed_ attempts at
   the two unauthenticated endpoints (`login`, `register`): 10 failures per
   (username, client IP) per 15 minutes → 429 `RATE_LIMITED` until the window
   rolls; success resets the counter. In-memory only (single process); resets
@@ -230,8 +230,8 @@ Flows:
   effective key came from the user's `secrets.env` rather than server env,
   usage is still recorded (`own_key=true`, for visibility) but never counted
   against the budget.
-- **Admin exemption:** admins are exempt from budget *enforcement* but fully
-  *recorded* (their usage appears in the aggregate view). Same mechanics as
+- **Admin exemption:** admins are exempt from budget _enforcement_ but fully
+  _recorded_ (their usage appears in the aggregate view). Same mechanics as
   the own-key exemption — record always, enforce conditionally — one code
   path, two exemption reasons. Resource quotas still apply to admins.
 - **Recording never breaks the call:** a failed `UsageEvent` write logs a
@@ -253,11 +253,11 @@ Flows:
 
 **Shipped defaults:**
 
-| Limit | Default | Sizing rationale |
-| --- | --- | --- |
+| Limit                 | Default                  | Sizing rationale                                                                                                  |
+| --------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | `weekly_token_budget` | 10M weighted tokens/week | Dozens of tailors + daily discovery scoring with headroom; catches a runaway loop before it is a three-digit bill |
-| `max_active_jobs` | 2,000 non-archived jobs | Guards disk/query latency, not behavior — well above a serious pipeline |
-| `max_concurrent_runs` | 2 per user | One long pull + one tailor; protects the shared `llm_concurrency` pool and the single Playwright browser |
+| `max_active_jobs`     | 2,000 non-archived jobs  | Guards disk/query latency, not behavior — well above a serious pipeline                                           |
+| `max_concurrent_runs` | 2 per user               | One long pull + one tailor; protects the shared `llm_concurrency` pool and the single Playwright browser          |
 
 ## 5. Admin API, CLI, and web UI
 
@@ -267,7 +267,7 @@ over auth):
 - Users: list (with usage summary + limits), set-role, set-limits,
   reset-password, disable/enable, delete. Delete refuses when the target is
   the last admin **or has in-flight runs**; deleting evicts and closes the
-  user's engine from the registry *before* removing the Workspace directory
+  user's engine from the registry _before_ removing the Workspace directory
   (open SQLite handles block directory removal on Windows), and requires an
   explicit confirmation flag. Deletion is admin-only — no self-service
   account deletion.
@@ -333,14 +333,14 @@ keep their explicit cloud degradation, now per user.
 
 Typed codes through the existing `ApiException` envelope:
 
-| Code | Meaning |
-| --- | --- |
-| `INVITE_INVALID` / `INVITE_USED` / `INVITE_EXPIRED` | Registration rejected |
-| `BUDGET_EXCEEDED` | Rolling 7-day token budget exhausted (shared-key users) |
-| `QUOTA_EXCEEDED` (429) | Concurrent-run cap hit (job cap reports in run summary instead) |
-| `FORBIDDEN` (403) | Non-admin on `/api/admin/*` |
-| `USER_DISABLED` | Auth succeeds but account is disabled |
-| `RATE_LIMITED` (429) | Failed-attempt throttle on `login` / `register` |
+| Code                                                | Meaning                                                         |
+| --------------------------------------------------- | --------------------------------------------------------------- |
+| `INVITE_INVALID` / `INVITE_USED` / `INVITE_EXPIRED` | Registration rejected                                           |
+| `BUDGET_EXCEEDED`                                   | Rolling 7-day token budget exhausted (shared-key users)         |
+| `QUOTA_EXCEEDED` (429)                              | Concurrent-run cap hit (job cap reports in run summary instead) |
+| `FORBIDDEN` (403)                                   | Non-admin on `/api/admin/*`                                     |
+| `USER_DISABLED`                                     | Auth succeeds but account is disabled                           |
+| `RATE_LIMITED` (429)                                | Failed-attempt throttle on `login` / `register`                 |
 
 Budget/quota failures inside runs surface as failed run records with the same
 codes so the SPA renders them distinctly.

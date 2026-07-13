@@ -60,6 +60,7 @@ These corrections are normative and override later reference snippets:
 ### Task 1: `require_admin` + admin users API
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/admin_users.py`
 - Create: `src/resume_agent/api/schemas/admin_users.py`
 - Modify: `src/resume_agent/api/deps.py` (add `require_admin`)
@@ -67,6 +68,7 @@ These corrections are normative and override later reference snippets:
 - Test: `tests/api/test_admin_users.py`
 
 **Interfaces:**
+
 - Consumes: `require_context` (Plan 1), `weekly_usage`/`resolve_limit`/`system_default` (Plan 2 `tenancy/limits.py`), `EngineRegistry.evict`, `hash_password`.
 - Produces:
   - `require_admin()` dependency: `require_context()` + 403 `FORBIDDEN` unless `ctx.is_admin`.
@@ -420,12 +422,14 @@ git commit -m "Adds admin user management API with guarded deletion"
 ### Task 2: Invites API
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/admin_invites.py`
 - Create: `src/resume_agent/api/schemas/admin_invites.py`
 - Modify: `src/resume_agent/api/app.py` (include router)
 - Test: `tests/api/test_admin_invites.py`
 
 **Interfaces:**
+
 - Produces:
   - `POST /api/admin/invites {expiresInDays?: int = 14}` → `{id, code, expiresAt}` (raw `inv_…` shown once).
   - `GET /api/admin/invites` → `{invites: [{id, createdBy, createdAt, expiresAt, usedBy, usedAt, revokedAt}]}` (no hashes).
@@ -600,12 +604,14 @@ git commit -m "Adds invite minting, listing, and revocation"
 ### Task 3: System defaults + aggregate usage
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/admin_system.py`
 - Create: `src/resume_agent/api/schemas/admin_system.py`
 - Modify: `src/resume_agent/api/app.py`
 - Test: `tests/api/test_admin_system.py`
 
 **Interfaces:**
+
 - Produces:
   - `GET /api/admin/system/defaults` → `{weeklyTokenBudget, maxActiveJobs, maxConcurrentRuns}` (resolved: stored `SystemSetting` or shipped default).
   - `PUT /api/admin/system/defaults` same shape → upserts `SystemSetting` rows.
@@ -794,11 +800,13 @@ git commit -m "Adds system defaults and aggregate usage endpoints"
 ### Task 4: Account endpoints — change password + self-service export
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/account.py` (from Plan 2 Task 5)
 - Modify: `src/resume_agent/api/schemas/account.py`
 - Test: `tests/api/test_account.py`
 
 **Interfaces:**
+
 - Produces:
   - `POST /api/account/password {currentPassword, newPassword}` — verifies current, sets new hash; the response also sets a **fresh session cookie** (the old signature just died with the hash change).
   - `GET /api/account/export` → `tar.gz` of the caller's own Workspace, filename `workspace-<username>-<date>.tar.gz`. Reuses `services/backup.export_data_root(ws.root, ws.db_url, tmp)` — a Workspace is shaped like a data root (DB + dirs), so the WAL-safe snapshot logic applies unchanged. Refuses while the caller has active runs (`409 RUNS_ACTIVE`) — same reason as the admin export.
@@ -994,11 +1002,13 @@ git commit -m "Adds password change, workspace self-export, and usage meter"
 ### Task 5: Admin CLI — HTTP client
 
 **Files:**
+
 - Create: `src/resume_agent/admin_cli.py`
 - Modify: `src/resume_agent/cli.py` (register the sub-app)
 - Test: `tests/test_admin_cli.py`
 
 **Interfaces:**
+
 - Consumes: Tasks 1-4 endpoints; Plan 2 login + PAT endpoints.
 - Produces: `resume-agent admin <cmd>` — `login`, `logout`, `whoami`, `list-users`, `invite [--expires-days N]`, `set-role USERNAME ROLE`, `set-limits USERNAME [--budget N] [--max-jobs N] [--max-runs N]`, `usage [--days N]`, `disable USERNAME`, `enable USERNAME`, `delete USERNAME --confirm`, `reset-password USERNAME`. Server from `RESUME_AGENT_URL` (default `http://localhost:8000`); credentials at `~/.resume-agent/credentials.json` (`{"apiUrl", "username", "token"}`, the token being a PAT named `cli`). All commands print human-readable tables/lines via `typer.echo`.
 
@@ -1352,6 +1362,7 @@ git commit -m "Adds HTTP-client admin CLI over the admin API"
 ### Task 6: SPA — register page + account page
 
 **Files:**
+
 - Create: `web/src/features/auth/RegisterPage.tsx`
 - Create: `web/src/features/account/AccountPage.tsx`
 - Modify: the router + login page (locate with `grep -rn "login" web/src/app web/src/features/auth --include=*.tsx -il`) to add the `/register` and `/account` routes and a "Have an invite code? Register" link on the login form
@@ -1387,7 +1398,9 @@ export function RegisterPage() {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? `Registration failed (${response.status})`);
+        setError(
+          body?.error?.message ?? `Registration failed (${response.status})`,
+        );
         return;
       }
       navigate("/login", { state: { registered: username } });
@@ -1401,18 +1414,36 @@ export function RegisterPage() {
       <h1>Create account</h1>
       <label>
         Username
-        <input value={username} onChange={(e) => setUsername(e.target.value)} required autoFocus />
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          autoFocus
+        />
       </label>
       <label>
         Password
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={8}
+        />
       </label>
       <label>
         Invitation code
-        <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} required placeholder="inv_…" />
+        <input
+          value={inviteCode}
+          onChange={(e) => setInviteCode(e.target.value)}
+          required
+          placeholder="inv_…"
+        />
       </label>
       {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={busy}>Register</button>
+      <button type="submit" disabled={busy}>
+        Register
+      </button>
       <p>
         Already have an account? <Link to="/login">Sign in</Link>
       </p>
@@ -1427,8 +1458,17 @@ export function RegisterPage() {
 // web/src/features/account/AccountPage.tsx
 import { useEffect, useState } from "react";
 
-type TokenInfo = { id: string; name: string; createdAt: string; lastUsedAt: string | null };
-type Usage = { weightedTotal: number; ownKeyWeightedTotal: number; budget: number };
+type TokenInfo = {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
+type Usage = {
+  weightedTotal: number;
+  ownKeyWeightedTotal: number;
+  budget: number;
+};
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -1496,9 +1536,10 @@ export function AccountPage() {
     }
   }
 
-  const percent = usage && usage.budget > 0
-    ? Math.min(100, Math.round((usage.weightedTotal / usage.budget) * 100))
-    : 0;
+  const percent =
+    usage && usage.budget > 0
+      ? Math.min(100, Math.round((usage.weightedTotal / usage.budget) * 100))
+      : 0;
 
   return (
     <div className="account-page">
@@ -1509,7 +1550,8 @@ export function AccountPage() {
         {usage && (
           <p>
             {usage.weightedTotal.toLocaleString()} of{" "}
-            {usage.budget === 0 ? "unlimited" : usage.budget.toLocaleString()} weighted tokens
+            {usage.budget === 0 ? "unlimited" : usage.budget.toLocaleString()}{" "}
+            weighted tokens
             {usage.budget > 0 && ` (${percent}%)`}
             {usage.ownKeyWeightedTotal > 0 &&
               ` — plus ${usage.ownKeyWeightedTotal.toLocaleString()} on your own key`}
@@ -1521,7 +1563,8 @@ export function AccountPage() {
         <h2>Personal access tokens</h2>
         {freshToken && (
           <p role="alert">
-            Copy this token now — it will not be shown again: <code>{freshToken}</code>
+            Copy this token now — it will not be shown again:{" "}
+            <code>{freshToken}</code>
           </p>
         )}
         <form onSubmit={mintToken}>
@@ -1536,8 +1579,10 @@ export function AccountPage() {
         <ul>
           {tokens.map((token) => (
             <li key={token.id}>
-              {token.name} — created {new Date(token.createdAt).toLocaleDateString()}
-              {token.lastUsedAt && `, last used ${new Date(token.lastUsedAt).toLocaleDateString()}`}
+              {token.name} — created{" "}
+              {new Date(token.createdAt).toLocaleDateString()}
+              {token.lastUsedAt &&
+                `, last used ${new Date(token.lastUsedAt).toLocaleDateString()}`}
               <button onClick={() => void revoke(token.id)}>Revoke</button>
             </li>
           ))}
@@ -1547,8 +1592,21 @@ export function AccountPage() {
       <section>
         <h2>Change password</h2>
         <form onSubmit={changePassword}>
-          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="Current password" required />
-          <input type="password" value={next} onChange={(e) => setNext(e.target.value)} placeholder="New password" required minLength={8} />
+          <input
+            type="password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            placeholder="Current password"
+            required
+          />
+          <input
+            type="password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            placeholder="New password"
+            required
+            minLength={8}
+          />
           <button type="submit">Change password</button>
         </form>
         {message && <p role="status">{message}</p>}
@@ -1586,13 +1644,25 @@ import { AccountPage } from "./AccountPage";
 
 describe("AccountPage", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo) => {
-      const url = String(input);
-      const body = url.endsWith("/api/account/tokens")
-        ? { tokens: [{ id: "t1", name: "cli", createdAt: "2026-07-12T00:00:00Z", lastUsedAt: null }] }
-        : { weightedTotal: 1000, ownKeyWeightedTotal: 0, budget: 10000000 };
-      return new Response(JSON.stringify(body), { status: 200 });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo) => {
+        const url = String(input);
+        const body = url.endsWith("/api/account/tokens")
+          ? {
+              tokens: [
+                {
+                  id: "t1",
+                  name: "cli",
+                  createdAt: "2026-07-12T00:00:00Z",
+                  lastUsedAt: null,
+                },
+              ],
+            }
+          : { weightedTotal: 1000, ownKeyWeightedTotal: 0, budget: 10000000 };
+        return new Response(JSON.stringify(body), { status: 200 });
+      }),
+    );
   });
 
   it("renders usage meter and token list", async () => {
@@ -1622,6 +1692,7 @@ git commit -m "Adds register and account pages to the SPA"
 ### Task 7: SPA admin page + contract regen + docs
 
 **Files:**
+
 - Create: `web/src/features/admin/AdminPage.tsx`
 - Modify: router + nav (admin page visible only when `/api/auth/me` returns `role === "admin"`)
 - Modify: `contracts/openapi.json` + `contracts/ts/api.ts` (regenerated)
@@ -1629,6 +1700,7 @@ git commit -m "Adds register and account pages to the SPA"
 - Test: `web/src/features/admin/AdminPage.test.tsx`, drift gate
 
 **Interfaces:**
+
 - Consumes: every endpoint from Tasks 1-3.
 - Produces: one admin page with three panels — user table (role/usage/limits editors, disable/enable, delete with confirm prompt), invite panel (mint + copy-to-clipboard + list/revoke), system defaults panel. Nav link rendered only for admins (extend the existing `/api/auth/me` consumer — Plan 2 added `role` to `MeResponse`).
 
@@ -1639,16 +1711,31 @@ git commit -m "Adds register and account pages to the SPA"
 import { useEffect, useState } from "react";
 
 type AdminUser = {
-  id: string; username: string; role: string; createdAt: string;
-  disabledAt: string | null; weeklyTokenBudget: number | null;
-  maxActiveJobs: number | null; maxConcurrentRuns: number | null;
-  weeklyUsage: number; activeJobs: number;
+  id: string;
+  username: string;
+  role: string;
+  createdAt: string;
+  disabledAt: string | null;
+  weeklyTokenBudget: number | null;
+  maxActiveJobs: number | null;
+  maxConcurrentRuns: number | null;
+  weeklyUsage: number;
+  activeJobs: number;
 };
 type Invite = {
-  id: string; createdBy: string; createdAt: string; expiresAt: string;
-  usedBy: string | null; usedAt: string | null; revokedAt: string | null;
+  id: string;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  usedBy: string | null;
+  usedAt: string | null;
+  revokedAt: string | null;
 };
-type Defaults = { weeklyTokenBudget: number; maxActiveJobs: number; maxConcurrentRuns: number };
+type Defaults = {
+  weeklyTokenBudget: number;
+  maxActiveJobs: number;
+  maxConcurrentRuns: number;
+};
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -1660,7 +1747,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error?.message ?? `${response.status}`);
   }
-  return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
+  return response.status === 204
+    ? (undefined as T)
+    : (response.json() as Promise<T>);
 }
 
 export function AdminPage() {
@@ -1690,13 +1779,23 @@ export function AdminPage() {
   }, []);
 
   async function patchUser(id: string, patch: Record<string, unknown>) {
-    await api(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+    await api(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
     await refresh();
   }
 
   async function deleteUser(user: AdminUser) {
-    if (!window.confirm(`Delete ${user.username} AND their entire workspace? This cannot be undone.`)) return;
-    await api(`/api/admin/users/${user.id}?confirm=DELETE`, { method: "DELETE" });
+    if (
+      !window.confirm(
+        `Delete ${user.username} AND their entire workspace? This cannot be undone.`,
+      )
+    )
+      return;
+    await api(`/api/admin/users/${user.id}?confirm=DELETE`, {
+      method: "DELETE",
+    });
     await refresh();
   }
 
@@ -1712,7 +1811,10 @@ export function AdminPage() {
   async function saveDefaults(event: React.FormEvent) {
     event.preventDefault();
     if (!defaults) return;
-    await api("/api/admin/system/defaults", { method: "PUT", body: JSON.stringify(defaults) });
+    await api("/api/admin/system/defaults", {
+      method: "PUT",
+      body: JSON.stringify(defaults),
+    });
     await refresh();
   }
 
@@ -1726,18 +1828,29 @@ export function AdminPage() {
         <table>
           <thead>
             <tr>
-              <th>User</th><th>Role</th><th>7-day usage</th><th>Jobs</th>
-              <th>Budget</th><th>Max jobs</th><th>Max runs</th><th></th>
+              <th>User</th>
+              <th>Role</th>
+              <th>7-day usage</th>
+              <th>Jobs</th>
+              <th>Budget</th>
+              <th>Max jobs</th>
+              <th>Max runs</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
               <tr key={user.id} className={user.disabledAt ? "disabled" : ""}>
-                <td>{user.username}{user.disabledAt && " (disabled)"}</td>
+                <td>
+                  {user.username}
+                  {user.disabledAt && " (disabled)"}
+                </td>
                 <td>
                   <select
                     value={user.role}
-                    onChange={(e) => void patchUser(user.id, { role: e.target.value })}
+                    onChange={(e) =>
+                      void patchUser(user.id, { role: e.target.value })
+                    }
                   >
                     <option value="user">user</option>
                     <option value="admin">admin</option>
@@ -1745,11 +1858,27 @@ export function AdminPage() {
                 </td>
                 <td>{user.weeklyUsage.toLocaleString()}</td>
                 <td>{user.activeJobs}</td>
-                <LimitCell user={user} field="weeklyTokenBudget" onSave={patchUser} />
-                <LimitCell user={user} field="maxActiveJobs" onSave={patchUser} />
-                <LimitCell user={user} field="maxConcurrentRuns" onSave={patchUser} />
+                <LimitCell
+                  user={user}
+                  field="weeklyTokenBudget"
+                  onSave={patchUser}
+                />
+                <LimitCell
+                  user={user}
+                  field="maxActiveJobs"
+                  onSave={patchUser}
+                />
+                <LimitCell
+                  user={user}
+                  field="maxConcurrentRuns"
+                  onSave={patchUser}
+                />
                 <td>
-                  <button onClick={() => void patchUser(user.id, { disabled: !user.disabledAt })}>
+                  <button
+                    onClick={() =>
+                      void patchUser(user.id, { disabled: !user.disabledAt })
+                    }
+                  >
                     {user.disabledAt ? "Enable" : "Disable"}
                   </button>
                   <button onClick={() => void deleteUser(user)}>Delete</button>
@@ -1765,20 +1894,27 @@ export function AdminPage() {
         {freshInvite && (
           <p role="alert">
             Copy now — shown once: <code>{freshInvite}</code>{" "}
-            <button onClick={() => void navigator.clipboard.writeText(freshInvite)}>Copy</button>
+            <button
+              onClick={() => void navigator.clipboard.writeText(freshInvite)}
+            >
+              Copy
+            </button>
           </p>
         )}
         <button onClick={() => void mintInvite()}>New invite (14 days)</button>
         <ul>
           {invites.map((invite) => (
             <li key={invite.id}>
-              {invite.id} — expires {new Date(invite.expiresAt).toLocaleDateString()}
+              {invite.id} — expires{" "}
+              {new Date(invite.expiresAt).toLocaleDateString()}
               {invite.usedAt && ` — used`}
               {invite.revokedAt && ` — revoked`}
               {!invite.usedAt && !invite.revokedAt && (
                 <button
                   onClick={() =>
-                    void api(`/api/admin/invites/${invite.id}`, { method: "DELETE" }).then(refresh)
+                    void api(`/api/admin/invites/${invite.id}`, {
+                      method: "DELETE",
+                    }).then(refresh)
                   }
                 >
                   Revoke
@@ -1798,7 +1934,12 @@ export function AdminPage() {
               <input
                 type="number"
                 value={defaults.weeklyTokenBudget}
-                onChange={(e) => setDefaults({ ...defaults, weeklyTokenBudget: Number(e.target.value) })}
+                onChange={(e) =>
+                  setDefaults({
+                    ...defaults,
+                    weeklyTokenBudget: Number(e.target.value),
+                  })
+                }
               />
             </label>
             <label>
@@ -1806,7 +1947,12 @@ export function AdminPage() {
               <input
                 type="number"
                 value={defaults.maxActiveJobs}
-                onChange={(e) => setDefaults({ ...defaults, maxActiveJobs: Number(e.target.value) })}
+                onChange={(e) =>
+                  setDefaults({
+                    ...defaults,
+                    maxActiveJobs: Number(e.target.value),
+                  })
+                }
               />
             </label>
             <label>
@@ -1814,7 +1960,12 @@ export function AdminPage() {
               <input
                 type="number"
                 value={defaults.maxConcurrentRuns}
-                onChange={(e) => setDefaults({ ...defaults, maxConcurrentRuns: Number(e.target.value) })}
+                onChange={(e) =>
+                  setDefaults({
+                    ...defaults,
+                    maxConcurrentRuns: Number(e.target.value),
+                  })
+                }
               />
             </label>
             <button type="submit">Save defaults</button>
@@ -1868,22 +2019,40 @@ import { AdminPage } from "./AdminPage";
 
 describe("AdminPage", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo) => {
-      const url = String(input);
-      let body: unknown = {};
-      if (url.includes("/api/admin/users")) {
-        body = { users: [{
-          id: "u1", username: "owner", role: "admin", createdAt: "2026-07-12T00:00:00Z",
-          disabledAt: null, weeklyTokenBudget: null, maxActiveJobs: null,
-          maxConcurrentRuns: null, weeklyUsage: 12345, activeJobs: 7,
-        }] };
-      } else if (url.includes("/api/admin/invites")) {
-        body = { invites: [] };
-      } else if (url.includes("/api/admin/system/defaults")) {
-        body = { weeklyTokenBudget: 10000000, maxActiveJobs: 2000, maxConcurrentRuns: 2 };
-      }
-      return new Response(JSON.stringify(body), { status: 200 });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo) => {
+        const url = String(input);
+        let body: unknown = {};
+        if (url.includes("/api/admin/users")) {
+          body = {
+            users: [
+              {
+                id: "u1",
+                username: "owner",
+                role: "admin",
+                createdAt: "2026-07-12T00:00:00Z",
+                disabledAt: null,
+                weeklyTokenBudget: null,
+                maxActiveJobs: null,
+                maxConcurrentRuns: null,
+                weeklyUsage: 12345,
+                activeJobs: 7,
+              },
+            ],
+          };
+        } else if (url.includes("/api/admin/invites")) {
+          body = { invites: [] };
+        } else if (url.includes("/api/admin/system/defaults")) {
+          body = {
+            weeklyTokenBudget: 10000000,
+            maxActiveJobs: 2000,
+            maxConcurrentRuns: 2,
+          };
+        }
+        return new Response(JSON.stringify(body), { status: 200 });
+      }),
+    );
   });
 
   it("renders the user table and defaults", async () => {
@@ -1931,10 +2100,12 @@ git commit -m "Adds SPA admin page with contract regeneration"
 ### Task 8: Whole-root import/export under multi-user
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/admin.py` (import handler engine lifecycle; both routes behind `require_admin`)
 - Test: `tests/api/test_admin_root_import_export.py`
 
 **Interfaces:**
+
 - Consumes: Plan 1 `EngineRegistry.close_all`, `ensure_bootstrapped`, `build_context`, `init_system_db`, `make_system_engine`; Task 1's `require_admin`.
 - Produces: the existing `GET /api/admin/export` / `POST /api/admin/import` operate on the **whole** data root (`system.db` + `users/`) in multi-user mode. Export already archives `app.state.data_dir` — it only needs the WAL snapshot special-casing to also cover `system.db` and each workspace DB (check `services/backup.export_data_root`'s `_sqlite_file` handling: it snapshots the DB named by `db_url`; extend it to snapshot **every** `*.db` under the root the same way, which also fixes workspace DBs). Import gains the multi-user engine lifecycle: dispose registry + system engine before the swap, then rebuild system engine → `init_system_db` → `ensure_bootstrapped` → fresh registry + default context after. Both routes require the admin role in multi-user mode.
 
@@ -2037,6 +2208,21 @@ and add `dependencies=[Depends(require_admin_when_multiuser)]` to the router con
                 engine = make_engine(request.app.state.db_url)
                 init_db(engine)
                 request.app.state.engine = engine
+```
+
+Also pass `before_swap=` a callable that disposes the registry AND the system engine (the archived root's DB files are open until then). Check whether `export_data_root` snapshots only the `db_url`-named file; if so, extend it to snapshot every `*.db` under the root (system.db + each workspace DB) via the existing `sqlite_snapshot` helper, keeping non-DB files copied as before.
+
+- [ ] **Step 4: Run tests + full suite**
+
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_admin_root_import_export.py -v` → 3 passed
+Run: `.venv/Scripts/python.exe -m pytest -q && ruff check` → green (legacy import/export tests unaffected via the no-op dependency).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/resume_agent/api/routers/admin.py src/resume_agent/services/backup.py tests/api/test_admin_root_import_export.py
+git commit -m "Rebuilds tenancy engines across whole-root import under multi-user"
+```             request.app.state.engine = engine
 ```
 
 Also pass `before_swap=` a callable that disposes the registry AND the system engine (the archived root's DB files are open until then). Check whether `export_data_root` snapshots only the `db_url`-named file; if so, extend it to snapshot every `*.db` under the root (system.db + each workspace DB) via the existing `sqlite_snapshot` helper, keeping non-DB files copied as before.

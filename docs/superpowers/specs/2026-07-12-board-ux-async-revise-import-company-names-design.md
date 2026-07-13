@@ -55,7 +55,7 @@ green.
     already refuses deletion of progressed jobs; surface that error as a
     toast verbatim. Bulk delete with preview remains the primary path for
     volume.
-- **Pipeline** — the cards/list toggle applies *within* each stage
+- **Pipeline** — the cards/list toggle applies _within_ each stage
   section (list mode renders a `JobTable` per stage). `PipelineCard`
   footers and table rows get **Open posting** + **Archive**. Stage moves
   stay bulk-only; a per-card status picker is the modal's job.
@@ -89,7 +89,7 @@ they are reachable on touch and never shift layout.
   kinds' idempotent-join behavior); revise submits with
   `singleton_key=f"revise:{version_id}"` (cover-letter analog) in raise
   mode. Join semantics are wrong here because a second revise with a
-  *different instruction* would silently discard that instruction. The
+  _different instruction_ would silently discard that instruction. The
   guard is server-side because clients cannot know about runs launched
   before a page reload.
 

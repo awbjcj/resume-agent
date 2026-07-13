@@ -69,11 +69,13 @@ These corrections are normative and override later reference snippets:
 ### Task 1: System tables — InviteCode, ApiToken, UsageEvent, SystemSetting + secret helpers
 
 **Files:**
+
 - Modify: `src/resume_agent/tenancy/system_db.py` (append models)
 - Create: `src/resume_agent/tenancy/secrets.py`
 - Test: `tests/tenancy/test_system_tables.py`
 
 **Interfaces:**
+
 - Produces (models, all on `SystemBase`):
   - `InviteCode`: `id: str` PK, `code_hash: str` unique, `created_by: str`, `created_at`, `expires_at: datetime`, `used_by: str | None`, `used_at: datetime | None`, `revoked_at: datetime | None`.
   - `ApiToken`: `id: str` PK, `user_id: str` indexed, `name: str`, `token_hash: str` unique, `created_at`, `last_used_at: datetime | None`, `revoked_at: datetime | None`.
@@ -253,10 +255,12 @@ git commit -m "Adds invite/token/usage/setting system tables and secret helpers"
 ### Task 2: User-scoped sessions and link tokens (pure crypto in `api/auth.py`)
 
 **Files:**
+
 - Modify: `src/resume_agent/api/auth.py` (add user-scoped functions; keep the legacy single-account functions — legacy apps still use them until Task 5 rewires, and `hash_password`/`verify_password` are reused everywhere)
 - Test: `tests/api/test_user_sessions.py`
 
 **Interfaces:**
+
 - Produces:
   - `issue_user_session(settings, *, user_id: str, password_hash: str, now: float | None = None) -> str` — token `"{user_id}:{expiry}:{sig}"`; `sig = HMAC-SHA256(key=f"{session_secret}:{password_hash[-16:]}", payload=f"{user_id}:{expiry}")`.
   - `parse_session_user_id(token: str) -> str | None` — unverified peek so the caller can load the user row.
@@ -430,10 +434,12 @@ git commit -m "Adds user-scoped stateless sessions and signed link tokens"
 ### Task 3: Failed-attempt rate limiter
 
 **Files:**
+
 - Create: `src/resume_agent/api/rate_limit.py`
 - Test: `tests/api/test_rate_limit.py`
 
 **Interfaces:**
+
 - Produces: `FailedAttemptLimiter(max_failures: int = 10, window_seconds: float = 900.0)` with `blocked(username: str, ip: str, *, now: float | None = None) -> bool`, `record_failure(username, ip, *, now=None) -> None`, `reset(username, ip) -> None`. Instantiated once on `app.state.login_limiter` (Task 4).
 
 - [ ] **Step 1: Write the failing tests**
@@ -543,6 +549,7 @@ git commit -m "Adds failed-attempt rate limiter for login and register"
 ### Task 4: Multi-user auth endpoints — login/logout/me rewrite + register
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/auth.py`
 - Modify: `src/resume_agent/api/schemas/auth.py` (add `RegisterRequest`, extend `MeResponse` with `role: str | None = None`)
 - Modify: `src/resume_agent/api/app.py` (instantiate `app.state.login_limiter = FailedAttemptLimiter()`)
@@ -550,6 +557,7 @@ git commit -m "Adds failed-attempt rate limiter for login and register"
 - Test: `tests/api/test_auth_multiuser.py`
 
 **Interfaces:**
+
 - Consumes: Tasks 1-3, Plan 1's `provision_workspace`, `new_user_id`, `hash_password`/`verify_password`.
 - Produces:
   - `POST /api/auth/register {username, password, inviteCode}` → 200 `MeResponse` (does **not** log in; client proceeds to login) with typed failures `INVITE_INVALID`/`INVITE_EXPIRED`/`INVITE_USED`/`USERNAME_TAKEN`/`RATE_LIMITED`.
@@ -916,6 +924,7 @@ git commit -m "Adds invite-code registration and system.db-backed login"
 ### Task 5: PATs + unified per-request auth resolution
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/account.py` (PAT endpoints; Plan 3 adds password-change/export here)
 - Create: `src/resume_agent/api/schemas/account.py`
 - Modify: `src/resume_agent/api/deps.py` (`get_user_context` becomes the real resolver)
@@ -923,6 +932,7 @@ git commit -m "Adds invite-code registration and system.db-backed login"
 - Test: `tests/api/test_pats.py`, `tests/api/test_tenancy_isolation.py`
 
 **Interfaces:**
+
 - Consumes: Task 2 crypto, Task 4 fixture, Plan 1 `build_context`.
 - Produces:
   - `POST /api/account/tokens {name}` → `{id, name, token}` (raw `rat_…` shown once); `GET /api/account/tokens` → list (no hashes); `DELETE /api/account/tokens/{id}` → revoke.
@@ -1243,12 +1253,14 @@ git commit -m "Adds PATs and per-user request auth resolution"
 ### Task 6: Link-token endpoint + SPA plumbing
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/auth.py` (add `/auth/link-token`)
 - Modify: `src/resume_agent/api/schemas/auth.py` (add `LinkTokenResponse`)
 - Modify: `web/src/lib/api` (add `fetchLinkToken`) and the SSE/download call sites
 - Test: `tests/api/test_link_tokens.py`
 
 **Interfaces:**
+
 - Produces: `POST /api/auth/link-token {purpose: "sse" | "download"}` → `{token, expiresInSeconds}` (guarded route — caller is already authenticated via cookie). The SPA requests a fresh link token immediately before opening an `EventSource` or building a download `href`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1330,7 +1342,9 @@ First locate current static-token usage: run `grep -rn "token=" web/src` and `gr
 
 ```typescript
 // web/src/lib/api/linkToken.ts
-export async function fetchLinkToken(purpose: "sse" | "download"): Promise<string> {
+export async function fetchLinkToken(
+  purpose: "sse" | "download",
+): Promise<string> {
   const response = await fetch("/api/auth/link-token", {
     method: "POST",
     credentials: "include",
@@ -1347,7 +1361,9 @@ At each `EventSource` construction found by the grep, fetch a token first:
 
 ```typescript
 const token = await fetchLinkToken("sse");
-const source = new EventSource(`/api/runs/${runId}/events?token=${encodeURIComponent(token)}`);
+const source = new EventSource(
+  `/api/runs/${runId}/events?token=${encodeURIComponent(token)}`,
+);
 ```
 
 At each download `href` builder, do the same with `"download"` — since minting is async, convert static `href`s into click handlers that fetch the token then set `window.location`. Run the web tests (`cd web && npx vitest run`) and fix any mocked-fetch expectations the change breaks.
@@ -1369,12 +1385,14 @@ git commit -m "Adds short-lived link tokens for SSE and downloads"
 ### Task 7: Usage recording at the acall leaf
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/usage.py`
 - Modify: `src/resume_agent/llm_runner.py:300-314` (`acall`)
 - Modify: `src/resume_agent/api/app.py` + `src/resume_agent/tenancy/local.py` (configure the recorder)
 - Test: `tests/tenancy/test_usage.py`
 
 **Interfaces:**
+
 - Produces:
   - `usage.configure(engine: Engine | None) -> None` (module-level; app lifespan and CLI local-context activation call it; tests call `configure(None)` to reset).
   - `usage.record_call(agent, response) -> None` — extracts model/metrics defensively, computes `weighted_total`, determines `own_key`, appends a `UsageEvent`. **Never raises**; no-ops without a configured engine or active context.
@@ -1597,6 +1615,7 @@ Integrate in `llm_runner.acall` (line ~309):
 ```
 
 Configure at both server and CLI set-points:
+
 - `app.py` lifespan multi-user branch: `from resume_agent.tenancy import usage` → `usage.configure(system_engine)`; legacy branch: `usage.configure(None)`.
 - `tenancy/local.py` `activate_local_context`: after resolving a multi-user context, `usage.configure(make_system_engine(root))` — construct one engine and keep it (module-lifetime is fine for a CLI process).
 
@@ -1617,11 +1636,13 @@ git commit -m "Records per-user LLM usage at the acall leaf"
 ### Task 8: Budget enforcement at phase entrypoints
 
 **Files:**
+
 - Create: `src/resume_agent/tenancy/limits.py`
 - Modify: the LLM-phase service entrypoints (locate with `grep -n "^def " src/resume_agent/services/discovery.py src/resume_agent/services/tailoring.py src/resume_agent/services/cover_letters.py src/resume_agent/services/profile_build.py` — add the two-line guard to each public function that fans out LLM calls: discovery extract/score, `tailor`, `write_cover_letters`, `run_corpus_build`)
 - Test: `tests/tenancy/test_limits.py`
 
 **Interfaces:**
+
 - Produces:
   - Constants: `DEFAULT_WEEKLY_TOKEN_BUDGET = 10_000_000`, `DEFAULT_MAX_ACTIVE_JOBS = 2000`, `DEFAULT_MAX_CONCURRENT_RUNS = 2`.
   - `class BudgetExceededError(RuntimeError)` with `.code = "BUDGET_EXCEEDED"`.
@@ -1846,6 +1867,7 @@ git commit -m "Enforces weekly token budgets at LLM phase entrypoints"
 ### Task 9: Quotas — concurrent runs and active-job cap + contract regen
 
 **Files:**
+
 - Modify: `src/resume_agent/api/runs/manager.py` (`create`/`submit` gain `user_id` + cap), `src/resume_agent/api/runs/models.py` (snapshot carries `user_id`)
 - Modify: `src/resume_agent/api/routers/runs.py` (pass `user_id`/cap from context; 429 mapping; per-user filtering of list/get)
 - Modify: `src/resume_agent/discovery/ingest.py` (job-cap gate in the `IngestCounts` loop)
@@ -1853,6 +1875,7 @@ git commit -m "Enforces weekly token budgets at LLM phase entrypoints"
 - Test: `tests/api/test_run_quota.py`, `tests/test_ingest_job_cap.py`
 
 **Interfaces:**
+
 - Produces:
   - `class RunQuotaError(RuntimeError)` in `manager.py`; `RunManager.create(kind, user_id: str | None = None)` writes `user_id` into the record; `RunManager.submit(kind, fn, *, singleton_key=None, user_id=None, max_concurrent: int | None = None)` counts the user's ACTIVE runs and raises `RunQuotaError` at the cap; `RunManager.list_active(user_id: str | None = None)` filters.
   - Runs router: submissions pass `user_id=ctx.user_id` and `max_concurrent=resolve_limit(user.max_concurrent_runs, system_default(..., DEFAULT_MAX_CONCURRENT_RUNS))`; `RunQuotaError` → `ApiException(429, "QUOTA_EXCEEDED", …)`; `GET /api/runs` and `GET /api/runs/{id}` scope to the caller's `user_id` in multi-user mode (a foreign run 404s).
@@ -2034,6 +2057,25 @@ Run: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -v` 
 
 Append to CLAUDE.md's tenancy section:
 
+```markdown
+Budgets and quotas: usage is recorded in `llm_runner.acall` (best-effort,
+never breaks the call); budgets are enforced per phase via
+`tenancy/limits.enforce_active_budget()` (admins and own-key exempt);
+`RunManager.submit` caps per-user concurrent runs (429 QUOTA_EXCEEDED);
+the ingest loop caps non-archived jobs per workspace (inserts skip,
+upgrades apply). NULL limit = system default, 0 = unlimited.
+```
+
+- [ ] **Step 6: Run the full suite**
+
+Run: `.venv/Scripts/python.exe -m pytest -q && ruff check`
+Expected: green
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/resume_agent/api/runs src/resume_agent/api/routers/runs.py src/resume_agent/discovery/ingest.py contracts CLAUDE.md tests/api/test_run_quota.py tests/test_ingest_job_cap.py
+git commit -m "Adds per-user run and job quotas with 429 surfacing"
 ```markdown
 Budgets and quotas: usage is recorded in `llm_runner.acall` (best-effort,
 never breaks the call); budgets are enforced per phase via
