@@ -44,7 +44,6 @@ from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.rate_limit import FailedAttemptLimiter
 from resume_agent.config import Settings, get_settings
 from resume_agent.db import init_db, make_engine
-from resume_agent.progress import RUNS_ROOT
 from resume_agent.services.config_store import YamlConfigStore
 from resume_agent.services.profile_documents import DocumentStore
 from resume_agent.tenancy.bootstrap import build_context, ensure_bootstrapped
@@ -146,7 +145,12 @@ def create_app(
         app.state.data_dir / "profile" / "documents"
     )
     app.state.login_limiter = FailedAttemptLimiter()
-    manager_root = runs_root if runs_root is not None else RUNS_ROOT
+    # Falls back to a path under data_dir (not the separate RUNS_ROOT constant) so
+    # that overriding data_dir — as most tests do to avoid touching the real repo —
+    # also isolates the run manager; otherwise runs launched with no active
+    # per-request UserContext (e.g. in-memory-db tests) write into the real
+    # project's data/runs regardless of data_dir.
+    manager_root = runs_root if runs_root is not None else (app.state.data_dir / "runs")
     # The in-memory test adapter uses one StaticPool connection shared by every
     # thread, so concurrent sessions cannot safely transact on it. File-backed
     # SQLite and production databases retain the configured suggestion width.
