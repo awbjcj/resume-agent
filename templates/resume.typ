@@ -185,14 +185,10 @@
     [
       #section-title("Projects")
       #for p in xs [
-        #grid(
-          columns: (1fr, auto),
-          [*#p.name*#if p.at("description", default: none) != none [ — #p.description]],
-          align(right)[
-            #let tech = p.at("tech", default: ())
-            #if tech.len() > 0 [*#tech.join("  |  ")*]
-          ],
-        )
+        #let tech = p.at("tech", default: ())
+        *#p.name* \
+        #if tech.len() > 0 [*#tech.join("  |  ")* \ ]
+        #if p.at("description", default: none) != none [#p.description \ ]
         #for b in p.at("bullets", default: ()) [ - #highlight(b.text, tech-keywords) ]
         #v(0.2em)
       ]
