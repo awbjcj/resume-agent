@@ -42,6 +42,30 @@ DETAIL = {
 }
 
 
+def test_default_facets_dir_falls_back_without_context():
+    assert workday.default_facets_dir() == workday._FACETS_DIR
+
+
+def test_default_facets_dir_resolves_per_tenant_workspace(tmp_path):
+    from resume_agent.config import Settings
+    from resume_agent.tenancy.context import UserContext, use_context
+    from resume_agent.tenancy.workspace import WorkspacePaths
+
+    root = tmp_path / "users" / "abc123def456"
+    context = UserContext(
+        user_id="abc123def456",
+        username="alice",
+        role="user",
+        paths=WorkspacePaths(root),
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        engine=None,
+        system_engine=None,
+        own_key_providers=frozenset(),
+    )
+    with use_context(context):
+        assert workday.default_facets_dir() == root / "workday_facets"
+
+
 def test_cxs_jobs_url_is_built_from_triple():
     assert cxs_jobs_url(TARGET) == "https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/Careers/jobs"
 

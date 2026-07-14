@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from resume_agent.api.auth import hash_password
-from resume_agent.api.runs.manager import RunManager, RunQuotaError
+from resume_agent.api.runs.manager import RunManager, RunQuotaError, RunResetConflict
 from resume_agent.config import Settings
 from resume_agent.tenancy.context import UserContext, new_user_id, use_context
 from resume_agent.tenancy.system_db import User
@@ -85,6 +85,49 @@ def test_direct_submissions_inherit_active_context_quota(tmp_path, monkeypatch):
         with pytest.raises(RunQuotaError):
             manager.submit("profile-build", blocker)
     release.set()
+    manager.shutdown()
+
+
+def test_reset_guard_refuses_when_owner_has_active_runs(tmp_path):
+    manager = RunManager(root=tmp_path, executor=ThreadPoolExecutor(max_workers=2))
+    release = threading.Event()
+
+    def blocker(_reporter):
+        release.wait(timeout=5)
+        return {}
+
+    manager.submit("pull", blocker, user_id="u1")
+    with pytest.raises(RunResetConflict):
+        with manager.reset_guard("u1"):
+            pass
+    release.set()
+    manager.shutdown()
+
+
+def test_reset_guard_reserves_owner_and_blocks_racing_submit(tmp_path):
+    manager = RunManager(root=tmp_path, executor=ThreadPoolExecutor(max_workers=2))
+
+    # The barrier reserves the owner: a run submitted for that owner mid-reset
+    # (the TOCTOU window) is refused, while other owners are unaffected.
+    with manager.reset_guard("u1"):
+        with pytest.raises(RunResetConflict):
+            manager.submit("pull", lambda _r: {}, user_id="u1")
+        assert manager.submit("pull", lambda _r: {}, user_id="u2")
+
+    # Once the barrier exits, the owner can submit again.
+    assert manager.submit("pull", lambda _r: {}, user_id="u1")
+    manager.shutdown()
+
+
+def test_reset_guard_is_reentrant_free_after_conflict(tmp_path):
+    manager = RunManager(root=tmp_path, executor=ThreadPoolExecutor(max_workers=1))
+    with manager.reset_guard("u1"):
+        with pytest.raises(RunResetConflict):
+            with manager.reset_guard("u1"):
+                pass
+    # The failed nested attempt must not have cleared the still-open outer
+    # reservation prematurely; after the outer exits the owner is free.
+    assert manager.submit("pull", lambda _r: {}, user_id="u1")
     manager.shutdown()
 
 
