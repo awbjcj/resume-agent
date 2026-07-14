@@ -60,8 +60,9 @@ legacy flat layout.
 Rules:
 
 - Table order is children-first, extending the `delete_job_row` cascade order
-  (`CoverLetter`, `Application`, `ResumeVersion`, then job-adjacent tables,
-  then `jobs`). All deletes commit in **one** transaction.
+  (`notifications`, `applications`, `cover_letters`, `resume_versions`, and
+  other job-adjacent tables before `jobs`). All deletes commit in **one**
+  transaction.
 - A DB-phase exception explicitly rolls back the session before it propagates;
   no file operation starts unless the commit succeeds.
 - Directories are cleared-and-recreated: contents removed, the empty

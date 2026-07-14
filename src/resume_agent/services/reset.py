@@ -220,10 +220,10 @@ def _clear_directory(directory: Path, failures: dict[str, str]) -> bool:
                 return False
             for child in children:
                 try:
-                    if child.is_dir() and not child.is_symlink():
-                        shutil.rmtree(child)
-                    else:
+                    if child.is_symlink() or not child.is_dir():
                         child.unlink()
+                    else:
+                        shutil.rmtree(child)
                 except OSError as error:
                     failures[str(child)] = str(error)
                     succeeded = False

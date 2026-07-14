@@ -2,19 +2,19 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { toast } from "sonner";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "@/test/server";
 import { DangerZoneCard } from "./DangerZoneCard";
 
-async function openConfirmedDialog() {
-  const user = userEvent.setup();
+async function openConfirmedDialog(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Reset data" }));
   await user.type(screen.getByLabelText(/type reset/i), "RESET");
-  return user;
 }
 
 describe("DangerZoneCard", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("gates reset and disarms confirmation when the dialog is dismissed", async () => {
     const user = userEvent.setup();
     render(<DangerZoneCard />);
@@ -58,7 +58,7 @@ describe("DangerZoneCard", () => {
     const user = userEvent.setup();
     render(<DangerZoneCard reloadPage={reload} />);
     await user.click(screen.getByRole("button", { name: /everything/i }));
-    await openConfirmedDialog();
+    await openConfirmedDialog(user);
 
     await user.click(screen.getByRole("button", { name: "Erase selected data" }));
 
@@ -80,7 +80,9 @@ describe("DangerZoneCard", () => {
         }),
       ),
     );
-    const user = await openConfirmedDialogAfterRender(reload);
+    const user = userEvent.setup();
+    render(<DangerZoneCard reloadPage={reload} />);
+    await openConfirmedDialog(user);
 
     await user.click(screen.getByRole("button", { name: "Erase selected data" }));
 
@@ -89,9 +91,38 @@ describe("DangerZoneCard", () => {
     expect(screen.getByLabelText(/type reset/i)).toHaveValue("RESET");
     expect(screen.getByRole("button", { name: "Erase selected data" })).toBeEnabled();
   });
-});
 
-async function openConfirmedDialogAfterRender(reloadPage: () => void) {
-  render(<DangerZoneCard reloadPage={reloadPage} />);
-  return openConfirmedDialog();
-}
+  it("cannot dismiss the dialog while reset is in flight", async () => {
+    let finishRequest: (() => void) | undefined;
+    server.use(
+      http.post("*/api/account/reset", async () => {
+        await new Promise<void>((resolve) => {
+          finishRequest = resolve;
+        });
+        return HttpResponse.json({
+          scope: "jobs",
+          rowsDeleted: { jobs: 1 },
+          areasCleared: [],
+          failures: { "output/locked.pdf": "locked" },
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<DangerZoneCard reloadPage={vi.fn()} />);
+    await openConfirmedDialog(user);
+    await user.click(screen.getByRole("button", { name: "Erase selected data" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /erase selected data/i })).toBeDisabled(),
+    );
+
+    await user.keyboard("{Escape}");
+
+    expect(
+      screen.getByRole("alertdialog", { name: /reset jobs/i }),
+    ).toBeInTheDocument();
+    finishRequest?.();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Erase selected data" })).toBeEnabled(),
+    );
+  });
+});

@@ -1,10 +1,9 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Download, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -68,6 +67,7 @@ export function DangerZoneCard({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [resetting, setResetting] = useState(false);
+  const resettingRef = useRef(false);
   const selected = SCOPES.find((option) => option.value === scope) ?? SCOPES[0];
 
   function selectScope(values: string[]) {
@@ -77,7 +77,11 @@ export function DangerZoneCard({
     setConfirmText("");
   }
 
-  function setOpen(open: boolean) {
+  function setOpen(open: boolean, eventDetails: { cancel(): void }) {
+    if (!open && resettingRef.current) {
+      eventDetails.cancel();
+      return;
+    }
     setDialogOpen(open);
     if (!open) {
       setConfirmText("");
@@ -87,6 +91,7 @@ export function DangerZoneCard({
 
   async function runReset() {
     if (confirmText !== "RESET" || resetting) return;
+    resettingRef.current = true;
     setResetting(true);
     try {
       const report = await unwrap(
@@ -100,12 +105,14 @@ export function DangerZoneCard({
         toast.warning(
           `Reset finished with ${failureCount} file(s) left behind; run it again to finish.`,
         );
+        resettingRef.current = false;
         setResetting(false);
         return;
       }
       reloadPage();
     } catch (error) {
       toast.error((error as Error).message);
+      resettingRef.current = false;
       setResetting(false);
     }
   }
@@ -184,17 +191,14 @@ export function DangerZoneCard({
             </FieldGroup>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={resetting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
+              <Button
                 variant="destructive"
                 disabled={confirmText !== "RESET" || resetting}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void runReset();
-                }}
+                onClick={() => void runReset()}
               >
                 {resetting ? <Spinner data-icon="inline-start" /> : null}
                 Erase selected data
-              </AlertDialogAction>
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
