@@ -18,8 +18,9 @@ import contextvars
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -60,6 +61,17 @@ class RunSingletonConflict(RuntimeError):
     def __init__(self, run_id: str):
         super().__init__("A run is already active for this item")
         self.run_id = run_id
+
+
+class RunResetConflict(RuntimeError):
+    """A destructive workspace reset cannot proceed because runs are live.
+
+    Raised either when the owner already has active runs, or when a reset for
+    the same owner is already underway. Reusing ``RUNS_ACTIVE`` keeps the
+    existing API contract for the caller.
+    """
+
+    code = "RUNS_ACTIVE"
 
 
 class RunProgressReporter(ProgressReporter):
@@ -164,6 +176,10 @@ class RunManager:
         # under the GIL add/discard/contains are atomic, and a missed read just
         # defers the stop to the next checkpoint.
         self._cancel_requested: set[str] = set()
+        # Owners whose workspace is mid-reset. Guarded by ``_singleton_lock`` so
+        # the reset barrier's check-and-reserve and ``submit``'s admission
+        # decision are one atomic step, closing the reset/submit race.
+        self._reset_in_progress: set[str | None] = set()
         self._futures: dict[str, Future] = {}
         self._singleton_lock = threading.RLock()
         self._active_singletons: dict[str, str] = {}
@@ -279,6 +295,8 @@ class RunManager:
         with self._singleton_lock:
             ctx = current_context()
             owner_id = user_id or (ctx.user_id if ctx is not None else None)
+            if owner_id in self._reset_in_progress:
+                raise RunResetConflict("a workspace reset is in progress")
             if max_concurrent is None and ctx is not None and owner_id == ctx.user_id:
                 from resume_agent.tenancy.limits import (
                     DEFAULT_MAX_CONCURRENT_RUNS,
@@ -368,6 +386,30 @@ class RunManager:
 
             future.add_done_callback(release)
         return run_id
+
+    @contextmanager
+    def reset_guard(self, user_id: str | None) -> Iterator[None]:
+        """Reserve ``user_id``'s workspace for a destructive reset.
+
+        The active-runs check and the reservation happen under one hold of
+        ``_singleton_lock``, and ``submit`` refuses reserved owners under the
+        same lock, so no run can slip between the check and the truncate.
+        ``list_active`` reads run files, but the lock is reentrant and reset is
+        rare, so briefly holding it here does not deadlock or stall the common
+        path. Raises :class:`RunResetConflict` if runs are live or a reset for
+        the same owner is already underway.
+        """
+        with self._singleton_lock:
+            if self.list_active(user_id=user_id):
+                raise RunResetConflict("runs are active")
+            if user_id in self._reset_in_progress:
+                raise RunResetConflict("a workspace reset is in progress")
+            self._reset_in_progress.add(user_id)
+        try:
+            yield
+        finally:
+            with self._singleton_lock:
+                self._reset_in_progress.discard(user_id)
 
     def _root_for(self, run_id: str) -> Path:
         with self._singleton_lock:

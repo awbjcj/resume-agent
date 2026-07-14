@@ -18,6 +18,7 @@ from starlette.background import BackgroundTask
 from resume_agent.api import auth
 from resume_agent.api.deps import get_session, get_settings_dep
 from resume_agent.api.errors import ApiException
+from resume_agent.api.runs.manager import RunResetConflict
 from resume_agent.api.uploads import UploadTooLargeError, copy_upload
 from resume_agent.api.schemas.account import (
     AccountUsage,
@@ -168,8 +169,6 @@ def reset_data(
         )
     context = current_context()
     user_id = context.user_id if context is not None else None
-    if request.app.state.run_manager.list_active(user_id=user_id):
-        raise ApiException(409, "RUNS_ACTIVE", "Refusing while your runs are active")
     paths = (
         ResetPaths.from_workspace(context.paths)
         if context is not None
@@ -179,7 +178,15 @@ def reset_data(
             runs_dir=request.app.state.run_manager.root,
         )
     )
-    report = reset_workspace(session, paths, ResetScope(body.scope))
+    # The reset barrier makes the active-runs check and the truncate atomic: no
+    # run can be submitted for this owner between the two.
+    try:
+        with request.app.state.run_manager.reset_guard(user_id):
+            report = reset_workspace(session, paths, ResetScope(body.scope))
+    except RunResetConflict as exc:
+        raise ApiException(
+            409, "RUNS_ACTIVE", "Refusing while your runs are active"
+        ) from exc
     return ResetReportOut(
         scope=report.scope.value,
         rows_deleted=report.rows_deleted,
