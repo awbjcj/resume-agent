@@ -88,10 +88,12 @@ def enforce_active_budget(*, now: datetime | None = None) -> None:
 
 
 def active_limit(key: str, fallback: int) -> int | None:
-    """Resolve a current user's optional override over a system default."""
+    """Resolve the active user's limit, with administrators always unlimited."""
     context = current_context()
     if context is None or context.system_engine is None:
         return None
+    if context.is_admin:
+        return 0
     with Session(context.system_engine) as session:
         user = session.get(User, context.user_id)
         override = getattr(user, key, None) if user is not None else None

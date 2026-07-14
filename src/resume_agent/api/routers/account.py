@@ -270,9 +270,13 @@ def account_usage(request: Request) -> AccountUsage:
                 UsageEvent.ts >= cutoff,
             )
         ).scalar_one()
-    budget = resolve_limit(
-        user.weekly_token_budget if user is not None else None,
-        system_default(engine, "weekly_token_budget", DEFAULT_WEEKLY_TOKEN_BUDGET),
+    budget = (
+        0
+        if context.is_admin
+        else resolve_limit(
+            user.weekly_token_budget if user is not None else None,
+            system_default(engine, "weekly_token_budget", DEFAULT_WEEKLY_TOKEN_BUDGET),
+        )
     )
     return AccountUsage(
         weighted_total=weekly_usage(engine, context.user_id),

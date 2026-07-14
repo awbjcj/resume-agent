@@ -10,7 +10,10 @@ from resume_agent.llm_runner import AgentRunner
 from resume_agent.tenancy.context import UserContext, use_context
 from resume_agent.tenancy.limits import (
     BudgetExceededError,
+    DEFAULT_MAX_ACTIVE_JOBS,
+    DEFAULT_MAX_CONCURRENT_RUNS,
     DEFAULT_WEEKLY_TOKEN_BUDGET,
+    active_limit,
     enforce_active_budget,
     enforce_budget,
     weekly_usage,
@@ -147,3 +150,26 @@ def test_budget_window_exemptions_and_active_guard(tmp_path):
 
 def test_default_budget_constant_is_shipped_value():
     assert DEFAULT_WEEKLY_TOKEN_BUDGET == 10_000_000
+
+
+def test_admin_active_job_and_concurrency_limits_are_unlimited(tmp_path):
+    engine = make_system_engine(tmp_path)
+    init_system_db(engine)
+    with Session(engine) as session:
+        session.add(
+            User(
+                id="abc123def456",
+                username="alice",
+                password_hash="hash",
+                role="admin",
+                max_active_jobs=1,
+                max_concurrent_runs=1,
+            )
+        )
+        session.commit()
+
+    with use_context(_context(tmp_path, engine, role="admin")):
+        assert active_limit("max_active_jobs", DEFAULT_MAX_ACTIVE_JOBS) == 0
+        assert active_limit("max_concurrent_runs", DEFAULT_MAX_CONCURRENT_RUNS) == 0
+
+    engine.dispose()

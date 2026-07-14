@@ -140,21 +140,8 @@ def _scope_targets(paths: ResetPaths, scope: ResetScope) -> tuple[_ResetTarget, 
     return jobs + profile + caches
 
 
-def scope_areas(scope: ResetScope) -> tuple[str, ...]:
-    if scope is ResetScope.jobs:
-        return ("output", "runs", "progress", "connector_runs")
-    if scope is ResetScope.profile:
-        return ("profile", "taxonomy")
-    return (
-        "output",
-        "runs",
-        "progress",
-        "connector_runs",
-        "profile",
-        "taxonomy",
-        "scraper_recipes",
-        "workday_facets",
-    )
+def scope_areas(paths: ResetPaths, scope: ResetScope) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(target.area for target in _scope_targets(paths, scope)))
 
 
 def scope_paths(paths: ResetPaths, scope: ResetScope) -> tuple[Path, ...]:
@@ -192,7 +179,7 @@ def reset_workspace(
         )
         area_success[target.area] = area_success.get(target.area, True) and succeeded
     report.areas_cleared = [
-        area for area in scope_areas(scope) if area_success.get(area, False)
+        area for area in scope_areas(paths, scope) if area_success.get(area, False)
     ]
     return report
 

@@ -127,7 +127,9 @@ def test_delete_restores_user_and_workspace_when_cleanup_fails(
 
 def test_account_password_usage_and_export(mu_app, mu_client):
     assert _login(mu_client).status_code == 200
-    assert mu_client.get("/api/account/usage").json()["weightedTotal"] == 0
+    usage = mu_client.get("/api/account/usage").json()
+    assert usage["weightedTotal"] == 0
+    assert usage["budget"] == 0
     exported = mu_client.get("/api/account/export")
     assert exported.status_code == 200
     assert exported.headers["content-type"] == "application/gzip"
@@ -220,26 +222,39 @@ def test_whole_root_export_is_admin_only_and_snapshots_all_databases(mu_app, mu_
 
 
 def test_active_job_limit_applies_to_manual_ingest(mu_app, mu_client):
+    alice_id = _add_user(mu_app)
     assert _login(mu_client).status_code == 200
-    owner_id = mu_app.state.default_context.user_id
     assert (
         mu_client.patch(
-            f"/api/admin/users/{owner_id}", json={"maxActiveJobs": 1}
+            f"/api/admin/users/{alice_id}", json={"maxActiveJobs": 1}
         ).status_code
         == 200
     )
+    assert _login(mu_client, "alice", "alice-password").status_code == 200
     assert mu_client.post("/api/jobs", json={"jdText": "first role"}).status_code == 201
     blocked = mu_client.post("/api/jobs", json={"jdText": "second role"})
     assert blocked.status_code == 429
     assert blocked.json()["error"]["code"] == "QUOTA_EXCEEDED"
 
 
-def test_active_job_limit_applies_to_file_import(mu_app, mu_client):
+def test_active_job_limit_does_not_apply_to_admin(mu_app, mu_client):
     assert _login(mu_client).status_code == 200
     owner_id = mu_app.state.default_context.user_id
     assert mu_client.patch(
         f"/api/admin/users/{owner_id}", json={"maxActiveJobs": 1}
     ).status_code == 200
+
+    assert mu_client.post("/api/jobs", json={"jdText": "first admin role"}).status_code == 201
+    assert mu_client.post("/api/jobs", json={"jdText": "second admin role"}).status_code == 201
+
+
+def test_active_job_limit_applies_to_file_import(mu_app, mu_client):
+    alice_id = _add_user(mu_app)
+    assert _login(mu_client).status_code == 200
+    assert mu_client.patch(
+        f"/api/admin/users/{alice_id}", json={"maxActiveJobs": 1}
+    ).status_code == 200
+    assert _login(mu_client, "alice", "alice-password").status_code == 200
     assert mu_client.post("/api/jobs", json={"jdText": "existing role"}).status_code == 201
 
     imported = mu_client.post(
