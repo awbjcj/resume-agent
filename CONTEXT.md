@@ -228,6 +228,15 @@ secret material.
 _Avoid_: self-export (names the actor, not the unit), backup (a backup is the
 Data root), partial export (it is complete for its Workspace)
 
+**Workspace reset**:
+The user-initiated destructive clear of a Workspace's accumulated data, in
+tiered scopes — the job pipeline, the profile corpus, or everything. Always
+preserves mutable config, Operational secrets, and hand-authored corrections:
+machine-derived artifacts die, hand-authored ones survive. Distinct from
+Workspace import (replace with an archive), prune (policy-driven archiving),
+and admin user deletion (the account itself).
+_Avoid_: factory reset (config and secrets survive), wipe, clear-all
+
 **UserContext**:
 The binding of one authenticated user to their Workspace and effective
 settings for the duration of exactly one request, background run, or CLI

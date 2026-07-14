@@ -33,7 +33,7 @@
 - Consumes: `resume_agent.tracking.tables` models (`Job`, `ResumeVersion`, `Application`, `CoverLetter`, `Notification`, `SkillSuggestion`); `resume_agent.tenancy.paths.resolve_tenant_path`.
 - Produces (used by Tasks 2 and 3):
   - `class ResetScope(str, Enum)` with values `jobs`, `profile`, `all`
-  - `@dataclass(frozen=True) ResetPaths` with fields `output_dir, runs_dir, progress_dir, profile_dir, taxonomy_file, scraper_recipes_dir, workday_facets_dir` (all `Path`) and classmethod `ResetPaths.resolve() -> ResetPaths`
+  - `@dataclass(frozen=True) ResetPaths` with fields `output_dir, runs_dir, progress_dir, profile_dir, taxonomy_file, scraper_recipes_dir, workday_facets_dir, connector_runs_file` (all `Path`) and classmethod `ResetPaths.resolve() -> ResetPaths`
   - `@dataclass ResetReport` with `scope: ResetScope`, `rows_deleted: dict[str, int]`, `areas_cleared: list[str]`, `failures: dict[str, str]`
   - `reset_workspace(session, paths: ResetPaths, scope: ResetScope) -> ResetReport`
   - `count_rows(session, scope: ResetScope) -> dict[str, int]`
@@ -79,6 +79,7 @@ def paths(tmp_path):
         taxonomy_file=root / "taxonomy" / "skill_groups.json",
         scraper_recipes_dir=root / "scraper_recipes",
         workday_facets_dir=root / "workday_facets",
+        connector_runs_file=root / "connector_runs.json",
     )
     for directory in (
         built.output_dir,
@@ -135,7 +136,10 @@ def _seed_files(paths: ResetPaths) -> None:
     (paths.output_dir / "acme" / "resume.pdf").write_bytes(b"%PDF")
     (paths.runs_dir / "run.json").write_text("{}", encoding="utf-8")
     (paths.progress_dir / "pull.json").write_text("{}", encoding="utf-8")
+    paths.connector_runs_file.write_text("{}", encoding="utf-8")
     (paths.profile_dir / "facts.json").write_text("{}", encoding="utf-8")
+    (paths.profile_dir / "cluster_map.json").write_text("{}", encoding="utf-8")
+    (paths.profile_dir / "overrides.yaml").write_text("ban: []\n", encoding="utf-8")
     (paths.profile_dir / "sources" / "resume.pdf").write_bytes(b"%PDF")
     (paths.profile_dir / "fragments" / "resume.json").write_text("{}", encoding="utf-8")
     (paths.profile_dir / "documents" / "manifest.json").write_text("[]", encoding="utf-8")
@@ -161,6 +165,7 @@ def test_jobs_scope_truncates_pipeline_and_clears_output(session, paths):
     assert session.exec(select(Job)).first() is None
     assert list(paths.output_dir.iterdir()) == []
     assert list(paths.runs_dir.iterdir()) == []
+    assert not paths.connector_runs_file.exists()
     assert (paths.profile_dir / "facts.json").exists()  # profile untouched
     assert paths.taxonomy_file.exists()
 
@@ -169,11 +174,15 @@ def test_profile_scope_clears_corpus_and_derived_rows_only(session, paths):
     _seed_pipeline(session)
     _seed_files(paths)
     report = reset_workspace(session, paths, ResetScope.profile)
-    assert report.rows_deleted == {"notifications": 1, "skill_suggestions": 1}
+    assert report.rows_deleted == {"skill_suggestions": 1}
     assert report.areas_cleared == ["profile"]
     assert session.exec(select(Job)).first() is not None  # pipeline survives
     assert session.exec(select(Application)).first() is not None
+    assert session.exec(select(Notification)).first() is not None
     assert not (paths.profile_dir / "facts.json").exists()
+    assert not (paths.profile_dir / "cluster_map.json").exists()
+    assert (paths.profile_dir / "overrides.yaml").exists()  # hand-authored: kept
+    assert paths.connector_runs_file.exists()  # pipeline telemetry: kept
     assert not paths.taxonomy_file.exists()
     for name in ("sources", "fragments", "documents"):
         sub = paths.profile_dir / name
@@ -197,6 +206,7 @@ def test_all_scope_clears_everything_but_config_and_secrets(session, paths):
     root = paths.output_dir.parent
     assert (root / "config" / "search.yaml").read_text(encoding="utf-8") == "titles: []\n"
     assert (root / "secrets.env").exists()
+    assert (paths.profile_dir / "overrides.yaml").exists()
     assert list(paths.scraper_recipes_dir.iterdir()) == []
     assert list(paths.workday_facets_dir.iterdir()) == []
 
@@ -233,6 +243,7 @@ def test_missing_directories_are_recreated_empty(session, tmp_path):
         taxonomy_file=root / "taxonomy" / "skill_groups.json",
         scraper_recipes_dir=root / "scraper_recipes",
         workday_facets_dir=root / "workday_facets",
+        connector_runs_file=root / "connector_runs.json",
     )
     report = reset_workspace(session, built, ResetScope.all)
     assert report.failures == {}
@@ -253,12 +264,13 @@ Create `src/resume_agent/services/reset.py`:
 """Workspace reset use-case: truncate pipeline tables + clear derived files.
 
 Scopes (spec: docs/superpowers/specs/2026-07-13-data-reset-design.md):
-- jobs:    all six workspace tables + output/, runs/, progress/
+- jobs:    all six workspace tables + output/, runs/, progress/, connector_runs.json
 - profile: profile corpus files + derived notification/suggestion rows
 - all:     both + scraper_recipes/, workday_facets/
-config/ and secrets.env are never touched. DB deletes commit first; file
-failures are collected on the report (never raised) so a re-run finishes
-the cleanup.
+config/, secrets.env, and profile/overrides.yaml are never touched; the
+profile clear is an enumerated delete, so unlisted files survive. DB deletes
+commit first; file failures are collected on the report (never raised) so a
+re-run finishes the cleanup.
 """
 
 from __future__ import annotations
@@ -299,10 +311,14 @@ _PIPELINE_TABLES = (
     SkillSuggestion,
     Job,
 )
-# Derived from the profile; stale after a profile wipe.
-_PROFILE_TABLES = (Notification, SkillSuggestion)
+# Match-gap advice derived from the profile; stale after a profile wipe.
+# Notification is NOT here: notifications hang off applications (pipeline data).
+_PROFILE_TABLES = (SkillSuggestion,)
 
 _PROFILE_SUBDIRS = ("sources", "fragments", "documents")
+# Enumerated delete: overrides.yaml (hand-authored corrections) and any
+# unlisted future file survive a profile reset by default.
+_PROFILE_FILES = ("facts.json", "matrix.json", "sources.json", "cluster_map.json")
 
 
 @dataclass(frozen=True)
@@ -314,6 +330,7 @@ class ResetPaths:
     taxonomy_file: Path
     scraper_recipes_dir: Path
     workday_facets_dir: Path
+    connector_runs_file: Path
 
     @classmethod
     def resolve(cls) -> "ResetPaths":
@@ -326,6 +343,7 @@ class ResetPaths:
             taxonomy_file=resolve_tenant_path("data/taxonomy/skill_groups.json"),
             scraper_recipes_dir=resolve_tenant_path("data/scraper_recipes"),
             workday_facets_dir=resolve_tenant_path("data/workday_facets"),
+            connector_runs_file=resolve_tenant_path("data/connector_runs.json"),
         )
 
 
@@ -374,17 +392,27 @@ def reset_workspace(
     }
     for area in scope_areas(scope):
         if area == "profile":
-            _clear_directory(paths.profile_dir, report.failures)
             for name in _PROFILE_SUBDIRS:
-                (paths.profile_dir / name).mkdir(parents=True, exist_ok=True)
-            try:
-                paths.taxonomy_file.unlink(missing_ok=True)
-            except OSError as error:
-                report.failures[str(paths.taxonomy_file)] = str(error)
+                _clear_directory(paths.profile_dir / name, report.failures)
+            for name in _PROFILE_FILES:
+                _remove_file(paths.profile_dir / name, report.failures)
+            _remove_file(paths.taxonomy_file, report.failures)
         else:
             _clear_directory(directories[area], report.failures)
+            if area == "runs":
+                # Pull telemetry (sync-status "last pull") lives beside the DB,
+                # not under runs/ — stale over an empty jobs table, so it goes
+                # with the runs area.
+                _remove_file(paths.connector_runs_file, report.failures)
         report.areas_cleared.append(area)
     return report
+
+
+def _remove_file(target: Path, failures: dict[str, str]) -> None:
+    try:
+        target.unlink(missing_ok=True)
+    except OSError as error:
+        failures[str(target)] = str(error)
 
 
 def _clear_directory(directory: Path, failures: dict[str, str]) -> None:
@@ -907,7 +935,7 @@ const SCOPES = [
     value: "profile",
     label: "Profile",
     description:
-      "Profile sources, extracted facts, skill matrix, fragments, and uploaded documents.",
+      "Profile sources, extracted facts, skill matrix, fragments, and uploaded documents. Hand-written overrides are kept.",
   },
   {
     value: "all",
@@ -936,13 +964,16 @@ export function DangerZoneCard() {
           body: { scope },
         }),
       );
-      const failures = Object.entries(report.failures ?? {});
-      if (failures.length > 0) {
+      const failureCount = Object.keys(report.failures ?? {}).length;
+      if (failureCount > 0) {
+        // No reload: it would destroy this warning before it renders. The
+        // dialog stays open and reset is idempotent — re-running finishes
+        // the cleanup.
         toast.warning(
-          `Reset finished with ${failures.length} file(s) left behind; run it again to finish.`,
+          `Reset finished with ${failureCount} file(s) left behind; run it again to finish.`,
         );
-      } else {
-        toast.success("Reset complete");
+        setResetting(false);
+        return;
       }
       window.location.reload();
     } catch (error) {
@@ -1045,7 +1076,7 @@ export function DangerZoneCard() {
 }
 ```
 
-(The page reload after success mirrors `DataArchiveCard`'s import flow — it is the simplest way to guarantee every cached view refreshes empty, with no cache-key list to maintain.)
+(The page reload after a clean success mirrors `DataArchiveCard`'s import flow — the simplest way to guarantee every cached view refreshes empty, with no cache-key list to maintain. On failures the component deliberately does NOT reload, so the warning toast survives and the user can re-run from the still-open dialog.)
 
 - [ ] **Step 4: Wire into the Account page**
 
