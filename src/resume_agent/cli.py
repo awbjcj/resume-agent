@@ -579,9 +579,7 @@ def fix_company_names_cmd(
         qualifier = "would be " if dry_run else ""
         typer.echo(f"{token}: {count} row(s) {qualifier}renamed")
     for kept, skipped in report.conflicts:
-        typer.echo(
-            f"CONFLICT: row #{skipped} skipped (identity held by #{kept})"
-        )
+        typer.echo(f"CONFLICT: row #{skipped} skipped (identity held by #{kept})")
     for token in report.unresolved:
         typer.echo(f"unresolved: {token} (no display name)")
 

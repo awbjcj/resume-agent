@@ -49,12 +49,8 @@ def paths(tmp_path: Path) -> ResetPaths:
     ):
         directory.mkdir(parents=True)
     (root / "config").mkdir()
-    (root / "config" / "search.yaml").write_text(
-        "titles: []\n", encoding="utf-8"
-    )
-    (root / "secrets.env").write_text(
-        "ANTHROPIC_API_KEY=sk-test\n", encoding="utf-8"
-    )
+    (root / "config" / "search.yaml").write_text("titles: []\n", encoding="utf-8")
+    (root / "secrets.env").write_text("ANTHROPIC_API_KEY=sk-test\n", encoding="utf-8")
     return built
 
 
@@ -108,9 +104,7 @@ def _seed_files(paths: ResetPaths) -> None:
     (paths.profile_dir / "cluster_map.json").write_text("{}", encoding="utf-8")
     (paths.profile_dir / "overrides.yaml").write_text("ban: []\n", encoding="utf-8")
     (paths.profile_dir / "future-note.txt").write_text("keep", encoding="utf-8")
-    (paths.profile_dir / "fragments" / "resume.json").write_text(
-        "{}", encoding="utf-8"
-    )
+    (paths.profile_dir / "fragments" / "resume.json").write_text("{}", encoding="utf-8")
     (paths.profile_dir / "documents" / "manifest.json").write_text(
         "[]", encoding="utf-8"
     )
@@ -190,7 +184,9 @@ def test_all_scope_preserves_config_secrets_and_overrides(session, paths):
         "workday_facets",
     ]
     root = paths.profile_dir.parent
-    assert (root / "config" / "search.yaml").read_text(encoding="utf-8") == "titles: []\n"
+    assert (root / "config" / "search.yaml").read_text(
+        encoding="utf-8"
+    ) == "titles: []\n"
     assert (root / "secrets.env").exists()
     assert (paths.profile_dir / "overrides.yaml").exists()
     assert list(paths.scraper_recipes_dir.iterdir()) == []
