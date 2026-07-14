@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api, openDownload, unwrap } from "@/lib/api/client";
 import { useMe } from "@/features/auth/AuthGate";
 import { DataArchiveCard } from "./DataArchiveCard";
+import { DangerZoneCard } from "./DangerZoneCard";
 
 export function AccountPage() {
   const me = useMe();
@@ -74,6 +75,7 @@ export function AccountPage() {
         importPath="/api/account/import"
         successMessage="Workspace imported"
       />
+      <DangerZoneCard />
       <Card>
         <CardHeader><CardTitle>Personal access tokens</CardTitle><CardDescription>Use PATs for automation. A token is shown once when created.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
