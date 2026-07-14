@@ -24,7 +24,7 @@ from resume_agent.discovery.scraper.recipe_parse import (
     parse_detail,
 )
 from resume_agent.discovery.scraper.recipe_store import (
-    RECIPES_DIR,
+    default_recipes_dir,
     host_key,
     load_recipe,
     save_recipe,
@@ -68,7 +68,7 @@ class DashboardScraper:
         self,
         targets: Sequence[ScrapeTargetLike],
         *,
-        store_dir: str | Path = RECIPES_DIR,
+        store_dir: str | Path | None = None,
         learn_agent: Runner | None = None,
         extract_agent: Runner | None = None,
         relearn: bool = False,
@@ -76,7 +76,7 @@ class DashboardScraper:
         pace_seconds: float = 1.0,
     ) -> None:
         self.targets = list(targets)
-        self.store_dir = store_dir
+        self.store_dir = store_dir if store_dir is not None else default_recipes_dir()
         self._learn_agent = learn_agent
         self._extract_agent = extract_agent
         self.relearn = relearn

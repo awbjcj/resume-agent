@@ -10,12 +10,25 @@ from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.harvest import harvest_detailed
 from resume_agent.discovery.connectors.text import html_to_markdown, primary_search_term
 from resume_agent.discovery.search_config import SearchConfig
+from resume_agent.tenancy.context import current_context
 
 _PAGE = 20  # cxs page size
 _MAX_OFFSET = (
     1000  # safety ceiling: <=51 pages (~1020 rows) even if a tenant ignores searchText
 )
 _FACETS_DIR = Path("data/workday_facets")
+
+
+def default_facets_dir() -> Path:
+    """Per-tenant facet cache when a workspace is active, else the flat default.
+
+    ``fetch_workday`` runs inside a pull run, where ``RunManager.submit`` has
+    copied the caller's ``UserContext`` into the worker, so each workspace's
+    resolved location facets live under its own root (which provisioning creates
+    and reset targets) instead of a shared cwd path.
+    """
+    context = current_context()
+    return context.paths.workday_facets_dir if context is not None else _FACETS_DIR
 
 
 @dataclass
@@ -282,9 +295,11 @@ def fetch_workday(
     search: SearchConfig,
     limit: int | None = None,
     skip_seen: SkipSeen | None = None,
-    facets_dir: str | Path = _FACETS_DIR,
+    facets_dir: str | Path | None = None,
 ) -> list[RawJob]:
     """List with safe location facets, then gate and detail-fetch survivors."""
+    if facets_dir is None:
+        facets_dir = default_facets_dir()
     return harvest_detailed(
         _list_pages(target, search, facets_dir),
         lambda row: _fetch_detail(target, row),

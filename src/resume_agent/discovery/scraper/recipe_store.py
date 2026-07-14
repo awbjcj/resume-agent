@@ -5,10 +5,23 @@ from urllib.parse import urlsplit
 from pydantic import ValidationError
 
 from resume_agent.discovery.scraper.recipe import RECIPE_SCHEMA_VERSION, ScrapeRecipe
+from resume_agent.tenancy.context import current_context
 
 RECIPES_DIR = "data/scraper_recipes"
 
 _UNSAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def default_recipes_dir() -> Path:
+    """Per-tenant recipe cache when a workspace is active, else the flat default.
+
+    Recipes are written and read by the browser scraper inside a pull run, where
+    ``RunManager.submit`` has copied the caller's ``UserContext`` into the worker.
+    Resolving here keeps every workspace's learned selectors under its own root
+    (which provisioning creates and reset targets) instead of a shared cwd path.
+    """
+    context = current_context()
+    return context.paths.scraper_recipes_dir if context is not None else Path(RECIPES_DIR)
 
 
 def host_key(url: str) -> str:
