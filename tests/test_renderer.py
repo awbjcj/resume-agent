@@ -1,4 +1,6 @@
 
+from pypdf import PdfReader
+
 from resume_agent.models.profile import Contact, Education
 from resume_agent.models.resume import (
     ResumeContent,
@@ -53,3 +55,39 @@ def test_render_pdf_writes_a_pdf(tmp_path):
     assert result == out
     assert out.exists()
     assert out.read_bytes().startswith(b"%PDF")
+
+
+def test_project_description_keeps_full_width_with_long_tech_stack(tmp_path):
+    out = tmp_path / "resume.pdf"
+    content = ResumeContent(
+        contact=Contact(name="Ada Lovelace"),
+        projects=[
+            TailoredProject(
+                name=(
+                    "Deep Agent — Multi-Agent LLM Platform for Enterprise "
+                    "Engineering-Data Analytics"
+                ),
+                description=(
+                    "An agentic AI backend that routes engineering-data requests "
+                    "to seven domain subagents."
+                ),
+                tech=[
+                    "Python",
+                    "LangGraph",
+                    "Elasticsearch",
+                    "FastAPI",
+                    "OpenAI",
+                    "Anthropic Claude",
+                    "Jira",
+                    "Confluence",
+                    "Polarion",
+                ],
+                provenance="p1",
+            )
+        ],
+    )
+
+    render_pdf(content, out, template_path="templates/resume.typ", fit_pages=None)
+
+    layout = PdfReader(str(out)).pages[0].extract_text(extraction_mode="layout")
+    assert "An agentic AI backend" in layout
