@@ -109,9 +109,9 @@ A "Danger zone" card appended to `web/src/features/account/AccountPage.tsx`
   "Export backup first" button reusing the existing `openDownload` on
   `/api/account/export`, and a text input — the button enables only when the
   user types `RESET`.
-- On success: toast with the report summary and invalidation of the affected
-  React Query caches (`jobs`, `board`, `dashboard`, `profile`, `matrix`,
-  `suggestions`, `notifications`, `runs`) so every view refreshes empty.
+- On success: toast with the report summary, then a full page reload —
+  mirroring the existing import flow in `DataArchiveCard` — so every cached
+  view refreshes empty without maintaining a cache-key list.
 - `failures` render as a warning list in the toast/dialog.
 
 ## Error handling
