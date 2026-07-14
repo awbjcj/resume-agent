@@ -15,12 +15,14 @@ from sqlalchemy.orm import Session
 from starlette.background import BackgroundTask
 
 from resume_agent.api import auth
-from resume_agent.api.deps import get_settings_dep
+from resume_agent.api.deps import get_session, get_settings_dep
 from resume_agent.api.errors import ApiException
 from resume_agent.api.uploads import UploadTooLargeError, copy_upload
 from resume_agent.api.schemas.account import (
     AccountUsage,
     PasswordChangeRequest,
+    ResetReportOut,
+    ResetRequest,
     TokenCreated,
     TokenCreateRequest,
     TokenInfo,
@@ -33,7 +35,8 @@ from resume_agent.services.backup import (
     export_data_root,
     import_data_root,
 )
-from resume_agent.tenancy.context import require_context
+from resume_agent.services.reset import ResetPaths, ResetScope, reset_workspace
+from resume_agent.tenancy.context import current_context, require_context
 from resume_agent.tenancy.limits import (
     DEFAULT_WEEKLY_TOKEN_BUDGET,
     resolve_limit,
@@ -147,6 +150,41 @@ def change_password(
         path="/",
     )
     return {"status": "changed"}
+
+
+@router.post("/reset")
+def reset_data(
+    body: ResetRequest,
+    request: Request,
+    confirm: str = "",
+    session: Session = Depends(get_session),
+) -> ResetReportOut:
+    if confirm != "RESET":
+        raise ApiException(
+            400,
+            "CONFIRM_REQUIRED",
+            "Reset destroys data; pass ?confirm=RESET",
+        )
+    context = current_context()
+    user_id = context.user_id if context is not None else None
+    if request.app.state.run_manager.list_active(user_id=user_id):
+        raise ApiException(409, "RUNS_ACTIVE", "Refusing while your runs are active")
+    paths = (
+        ResetPaths.from_workspace(context.paths)
+        if context is not None
+        else ResetPaths.legacy(
+            data_dir=request.app.state.data_dir,
+            output_dir=Path("output"),
+            runs_dir=request.app.state.run_manager.root,
+        )
+    )
+    report = reset_workspace(session, paths, ResetScope(body.scope))
+    return ResetReportOut(
+        scope=report.scope.value,
+        rows_deleted=report.rows_deleted,
+        areas_cleared=report.areas_cleared,
+        failures=report.failures,
+    )
 
 
 @link_router.get("/export")

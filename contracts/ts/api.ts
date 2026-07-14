@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/account/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Data */
+        post: operations["reset_data_api_account_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/tokens": {
         parameters: {
             query?: never;
@@ -2424,6 +2441,32 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** ResetReportOut */
+        ResetReportOut: {
+            /** Areascleared */
+            areasCleared: string[];
+            /** Failures */
+            failures: {
+                [key: string]: string;
+            };
+            /** Rowsdeleted */
+            rowsDeleted: {
+                [key: string]: number;
+            };
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "jobs" | "profile" | "all";
+        };
+        /** ResetRequest */
+        ResetRequest: {
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "jobs" | "profile" | "all";
+        };
         /** ResourceOut */
         ResourceOut: {
             /**
@@ -3214,6 +3257,43 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_data_api_account_reset_post: {
+        parameters: {
+            query?: {
+                confirm?: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetReportOut"];
                 };
             };
             /** @description Validation Error */

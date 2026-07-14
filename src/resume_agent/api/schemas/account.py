@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field
 
@@ -35,3 +36,14 @@ class AccountUsage(CamelModel):
     weighted_total: float
     own_key_weighted_total: float
     budget: int
+
+
+class ResetRequest(CamelModel):
+    scope: Literal["jobs", "profile", "all"]
+
+
+class ResetReportOut(CamelModel):
+    scope: Literal["jobs", "profile", "all"]
+    rows_deleted: dict[str, int]
+    areas_cleared: list[str]
+    failures: dict[str, str]

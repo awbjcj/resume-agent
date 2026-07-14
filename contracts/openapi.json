@@ -2855,6 +2855,66 @@
         "title": "ResetPasswordRequest",
         "type": "object"
       },
+      "ResetReportOut": {
+        "properties": {
+          "areasCleared": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Areascleared",
+            "type": "array"
+          },
+          "failures": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Failures",
+            "type": "object"
+          },
+          "rowsDeleted": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Rowsdeleted",
+            "type": "object"
+          },
+          "scope": {
+            "enum": [
+              "jobs",
+              "profile",
+              "all"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "rowsDeleted",
+          "areasCleared",
+          "failures"
+        ],
+        "title": "ResetReportOut",
+        "type": "object"
+      },
+      "ResetRequest": {
+        "properties": {
+          "scope": {
+            "enum": [
+              "jobs",
+              "profile",
+              "all"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ResetRequest",
+        "type": "object"
+      },
       "ResourceOut": {
         "properties": {
           "kind": {
@@ -5149,6 +5209,75 @@
           }
         },
         "summary": "Change Password",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/reset": {
+      "post": {
+        "operationId": "reset_data_api_account_reset_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "confirm",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Confirm",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Data",
         "tags": [
           "account"
         ]
