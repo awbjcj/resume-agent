@@ -1,6 +1,8 @@
 # Workspace Data Reset Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution mode:** Implement this plan in-line with test-driven development.
+> Do not delegate tasks to subagents. Steps use checkbox (`- [ ]`) syntax for
+> tracking.
 
 **Goal:** Let a user clear their workspace data in three tiers — `jobs` (pipeline), `profile` (corpus), `all` (both + caches) — from the web UI, the API, and the CLI.
 
@@ -12,14 +14,58 @@
 
 ## Global Constraints
 
-- Tests are offline: no API key, no network, no real browser (`.venv/Scripts/python.exe -m pytest`).
+- Implementation tests are offline: no API key or external network. Final
+  verification also includes a local-browser walkthrough.
 - `ruff check` must pass on all touched Python files.
 - Wire format is camelCase via `CamelModel` (`api/schemas/base.py`); Python stays snake_case.
 - `config/` and `secrets.env` are NEVER touched by any reset scope.
 - Confirmation literals: API query param `confirm=RESET`; web dialog typed word `RESET`; CLI typed word = the scope value (`jobs`/`profile`/`all`).
 - Never delete `resume_agent.db` or its WAL/SHM sidecars — truncate tables only.
 - DB deletes commit in ONE transaction BEFORE any file removal; file-phase errors are collected into `ResetReport.failures`, never raised.
-- After Task 2, regenerate the OpenAPI contract (`bash scripts/gen_ts_client.sh`); `tests/api/test_openapi_contract.py` is the drift gate.
+- After Task 2, regenerate the OpenAPI contract (`bash scripts/gen_ts_client.sh`);
+  commit `contracts/openapi.json`, `contracts/ts/api.ts`, and
+  `web/src/lib/api/schema.ts` together. `tests/api/test_openapi_contract.py` is
+  the drift gate. On Windows, use the repository's direct PowerShell generation
+  flow if the bash wrapper fails on CRLF `pipefail`.
+
+## Correctness Amendments (authoritative over snippets below)
+
+The initial plan was audited against the current runtime on 2026-07-14. Apply
+these corrections wherever an older code snippet conflicts:
+
+1. **Callers provide concrete paths.** `ResetPaths.resolve()` may be used by
+   the CLI, but the API must not rely on cwd-relative resolution. Multi-user API
+   requests derive paths from the active `WorkspacePaths`; single-user requests
+   derive them from `app.state.data_dir`, `app.state.run_manager.root`, and the
+   legacy `output/` root. Add a single-user configured-path regression test.
+2. **Use the current profile layout.** Clear `documents/`, `fragments/`,
+   `sources.json`, `facts.json`, `matrix.json`, and `cluster_map.json`. Do not
+   invent or recreate an unused `profile/sources/` directory. Preserve
+   `overrides.yaml` and unlisted profile children.
+3. **Make the file-phase contract true.** Catch failures from inspection,
+   unlinking, recursive removal, and directory recreation. Never follow a
+   directory-root symlink; unlink it and recreate the intended empty directory.
+   Add tests for root symlinks and recreation/inspection failures.
+4. **Make rollback explicit.** If delete or commit fails, call
+   `session.rollback()`, re-raise, and do not touch files. Add a regression test.
+5. **Report exact outcomes.** Include `connector_runs` and `taxonomy` as
+   explicit reset areas. `areasCleared` contains only areas whose file
+   operations fully succeeded; `failures` contains exact path-to-reason entries.
+   CLI preview lists every directory and file target, not only broad labels.
+6. **Keep the generated SPA schema in sync.** Contract regeneration modifies
+   three committed files, including `web/src/lib/api/schema.ts`.
+7. **Use the installed Base UI/shadcn conventions.** Compose the scope picker
+   and confirmation field from existing primitives (`ToggleGroup` or the
+   installed choice control, `FieldSet`/`Field`, `AlertDialog`, `Card`). Use
+   semantic tokens and existing variants rather than raw radio markup and
+   one-off styling.
+8. **Strengthen the destructive UX tests.** Test the POST method/query/body,
+   clean reload behavior, partial-failure no-reload behavior, and confirmation
+   reset when scope changes or the dialog is dismissed. Put the "Export backup
+   first" action inside the confirmation dialog as promised by the design.
+9. **Finish with the real repository gate.** In addition to Python tests, Ruff,
+   and Vitest, run OpenAPI drift, web lint, web build, `git diff --check`, and a
+   local Playwright/browser walkthrough of the reset flow.
 
 ---
 
@@ -454,7 +500,7 @@ git commit -m "feat: add workspace reset service with tiered scopes"
 **Files:**
 - Modify: `src/resume_agent/api/schemas/account.py` (append schemas)
 - Modify: `src/resume_agent/api/routers/account.py` (add endpoint + imports)
-- Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`
+- Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_account_reset.py`
 
 **Interfaces:**
@@ -664,7 +710,8 @@ Expected: 4 passed
 
 Run: `bash scripts/gen_ts_client.sh`
 Then: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -v`
-Expected: PASS; `git status` shows `contracts/openapi.json` and `contracts/ts/api.ts` modified.
+Expected: PASS; `git status` shows `contracts/openapi.json`,
+`contracts/ts/api.ts`, and `web/src/lib/api/schema.ts` modified.
 
 - [ ] **Step 7: Lint**
 
@@ -674,7 +721,7 @@ Expected: All checks passed
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/account.py src/resume_agent/api/routers/account.py tests/api/test_account_reset.py contracts/openapi.json contracts/ts/api.ts
+git add src/resume_agent/api/schemas/account.py src/resume_agent/api/routers/account.py tests/api/test_account_reset.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: add POST /api/account/reset with confirm gate and run guard"
 ```
 
@@ -1117,7 +1164,24 @@ Expected: All checks passed
 Run: `cd web && npx vitest run`
 Expected: all web tests pass
 
-- [ ] **Step 4: Commit anything outstanding**
+- [ ] **Step 4: Run web lint and production build**
+
+Run: `cd web && npm run lint && npm run build`
+Expected: both pass
+
+- [ ] **Step 5: Run contract and diff gates**
+
+Run: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -v`
+Then: `git diff --check`
+Expected: both pass
+
+- [ ] **Step 6: Walk the reset story in a local browser**
+
+Use the webapp-testing server helper and Playwright to verify scope selection,
+typed confirmation, the reset request, the empty post-reset state, and a clean
+browser console. Keep the test workspace isolated from repository data.
+
+- [ ] **Step 7: Commit anything outstanding**
 
 ```bash
 git status --short

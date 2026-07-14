@@ -1,7 +1,7 @@
 # Workspace Data Reset — Design
 
 **Date:** 2026-07-13
-**Status:** Approved for planning
+**Status:** Approved with correctness amendments (2026-07-14)
 
 ## Problem
 
@@ -41,17 +41,20 @@ def reset_workspace(
 ) -> ResetReport: ...
 ```
 
-`WorkspacePaths` already models both deployment modes (multi-user:
-`data/users/{id}/`; single-user: the flat data root), so the service never
-branches on tenancy — callers resolve `paths` the same way the export
-endpoint does.
+The service receives a concrete `ResetPaths` value and never guesses deployment
+layout. Multi-user callers derive it from the active `WorkspacePaths`.
+Single-user API callers derive it from the app's configured `data_dir`,
+`run_manager.root`, and legacy `output/` root. This distinction matters because
+`create_app(data_dir=..., runs_root=...)` may not use cwd-relative defaults.
+The CLI resolves the active local tenant when present and otherwise uses the
+legacy flat layout.
 
 ### Scope mapping
 
 | Scope     | DB tables cleared (in this order)                                                                | Directories/files cleared                                                                                              |
 | --------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `jobs`    | `cover_letters`, `applications`, `resume_versions`, `notifications`, `skill_suggestions`, `jobs` | `output/`, `runs/`, `progress/`, `connector_runs.json` (pull telemetry; workspace root). Run-record clearing includes profile-build history — accepted as operational telemetry |
-| `profile` | `skill_suggestions` only (match-gap advice derived from the profile; `notifications` hang off `applications` and are pipeline data) | enumerated `profile/` children: `sources/`, `fragments/`, `documents/` (contents), `facts.json`, `matrix.json`, `sources.json`, `cluster_map.json`; plus `taxonomy/skill_groups.json`. `overrides.yaml` and any unlisted file survive |
+| `jobs`    | `notifications`, `applications`, `cover_letters`, `resume_versions`, `skill_suggestions`, `jobs` | `output/`, `runs/`, `progress/`, `connector_runs.json` (pull telemetry; workspace root). Run-record clearing includes profile-build history — accepted as operational telemetry |
+| `profile` | `skill_suggestions` only (match-gap advice derived from the profile; `notifications` hang off `applications` and are pipeline data) | enumerated `profile/` children used by the current corpus implementation: `fragments/`, `documents/` (contents), `facts.json`, `matrix.json`, `sources.json`, `cluster_map.json`; plus `taxonomy/skill_groups.json`. `overrides.yaml` and any unlisted file survive |
 | `all`     | all six tables                                                                                    | union of the above + `scraper_recipes/`, `workday_facets/`                                                              |
 
 Rules:
@@ -59,8 +62,13 @@ Rules:
 - Table order is children-first, extending the `delete_job_row` cascade order
   (`CoverLetter`, `Application`, `ResumeVersion`, then job-adjacent tables,
   then `jobs`). All deletes commit in **one** transaction.
+- A DB-phase exception explicitly rolls back the session before it propagates;
+  no file operation starts unless the commit succeeds.
 - Directories are cleared-and-recreated: contents removed, the empty
   directory kept, so downstream code never trips on a missing path.
+- Directory roots and children that are symbolic links are unlinked, never
+  traversed. Failures from inspection, unlinking, or recreation are collected
+  exactly like deletion failures; the file phase never raises an `OSError`.
 - `config/`, `secrets.env`, and `profile/overrides.yaml` are never touched by
   any scope. The profile clear is an **enumerated delete** (the listed
   children only), never "everything in the directory" — hand-authored and
@@ -69,8 +77,11 @@ Rules:
 - File removal runs **after** the DB commit succeeds. Rationale: an empty DB
   with leftover files is safe (orphans); DB rows pointing at deleted files
   would break the board.
-- `ResetReport` carries `scope`, per-table deleted-row counts, cleared areas,
-  and `failures: dict[str, str]` (path → reason) for file-phase errors.
+- `ResetReport` carries `scope`, per-table deleted-row counts, successfully
+  cleared areas, and `failures: dict[str, str]` (path → reason) for file-phase
+  errors. `connector_runs` and `taxonomy` are explicit areas so reports and CLI
+  previews do not hide file deletion behind a directory label. An area is only
+  listed as cleared when all of its operations succeeded.
 - No `VACUUM`: truncation leaves the DB file at its grown size (SQLite
   reuses the free pages on the next pull). Considered and accepted —
   reclaiming disk would need a separate autocommit connection and no surface
@@ -85,9 +96,11 @@ Rules:
   `400 CONFIRM_REQUIRED` — the exact pattern of import's `confirm=REPLACE`.
 - Guarded by the same active-runs check as export/import:
   `409 RUNS_ACTIVE` when `run_manager.list_active(user_id=...)` is non-empty.
-- Resolves `workspace_paths(app.state.data_dir, context.user_id)` exactly as
-  export does; uses the normal request session (truncation needs no engine
-  eviction, so there is no multi-user-only restriction).
+- In multi-user mode, derives reset paths from the active context's
+  `WorkspacePaths`. In single-user mode, derives them from the configured app
+  state (`data_dir`, `run_manager.root`, and legacy `output/`). It uses the
+  normal request session; truncation needs no engine eviction and has no
+  multi-user-only restriction.
 - Returns the `ResetReport` schema (200) even when `failures` is non-empty;
   clients surface failures as warnings. Re-running reset is idempotent and
   clears leftovers.
@@ -100,7 +113,7 @@ Rules:
 
 - Without `--yes`, prints what the scope will delete — current row counts per
   table (plain `SELECT COUNT(*)` before any deletion; no separate preview
-  service) and the directory list — then requires typing the scope word to
+  service) and every directory/file target — then requires typing the scope word to
   proceed; anything else aborts.
 - Resolves paths/session through the same tenancy callback as other CLI
   commands (`--user` respected).
@@ -111,12 +124,15 @@ Rules:
 A "Danger zone" card appended to `web/src/features/account/AccountPage.tsx`
 (alongside the existing export button and `DataArchiveCard`):
 
-- Scope picker (radio: Jobs / Profile / Everything) with a short description
-  of exactly what each clears.
+- Scope picker using the installed shadcn/Base UI choice primitives with a
+  short description of exactly what each clears.
 - Destructive button opens a confirm dialog: shows the scope summary, an
   "Export backup first" button reusing the existing `openDownload` on
   `/api/account/export`, and a text input — the button enables only when the
   user types `RESET`.
+- Changing scope or dismissing a clean dialog clears the typed confirmation so
+  reopening the dialog is never pre-armed. A partial file failure deliberately
+  leaves it open and armed to support the documented immediate retry.
 - Clean success (`failures` empty): full page reload immediately — mirroring
   the import flow in `DataArchiveCard` — so every cached view refreshes empty
   without maintaining a cache-key list. No toast races the reload; the
@@ -128,7 +144,7 @@ A "Danger zone" card appended to `web/src/features/account/AccountPage.tsx`
 
 ## Error handling
 
-- **DB phase fails** → transaction rolls back; no files touched; standard
+- **DB phase fails** → transaction explicitly rolls back; no files touched; standard
   error envelope. Workspace unchanged.
 - **File phase fails partway** (e.g. a locked PDF on Windows) → collected
   into `ResetReport.failures`, never raised — the same philosophy as
@@ -143,12 +159,15 @@ A "Danger zone" card appended to `web/src/features/account/AccountPage.tsx`
   `profile/overrides.yaml` survive `all`;
   report counts match; second run is a no-op with zero counts; a locked/
   undeletable file lands in `failures` without raising; directories exist
-  and are empty afterwards.
-- **API**: 400 without confirm, 409 with an active run, happy path per
-  scope, response shape; contract drift gate.
+  and are empty afterwards; root symlinks are not followed; a DB commit failure
+  rolls back and performs no file work.
+- **API**: 400 without confirm, 409 with an active run, invalid scope rejected,
+  happy path per scope in multi-user mode, configured-path behavior in
+  single-user mode, response shape; contract drift gate.
 - **CLI**: aborts without typed confirmation; `--yes` runs; report printed.
-- **Web** (Vitest): type-to-confirm gates the button; correct request; cache
-  invalidations fire; failures rendered.
+- **Web** (Vitest): type-to-confirm gates the button; scope changes and dialog
+  dismissal disarm it; the correct request is sent; a clean result reloads;
+  partial failures remain visible and retryable without reloading.
 
 ## Out of scope
 
