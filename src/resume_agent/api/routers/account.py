@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from sqlmodel import Session as WorkspaceSession
 from starlette.background import BackgroundTask
 
 from resume_agent.api import auth
@@ -157,7 +158,7 @@ def reset_data(
     body: ResetRequest,
     request: Request,
     confirm: str = "",
-    session: Session = Depends(get_session),
+    session: WorkspaceSession = Depends(get_session),
 ) -> ResetReportOut:
     if confirm != "RESET":
         raise ApiException(
