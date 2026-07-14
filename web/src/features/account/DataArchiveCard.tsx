@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Download, Upload } from "lucide-react";
+import { Archive, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -10,17 +10,22 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { getToken, openDownload } from "@/lib/api/client";
@@ -73,11 +78,29 @@ export function DataArchiveCard({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+      <CardHeader className="border-b">
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
+            <Archive aria-hidden="true" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <CardTitle>
+              <h3>{title}</h3>
+            </CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </div>
+        </div>
+        <CardAction>
+          <Badge variant="outline">Portable archive</Badge>
+        </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-3">
+      <CardContent>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Exports are compressed tar.gz files. Keep archives private because they may
+          contain workspace credentials and source data.
+        </p>
+      </CardContent>
+      <CardFooter className="flex-wrap justify-end gap-3">
         <Button variant="outline" onClick={() => void openDownload(exportPath)}>
           <Download data-icon="inline-start" />
           {exportLabel}
@@ -89,32 +112,35 @@ export function DataArchiveCard({
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
+              <AlertDialogMedia>
+                <Upload aria-hidden="true" />
+              </AlertDialogMedia>
               <AlertDialogTitle>Replace {title.toLowerCase()}?</AlertDialogTitle>
               <AlertDialogDescription>
                 This replaces the current data. Export a backup first. Select a
                 tar.gz archive and type REPLACE to continue.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <div className="space-y-4 py-2">
-              <label className="block space-y-2 text-sm font-medium" htmlFor={fileId}>
-                Archive file
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor={fileId}>Archive file</FieldLabel>
                 <Input
                   id={fileId}
                   type="file"
                   accept=".tar.gz,.tgz,application/gzip"
                   onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                 />
-              </label>
-              <label className="block space-y-2 text-sm font-medium" htmlFor={confirmId}>
-                Type REPLACE to confirm
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={confirmId}>Type REPLACE to confirm</FieldLabel>
                 <Input
                   id={confirmId}
                   value={confirmText}
                   autoComplete="off"
                   onChange={(event) => setConfirmText(event.target.value)}
                 />
-              </label>
-            </div>
+              </Field>
+            </FieldGroup>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={importing}>Cancel</AlertDialogCancel>
               <AlertDialogAction
@@ -130,7 +156,7 @@ export function DataArchiveCard({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </CardContent>
+      </CardFooter>
     </Card>
   );
 }

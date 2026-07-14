@@ -1,5 +1,14 @@
 import { useId, useRef, useState } from "react";
-import { Download, TriangleAlert } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  ContactRound,
+  Download,
+  Layers3,
+  LockKeyhole,
+  ShieldAlert,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -9,9 +18,16 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,18 +54,21 @@ const SCOPES = [
   {
     value: "jobs",
     label: "Jobs",
+    icon: BriefcaseBusiness,
     description:
       "Pulled jobs, applications, tailored resumes, cover letters, rendered files, and run history.",
   },
   {
     value: "profile",
     label: "Profile",
+    icon: ContactRound,
     description:
       "Profile sources, extracted facts, skill matrix, fragments, and documents. Hand-written overrides stay.",
   },
   {
     value: "all",
     label: "Everything",
+    icon: Layers3,
     description:
       "Jobs and profile plus discovery caches. Configuration and API keys stay.",
   },
@@ -110,6 +129,8 @@ export function DangerZoneCard({
         return;
       }
       reloadPage();
+      resettingRef.current = false;
+      setResetting(false);
     } catch (error) {
       toast.error((error as Error).message);
       resettingRef.current = false;
@@ -118,13 +139,25 @@ export function DangerZoneCard({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Danger zone</CardTitle>
-        <CardDescription>
-          Clear this workspace&apos;s data. Configuration, API keys, and
-          hand-written profile overrides are always kept.
-        </CardDescription>
+    <Card className="bg-destructive/5 ring-destructive/30">
+      <CardHeader className="border-b">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+              <ShieldAlert aria-hidden="true" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <CardTitle>Danger zone</CardTitle>
+              <CardDescription>
+                Clear this workspace&apos;s data. Configuration, API keys, and
+                hand-written profile overrides are always kept.
+              </CardDescription>
+            </div>
+          </div>
+          <Badge variant="destructive" className="shrink-0 self-start">
+            Irreversible
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent>
         <FieldSet>
@@ -136,33 +169,52 @@ export function DangerZoneCard({
             aria-label="Reset scope"
             value={[scope]}
             onValueChange={selectScope}
+            className="grid auto-rows-fr grid-cols-1 items-stretch gap-2 md:grid-cols-3"
           >
-            {SCOPES.map((option) => (
-              <ToggleGroupItem
-                key={option.value}
-                value={option.value}
-                aria-label={`${option.label}: ${option.description}`}
-                className="h-auto min-w-48 flex-1 items-start justify-start text-left whitespace-normal"
-              >
-                <span className="flex flex-col gap-1">
-                  <span>{option.label}</span>
-                  <span className="text-muted-foreground">
-                    {option.description}
+            {SCOPES.map((option) => {
+              const ScopeIcon = option.icon;
+              return (
+                <ToggleGroupItem
+                  key={option.value}
+                  value={option.value}
+                  aria-label={`${option.label}: ${option.description}`}
+                  className="h-full min-w-0 items-stretch justify-start rounded-lg p-0 text-left whitespace-normal"
+                >
+                  <span className="flex h-full flex-1 flex-col gap-2 p-3">
+                    <span className="flex items-center gap-2 font-medium">
+                      <ScopeIcon aria-hidden="true" />
+                      {option.label}
+                      {option.value === "jobs" ? (
+                        <Badge variant="outline" className="ml-auto">
+                          Common
+                        </Badge>
+                      ) : null}
+                    </span>
+                    <span className="text-xs leading-relaxed text-muted-foreground">
+                      {option.description}
+                    </span>
                   </span>
-                </span>
-              </ToggleGroupItem>
-            ))}
+                </ToggleGroupItem>
+              );
+            })}
           </ToggleGroup>
         </FieldSet>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex-col items-stretch gap-3 bg-transparent sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <LockKeyhole aria-hidden="true" className="size-4" />
+          A typed confirmation is required before anything is erased.
+        </div>
         <AlertDialog open={dialogOpen} onOpenChange={setOpen}>
           <AlertDialogTrigger render={<Button variant="destructive" />}>
             <TriangleAlert data-icon="inline-start" />
             Reset data
           </AlertDialogTrigger>
-          <AlertDialogContent>
+          <AlertDialogContent className="sm:max-w-md">
             <AlertDialogHeader>
+              <AlertDialogMedia className="bg-destructive/10 text-destructive">
+                <TriangleAlert aria-hidden="true" />
+              </AlertDialogMedia>
               <AlertDialogTitle>
                 Reset {selected.label.toLowerCase()}?
               </AlertDialogTitle>
@@ -172,6 +224,14 @@ export function DangerZoneCard({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <FieldGroup>
+              <Alert>
+                <ShieldCheck aria-hidden="true" />
+                <AlertTitle>Protected settings stay in place</AlertTitle>
+                <AlertDescription>
+                  Configuration, API keys, and hand-written profile overrides
+                  will not be removed.
+                </AlertDescription>
+              </Alert>
               <Button
                 variant="outline"
                 onClick={() => void openDownload("/api/account/export")}
@@ -184,6 +244,7 @@ export function DangerZoneCard({
                 <Input
                   id={confirmId}
                   value={confirmText}
+                  placeholder="RESET"
                   autoComplete="off"
                   onChange={(event) => setConfirmText(event.target.value)}
                 />
