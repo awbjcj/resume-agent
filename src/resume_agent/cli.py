@@ -859,6 +859,62 @@ def prune(
         )
 
 
+@app.command("reset")
+def reset_cmd(
+    scope: str = typer.Option(
+        ...,
+        "--scope",
+        help="What to clear: jobs | profile | all.",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Skip the typed confirmation.",
+    ),
+    db_url: str | None = typer.Option(
+        None,
+        "--db-url",
+        help="Override the configured DB URL.",
+    ),
+) -> None:
+    """Clear job data, the profile corpus, or all workspace-derived data."""
+    from resume_agent.services.reset import (
+        ResetPaths,
+        ResetScope,
+        count_rows,
+        reset_workspace,
+        scope_paths,
+    )
+
+    try:
+        reset_scope = ResetScope(scope)
+    except ValueError:
+        raise typer.BadParameter(
+            "scope must be jobs, profile, or all",
+            param_hint="--scope",
+        ) from None
+
+    paths = ResetPaths.resolve()
+    with get_session(_engine(db_url)) as session:
+        if not yes:
+            typer.echo(f"Reset scope '{reset_scope.value}' will delete:")
+            for table, count in count_rows(session, reset_scope).items():
+                typer.echo(f"  {table}: {count} rows")
+            typer.echo("  filesystem targets:")
+            for path in scope_paths(paths, reset_scope):
+                typer.echo(f"    {path.absolute()}")
+            answer = typer.prompt(f"Type {reset_scope.value} to confirm")
+            if answer != reset_scope.value:
+                typer.echo("Aborted.")
+                raise typer.Exit(code=1)
+        report = reset_workspace(session, paths, reset_scope)
+
+    typer.echo(f"Deleted {sum(report.rows_deleted.values())} rows")
+    typer.echo(f"Cleared: {', '.join(report.areas_cleared) or 'none'}")
+    for path, reason in report.failures.items():
+        typer.echo(f"Warning: {path}: {reason}", err=True)
+
+
 @app.command("sync-status")
 def sync_status_cmd(
     apply: bool = typer.Option(
