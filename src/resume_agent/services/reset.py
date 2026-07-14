@@ -60,8 +60,8 @@ class ResetPaths:
             progress_dir=workspace.root / "progress",
             profile_dir=workspace.profile_dir,
             taxonomy_file=workspace.root / "taxonomy" / "skill_groups.json",
-            scraper_recipes_dir=workspace.root / "scraper_recipes",
-            workday_facets_dir=workspace.root / "workday_facets",
+            scraper_recipes_dir=workspace.scraper_recipes_dir,
+            workday_facets_dir=workspace.workday_facets_dir,
             connector_runs_file=workspace.root / "connector_runs.json",
         )
 

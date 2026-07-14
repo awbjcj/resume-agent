@@ -66,6 +66,14 @@ class WorkspacePaths:
     def documents_dir(self) -> Path:
         return self.profile_dir / "documents"
 
+    @property
+    def scraper_recipes_dir(self) -> Path:
+        return self.root / "scraper_recipes"
+
+    @property
+    def workday_facets_dir(self) -> Path:
+        return self.root / "workday_facets"
+
 
 @dataclass(frozen=True)
 class SettingsOverlay:
@@ -89,8 +97,8 @@ def provision_workspace(
         paths.config_dir,
         paths.output_dir,
         paths.runs_root,
-        paths.root / "scraper_recipes",
-        paths.root / "workday_facets",
+        paths.scraper_recipes_dir,
+        paths.workday_facets_dir,
         paths.root / "taxonomy",
     ):
         directory.mkdir(parents=True, exist_ok=True)
