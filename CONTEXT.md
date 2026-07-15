@@ -20,6 +20,14 @@ bare id, or an unknown prefix, is Anthropic. `split_provider` parses it,
 providers without a separate provider setting.
 _Avoid_: namespaced model, qualified id (reserve "provider" for the prefix value)
 
+**Tool loop**:
+An agent run in which the model may call tools before returning its structured
+answer. Every tool exposed inside one is read-only (search, probe, inspect);
+writes happen only after the loop, through deterministic services, behind user
+approval. Anything a tool "verified" is re-verified outside the loop before it
+is presented as validated.
+_Avoid_: agentic mode, autonomous agent (the loop is bounded and read-only)
+
 ## Discovery & connectors
 
 **Connector**:
@@ -87,6 +95,21 @@ registry — it is a scraper target, not an ATS.
 The title-and-JD filter applied to the harvested union; `title_relevance_gate`
 is its title-only form used before JD text is available (Workday/Tesla list rows).
 _Avoid_: filter (filtering is a later pipeline stage on persisted jobs)
+
+**Source Scout**:
+The Tool loop that turns a free-text company prompt into Scout candidates —
+it searches the web, expands the prompt into similar companies grounded in the
+user's profile and search config, and probes career boards. It proposes; it
+never writes a source.
+_Avoid_: recommender, company search (search is one tool it uses)
+
+**Scout candidate**:
+One proposed source from a Source Scout run: company, careers URL, and a
+validation verdict — validated (live ATS board with a role count), unverified
+(no supported ATS; addable only as a scrape target), or failed (with reason).
+Approving one routes through the ordinary add-source path.
+_Avoid_: recommendation, suggestion (a Suggestion belongs to the match-gap
+advisor)
 
 ## Tailoring & verdict
 
@@ -191,6 +214,31 @@ What a Fragment producer yields for one document: the fragment's `facts`, an
 optional `evidence` sidecar (synthesis only), and optional verification `drops`.
 `Produced` in `profile/fragments.py`.
 _Avoid_: extraction result, payload
+
+**Interview round**:
+One stateless batch of gap-driven questions and Research actions produced by
+the profile interview Tool loop. Gaps come from both the corpus's own
+thinness and market demand (skills the user's discovered jobs ask for but the
+profile cannot evidence). Questions demand evidence, never yes/no claims.
+Answers become user-authored note sources; the round itself never touches
+facts. Rounds may be rendered as a conversation, but there is no session —
+each round stands alone against the corpus plus the interview history.
+_Avoid_: chat turn, interview session (nothing persists between rounds except
+history)
+
+**Research action**:
+A non-question item in an Interview round: a concrete evidence-gathering step
+the agent proposes — re-harvest a repository, or request a URL from the user.
+Executed only by existing intake paths on user click.
+_Avoid_: research suggestion (a Suggestion belongs to the match-gap advisor),
+task
+
+**Interview history**:
+The per-workspace sidecar recording every asked question and each answer's
+resulting note document — kept outside the corpus so it never pollutes
+extraction, and injected into later rounds so no question repeats. Also the
+source the conversation view is reconstructed from.
+_Avoid_: transcript (the transcript is a rendering of it), chat log
 
 ## Deployment & data custody
 

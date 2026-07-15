@@ -36,6 +36,7 @@ Agents run real agno tool-calling loops, but:
 
 This mirrors `profile/synthesis.py`'s generate → verify → bounded-repair
 pattern and keeps fact-lock and config writes on deterministic, tested paths.
+Recorded as ADR 0005 (read-only agent tools, deterministic writes).
 
 ---
 
@@ -64,7 +65,10 @@ whatever context exists — prompt-only in the worst case.
 - Model + web search from the existing `build_search_equipped(mid_tier)`
   (Anthropic native / OpenAI native / DuckDuckGo tool fallback).
 - One custom read-only tool: `check_source(url)` — wraps `preview_source()`
-  and returns `{ ok, ats, token, role_count, error }`. Writes nothing.
+  and returns `{ ok, ats, token, role_count, error }`. Writes nothing. Probes
+  run with a small fetch limit (loop speed) and always with the browser
+  disabled, so no probe can pop a visible browser mid-loop; browser-only
+  sources (Tesla) surface their degradation reason instead.
 - The agent finds the named companies' career boards, expands the prompt into
   similar companies (using the profile/search grounding for relevance), probes
   candidate URLs with `check_source`, and self-corrects on misses (e.g. a
@@ -82,15 +86,30 @@ never trusted for the final verdict. Failures never abort the run (same
 isolation philosophy as `companies.py`).
 
 The run result payload carries the full candidate table: validated rows
-(`ats`, `token`, resolved URL, live `role_count`) and failed rows (reason).
+(`ats`, `token`, resolved URL, live `role_count`), **unverified rows**
+(careers URL found but no supported ATS detected — see below), and failed
+rows (reason). A validated row with `role_count = 0` stays selectable: a
+source is durable and openings change; the UI hints at the empty count.
+
+**Unverified rows (no supported ATS).** A company whose careers page fails
+`detect_ats` is offered as a **scrape target**: a new explicit
+`provider="scrape"` branch in `add_source` writes `config.scrape.targets`
+(Source Manager can already toggle/limit/remove scrape targets, just not add
+them). These rows are explicitly marked unverified — a recipe is learned on
+first pull, so "validated to exist" applies only to ATS-backed rows. The
+action is disabled with an explanatory tooltip when `browser_enabled=false`
+(Railway), matching the browser-degradation doctrine.
 
 ### Approval
 
 The Sources page renders the table with checkboxes; validated rows are
-selectable, failed rows greyed out with their reason. "Add selected" calls the
-**existing** `POST /api/sources` per row (`add_source` re-validates once more
-and writes `connectors.yaml`). No new mutation endpoint. Per-row add failures
-surface inline; other rows proceed.
+selectable, unverified rows carry the "add as scrape target" action, failed
+rows are greyed out with their reason. "Add selected" calls the **existing**
+`POST /api/sources` per row (`add_source` re-validates once more and writes
+`connectors.yaml`). Scrape adds ride the same endpoint via a new explicit
+`provider="scrape"` branch in `add_source` (skips ATS detection, writes
+`config.scrape.targets`) — so still no new mutation endpoint. Per-row add
+failures surface inline; other rows proceed.
 
 CLI `--add` adds all validated candidates through the same service call.
 
@@ -117,10 +136,15 @@ terminal: print questions, read answers, save notes, trigger build).
 - Facts summary: experiences/projects with bullet and metric counts.
 - Skill-matrix stats: rows with thin evidence.
 - Corpus manifest: document names, types, origins, sizes.
+- **Market gaps:** a compact Match/Gap summary — top demanded canonical
+  tokens (from the existing cluster map) with weak or missing profile
+  evidence — so questions target what the user's discovered jobs actually
+  ask for. Degrades gracefully to corpus-only when no jobs exist yet.
 - **History:** previously asked questions from
   `data/profile/interview_history.json` (per-workspace sidecar), injected so
   rounds never repeat. Kept outside the corpus so it never pollutes
-  extraction.
+  extraction. The history also records each answer's resulting note-doc id,
+  making it the single source the conversation view reconstructs from.
 
 **2. Agent loop.** `build_interview_agent()` with read-only tools:
 
@@ -136,25 +160,40 @@ either:
 
 - a **question**: `{ id, gap, why_it_matters, question_text, related_ref }`
   (`related_ref` = fact or doc id), or
-- a **research suggestion**: `{ kind: "harvest_repo" | "request_url", target,
-  why }`.
+- a **research action**: `{ kind: "harvest_repo" | "request_url", target,
+  why }` ("research suggestion" is avoided — a Suggestion belongs to the
+  match-gap advisor).
+
+Questions must demand **evidence**, never yes/no claims: "where did you use
+Terraform and what did you do with it," not "do you know Terraform?" —
+market-gap questions especially must not invite thin assertions.
 
 The round is the run's result; asked questions are appended to the history
 file.
 
 ### Answering
 
-The Profile page renders the round as a form: skippable text boxes for
-questions; one-click chips for research suggestions ("Re-harvest repo" →
-existing GitHub sync, "Provide URL" → existing URL intake).
+The round renders **chat-styled**: the agent's questions appear as message
+bubbles in a conversation column, the user's answers as replies, research
+actions as inline action chips ("Re-harvest repo" → existing GitHub sync,
+"Provide URL" → existing URL intake) — visual patterns borrowed from agno's
+agent-ui. The semantics stay round-based: answers are skippable, and one send
+submits the whole round. Past rounds render above the current one,
+reconstructed from the interview history — there is no chat session state.
 
 `POST /api/profile/interview/{run_id}/answers` `{ answers: [{ question_id,
-text }] }`:
+text }], build: bool = true }`:
 
 1. Each non-empty answer becomes a note source via the existing
-   `add_note_source` (title `Interview — <gap>`).
-2. A profile-build run is started (existing build path); its run id is
-   returned alongside the created source documents.
+   `add_note_source` (title `Interview — <gap>`); the note-doc id is recorded
+   in the history file.
+2. A profile-build run is started (existing build path) and its run id
+   returned alongside the created documents — unless `build=false` (a "save
+   only" option for users batching evidence) or a build/reset is already
+   active, in which case notes still save and the response says
+   `buildStarted=false` with the reason.
+3. A second submission for the same `run_id` is refused with `409` — one
+   round, one submission.
 
 Fact-lock is untouched: answers are user-authored literal corpus documents
 flowing through the normal extract pipeline. The agent never writes facts.
@@ -192,14 +231,19 @@ notes plus the history file, so successive rounds converge on remaining gaps.
 - Both agents are faked with canned structured outputs; `preview_source` faked
   per URL; no network.
 - Part A: dedupe against existing sources, validation fan-out and isolation,
-  run lifecycle, empty-result run, key/search-mode preflight, contract gate.
-- Part B: context assembly (thin-doc inputs), history-based no-repeat
-  injection, answers → note sources → build trigger, skipped questions produce
-  no documents, contract gate.
+  run lifecycle, empty-result run, key/search-mode preflight, the
+  `provider="scrape"` add branch (including its `browser_enabled=false`
+  refusal), contract gate.
+- Part B: context assembly (thin-doc and market-gap inputs, graceful
+  no-jobs degradation), history-based no-repeat injection, answers → note
+  sources → build trigger, busy-build `buildStarted=false` branch, duplicate
+  submission 409, skipped questions produce no documents, contract gate.
 
 ## Non-goals
 
-- No free-form chat surface (rounds/forms only).
+- No persistent chat session or streamed turns — the conversation UI is a
+  chat-styled *presentation* of stateless rounds reconstructed from the
+  interview history.
 - No open web search about the user in Part B (repo + user-URL evidence only).
 - No agent-side writes of any kind; no new mutation endpoints beyond the
   interview answers submission.
