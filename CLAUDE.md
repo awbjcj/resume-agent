@@ -282,11 +282,21 @@ aggressiveness determines how many detail fetches are issued.
   searchText-only paging. Category/job-family facets remain out of scope.
 - **Tesla/Google portals are reverse-engineered.** Google's `ds:1`
   `AF_initDataCallback` carries complete list rows and full JDs; a missing or malformed
-  jobs callback raises a per-URL parse failure. Tesla's API is Akamai-gated, so one
-  visible `TeslaPortal` captures state and performs same-origin detail fetches. A
-  companies connector containing Tesla opts out of concurrent fetch and is serialized
-  with other visible-browser connectors by the pull runner. Either portal can change
-  without notice, but its failure never aborts other company URLs.
+  jobs callback raises a per-URL parse failure. Tesla's site is Akamai-gated: the
+  visible `TeslaPortal` only passes with **real Chrome** (`channel="chrome"`),
+  `--disable-blink-features=AutomationControlled` (so `navigator.webdriver` is
+  `false`), and a **fresh non-persistent context** (a persistent profile keeps a
+  poisoned `_abck` cookie from a prior denial). All three are required; bundled
+  Chromium or `webdriver=true` is served "Access Denied" and the `state` XHR never
+  fires. `_capture_state` retries past a throttled cold denial and raises
+  `TeslaStateUnavailable` (isolated by `_failure_reason`, never aborting the pull).
+  Live schema: listing location is a code resolved via `state.lookup.locations`; the
+  detail endpoint is `cua-api/careers/job/{id}` (no `apps/`) and JD prose lives in
+  `jobDescription`/`jobResponsibilities`/`jobRequirements`/`jobCompensationAndBenefits`
+  (`description` is empty). A companies connector containing Tesla opts out of
+  concurrent fetch and is serialized with other visible-browser connectors by the
+  pull runner. Either portal can change without notice, but its failure never aborts
+  other company URLs.
 - **Limits are per source unit.** Every board, careers URL, aggregator, and scrape
   target can set an optional positive `limit` in `connectors.yaml` or Source Manager.
   The global `--limit` is the per-unit fallback; `harvest` gates, skips known rows, and
