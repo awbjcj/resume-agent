@@ -3,6 +3,34 @@
 Date: 2026-07-14
 Status: Approved
 
+## Correctness clarifications (2026-07-14 implementation audit)
+
+- Candidate validation returns structured failure codes. A reachable page with
+  no supported ATS is `unverified`; an unreachable page is `failed`. UI logic
+  never classifies by matching human-readable error text.
+- Source Scout dedupes normalized URL/token identities against both configured
+  sources and earlier rows in the same report while preserving proposal order.
+- The discovery result carries browser/scrape capability so an unverified row is
+  disabled before approval when scrape is unavailable.
+- Public scrape additions reject unsafe URL shapes at the API/service boundary.
+- Both two-stage workflows preflight every configured model provider they will
+  call, and every tool returns a bounded error value rather than leaking an
+  exception into the model loop.
+- Interview rounds have an explicit submitted timestamp. Even a round whose
+  answers are all skipped is one-shot, and answer creation/history mutation are
+  serialized per profile.
+- Interview answer intake requires an existing literal primary corpus source;
+  an interview note can never accidentally become the primary resume.
+- The history API resolves recorded note IDs to actual answer text for display
+  while the sidecar continues to store only document IDs. Missing note files
+  remain visible as unavailable replies rather than erasing history.
+- Application code assigns unique question IDs and enforces the item cap across
+  questions plus research actions; it does not trust formatter IDs or counts.
+- The CLI follows the same default as the API: answers trigger a build unless
+  `--no-build` is selected.
+- Frontend run tracking uses the repository's `RunRecord.status` contract, and
+  research-action controls call the existing GitHub-sync and URL-intake paths.
+
 Two features built on one new foundation — the repo's first **tool-calling agent
 loops**, constrained by a single rule: **agents get read-only tools; every write
 goes through an existing deterministic service after structured output and user

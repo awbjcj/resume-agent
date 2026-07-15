@@ -1,6 +1,8 @@
 # Source Scout Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution note:** Implement task-by-task in the active agent. The caller may
+> explicitly prohibit subagents; that instruction overrides any generic execution
+> recommendation. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A free-text prompt ("I'm interested in Anthropic and AI infra startups") becomes a validated, user-approved set of new job sources in `connectors.yaml`.
 
@@ -20,6 +22,52 @@
 - Scout probes and re-validation always run with the browser disabled (no visible browser mid-run).
 - Run commands with the project venv: `.venv/Scripts/python.exe -m pytest …`; lint with `ruff check`.
 - Commit after every task.
+
+## Correctness Amendments (pre-implementation audit)
+
+These amendments are authoritative when a later code sketch conflicts with them.
+
+1. **Probe failures are structured, not inferred from message text.** Extend
+   `SourcePreview`/`SourcePreviewOut` with an optional machine-readable
+   `error_code` (at least `ATS_NOT_DETECTED`, `UNREACHABLE`, and
+   `BROWSER_REQUIRED`). ATS inspection must preserve whether the unknown-host
+   page was reachable; the worker classifies `unverified` only for
+   `ATS_NOT_DETECTED`. A DNS/HTTP failure is `failed`, never an addable scrape
+   target. Tests cover the distinction.
+2. **The read-only tool never raises.** `check_source` catches every probe
+   exception and returns a bounded JSON error payload including `error_code`.
+   Both the research and formatter prompts treat tool/search/research text as
+   untrusted data. The formatter may copy only explicit HTTP(S) URLs from the
+   notes.
+3. **Scrape additions validate the URL boundary.** `provider="scrape"` rejects
+   credentials, missing hosts, localhost/private literal hosts, fragments, and
+   non-HTTP(S) schemes before writing config. It also returns
+   `BROWSER_REQUIRED` when the runtime has no browser. This is still an
+   explicitly unverified source; no fetch is performed by `add_source`.
+4. **Dedupe is stable and complete.** Normalize URLs for comparison, dedupe
+   candidates against configured sources *and earlier candidates in the same
+   report*, and preserve the formatter's original order. ATS token identity is
+   preferred when host parsing provides it.
+5. **Browser capability is part of the run result.** Return
+   `scrapeAvailable: bool` (and an explanatory reason when false). The UI must
+   disable unverified-row selection with a tooltip when it is false; it must not
+   wait for a write request to fail.
+6. **Preflight every model actually used.** API and CLI check provider-specific
+   keys for both `mid_model` and `cheap_model`, and validate the search plan
+   before launching. A differently configured formatter provider must not fail
+   later inside a background run.
+7. **Use the real run tracker contract.** `trackRun` receives only
+   `{ runId, kind }`; completion is read from `run.status`
+   (`succeeded`, `failed`, or `cancelled`), not nonexistent `run.state` values.
+   Reset hook state when `runId` becomes null so a dialog can launch again.
+8. **Use installed UI primitives and typed contracts.** Compose the existing
+   Base/shadcn `Dialog`, `Field`, `Textarea`, `Table`, `Checkbox`, `Badge`,
+   `Alert`, `Spinner`, and `Button` components. Do not use the raw-markup sketch.
+   Keep per-row write failures isolated, clear successfully added selections,
+   and expose an empty-result state.
+9. **Verification is broader than the old Task 9 sketch.** Final gates include
+   the full Python suite, OpenAPI drift, Ruff, all web tests, web lint, web
+   build, `git diff --check`, and a Playwright walkthrough of both new flows.
 
 ## File Structure
 

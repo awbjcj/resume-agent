@@ -1,6 +1,8 @@
 # Profile Interview Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution note:** Implement task-by-task in the active agent. The caller may
+> explicitly prohibit subagents; that instruction overrides any generic execution
+> recommendation. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A gap-driven interview agent that inspects the profile corpus and market demand, asks evidence-demanding questions in stateless rounds, and turns answers into note sources that flow through the normal profile build.
 
@@ -21,6 +23,58 @@
 - The agent's only write surface is nothing; answers become notes only via `add_note_source` on submit. Fact-lock untouched.
 - History sidecar `interview_history.json` lives in the profile dir, outside the corpus, and records questions AND answer doc ids.
 - Wire format camelCase; commit after every task; `.venv/Scripts/python.exe -m pytest`; `ruff check`.
+
+## Correctness Amendments (pre-implementation audit)
+
+These amendments are authoritative when a later code sketch conflicts with them.
+
+1. **History never silently resets and submission has explicit state.** Missing
+   history means an empty history; malformed history raises a clear error rather
+   than discarding prior rounds. Each round stores `submitted_at: str | None`.
+   `record_answers` refuses a second submission based on `submitted_at`, so an
+   all-skipped first submission is still final.
+2. **History mutations and note creation share a per-profile critical section.**
+   Concurrent submissions cannot both pass the unanswered check or create
+   duplicate notes. Validate the entire answer batch (duplicate/unknown IDs and
+   length bounds) before the first write, then create notes and atomically record
+   their IDs. Tests exercise concurrent and empty-answer resubmission.
+3. **A real primary corpus is required before answers can be accepted.** An
+   interview note must never become the first/primary resume. API and CLI
+   preflight a literal primary source; the service repeats the invariant at the
+   mutation boundary.
+4. **Normalize model output deterministically.** Drop blank questions/actions,
+   assign unique stable question IDs in application code, and enforce
+   `MAX_QUESTIONS` across questions plus research actions combined. Treat corpus
+   text and inspector notes as untrusted data in both agent stages.
+5. **The transcript returns actual replies.** The sidecar remains limited to
+   question metadata and note doc IDs. `GET /profile/interview/history` resolves
+   each recorded note safely and returns `answerText` for the conversation UI;
+   missing documents degrade to an unavailable marker. Define and use a typed
+   `InterviewHistoryOut` response so OpenAPI/TypeScript carry the full shape.
+6. **Preflight the configured providers precisely.** Interview launch checks keys
+   for both `mid_model` and `cheap_model`, not merely "any LLM key". Answer input
+   is bounded to the round cap and per-answer corpus limit.
+7. **Build behavior matches the approved design.** API auto-build catches only
+   the known active-build/reset conflicts as `buildStarted=false`; unrelated
+   validation failures are not mislabeled as busy. CLI defaults to rebuilding
+   after saving and offers `--no-build` for batching instead of only printing a
+   follow-up command.
+8. **Use the real run tracker contract and reset completed state.** `trackRun`
+   receives `{ runId, kind }`; completion uses `run.status`, not `run.state`.
+   After submit, clear the current round so another round can be started.
+9. **Research actions are functional.** `harvest_repo` invokes the existing
+   GitHub sync flow. `request_url` presents a validated URL input and invokes the
+   existing URL-intake mutation; a placeholder target is never submitted as if
+   it were a URL.
+10. **Use installed Base/shadcn primitives.** Compose `Card`, `Field`,
+    `Textarea`, `Input`, `Checkbox`, `Badge`, `Alert`, `Spinner`, and `Button`.
+    The current registry has no message/bubble primitives, so the UI uses these
+    installed primitives with semantic tokens rather than inventing a second
+    component library or copying unavailable examples.
+11. **Final verification is full-story.** Run the complete Python suite,
+    OpenAPI drift, Ruff, all web tests, web lint, web build, `git diff --check`,
+    and a Playwright walkthrough covering start, answer submission, history,
+    save-only, rebuild, and both research actions.
 
 ## File Structure
 
