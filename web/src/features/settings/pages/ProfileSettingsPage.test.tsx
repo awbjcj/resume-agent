@@ -18,6 +18,10 @@ vi.mock("@/features/profile-sources/SourceManager", () => ({
   SourceManager: () => <div data-testid="source-manager" />,
 }));
 
+vi.mock("@/features/interview/InterviewPanel", () => ({
+  InterviewPanel: () => <div data-testid="interview-panel" />,
+}));
+
 vi.mock("../SkillGroupsPanel", () => ({
   SkillGroupsPanel: () => <div data-testid="skill-groups" />,
 }));
@@ -74,6 +78,7 @@ describe("ProfileSettingsPage", () => {
     const user = userEvent.setup();
     render(<ProfileSettingsPage />, { wrapper: withQueryClient });
     expect(screen.getByTestId("skill-groups")).toBeInTheDocument();
+    expect(screen.getByTestId("interview-panel")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/always include repositories/i), "important, fork");
     await user.type(screen.getByLabelText(/exclude repositories/i), "noise");

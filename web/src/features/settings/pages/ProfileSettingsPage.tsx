@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { BuildReportPanel } from "@/features/profile-sources/BuildReportPanel";
 import { SourceManager } from "@/features/profile-sources/SourceManager";
+import { InterviewPanel } from "@/features/interview/InterviewPanel";
 import { useActiveRun } from "@/features/runs/use-active-run";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
 import type { paths } from "@/lib/api/schema";
@@ -68,6 +69,7 @@ export function ProfileSettingsPage() {
           The resume and other source documents the profile is built from.
         </p>
       </header>
+      <InterviewPanel />
       <SourceManager />
       <Separator />
       <FieldGroup>
