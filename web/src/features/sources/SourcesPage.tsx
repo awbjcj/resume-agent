@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
 import { useRunStore, type PullRunResult } from "@/lib/runs/store";
 import { AddSourceDialog } from "./AddSourceDialog";
+import { DiscoverCompaniesDialog } from "./DiscoverCompaniesDialog";
 import {
   useRemoveSource,
   useSetEnabled,
@@ -235,6 +236,7 @@ export function SourcesManager() {
     <div>
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <AddSourceDialog />
+        <DiscoverCompaniesDialog />
         <Button
           variant="outline"
           size="sm"

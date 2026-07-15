@@ -10,7 +10,8 @@ export type SourceProvider =
   | "personio"
   | "breezy"
   | "jazzhr"
-  | "bamboohr";
+  | "bamboohr"
+  | "scrape";
 
 export type SourceConnection = {
   provider: SourceProvider;
