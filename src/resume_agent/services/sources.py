@@ -36,6 +36,7 @@ from resume_agent.discovery.connectors.sources import (
     scrape_target_id,
 )
 from resume_agent.discovery.search_config import load_search_config
+from resume_agent.profile.intake import _resolve_host
 from resume_agent.services.discovery import DEFAULT_CONNECTORS, DEFAULT_SEARCH
 
 _PREVIEW_LIMIT = 50
@@ -112,7 +113,14 @@ def _preview_connector(target: AtsTarget, url: str, *, browser: bool = True):
 
 
 def _scrape_url(url: str | None) -> str:
-    """Validate and normalize a user-supplied browser target."""
+    """Validate and normalize a user-supplied browser target.
+
+    A hostname (as opposed to a literal IP) must resolve to only globally
+    routable addresses — the same DNS-rebinding-aware check
+    ``profile.intake._resolve_host`` applies to note/URL intake — otherwise an
+    attacker-controlled or misconfigured domain could point the real,
+    visible-browser scraper at an internal-only service.
+    """
     raw = (url or "").strip()
     try:
         parsed = urlsplit(raw)
@@ -132,10 +140,16 @@ def _scrape_url(url: str | None) -> str:
     if normalized_host == "localhost" or normalized_host.endswith(".localhost"):
         raise SourceError("A scrape target must be a public HTTP(S) URL.")
     try:
-        if not ip_address(normalized_host).is_global:
-            raise SourceError("A scrape target must be a public HTTP(S) URL.")
+        addresses = {str(ip_address(normalized_host))}
     except ValueError:
-        pass
+        try:
+            addresses = _resolve_host(normalized_host)
+        except OSError as exc:
+            raise SourceError(
+                f"Could not resolve scrape target host {normalized_host!r}."
+            ) from exc
+    if not addresses or any(not ip_address(addr).is_global for addr in addresses):
+        raise SourceError("A scrape target must be a public HTTP(S) URL.")
     default_port = (parsed.scheme == "http" and port == 80) or (
         parsed.scheme == "https" and port == 443
     )

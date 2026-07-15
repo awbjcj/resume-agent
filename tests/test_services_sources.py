@@ -259,12 +259,17 @@ def test_scrape_source_can_be_disabled_and_removed(tmp_path):
     assert source_id not in {source.id for source in svc.list_sources(path)}
 
 
+def _fake_public_resolver(monkeypatch):
+    monkeypatch.setattr(svc, "_resolve_host", lambda host: {"93.184.216.34"})
+
+
 def test_add_scrape_target_writes_scrape_section(tmp_path, monkeypatch):
     from resume_agent.config import Settings
 
     monkeypatch.setattr(
         svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)
     )
+    _fake_public_resolver(monkeypatch)
     path = str(tmp_path / "connectors.yaml")
 
     view = svc.add_source(
@@ -285,6 +290,7 @@ def test_add_scrape_target_refuses_browserless_and_unsafe_urls(tmp_path, monkeyp
     from resume_agent.config import Settings
 
     path = str(tmp_path / "connectors.yaml")
+    _fake_public_resolver(monkeypatch)
     monkeypatch.setattr(
         svc, "get_settings", lambda: Settings.model_construct(browser_enabled=False)
     )
@@ -315,6 +321,7 @@ def test_add_scrape_target_duplicate_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(
         svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)
     )
+    _fake_public_resolver(monkeypatch)
     path = str(tmp_path / "connectors.yaml")
     svc.add_source(
         url="https://jobs.example.com/careers",
