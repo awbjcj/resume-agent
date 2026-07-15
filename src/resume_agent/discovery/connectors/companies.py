@@ -26,7 +26,10 @@ from resume_agent.discovery.connectors.jazzhr import fetch_jazzhr
 from resume_agent.discovery.connectors.personio import fetch_personio
 from resume_agent.discovery.connectors.recruitee import fetch_recruitee
 from resume_agent.discovery.connectors.smartrecruiters import fetch_smartrecruiters
-from resume_agent.discovery.connectors.tesla import fetch_tesla
+from resume_agent.discovery.connectors.tesla import (
+    TeslaStateUnavailable,
+    fetch_tesla,
+)
 from resume_agent.discovery.connectors.workday import fetch_workday
 from resume_agent.discovery.connectors.workable import fetch_workable
 from resume_agent.discovery.search_config import SearchConfig
@@ -146,6 +149,8 @@ def _failure_reason(exc: Exception) -> str | None:
         return f"{exc.ats.title()} recognized, not yet supported"
     if isinstance(exc, BrowserRequired):
         return "requires a local browser (browser_enabled=false)"
+    if isinstance(exc, TeslaStateUnavailable):
+        return "Tesla careers blocked (Akamai bot gate)"
     if isinstance(exc, httpx.HTTPError):
         return board_error(exc)
     if isinstance(exc, (ValueError, KeyError, TypeError, AttributeError)):

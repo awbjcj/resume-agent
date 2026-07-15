@@ -1,16 +1,22 @@
 {
+  "lookup": {
+    "locations": {
+      "401022": "Palo Alto, California",
+      "500001": "Fremont, California"
+    }
+  },
   "listings": [
     {
       "id": "1",
-      "title": "Software Engineer",
-      "department": "Software",
-      "region": "Austin, TX"
+      "t": "Software Engineer",
+      "dp": "1",
+      "l": "401022"
     },
     {
       "id": "2",
-      "title": "Welder",
-      "department": "Manufacturing",
-      "region": "Fremont, CA"
+      "t": "Welder",
+      "dp": "2",
+      "l": "500001"
     }
   ]
 }

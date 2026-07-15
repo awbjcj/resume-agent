@@ -41,7 +41,7 @@ def test_parse_tesla_listings_to_partial_rawjobs():
     assert [row.title for row in rows] == ["Software Engineer", "Welder"]
     assert rows[0].source == "tesla"
     assert rows[0].company == "Tesla"
-    assert rows[0].location == "Austin, TX"
+    assert rows[0].location == "Palo Alto, California"  # resolved from lookup code
     assert rows[0].listing_id == "1"
     assert rows[0].jd_text == ""
 
@@ -85,6 +85,62 @@ def test_fetch_tesla_respects_limit(monkeypatch):
     assert portal.detail_calls == ["1"]
 
 
+def test_apply_tesla_detail_assembles_jd_and_absolutizes_url():
+    row = tesla.TeslaRow(
+        source="tesla",
+        url=None,
+        company="Tesla",
+        title="SWE",
+        location="Palo Alto, California",
+        jd_text="",
+        listing_id="1",
+    )
+    tesla.apply_tesla_detail(row, DETAILS["1"])
+    assert "Python" in row.jd_text  # from jobDescription, not the empty description
+    assert "shipping software" in row.jd_text  # jobRequirements folded in too
+    assert row.url == "https://www.tesla.com/careers/search/job/software-engineer-1"
+
+
+def test_capture_state_retries_past_transient_denial(monkeypatch):
+    sleeps: list[float] = []
+    monkeypatch.setattr(tesla.time, "sleep", lambda s: sleeps.append(s))
+    calls = {"n": 0}
+
+    def flaky(_page):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise RuntimeError("Access Denied")
+        return STATE
+
+    monkeypatch.setattr(tesla, "_capture_once", flaky)
+    assert tesla._capture_state(object(), attempts=3, backoff_s=0.1) is STATE
+    assert calls["n"] == 3
+    assert sleeps == [0.1, 0.1]  # backed off between the two failures
+
+
+def test_capture_state_raises_isolable_error_when_exhausted(monkeypatch):
+    monkeypatch.setattr(tesla.time, "sleep", lambda s: None)
+
+    def always_denied(_page):
+        raise RuntimeError("Access Denied")
+
+    monkeypatch.setattr(tesla, "_capture_once", always_denied)
+    try:
+        tesla._capture_state(object(), attempts=2, backoff_s=0.0)
+    except tesla.TeslaStateUnavailable as error:
+        assert isinstance(error.__cause__, RuntimeError)
+    else:  # pragma: no cover - failure path must raise
+        raise AssertionError("expected TeslaStateUnavailable")
+
+
+def test_tesla_block_is_isolated_not_fatal_to_the_pull():
+    from resume_agent.discovery.connectors.companies import _failure_reason
+
+    reason = _failure_reason(tesla.TeslaStateUnavailable("blocked"))
+    assert reason is not None  # a reason string means harvest records, not re-raises
+    assert "Akamai" in reason
+
+
 def test_tesla_portal_runs_same_origin_detail_fetch():
     class _Page:
         def __init__(self):
@@ -97,5 +153,5 @@ def test_tesla_portal_runs_same_origin_detail_fetch():
     page = _Page()
     portal = tesla.TeslaPortal(page, STATE)
     assert portal.job_detail("1") == DETAILS["1"]
-    assert page.calls[0][1].endswith("/cua-api/apps/careers/job/1")
+    assert page.calls[0][1].endswith("/cua-api/careers/job/1")
     assert "fetch(url" in page.calls[0][0]

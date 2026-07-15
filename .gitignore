@@ -41,6 +41,8 @@ tests/fixtures/linkedin/*_live.html
 .pytest_cache/
 .claude/
 .superpowers/
+.linkedin_profile_tesla/
+.tesla_profile/
 
 
 # OS / editor

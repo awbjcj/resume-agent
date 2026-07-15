@@ -1,5 +1,9 @@
 {
   "id": "1",
-  "description": "<p>Build with Python.</p>",
-  "url": "https://www.tesla.com/careers/search/job/1"
+  "title": "Software Engineer",
+  "location": "Palo Alto, California",
+  "description": "",
+  "jobDescription": "<p>Build with Python.</p>",
+  "jobRequirements": "<ul><li>Experience shipping software.</li></ul>",
+  "url": "/careers/search/job/software-engineer-1"
 }
