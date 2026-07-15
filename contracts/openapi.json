@@ -179,7 +179,8 @@
               "personio",
               "breezy",
               "jazzhr",
-              "bamboohr"
+              "bamboohr",
+              "scrape"
             ],
             "title": "Provider",
             "type": "string"
@@ -1208,6 +1209,21 @@
       "DiscoverParams": {
         "properties": {},
         "title": "DiscoverParams",
+        "type": "object"
+      },
+      "DiscoverSourcesIn": {
+        "properties": {
+          "prompt": {
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "DiscoverSourcesIn",
         "type": "object"
       },
       "DocumentOut": {
@@ -4072,7 +4088,8 @@
               "personio",
               "breezy",
               "jazzhr",
-              "bamboohr"
+              "bamboohr",
+              "scrape"
             ],
             "title": "Provider",
             "type": "string"
@@ -4137,6 +4154,17 @@
               }
             ],
             "title": "Error"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errorcode"
           },
           "kind": {
             "anyOf": [
@@ -10659,6 +10687,62 @@
           }
         },
         "summary": "Add Source Route"
+      }
+    },
+    "/api/sources/discover": {
+      "post": {
+        "operationId": "discover_sources_route_api_sources_discover_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoverSourcesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discover Sources Route"
       }
     },
     "/api/sources/linkedin/scrape": {

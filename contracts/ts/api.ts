@@ -1318,6 +1318,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover Sources Route */
+        post: operations["discover_sources_route_api_sources_discover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/linkedin/scrape": {
         parameters: {
             query?: never;
@@ -1517,7 +1534,7 @@ export interface components {
              * @default auto
              * @enum {string}
              */
-            provider: "auto" | "greenhouse" | "lever" | "ashby" | "workday" | "smartrecruiters" | "workable" | "recruitee" | "personio" | "breezy" | "jazzhr" | "bamboohr";
+            provider: "auto" | "greenhouse" | "lever" | "ashby" | "workday" | "smartrecruiters" | "workable" | "recruitee" | "personio" | "breezy" | "jazzhr" | "bamboohr" | "scrape";
             /** Site */
             site?: string | null;
             /** Tenant */
@@ -1868,6 +1885,11 @@ export interface components {
         };
         /** DiscoverParams */
         DiscoverParams: Record<string, never>;
+        /** DiscoverSourcesIn */
+        DiscoverSourcesIn: {
+            /** Prompt */
+            prompt: string;
+        };
         /** DocumentOut */
         DocumentOut: {
             /** Doctype */
@@ -2819,7 +2841,7 @@ export interface components {
              * @default auto
              * @enum {string}
              */
-            provider: "auto" | "greenhouse" | "lever" | "ashby" | "workday" | "smartrecruiters" | "workable" | "recruitee" | "personio" | "breezy" | "jazzhr" | "bamboohr";
+            provider: "auto" | "greenhouse" | "lever" | "ashby" | "workday" | "smartrecruiters" | "workable" | "recruitee" | "personio" | "breezy" | "jazzhr" | "bamboohr" | "scrape";
             /** Site */
             site?: string | null;
             /** Tenant */
@@ -2833,6 +2855,8 @@ export interface components {
         SourcePreviewOut: {
             /** Error */
             error?: string | null;
+            /** Errorcode */
+            errorCode?: string | null;
             /** Kind */
             kind?: string | null;
             /** Label */
@@ -6308,6 +6332,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["resume_agent__api__schemas__sources__SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_sources_route_api_sources_discover_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoverSourcesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

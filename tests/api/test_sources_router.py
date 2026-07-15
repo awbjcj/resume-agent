@@ -4,8 +4,15 @@ from resume_agent.api.app import create_app
 from resume_agent.api.routers import sources as sources_router
 
 
-def _client():
-    return TestClient(create_app(db_url="sqlite://"))
+def _client(data_dir=None):
+    kwargs = {"db_url": "sqlite://", "api_token": ""}
+    if data_dir is not None:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        env_path = data_dir / "empty.env"
+        env_path.write_text("", encoding="utf-8")
+        kwargs["data_dir"] = data_dir
+        kwargs["env_path"] = env_path
+    return TestClient(create_app(**kwargs))
 
 
 def test_list_sources_returns_views(monkeypatch):
@@ -169,3 +176,59 @@ def test_patch_source_rejects_empty_or_non_positive_changes():
 
     assert empty.status_code == 400
     assert invalid.status_code == 422
+
+
+def test_discover_launches_run_with_runtime_capability(monkeypatch, tmp_path):
+    import time
+
+    monkeypatch.setattr(sources_router, "resolve_api_key", lambda model_id: "key")
+    monkeypatch.setattr(
+        sources_router,
+        "run_source_discovery",
+        lambda reporter, **kwargs: {
+            "prompt": kwargs["prompt"],
+            "candidates": [],
+            "scrapeAvailable": kwargs["browser_enabled"],
+            "scrapeUnavailableReason": None,
+        },
+    )
+    client = _client(tmp_path / "data")
+    with client:
+        launched = client.post(
+            "/api/sources/discover", json={"prompt": "AI infrastructure startups"}
+        )
+        assert launched.status_code == 202
+        run_id = launched.json()["runId"]
+        for _ in range(50):
+            run = client.get(f"/api/runs/{run_id}").json()
+            if run["state"] in {"done", "error"}:
+                break
+            time.sleep(0.05)
+
+    assert run["state"] == "done"
+    assert run["result"]["prompt"] == "AI infrastructure startups"
+    assert isinstance(run["result"]["scrapeAvailable"], bool)
+
+
+def test_discover_preflights_both_models_and_search(monkeypatch, tmp_path):
+    seen = []
+
+    def key(model_id):
+        seen.append(model_id)
+        return "key" if len(seen) == 1 else ""
+
+    monkeypatch.setattr(sources_router, "resolve_api_key", key)
+    client = _client(tmp_path / "data")
+    with client:
+        response = client.post("/api/sources/discover", json={"prompt": "find acme"})
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "SETUP_INCOMPLETE"
+    assert len(set(seen)) == 2
+
+
+def test_discover_rejects_short_prompt(tmp_path):
+    client = _client(tmp_path / "data")
+    with client:
+        response = client.post("/api/sources/discover", json={"prompt": "x"})
+    assert response.status_code == 422

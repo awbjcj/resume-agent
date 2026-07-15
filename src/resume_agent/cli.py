@@ -11,7 +11,7 @@ from resume_agent.discovery.connectors.telemetry import read_runs
 from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
 from resume_agent.gmail.propose import propose_transitions
-from resume_agent.llm_runner import resolve_api_key
+from resume_agent.llm_runner import plan_search, resolve_api_key
 from resume_agent.progress import ProgressReporter
 from resume_agent.profile.store import load_facts
 from resume_agent.render.export import export_job_artifacts
@@ -312,6 +312,77 @@ def _engine(db_url: str | None):
     engine = make_engine(db_url or get_settings().db_url)
     init_db(engine)
     return engine
+
+
+@app.command("scout")
+def scout_cmd(
+    prompt: str = typer.Argument(..., help="Companies or kinds of companies you want."),
+    add: bool = typer.Option(False, "--add", help="Add every validated candidate."),
+    connectors_path: str = typer.Option(
+        DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
+    ),
+    search_path: str = typer.Option(
+        DEFAULT_SEARCH, "--search", help="Path to search.yaml."
+    ),
+) -> None:
+    """Discover and validate new company sources from a free-text prompt."""
+    from resume_agent.services.source_discovery import run_source_discovery
+    from resume_agent.services.sources import SourceError, add_source
+
+    settings = get_settings()
+    required_models = tuple(dict.fromkeys((settings.mid_model, settings.cheap_model)))
+    missing = [model for model in required_models if not resolve_api_key(model)]
+    if missing:
+        typer.echo(f"Missing API key for configured model(s): {', '.join(missing)}")
+        raise typer.Exit(code=1)
+    try:
+        search_plan = plan_search(settings.mid_model, settings.search_mode)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    if search_plan.strategy == "none":
+        typer.echo("Source Scout needs web search; change search_mode from off.")
+        raise typer.Exit(code=1)
+
+    class EchoReporter:
+        def begin(self, total, label, **extra):
+            typer.echo(f"{label}…")
+
+        def step(self, current, *, label=None, **extra):
+            pass
+
+        def checkpoint(self):
+            pass
+
+    connectors = str(_tenant_cli_path(connectors_path))
+    search = str(_tenant_cli_path(search_path))
+    result = run_source_discovery(
+        EchoReporter(),
+        prompt=prompt,
+        connectors_path=connectors,
+        search_path=search,
+        profile_dir=_tenant_cli_path(DEFAULT_PROFILE_DIR),
+        browser_enabled=settings.browser_enabled,
+    )
+    for row in result["candidates"]:
+        roles = f" ({row['roleCount']} roles)" if row["roleCount"] is not None else ""
+        detail = row["error"] or row["reason"]
+        typer.echo(f"  {row['company']:<24} {row['status']:<10}{roles} {detail}")
+    if not add:
+        return
+    for row in result["candidates"]:
+        if row["status"] != "validated":
+            continue
+        try:
+            add_source(
+                url=row["url"],
+                label=row["company"],
+                connectors_path=connectors,
+                search_path=search,
+            )
+            typer.echo(f"added: {row['company']}")
+        except SourceError as exc:
+            typer.echo(f"skipped {row['company']}: {exc}")
 
 
 def _read_piped_stdin() -> str | None:
