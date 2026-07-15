@@ -1,6 +1,8 @@
 import io
 import time
+from typing import cast
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
@@ -55,11 +57,13 @@ def _launch_and_wait(client, monkeypatch):
     launched = client.post("/api/profile/interview")
     assert launched.status_code == 202
     run_id = launched.json()["runId"]
+    run = None
     for _ in range(50):
         run = client.get(f"/api/runs/{run_id}").json()
         if run["state"] in {"done", "error"}:
             break
         time.sleep(0.02)
+    assert run is not None
     assert run["state"] == "done"
     return run_id
 
@@ -72,11 +76,12 @@ def test_interview_requires_primary_and_both_model_keys(monkeypatch, tmp_path):
         assert missing_primary.status_code == 400
 
         _seed_primary(client)
+        app = cast(FastAPI, client.app)
         monkeypatch.setattr(
             profile_router,
             "resolve_api_key",
             lambda model: (
-                "" if model == client.app.state.settings.cheap_model else "key"
+                "" if model == app.state.settings.cheap_model else "key"
             ),
         )
         missing_key = client.post("/api/profile/interview")

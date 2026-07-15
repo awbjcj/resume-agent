@@ -1,11 +1,21 @@
+from pathlib import Path
+from typing import NotRequired, TypedDict
+
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.api.routers import sources as sources_router
 
 
-def _client(data_dir=None):
-    kwargs = {"db_url": "sqlite://", "api_token": ""}
+class _AppKwargs(TypedDict):
+    db_url: str
+    api_token: str
+    data_dir: NotRequired[Path]
+    env_path: NotRequired[Path]
+
+
+def _client(data_dir: Path | None = None):
+    kwargs: _AppKwargs = {"db_url": "sqlite://", "api_token": ""}
     if data_dir is not None:
         data_dir.mkdir(parents=True, exist_ok=True)
         env_path = data_dir / "empty.env"
@@ -199,12 +209,14 @@ def test_discover_launches_run_with_runtime_capability(monkeypatch, tmp_path):
         )
         assert launched.status_code == 202
         run_id = launched.json()["runId"]
+        run = None
         for _ in range(50):
             run = client.get(f"/api/runs/{run_id}").json()
             if run["state"] in {"done", "error"}:
                 break
             time.sleep(0.05)
 
+    assert run is not None
     assert run["state"] == "done"
     assert run["result"]["prompt"] == "AI infrastructure startups"
     assert isinstance(run["result"]["scrapeAvailable"], bool)

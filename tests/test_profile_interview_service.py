@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 
 import pytest
 
@@ -28,18 +29,20 @@ class FakeReporter:
         pass
 
 
+@dataclass
+class FakeResult:
+    content: object
+
+
 class FakeAgent:
-    def __init__(self, content):
+    def __init__(self, content: object):
         self.content = content
 
-    def run(self, prompt):
-        content = self.content
+    def run(self, prompt: str) -> FakeResult:
+        return FakeResult(self.content)
 
-        class Result:
-            pass
-
-        Result.content = content
-        return Result()
+    async def arun(self, prompt: str) -> FakeResult:
+        return self.run(prompt)
 
 
 def seed_resume(profile_dir):

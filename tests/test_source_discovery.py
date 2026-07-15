@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from resume_agent.discovery.source_scout import ScoutCandidate, ScoutReport
 from resume_agent.services import source_discovery as svc
 from resume_agent.services.sources import SourcePreview
@@ -14,18 +16,20 @@ class FakeReporter:
         pass
 
 
+@dataclass
+class FakeResult:
+    content: object
+
+
 class FakeAgent:
-    def __init__(self, content):
+    def __init__(self, content: object):
         self.content = content
 
-    def run(self, prompt):
-        content = self.content
+    def run(self, prompt: str) -> FakeResult:
+        return FakeResult(self.content)
 
-        class Result:
-            pass
-
-        Result.content = content
-        return Result()
+    async def arun(self, prompt: str) -> FakeResult:
+        return self.run(prompt)
 
 
 def run_worker(monkeypatch, tmp_path, candidates, previews, *, browser_enabled=True):
