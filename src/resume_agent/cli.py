@@ -303,6 +303,101 @@ def profile_build(
         typer.echo(f"  WARNING: {warning}")
 
 
+@profile_app.command("interview")
+def profile_interview_cmd(
+    facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    db_url: str | None = typer.Option(None, help="Override the database URL."),
+    no_build: bool = typer.Option(
+        False,
+        "--no-build",
+        help="Save answers without rebuilding the profile.",
+    ),
+    sources: str = typer.Option(
+        DEFAULT_SOURCES,
+        help="Profile source configuration used by the rebuild.",
+    ),
+) -> None:
+    """Run one grounded interview round and save its answers as profile notes."""
+    from resume_agent.profile.corpus import load_manifest
+    from resume_agent.services.profile_build import run_corpus_build
+    from resume_agent.services.profile_interview import (
+        run_interview_round,
+        submit_interview_answers,
+    )
+
+    profile_dir = _tenant_cli_path(facts).parent
+    if not any(
+        doc.primary and doc.mode == "literal" for doc in load_manifest(profile_dir).docs
+    ):
+        typer.echo("Upload a primary resume before starting an interview.")
+        raise typer.Exit(code=1)
+    settings = get_settings()
+    configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
+    missing = [
+        f"{tier} ({model})" for tier, model in configured if not resolve_api_key(model)
+    ]
+    if missing:
+        typer.echo(f"Missing API key for configured model(s): {', '.join(missing)}")
+        raise typer.Exit(code=1)
+
+    class EchoReporter:
+        process = "cli-interview"
+
+        def begin(self, total, label, **extra):
+            typer.echo(f"{label}…")
+
+        def step(self, current, *, label=None, **extra):
+            pass
+
+        def checkpoint(self):
+            pass
+
+    result = run_interview_round(
+        EchoReporter(),
+        profile_dir=profile_dir,
+        engine=_engine(db_url),
+    )
+    if not result["questions"] and not result["researchActions"]:
+        typer.echo("No gaps worth asking about — your profile looks well-evidenced.")
+        return
+
+    answers: list[tuple[str, str]] = []
+    for question in result["questions"]:
+        typer.echo(f"\n[{question['gap']}]")
+        text = typer.prompt(
+            question["questionText"],
+            default="",
+            show_default=False,
+        )
+        answers.append((question["id"], text))
+    for action in result["researchActions"]:
+        typer.echo(f"suggested: {action['kind']} {action['target']} — {action['why']}")
+
+    doc_ids = submit_interview_answers(profile_dir, result["roundId"], answers)
+    typer.echo(f"\nSaved {len(doc_ids)} note(s).")
+    if not doc_ids:
+        typer.echo("No non-blank answers were available to rebuild.")
+        return
+    if no_build:
+        typer.echo(
+            "Answers saved without rebuilding; run `resume-agent profile build` later."
+        )
+        return
+
+    sources_path = _tenant_cli_path(sources)
+    config = load_yaml(sources_path) if sources_path.exists() else {}
+    run_corpus_build(
+        None,
+        profile_dir=profile_dir,
+        github_username=cast(str | None, config.get("github_username")),
+        facts_out=profile_dir / "facts.json",
+        github_allow=tuple(config.get("github_repo_allow") or ()),
+        github_deny=tuple(config.get("github_repo_deny") or ()),
+        github_limit=int(config.get("github_repo_limit") or 20),
+    )
+    typer.echo("Rebuilt profile with the new interview evidence.")
+
+
 DEFAULT_SEARCH = "config/search.yaml"
 DEFAULT_CONNECTORS = "config/connectors.yaml"
 CONNECTOR_RUNS_PATH = "data/connector_runs.json"
