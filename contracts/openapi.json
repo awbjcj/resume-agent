@@ -1272,6 +1272,231 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "InterviewAnswerIn": {
+        "properties": {
+          "questionId": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Questionid",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "maxLength": 100000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "questionId"
+        ],
+        "title": "InterviewAnswerIn",
+        "type": "object"
+      },
+      "InterviewAnswersIn": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewAnswerIn"
+            },
+            "maxItems": 8,
+            "title": "Answers",
+            "type": "array"
+          },
+          "build": {
+            "default": true,
+            "title": "Build",
+            "type": "boolean"
+          }
+        },
+        "title": "InterviewAnswersIn",
+        "type": "object"
+      },
+      "InterviewAnswersOut": {
+        "properties": {
+          "buildRunId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buildrunid"
+          },
+          "buildSkippedReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buildskippedreason"
+          },
+          "buildStarted": {
+            "title": "Buildstarted",
+            "type": "boolean"
+          },
+          "docIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Docids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "docIds",
+          "buildStarted"
+        ],
+        "title": "InterviewAnswersOut",
+        "type": "object"
+      },
+      "InterviewHistoryAnswerOut": {
+        "properties": {
+          "answerText": {
+            "title": "Answertext",
+            "type": "string"
+          },
+          "docId": {
+            "title": "Docid",
+            "type": "string"
+          },
+          "questionId": {
+            "title": "Questionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "questionId",
+          "docId",
+          "answerText"
+        ],
+        "title": "InterviewHistoryAnswerOut",
+        "type": "object"
+      },
+      "InterviewHistoryOut": {
+        "properties": {
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewHistoryRoundOut"
+            },
+            "title": "Rounds",
+            "type": "array"
+          }
+        },
+        "title": "InterviewHistoryOut",
+        "type": "object"
+      },
+      "InterviewHistoryRoundOut": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewHistoryAnswerOut"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "askedAt": {
+            "title": "Askedat",
+            "type": "string"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewQuestionOut"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "researchActions": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewResearchActionOut"
+            },
+            "title": "Researchactions",
+            "type": "array"
+          },
+          "roundId": {
+            "title": "Roundid",
+            "type": "string"
+          },
+          "submittedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submittedat"
+          }
+        },
+        "required": [
+          "roundId",
+          "askedAt"
+        ],
+        "title": "InterviewHistoryRoundOut",
+        "type": "object"
+      },
+      "InterviewQuestionOut": {
+        "properties": {
+          "gap": {
+            "default": "",
+            "title": "Gap",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "questionText": {
+            "title": "Questiontext",
+            "type": "string"
+          },
+          "relatedRef": {
+            "default": "",
+            "title": "Relatedref",
+            "type": "string"
+          },
+          "whyItMatters": {
+            "default": "",
+            "title": "Whyitmatters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "questionText"
+        ],
+        "title": "InterviewQuestionOut",
+        "type": "object"
+      },
+      "InterviewResearchActionOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "why": {
+            "default": "",
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "target"
+        ],
+        "title": "InterviewResearchActionOut",
+        "type": "object"
+      },
       "InviteInfo": {
         "properties": {
           "createdAt": {
@@ -8955,6 +9180,163 @@
           }
         },
         "summary": "Delete Document"
+      }
+    },
+    "/api/profile/interview": {
+      "post": {
+        "operationId": "launch_interview_api_profile_interview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Interview"
+      }
+    },
+    "/api/profile/interview/history": {
+      "get": {
+        "operationId": "interview_history_api_profile_interview_history_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewHistoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Interview History"
+      }
+    },
+    "/api/profile/interview/{run_id}/answers": {
+      "post": {
+        "operationId": "answer_interview_api_profile_interview__run_id__answers_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewAnswersIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewAnswersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Interview"
       }
     },
     "/api/profile/matrix": {

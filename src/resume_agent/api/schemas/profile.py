@@ -67,3 +67,53 @@ class MatrixOut(CamelModel):
     generated_at: str = ""
     groups: list[SkillGroupOut] = Field(default_factory=list)
     rows: list[MatrixRowOut] = Field(default_factory=list)
+
+
+class InterviewQuestionOut(CamelModel):
+    id: str
+    gap: str = ""
+    why_it_matters: str = ""
+    question_text: str
+    related_ref: str = ""
+
+
+class InterviewResearchActionOut(CamelModel):
+    kind: str
+    target: str
+    why: str = ""
+
+
+class InterviewHistoryAnswerOut(CamelModel):
+    question_id: str
+    doc_id: str
+    answer_text: str
+
+
+class InterviewHistoryRoundOut(CamelModel):
+    round_id: str
+    asked_at: str
+    questions: list[InterviewQuestionOut] = Field(default_factory=list)
+    research_actions: list[InterviewResearchActionOut] = Field(default_factory=list)
+    answers: list[InterviewHistoryAnswerOut] = Field(default_factory=list)
+    submitted_at: str | None = None
+
+
+class InterviewHistoryOut(CamelModel):
+    rounds: list[InterviewHistoryRoundOut] = Field(default_factory=list)
+
+
+class InterviewAnswerIn(CamelModel):
+    question_id: str = Field(min_length=1, max_length=100)
+    text: str = Field(default="", max_length=100_000)
+
+
+class InterviewAnswersIn(CamelModel):
+    answers: list[InterviewAnswerIn] = Field(default_factory=list, max_length=8)
+    build: bool = True
+
+
+class InterviewAnswersOut(CamelModel):
+    doc_ids: list[str]
+    build_started: bool
+    build_run_id: str | None = None
+    build_skipped_reason: str | None = None

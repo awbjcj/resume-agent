@@ -936,6 +936,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile/interview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Interview */
+        post: operations["launch_interview_api_profile_interview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/interview/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview History */
+        get: operations["interview_history_api_profile_interview_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/interview/{run_id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer Interview */
+        post: operations["answer_interview_api_profile_interview__run_id__answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profile/matrix": {
         parameters: {
             query?: never;
@@ -1907,6 +1958,100 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InterviewAnswerIn */
+        InterviewAnswerIn: {
+            /** Questionid */
+            questionId: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
+        /** InterviewAnswersIn */
+        InterviewAnswersIn: {
+            /** Answers */
+            answers?: components["schemas"]["InterviewAnswerIn"][];
+            /**
+             * Build
+             * @default true
+             */
+            build: boolean;
+        };
+        /** InterviewAnswersOut */
+        InterviewAnswersOut: {
+            /** Buildrunid */
+            buildRunId?: string | null;
+            /** Buildskippedreason */
+            buildSkippedReason?: string | null;
+            /** Buildstarted */
+            buildStarted: boolean;
+            /** Docids */
+            docIds: string[];
+        };
+        /** InterviewHistoryAnswerOut */
+        InterviewHistoryAnswerOut: {
+            /** Answertext */
+            answerText: string;
+            /** Docid */
+            docId: string;
+            /** Questionid */
+            questionId: string;
+        };
+        /** InterviewHistoryOut */
+        InterviewHistoryOut: {
+            /** Rounds */
+            rounds?: components["schemas"]["InterviewHistoryRoundOut"][];
+        };
+        /** InterviewHistoryRoundOut */
+        InterviewHistoryRoundOut: {
+            /** Answers */
+            answers?: components["schemas"]["InterviewHistoryAnswerOut"][];
+            /** Askedat */
+            askedAt: string;
+            /** Questions */
+            questions?: components["schemas"]["InterviewQuestionOut"][];
+            /** Researchactions */
+            researchActions?: components["schemas"]["InterviewResearchActionOut"][];
+            /** Roundid */
+            roundId: string;
+            /** Submittedat */
+            submittedAt?: string | null;
+        };
+        /** InterviewQuestionOut */
+        InterviewQuestionOut: {
+            /**
+             * Gap
+             * @default
+             */
+            gap: string;
+            /** Id */
+            id: string;
+            /** Questiontext */
+            questionText: string;
+            /**
+             * Relatedref
+             * @default
+             */
+            relatedRef: string;
+            /**
+             * Whyitmatters
+             * @default
+             */
+            whyItMatters: string;
+        };
+        /** InterviewResearchActionOut */
+        InterviewResearchActionOut: {
+            /** Kind */
+            kind: string;
+            /** Target */
+            target: string;
+            /**
+             * Why
+             * @default
+             */
+            why: string;
         };
         /** InviteInfo */
         InviteInfo: {
@@ -5443,6 +5588,105 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_interview_api_profile_interview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_history_api_profile_interview_history_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewHistoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_interview_api_profile_interview__run_id__answers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewAnswersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewAnswersOut"];
+                };
             };
             /** @description Validation Error */
             422: {
