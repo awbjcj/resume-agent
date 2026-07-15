@@ -101,4 +101,16 @@ describe("InterviewPanel", () => {
     expect(mocks.sync).toHaveBeenCalledOnce();
     expect(mocks.addUrl).toHaveBeenCalledWith({ url: "https://me.dev" });
   });
+
+  it("can save a round without rebuilding", async () => {
+    const user = userEvent.setup();
+    render(<InterviewPanel />);
+    await user.click(screen.getByRole("button", { name: /start interview/i }));
+    await user.click(screen.getByRole("checkbox", { name: /rebuild profile/i }));
+    await user.click(screen.getByRole("button", { name: /send answers/i }));
+
+    expect(mocks.submit).toHaveBeenCalledWith(
+      expect.objectContaining({ build: false }),
+    );
+  });
 });

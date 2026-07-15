@@ -4,6 +4,7 @@ import { Bot, Link, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardAction,
@@ -113,11 +114,13 @@ export function InterviewPanel() {
   const submit = useSubmitInterview();
   const [runId, setRunId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [build, setBuild] = useState(true);
   const current = useInterviewRound(runId);
 
   const startRound = async () => {
     const run = await start.mutateAsync();
     setAnswers({});
+    setBuild(true);
     setRunId(run.runId);
   };
 
@@ -129,7 +132,7 @@ export function InterviewPanel() {
         questionId: question.id,
         text: answers[question.id] ?? "",
       })),
-      build: true,
+      build,
     });
     setAnswers({});
     setRunId(null);
@@ -148,13 +151,19 @@ export function InterviewPanel() {
         <CardAction>
           <Button
             size="sm"
-            disabled={start.isPending || current.state === "running"}
+            disabled={
+              start.isPending || current.state === "running" || Boolean(current.round)
+            }
             onClick={() => void startRound()}
           >
             {start.isPending || current.state === "running" ? (
               <Spinner data-icon="inline-start" />
             ) : null}
-            {current.state === "running" ? "Reviewing profile…" : "Start interview"}
+            {current.state === "running"
+              ? "Reviewing profile…"
+              : current.round
+                ? "Round ready"
+                : "Start interview"}
           </Button>
         </CardAction>
       </CardHeader>
@@ -229,7 +238,17 @@ export function InterviewPanel() {
                 ))}
               </div>
             ) : null}
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Field orientation="horizontal" className="w-auto">
+                <Checkbox
+                  id="interview-build"
+                  checked={build}
+                  onCheckedChange={setBuild}
+                />
+                <FieldLabel htmlFor="interview-build">
+                  Rebuild profile after saving
+                </FieldLabel>
+              </Field>
               <Button disabled={submit.isPending} onClick={() => void sendAnswers()}>
                 {submit.isPending ? <Spinner data-icon="inline-start" /> : (
                   <Send data-icon="inline-start" aria-hidden="true" />
