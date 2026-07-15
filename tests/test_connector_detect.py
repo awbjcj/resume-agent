@@ -1,8 +1,10 @@
 import resume_agent.discovery.connectors.detect as detect
 from resume_agent.discovery.connectors.detect import (
+    AtsInspection,
     AtsTarget,
     detect_ats,
     identify_host,
+    inspect_ats,
 )
 
 
@@ -91,6 +93,22 @@ def test_l2_returns_none_for_unknown(monkeypatch):
 def test_l2_fails_open_on_fetch_error(monkeypatch):
     monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
     assert detect_ats("https://careers.acme.com") is None
+
+
+def test_inspect_ats_distinguishes_reachable_unknown_from_fetch_failure(monkeypatch):
+    monkeypatch.setattr(
+        detect,
+        "_get_html",
+        lambda url, client=None: "<html><body>Careers</body></html>",
+    )
+    assert inspect_ats("https://careers.acme.com") == AtsInspection(
+        target=None, reachable=True
+    )
+
+    monkeypatch.setattr(detect, "_get_html", lambda url, client=None: None)
+    assert inspect_ats("https://careers.acme.com") == AtsInspection(
+        target=None, reachable=False
+    )
 
 
 def test_atstarget_backward_compatible_positional():

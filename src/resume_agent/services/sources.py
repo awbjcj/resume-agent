@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from ipaddress import ip_address
 from pathlib import Path
 from typing import cast
+from urllib.parse import urlsplit, urlunsplit
 
 import yaml
 
@@ -19,9 +21,10 @@ from resume_agent.discovery.connectors.config import (
     GreenhouseBoard,
     LeverBoard,
     NativeUrlBoard,
+    ScrapeTarget,
     load_connectors_config,
 )
-from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats
+from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, inspect_ats
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
 from resume_agent.discovery.connectors.sources import (
@@ -67,6 +70,7 @@ class SourcePreview:
     label: str | None = None
     role_count: int | None = None
     error: str | None = None
+    error_code: str | None = None
 
 
 def _save(path: str, config: ConnectorsConfig) -> None:
@@ -99,12 +103,45 @@ def _view(config: ConnectorsConfig, source_id: str) -> SourceView:
     raise SourceError(f"Unknown source '{source_id}'")
 
 
-def _preview_connector(target: AtsTarget, url: str):
+def _preview_connector(target: AtsTarget, url: str, *, browser: bool = True):
     if target.ats == "greenhouse" and target.token:
         return GreenhouseConnector([GreenhouseBoard(token=target.token)])
     if target.ats == "lever" and target.token:
         return LeverConnector([LeverBoard(token=target.token)])
-    return CompaniesConnector([url])
+    return CompaniesConnector([url], browser_enabled=browser)
+
+
+def _scrape_url(url: str | None) -> str:
+    """Validate and normalize a user-supplied browser target."""
+    raw = (url or "").strip()
+    try:
+        parsed = urlsplit(raw)
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        raise SourceError("A scrape target must be a public HTTP(S) URL.") from exc
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not host
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+    ):
+        raise SourceError("A scrape target must be a public HTTP(S) URL.")
+    normalized_host = host.casefold().rstrip(".")
+    if normalized_host == "localhost" or normalized_host.endswith(".localhost"):
+        raise SourceError("A scrape target must be a public HTTP(S) URL.")
+    try:
+        if not ip_address(normalized_host).is_global:
+            raise SourceError("A scrape target must be a public HTTP(S) URL.")
+    except ValueError:
+        pass
+    default_port = (parsed.scheme == "http" and port == 80) or (
+        parsed.scheme == "https" and port == 443
+    )
+    netloc = normalized_host if port is None or default_port else f"{normalized_host}:{port}"
+    path = parsed.path.rstrip("/") or "/"
+    return urlunsplit((parsed.scheme, netloc, path, parsed.query, ""))
 
 
 def _connection_url(
@@ -170,7 +207,30 @@ def preview_source(
     datacenter: str | None = None,
     site: str | None = None,
     country: str = "com",
+    limit: int = _PREVIEW_LIMIT,
+    browser: bool = True,
 ) -> SourcePreview:
+    if provider == "scrape":
+        try:
+            normalized = _scrape_url(url)
+        except SourceError as exc:
+            return SourcePreview(
+                ok=False,
+                url=url or "",
+                kind="scrape",
+                error=str(exc),
+                error_code="INVALID_URL",
+            )
+        if not get_settings().browser_enabled:
+            return SourcePreview(
+                ok=False,
+                url=normalized,
+                kind="scrape",
+                error="Scrape targets require a local browser.",
+                error_code="BROWSER_REQUIRED",
+            )
+        return SourcePreview(ok=True, url=normalized, kind="scrape", label=label)
+
     try:
         resolved_url = _connection_url(
             provider=provider,
@@ -184,12 +244,20 @@ def preview_source(
     except SourceError as exc:
         return SourcePreview(ok=False, url=url or "", error=str(exc))
 
-    target = detect_ats(resolved_url)
+    inspection = inspect_ats(resolved_url)
+    target = inspection.target
     if target is None:
+        error_code = "ATS_NOT_DETECTED" if inspection.reachable else "UNREACHABLE"
+        message = (
+            "Could not detect a known ATS behind this URL."
+            if inspection.reachable
+            else "Could not reach this source."
+        )
         return SourcePreview(
             ok=False,
             url=resolved_url,
-            error="Could not detect a known ATS behind this URL.",
+            error=message,
+            error_code=error_code,
         )
     if provider != "auto" and target.ats != provider:
         return SourcePreview(
@@ -200,9 +268,9 @@ def preview_source(
         )
 
     try:
-        result = _preview_connector(target, resolved_url).fetch(
+        result = _preview_connector(target, resolved_url, browser=browser).fetch(
             load_search_config(search_path),
-            limit=_PREVIEW_LIMIT,
+            limit=limit,
         )
     except Exception as exc:  # noqa: BLE001 - preview returns errors instead of raising.
         return SourcePreview(
@@ -211,6 +279,7 @@ def preview_source(
             kind=target.ats,
             token=target.token or None,
             error=f"Could not reach this source: {type(exc).__name__}",
+            error_code="UNREACHABLE",
         )
 
     if result.failures and not result.jobs:
@@ -221,6 +290,7 @@ def preview_source(
             kind=target.ats,
             token=target.token or None,
             error=reason,
+            error_code="UNREACHABLE",
         )
 
     return SourcePreview(
@@ -245,6 +315,25 @@ def add_source(
     site: str | None = None,
     country: str = "com",
 ) -> SourceView:
+    if provider == "scrape":
+        preview = preview_source(url, label=label, provider="scrape")
+        if not preview.ok:
+            raise SourceError(preview.error or "Could not validate this source.")
+        config = (
+            load_connectors_config(connectors_path)
+            if Path(connectors_path).exists()
+            else ConnectorsConfig()
+        )
+        if any(
+            scrape_target_id(target.url) == scrape_target_id(preview.url)
+            for target in config.scrape.targets
+        ):
+            raise SourceError("This URL is already a scrape target.")
+        config.scrape.enabled = True
+        config.scrape.targets.append(ScrapeTarget(url=preview.url, label=label))
+        _save(connectors_path, config)
+        return _view(config, scrape_target_id(preview.url))
+
     if (
         provider == "auto"
         and search_path == DEFAULT_SEARCH

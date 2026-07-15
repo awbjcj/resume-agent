@@ -330,3 +330,8 @@ def retry_kwargs() -> dict[str, Any]:
     schema, parse) surfaces after one call instead of 1 + llm_retries.
     """
     return {"retries": 0}
+
+
+def tool_kwargs() -> dict[str, Any]:
+    """Bound tool calls across one complete agno agent run."""
+    return {"tool_call_limit": 15}

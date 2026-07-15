@@ -257,3 +257,74 @@ def test_scrape_source_can_be_disabled_and_removed(tmp_path):
     )
     svc.remove_source(source_id, connectors_path=path)
     assert source_id not in {source.id for source in svc.list_sources(path)}
+
+
+def test_add_scrape_target_writes_scrape_section(tmp_path, monkeypatch):
+    from resume_agent.config import Settings
+
+    monkeypatch.setattr(
+        svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)
+    )
+    path = str(tmp_path / "connectors.yaml")
+
+    view = svc.add_source(
+        url="https://jobs.example.com/careers",
+        label="Example",
+        provider="scrape",
+        connectors_path=path,
+    )
+
+    config = svc.load_connectors_config(path)
+    assert view.kind == "scrape"
+    assert config.scrape.enabled is True
+    assert config.scrape.targets[0].url == "https://jobs.example.com/careers"
+    assert config.scrape.targets[0].label == "Example"
+
+
+def test_add_scrape_target_refuses_browserless_and_unsafe_urls(tmp_path, monkeypatch):
+    from resume_agent.config import Settings
+
+    path = str(tmp_path / "connectors.yaml")
+    monkeypatch.setattr(
+        svc, "get_settings", lambda: Settings.model_construct(browser_enabled=False)
+    )
+    with pytest.raises(svc.SourceError, match="browser"):
+        svc.add_source(
+            url="https://jobs.example.com/careers",
+            provider="scrape",
+            connectors_path=path,
+        )
+
+    monkeypatch.setattr(
+        svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)
+    )
+    for url in (
+        "file:///etc/passwd",
+        "http://localhost/admin",
+        "http://127.0.0.1/admin",
+        "https://user:password@example.com/jobs",
+        "https://example.com/jobs#secret",
+    ):
+        with pytest.raises(svc.SourceError, match="public HTTP"):
+            svc.add_source(url=url, provider="scrape", connectors_path=path)
+
+
+def test_add_scrape_target_duplicate_refused(tmp_path, monkeypatch):
+    from resume_agent.config import Settings
+
+    monkeypatch.setattr(
+        svc, "get_settings", lambda: Settings.model_construct(browser_enabled=True)
+    )
+    path = str(tmp_path / "connectors.yaml")
+    svc.add_source(
+        url="https://jobs.example.com/careers",
+        provider="scrape",
+        connectors_path=path,
+    )
+
+    with pytest.raises(svc.SourceError, match="already"):
+        svc.add_source(
+            url="https://jobs.example.com/careers/",
+            provider="scrape",
+            connectors_path=path,
+        )

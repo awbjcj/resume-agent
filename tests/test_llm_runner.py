@@ -255,3 +255,9 @@ def test_retry_kwargs_disables_agno_retry_regardless_of_settings(monkeypatch):
         assert retry_kwargs() == {"retries": 0}
     finally:
         env_settings.cache_clear()
+
+
+def test_tool_kwargs_bounds_tool_loop():
+    from resume_agent.llm_runner import tool_kwargs
+
+    assert tool_kwargs() == {"tool_call_limit": 15}

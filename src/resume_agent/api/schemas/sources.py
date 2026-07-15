@@ -33,6 +33,7 @@ SourceProvider = Literal[
     "breezy",
     "jazzhr",
     "bamboohr",
+    "scrape",
 ]
 
 
@@ -58,6 +59,7 @@ class SourcePreviewOut(CamelModel):
     label: str | None = None
     role_count: int | None = None
     error: str | None = None
+    error_code: str | None = None
 
 
 class AddSourceIn(SourceConnectionIn):

@@ -85,6 +85,14 @@ class AtsTarget:
     country: str = "com"  # Personio careers host suffix
 
 
+@dataclass(frozen=True)
+class AtsInspection:
+    """ATS identity plus whether an unknown-host page was reachable."""
+
+    target: AtsTarget | None
+    reachable: bool
+
+
 def _first_path_segment(path: str) -> str | None:
     segments = [segment for segment in path.split("/") if segment]
     return segments[0] if segments else None
@@ -189,11 +197,7 @@ def _get_html(url: str, *, client: httpx.Client | None = None) -> str | None:
         return None
 
 
-def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
-    raw_html = _get_html(url, client=client)
-    if not raw_html:
-        return None
-
+def _target_from_html(raw_html: str) -> AtsTarget | None:
     for ats, pattern in _L2_MARKERS:
         match = pattern.search(raw_html)
         if match:
@@ -207,6 +211,11 @@ def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
     return None
 
 
+def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
+    raw_html = _get_html(url, client=client)
+    return _target_from_html(raw_html) if raw_html is not None else None
+
+
 def identify_host(url: str) -> AtsTarget | None:
     """Resolve a URL to its ATS by host/path alone — bespoke singleton, then URL pattern.
 
@@ -218,4 +227,17 @@ def identify_host(url: str) -> AtsTarget | None:
 
 def detect_ats(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
     """Resolve a careers URL: host/path identity, then an HTML sniff for embeds."""
-    return identify_host(url) or _l2(url, client=client)
+    return inspect_ats(url, client=client).target
+
+
+def inspect_ats(
+    url: str, *, client: httpx.Client | None = None
+) -> AtsInspection:
+    """Resolve an ATS while preserving reachability for an unknown host."""
+    target = identify_host(url)
+    if target is not None:
+        return AtsInspection(target=target, reachable=True)
+    raw_html = _get_html(url, client=client)
+    if raw_html is None:
+        return AtsInspection(target=None, reachable=False)
+    return AtsInspection(target=_target_from_html(raw_html), reachable=True)
