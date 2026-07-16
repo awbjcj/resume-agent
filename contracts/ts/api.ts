@@ -1952,6 +1952,8 @@ export interface components {
             sponsorship?: string[];
             /** Staledays */
             staleDays?: number | null;
+            /** Stalemindays */
+            staleMinDays?: number | null;
             /** Status */
             status?: string | null;
             /** Statusin */
@@ -5683,6 +5685,7 @@ export interface operations {
                 maxFit?: number | null;
                 minSalary?: number | null;
                 staleDays?: number | null;
+                staleMinDays?: number | null;
                 q?: string | null;
                 sortBy?: string;
                 page?: number;
@@ -7042,6 +7045,7 @@ export interface operations {
                 maxFit?: number | null;
                 minSalary?: number | null;
                 staleDays?: number | null;
+                staleMinDays?: number | null;
                 sortBy?: string;
                 page?: number;
                 pageSize?: number;
@@ -7469,6 +7473,7 @@ export interface operations {
                 maxFit?: number | null;
                 minSalary?: number | null;
                 staleDays?: number | null;
+                staleMinDays?: number | null;
                 sortBy?: string;
                 page?: number;
                 pageSize?: number;

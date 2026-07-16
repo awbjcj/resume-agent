@@ -985,6 +985,17 @@
             ],
             "title": "Staledays"
           },
+          "staleMinDays": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stalemindays"
+          },
           "status": {
             "anyOf": [
               {
@@ -9262,6 +9273,22 @@
           },
           {
             "in": "query",
+            "name": "staleMinDays",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stalemindays"
+            }
+          },
+          {
+            "in": "query",
             "name": "q",
             "required": false,
             "schema": {
@@ -11782,6 +11809,22 @@
           },
           {
             "in": "query",
+            "name": "staleMinDays",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stalemindays"
+            }
+          },
+          {
+            "in": "query",
             "name": "sortBy",
             "required": false,
             "schema": {
@@ -12751,6 +12794,22 @@
                 }
               ],
               "title": "Staledays"
+            }
+          },
+          {
+            "in": "query",
+            "name": "staleMinDays",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stalemindays"
             }
           },
           {
