@@ -24,6 +24,21 @@
         "title": "AccountUsage",
         "type": "object"
       },
+      "AddAliasIn": {
+        "properties": {
+          "alias": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Alias",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias"
+        ],
+        "title": "AddAliasIn",
+        "type": "object"
+      },
       "AddJobTextRequest": {
         "properties": {
           "company": {
@@ -130,6 +145,37 @@
           "url"
         ],
         "title": "AddJobUrlParams",
+        "type": "object"
+      },
+      "AddSkillIn": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "hard",
+                  "soft",
+                  "domain"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AddSkillIn",
         "type": "object"
       },
       "AddSourceIn": {
@@ -2376,6 +2422,82 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "ManualEntryOut": {
+        "properties": {
+          "addedAt": {
+            "title": "Addedat",
+            "type": "string"
+          },
+          "aliasText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliastext"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "hard",
+                  "soft",
+                  "domain"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "new_skill",
+              "alias"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "targetSkillDisplay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetskilldisplay"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "addedAt"
+        ],
+        "title": "ManualEntryOut",
+        "type": "object"
+      },
       "MatchGapOut": {
         "properties": {
           "clustersStale": {
@@ -4289,6 +4411,40 @@
           "label"
         ],
         "title": "SkeletonEntryOut",
+        "type": "object"
+      },
+      "SkillEntryOut": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "hard",
+                  "soft",
+                  "domain"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SkillEntryOut",
         "type": "object"
       },
       "SkillGroupOut": {
