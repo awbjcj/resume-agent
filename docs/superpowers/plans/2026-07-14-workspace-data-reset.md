@@ -932,7 +932,9 @@ describe("DangerZoneCard", () => {
     // Match on description text: the "Everything" option's accessible name
     // also contains the word "Jobs", so /jobs/i alone would be ambiguous.
     expect(screen.getByRole("radio", { name: /pulled jobs/i })).toBeChecked();
-    await userEvent.click(screen.getByRole("radio", { name: /profile sources/i }));
+    await userEvent.click(
+      screen.getByRole("radio", { name: /profile sources/i }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Reset data" }));
     const submit = screen.getByRole("button", { name: "Erase selected data" });
     expect(submit).toBeDisabled();
@@ -1091,8 +1093,8 @@ export function DangerZoneCard() {
                   Reset {selected?.label.toLowerCase()}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  This permanently deletes: {selected?.description} Configuration
-                  and API keys are kept. Type RESET to continue.
+                  This permanently deletes: {selected?.description}{" "}
+                  Configuration and API keys are kept. Type RESET to continue.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="py-2">
@@ -1110,7 +1112,9 @@ export function DangerZoneCard() {
                 </label>
               </div>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={resetting}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={resetting}>
+                  Cancel
+                </AlertDialogCancel>
                 <AlertDialogAction
                   disabled={confirmText !== "RESET" || resetting}
                   onClick={(event) => {
