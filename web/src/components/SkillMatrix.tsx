@@ -4,6 +4,7 @@
 // Staggered rise-in on open. Used by the job detail modal rail.
 
 import type { SkillTag } from "@/lib/filters/types";
+import { AddSkillPopover } from "@/features/profile-skills/AddSkillPopover";
 
 function Chip({
   tag,
@@ -28,6 +29,7 @@ function Chip({
         {tag.covered ? "●" : "○"}
       </span>
       {tag.name}
+      {!tag.covered && <AddSkillPopover skillName={tag.name} />}
     </span>
   );
 }

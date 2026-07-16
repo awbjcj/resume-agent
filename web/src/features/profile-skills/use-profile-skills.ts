@@ -1,0 +1,85 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { api, unwrap } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
+
+export type SkillEntry = components["schemas"]["SkillEntryOut"];
+export type ManualEntry = components["schemas"]["ManualEntryOut"];
+
+function invalidateSkillSurfaces(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["profile-skills"] });
+  qc.invalidateQueries({ queryKey: ["manual-skills"] });
+  qc.invalidateQueries({ queryKey: ["profile-matrix"] });
+  qc.invalidateQueries({ queryKey: ["job"] });
+  for (const k of ["shortlist", "pipeline", "triage"]) {
+    qc.invalidateQueries({ queryKey: [k] });
+  }
+}
+
+export function useProfileSkills(enabled = true) {
+  return useQuery({
+    queryKey: ["profile-skills"],
+    enabled,
+    queryFn: () =>
+      unwrap(api.GET("/api/profile/skills", {} as never)) as Promise<SkillEntry[]>,
+  });
+}
+
+export function useManualSkills() {
+  return useQuery({
+    queryKey: ["manual-skills"],
+    queryFn: () =>
+      unwrap(api.GET("/api/profile/manual-skills", {} as never)) as Promise<
+        ManualEntry[]
+      >,
+  });
+}
+
+export function useAddSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { name: string; category?: "hard" | "soft" | "domain" | null }) =>
+      unwrap(api.POST("/api/profile/skills", { body: vars })),
+    onSuccess: () => {
+      invalidateSkillSurfaces(qc);
+      toast.success("Added to your skills");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useAddSkillAlias() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { skillId: string; alias: string }) =>
+      unwrap(
+        api.POST("/api/profile/skills/{skill_id}/aliases", {
+          params: { path: { skill_id: vars.skillId } },
+          body: { alias: vars.alias },
+        }),
+      ),
+    onSuccess: () => {
+      invalidateSkillSurfaces(qc);
+      toast.success("Added to your skills");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useRemoveManualSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: string) =>
+      unwrap(
+        api.DELETE("/api/profile/manual-skills/{entry_id}", {
+          params: { path: { entry_id: entryId } },
+        }),
+      ),
+    onSuccess: () => {
+      invalidateSkillSurfaces(qc);
+      toast.success("Removed");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}

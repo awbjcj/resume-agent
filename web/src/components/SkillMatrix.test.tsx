@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
+import { withQueryClient } from "@/test/utils";
 import { SkillMatrix } from "./SkillMatrix";
 
 describe("SkillMatrix", () => {
@@ -11,6 +13,7 @@ describe("SkillMatrix", () => {
           { name: "Go", required: false, covered: false },
         ]}
       />,
+      { wrapper: withQueryClient },
     );
     expect(screen.getByText("Nice-to-have")).toBeInTheDocument();
     expect(screen.queryByText("Best-have")).not.toBeInTheDocument();
