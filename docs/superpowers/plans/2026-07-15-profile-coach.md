@@ -3162,6 +3162,34 @@ git commit -m "feat: add coach page with thread, agenda rail, and draft cards"
 ### Task 14: Web — routing, nav, settings entry card; delete the interview feature
 
 **Files:**
+
+- Modify: `web/src/app/router.tsx` — add lazy `CoachPage` import and `{ path: "coach", element: <SetupGate>{page(<CoachPage />)}</SetupGate> }` after the `match-gap` row (`router.tsx:118`).
+- Modify: `web/src/app/AppLayout.tsx` — add `{ to: "/coach", label: "Coach", icon: GraduationCap }` to `NAV` (`AppLayout.tsx:39-46`); import `GraduationCap` from `lucide-react`.
+- Modify: `web/src/features/settings/pages/ProfileSettingsPage.tsx` — remove the `InterviewPanel` import (`:11`) and usage (`:72`); add a small entry `Card` in its place: title "Profile Coach", description from `useCoachSessions` ("`N` open topics · last session `date`" or "Start your first coaching session"), and a `Link` button to `/coach`.
+- Modify: `web/src/features/settings/pages/ProfileSettingsPage.test.tsx` — replace any `InterviewPanel` mocks with a `use-coach` `useCoachSessions` mock.
+- Delete: `web/src/features/interview/` (all three files).
+
+- [ ] **Step 1: Make the edits above.** Grep first: `Grep "features/interview" web/src -l` — every hit must be updated before deletion.
+
+- [ ] **Step 2: Run the full web suite and typecheck**
+
+Run (from `web/`): `npx tsc --noEmit && npx vitest run`
+Expected: clean; no test references the deleted feature.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add -A web/
+git commit -m "feat: route coach page, add nav entry, retire interview panel"
+```
+
+---
+
+### Task 15: Docs and full verification
+
+**Files:**
+
+
 - Modify: `web/src/app/router.tsx` — add lazy `CoachPage` import and `{ path: "coach", element: <SetupGate>{page(<CoachPage />)}</SetupGate> }` after the `match-gap` row (`router.tsx:118`).
 - Modify: `web/src/app/AppLayout.tsx` — add `{ to: "/coach", label: "Coach", icon: GraduationCap }` to `NAV` (`AppLayout.tsx:39-46`); import `GraduationCap` from `lucide-react`.
 - Modify: `web/src/features/settings/pages/ProfileSettingsPage.tsx` — remove the `InterviewPanel` import (`:11`) and usage (`:72`); add a small entry `Card` in its place: title "Profile Coach", description from `useCoachSessions` ("`N` open topics · last session `date`" or "Start your first coaching session"), and a `Link` button to `/coach`.
