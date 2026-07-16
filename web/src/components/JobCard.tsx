@@ -41,8 +41,8 @@ export function JobCard({
     row.sponsorshipSignal && SPONSORSHIP_PILL[row.sponsorshipSignal];
 
   return (
-    <Card className="min-w-0 flex min-h-[280px] flex-col gap-4 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
-      <div className="flex flex-1 items-start gap-3">
+    <Card className="min-w-0 flex min-h-0 flex-col gap-4 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)] sm:min-h-[280px] sm:p-5">
+      <div className="flex flex-1 items-start gap-2 sm:gap-3">
         {onSelect && (
           <div className="pt-1">
             <Checkbox
@@ -55,11 +55,11 @@ export function JobCard({
         <button
           type="button"
           onClick={onOpen}
-          className="group flex flex-1 gap-4 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+          className="group flex flex-1 gap-3 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40 sm:gap-4"
         >
           <FitMeter score={row.fitScore} />
           <div className="min-w-0 flex-1">
-            <div className="break-words text-xl font-semibold leading-snug group-hover:text-primary">
+            <div className="break-words text-lg font-semibold leading-snug group-hover:text-primary sm:text-xl">
               {row.title ?? "—"}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
