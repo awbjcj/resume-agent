@@ -179,7 +179,7 @@ def _passes_filter(row: Any, f: BoardFilter) -> bool:
         if posted_at is None:
             return False
         cutoff = datetime.now(timezone.utc) - timedelta(days=f.stale_days)
-        if _aware(posted_at) > cutoff:
+        if _aware(posted_at) < cutoff:
             return False
 
     for spec in FACET_SPECS:
