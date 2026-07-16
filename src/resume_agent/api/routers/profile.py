@@ -16,27 +16,22 @@ from resume_agent.api.deps import (
     get_env_path,
     get_profile_dir,
     get_run_manager,
-    get_settings_dep,
 )
 from resume_agent.api.errors import ApiException
 from resume_agent.api.uploads import UploadTooLargeError, read_upload_async
-from resume_agent.api.runs.manager import (
-    RunManager,
-    RunResetConflict,
-    RunSingletonConflict,
-)
-from resume_agent.api.runs.models import RunState
+from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.config import ProfileConfigDoc
 from resume_agent.api.schemas.profile import (
+    AddAliasIn,
+    AddSkillIn,
     DocumentOut,
-    InterviewAnswersIn,
-    InterviewAnswersOut,
-    InterviewHistoryOut,
+    ManualEntryOut,
     MatrixOut,
     MatrixRowOut,
     NoteIn,
     SkeletonEntryOut,
+    SkillEntryOut,
     SourceOut,
     SourcePatch,
     SkillGroupOut,
@@ -44,8 +39,6 @@ from resume_agent.api.schemas.profile import (
 )
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.api.schemas.secrets import LLM_KEY_ENV_VARS
-from resume_agent.config import Settings
-from resume_agent.llm_runner import resolve_api_key
 from resume_agent.profile.corpus import (
     _UNSET,
     SourceMode,
@@ -60,14 +53,9 @@ from resume_agent.profile.intake import add_note_source, add_url_source
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
 from resume_agent.profile.synthesis import profile_skeleton
-from resume_agent.services import profile_build
+from resume_agent.services import profile_build, profile_skills
 from resume_agent.services.env_config import read_env
 from resume_agent.services.profile_documents import DocumentError, DocumentStore
-from resume_agent.services.profile_interview import (
-    interview_history_view,
-    run_interview_round,
-    submit_interview_answers,
-)
 from resume_agent.taxonomy.groups import SKILL_GROUPS
 
 router = APIRouter()
@@ -187,111 +175,6 @@ def _source_out(profile_dir: Path, doc) -> SourceOut:
         added_at=doc.added_at,
         fragment_status=fragment_cache_status(profile_dir, doc),
         origin=doc.origin,
-    )
-
-
-@router.post("/profile/interview", response_model=RunOut, status_code=202)
-def launch_interview(
-    request: Request,
-    mgr: RunManager = Depends(get_run_manager),
-    settings: Settings = Depends(get_settings_dep),
-):
-    profile_dir = _profile_dir(request)
-    if not any(
-        doc.primary and doc.mode == "literal" for doc in load_manifest(profile_dir).docs
-    ):
-        raise ApiException(
-            400,
-            "SETUP_INCOMPLETE",
-            "Upload a primary resume before starting an interview",
-        )
-    configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
-    missing = [
-        f"{tier} ({model})" for tier, model in configured if not resolve_api_key(model)
-    ]
-    if missing:
-        raise ApiException(
-            400,
-            "SETUP_INCOMPLETE",
-            f"Missing API key for configured model(s): {', '.join(missing)}",
-        )
-    engine = request.app.state.engine
-
-    def work(reporter):
-        return run_interview_round(
-            reporter,
-            profile_dir=profile_dir,
-            engine=engine,
-        )
-
-    run_id = mgr.submit(
-        "profile-interview",
-        work,
-        singleton_key="profile-interview",
-    )
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
-
-
-@router.post(
-    "/profile/interview/{run_id}/answers",
-    response_model=InterviewAnswersOut,
-)
-def answer_interview(
-    run_id: str,
-    payload: InterviewAnswersIn,
-    request: Request,
-    mgr: RunManager = Depends(get_run_manager),
-):
-    snapshot = mgr.get(run_id)
-    if (
-        snapshot is None
-        or snapshot.kind != "profile-interview"
-        or snapshot.state is not RunState.done
-        or not isinstance(snapshot.result, dict)
-    ):
-        raise ApiException(404, "NOT_FOUND", f"No finished interview run '{run_id}'")
-    round_id = snapshot.result.get("roundId")
-    if not isinstance(round_id, str) or not round_id:
-        raise ApiException(404, "NOT_FOUND", f"Interview run '{run_id}' has no round")
-    try:
-        doc_ids = submit_interview_answers(
-            _profile_dir(request),
-            round_id,
-            [(answer.question_id, answer.text) for answer in payload.answers],
-        )
-    except ValueError as exc:
-        if "already answered" in str(exc):
-            raise ApiException(409, "ALREADY_ANSWERED", str(exc)) from exc
-        raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
-
-    build_started = False
-    build_run_id = None
-    skipped = None
-    if payload.build and doc_ids:
-        try:
-            build = _launch_build(request, mgr, singleton_conflict="raise")
-            build_started = True
-            build_run_id = build.run_id
-        except (RunSingletonConflict, RunResetConflict) as exc:
-            skipped = str(exc)
-    elif not doc_ids:
-        skipped = "no answers to build from"
-    else:
-        skipped = "build=false"
-    return InterviewAnswersOut(
-        doc_ids=doc_ids,
-        build_started=build_started,
-        build_run_id=build_run_id,
-        build_skipped_reason=skipped,
-    )
-
-
-@router.get("/profile/interview/history", response_model=InterviewHistoryOut)
-def interview_history(request: Request):
-    return InterviewHistoryOut.model_validate(
-        interview_history_view(_profile_dir(request))
     )
 
 
