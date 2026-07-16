@@ -213,6 +213,8 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/profile/fragments.py`              | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis, project), concurrent production  |
 | `src/resume_agent/profile/github_harvest.py`          | Deterministic GitHub project-source selection, materialization, supersession, and cleanup                                  |
 | `src/resume_agent/profile/project_extractor.py`       | Project-only structured extraction that cannot emit employment or education facts                                        |
+| `src/resume_agent/profile/coach.py`                   | Coach turn validation, topic-aware context, and structured-output agents                                                  |
+| `src/resume_agent/services/profile_coach.py`          | Coach session turns, draft approval, recap, rebuild, and impact orchestration                                             |
 | `src/resume_agent/discovery/connectors/detect.py`    | ATS detection (singleton → L1 → L2)                                                                                       |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation                                                                                   |
 | `src/resume_agent/discovery/scraper/dashboard.py`    | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/`                                                    |
@@ -230,6 +232,11 @@ aggressiveness determines how many detail fetches are issued.
 
 ## Known design notes
 
+- **Profile coaching is turn-per-run and evidence-locked.** Durable sessions follow
+  ADR 0006, while the ADR 0005 amendment requires every draft note to retain
+  verbatim quotes from the current user turn. The former batch interview API,
+  CLI command, and web panel are retired; its history remains read-only input
+  for avoiding repeated questions.
 - **Tailoring is fast by default.** `config/review.yaml.example` materializes as
   the two-round roster with mid-tier writers and one `MergedPanelReview`
   advisory call; the premium fact-check gate remains separate. Deep mode uses
