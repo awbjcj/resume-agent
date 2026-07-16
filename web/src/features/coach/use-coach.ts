@@ -133,6 +133,10 @@ export function useEndCoachSession() {
                 },
                 async (buildRun) => {
                   await Promise.all([
+                    queryClient.invalidateQueries({
+                      queryKey: ["coach-session", sessionId],
+                    }),
+                    queryClient.invalidateQueries({ queryKey: ["coach-sessions"] }),
                     queryClient.invalidateQueries({ queryKey: ["setup-status"] }),
                     queryClient.invalidateQueries({ queryKey: ["profile-skeleton"] }),
                     queryClient.invalidateQueries({ queryKey: ["profile-matrix"] }),
