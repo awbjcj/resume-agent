@@ -34,6 +34,7 @@ class BulkRequest(CamelModel):
     max_fit: int | None = None
     min_salary: int | None = None
     stale_days: int | None = None
+    stale_min_days: int | None = None
     sort_by: str = "fit"
     preset: str = "balanced"
 

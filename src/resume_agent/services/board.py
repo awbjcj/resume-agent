@@ -71,6 +71,7 @@ class BoardFilter:
     max_fit: int | None = None
     min_salary: int | None = None
     stale_days: int | None = None
+    stale_min_days: int | None = None
     sort: str = "fit"
     archived: bool = False
 
@@ -180,6 +181,14 @@ def _passes_filter(row: Any, f: BoardFilter) -> bool:
             return False
         cutoff = datetime.now(timezone.utc) - timedelta(days=f.stale_days)
         if _aware(posted_at) < cutoff:
+            return False
+
+    if f.stale_min_days is not None:
+        posted_at = getattr(row, "posted_at", None)
+        if posted_at is None:
+            return False
+        cutoff = datetime.now(timezone.utc) - timedelta(days=f.stale_min_days)
+        if _aware(posted_at) >= cutoff:
             return False
 
     for spec in FACET_SPECS:

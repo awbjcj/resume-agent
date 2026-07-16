@@ -255,6 +255,34 @@ def test_stale_days_filter_keeps_only_recently_posted_jobs():
     assert [row.company for row in result.page.data] == ["Fresh"]
 
 
+def test_stale_min_days_filter_keeps_only_older_jobs():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    with _session() as session:
+        _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=90,
+            company="Fresh",
+            posted_at=now - timedelta(days=1),
+        )
+        _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=90,
+            company="Stale",
+            posted_at=now - timedelta(days=30),
+        )
+        result = board.list_board(
+            session,
+            "shortlist",
+            board_filter=board.BoardFilter(stale_min_days=7),
+        )
+
+    assert [row.company for row in result.page.data] == ["Stale"]
+
+
 def test_facet_specs_match_board_filter_fields():
     import dataclasses
 

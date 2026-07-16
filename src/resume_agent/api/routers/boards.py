@@ -39,6 +39,7 @@ def _filter_from_query(
     max_fit: int | None = None,
     min_salary: int | None = None,
     stale_days: int | None = None,
+    stale_min_days: int | None = None,
     sort: str = "fit",
     archived: bool = False,
 ) -> board.BoardFilter:
@@ -60,6 +61,7 @@ def _filter_from_query(
         max_fit=max_fit,
         min_salary=min_salary,
         stale_days=stale_days,
+        stale_min_days=stale_min_days,
         sort=sort,
         archived=archived,
     )
@@ -84,6 +86,7 @@ def get_shortlist(
     max_fit: int | None = Query(None, alias="maxFit"),
     min_salary: int | None = Query(None, alias="minSalary"),
     stale_days: int | None = Query(None, alias="staleDays"),
+    stale_min_days: int | None = Query(None, alias="staleMinDays"),
     sort: str = Query("fit", alias="sortBy"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, alias="pageSize", ge=1, le=200),
@@ -94,7 +97,7 @@ def get_shortlist(
         seniority=seniority, employment_type=employment_type, industry=industry,
         country=country, region=region, city=city, company_size=company_size,
         skills=skills, min_fit=min_fit, max_fit=max_fit, min_salary=min_salary,
-        stale_days=stale_days, sort=sort,
+        stale_days=stale_days, stale_min_days=stale_min_days, sort=sort,
     )
     result = board.list_board(
         session, "shortlist", board_filter=board_filter, page=page, page_size=page_size,
@@ -120,6 +123,7 @@ def get_pipeline(
     max_fit: int | None = Query(None, alias="maxFit"),
     min_salary: int | None = Query(None, alias="minSalary"),
     stale_days: int | None = Query(None, alias="staleDays"),
+    stale_min_days: int | None = Query(None, alias="staleMinDays"),
     q: str | None = None,
     sort: str = Query("stage", alias="sortBy"),
     page: int = Query(1, ge=1),
@@ -131,7 +135,7 @@ def get_pipeline(
         seniority=seniority, employment_type=employment_type, industry=industry,
         country=country, region=region, city=city, company_size=company_size,
         skills=skills, min_fit=min_fit, max_fit=max_fit, min_salary=min_salary,
-        stale_days=stale_days, sort=sort,
+        stale_days=stale_days, stale_min_days=stale_min_days, sort=sort,
     )
     result = board.list_board(
         session, "pipeline", board_filter=board_filter, page=page, page_size=page_size,
@@ -159,6 +163,7 @@ def get_triage(
     max_fit: int | None = Query(None, alias="maxFit"),
     min_salary: int | None = Query(None, alias="minSalary"),
     stale_days: int | None = Query(None, alias="staleDays"),
+    stale_min_days: int | None = Query(None, alias="staleMinDays"),
     sort: str = Query("fit", alias="sortBy"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, alias="pageSize", ge=1, le=200),
@@ -169,7 +174,7 @@ def get_triage(
         seniority=seniority, employment_type=employment_type, industry=industry,
         country=country, region=region, city=city, company_size=company_size,
         skills=skills, min_fit=min_fit, max_fit=max_fit, min_salary=min_salary,
-        stale_days=stale_days, sort=sort, archived=archived,
+        stale_days=stale_days, stale_min_days=stale_min_days, sort=sort, archived=archived,
     )
     result = board.list_board(
         session, "triage", board_filter=board_filter, page=page, page_size=page_size,

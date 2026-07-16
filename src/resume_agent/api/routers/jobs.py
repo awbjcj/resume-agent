@@ -117,6 +117,7 @@ def _bulk_filter(body: BulkRequest) -> board.BoardFilter:
         max_fit=body.max_fit,
         min_salary=body.min_salary,
         stale_days=body.stale_days,
+        stale_min_days=body.stale_min_days,
         sort=body.sort_by,
         archived=body.archived,
     )
