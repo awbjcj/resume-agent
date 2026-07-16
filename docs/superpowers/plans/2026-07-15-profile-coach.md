@@ -2989,35 +2989,88 @@ const mocks = vi.hoisted(() => ({
 }));
 
 const session = {
-  sessionId: "s1", startedAt: "2026-07-15T00:00:00+00:00", endedAt: null,
+  sessionId: "s1",
+  startedAt: "2026-07-15T00:00:00+00:00",
+  endedAt: null,
   status: "active",
   turns: [
-    { role: "coach", kind: "question", text: "What changed at Acme?", topicId: "t1", at: "" },
-    { role: "user", kind: "", text: "I cut deploy time 40%.", topicId: "", at: "" },
-    { role: "coach", kind: "draft_note", text: "Here's a draft.", topicId: "t1", at: "" },
+    {
+      role: "coach",
+      kind: "question",
+      text: "What changed at Acme?",
+      topicId: "t1",
+      at: "",
+    },
+    {
+      role: "user",
+      kind: "",
+      text: "I cut deploy time 40%.",
+      topicId: "",
+      at: "",
+    },
+    {
+      role: "coach",
+      kind: "draft_note",
+      text: "Here's a draft.",
+      topicId: "t1",
+      at: "",
+    },
   ],
   topics: [
-    { id: "t1", gap: "Acme impact", whyItMatters: "", relatedRef: "", status: "drafted", noteDocId: null },
-    { id: "t2", gap: "K8s evidence", whyItMatters: "", relatedRef: "", status: "open", noteDocId: null },
+    {
+      id: "t1",
+      gap: "Acme impact",
+      whyItMatters: "",
+      relatedRef: "",
+      status: "drafted",
+      noteDocId: null,
+    },
+    {
+      id: "t2",
+      gap: "K8s evidence",
+      whyItMatters: "",
+      relatedRef: "",
+      status: "open",
+      noteDocId: null,
+    },
   ],
   draftNotes: [
-    { topicId: "t1", title: "Acme deploys", summary: "Cut deploy time 40%.",
-      quotes: ["I cut deploy time 40%."], status: "pending" },
+    {
+      topicId: "t1",
+      title: "Acme deploys",
+      summary: "Cut deploy time 40%.",
+      quotes: ["I cut deploy time 40%."],
+      status: "pending",
+    },
   ],
-  recap: null, impact: null,
+  recap: null,
+  impact: null,
 };
 
 vi.mock("./use-coach", () => ({
   useCoachSessions: () => ({
-    data: { sessions: [{ sessionId: "s1", startedAt: "", endedAt: null, status: "active",
-                          topicCount: 2, savedNoteCount: 0 }] },
+    data: {
+      sessions: [
+        {
+          sessionId: "s1",
+          startedAt: "",
+          endedAt: null,
+          status: "active",
+          topicCount: 2,
+          savedNoteCount: 0,
+        },
+      ],
+    },
   }),
   useCoachSession: () => ({ data: session, isLoading: false }),
   useStartCoachSession: () => ({ mutateAsync: mocks.start, isPending: false }),
   useSendCoachMessage: () => ({ mutateAsync: mocks.send, isPending: false }),
   useEndCoachSession: () => ({ mutateAsync: mocks.end, isPending: false }),
   useSaveCoachNote: () => ({ mutateAsync: mocks.saveNote, isPending: false }),
-  useDiscardCoachNote: () => ({ mutateAsync: mocks.discardNote, isPending: false }),
+  useDiscardCoachNote: () => ({
+    mutateAsync: mocks.discardNote,
+    isPending: false,
+  }),
   useTurnRun: () => ({ state: "idle", error: null }),
 }));
 
@@ -3035,16 +3088,24 @@ describe("CoachPage", () => {
     expect(screen.getByText("What changed at Acme?")).toBeInTheDocument();
     expect(screen.getByText("I cut deploy time 40%.")).toBeInTheDocument();
     expect(screen.getByText("K8s evidence")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Cut deploy time 40%.")).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue("Cut deploy time 40%."),
+    ).toBeInTheDocument();
   });
 
   it("sends a composed message", async () => {
     const user = userEvent.setup();
     render(<CoachPage />);
-    await user.type(screen.getByPlaceholderText(/reply to your coach/i), "It was per region");
+    await user.type(
+      screen.getByPlaceholderText(/reply to your coach/i),
+      "It was per region",
+    );
     await user.keyboard("{Enter}");
     expect(mocks.send).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: "s1", message: "It was per region" }),
+      expect.objectContaining({
+        sessionId: "s1",
+        message: "It was per region",
+      }),
     );
   });
 
@@ -3057,7 +3118,8 @@ describe("CoachPage", () => {
     await user.click(screen.getByRole("button", { name: /save to profile/i }));
     expect(mocks.saveNote).toHaveBeenCalledWith(
       expect.objectContaining({
-        sessionId: "s1", topicId: "t1",
+        sessionId: "s1",
+        topicId: "t1",
         summary: "Cut deploy time by 40% at Acme.",
       }),
     );
