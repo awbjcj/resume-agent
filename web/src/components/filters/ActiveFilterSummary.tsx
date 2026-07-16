@@ -46,7 +46,7 @@ export function ActiveFilterSummary({
   if (filter.fitMin != null) scalar("fitMin", `Fit >= ${filter.fitMin}`);
   if (filter.maxFit != null) scalar("maxFit", `Fit <= ${filter.maxFit}`);
   if (filter.salaryMin != null) scalar("salaryMin", `Salary >= ${filter.salaryMin}`);
-  if (filter.staleDays != null) scalar("staleDays", `Stale > ${filter.staleDays}d`);
+  if (filter.staleDays != null) scalar("staleDays", `Posted <= ${filter.staleDays}d`);
 
   if (!chips.length && !scalars.length) return null;
 
