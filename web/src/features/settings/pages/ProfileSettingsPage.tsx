@@ -1,17 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { ArrowRight, Sparkles } from "lucide-react";
 
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { BuildReportPanel } from "@/features/profile-sources/BuildReportPanel";
 import { SourceManager } from "@/features/profile-sources/SourceManager";
-import { InterviewPanel } from "@/features/interview/InterviewPanel";
+import { useCoachSessions } from "@/features/coach/use-coach";
 import { useActiveRun } from "@/features/runs/use-active-run";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
 import type { paths } from "@/lib/api/schema";
+import { ManualSkillsPanel } from "../ManualSkillsPanel";
 import { SaveBar } from "../SaveBar";
 import { SkillGroupsPanel } from "../SkillGroupsPanel";
 import { useConfig, useSaveConfig } from "../use-config";
@@ -34,6 +37,7 @@ export function ProfileSettingsPage() {
   const save = useSaveConfig("/api/config/profile");
   const { draft, setDraft, dirty, reset } = useDraft(data as ProfileDoc | undefined);
   const setupStatus = useSetupStatus();
+  const coachSessions = useCoachSessions();
   const { launch } = useLaunchRun();
   const building = useActiveRun("profile-build")?.status === "running";
   const [allowText, setAllowText] = useState("");
@@ -50,6 +54,10 @@ export function ProfileSettingsPage() {
   }
 
   if (!draft) return <Skeleton className="h-64 w-full" />;
+
+  const coachRows = coachSessions.data?.sessions ?? [];
+  const activeCoach = coachRows.find((session) => session.status === "active");
+  const lastCoach = coachRows[coachRows.length - 1];
 
   const parsedLimit = Number(limitText);
   const limitValid = Number.isInteger(parsedLimit) && parsedLimit >= 1 && parsedLimit <= 100;
@@ -69,7 +77,25 @@ export function ProfileSettingsPage() {
           The resume and other source documents the profile is built from.
         </p>
       </header>
-      <InterviewPanel />
+      <Card className="border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.05]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="size-4 text-primary" aria-hidden="true" />
+            Profile coach
+          </CardTitle>
+          <CardDescription>
+            {lastCoach
+              ? `${activeCoach?.topicCount ?? 0} open topics · last session ${new Date(lastCoach.startedAt).toLocaleDateString()}`
+              : "Start your first coaching session to uncover grounded profile evidence."}
+          </CardDescription>
+          <CardAction>
+            <Button render={<a href="/coach" />}>
+              Open coach
+              <ArrowRight data-icon="inline-end" aria-hidden="true" />
+            </Button>
+          </CardAction>
+        </CardHeader>
+      </Card>
       <SourceManager />
       <Separator />
       <FieldGroup>
@@ -156,6 +182,8 @@ export function ProfileSettingsPage() {
       <BuildReportPanel />
       <Separator />
       <SkillGroupsPanel />
+      <Separator />
+      <ManualSkillsPanel />
     </div>
   );
 }

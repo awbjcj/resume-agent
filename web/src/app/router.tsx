@@ -26,6 +26,9 @@ const AnalyticsPage = lazy(() =>
 const MatchGapPage = lazy(() =>
   import("@/features/match-gap/MatchGapPage").then((m) => ({ default: m.MatchGapPage })),
 );
+const CoachPage = lazy(() =>
+  import("@/features/coach/CoachPage").then((m) => ({ default: m.CoachPage })),
+);
 const SourcesPage = lazy(() =>
   import("@/features/sources/SourcesPage").then((m) => ({ default: m.SourcesPage })),
 );
@@ -116,6 +119,7 @@ export const router = createBrowserRouter([
       { path: "triage", element: <SetupGate>{page(<TriagePage />)}</SetupGate> },
       { path: "analytics", element: <SetupGate>{page(<AnalyticsPage />)}</SetupGate> },
       { path: "match-gap", element: <SetupGate>{page(<MatchGapPage />)}</SetupGate> },
+      { path: "coach", element: <SetupGate>{page(<CoachPage />)}</SetupGate> },
       { path: "account", element: page(<AccountPage />) },
       { path: "admin", element: page(<AdminPage />) },
       { path: "sources", element: <Navigate to="/settings/sources" replace /> },

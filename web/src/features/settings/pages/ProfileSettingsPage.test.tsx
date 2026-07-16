@@ -18,12 +18,17 @@ vi.mock("@/features/profile-sources/SourceManager", () => ({
   SourceManager: () => <div data-testid="source-manager" />,
 }));
 
-vi.mock("@/features/interview/InterviewPanel", () => ({
-  InterviewPanel: () => <div data-testid="interview-panel" />,
+vi.mock("@/features/coach/use-coach", () => ({
+  useCoachSessions: () => ({ data: { sessions: [] } }),
 }));
+
 
 vi.mock("../SkillGroupsPanel", () => ({
   SkillGroupsPanel: () => <div data-testid="skill-groups" />,
+}));
+
+vi.mock("../ManualSkillsPanel", () => ({
+  ManualSkillsPanel: () => <div data-testid="manual-skills" />,
 }));
 
 vi.mock("@/features/runs/use-active-run", () => ({
@@ -78,7 +83,7 @@ describe("ProfileSettingsPage", () => {
     const user = userEvent.setup();
     render(<ProfileSettingsPage />, { wrapper: withQueryClient });
     expect(screen.getByTestId("skill-groups")).toBeInTheDocument();
-    expect(screen.getByTestId("interview-panel")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open coach/i })).toHaveAttribute("href", "/coach");
 
     await user.type(screen.getByLabelText(/always include repositories/i), "important, fork");
     await user.type(screen.getByLabelText(/exclude repositories/i), "noise");

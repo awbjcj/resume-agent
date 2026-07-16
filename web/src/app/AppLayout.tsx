@@ -5,6 +5,7 @@ import {
   Inbox,
   Kanban,
   LayoutDashboard,
+  MessageCircleMore,
   Settings,
   CircleUserRound,
   ShieldCheck,
@@ -43,6 +44,7 @@ const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
   { to: "/triage", label: "Triage", icon: Inbox },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/match-gap", label: "Match-gap", icon: Target },
+  { to: "/coach", label: "Profile coach", icon: MessageCircleMore },
 ];
 
 export function AppLayout() {

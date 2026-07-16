@@ -901,6 +901,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile/coach/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Coach Sessions */
+        get: operations["list_coach_sessions_api_profile_coach_sessions_get"];
+        put?: never;
+        /** Start Session */
+        post: operations["start_session_api_profile_coach_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/coach/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Coach Session */
+        get: operations["get_coach_session_api_profile_coach_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/coach/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End Coach Session */
+        post: operations["end_coach_session_api_profile_coach_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/coach/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_api_profile_coach_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/coach/sessions/{session_id}/notes/{topic_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Note */
+        post: operations["save_note_api_profile_coach_sessions__session_id__notes__topic_id__post"];
+        /** Discard Note */
+        delete: operations["discard_note_api_profile_coach_sessions__session_id__notes__topic_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profile/documents": {
         parameters: {
             query?: never;
@@ -936,32 +1023,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/profile/interview": {
+    "/api/profile/manual-skills": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** Launch Interview */
-        post: operations["launch_interview_api_profile_interview_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/profile/interview/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Interview History */
-        get: operations["interview_history_api_profile_interview_history_get"];
+        /** Get Manual Skills */
+        get: operations["get_manual_skills_api_profile_manual_skills_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -970,7 +1040,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/profile/interview/{run_id}/answers": {
+    "/api/profile/manual-skills/{entry_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -979,9 +1049,9 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Answer Interview */
-        post: operations["answer_interview_api_profile_interview__run_id__answers_post"];
-        delete?: never;
+        post?: never;
+        /** Delete Manual Skill */
+        delete: operations["delete_manual_skill_api_profile_manual_skills__entry_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1015,6 +1085,41 @@ export interface paths {
         get: operations["get_skeleton_api_profile_skeleton_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile Skills */
+        get: operations["get_profile_skills_api_profile_skills_get"];
+        put?: never;
+        /** Post Profile Skill */
+        post: operations["post_profile_skill_api_profile_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/skills/{skill_id}/aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Profile Skill Alias */
+        post: operations["post_profile_skill_alias_api_profile_skills__skill_id__aliases_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1539,6 +1644,11 @@ export interface components {
             /** Weightedtotal */
             weightedTotal: number;
         };
+        /** AddAliasIn */
+        AddAliasIn: {
+            /** Alias */
+            alias: string;
+        };
         /** AddJobTextRequest */
         AddJobTextRequest: {
             /** Company */
@@ -1567,6 +1677,13 @@ export interface components {
             title?: string | null;
             /** Url */
             url: string;
+        };
+        /** AddSkillIn */
+        AddSkillIn: {
+            /** Category */
+            category?: ("hard" | "soft" | "domain") | null;
+            /** Name */
+            name: string;
         };
         /** AddSourceIn */
         AddSourceIn: {
@@ -1851,6 +1968,198 @@ export interface components {
             /** Skipped */
             skipped: number;
         };
+        /** CoachDraftNoteOut */
+        CoachDraftNoteOut: {
+            /** Quotes */
+            quotes?: string[];
+            /**
+             * Status
+             * @default pending
+             */
+            status: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Topicid */
+            topicId: string;
+        };
+        /** CoachEndIn */
+        CoachEndIn: {
+            /**
+             * Build
+             * @default true
+             */
+            build: boolean;
+        };
+        /** CoachImpactOut */
+        CoachImpactOut: {
+            /** Bulletsgainedmetrics */
+            bulletsGainedMetrics?: components["schemas"]["CoachMetricGainOut"][];
+            /** Error */
+            error?: string | null;
+            /** Newfactids */
+            newFactIds?: string[];
+            /** Newskills */
+            newSkills?: string[];
+            /** Skillsgainedevidence */
+            skillsGainedEvidence?: components["schemas"]["CoachSkillGainOut"][];
+        };
+        /** CoachMessageIn */
+        CoachMessageIn: {
+            /** Message */
+            message: string;
+        };
+        /** CoachMetricGainOut */
+        CoachMetricGainOut: {
+            /** After */
+            after: number;
+            /** Before */
+            before: number;
+            /** Experienceid */
+            experienceId: string;
+        };
+        /** CoachNoteIn */
+        CoachNoteIn: {
+            /** Quotes */
+            quotes: string[];
+            /** Summary */
+            summary: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
+        /** CoachNoteOut */
+        CoachNoteOut: {
+            /** Docid */
+            docId: string;
+        };
+        /** CoachResearchActionOut */
+        CoachResearchActionOut: {
+            /** Kind */
+            kind: string;
+            /** Target */
+            target: string;
+            /**
+             * Why
+             * @default
+             */
+            why: string;
+        };
+        /** CoachSessionOut */
+        CoachSessionOut: {
+            /** Draftnotes */
+            draftNotes?: components["schemas"]["CoachDraftNoteOut"][];
+            /** Endedat */
+            endedAt?: string | null;
+            impact?: components["schemas"]["CoachImpactOut"] | null;
+            /** Recap */
+            recap?: string | null;
+            /** Sessionid */
+            sessionId: string;
+            /** Startedat */
+            startedAt: string;
+            /** Status */
+            status: string;
+            /** Topics */
+            topics?: components["schemas"]["CoachTopicOut"][];
+            /** Turns */
+            turns?: components["schemas"]["CoachTurnOut"][];
+        };
+        /** CoachSessionSummaryOut */
+        CoachSessionSummaryOut: {
+            /** Endedat */
+            endedAt?: string | null;
+            /**
+             * Savednotecount
+             * @default 0
+             */
+            savedNoteCount: number;
+            /** Sessionid */
+            sessionId: string;
+            /** Startedat */
+            startedAt: string;
+            /** Status */
+            status: string;
+            /**
+             * Topiccount
+             * @default 0
+             */
+            topicCount: number;
+        };
+        /** CoachSessionsOut */
+        CoachSessionsOut: {
+            /** Sessions */
+            sessions?: components["schemas"]["CoachSessionSummaryOut"][];
+        };
+        /** CoachSkillGainOut */
+        CoachSkillGainOut: {
+            /** After */
+            after: number;
+            /** Before */
+            before: number;
+            /** Skill */
+            skill: string;
+        };
+        /** CoachTopicOut */
+        CoachTopicOut: {
+            /**
+             * Gap
+             * @default
+             */
+            gap: string;
+            /** Id */
+            id: string;
+            /** Notedocid */
+            noteDocId?: string | null;
+            /**
+             * Relatedref
+             * @default
+             */
+            relatedRef: string;
+            /**
+             * Status
+             * @default open
+             */
+            status: string;
+            /**
+             * Whyitmatters
+             * @default
+             */
+            whyItMatters: string;
+        };
+        /** CoachTurnOut */
+        CoachTurnOut: {
+            /**
+             * At
+             * @default
+             */
+            at: string;
+            /**
+             * Kind
+             * @default
+             */
+            kind: string;
+            /** Researchactions */
+            researchActions?: components["schemas"]["CoachResearchActionOut"][];
+            /** Role */
+            role: string;
+            /** Text */
+            text: string;
+            /**
+             * Topicid
+             * @default
+             */
+            topicId: string;
+        };
         /** CohortOut */
         CohortOut: {
             /** Applications */
@@ -1958,100 +2267,6 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
-        };
-        /** InterviewAnswerIn */
-        InterviewAnswerIn: {
-            /** Questionid */
-            questionId: string;
-            /**
-             * Text
-             * @default
-             */
-            text: string;
-        };
-        /** InterviewAnswersIn */
-        InterviewAnswersIn: {
-            /** Answers */
-            answers?: components["schemas"]["InterviewAnswerIn"][];
-            /**
-             * Build
-             * @default true
-             */
-            build: boolean;
-        };
-        /** InterviewAnswersOut */
-        InterviewAnswersOut: {
-            /** Buildrunid */
-            buildRunId?: string | null;
-            /** Buildskippedreason */
-            buildSkippedReason?: string | null;
-            /** Buildstarted */
-            buildStarted: boolean;
-            /** Docids */
-            docIds: string[];
-        };
-        /** InterviewHistoryAnswerOut */
-        InterviewHistoryAnswerOut: {
-            /** Answertext */
-            answerText: string;
-            /** Docid */
-            docId: string;
-            /** Questionid */
-            questionId: string;
-        };
-        /** InterviewHistoryOut */
-        InterviewHistoryOut: {
-            /** Rounds */
-            rounds?: components["schemas"]["InterviewHistoryRoundOut"][];
-        };
-        /** InterviewHistoryRoundOut */
-        InterviewHistoryRoundOut: {
-            /** Answers */
-            answers?: components["schemas"]["InterviewHistoryAnswerOut"][];
-            /** Askedat */
-            askedAt: string;
-            /** Questions */
-            questions?: components["schemas"]["InterviewQuestionOut"][];
-            /** Researchactions */
-            researchActions?: components["schemas"]["InterviewResearchActionOut"][];
-            /** Roundid */
-            roundId: string;
-            /** Submittedat */
-            submittedAt?: string | null;
-        };
-        /** InterviewQuestionOut */
-        InterviewQuestionOut: {
-            /**
-             * Gap
-             * @default
-             */
-            gap: string;
-            /** Id */
-            id: string;
-            /** Questiontext */
-            questionText: string;
-            /**
-             * Relatedref
-             * @default
-             */
-            relatedRef: string;
-            /**
-             * Whyitmatters
-             * @default
-             */
-            whyItMatters: string;
-        };
-        /** InterviewResearchActionOut */
-        InterviewResearchActionOut: {
-            /** Kind */
-            kind: string;
-            /** Target */
-            target: string;
-            /**
-             * Why
-             * @default
-             */
-            why: string;
         };
         /** InviteInfo */
         InviteInfo: {
@@ -2262,6 +2477,26 @@ export interface components {
             password: string;
             /** Username */
             username: string;
+        };
+        /** ManualEntryOut */
+        ManualEntryOut: {
+            /** Addedat */
+            addedAt: string;
+            /** Aliastext */
+            aliasText?: string | null;
+            /** Category */
+            category?: ("hard" | "soft" | "domain") | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new_skill" | "alias";
+            /** Name */
+            name?: string | null;
+            /** Targetskilldisplay */
+            targetSkillDisplay?: string | null;
         };
         /** MatchGapOut */
         MatchGapOut: {
@@ -2907,6 +3142,15 @@ export interface components {
             kind: string;
             /** Label */
             label: string;
+        };
+        /** SkillEntryOut */
+        SkillEntryOut: {
+            /** Category */
+            category?: ("hard" | "soft" | "domain") | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** SkillGroupOut */
         SkillGroupOut: {
@@ -5503,6 +5747,247 @@ export interface operations {
             };
         };
     };
+    list_coach_sessions_api_profile_coach_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_session_api_profile_coach_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_coach_session_api_profile_coach_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_coach_session_api_profile_coach_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachEndIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_api_profile_coach_sessions__session_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_note_api_profile_coach_sessions__session_id__notes__topic_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachNoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_note_api_profile_coach_sessions__session_id__notes__topic_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+                topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_documents_api_profile_documents_get: {
         parameters: {
             query?: never;
@@ -5600,38 +6085,7 @@ export interface operations {
             };
         };
     };
-    launch_interview_api_profile_interview_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RunOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    interview_history_api_profile_interview_history_get: {
+    get_manual_skills_api_profile_manual_skills_get: {
         parameters: {
             query?: never;
             header?: {
@@ -5648,7 +6102,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InterviewHistoryOut"];
+                    "application/json": components["schemas"]["ManualEntryOut"][];
                 };
             };
             /** @description Validation Error */
@@ -5662,31 +6116,25 @@ export interface operations {
             };
         };
     };
-    answer_interview_api_profile_interview__run_id__answers_post: {
+    delete_manual_skill_api_profile_manual_skills__entry_id__delete: {
         parameters: {
             query?: never;
             header?: {
                 authorization?: string | null;
             };
             path: {
-                run_id: string;
+                entry_id: string;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InterviewAnswersIn"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
-            200: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["InterviewAnswersOut"];
-                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -5748,6 +6196,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkeletonEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_profile_skills_api_profile_skills_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_profile_skill_api_profile_skills_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddSkillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualEntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_profile_skill_alias_api_profile_skills__skill_id__aliases_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAliasIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualEntryOut"];
                 };
             };
             /** @description Validation Error */
