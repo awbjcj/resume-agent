@@ -56,7 +56,6 @@ export function ProfileSettingsPage() {
   if (!draft) return <Skeleton className="h-64 w-full" />;
 
   const coachRows = coachSessions.data?.sessions ?? [];
-  const activeCoach = coachRows.find((session) => session.status === "active");
   const lastCoach = coachRows[coachRows.length - 1];
 
   const parsedLimit = Number(limitText);
@@ -85,7 +84,7 @@ export function ProfileSettingsPage() {
           </CardTitle>
           <CardDescription>
             {lastCoach
-              ? `${activeCoach?.topicCount ?? 0} open topics · last session ${new Date(lastCoach.startedAt).toLocaleDateString()}`
+              ? `${lastCoach.topicCount} topics · last session ${new Date(lastCoach.startedAt).toLocaleDateString()}`
               : "Start your first coaching session to uncover grounded profile evidence."}
           </CardDescription>
           <CardAction>
