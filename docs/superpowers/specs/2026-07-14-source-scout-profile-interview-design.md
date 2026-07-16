@@ -193,7 +193,7 @@ either:
 - a **question**: `{ id, gap, why_it_matters, question_text, related_ref }`
   (`related_ref` = fact or doc id), or
 - a **research action**: `{ kind: "harvest_repo" | "request_url", target,
-  why }` ("research suggestion" is avoided — a Suggestion belongs to the
+why }` ("research suggestion" is avoided — a Suggestion belongs to the
   match-gap advisor).
 
 Questions must demand **evidence**, never yes/no claims: "where did you use
@@ -274,7 +274,7 @@ notes plus the history file, so successive rounds converge on remaining gaps.
 ## Non-goals
 
 - No persistent chat session or streamed turns — the conversation UI is a
-  chat-styled *presentation* of stateless rounds reconstructed from the
+  chat-styled _presentation_ of stateless rounds reconstructed from the
   interview history.
 - No open web search about the user in Part B (repo + user-URL evidence only).
 - No agent-side writes of any kind; no new mutation endpoints beyond the
