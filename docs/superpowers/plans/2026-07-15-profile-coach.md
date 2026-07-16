@@ -23,15 +23,72 @@
 - Commit style: imperative conventional prefixes (`feat:`, `refactor:`, `docs:`), matching `git log`.
 - The batch interview is retired at the end (endpoints, service, panel, CLI command deleted); `data/profile/interview_history.json` stays on disk as read-only anti-repeat input.
 
+## Correctness Amendments (binding; supersede snippets below)
+
+The plan was audited against the current store, RunManager, Agno, API, and web
+contracts before implementation. Apply these corrections wherever a later
+snippet conflicts with them:
+
+1. **Persist research actions.** `CoachTurnRecord` and `CoachTurnOut` carry
+   `research_actions`; `ValidatedTurn.research_actions` is copied into the
+   durable coach turn. Otherwise the web's research-action cards can never be
+   reconstructed after the run finishes.
+2. **Validate the action state machine, not just the schema.** Opening output
+   must be `action="ask"` and reference a known assigned topic. Message turns
+   allow only `ask` or `draft`; recap output must be `action="recap"`. Drafts
+   may target only an open topic, may not coexist with a skip for the same
+   topic, and only one draft may exist per topic.
+3. **Keep quote validation turn-local and the saved quote block mandatory.**
+   Each formatter quote must be a whitespace-normalized substring of one
+   individual user turn (never a synthetic substring spanning two turns).
+   Approval may edit user-authored content, but at least one non-empty quote is
+   required so every saved note contains the promised `In your own words`
+   section.
+4. **Make topic-aware elision real and bounded.** Store each user turn with the
+   topic selected by the validated coach response. `render_transcript` must
+   always return at most `TRANSCRIPT_CHAR_CAP` characters. Completed topics
+   collapse first; if active-topic text alone exceeds the cap, retain the
+   newest active exchanges and use an explicit elision marker rather than
+   exceeding the model-context budget.
+5. **Serialize approval as one critical section.** Hold `coach_lock()` across
+   pending-draft validation, `add_note_source`, and the re-entrant status
+   mutation. Add a concurrent-approval regression test proving exactly one
+   corpus note is created. The earlier "idempotent-enough duplicate" comment is
+   not an acceptable write contract.
+6. **Snapshot all fact-lock IDs.** Use the existing
+   `cover_letter.provenance.collect_fact_ids` helper (including bullets,
+   education, skills, credentials, and other `FactItem`s), not only experience
+   and project parent IDs. Sort diff collections for deterministic API output.
+7. **Validate session identifiers at the store boundary.** Only generated
+   lowercase hex session IDs (and bounded test IDs) are accepted; path
+   separators and traversal-like identifiers reject as `unknown session`.
+8. **Respect durable CLI sessions and the specified edit flow.** `profile
+coach` resumes an existing active session instead of always trying to create
+   one. Draft prompts implement save/edit/discard/leave, and `/end` offers the
+   same resolution choices for every still-pending draft before recap.
+9. **Implement run tracking from the current tracker contract.** Mutation hooks
+   own their submitted run id, keep the composer text until the tracked run
+   succeeds, preserve it on failure for Retry, invalidate the exact session and
+   session-list keys on completion, and separately track any returned
+   `buildRunId` until the impact refetch completes.
+10. **Use the checked-in Base UI/Nova primitives accessibly.** Follow the
+    project's semantic tokens, `Field` composition, icon conventions, and
+    Base UI `render` API. Do not import uninstalled chat primitives; compose the
+    existing Card/ScrollArea/Collapsible/Field primitives without adding a new
+    dependency solely for presentation. Loading, empty, error, ended, and
+    mobile agenda states require focused tests.
+
 ---
 
 ### Task 1: Coach session store
 
 **Files:**
+
 - Create: `src/resume_agent/profile/coach_store.py`
 - Test: `tests/test_coach_store.py`
 
 **Interfaces:**
+
 - Consumes: `resume_agent.models.base.ExtensibleModel`, `resume_agent.progress.atomic_write_text`.
 - Produces (used by Tasks 2, 6, 7):
   - Models: `CoachTopic(id, gap, why_it_matters, related_ref, status, note_doc_id)`, `CoachDraftNote(topic_id, title, summary, quotes, status)`, `CoachTurnRecord(role, kind, text, topic_id, at)`, `CoachSession(session_id, started_at, ended_at, status, turns, topics, draft_notes, recap, impact)`.
@@ -409,10 +466,12 @@ git commit -m "feat: add coach session store with delta-under-lock mutations"
 ### Task 2: CoachTurn schemas and turn validation
 
 **Files:**
+
 - Create: `src/resume_agent/profile/coach.py`
 - Test: `tests/test_profile_coach.py`
 
 **Interfaces:**
+
 - Consumes: `ResearchAction` from `resume_agent.profile.interview`; `CoachTopic`, `CoachDraftNote`, `CoachTurnRecord` from Task 1.
 - Produces (used by Tasks 4, 6):
   - `AGENDA_CAP = 12`, `TRANSCRIPT_CHAR_CAP = 12_000`.
@@ -735,10 +794,12 @@ git commit -m "feat: add coach turn schemas with quote and agenda validation"
 ### Task 3: Context assembly and topic-aware transcript elision
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/coach.py` (append)
 - Test: `tests/test_profile_coach.py` (append)
 
 **Interfaces:**
+
 - Consumes: `load_facts`, `load_matrix`, `load_manifest` (same imports as `services/profile_interview.interview_context`); `asked_questions` + `load_history` from `resume_agent.profile.interview`; `list_sessions` from Task 1.
 - Produces (used by Task 6):
   - `profile_overview(profile_dir, session=None) -> str` — the FACTS / TOP SKILLS / CORPUS / MARKET GAPS blocks, moved verbatim from `services/profile_interview.interview_context` (same `_block` helper, same `_market_gaps_report`), with the PREVIOUSLY ASKED block replaced by `previously_asked(profile_dir)`.
@@ -992,10 +1053,12 @@ git commit -m "feat: add coach context assembly with topic-aware transcript elis
 ### Task 4: Coach agents (two-stage, ADR 0005)
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/coach.py` (append)
 - Test: `tests/test_profile_coach.py` (append)
 
 **Interfaces:**
+
 - Consumes: `AgentRunner`, `Runner`, `build_model`, `retry_kwargs`, `tool_kwargs`, `use_json_mode_for` from `resume_agent.llm_runner`; `make_corpus_tools` from `resume_agent.profile.interview`; `get_settings` from `resume_agent.config`.
 - Produces (used by Task 6):
   - `build_coach_agent(tools) -> Runner` — mid-tier tool loop with `_COACH_INSTRUCTIONS`.
@@ -1122,10 +1185,12 @@ git commit -m "feat: add coach inspector and formatter agents"
 ### Task 5: Profile snapshot and impact diff
 
 **Files:**
+
 - Create: `src/resume_agent/profile/snapshot.py`
 - Test: `tests/test_profile_snapshot.py`
 
 **Interfaces:**
+
 - Consumes: `load_facts` (`resume_agent.profile.store`), `load_matrix` (`resume_agent.profile.matrix`).
 - Produces (used by Task 7):
   - `profile_snapshot(profile_dir) -> dict` with shape `{"factIds": [str], "bullets": {experience_id: {"total": int, "withMetrics": int}}, "skills": {matrix_key: evidence_ref_count}}`. Missing `facts.json`/`matrix.json` yield empty collections.
@@ -1288,10 +1353,12 @@ git commit -m "feat: add profile snapshot and impact diff functions"
 ### Task 6: Coach service — opening and message turns
 
 **Files:**
+
 - Create: `src/resume_agent/services/profile_coach.py`
 - Test: `tests/test_profile_coach_service.py`
 
 **Interfaces:**
+
 - Consumes: Tasks 1–4 (`coach_store`, `coach` validation/context/agents), `make_corpus_tools` (`resume_agent.profile.interview`), `get_session` (`resume_agent.db`).
 - Produces (used by Tasks 8, 9):
   - `run_opening_turn(reporter, *, profile_dir, engine=None, coach_agent=None, formatter_agent=None) -> dict` — returns `session_view(...)` of the new session (`{"sessionId", "status", "turns", "topics", "draftNotes", "recap", "impact"}` camelCase keys).
@@ -1676,10 +1743,12 @@ git commit -m "feat: add coach service opening and message turns"
 ### Task 7: Coach service — draft approval, recap, build-with-impact
 
 **Files:**
+
 - Modify: `src/resume_agent/services/profile_coach.py` (append)
 - Test: `tests/test_profile_coach_service.py` (append)
 
 **Interfaces:**
+
 - Consumes: `add_note_source` (`resume_agent.profile.intake`), `load_manifest` (`resume_agent.profile.corpus`), `profile_snapshot`/`snapshot_diff` (Task 5), `run_corpus_build` (`resume_agent.services.profile_build`), store helpers (Task 1).
 - Produces (used by Tasks 8, 9):
   - `approve_draft(profile_dir, session_id, topic_id, *, title, summary, quotes) -> str` — requires a literal primary corpus source (same guard as the old `submit_interview_answers`); renders the note markdown; `add_note_source`; `set_draft_status(..., "saved", doc.id)`; returns the doc id. Raises `ValueError` (`"upload a primary resume"`, `"unknown draft"`, `"draft already resolved"`, `"empty note"`).
@@ -1966,12 +2035,14 @@ git commit -m "feat: add coach draft approval, recap, and build-with-impact"
 ### Task 8: API schemas, coach router, and registration
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/coach.py`
 - Create: `src/resume_agent/api/routers/coach.py`
 - Modify: `src/resume_agent/api/app.py` (register router)
 - Test: `tests/api/test_coach_router.py`
 
 **Interfaces:**
+
 - Consumes: Task 6/7 service functions; `RunManager`, `RunSingletonConflict`, `RunResetConflict`, `record_to_run`, `RunOut`, `ApiException`, `resolve_api_key`, `get_profile_dir`, `get_run_manager`, `get_settings_dep`, `get_config_store`, `ProfileConfigDoc` — all exactly as `routers/profile.py` uses them today.
 - Produces: the wire contract (all under `/api`):
   - `POST /profile/coach/sessions` → 202 `RunOut` (kind `profile-coach-open`, singleton `profile-coach`, `singleton_conflict="raise"` → 409 `COACH_BUSY`; 409 `SESSION_ACTIVE` if `active_session` already exists; 400 `SETUP_INCOMPLETE` guards copied from the old `launch_interview`).
@@ -2527,11 +2598,13 @@ git commit -m "feat: expose profile coach API"
 ### Task 9: CLI `profile coach` (replaces `profile interview`)
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py` (delete `profile_interview_cmd` at ~`cli.py:306-398`, add `profile_coach_cmd` in its place)
 - Create: `tests/test_cli_profile_coach.py`
 - Delete: `tests/test_cli_profile_interview.py`
 
 **Interfaces:**
+
 - Consumes: `run_opening_turn`, `run_message_turn`, `run_recap_turn`, `approve_draft`, `discard_draft`, `run_build_with_impact` (imported lazily inside the command like the old command did, so tests can monkeypatch `resume_agent.services.profile_coach.*`).
 - Produces: `resume-agent profile coach [--facts …] [--db-url …] [--no-build] [--profile-sources …]`. Loop: print coach message → `typer.prompt("You")` → send; `/end` finishes; when a turn returns a new pending draft, prompt `Save this note? [s]ave / [d]iscard / [l]eave` and dispatch accordingly.
 
@@ -2787,6 +2860,7 @@ git commit -m "feat: replace profile interview command with interactive coach ch
 ### Task 10: Retire the batch interview backend
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/profile.py` — delete `launch_interview` (~193-234), `answer_interview` (~237-288), `interview_history` (~291-295), and the now-unused imports (`InterviewAnswersIn`, `InterviewAnswersOut`, `InterviewHistoryOut`, `interview_history_view`, `run_interview_round`, `submit_interview_answers`).
 - Modify: `src/resume_agent/api/schemas/profile.py` — delete `InterviewQuestionOut`, `InterviewResearchActionOut`, `InterviewHistoryAnswerOut`, `InterviewHistoryRoundOut`, `InterviewHistoryOut`, `InterviewAnswerIn`, `InterviewAnswersIn`, `InterviewAnswersOut` (lines ~72-119).
 - Delete: `src/resume_agent/services/profile_interview.py`
@@ -2795,6 +2869,7 @@ git commit -m "feat: replace profile interview command with interactive coach ch
 - Modify: `tests/test_profile_interview.py` — delete tests exercising removed functions (`normalize_round`, `record_answers`, agent builders); keep tests for `load_history`, `asked_questions`, `append_round`, `make_corpus_tools`. Read the file first; if all remaining coverage is duplicated by `tests/test_profile_coach.py`, delete the whole file instead.
 
 **Interfaces:**
+
 - Consumes: nothing new. Produces: a codebase where `grep -r "profile_interview" src/` returns nothing and `grep -r "/profile/interview" src/` returns nothing.
 
 - [ ] **Step 1: Delete in dependency order** (router → service → schemas → interview.py trim → tests), running `Grep "profile_interview|InterviewAnswers|InterviewHistory|run_interview_round|submit_interview_answers|interview_history_view|normalize_round|record_answers|history_lock|build_interview" src/ tests/` after each removal to find stragglers.
@@ -2821,6 +2896,7 @@ git commit -m "refactor: retire batch interview endpoints, service, and schemas"
 ### Task 11: Regenerate the OpenAPI contract and TS client
 
 **Files:**
+
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (generated)
 
 - [ ] **Step 1: Regenerate**
@@ -2845,10 +2921,12 @@ git commit -m "feat: regenerate API contract for profile coach endpoints"
 ### Task 12: Web — coach hooks
 
 **Files:**
+
 - Create: `web/src/features/coach/use-coach.ts`
 - Delete: nothing yet (interview feature dies in Task 14)
 
 **Interfaces:**
+
 - Consumes: `api`, `unwrap` (`@/lib/api/client`), `components` (`@/lib/api/schema`), `trackRun` (`@/lib/runs/tracker`), `useRunStore` (`@/lib/runs/store`) — the same imports `use-interview.ts` uses today.
 - Produces (used by Task 13):
   - `type CoachSession = components["schemas"]["CoachSessionOut"]`, `type CoachSessions = components["schemas"]["CoachSessionsOut"]`.
@@ -2875,6 +2953,7 @@ git commit -m "feat: add coach session hooks"
 ### Task 13: Web — Coach page and components
 
 **Files:**
+
 - Create: `web/src/features/coach/CoachPage.tsx` (page: thread + composer + end button)
 - Create: `web/src/features/coach/AgendaRail.tsx` (topic list with status chips; collapsible below `sm`)
 - Create: `web/src/features/coach/DraftNoteCard.tsx` (editable title/summary/quotes + Save to profile / Discard)
@@ -2883,6 +2962,7 @@ git commit -m "feat: add coach session hooks"
 - Test: `web/src/features/coach/CoachPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 12 hooks; chat bubble styling copied from `InterviewPanel.tsx`'s `AssistantMessage`/`AnswerMessage`; `useSyncGithub`/`useAddUrl` from `@/features/profile-sources/use-sources`; shadcn `Button`, `Card`, `Textarea`, `Checkbox`, `Badge`, `Alert`, `Spinner`, `Field` as already imported in `InterviewPanel.tsx`.
 - Produces: `CoachPage` (exported for the router), behavior:
   - No active session → "Start a session" hero button (disabled while the opening run tracks).
@@ -3045,6 +3125,7 @@ git commit -m "feat: route coach page, add nav entry, retire interview panel"
 ### Task 15: Docs and full verification
 
 **Files:**
+
 - Modify: `CLAUDE.md` — in "Hot paths" replace nothing (add `src/resume_agent/profile/coach.py | Coach turn validation, context, agents` and `src/resume_agent/services/profile_coach.py | Coach session service: turns, approval, recap, impact`); in "Known design notes" add one bullet summarizing the coach (turn-per-run sessions per ADR 0006, quote-validated draft notes per ADR 0005 amendment, batch interview retired) and delete any stale reference to the batch interview if present.
 - Modify: `docs/superpowers/specs/2026-07-15-profile-coach-design.md` — add the `DELETE …/notes/{topic_id}` discard endpoint to the Part 3 table (implemented in Task 8; the spec table omitted it).
 
