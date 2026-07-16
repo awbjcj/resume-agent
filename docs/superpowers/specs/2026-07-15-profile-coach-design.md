@@ -33,6 +33,27 @@ Decisions fixed during brainstorming:
    machinery; all conversation state lives in a workspace JSON sidecar. No
    long-lived agent processes, no new transport.
 
+### Correctness clarifications from implementation audit
+
+- Durable turn records include any structured research actions so the UI can
+  render them after a reload.
+- Opening turns must ask on an assigned topic; normal message turns cannot emit
+  recaps; recap runs must emit a recap. A topic can produce at most one draft,
+  and only while it is open.
+- Quote validation is performed against each individual user turn, not a
+  concatenation that could create a quote across turn boundaries. Saved notes
+  always contain at least one user-authored quote and the `In your own words`
+  block.
+- User turns are stored with their resolved topic. The transcript block has a
+  hard 12,000-character ceiling: completed topics collapse first, then the
+  oldest active exchanges elide with an explicit marker if necessary.
+- Draft approval is serialized across validation, corpus insertion, and session
+  status mutation, so concurrent approvals create exactly one note.
+- Impact snapshots include every fact-lock item ID, including nested bullets
+  and non-experience collections, and return deterministic ordering.
+- The terminal client resumes an existing active durable session and supports
+  save, edit, discard, or leave for pending drafts, including at `/end`.
+
 ---
 
 ## Architecture rule (unchanged from ADR 0005)
@@ -61,12 +82,12 @@ keeps atomic rewrites bounded by a single transcript, not all history.
   Coach turns carry `kind: question | draft_note | recap`; user turns have no
   kind.
 - `topics`: the coach's agenda — `{id, gap, why_it_matters, related_ref,
-  status: open | drafted | saved | skipped, note_doc_id}`. Rendered to the
+status: open | drafted | saved | skipped, note_doc_id}`. Rendered to the
   user so they always see session progress. The agenda is not frozen at
   opening: a coach turn may add topics when the conversation surfaces new
   material, bounded by a total agenda cap so sessions stay finite.
 - `draft_notes`: `{topic_id, title, summary, quotes, status: pending | saved |
-  discarded}` — coach-distilled notes awaiting approval. `summary` is the
+discarded}` — coach-distilled notes awaiting approval. `summary` is the
   coach's distillation; `quotes` are verbatim user statements from this
   session's transcript that back it.
 - `recap`: coach-written summary (topics covered, notes saved, open gaps,
@@ -158,14 +179,15 @@ same as one batch round, spent per exchange.
 
 New service module `services/profile_coach.py`; routers stay thin.
 
-| Endpoint | Behavior |
-| --- | --- |
-| `POST /api/profile/coach/sessions` | Guards (literal primary source exists; API keys for mid+cheap models resolve — same as today). Mints the session id and submits the opening-turn run; **the session file is written by the successful opening turn**, atomically with the agenda and first question, so a failed opening leaves no residue and retry is simply POST again. `202` + run record. `409` if an active session file exists or an opening run is in flight (singleton). |
-| `POST /api/profile/coach/sessions/{sid}/messages` | Appends the user turn, submits a coach-turn run. `409` if a turn run is active or the session ended. `202` + run record. |
-| `POST /api/profile/coach/sessions/{sid}/notes/{topic_id}` | **Approval write.** Body `{title, summary, quotes}` (pre-filled from the draft, user-editable — user edits are user-authored by definition and are not re-validated against the transcript). Renders one markdown note (summary + "In your own words" section) and calls `add_note_source`, marks the topic `saved`, records `note_doc_id`. `200`; `409` if already saved/discarded. No LLM. |
-| `POST /api/profile/coach/sessions/{sid}/end` | Body `{build: bool}`. Submits the recap-turn run; on completion, if `build` and ≥1 note saved, starts a profile-build run (existing skip-if-busy semantics) wrapped with before/after snapshots for the impact diff. |
-| `GET /api/profile/coach/sessions` | Session list for history (id, dates, status, counts). |
-| `GET /api/profile/coach/sessions/{sid}` | Full session state: transcript, agenda, drafts, recap, impact. |
+| Endpoint                                                    | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/profile/coach/sessions`                          | Guards (literal primary source exists; API keys for mid+cheap models resolve — same as today). Mints the session id and submits the opening-turn run; **the session file is written by the successful opening turn**, atomically with the agenda and first question, so a failed opening leaves no residue and retry is simply POST again. `202` + run record. `409` if an active session file exists or an opening run is in flight (singleton). |
+| `POST /api/profile/coach/sessions/{sid}/messages`           | Appends the user turn, submits a coach-turn run. `409` if a turn run is active or the session ended. `202` + run record.                                                                                                                                                                                                                                                                                                                          |
+| `POST /api/profile/coach/sessions/{sid}/notes/{topic_id}`   | **Approval write.** Body `{title, summary, quotes}` (pre-filled from the draft, user-editable — user edits are user-authored by definition and are not re-validated against the transcript). Renders one markdown note (summary + "In your own words" section) and calls `add_note_source`, marks the topic `saved`, records `note_doc_id`. `200`; `409` if already saved/discarded. No LLM.                                                      |
+| `DELETE /api/profile/coach/sessions/{sid}/notes/{topic_id}` | Discards one pending draft without a corpus write and returns the updated session. `409` if already saved/discarded; `404` for an unknown session or draft.                                                                                                                                                                                                                                                                                       |
+| `POST /api/profile/coach/sessions/{sid}/end`                | Body `{build: bool}`. Submits the recap-turn run; on completion, if `build` and ≥1 note saved, starts a profile-build run (existing skip-if-busy semantics) wrapped with before/after snapshots for the impact diff.                                                                                                                                                                                                                              |
+| `GET /api/profile/coach/sessions`                           | Session list for history (id, dates, status, counts).                                                                                                                                                                                                                                                                                                                                                                                             |
+| `GET /api/profile/coach/sessions/{sid}`                     | Full session state: transcript, agenda, drafts, recap, impact.                                                                                                                                                                                                                                                                                                                                                                                    |
 
 **Turn data flow:** client POSTs → run id → existing SSE run tracker → on
 completion re-fetch the session and render the new turn. The run's work
@@ -217,7 +239,7 @@ existing chat-bubble components:
   confirms first when pending drafts exist ("2 drafts not saved — save or
   discard first?"), and the recap lists any drafts left pending. Ending never
   auto-discards a draft. The CLI's `/end` prompts `[s]ave / [d]iscard /
-  leave` per pending draft.
+leave` per pending draft.
   The recap renders as a distinguished coach message; when the build
   completes, an **impact card** renders beneath it ("3 new facts · 2 bullets
   gained metrics · +4 evidence refs on Kubernetes").
@@ -228,8 +250,9 @@ existing chat-bubble components:
 `resume-agent profile coach` — an interactive chat loop calling the service
 functions directly (no RunManager): print coach message → prompt for reply →
 loop; draft notes prompt `[s]ave / [e]dit / [d]iscard`; `/end` triggers recap
-+ optional rebuild (`--no-build` preserved). No alias: the batch command name
-disappears with the batch flow.
+
+- optional rebuild (`--no-build` preserved). No alias: the batch command name
+  disappears with the batch flow.
 
 **Contract:** schemas regenerate through `scripts/export_openapi.py` +
 `scripts/gen_ts_client.sh`; the OpenAPI drift gate covers the new routes.
