@@ -1,0 +1,108 @@
+import pytest
+
+from resume_agent.models.profile import Contact, ProfileFacts, Skill
+from resume_agent.profile.manual_skills import load_manual_skills
+from resume_agent.profile.matrix import load_matrix
+from resume_agent.profile.store import load_facts, save_facts
+from resume_agent.services.profile_skills import (
+    ManualEntryNotFoundError,
+    ProfileNotBuiltError,
+    SkillAlreadyExistsError,
+    SkillNotFoundError,
+    add_alias,
+    add_skill,
+    list_manual_entries,
+    list_skills,
+    remove_manual_entry,
+)
+
+
+@pytest.fixture()
+def profile_dir(tmp_path):
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"Languages": [Skill(name="Python", aliases=["py"])]},
+    )
+    save_facts(facts, tmp_path / "facts.json")
+    return tmp_path
+
+
+def test_add_skill_raises_when_profile_not_built(tmp_path):
+    with pytest.raises(ProfileNotBuiltError):
+        add_skill(tmp_path, "Rust", None)
+
+
+def test_list_skills_returns_flat_entries(profile_dir):
+    rows = list_skills(profile_dir)
+    assert rows == [{"id": rows[0]["id"], "name": "Python", "category": None}]
+
+
+def test_add_skill_persists_and_regenerates_matrix(profile_dir):
+    entry = add_skill(profile_dir, "Rust", "hard")
+
+    facts = load_facts(profile_dir / "facts.json")
+    assert any(s.name == "Rust" for s in facts.skills["Manually added"])
+
+    ledger = load_manual_skills(profile_dir / "manual_skills.json")
+    assert ledger.entries[0].id == entry.id
+
+    matrix = load_matrix(profile_dir / "matrix.json")
+    assert matrix is not None
+    assert any(row.key == "rust" for row in matrix.rows)
+
+
+def test_add_skill_rejects_a_duplicate(profile_dir):
+    with pytest.raises(SkillAlreadyExistsError):
+        add_skill(profile_dir, "python", None)
+
+
+def test_add_alias_attaches_to_the_chosen_skill(profile_dir):
+    skill_id = list_skills(profile_dir)[0]["id"]
+    assert skill_id is not None
+
+    entry = add_alias(profile_dir, skill_id, "Python3")
+
+    facts = load_facts(profile_dir / "facts.json")
+    assert "Python3" in facts.skills["Languages"][0].aliases
+    ledger = load_manual_skills(profile_dir / "manual_skills.json")
+    assert ledger.entries[0].id == entry.id
+
+
+def test_add_alias_rejects_unknown_skill_id(profile_dir):
+    with pytest.raises(SkillNotFoundError):
+        add_alias(profile_dir, "nonexistent", "Python3")
+
+
+def test_add_alias_rejects_a_duplicate_alias(profile_dir):
+    skill_id = list_skills(profile_dir)[0]["id"]
+    assert skill_id is not None
+
+    with pytest.raises(SkillAlreadyExistsError):
+        add_alias(profile_dir, skill_id, "py")
+
+
+def test_remove_manual_entry_reverses_a_new_skill(profile_dir):
+    entry = add_skill(profile_dir, "Rust", None)
+
+    remove_manual_entry(profile_dir, entry.id)
+
+    facts = load_facts(profile_dir / "facts.json")
+    assert "Manually added" not in facts.skills
+    assert list_manual_entries(profile_dir) == []
+
+
+def test_remove_manual_entry_reverses_an_alias(profile_dir):
+    skill_id = list_skills(profile_dir)[0]["id"]
+    assert skill_id is not None
+
+    entry = add_alias(profile_dir, skill_id, "Python3")
+
+    remove_manual_entry(profile_dir, entry.id)
+
+    facts = load_facts(profile_dir / "facts.json")
+    assert facts.skills["Languages"][0].aliases == ["py"]
+
+
+def test_remove_manual_entry_raises_for_unknown_id(profile_dir):
+    with pytest.raises(ManualEntryNotFoundError):
+        remove_manual_entry(profile_dir, "nope")
