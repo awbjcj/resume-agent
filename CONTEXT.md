@@ -215,30 +215,67 @@ optional `evidence` sidecar (synthesis only), and optional verification `drops`.
 `Produced` in `profile/fragments.py`.
 _Avoid_: extraction result, payload
 
-**Interview round**:
-One stateless batch of gap-driven questions and Research actions produced by
-the profile interview Tool loop. Gaps come from both the corpus's own
-thinness and market demand (skills the user's discovered jobs ask for but the
-profile cannot evidence). Questions demand evidence, never yes/no claims.
-Answers become user-authored note sources; the round itself never touches
-facts. Rounds may be rendered as a conversation, but there is no session —
-each round stands alone against the corpus plus the interview history.
-_Avoid_: chat turn, interview session (nothing persists between rounds except
-history)
+**Coach session**:
+One durable coaching conversation between the user and the Profile Coach tool
+loop — an agenda of topics worked one question at a time, closing in Draft
+notes, a recap, and an Impact diff. Exactly one active per workspace; survives
+restarts. Supersedes the retired Interview round's stateless batches.
+_Avoid_: interview session (retired vocabulary), chat (the chat is its
+rendering)
+
+**Coach turn**:
+One typed coach reply within a Coach session — ask (react + teach + exactly
+one question), draft (present a Draft note), or recap (close the session).
+One user message produces exactly one turn; turns may also carry Research
+actions.
+_Avoid_: message (either side's text; the turn is the coach's typed step),
+round (retired)
+
+**Agenda topic**:
+One evidence gap on a Coach session's agenda — from corpus thinness or market
+demand — with a user-visible lifecycle: open → drafted → saved | skipped.
+The unit a Draft note closes.
+_Avoid_: gap (the gap is why the topic exists; the topic is the work item),
+question (a topic spans many questions)
+
+**Draft note**:
+The approval-gated close of an Agenda topic: the coach's distilled summary
+paired with verbatim user quotes from the session transcript that back it.
+Saving one (user-editable) is the only corpus write a Coach session can
+cause; coach-proposed quotes are mechanically validated against the
+transcript, user edits are user-authored by definition.
+_Avoid_: answer (answers were the batch interview's raw notes), suggestion
+(a Suggestion belongs to the match-gap advisor)
+
+**Impact diff**:
+The structured before/after profile delta from the rebuild that follows a
+Coach session — new facts, bullets that gained metrics, skills that gained
+evidence refs. Attributed to the rebuild as a whole, never to one note.
+_Avoid_: build report (warnings are not impact), changelog
+
+**Interview round** (retired):
+The batch predecessor of the Coach session — one stateless batch of
+gap-driven questions whose answers became user-authored note sources
+verbatim. No new rounds are produced; recorded rounds persist in the
+Interview history as anti-repeat input to Coach sessions.
+_Avoid_: using for new work (the Coach session supersedes it)
 
 **Research action**:
-A non-question item in an Interview round: a concrete evidence-gathering step
-the agent proposes — re-harvest a repository, or request a URL from the user.
-Executed only by existing intake paths on user click.
+A non-question item in a Coach turn (formerly an Interview round): a concrete
+evidence-gathering step the agent proposes — re-harvest a repository, or
+request a URL from the user. Executed only by existing intake paths on user
+click.
 _Avoid_: research suggestion (a Suggestion belongs to the match-gap advisor),
 task
 
 **Interview history**:
-The per-workspace sidecar recording every asked question and each answer's
-resulting note document — kept outside the corpus so it never pollutes
-extraction, and injected into later rounds so no question repeats. Also the
-source the conversation view is reconstructed from.
-_Avoid_: transcript (the transcript is a rendering of it), chat log
+The per-workspace sidecar recording every question the retired batch
+interview asked and each answer's note document — kept outside the corpus so
+it never pollutes extraction. Read-only since retirement: it feeds the
+anti-repeat context of Coach sessions alongside prior sessions' own
+transcripts.
+_Avoid_: transcript (a Coach session owns its transcript; this is the batch
+record), chat log
 
 ## Deployment & data custody
 

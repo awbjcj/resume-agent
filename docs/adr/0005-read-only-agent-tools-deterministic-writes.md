@@ -60,3 +60,12 @@ and any future tool-loop agent.
 - Giving a future agent write tools is an explicit reversal of this decision
   and requires revisiting the offline test strategy, budget enforcement, and
   approval UX that assume it.
+
+## Amendment (2026-07-15)
+
+The Profile Coach (successor to the batch Profile Interview; see ADR 0006 for
+its conversation architecture) is the second tool-loop instance under this
+rule. Its approval write is the draft-note save, and it adds a mechanical
+guard in this decision's spirit: coach-proposed verbatim quotes are validated
+against the session transcript before a draft is ever shown, so the agent
+cannot fabricate the user's words.
