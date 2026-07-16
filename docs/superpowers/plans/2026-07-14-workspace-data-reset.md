@@ -72,10 +72,12 @@ these corrections wherever an older code snippet conflicts:
 ### Task 1: Reset service (`services/reset.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/services/reset.py`
 - Test: `tests/test_reset_service.py`
 
 **Interfaces:**
+
 - Consumes: `resume_agent.tracking.tables` models (`Job`, `ResumeVersion`, `Application`, `CoverLetter`, `Notification`, `SkillSuggestion`); `resume_agent.tenancy.paths.resolve_tenant_path`.
 - Produces (used by Tasks 2 and 3):
   - `class ResetScope(str, Enum)` with values `jobs`, `profile`, `all`
@@ -498,12 +500,14 @@ git commit -m "feat: add workspace reset service with tiered scopes"
 ### Task 2: API endpoint `POST /api/account/reset` + contract regen
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/account.py` (append schemas)
 - Modify: `src/resume_agent/api/routers/account.py` (add endpoint + imports)
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_account_reset.py`
 
 **Interfaces:**
+
 - Consumes (from Task 1): `ResetPaths.resolve()`, `ResetScope`, `reset_workspace(session, paths, scope) -> ResetReport`.
 - Produces (used by Task 4): route `POST /api/account/reset?confirm=RESET`, body `{"scope": "jobs"|"profile"|"all"}`, 200 response `{scope, rowsDeleted, areasCleared, failures}`; errors `400 CONFIRM_REQUIRED`, `409 RUNS_ACTIVE`.
 
@@ -730,10 +734,12 @@ git commit -m "feat: add POST /api/account/reset with confirm gate and run guard
 ### Task 3: CLI `resume-agent reset`
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py` (new command, place directly after the `prune` command around line 860)
 - Test: `tests/test_reset_cli.py`
 
 **Interfaces:**
+
 - Consumes (from Task 1): `ResetPaths.resolve()`, `ResetScope`, `count_rows`, `scope_areas`, `reset_workspace`. Also `cli.py`'s existing `_engine(db_url)` helper and `get_session` (already imported there for `prune`).
 - Produces: command `resume-agent reset --scope jobs|profile|all [--yes] [--db-url URL]`.
 
@@ -895,11 +901,13 @@ git commit -m "feat: add resume-agent reset command with typed confirmation"
 ### Task 4: Web danger zone on the Account page
 
 **Files:**
+
 - Create: `web/src/features/account/DangerZoneCard.tsx`
 - Modify: `web/src/features/account/AccountPage.tsx`
 - Test: `web/src/features/account/DangerZoneCard.test.tsx`
 
 **Interfaces:**
+
 - Consumes (from Task 2, via the regenerated `contracts/ts/api.ts`): `api.POST("/api/account/reset", { params: { query: { confirm: "RESET" } }, body: { scope } })` returning `{ scope, rowsDeleted, areasCleared, failures }`; existing `openDownload` and `unwrap` from `@/lib/api/client`.
 - Produces: `<DangerZoneCard />` (no props), rendered on the Account page.
 
@@ -1128,6 +1136,7 @@ export function DangerZoneCard() {
 - [ ] **Step 4: Wire into the Account page**
 
 In `web/src/features/account/AccountPage.tsx`:
+
 1. Add the import next to the existing card import: `import { DangerZoneCard } from "./DangerZoneCard";`
 2. Find the `<DataArchiveCard` element (inside the `grid gap-6 xl:grid-cols-2` container) and insert `<DangerZoneCard />` immediately after it as a sibling.
 
@@ -1179,6 +1188,15 @@ Expected: both pass
 
 Use the webapp-testing server helper and Playwright to verify scope selection,
 typed confirmation, the reset request, the empty post-reset state, and a clean
+browser console. Keep the test workspace isolated from repository data.
+
+- [ ] **Step 7: Commit anything outstanding**
+
+```bash
+git status --short
+```
+
+Expected: clean tree (every task already committed). If generated contract files changed again, commit them with `chore: refresh generated API contract`.
 browser console. Keep the test workspace isolated from repository data.
 
 - [ ] **Step 7: Commit anything outstanding**
