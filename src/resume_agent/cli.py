@@ -303,33 +303,30 @@ def profile_build(
         typer.echo(f"  WARNING: {warning}")
 
 
-@profile_app.command("interview")
-def profile_interview_cmd(
+@profile_app.command("coach")
+def profile_coach_cmd(
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
     no_build: bool = typer.Option(
         False,
         "--no-build",
-        help="Save answers without rebuilding the profile.",
+        help="End the session without rebuilding the profile.",
     ),
-    sources: str = typer.Option(
+    profile_sources: str = typer.Option(
         DEFAULT_SOURCES,
         help="Profile source configuration used by the rebuild.",
     ),
 ) -> None:
-    """Run one grounded interview round and save its answers as profile notes."""
+    """Strengthen profile evidence in an interactive coaching chat."""
+    from resume_agent.profile.coach_store import active_session
     from resume_agent.profile.corpus import load_manifest
-    from resume_agent.services.profile_build import run_corpus_build
-    from resume_agent.services.profile_interview import (
-        run_interview_round,
-        submit_interview_answers,
-    )
+    from resume_agent.services import profile_coach as coach_service
 
     profile_dir = _tenant_cli_path(facts).parent
     if not any(
         doc.primary and doc.mode == "literal" for doc in load_manifest(profile_dir).docs
     ):
-        typer.echo("Upload a primary resume before starting an interview.")
+        typer.echo("Upload a primary resume before starting a coach session.")
         raise typer.Exit(code=1)
     settings = get_settings()
     configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
@@ -341,7 +338,7 @@ def profile_interview_cmd(
         raise typer.Exit(code=1)
 
     class EchoReporter:
-        process = "cli-interview"
+        process = "cli-coach"
 
         def begin(self, total, label, **extra):
             typer.echo(f"{label}…")
@@ -352,50 +349,107 @@ def profile_interview_cmd(
         def checkpoint(self):
             pass
 
-    result = run_interview_round(
-        EchoReporter(),
+    reporter = EchoReporter()
+    engine = _engine(db_url)
+
+    def show_latest(view: dict) -> None:
+        if view["turns"]:
+            typer.echo(f"\nCOACH: {view['turns'][-1]['text']}")
+
+    def resolve_pending(view: dict) -> None:
+        for draft in view["draftNotes"]:
+            if draft["status"] != "pending":
+                continue
+            typer.echo(f"\nDRAFT NOTE — {draft['title']}\n{draft['summary']}")
+            for quote in draft["quotes"]:
+                typer.echo(f'  "{quote}"')
+            choice = typer.prompt(
+                "Resolve this note? [s]ave / [e]dit / [d]iscard / [l]eave",
+                default="l",
+            ).strip().lower()
+            title = draft["title"]
+            summary = draft["summary"]
+            quotes = list(draft["quotes"])
+            if choice.startswith("e"):
+                title = typer.prompt("Title", default=title)
+                summary = typer.prompt("Summary", default=summary)
+                quotes = [
+                    typer.prompt(f"Quote {index}", default=quote)
+                    for index, quote in enumerate(quotes, 1)
+                ]
+                choice = "s"
+            if choice.startswith("s"):
+                coach_service.approve_draft(
+                    profile_dir,
+                    view["sessionId"],
+                    draft["topicId"],
+                    title=title,
+                    summary=summary,
+                    quotes=quotes,
+                )
+                draft["status"] = "saved"
+                typer.echo("Saved to profile.")
+            elif choice.startswith("d"):
+                coach_service.discard_draft(
+                    profile_dir,
+                    view["sessionId"],
+                    draft["topicId"],
+                )
+                draft["status"] = "discarded"
+                typer.echo("Discarded.")
+
+    active = active_session(profile_dir)
+    if active is None:
+        view = coach_service.run_opening_turn(
+            reporter,
+            profile_dir=profile_dir,
+            engine=engine,
+        )
+    else:
+        view = coach_service.session_view(profile_dir, active["session_id"])
+        typer.echo("Resuming your active coaching session.")
+    session_id = view["sessionId"]
+    show_latest(view)
+
+    while True:
+        message = typer.prompt("You")
+        if message.strip() == "/end":
+            break
+        view = coach_service.run_message_turn(
+            reporter,
+            profile_dir=profile_dir,
+            session_id=session_id,
+            message=message,
+            engine=engine,
+        )
+        show_latest(view)
+        resolve_pending(view)
+
+    resolve_pending(view)
+    saved_any = any(draft["status"] == "saved" for draft in view["draftNotes"])
+    recap = coach_service.run_recap_turn(
+        reporter,
         profile_dir=profile_dir,
-        engine=_engine(db_url),
+        session_id=session_id,
     )
-    if not result["questions"] and not result["researchActions"]:
-        typer.echo("No gaps worth asking about — your profile looks well-evidenced.")
+    typer.echo(f"\nRECAP: {recap['recap']}")
+    if no_build or not saved_any:
+        typer.echo("Session saved without rebuilding.")
         return
 
-    answers: list[tuple[str, str]] = []
-    for question in result["questions"]:
-        typer.echo(f"\n[{question['gap']}]")
-        text = typer.prompt(
-            question["questionText"],
-            default="",
-            show_default=False,
-        )
-        answers.append((question["id"], text))
-    for action in result["researchActions"]:
-        typer.echo(f"suggested: {action['kind']} {action['target']} — {action['why']}")
-
-    doc_ids = submit_interview_answers(profile_dir, result["roundId"], answers)
-    typer.echo(f"\nSaved {len(doc_ids)} note(s).")
-    if not doc_ids:
-        typer.echo("No non-blank answers were available to rebuild.")
-        return
-    if no_build:
-        typer.echo(
-            "Answers saved without rebuilding; run `resume-agent profile build` later."
-        )
-        return
-
-    sources_path = _tenant_cli_path(sources)
+    sources_path = _tenant_cli_path(profile_sources)
     config = load_yaml(sources_path) if sources_path.exists() else {}
-    run_corpus_build(
-        None,
+    coach_service.run_build_with_impact(
+        reporter,
         profile_dir=profile_dir,
+        session_id=session_id,
         github_username=cast(str | None, config.get("github_username")),
         facts_out=profile_dir / "facts.json",
         github_allow=tuple(config.get("github_repo_allow") or ()),
         github_deny=tuple(config.get("github_repo_deny") or ()),
         github_limit=int(config.get("github_repo_limit") or 20),
     )
-    typer.echo("Rebuilt profile with the new interview evidence.")
+    typer.echo("Rebuilt profile with the new coach evidence.")
 
 
 DEFAULT_SEARCH = "config/search.yaml"
