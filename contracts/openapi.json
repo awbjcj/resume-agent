@@ -992,6 +992,442 @@
         "title": "BulkResultOut",
         "type": "object"
       },
+      "CoachDraftNoteOut": {
+        "properties": {
+          "quotes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Quotes",
+            "type": "array"
+          },
+          "status": {
+            "default": "pending",
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "topicId": {
+            "title": "Topicid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topicId"
+        ],
+        "title": "CoachDraftNoteOut",
+        "type": "object"
+      },
+      "CoachEndIn": {
+        "properties": {
+          "build": {
+            "default": true,
+            "title": "Build",
+            "type": "boolean"
+          }
+        },
+        "title": "CoachEndIn",
+        "type": "object"
+      },
+      "CoachImpactOut": {
+        "properties": {
+          "bulletsGainedMetrics": {
+            "items": {
+              "$ref": "#/components/schemas/CoachMetricGainOut"
+            },
+            "title": "Bulletsgainedmetrics",
+            "type": "array"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "newFactIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Newfactids",
+            "type": "array"
+          },
+          "newSkills": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Newskills",
+            "type": "array"
+          },
+          "skillsGainedEvidence": {
+            "items": {
+              "$ref": "#/components/schemas/CoachSkillGainOut"
+            },
+            "title": "Skillsgainedevidence",
+            "type": "array"
+          }
+        },
+        "title": "CoachImpactOut",
+        "type": "object"
+      },
+      "CoachMessageIn": {
+        "properties": {
+          "message": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "CoachMessageIn",
+        "type": "object"
+      },
+      "CoachMetricGainOut": {
+        "properties": {
+          "after": {
+            "title": "After",
+            "type": "integer"
+          },
+          "before": {
+            "title": "Before",
+            "type": "integer"
+          },
+          "experienceId": {
+            "title": "Experienceid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "experienceId",
+          "before",
+          "after"
+        ],
+        "title": "CoachMetricGainOut",
+        "type": "object"
+      },
+      "CoachNoteIn": {
+        "properties": {
+          "quotes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Quotes",
+            "type": "array"
+          },
+          "summary": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "quotes"
+        ],
+        "title": "CoachNoteIn",
+        "type": "object"
+      },
+      "CoachNoteOut": {
+        "properties": {
+          "docId": {
+            "title": "Docid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "docId"
+        ],
+        "title": "CoachNoteOut",
+        "type": "object"
+      },
+      "CoachResearchActionOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "why": {
+            "default": "",
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "target"
+        ],
+        "title": "CoachResearchActionOut",
+        "type": "object"
+      },
+      "CoachSessionOut": {
+        "properties": {
+          "draftNotes": {
+            "items": {
+              "$ref": "#/components/schemas/CoachDraftNoteOut"
+            },
+            "title": "Draftnotes",
+            "type": "array"
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoachImpactOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recap"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "startedAt": {
+            "title": "Startedat",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "topics": {
+            "items": {
+              "$ref": "#/components/schemas/CoachTopicOut"
+            },
+            "title": "Topics",
+            "type": "array"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/CoachTurnOut"
+            },
+            "title": "Turns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessionId",
+          "startedAt",
+          "status"
+        ],
+        "title": "CoachSessionOut",
+        "type": "object"
+      },
+      "CoachSessionSummaryOut": {
+        "properties": {
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "savedNoteCount": {
+            "default": 0,
+            "title": "Savednotecount",
+            "type": "integer"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "startedAt": {
+            "title": "Startedat",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "topicCount": {
+            "default": 0,
+            "title": "Topiccount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sessionId",
+          "startedAt",
+          "status"
+        ],
+        "title": "CoachSessionSummaryOut",
+        "type": "object"
+      },
+      "CoachSessionsOut": {
+        "properties": {
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/CoachSessionSummaryOut"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "title": "CoachSessionsOut",
+        "type": "object"
+      },
+      "CoachSkillGainOut": {
+        "properties": {
+          "after": {
+            "title": "After",
+            "type": "integer"
+          },
+          "before": {
+            "title": "Before",
+            "type": "integer"
+          },
+          "skill": {
+            "title": "Skill",
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill",
+          "before",
+          "after"
+        ],
+        "title": "CoachSkillGainOut",
+        "type": "object"
+      },
+      "CoachTopicOut": {
+        "properties": {
+          "gap": {
+            "default": "",
+            "title": "Gap",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "noteDocId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notedocid"
+          },
+          "relatedRef": {
+            "default": "",
+            "title": "Relatedref",
+            "type": "string"
+          },
+          "status": {
+            "default": "open",
+            "title": "Status",
+            "type": "string"
+          },
+          "whyItMatters": {
+            "default": "",
+            "title": "Whyitmatters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "CoachTopicOut",
+        "type": "object"
+      },
+      "CoachTurnOut": {
+        "properties": {
+          "at": {
+            "default": "",
+            "title": "At",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "researchActions": {
+            "items": {
+              "$ref": "#/components/schemas/CoachResearchActionOut"
+            },
+            "title": "Researchactions",
+            "type": "array"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "topicId": {
+            "default": "",
+            "title": "Topicid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ],
+        "title": "CoachTurnOut",
+        "type": "object"
+      },
       "CohortOut": {
         "properties": {
           "applications": {
@@ -1270,231 +1706,6 @@
           }
         },
         "title": "HTTPValidationError",
-        "type": "object"
-      },
-      "InterviewAnswerIn": {
-        "properties": {
-          "questionId": {
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Questionid",
-            "type": "string"
-          },
-          "text": {
-            "default": "",
-            "maxLength": 100000,
-            "title": "Text",
-            "type": "string"
-          }
-        },
-        "required": [
-          "questionId"
-        ],
-        "title": "InterviewAnswerIn",
-        "type": "object"
-      },
-      "InterviewAnswersIn": {
-        "properties": {
-          "answers": {
-            "items": {
-              "$ref": "#/components/schemas/InterviewAnswerIn"
-            },
-            "maxItems": 8,
-            "title": "Answers",
-            "type": "array"
-          },
-          "build": {
-            "default": true,
-            "title": "Build",
-            "type": "boolean"
-          }
-        },
-        "title": "InterviewAnswersIn",
-        "type": "object"
-      },
-      "InterviewAnswersOut": {
-        "properties": {
-          "buildRunId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Buildrunid"
-          },
-          "buildSkippedReason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Buildskippedreason"
-          },
-          "buildStarted": {
-            "title": "Buildstarted",
-            "type": "boolean"
-          },
-          "docIds": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Docids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "docIds",
-          "buildStarted"
-        ],
-        "title": "InterviewAnswersOut",
-        "type": "object"
-      },
-      "InterviewHistoryAnswerOut": {
-        "properties": {
-          "answerText": {
-            "title": "Answertext",
-            "type": "string"
-          },
-          "docId": {
-            "title": "Docid",
-            "type": "string"
-          },
-          "questionId": {
-            "title": "Questionid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "questionId",
-          "docId",
-          "answerText"
-        ],
-        "title": "InterviewHistoryAnswerOut",
-        "type": "object"
-      },
-      "InterviewHistoryOut": {
-        "properties": {
-          "rounds": {
-            "items": {
-              "$ref": "#/components/schemas/InterviewHistoryRoundOut"
-            },
-            "title": "Rounds",
-            "type": "array"
-          }
-        },
-        "title": "InterviewHistoryOut",
-        "type": "object"
-      },
-      "InterviewHistoryRoundOut": {
-        "properties": {
-          "answers": {
-            "items": {
-              "$ref": "#/components/schemas/InterviewHistoryAnswerOut"
-            },
-            "title": "Answers",
-            "type": "array"
-          },
-          "askedAt": {
-            "title": "Askedat",
-            "type": "string"
-          },
-          "questions": {
-            "items": {
-              "$ref": "#/components/schemas/InterviewQuestionOut"
-            },
-            "title": "Questions",
-            "type": "array"
-          },
-          "researchActions": {
-            "items": {
-              "$ref": "#/components/schemas/InterviewResearchActionOut"
-            },
-            "title": "Researchactions",
-            "type": "array"
-          },
-          "roundId": {
-            "title": "Roundid",
-            "type": "string"
-          },
-          "submittedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Submittedat"
-          }
-        },
-        "required": [
-          "roundId",
-          "askedAt"
-        ],
-        "title": "InterviewHistoryRoundOut",
-        "type": "object"
-      },
-      "InterviewQuestionOut": {
-        "properties": {
-          "gap": {
-            "default": "",
-            "title": "Gap",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "questionText": {
-            "title": "Questiontext",
-            "type": "string"
-          },
-          "relatedRef": {
-            "default": "",
-            "title": "Relatedref",
-            "type": "string"
-          },
-          "whyItMatters": {
-            "default": "",
-            "title": "Whyitmatters",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "questionText"
-        ],
-        "title": "InterviewQuestionOut",
-        "type": "object"
-      },
-      "InterviewResearchActionOut": {
-        "properties": {
-          "kind": {
-            "title": "Kind",
-            "type": "string"
-          },
-          "target": {
-            "title": "Target",
-            "type": "string"
-          },
-          "why": {
-            "default": "",
-            "title": "Why",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind",
-          "target"
-        ],
-        "title": "InterviewResearchActionOut",
         "type": "object"
       },
       "InviteInfo": {
@@ -9030,6 +9241,417 @@
         "summary": "Launch Profile Build"
       }
     },
+    "/api/profile/coach/sessions": {
+      "get": {
+        "operationId": "list_coach_sessions_api_profile_coach_sessions_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachSessionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Coach Sessions"
+      },
+      "post": {
+        "operationId": "start_session_api_profile_coach_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Session"
+      }
+    },
+    "/api/profile/coach/sessions/{session_id}": {
+      "get": {
+        "operationId": "get_coach_session_api_profile_coach_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Coach Session"
+      }
+    },
+    "/api/profile/coach/sessions/{session_id}/end": {
+      "post": {
+        "operationId": "end_coach_session_api_profile_coach_sessions__session_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachEndIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Coach Session"
+      }
+    },
+    "/api/profile/coach/sessions/{session_id}/messages": {
+      "post": {
+        "operationId": "send_message_api_profile_coach_sessions__session_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Message"
+      }
+    },
+    "/api/profile/coach/sessions/{session_id}/notes/{topic_id}": {
+      "delete": {
+        "operationId": "discard_note_api_profile_coach_sessions__session_id__notes__topic_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "topic_id",
+            "required": true,
+            "schema": {
+              "title": "Topic Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discard Note"
+      },
+      "post": {
+        "operationId": "save_note_api_profile_coach_sessions__session_id__notes__topic_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "topic_id",
+            "required": true,
+            "schema": {
+              "title": "Topic Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachNoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachNoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Note"
+      }
+    },
     "/api/profile/documents": {
       "get": {
         "operationId": "list_documents_api_profile_documents_get",
@@ -9180,163 +9802,6 @@
           }
         },
         "summary": "Delete Document"
-      }
-    },
-    "/api/profile/interview": {
-      "post": {
-        "operationId": "launch_interview_api_profile_interview_post",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RunOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Launch Interview"
-      }
-    },
-    "/api/profile/interview/history": {
-      "get": {
-        "operationId": "interview_history_api_profile_interview_history_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InterviewHistoryOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Interview History"
-      }
-    },
-    "/api/profile/interview/{run_id}/answers": {
-      "post": {
-        "operationId": "answer_interview_api_profile_interview__run_id__answers_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "run_id",
-            "required": true,
-            "schema": {
-              "title": "Run Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InterviewAnswersIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InterviewAnswersOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Answer Interview"
       }
     },
     "/api/profile/matrix": {
