@@ -1,3 +1,6 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
@@ -54,6 +57,43 @@ def test_add_skill_persists_and_regenerates_matrix(profile_dir):
 def test_add_skill_rejects_a_duplicate(profile_dir):
     with pytest.raises(SkillAlreadyExistsError):
         add_skill(profile_dir, "python", None)
+
+
+def test_concurrent_skill_additions_preserve_both_entries(profile_dir, monkeypatch):
+    from resume_agent.services import profile_skills as service
+
+    original_load = service.load_manual_skills
+    first_loaded = threading.Event()
+    second_loaded = threading.Event()
+    call_lock = threading.Lock()
+    call_count = 0
+
+    def synchronized_load(path):
+        nonlocal call_count
+        ledger = original_load(path)
+        with call_lock:
+            call_count += 1
+            current = call_count
+        if current == 1:
+            first_loaded.set()
+            second_loaded.wait(timeout=0.25)
+        elif current == 2:
+            second_loaded.set()
+        return ledger
+
+    monkeypatch.setattr(service, "load_manual_skills", synchronized_load)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(add_skill, profile_dir, "Rust", None)
+        assert first_loaded.wait(timeout=1)
+        second = pool.submit(add_skill, profile_dir, "Go", None)
+        first.result(timeout=2)
+        second.result(timeout=2)
+
+    ledger = load_manual_skills(profile_dir / "manual_skills.json")
+    assert {entry.name for entry in ledger.entries if entry.kind == "new_skill"} == {
+        "Go",
+        "Rust",
+    }
 
 
 def test_add_alias_attaches_to_the_chosen_skill(profile_dir):

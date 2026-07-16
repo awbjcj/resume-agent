@@ -26,7 +26,11 @@ def run_corpus_build(
     facts_out = resolve_tenant_path(facts_out)
     from resume_agent.profile.build import build_corpus_profile
     from resume_agent.profile.inference import build_inference_agent
-    from resume_agent.profile.manual_skills import apply_manual_skills, load_manual_skills
+    from resume_agent.profile.manual_skills import (
+        apply_manual_skills,
+        load_manual_skills,
+        manual_skills_lock,
+    )
     from resume_agent.profile.matrix import (
         apply_skill_groups,
         build_matrix,
@@ -56,33 +60,34 @@ def run_corpus_build(
         github_deny=github_deny,
         github_limit=github_limit,
     )
-    manual_ledger = load_manual_skills(Path(profile_dir) / "manual_skills.json")
-    facts, replay_warnings = apply_manual_skills(facts, manual_ledger)
-    report.warnings.extend(replay_warnings)
-    if reporter is not None:
-        reporter.step(1, label="Saving facts.json")
-    save_facts(facts, str(facts_out))
-    if reporter is not None:
-        reporter.step(2, label="Building skill matrix")
-    overrides = load_overrides(Path(profile_dir) / "overrides.yaml")
-    matrix = build_matrix(
-        facts,
-        load_cluster_map(Path(profile_dir) / "cluster_map.json"),
-        overrides,
-    )
-    taxonomy_path = skill_groups.group_map_path(profile_dir)
-    group_map = skill_groups.load_group_map(taxonomy_path)
-    missing = {row.key for row in matrix.rows} - set(group_map)
-    if missing:
-        additions = skill_groups.classify_missing_groups(
-            missing,
-            skill_groups.build_group_classifier_agent(),
+    with manual_skills_lock(profile_dir):
+        manual_ledger = load_manual_skills(Path(profile_dir) / "manual_skills.json")
+        facts, replay_warnings = apply_manual_skills(facts, manual_ledger)
+        report.warnings.extend(replay_warnings)
+        if reporter is not None:
+            reporter.step(1, label="Saving facts.json")
+        save_facts(facts, str(facts_out))
+        if reporter is not None:
+            reporter.step(2, label="Building skill matrix")
+        overrides = load_overrides(Path(profile_dir) / "overrides.yaml")
+        matrix = build_matrix(
+            facts,
+            load_cluster_map(Path(profile_dir) / "cluster_map.json"),
+            overrides,
         )
-        if additions:
-            skill_groups.save_group_map(additions, taxonomy_path)
-            group_map = skill_groups.load_group_map(taxonomy_path)
-    apply_skill_groups(matrix, group_map, overrides)
-    save_matrix(matrix, Path(facts_out).with_name("matrix.json"))
+        taxonomy_path = skill_groups.group_map_path(profile_dir)
+        group_map = skill_groups.load_group_map(taxonomy_path)
+        missing = {row.key for row in matrix.rows} - set(group_map)
+        if missing:
+            additions = skill_groups.classify_missing_groups(
+                missing,
+                skill_groups.build_group_classifier_agent(),
+            )
+            if additions:
+                skill_groups.save_group_map(additions, taxonomy_path)
+                group_map = skill_groups.load_group_map(taxonomy_path)
+        apply_skill_groups(matrix, group_map, overrides)
+        save_matrix(matrix, Path(facts_out).with_name("matrix.json"))
     if reporter is not None:
         reporter.step(3, label="Saved matrix.json")
     return {

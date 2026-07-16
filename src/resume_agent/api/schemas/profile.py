@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import AnyHttpUrl, Field
+from pydantic import AnyHttpUrl, Field, StringConstraints
 
 from resume_agent.api.schemas.base import CamelModel
 from resume_agent.profile.corpus import SourceMode, SourceOrigin
@@ -78,12 +78,16 @@ class SkillEntryOut(CamelModel):
 
 
 class AddSkillIn(CamelModel):
-    name: str = Field(min_length=1, max_length=200)
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+    ]
     category: Literal["hard", "soft", "domain"] | None = None
 
 
 class AddAliasIn(CamelModel):
-    alias: str = Field(min_length=1, max_length=200)
+    alias: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+    ]
 
 
 class ManualEntryOut(CamelModel):

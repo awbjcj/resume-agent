@@ -71,6 +71,15 @@ def test_add_skill_rejects_a_duplicate(client):
     assert resp.status_code == 422
 
 
+def test_add_skill_rejects_whitespace_only_name(client):
+    test_client, data_dir = client
+    _seed_facts(data_dir)
+
+    resp = test_client.post("/api/profile/skills", json={"name": "   "})
+
+    assert resp.status_code == 422
+
+
 def test_add_alias_attaches_to_the_chosen_skill(client):
     test_client, data_dir = client
     _seed_facts(data_dir)
@@ -91,6 +100,18 @@ def test_add_alias_rejects_unknown_skill_id(client):
     _seed_facts(data_dir)
     resp = test_client.post("/api/profile/skills/nope/aliases", json={"alias": "x"})
     assert resp.status_code == 404
+
+
+def test_add_alias_rejects_whitespace_only_text(client):
+    test_client, data_dir = client
+    _seed_facts(data_dir)
+    skill_id = test_client.get("/api/profile/skills").json()[0]["id"]
+
+    resp = test_client.post(
+        f"/api/profile/skills/{skill_id}/aliases", json={"alias": "   "}
+    )
+
+    assert resp.status_code == 422
 
 
 def test_manual_skills_list_and_remove_round_trip(client):

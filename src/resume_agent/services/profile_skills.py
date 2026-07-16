@@ -19,6 +19,7 @@ from resume_agent.profile.manual_skills import (
     ManualSkillEntry,
     apply_manual_skills,
     load_manual_skills,
+    manual_skills_lock,
     remove_manual_skill_entry,
     save_manual_skills,
 )
@@ -99,55 +100,57 @@ def add_skill(
     name: str,
     category: Literal["hard", "soft", "domain"] | None,
 ) -> ManualSkillEntry:
-    facts = _load_facts_or_raise(profile_dir)
-    token = normalize_skill(name)
-    if not token:
-        raise ValueError("skill name is required")
-    if token in _known_tokens(facts):
-        raise SkillAlreadyExistsError(f"'{name}' is already in your profile")
+    with manual_skills_lock(profile_dir):
+        facts = _load_facts_or_raise(profile_dir)
+        token = normalize_skill(name)
+        if not token:
+            raise ValueError("skill name is required")
+        if token in _known_tokens(facts):
+            raise SkillAlreadyExistsError(f"'{name}' is already in your profile")
 
-    entry = ManualSkillEntry(name=name, category=category, added_at=_utcnow())
-    ledger = load_manual_skills(_ledger_path(profile_dir))
-    ledger.entries.append(entry)
-    updated_facts, _warnings = apply_manual_skills(facts, ledger)
-    save_facts(updated_facts, _facts_path(profile_dir))
-    save_manual_skills(ledger, _ledger_path(profile_dir))
-    _rebuild_matrix(profile_dir, updated_facts)
-    return entry
+        entry = ManualSkillEntry(name=name, category=category, added_at=_utcnow())
+        ledger = load_manual_skills(_ledger_path(profile_dir))
+        ledger.entries.append(entry)
+        updated_facts, _warnings = apply_manual_skills(facts, ledger)
+        save_facts(updated_facts, _facts_path(profile_dir))
+        save_manual_skills(ledger, _ledger_path(profile_dir))
+        _rebuild_matrix(profile_dir, updated_facts)
+        return entry
 
 
 def add_alias(profile_dir: str | Path, skill_id: str, alias: str) -> ManualAliasEntry:
-    facts = _load_facts_or_raise(profile_dir)
-    target = next(
-        (
-            skill
-            for skills in facts.skills.values()
-            for skill in skills
-            if skill.id == skill_id
-        ),
-        None,
-    )
-    if target is None:
-        raise SkillNotFoundError(f"No skill '{skill_id}'")
-    alias = alias.strip()
-    if not alias:
-        raise ValueError("alias text is required")
-    if normalize_skill(alias) in _known_tokens(facts):
-        raise SkillAlreadyExistsError(f"'{alias}' is already in your profile")
+    with manual_skills_lock(profile_dir):
+        facts = _load_facts_or_raise(profile_dir)
+        target = next(
+            (
+                skill
+                for skills in facts.skills.values()
+                for skill in skills
+                if skill.id == skill_id
+            ),
+            None,
+        )
+        if target is None:
+            raise SkillNotFoundError(f"No skill '{skill_id}'")
+        alias = alias.strip()
+        if not alias:
+            raise ValueError("alias text is required")
+        if normalize_skill(alias) in _known_tokens(facts):
+            raise SkillAlreadyExistsError(f"'{alias}' is already in your profile")
 
-    entry = ManualAliasEntry(
-        target_skill_token=normalize_skill(target.name),
-        target_skill_display=target.name,
-        alias_text=alias,
-        added_at=_utcnow(),
-    )
-    ledger = load_manual_skills(_ledger_path(profile_dir))
-    ledger.entries.append(entry)
-    updated_facts, _warnings = apply_manual_skills(facts, ledger)
-    save_facts(updated_facts, _facts_path(profile_dir))
-    save_manual_skills(ledger, _ledger_path(profile_dir))
-    _rebuild_matrix(profile_dir, updated_facts)
-    return entry
+        entry = ManualAliasEntry(
+            target_skill_token=normalize_skill(target.name),
+            target_skill_display=target.name,
+            alias_text=alias,
+            added_at=_utcnow(),
+        )
+        ledger = load_manual_skills(_ledger_path(profile_dir))
+        ledger.entries.append(entry)
+        updated_facts, _warnings = apply_manual_skills(facts, ledger)
+        save_facts(updated_facts, _facts_path(profile_dir))
+        save_manual_skills(ledger, _ledger_path(profile_dir))
+        _rebuild_matrix(profile_dir, updated_facts)
+        return entry
 
 
 def list_manual_entries(
@@ -157,14 +160,15 @@ def list_manual_entries(
 
 
 def remove_manual_entry(profile_dir: str | Path, entry_id: str) -> None:
-    facts = _load_facts_or_raise(profile_dir)
-    ledger = load_manual_skills(_ledger_path(profile_dir))
-    entry = next((e for e in ledger.entries if e.id == entry_id), None)
-    if entry is None:
-        raise ManualEntryNotFoundError(f"No manual entry '{entry_id}'")
+    with manual_skills_lock(profile_dir):
+        facts = _load_facts_or_raise(profile_dir)
+        ledger = load_manual_skills(_ledger_path(profile_dir))
+        entry = next((e for e in ledger.entries if e.id == entry_id), None)
+        if entry is None:
+            raise ManualEntryNotFoundError(f"No manual entry '{entry_id}'")
 
-    updated_facts = remove_manual_skill_entry(facts, entry)
-    ledger.entries = [e for e in ledger.entries if e.id != entry_id]
-    save_facts(updated_facts, _facts_path(profile_dir))
-    save_manual_skills(ledger, _ledger_path(profile_dir))
-    _rebuild_matrix(profile_dir, updated_facts)
+        updated_facts = remove_manual_skill_entry(facts, entry)
+        ledger.entries = [e for e in ledger.entries if e.id != entry_id]
+        save_facts(updated_facts, _facts_path(profile_dir))
+        save_manual_skills(ledger, _ledger_path(profile_dir))
+        _rebuild_matrix(profile_dir, updated_facts)

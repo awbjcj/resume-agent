@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated, Literal, Union
 
@@ -24,6 +27,18 @@ from resume_agent.models.profile import ProfileFacts, Skill
 from resume_agent.tracking.match_gap import normalize_skill
 
 MANUAL_SKILLS_BUCKET = "Manually added"
+_MANUAL_SKILLS_LOCKS: dict[Path, threading.RLock] = {}
+_MANUAL_SKILLS_LOCKS_GUARD = threading.Lock()
+
+
+@contextmanager
+def manual_skills_lock(profile_dir: str | Path) -> Iterator[None]:
+    """Serialize live facts, ledger, and derived-matrix mutations."""
+    key = Path(profile_dir).resolve()
+    with _MANUAL_SKILLS_LOCKS_GUARD:
+        lock = _MANUAL_SKILLS_LOCKS.setdefault(key, threading.RLock())
+    with lock:
+        yield
 
 
 class ManualSkillEntry(ExtensibleModel):
