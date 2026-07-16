@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import AnyHttpUrl, Field
 
 from resume_agent.api.schemas.base import CamelModel

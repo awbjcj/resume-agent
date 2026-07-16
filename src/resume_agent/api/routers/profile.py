@@ -318,6 +318,79 @@ def delete_source(doc_id: str, request: Request, purge: bool = False):
         raise ApiException(404, "NOT_FOUND", f"No source '{doc_id}'")
 
 
+def _manual_entry_out(entry) -> ManualEntryOut:
+    if entry.kind == "new_skill":
+        return ManualEntryOut(
+            id=entry.id,
+            kind=entry.kind,
+            added_at=entry.added_at,
+            name=entry.name,
+            category=entry.category,
+        )
+    return ManualEntryOut(
+        id=entry.id,
+        kind=entry.kind,
+        added_at=entry.added_at,
+        alias_text=entry.alias_text,
+        target_skill_display=entry.target_skill_display,
+    )
+
+
+@router.get("/profile/skills", response_model=list[SkillEntryOut])
+def get_profile_skills(request: Request):
+    try:
+        rows = profile_skills.list_skills(_profile_dir(request))
+    except profile_skills.ProfileNotBuiltError:
+        return []
+    return [SkillEntryOut.model_validate(row) for row in rows]
+
+
+@router.post("/profile/skills", response_model=ManualEntryOut, status_code=201)
+def post_profile_skill(payload: AddSkillIn, request: Request):
+    try:
+        entry = profile_skills.add_skill(
+            _profile_dir(request), payload.name, payload.category
+        )
+    except profile_skills.ProfileNotBuiltError as exc:
+        raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
+    except profile_skills.SkillAlreadyExistsError as exc:
+        raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
+    return _manual_entry_out(entry)
+
+
+@router.post(
+    "/profile/skills/{skill_id}/aliases", response_model=ManualEntryOut, status_code=201
+)
+def post_profile_skill_alias(skill_id: str, payload: AddAliasIn, request: Request):
+    try:
+        entry = profile_skills.add_alias(
+            _profile_dir(request), skill_id, payload.alias
+        )
+    except profile_skills.ProfileNotBuiltError as exc:
+        raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
+    except profile_skills.SkillNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", str(exc)) from exc
+    except profile_skills.SkillAlreadyExistsError as exc:
+        raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
+    return _manual_entry_out(entry)
+
+
+@router.get("/profile/manual-skills", response_model=list[ManualEntryOut])
+def get_manual_skills(request: Request):
+    entries = profile_skills.list_manual_entries(_profile_dir(request))
+    return [_manual_entry_out(entry) for entry in entries]
+
+
+@router.delete("/profile/manual-skills/{entry_id}", status_code=204)
+def delete_manual_skill(entry_id: str, request: Request):
+    try:
+        profile_skills.remove_manual_entry(_profile_dir(request), entry_id)
+    except profile_skills.ProfileNotBuiltError as exc:
+        raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
+    except profile_skills.ManualEntryNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", str(exc)) from exc
+
+
 @router.get("/profile/skeleton", response_model=list[SkeletonEntryOut])
 def get_skeleton(request: Request):
     facts_path = _profile_dir(request) / "facts.json"

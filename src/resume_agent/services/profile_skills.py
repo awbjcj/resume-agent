@@ -1,0 +1,170 @@
+"""Quick-add a skill or alias from a job's gap chip -- takes effect immediately.
+
+Coverage on a job card is computed live from facts.json on every request
+(``tracking/queries.py::_skill_tags``), so a facts.json write is the entire
+"immediate effect" mechanism; the only other artifact that needs refreshing
+is the derived, sha-cached ``matrix.json`` (Settings > Skill Matrix, Match/Gap
+dashboard).
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Literal
+
+from resume_agent.models.profile import ProfileFacts
+from resume_agent.profile.manual_skills import (
+    ManualAliasEntry,
+    ManualSkillEntry,
+    apply_manual_skills,
+    load_manual_skills,
+    remove_manual_skill_entry,
+    save_manual_skills,
+)
+from resume_agent.profile.matrix import apply_skill_groups, build_matrix, load_overrides, save_matrix
+from resume_agent.profile.store import load_facts, save_facts
+from resume_agent.taxonomy import groups as skill_groups
+from resume_agent.taxonomy.clusters import load_cluster_map
+from resume_agent.tracking.match_gap import normalize_skill
+
+
+class ProfileNotBuiltError(RuntimeError):
+    """Raised when a skill mutation is attempted before facts.json exists."""
+
+
+class SkillAlreadyExistsError(ValueError):
+    """Raised when the requested skill/alias already matches a profile skill."""
+
+
+class SkillNotFoundError(ValueError):
+    """Raised when a skill id passed to ``add_alias`` doesn't resolve."""
+
+
+class ManualEntryNotFoundError(ValueError):
+    """Raised when a ledger entry id passed to ``remove_manual_entry`` doesn't resolve."""
+
+
+def _utcnow() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _facts_path(profile_dir: str | Path) -> Path:
+    return Path(profile_dir) / "facts.json"
+
+
+def _ledger_path(profile_dir: str | Path) -> Path:
+    return Path(profile_dir) / "manual_skills.json"
+
+
+def _load_facts_or_raise(profile_dir: str | Path) -> ProfileFacts:
+    try:
+        return load_facts(_facts_path(profile_dir))
+    except FileNotFoundError as exc:
+        raise ProfileNotBuiltError(
+            "Build your profile before adding skills"
+        ) from exc
+
+
+def _known_tokens(facts: ProfileFacts) -> set[str]:
+    return {
+        normalize_skill(alias)
+        for skills in facts.skills.values()
+        for skill in skills
+        for alias in (skill.name, *skill.aliases)
+    }
+
+
+def _rebuild_matrix(profile_dir: str | Path, facts: ProfileFacts) -> None:
+    profile_dir = Path(profile_dir)
+    overrides = load_overrides(profile_dir / "overrides.yaml")
+    cluster_map = load_cluster_map(profile_dir / "cluster_map.json")
+    matrix = build_matrix(facts, cluster_map, overrides)
+    group_map = skill_groups.load_group_map(skill_groups.group_map_path(profile_dir))
+    apply_skill_groups(matrix, group_map, overrides)
+    save_matrix(matrix, profile_dir / "matrix.json")
+
+
+def list_skills(profile_dir: str | Path) -> list[dict[str, str | None]]:
+    facts = _load_facts_or_raise(profile_dir)
+    return [
+        {"id": skill.id, "name": skill.name, "category": skill.category}
+        for skills in facts.skills.values()
+        for skill in skills
+    ]
+
+
+def add_skill(
+    profile_dir: str | Path,
+    name: str,
+    category: Literal["hard", "soft", "domain"] | None,
+) -> ManualSkillEntry:
+    facts = _load_facts_or_raise(profile_dir)
+    token = normalize_skill(name)
+    if not token:
+        raise ValueError("skill name is required")
+    if token in _known_tokens(facts):
+        raise SkillAlreadyExistsError(f"'{name}' is already in your profile")
+
+    entry = ManualSkillEntry(name=name, category=category, added_at=_utcnow())
+    ledger = load_manual_skills(_ledger_path(profile_dir))
+    ledger.entries.append(entry)
+    updated_facts, _warnings = apply_manual_skills(facts, ledger)
+    save_facts(updated_facts, _facts_path(profile_dir))
+    save_manual_skills(ledger, _ledger_path(profile_dir))
+    _rebuild_matrix(profile_dir, updated_facts)
+    return entry
+
+
+def add_alias(profile_dir: str | Path, skill_id: str, alias: str) -> ManualAliasEntry:
+    facts = _load_facts_or_raise(profile_dir)
+    target = next(
+        (
+            skill
+            for skills in facts.skills.values()
+            for skill in skills
+            if skill.id == skill_id
+        ),
+        None,
+    )
+    if target is None:
+        raise SkillNotFoundError(f"No skill '{skill_id}'")
+    alias = alias.strip()
+    if not alias:
+        raise ValueError("alias text is required")
+    if normalize_skill(alias) in _known_tokens(facts):
+        raise SkillAlreadyExistsError(f"'{alias}' is already in your profile")
+
+    entry = ManualAliasEntry(
+        target_skill_token=normalize_skill(target.name),
+        target_skill_display=target.name,
+        alias_text=alias,
+        added_at=_utcnow(),
+    )
+    ledger = load_manual_skills(_ledger_path(profile_dir))
+    ledger.entries.append(entry)
+    updated_facts, _warnings = apply_manual_skills(facts, ledger)
+    save_facts(updated_facts, _facts_path(profile_dir))
+    save_manual_skills(ledger, _ledger_path(profile_dir))
+    _rebuild_matrix(profile_dir, updated_facts)
+    return entry
+
+
+def list_manual_entries(
+    profile_dir: str | Path,
+) -> list[ManualSkillEntry | ManualAliasEntry]:
+    return load_manual_skills(_ledger_path(profile_dir)).entries
+
+
+def remove_manual_entry(profile_dir: str | Path, entry_id: str) -> None:
+    facts = _load_facts_or_raise(profile_dir)
+    ledger = load_manual_skills(_ledger_path(profile_dir))
+    entry = next((e for e in ledger.entries if e.id == entry_id), None)
+    if entry is None:
+        raise ManualEntryNotFoundError(f"No manual entry '{entry_id}'")
+
+    updated_facts = remove_manual_skill_entry(facts, entry)
+    ledger.entries = [e for e in ledger.entries if e.id != entry_id]
+    save_facts(updated_facts, _facts_path(profile_dir))
+    save_manual_skills(ledger, _ledger_path(profile_dir))
+    _rebuild_matrix(profile_dir, updated_facts)
