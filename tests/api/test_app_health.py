@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.api.deps import get_settings_dep
+from resume_agent.config import env_settings
 
 
 def _client(**kw):
@@ -16,6 +17,16 @@ def test_health_ok():
 
 def test_no_auth_by_default():
     assert _client().get("/api/health").status_code == 200
+
+
+def test_api_tests_ignore_host_auth_environment(monkeypatch):
+    monkeypatch.setenv("API_TOKEN", "host-token-that-tests-must-not-inherit")
+    env_settings.cache_clear()
+    try:
+        with _client() as client:
+            assert client.get("/api/pipeline").status_code == 200
+    finally:
+        env_settings.cache_clear()
 
 
 def test_bearer_required_when_token_set():

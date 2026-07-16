@@ -6,6 +6,11 @@ lifespan, which calls ``run_manager.sweep()`` — so without this fixture a plai
 ``pytest`` run would unlink real run records older than 24h on the developer's
 machine. Redirect every RunManager built via ``create_app`` to a per-test temp
 dir unless the test already pinned ``runs_root`` itself.
+
+The app factory also reads the project ``.env`` when callers omit ``env_path``.
+Most API tests intentionally exercise open mode, so default app instances use a
+settings snapshot built without either the host environment or project dotenv.
+Tests that pass ``env_path`` explicitly continue to exercise that file.
 """
 
 import pytest
@@ -15,6 +20,15 @@ from resume_agent.api import app as app_module
 from resume_agent.api.app import create_app
 from resume_agent.api.auth import hash_password
 from resume_agent.api.runs.manager import RunManager
+from resume_agent.config import Settings
+
+
+@pytest.fixture(autouse=True)
+def _isolate_default_app_settings(monkeypatch):
+    for field_name in Settings.model_fields:
+        monkeypatch.delenv(field_name.upper(), raising=False)
+    isolated_settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    monkeypatch.setattr(app_module, "get_settings", lambda: isolated_settings)
 
 
 @pytest.fixture(autouse=True)
