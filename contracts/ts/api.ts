@@ -1023,6 +1023,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile/manual-skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Manual Skills */
+        get: operations["get_manual_skills_api_profile_manual_skills_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/manual-skills/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Manual Skill */
+        delete: operations["delete_manual_skill_api_profile_manual_skills__entry_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profile/matrix": {
         parameters: {
             query?: never;
@@ -1051,6 +1085,41 @@ export interface paths {
         get: operations["get_skeleton_api_profile_skeleton_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile Skills */
+        get: operations["get_profile_skills_api_profile_skills_get"];
+        put?: never;
+        /** Post Profile Skill */
+        post: operations["post_profile_skill_api_profile_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/skills/{skill_id}/aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Profile Skill Alias */
+        post: operations["post_profile_skill_alias_api_profile_skills__skill_id__aliases_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1575,6 +1644,11 @@ export interface components {
             /** Weightedtotal */
             weightedTotal: number;
         };
+        /** AddAliasIn */
+        AddAliasIn: {
+            /** Alias */
+            alias: string;
+        };
         /** AddJobTextRequest */
         AddJobTextRequest: {
             /** Company */
@@ -1603,6 +1677,13 @@ export interface components {
             title?: string | null;
             /** Url */
             url: string;
+        };
+        /** AddSkillIn */
+        AddSkillIn: {
+            /** Category */
+            category?: ("hard" | "soft" | "domain") | null;
+            /** Name */
+            name: string;
         };
         /** AddSourceIn */
         AddSourceIn: {
@@ -2397,6 +2478,26 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** ManualEntryOut */
+        ManualEntryOut: {
+            /** Addedat */
+            addedAt: string;
+            /** Aliastext */
+            aliasText?: string | null;
+            /** Category */
+            category?: ("hard" | "soft" | "domain") | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new_skill" | "alias";
+            /** Name */
+            name?: string | null;
+            /** Targetskilldisplay */
+            targetSkillDisplay?: string | null;
+        };
         /** MatchGapOut */
         MatchGapOut: {
             /** Clustersstale */
@@ -3041,6 +3142,15 @@ export interface components {
             kind: string;
             /** Label */
             label: string;
+        };
+        /** SkillEntryOut */
+        SkillEntryOut: {
+            /** Category */
+            category?: ("hard" | "soft" | "domain") | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** SkillGroupOut */
         SkillGroupOut: {
@@ -5975,6 +6085,68 @@ export interface operations {
             };
         };
     };
+    get_manual_skills_api_profile_manual_skills_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_manual_skill_api_profile_manual_skills__entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_profile_matrix_api_profile_matrix_get: {
         parameters: {
             query?: never;
@@ -6024,6 +6196,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkeletonEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_profile_skills_api_profile_skills_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_profile_skill_api_profile_skills_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddSkillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualEntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_profile_skill_alias_api_profile_skills__skill_id__aliases_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAliasIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualEntryOut"];
                 };
             };
             /** @description Validation Error */
