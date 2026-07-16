@@ -12,7 +12,7 @@ export function QuickFilters({ onApply }: { onApply: (patch: Partial<FilterState
       <Button size="sm" variant="outline" onClick={() => onApply({ maxFit: 40 })}>
         <FilterIcon data-icon="inline-start" /> Low-fit (&lt;40)
       </Button>
-      <Button size="sm" variant="outline" onClick={() => onApply({ staleDays: 45 })}>
+      <Button size="sm" variant="outline" onClick={() => onApply({ staleMinDays: 45 })}>
         <FilterIcon data-icon="inline-start" /> Stale (&gt;45d)
       </Button>
       <Button size="sm" variant="outline" onClick={() => onApply({ status: new Set(["rejected"]) })}>

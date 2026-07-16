@@ -23,6 +23,7 @@ export interface FilterState {
   fitMin: number | null;
   maxFit: number | null;
   staleDays: number | null;
+  staleMinDays: number | null;
   skills: Set<string>;
   sort: SortKey;
   preset: Preset;
@@ -46,6 +47,7 @@ export function emptyFilterState(): FilterState {
     fitMin: null,
     maxFit: null,
     staleDays: null,
+    staleMinDays: null,
     skills: new Set(),
     sort: "fit",
     preset: "balanced",

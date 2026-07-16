@@ -49,6 +49,7 @@ function buildBody(board: Board, args: Args, dryRun: boolean): BulkRequest {
     maxFit: filter.maxFit,
     minSalary: filter.salaryMin,
     staleDays: filter.staleDays,
+    staleMinDays: filter.staleMinDays,
     sortBy: filter.sort,
     preset: filter.preset,
   };

@@ -25,6 +25,7 @@ export function boardFilterToParams(
   if (s.maxFit != null) p.maxFit = String(s.maxFit);
   if (s.salaryMin != null) p.minSalary = String(s.salaryMin);
   if (s.staleDays != null) p.staleDays = String(s.staleDays);
+  if (s.staleMinDays != null) p.staleMinDays = String(s.staleMinDays);
   for (const [key, param] of SET_PARAM) {
     const set = s[key] as Set<string>;
     if (set.size) p[param] = [...set].join(",");

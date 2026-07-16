@@ -31,6 +31,7 @@ export function stateToParams(s: FilterState): URLSearchParams {
   if (s.fitMin != null) p.set("fitMin", String(s.fitMin));
   if (s.maxFit != null) p.set("maxFit", String(s.maxFit));
   if (s.staleDays != null) p.set("staleDays", String(s.staleDays));
+  if (s.staleMinDays != null) p.set("staleMinDays", String(s.staleMinDays));
   if (s.sort !== "fit") p.set("sort", s.sort);
   if (s.preset !== "balanced") p.set("preset", s.preset);
   for (const k of SET_KEYS) {
@@ -48,6 +49,7 @@ export function paramsToState(p: URLSearchParams): FilterState {
   s.fitMin = parsePositiveNumber(p.get("fitMin"));
   s.maxFit = parsePositiveNumber(p.get("maxFit"));
   s.staleDays = parsePositiveNumber(p.get("staleDays"));
+  s.staleMinDays = parsePositiveNumber(p.get("staleMinDays"));
   if (p.get("sort")) s.sort = p.get("sort") as SortKey;
   if (p.get("preset")) s.preset = p.get("preset") as Preset;
   for (const k of SET_KEYS) {

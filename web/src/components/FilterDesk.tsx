@@ -205,6 +205,7 @@ export function FilterDesk({
     else if (key === "maxFit") set({ maxFit: null });
     else if (key === "salaryMin") set({ salaryMin: null });
     else if (key === "staleDays") set({ staleDays: null });
+    else if (key === "staleMinDays") set({ staleMinDays: null });
   };
   const clearFilters = () => {
     const cleared = emptyFilterState();
