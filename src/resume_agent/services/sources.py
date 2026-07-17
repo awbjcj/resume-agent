@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from ipaddress import ip_address
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 import yaml
@@ -27,7 +27,7 @@ from resume_agent.discovery.connectors.config import (
 from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, inspect_ats
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
-from resume_agent.discovery.connectors.registry import find_unit
+from resume_agent.discovery.connectors.registry import ConnectorSpec, find_unit, spec_for
 from resume_agent.discovery.connectors.sources import (
     SourceView,
     company_url_id,
@@ -318,6 +318,40 @@ def preview_source(
     )
 
 
+def _duplicate_message(spec: ConnectorSpec, payload: Any) -> str:
+    if spec.kind == "companies":
+        return "This URL is already a source."
+    if spec.kind == "scrape":
+        return "This URL is already a scrape target."
+    token = getattr(payload, "token", "")
+    if token:
+        return f"{spec.kind.title()} board '{token}' is already a source."
+    return f"This {spec.kind.title()} board is already a source."
+
+
+def _append_unit(
+    config: ConnectorsConfig,
+    spec: ConnectorSpec,
+    *,
+    target: AtsTarget | None,
+    url: str,
+    label: str | None,
+) -> str:
+    """Append one new unit through the spec table; return its source id."""
+    if (
+        spec.new_unit is None
+        or spec.unit_items is None
+        or not spec.admits(target)
+    ):
+        raise SourceError(f"Sources of kind '{spec.kind}' cannot be added.")
+    source_id, payload = spec.new_unit(target, url, label)
+    if any(unit.source_id == source_id for unit in spec.units(config)):
+        raise SourceError(_duplicate_message(spec, payload))
+    spec.section(config).enabled = True
+    spec.unit_items(config).append(payload)
+    return source_id
+
+
 def add_source(
     url: str | None = None,
     label: str | None = None,
@@ -339,15 +373,13 @@ def add_source(
             if Path(connectors_path).exists()
             else ConnectorsConfig()
         )
-        if any(
-            scrape_target_id(target.url) == scrape_target_id(preview.url)
-            for target in config.scrape.targets
-        ):
-            raise SourceError("This URL is already a scrape target.")
-        config.scrape.enabled = True
-        config.scrape.targets.append(ScrapeTarget(url=preview.url, label=label))
+        scrape_spec = spec_for("scrape")
+        assert scrape_spec is not None
+        new_id = _append_unit(
+            config, scrape_spec, target=None, url=preview.url, label=label
+        )
         _save(connectors_path, config)
-        return _view(config, scrape_target_id(preview.url))
+        return _view(config, new_id)
 
     if (
         provider == "auto"
@@ -383,40 +415,12 @@ def add_source(
     if target is None:
         raise SourceError("Could not detect a known ATS behind this URL.")
 
-    if target.ats == "greenhouse" and target.token:
-        if any(board.token == target.token for board in config.greenhouse.boards):
-            raise SourceError(f"Greenhouse board '{target.token}' is already a source.")
-        config.greenhouse.enabled = True
-        config.greenhouse.boards.append(
-            GreenhouseBoard(token=target.token, company=label)
-        )
-        new_id = f"greenhouse:{target.token}"
-    elif target.ats == "lever" and target.token:
-        if any(board.token == target.token for board in config.lever.boards):
-            raise SourceError(f"Lever board '{target.token}' is already a source.")
-        config.lever.enabled = True
-        config.lever.boards.append(LeverBoard(token=target.token, company=label))
-        new_id = f"lever:{target.token}"
-    elif target.ats == "ashby" and target.token:
-        if any(board.token == target.token for board in config.ashby.boards):
-            raise SourceError(f"Ashby board '{target.token}' is already a source.")
-        config.ashby.enabled = True
-        config.ashby.boards.append(AshbyBoard(token=target.token, company=label))
-        new_id = f"ashby:{target.token}"
-    elif target.ats in NATIVE_URL_KINDS:
-        section = getattr(config, target.ats)
-        if any(board.url == url for board in section.boards):
-            raise SourceError(f"This {target.ats.title()} board is already a source.")
-        section.enabled = True
-        section.boards.append(NativeUrlBoard(url=url, company=label))
-        new_id = native_url_id(target.ats, url)
-    else:
-        if any(entry.url == url for entry in config.companies.urls):
-            raise SourceError("This URL is already a source.")
-        config.companies.enabled = True
-        config.companies.urls.append(CompanyUrl(url=url, label=label))
-        new_id = company_url_id(url)
+    spec = spec_for(target.ats)
+    if spec is None or spec.new_unit is None or not spec.admits(target):
+        spec = spec_for("companies")
+        assert spec is not None
 
+    new_id = _append_unit(config, spec, target=target, url=url, label=label)
     _save(connectors_path, config)
     return _view(config, new_id)
 
