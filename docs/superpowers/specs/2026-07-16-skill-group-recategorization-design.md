@@ -25,6 +25,22 @@ API, no way to enumerate or revert corrections.
    `skill_groups.json` mutation (corrections would vanish on cache reset and be
    indistinguishable from LLM guesses).
 
+## Correctness amendments (implementation audit)
+
+- Alias-aware precedence is symmetric: correction, override, and taxonomy maps are all
+  checked against the canonical key, normalized display, and normalized aliases.
+- Service validation is side-effect-free. Unknown groups/skills and missing corrections
+  are rejected before either the ledger or `matrix.json` is written.
+- API contract regeneration includes the SPA's committed
+  `web/src/lib/api/schema.ts` copy in addition to the canonical OpenAPI and TypeScript
+  artifacts.
+- The installed shadcn stack uses Base UI, so editable badges use a `render` trigger,
+  grouped menu items, component icon conventions, and keyboard-accessible menu behavior.
+- Mutation success awaits matrix-query invalidation so a successful move/reset is not
+  reported while stale grouping remains visible.
+- `other` is the explicit Other group. It is not a null/ungroup operation; reset means
+  deleting the correction and falling back to override/taxonomy.
+
 ## Design
 
 ### 1. Storage — corrections ledger
@@ -116,7 +132,7 @@ In `web/src/features/settings/SkillGroupsPanel.tsx`, each skill badge gets a pop
 - A correction whose token later vanishes from the matrix (skill removed from the
   profile) stays in the ledger harmlessly and re-applies if the skill returns.
 - Concurrent writes serialize on the existing profile-dir lock.
-- `other` is a valid correction target (explicit "ungroup this").
+- `other` is a valid correction target (explicitly place the skill in Other).
 - Correction lookup is by canonical token, so renaming a skill's display text does not
   orphan its correction as long as the canonical key is stable.
 
@@ -128,7 +144,8 @@ In `web/src/features/settings/SkillGroupsPanel.tsx`, each skill badge gets a pop
 - **Service:** `set_group` persists across a full `matrix.json` rebuild (the "never make
   the same mistake again" guarantee); `clear_group` reverts to the taxonomy value;
   error types for unknown slug/skill/missing profile.
-- **API:** success paths plus the 404/409/422 mappings; OpenAPI contract test.
+- **API:** success paths plus the 400/404/422 mappings; OpenAPI contract test and all
+  three generated artifacts kept in sync.
 - **Web:** Vitest component tests for the popover move flow, pin indicator, and revert.
 
 ## Out of scope

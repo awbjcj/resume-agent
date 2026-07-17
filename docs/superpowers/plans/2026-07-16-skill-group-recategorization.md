@@ -1,6 +1,6 @@
 # Skill-Group Re-categorization Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan in-line with test-driven development. Do not delegate tasks or use subagent-driven methods. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let the user re-assign a skill's display group from the web UI, pinned durably in a corrections ledger so no rebuild or taxonomy reset ever re-applies the LLM's wrong guess.
 
@@ -20,6 +20,37 @@
 - "Profile not built" maps to HTTP 400 `SETUP_INCOMPLETE` (matches every manual-skills endpoint); unknown slug → 422; unknown skill / missing correction → 404.
 - Atomic file writes only (tempfile + `os.fsync` + `os.replace`), matching `save_manual_skills`.
 - Commit after every task; do not batch tasks into one commit.
+
+## Correctness Amendments (2026-07-16 audit)
+
+These amendments are part of the implementation contract and supersede conflicting
+snippets below:
+
+1. Every precedence layer uses the same alias-aware lookup keys (`row.key`, normalized
+   display, normalized aliases). The taxonomy layer must use `_lookup_group(...)` too;
+   limiting taxonomy to `taxonomy.get(row.key)` contradicts the design contract and
+   fails to recover older alias-keyed taxonomy entries.
+2. A rejected service request must not rewrite `matrix.json`. Resolve the requested row
+   from an in-memory decorated matrix first; persist the ledger and rebuilt matrix only
+   after the profile, group slug, and skill/correction have all been validated.
+3. Contract regeneration updates all three committed artifacts:
+   `contracts/openapi.json`, `contracts/ts/api.ts`, and
+   `web/src/lib/api/schema.ts`. The SPA imports the last file directly, so omitting it
+   leaves the frontend on a stale contract.
+4. The Base UI shadcn dropdown must use `render` for a custom trigger and place menu
+   labels/items inside `DropdownMenuGroup`. Icons use the component `data-icon`
+   convention without manual size classes. This keeps keyboard/focus behavior and the
+   installed `base-nova` component contract intact.
+5. TanStack mutation success handlers await
+   `queryClient.invalidateQueries({ queryKey: ["profile-matrix"] })` before reporting
+   success, so the mutation does not become successful while the visible matrix is
+   still stale.
+6. Intermediate verification stays focused as requested. Full Python/web suites,
+   OpenAPI drift, build, lint, diff checks, and browser verification run once in the
+   final gate after implementation and self-review.
+7. `other` means an explicit assignment to the **Other** group; it does not mean an
+   ungrouped/null assignment. Clearing a correction restores override/taxonomy
+   precedence.
 
 ---
 
@@ -358,7 +389,7 @@ def apply_skill_groups(
         ]
         correction = _lookup_group(correction_groups, lookup_keys)
         override = _lookup_group(override_groups, lookup_keys)
-        taxonomy_group = taxonomy.get(row.key)
+        taxonomy_group = _lookup_group(taxonomy, lookup_keys)
         if correction is not None:
             row.group, row.group_source = correction, "correction"
         elif override is not None:
@@ -463,10 +494,11 @@ with:
 
 Update the imports: in the `from resume_agent.profile.matrix import (...)` block replace `apply_skill_groups` with `decorate_matrix_groups`, and delete the line `from resume_agent.taxonomy.groups import group_map_path, load_group_map`.
 
-- [ ] **Step 5: Run the full suite and lint**
+- [ ] **Step 5: Run focused matrix/call-site tests and lint touched files**
 
-Run: `.venv/Scripts/python.exe -m pytest -q && ruff check`
-Expected: all pass (existing `test_apply_groups_uses_taxonomy_and_alias_aware_override_precedence` and profile-build/skills/match-gap tests must stay green), ruff clean.
+Run the focused matrix, profile-build, profile-skills, and match-gap tests that exercise
+the switched call sites, then Ruff only the touched Python files. Save the whole Python
+suite for the final gate.
 
 - [ ] **Step 6: Commit**
 
@@ -718,7 +750,7 @@ git commit -m "feat: profile_groups service for durable group corrections"
 **Files:**
 - Modify: `src/resume_agent/api/schemas/profile.py` (`MatrixRowOut.group_source`, new `SetGroupIn`)
 - Modify: `src/resume_agent/api/routers/profile.py` (two endpoints)
-- Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`
+- Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_profile_groups_router.py`
 
 **Interfaces:**
@@ -889,13 +921,14 @@ Expected: all pass.
 - [ ] **Step 5: Regenerate contracts and run the drift gate**
 
 Run: `bash scripts/gen_ts_client.sh`
-Then: `.venv/Scripts/python.exe -m pytest tests/api/test_openapi_contract.py -q && .venv/Scripts/python.exe -m pytest -q && ruff check`
-Expected: contracts updated (`contracts/openapi.json`, `contracts/ts/api.ts` show the new paths + `groupSource`), full suite green.
+Then run the router tests and `tests/api/test_openapi_contract.py`, plus Ruff on touched
+Python files. Expected: all three generated contract artifacts show the new paths and
+`groupSource`. Save the full suite for the final gate.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/resume_agent/api/schemas/profile.py src/resume_agent/api/routers/profile.py tests/api/test_profile_groups_router.py contracts/openapi.json contracts/ts/api.ts
+git add src/resume_agent/api/schemas/profile.py src/resume_agent/api/routers/profile.py tests/api/test_profile_groups_router.py contracts/openapi.json contracts/ts/api.ts web/src/lib/api/schema.ts
 git commit -m "feat: PUT/DELETE skill-group correction endpoints with groupSource on matrix rows"
 ```
 
@@ -1024,8 +1057,8 @@ export function useSetSkillGroup() {
           body: { group: vars.group },
         }),
       ),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["profile-matrix"] });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["profile-matrix"] });
       toast.success("Skill group updated");
     },
     onError: (error: Error) => toast.error(error.message),
@@ -1041,8 +1074,8 @@ export function useClearSkillGroup() {
           params: { path: { key } },
         }),
       ),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["profile-matrix"] });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["profile-matrix"] });
       toast.success("Reverted to automatic grouping");
     },
     onError: (error: Error) => toast.error(error.message),
@@ -1060,6 +1093,7 @@ import { Check, CircleAlert, Layers3, Pin, Undo2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -1083,42 +1117,42 @@ Replace the member badge rendering (`members.map((row) => (<Badge …>{row.displ
                     return (
                       <DropdownMenu key={row.key}>
                         <DropdownMenuTrigger
+                          render={<Badge render={<button type="button" />} variant="outline" />}
                           aria-label={`Change group for ${row.display}`}
-                          className="rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                         >
-                          <Badge variant="outline" className="cursor-pointer gap-1">
-                            {row.groupSource === "correction" ? (
-                              <Pin aria-hidden className="size-3" />
-                            ) : null}
-                            {row.display}
-                          </Badge>
+                          {row.groupSource === "correction" ? (
+                            <Pin aria-hidden data-icon="inline-start" />
+                          ) : null}
+                          {row.display}
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
-                          <DropdownMenuLabel>Move to…</DropdownMenuLabel>
-                          {orderedGroups.map((target) => (
-                            <DropdownMenuItem
-                              key={target.slug}
-                              disabled={setGroup.isPending || target.slug === current}
-                              onClick={() =>
-                                setGroup.mutate({ key: row.key, group: target.slug })
-                              }
-                            >
-                              {target.label}
-                              {target.slug === current ? (
-                                <Check aria-hidden className="ml-auto size-3.5" />
-                              ) : null}
-                            </DropdownMenuItem>
-                          ))}
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel>Move to…</DropdownMenuLabel>
+                            {orderedGroups.map((target) => (
+                              <DropdownMenuItem
+                                key={target.slug}
+                                disabled={setGroup.isPending || target.slug === current}
+                                onClick={() =>
+                                  setGroup.mutate({ key: row.key, group: target.slug })
+                                }
+                              >
+                                {target.label}
+                                {target.slug === current ? <Check aria-hidden /> : null}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuGroup>
                           {row.groupSource === "correction" ? (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                disabled={clearGroup.isPending}
-                                onClick={() => clearGroup.mutate(row.key)}
-                              >
-                                <Undo2 aria-hidden className="size-3.5" />
-                                Reset to automatic
-                              </DropdownMenuItem>
+                              <DropdownMenuGroup>
+                                <DropdownMenuItem
+                                  disabled={clearGroup.isPending}
+                                  onClick={() => clearGroup.mutate(row.key)}
+                                >
+                                  <Undo2 aria-hidden />
+                                  Reset to automatic
+                                </DropdownMenuItem>
+                              </DropdownMenuGroup>
                             </>
                           ) : null}
                         </DropdownMenuContent>
@@ -1133,8 +1167,9 @@ Note: `orderedGroups` and `known` are computed before the accordion renders — 
 
 - [ ] **Step 5: Run tests, lint, and typecheck**
 
-Run: `cd web && npx vitest run src/features/settings/SkillGroupsPanel.test.tsx && npx vitest run && npm run lint && npx tsc -b`
-Expected: all Vitest suites pass, ESLint clean, tsc clean (the regenerated `contracts/ts/api.ts` from Task 4 provides the new paths and `groupSource`).
+Run: `cd web && npx vitest run src/features/settings/SkillGroupsPanel.test.tsx && npx tsc -b`
+Expected: the focused component tests and typecheck pass. Save full Vitest and ESLint
+for the final gate.
 
 - [ ] **Step 6: Commit**
 
@@ -1167,8 +1202,11 @@ writes or reads them. `MatrixRow.group_source` records which layer
 
 - [ ] **Step 2: Run the full suites one final time**
 
-Run: `.venv/Scripts/python.exe -m pytest -q && ruff check && cd web && npx vitest run && npm run lint`
-Expected: everything green.
+Run the final gate: full Python pytest, OpenAPI drift, `ruff check`, full web Vitest,
+web lint, web build (including TypeScript), `git diff --check`, and a headless Playwright
+walkthrough of the Settings > Skill groups move/reset story with browser console checks.
+Expected: every automated gate passes and the browser flow visibly moves a skill,
+shows the pinned correction, resets it, and leaves no console errors.
 
 - [ ] **Step 3: Commit**
 
