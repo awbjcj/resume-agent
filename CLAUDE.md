@@ -253,8 +253,14 @@ aggressiveness determines how many detail fetches are issued.
   vocabulary in `taxonomy/groups.py`). Profile builds classify only missing
   tokens with the cheap tier; failed batches remain absent and retry on the next
   build. Match-gap refreshes apply the saved map without an LLM, and
-  `overrides.yaml`'s `group:` map wins. Groups never alter `facts.json` or the
-  hard/soft/domain categories used by fact-lock; unassigned rows render as Other.
+  `overrides.yaml`'s `group:` map wins over taxonomy. User re-categorizations
+  from Settings > Skill groups live in `data/profile/group_corrections.json`,
+  win over both overrides and taxonomy, and are replayed by
+  `decorate_matrix_groups` on every matrix rebuild. The LLM classifier never
+  reads or writes corrections, and `MatrixRow.group_source` records whether a
+  correction, override, or taxonomy assigned the row. Groups never alter
+  `facts.json` or the hard/soft/domain categories used by fact-lock; unassigned
+  rows render as Other.
 - **GitHub depth is two-tier; dossiers win.** `profile/github_harvest.py` writes
   qualifying repositories' root docs (README files plus CLAUDE, CONTEXT, and
   AGENTS markdown, capped at 30 KB per file) as deterministic
