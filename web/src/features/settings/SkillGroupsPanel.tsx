@@ -1,19 +1,30 @@
-import { CircleAlert, Layers3 } from "lucide-react";
+import { Check, CircleAlert, Layers3, Pin, Undo2 } from "lucide-react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import type { ProfileMatrix } from "./use-matrix";
-import { useMatrix } from "./use-matrix";
+import { useClearSkillGroup, useMatrix, useSetSkillGroup } from "./use-matrix";
 
 type MatrixRow = NonNullable<ProfileMatrix["rows"]>[number];
 
 export function SkillGroupsPanel() {
   const matrix = useMatrix();
+  const setGroup = useSetSkillGroup();
+  const clearGroup = useClearSkillGroup();
 
   if (matrix.isPending) {
     return <Skeleton className="h-48 w-full" aria-label="Loading skill matrix" />;
@@ -67,7 +78,8 @@ export function SkillGroupsPanel() {
     <section aria-labelledby="skill-groups-heading">
       <h2 id="skill-groups-heading" className="text-base font-semibold">Skill groups</h2>
       <p className="mb-2 text-sm text-muted-foreground">
-        Profile skills grouped by their primary professional use.
+        Profile skills grouped by their primary professional use. Click a skill to move it;
+        corrections are pinned and survive profile rebuilds.
       </p>
       <Accordion multiple defaultValue={orderedGroups.map((group) => group.slug)}>
         {orderedGroups.map((group) => {
@@ -82,9 +94,59 @@ export function SkillGroupsPanel() {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-wrap gap-2">
-                  {members.length > 0 ? members.map((row) => (
-                    <Badge key={row.key} variant="outline">{row.display}</Badge>
-                  )) : (
+                  {members.length > 0 ? members.map((row) => {
+                    const current = row.group && known.has(row.group) ? row.group : "other";
+                    return (
+                      <DropdownMenu key={row.key}>
+                        <DropdownMenuTrigger
+                          render={(
+                            <Badge
+                              render={<button type="button" />}
+                              variant="outline"
+                            />
+                          )}
+                          aria-label={`Change group for ${row.display}`}
+                          disabled={setGroup.isPending || clearGroup.isPending}
+                        >
+                          {row.groupSource === "correction" ? (
+                            <Pin aria-hidden data-icon="inline-start" />
+                          ) : null}
+                          {row.display}
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel>Move to…</DropdownMenuLabel>
+                            {orderedGroups.map((target) => (
+                              <DropdownMenuItem
+                                key={target.slug}
+                                disabled={setGroup.isPending || target.slug === current}
+                                onClick={() =>
+                                  setGroup.mutate({ key: row.key, group: target.slug })
+                                }
+                              >
+                                {target.label}
+                                {target.slug === current ? <Check aria-hidden /> : null}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuGroup>
+                          {row.groupSource === "correction" ? (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuGroup>
+                                <DropdownMenuItem
+                                  disabled={clearGroup.isPending}
+                                  onClick={() => clearGroup.mutate(row.key)}
+                                >
+                                  <Undo2 aria-hidden />
+                                  Reset to automatic
+                                </DropdownMenuItem>
+                              </DropdownMenuGroup>
+                            </>
+                          ) : null}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    );
+                  }) : (
                     <span className="text-xs text-muted-foreground">No skills in this group.</span>
                   )}
                 </div>

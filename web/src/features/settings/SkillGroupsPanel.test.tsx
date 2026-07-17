@@ -5,10 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   value: {} as Record<string, unknown>,
   refetch: vi.fn(),
+  setGroup: vi.fn(),
+  clearGroup: vi.fn(),
 }));
 
 vi.mock("./use-matrix", () => ({
   useMatrix: () => ({ ...state.value, refetch: state.refetch }),
+  useSetSkillGroup: () => ({ mutate: state.setGroup, isPending: false }),
+  useClearSkillGroup: () => ({ mutate: state.clearGroup, isPending: false }),
 }));
 
 import { SkillGroupsPanel } from "./SkillGroupsPanel";
@@ -21,6 +25,8 @@ const groups = [
 describe("SkillGroupsPanel", () => {
   beforeEach(() => {
     state.refetch.mockReset();
+    state.setGroup.mockReset();
+    state.clearGroup.mockReset();
   });
 
   it("renders explicit loading, error/retry, and empty states", async () => {
@@ -68,5 +74,86 @@ describe("SkillGroupsPanel", () => {
     expect(screen.getByText("Mystery")).toBeInTheDocument();
     expect(triggers[0]).toHaveTextContent("1");
     expect(triggers[1]).toHaveTextContent("1");
+  });
+
+  it("moves a skill to another group and resets a pinned one", async () => {
+    state.value = {
+      isPending: false,
+      isError: false,
+      data: {
+        generatedAt: "2026-07-16T00:00:00Z",
+        groups,
+        rows: [
+          {
+            key: "python",
+            display: "Python",
+            category: "hard",
+            group: "languages",
+            groupSource: "taxonomy",
+            inferred: false,
+            strength: 3,
+            lastUsed: "current",
+          },
+          {
+            key: "dbt",
+            display: "dbt",
+            category: "hard",
+            group: "languages",
+            groupSource: "correction",
+            inferred: false,
+            strength: 1,
+            lastUsed: null,
+          },
+        ],
+      },
+    };
+    render(<SkillGroupsPanel />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /change group for python/i }),
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: /^other$/i }));
+    expect(state.setGroup).toHaveBeenCalledWith({ key: "python", group: "other" });
+
+    const pinnedTrigger = screen.getByRole("button", {
+      name: /change group for dbt/i,
+    });
+    expect(pinnedTrigger.querySelector('[data-icon="inline-start"]')).not.toBeNull();
+    await userEvent.click(pinnedTrigger);
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: /reset to automatic/i }),
+    );
+    expect(state.clearGroup).toHaveBeenCalledWith("dbt");
+  });
+
+  it("does not offer reset for an automatic assignment", async () => {
+    state.value = {
+      isPending: false,
+      isError: false,
+      data: {
+        generatedAt: "2026-07-16T00:00:00Z",
+        groups,
+        rows: [
+          {
+            key: "python",
+            display: "Python",
+            category: "hard",
+            group: "languages",
+            groupSource: "taxonomy",
+            inferred: false,
+            strength: 3,
+            lastUsed: "current",
+          },
+        ],
+      },
+    };
+    render(<SkillGroupsPanel />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /change group for python/i }),
+    );
+
+    expect(await screen.findByRole("menuitem", { name: /^other$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /reset to automatic/i })).toBeNull();
   });
 });
