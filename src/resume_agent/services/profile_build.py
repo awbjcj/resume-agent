@@ -32,8 +32,8 @@ def run_corpus_build(
         manual_skills_lock,
     )
     from resume_agent.profile.matrix import (
-        apply_skill_groups,
         build_matrix,
+        decorate_matrix_groups,
         load_overrides,
         save_matrix,
     )
@@ -85,8 +85,7 @@ def run_corpus_build(
             )
             if additions:
                 skill_groups.save_group_map(additions, taxonomy_path)
-                group_map = skill_groups.load_group_map(taxonomy_path)
-        apply_skill_groups(matrix, group_map, overrides)
+        decorate_matrix_groups(matrix, profile_dir, overrides)
         save_matrix(matrix, Path(facts_out).with_name("matrix.json"))
     if reporter is not None:
         reporter.step(3, label="Saved matrix.json")

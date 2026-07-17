@@ -13,14 +13,22 @@ from resume_agent.profile.matrix import (
     MatrixRow,
     Overrides,
     SkillMatrix,
+    apply_skill_groups,
+    build_decorated_matrix,
     build_matrix,
     build_skill_match_context,
-    apply_skill_groups,
     effective_cluster_map,
     load_matrix,
     load_overrides,
     override_tokens,
+    rebuild_saved_matrix,
     save_matrix,
+)
+from resume_agent.profile.group_corrections import (
+    GroupCorrection,
+    GroupCorrections,
+    corrections_path,
+    save_group_corrections,
 )
 from resume_agent.taxonomy.clusters import ClusterMap
 
@@ -255,3 +263,111 @@ def test_group_validation_drops_unknown_values_without_expanding_override_tokens
     assert "python" not in override_tokens(overrides)
     apply_skill_groups(matrix, {"python": "invented"}, Overrides())
     assert matrix.rows[0].group is None
+
+
+def test_apply_groups_correction_beats_override_and_taxonomy():
+    matrix = SkillMatrix(rows=[MatrixRow(key="python", display="Python")])
+
+    apply_skill_groups(
+        matrix,
+        {"python": "languages"},
+        Overrides(group={"python": "frameworks"}),
+        corrections={"python": "data-ml"},
+    )
+
+    assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
+        "data-ml",
+        "correction",
+    )
+
+
+def test_apply_groups_records_override_taxonomy_and_none_sources():
+    matrix = SkillMatrix(
+        rows=[
+            MatrixRow(key="python", display="Python"),
+            MatrixRow(key="sql", display="SQL"),
+            MatrixRow(key="mystery", display="Mystery"),
+        ]
+    )
+
+    apply_skill_groups(
+        matrix,
+        {"python": "languages"},
+        Overrides(group={"sql": "databases"}),
+    )
+
+    by_key = {row.key: row for row in matrix.rows}
+    assert (by_key["python"].group, by_key["python"].group_source) == (
+        "languages",
+        "taxonomy",
+    )
+    assert (by_key["sql"].group, by_key["sql"].group_source) == (
+        "databases",
+        "override",
+    )
+    assert (by_key["mystery"].group, by_key["mystery"].group_source) == (None, None)
+
+
+def test_apply_groups_uses_aliases_for_corrections_and_taxonomy():
+    correction_row = MatrixRow(
+        key="postgresql", display="PostgreSQL", aliases=["postgres"]
+    )
+    taxonomy_row = MatrixRow(key="kubernetes", display="Kubernetes", aliases=["k8s"])
+    matrix = SkillMatrix(rows=[correction_row, taxonomy_row])
+
+    apply_skill_groups(
+        matrix,
+        {"k8s": "cloud-infra"},
+        Overrides(),
+        corrections={"postgres": "databases"},
+    )
+
+    assert (correction_row.group, correction_row.group_source) == (
+        "databases",
+        "correction",
+    )
+    assert (taxonomy_row.group, taxonomy_row.group_source) == (
+        "cloud-infra",
+        "taxonomy",
+    )
+
+
+def test_matrix_row_without_valid_group_source_still_loads():
+    assert MatrixRow.model_validate(
+        {"key": "python", "display": "Python"}
+    ).group_source is None
+    assert MatrixRow.model_validate(
+        {"key": "python", "display": "Python", "group_source": "bogus"}
+    ).group_source is None
+
+
+def test_build_decorated_matrix_does_not_persist_and_rebuild_does(tmp_path):
+    profile_dir = tmp_path / "profile"
+    profile_dir.mkdir(parents=True)
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"Languages": [Skill(name="Python")]},
+    )
+    save_group_corrections(
+        GroupCorrections(
+            corrections={"python": GroupCorrection(group="data-ml")}
+        ),
+        corrections_path(profile_dir),
+    )
+
+    matrix = build_decorated_matrix(profile_dir, facts)
+
+    assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
+        "data-ml",
+        "correction",
+    )
+    assert not (profile_dir / "matrix.json").exists()
+
+    rebuilt = rebuild_saved_matrix(profile_dir, facts)
+    reloaded = load_matrix(profile_dir / "matrix.json")
+    assert rebuilt.rows[0].group_source == "correction"
+    assert reloaded is not None
+    assert (reloaded.rows[0].group, reloaded.rows[0].group_source) == (
+        "data-ml",
+        "correction",
+    )

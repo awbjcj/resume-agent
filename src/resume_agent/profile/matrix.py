@@ -15,8 +15,17 @@ from pydantic import Field, field_validator
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
-from resume_agent.taxonomy.clusters import ClusterMap
-from resume_agent.taxonomy.groups import SKILL_GROUPS, sanitize_group_map
+from resume_agent.profile.group_corrections import (
+    corrections_path,
+    load_group_corrections,
+)
+from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
+from resume_agent.taxonomy.groups import (
+    SKILL_GROUPS,
+    group_map_path,
+    load_group_map,
+    sanitize_group_map,
+)
 from resume_agent.taxonomy.skills import split_skills
 from resume_agent.tracking.match_gap import normalize_skill
 
@@ -30,6 +39,7 @@ class MatrixRow(ExtensibleModel):
     aliases: list[str] = Field(default_factory=list)
     category: Literal["hard", "soft", "domain"] | None = None
     group: str | None = None
+    group_source: Literal["correction", "override", "taxonomy"] | None = None
     inferred: bool = False
     evidence_fact_ids: list[str] = Field(default_factory=list)
     strength: float = 0.0
@@ -39,6 +49,11 @@ class MatrixRow(ExtensibleModel):
     @classmethod
     def validate_group(cls, value: object) -> str | None:
         return value if isinstance(value, str) and value in SKILL_GROUPS else None
+
+    @field_validator("group_source", mode="before")
+    @classmethod
+    def validate_group_source(cls, value: object) -> object | None:
+        return value if value in ("correction", "override", "taxonomy") else None
 
 
 class SkillMatrix(ExtensibleModel):
@@ -372,25 +387,70 @@ def build_matrix(
     )
 
 
+def _lookup_group(mapping: dict[str, str], keys: list[str]) -> str | None:
+    return next((mapping[key] for key in keys if key in mapping), None)
+
+
 def apply_skill_groups(
     matrix: SkillMatrix,
     group_of: dict[str, str],
     overrides: Overrides,
+    corrections: dict[str, str] | None = None,
 ) -> None:
-    """Decorate existing rows with validated groups; overrides take precedence."""
+    """Decorate rows with validated groups; corrections beat overrides and taxonomy."""
     taxonomy = sanitize_group_map(group_of)
     override_groups = sanitize_group_map(overrides.group)
+    correction_groups = sanitize_group_map(corrections or {})
     for row in matrix.rows:
         lookup_keys = [
             row.key,
             normalize_skill(row.display),
             *(normalize_skill(alias) for alias in row.aliases),
         ]
-        override = next(
-            (override_groups[key] for key in lookup_keys if key in override_groups),
-            None,
-        )
-        row.group = override or taxonomy.get(row.key)
+        correction = _lookup_group(correction_groups, lookup_keys)
+        override = _lookup_group(override_groups, lookup_keys)
+        taxonomy_group = _lookup_group(taxonomy, lookup_keys)
+        if correction is not None:
+            row.group, row.group_source = correction, "correction"
+        elif override is not None:
+            row.group, row.group_source = override, "override"
+        elif taxonomy_group is not None:
+            row.group, row.group_source = taxonomy_group, "taxonomy"
+        else:
+            row.group, row.group_source = None, None
+
+
+def decorate_matrix_groups(
+    matrix: SkillMatrix, profile_dir: str | Path, overrides: Overrides
+) -> None:
+    """Apply every on-disk skill-group layer through one shared seam."""
+    profile_dir = Path(profile_dir)
+    group_map = load_group_map(group_map_path(profile_dir))
+    corrections = load_group_corrections(corrections_path(profile_dir)).as_map()
+    apply_skill_groups(matrix, group_map, overrides, corrections=corrections)
+
+
+def build_decorated_matrix(
+    profile_dir: str | Path, facts: ProfileFacts
+) -> SkillMatrix:
+    """Build and decorate a matrix without persisting it."""
+    profile_dir = Path(profile_dir)
+    overrides = load_overrides(profile_dir / "overrides.yaml")
+    matrix = build_matrix(
+        facts,
+        load_cluster_map(profile_dir / "cluster_map.json"),
+        overrides,
+    )
+    decorate_matrix_groups(matrix, profile_dir, overrides)
+    return matrix
+
+
+def rebuild_saved_matrix(profile_dir: str | Path, facts: ProfileFacts) -> SkillMatrix:
+    """Build, decorate, and persist matrix.json from current profile artifacts."""
+    profile_dir = Path(profile_dir)
+    matrix = build_decorated_matrix(profile_dir, facts)
+    save_matrix(matrix, profile_dir / "matrix.json")
+    return matrix
 
 
 def save_matrix(matrix: SkillMatrix, path: str | Path) -> None:

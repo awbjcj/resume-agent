@@ -23,10 +23,8 @@ from resume_agent.profile.manual_skills import (
     remove_manual_skill_entry,
     save_manual_skills,
 )
-from resume_agent.profile.matrix import apply_skill_groups, build_matrix, load_overrides, save_matrix
+from resume_agent.profile.matrix import rebuild_saved_matrix
 from resume_agent.profile.store import load_facts, save_facts
-from resume_agent.taxonomy import groups as skill_groups
-from resume_agent.taxonomy.clusters import load_cluster_map
 from resume_agent.tracking.match_gap import normalize_skill
 
 
@@ -76,16 +74,6 @@ def _known_tokens(facts: ProfileFacts) -> set[str]:
     }
 
 
-def _rebuild_matrix(profile_dir: str | Path, facts: ProfileFacts) -> None:
-    profile_dir = Path(profile_dir)
-    overrides = load_overrides(profile_dir / "overrides.yaml")
-    cluster_map = load_cluster_map(profile_dir / "cluster_map.json")
-    matrix = build_matrix(facts, cluster_map, overrides)
-    group_map = skill_groups.load_group_map(skill_groups.group_map_path(profile_dir))
-    apply_skill_groups(matrix, group_map, overrides)
-    save_matrix(matrix, profile_dir / "matrix.json")
-
-
 def list_skills(profile_dir: str | Path) -> list[dict[str, str | None]]:
     facts = _load_facts_or_raise(profile_dir)
     return [
@@ -114,7 +102,7 @@ def add_skill(
         updated_facts, _warnings = apply_manual_skills(facts, ledger)
         save_facts(updated_facts, _facts_path(profile_dir))
         save_manual_skills(ledger, _ledger_path(profile_dir))
-        _rebuild_matrix(profile_dir, updated_facts)
+        rebuild_saved_matrix(profile_dir, updated_facts)
         return entry
 
 
@@ -149,7 +137,7 @@ def add_alias(profile_dir: str | Path, skill_id: str, alias: str) -> ManualAlias
         updated_facts, _warnings = apply_manual_skills(facts, ledger)
         save_facts(updated_facts, _facts_path(profile_dir))
         save_manual_skills(ledger, _ledger_path(profile_dir))
-        _rebuild_matrix(profile_dir, updated_facts)
+        rebuild_saved_matrix(profile_dir, updated_facts)
         return entry
 
 
@@ -171,4 +159,4 @@ def remove_manual_entry(profile_dir: str | Path, entry_id: str) -> None:
         ledger.entries = [e for e in ledger.entries if e.id != entry_id]
         save_facts(updated_facts, _facts_path(profile_dir))
         save_manual_skills(ledger, _ledger_path(profile_dir))
-        _rebuild_matrix(profile_dir, updated_facts)
+        rebuild_saved_matrix(profile_dir, updated_facts)
