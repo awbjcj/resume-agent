@@ -55,6 +55,7 @@ class MatrixRowOut(CamelModel):
     display: str
     category: str | None = None
     group: str | None = None
+    group_source: Literal["correction", "override", "taxonomy"] | None = None
     inferred: bool = False
     strength: float = 0.0
     last_used: str | None = None
@@ -87,6 +88,12 @@ class AddSkillIn(CamelModel):
 class AddAliasIn(CamelModel):
     alias: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+    ]
+
+
+class SetGroupIn(CamelModel):
+    group: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)
     ]
 
 

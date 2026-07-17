@@ -38,9 +38,10 @@ def test_matrix_route_serves_rooted_rows_and_ordered_vocabulary(client):
     assert body["rows"][0] == {
         "key": "python",
         "display": "Python",
-        "category": "hard",
-        "group": "languages",
-        "inferred": False,
+            "category": "hard",
+            "group": "languages",
+            "groupSource": None,
+            "inferred": False,
         "strength": 2.5,
         "lastUsed": "current",
     }

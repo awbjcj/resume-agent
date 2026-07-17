@@ -2619,6 +2619,22 @@
             ],
             "title": "Group"
           },
+          "groupSource": {
+            "anyOf": [
+              {
+                "enum": [
+                  "correction",
+                  "override",
+                  "taxonomy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groupsource"
+          },
           "inferred": {
             "default": false,
             "title": "Inferred",
@@ -4119,6 +4135,21 @@
           }
         },
         "title": "SecretsUpdate",
+        "type": "object"
+      },
+      "SetGroupIn": {
+        "properties": {
+          "group": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Group",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group"
+        ],
+        "title": "SetGroupIn",
         "type": "object"
       },
       "SetupStatusOut": {
@@ -10283,6 +10314,117 @@
           }
         },
         "summary": "Post Profile Skill"
+      }
+    },
+    "/api/profile/skills/{key}/group": {
+      "delete": {
+        "operationId": "delete_skill_group_api_profile_skills__key__group_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Skill Group"
+      },
+      "put": {
+        "operationId": "put_skill_group_api_profile_skills__key__group_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetGroupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixRowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Skill Group"
       }
     },
     "/api/profile/skills/{skill_id}/aliases": {

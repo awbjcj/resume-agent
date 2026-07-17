@@ -1109,6 +1109,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile/skills/{key}/group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Skill Group */
+        put: operations["put_skill_group_api_profile_skills__key__group_put"];
+        post?: never;
+        /** Delete Skill Group */
+        delete: operations["delete_skill_group_api_profile_skills__key__group_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profile/skills/{skill_id}/aliases": {
         parameters: {
             query?: never;
@@ -2537,6 +2555,8 @@ export interface components {
             display: string;
             /** Group */
             group?: string | null;
+            /** Groupsource */
+            groupSource?: ("correction" | "override" | "taxonomy") | null;
             /**
              * Inferred
              * @default false
@@ -3079,6 +3099,11 @@ export interface components {
             linkedinPassword?: string | null;
             /** Openaiapikey */
             openaiApiKey?: string | null;
+        };
+        /** SetGroupIn */
+        SetGroupIn: {
+            /** Group */
+            group: string;
         };
         /** SetupStatusOut */
         SetupStatusOut: {
@@ -6266,6 +6291,74 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ManualEntryOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_skill_group_api_profile_skills__key__group_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetGroupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixRowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_skill_group_api_profile_skills__key__group_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

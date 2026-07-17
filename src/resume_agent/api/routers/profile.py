@@ -30,6 +30,7 @@ from resume_agent.api.schemas.profile import (
     MatrixOut,
     MatrixRowOut,
     NoteIn,
+    SetGroupIn,
     SkeletonEntryOut,
     SkillEntryOut,
     SourceOut,
@@ -53,7 +54,7 @@ from resume_agent.profile.intake import add_note_source, add_url_source
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
 from resume_agent.profile.synthesis import profile_skeleton
-from resume_agent.services import profile_build, profile_skills
+from resume_agent.services import profile_build, profile_groups, profile_skills
 from resume_agent.services.env_config import read_env
 from resume_agent.services.profile_documents import DocumentError, DocumentStore
 from resume_agent.taxonomy.groups import SKILL_GROUPS
@@ -388,6 +389,32 @@ def delete_manual_skill(entry_id: str, request: Request):
     except profile_skills.ProfileNotBuiltError as exc:
         raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
     except profile_skills.ManualEntryNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", str(exc)) from exc
+
+
+@router.put("/profile/skills/{key}/group", response_model=MatrixRowOut)
+def put_skill_group(key: str, payload: SetGroupIn, request: Request):
+    try:
+        row = profile_groups.set_group(_profile_dir(request), key, payload.group)
+    except profile_groups.UnknownGroupError as exc:
+        raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
+    except profile_skills.ProfileNotBuiltError as exc:
+        raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
+    except profile_skills.SkillNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", str(exc)) from exc
+    return MatrixRowOut.model_validate(row)
+
+
+@router.delete("/profile/skills/{key}/group", status_code=204)
+def delete_skill_group(key: str, request: Request):
+    try:
+        profile_groups.clear_group(_profile_dir(request), key)
+    except profile_skills.ProfileNotBuiltError as exc:
+        raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
+    except (
+        profile_groups.GroupCorrectionNotFoundError,
+        profile_skills.SkillNotFoundError,
+    ) as exc:
         raise ApiException(404, "NOT_FOUND", str(exc)) from exc
 
 
