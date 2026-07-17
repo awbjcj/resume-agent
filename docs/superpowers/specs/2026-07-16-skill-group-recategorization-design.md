@@ -90,8 +90,11 @@ Endpoints in `api/routers/profile.py`, same error mapping as the manual-skills e
 
 | Route | Body | Success | Errors |
 | --- | --- | --- | --- |
-| `PUT /api/profile/skills/{key}/group` | `{ "group": "data-ml" }` | 200 + updated row (key, display, group, groupSource) | 422 unknown slug, 404 unknown skill, 409 profile not built |
-| `DELETE /api/profile/skills/{key}/group` | — | 204 | 404 no correction for key, 409 profile not built |
+| `PUT /api/profile/skills/{key}/group` | `{ "group": "data-ml" }` | 200 + updated row (key, display, group, groupSource) | 422 unknown slug, 404 unknown skill, 400 `SETUP_INCOMPLETE` profile not built |
+| `DELETE /api/profile/skills/{key}/group` | — | 204 | 404 no correction for key, 400 `SETUP_INCOMPLETE` profile not built |
+
+("Profile not built" maps to 400 `SETUP_INCOMPLETE`, not 409, matching every
+existing manual-skills endpoint in `routers/profile.py`.)
 
 Contract regeneration: `scripts/export_openapi.py` + `bash scripts/gen_ts_client.sh`;
 `tests/api/test_openapi_contract.py` gates drift.
