@@ -27,6 +27,7 @@ from resume_agent.discovery.connectors.config import (
 from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, inspect_ats
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
+from resume_agent.discovery.connectors.registry import find_unit
 from resume_agent.discovery.connectors.sources import (
     SourceView,
     company_url_id,
@@ -474,143 +475,36 @@ def remove_source(source_id: str, connectors_path: str = DEFAULT_CONNECTORS) -> 
 
 
 def _apply_enabled(config: ConnectorsConfig, source_id: str, enabled: bool) -> bool:
-    if source_id == "adzuna":
-        config.adzuna.enabled = enabled
+    found = find_unit(config, source_id)
+    if found is None:
+        return False
+    spec, payload = found
+    section = spec.section(config)
+    if payload is None:
+        section.enabled = enabled
         return True
-    if source_id == "remoteok":
-        config.remoteok.enabled = enabled
-        return True
-    if source_id == "linkedin":
-        config.linkedin.enabled = enabled
-        return True
-
-    for board in config.greenhouse.boards:
-        if f"greenhouse:{board.token}" == source_id:
-            if enabled:
-                config.greenhouse.enabled = True
-            board.enabled = enabled
-            return True
-    for board in config.lever.boards:
-        if f"lever:{board.token}" == source_id:
-            if enabled:
-                config.lever.enabled = True
-            board.enabled = enabled
-            return True
-    for board in config.ashby.boards:
-        if f"ashby:{board.token}" == source_id:
-            if enabled:
-                config.ashby.enabled = True
-            board.enabled = enabled
-            return True
-    for kind in NATIVE_URL_KINDS:
-        section = getattr(config, kind)
-        for board in section.boards:
-            if native_url_id(kind, board.url) == source_id:
-                if enabled:
-                    section.enabled = True
-                board.enabled = enabled
-                return True
-    for entry in config.companies.urls:
-        if company_url_id(entry.url) == source_id:
-            if enabled:
-                config.companies.enabled = True
-            entry.enabled = enabled
-            return True
-    for target in config.scrape.targets:
-        if scrape_target_id(target.url) == source_id:
-            if enabled:
-                config.scrape.enabled = True
-            target.enabled = enabled
-            return True
-    return False
+    if enabled:
+        section.enabled = True
+    payload.enabled = enabled
+    return True
 
 
 def _apply_limit(config: ConnectorsConfig, source_id: str, limit: int | None) -> bool:
-    if source_id == "adzuna":
-        config.adzuna.limit = limit
-        return True
-    if source_id == "remoteok":
-        config.remoteok.limit = limit
-        return True
-    if source_id == "linkedin":
-        config.linkedin.limit = limit
-        return True
-    for board in config.greenhouse.boards:
-        if f"greenhouse:{board.token}" == source_id:
-            board.limit = limit
-            return True
-    for board in config.lever.boards:
-        if f"lever:{board.token}" == source_id:
-            board.limit = limit
-            return True
-    for board in config.ashby.boards:
-        if f"ashby:{board.token}" == source_id:
-            board.limit = limit
-            return True
-    for kind in NATIVE_URL_KINDS:
-        for board in getattr(config, kind).boards:
-            if native_url_id(kind, board.url) == source_id:
-                board.limit = limit
-                return True
-    for entry in config.companies.urls:
-        if company_url_id(entry.url) == source_id:
-            entry.limit = limit
-            return True
-    for target in config.scrape.targets:
-        if scrape_target_id(target.url) == source_id:
-            target.limit = limit
-            return True
-    return False
+    found = find_unit(config, source_id)
+    if found is None:
+        return False
+    spec, payload = found
+    target = payload if payload is not None else spec.section(config)
+    target.limit = limit
+    return True
 
 
 def _remove(config: ConnectorsConfig, source_id: str) -> bool:
-    before = len(config.greenhouse.boards)
-    config.greenhouse.boards = [
-        board
-        for board in config.greenhouse.boards
-        if f"greenhouse:{board.token}" != source_id
-    ]
-    if len(config.greenhouse.boards) != before:
-        return True
-
-    before = len(config.lever.boards)
-    config.lever.boards = [
-        board for board in config.lever.boards if f"lever:{board.token}" != source_id
-    ]
-    if len(config.lever.boards) != before:
-        return True
-
-    before = len(config.ashby.boards)
-    config.ashby.boards = [
-        board for board in config.ashby.boards if f"ashby:{board.token}" != source_id
-    ]
-    if len(config.ashby.boards) != before:
-        return True
-
-    for kind in NATIVE_URL_KINDS:
-        section = getattr(config, kind)
-        before = len(section.boards)
-        section.boards = [
-            board
-            for board in section.boards
-            if native_url_id(kind, board.url) != source_id
-        ]
-        if len(section.boards) != before:
-            return True
-
-    before = len(config.companies.urls)
-    config.companies.urls = [
-        entry
-        for entry in config.companies.urls
-        if company_url_id(entry.url) != source_id
-    ]
-    if len(config.companies.urls) != before:
-        return True
-
-    before = len(config.scrape.targets)
-    config.scrape.targets = [
-        target
-        for target in config.scrape.targets
-        if scrape_target_id(target.url) != source_id
-    ]
-    return len(config.scrape.targets) != before
+    found = find_unit(config, source_id)
+    if found is None:
+        return False
+    spec, payload = found
+    if payload is None or spec.unit_items is None:
+        return False
+    spec.unit_items(config).remove(payload)
+    return True

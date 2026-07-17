@@ -2,7 +2,12 @@ import textwrap
 
 import pytest
 
+from resume_agent.discovery.connectors.config import (
+    ConnectorsConfig,
+    load_connectors_config,
+)
 from resume_agent.discovery.connectors.detect import AtsTarget
+from resume_agent.discovery.connectors.registry import CONNECTOR_SPECS
 from resume_agent.services import sources as svc
 
 
@@ -20,6 +25,68 @@ adzuna: {enabled: true, country: us}
 remoteok: {enabled: true}
 linkedin: {enabled: false}
 """
+
+
+def _every_kind_config() -> ConnectorsConfig:
+    return ConnectorsConfig.model_validate(
+        {
+            "greenhouse": {"enabled": True, "boards": [{"token": "acme"}]},
+            "lever": {"enabled": True, "boards": [{"token": "lev"}]},
+            "ashby": {"enabled": True, "boards": [{"token": "ash"}]},
+            "workday": {
+                "enabled": True,
+                "boards": [
+                    {"url": "https://acme.wd5.myworkdayjobs.com/External"}
+                ],
+            },
+            "companies": {
+                "enabled": True,
+                "urls": ["https://example.com/careers"],
+            },
+            "scrape": {
+                "enabled": True,
+                "targets": [{"url": "https://jobs.example.org/list"}],
+            },
+            "adzuna": {"enabled": True},
+            "remoteok": {"enabled": True},
+            "linkedin": {"enabled": True},
+        }
+    )
+
+
+def test_patch_source_round_trips_every_unit(tmp_path):
+    path = str(tmp_path / "connectors.yaml")
+    svc._save(path, _every_kind_config())
+    config = load_connectors_config(path)
+    ids = [unit.source_id for spec in CONNECTOR_SPECS for unit in spec.units(config)]
+    assert len(ids) >= 9
+    for source_id in ids:
+        view = svc.patch_source(source_id, enabled=False, connectors_path=path)
+        assert view.enabled is False, source_id
+        view = svc.patch_source(
+            source_id, enabled=True, limit=7, connectors_path=path
+        )
+        assert view.enabled is True, source_id
+        assert view.limit == 7, source_id
+
+
+def test_remove_source_removes_boards_but_never_singletons(tmp_path):
+    path = str(tmp_path / "connectors.yaml")
+    svc._save(path, _every_kind_config())
+    config = load_connectors_config(path)
+    board_ids = [
+        unit.source_id
+        for spec in CONNECTOR_SPECS
+        if spec.unit_items is not None
+        for unit in spec.units(config)
+    ]
+    for source_id in board_ids:
+        svc.remove_source(source_id, connectors_path=path)
+        with pytest.raises(svc.SourceError, match="Unknown source"):
+            svc.patch_source(source_id, enabled=True, connectors_path=path)
+    for source_id in ("adzuna", "remoteok", "linkedin"):
+        with pytest.raises(svc.SourceError, match="Unknown source"):
+            svc.remove_source(source_id, connectors_path=path)
 
 
 def _preview_ok(monkeypatch):
