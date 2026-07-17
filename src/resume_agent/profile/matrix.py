@@ -52,8 +52,13 @@ class MatrixRow(ExtensibleModel):
 
     @field_validator("group_source", mode="before")
     @classmethod
-    def validate_group_source(cls, value: object) -> object | None:
-        return value if value in ("correction", "override", "taxonomy") else None
+    def validate_group_source(cls, value: object) -> str | None:
+        return (
+            value
+            if isinstance(value, str)
+            and value in ("correction", "override", "taxonomy")
+            else None
+        )
 
 
 class SkillMatrix(ExtensibleModel):

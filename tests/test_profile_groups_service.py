@@ -45,11 +45,12 @@ def test_set_group_rejects_unknown_slug(profile_dir):
 
 def test_set_group_rejects_unknown_skill_without_persisting_matrix(profile_dir):
     matrix_path = profile_dir / "matrix.json"
+    matrix_path.write_text("existing matrix", encoding="utf-8")
 
     with pytest.raises(SkillNotFoundError):
         set_group(profile_dir, "cobol", "languages")
 
-    assert not matrix_path.exists()
+    assert matrix_path.read_text(encoding="utf-8") == "existing matrix"
 
 
 def test_set_group_writes_ledger_and_matrix(profile_dir):

@@ -16,10 +16,14 @@ const setupStatus = {
 };
 
 test.beforeEach(async ({ page }) => {
+  let pythonGroup = "languages";
+  let pythonGroupSource = "taxonomy";
   await page.route("**/api/notifications", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/setup/status", (route) => route.fulfill({ json: setupStatus }));
   await mockEmptyRuns(page);
   await page.route("**/api/profile/skeleton", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/profile/manual-skills", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/profile/coach/sessions", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/profile/sources", (route) =>
     route.fulfill({
       json: [
@@ -58,7 +62,8 @@ test.beforeEach(async ({ page }) => {
             key: "python",
             display: "Python",
             category: "hard",
-            group: "languages",
+            group: pythonGroup,
+            groupSource: pythonGroupSource,
             inferred: false,
             strength: 3,
             lastUsed: "current",
@@ -75,6 +80,28 @@ test.beforeEach(async ({ page }) => {
         ],
       },
     }));
+  await page.route("**/api/profile/skills/*/group", async (route) => {
+    if (route.request().method() === "PUT") {
+      pythonGroup = route.request().postDataJSON().group;
+      pythonGroupSource = "correction";
+      await route.fulfill({
+        json: {
+          key: "python",
+          display: "Python",
+          category: "hard",
+          group: pythonGroup,
+          groupSource: pythonGroupSource,
+          inferred: false,
+          strength: 3,
+          lastUsed: "current",
+        },
+      });
+      return;
+    }
+    pythonGroup = "languages";
+    pythonGroupSource = "taxonomy";
+    await route.fulfill({ status: 204, body: "" });
+  });
   await page.route("**/api/config/profile", async (route) => {
     if (route.request().method() === "PUT") {
       await route.fulfill({ json: route.request().postDataJSON() });
@@ -142,6 +169,31 @@ test("profile depth controls and grouped skills form one working story", async (
   await expect(page.getByRole("heading", { name: "Skill groups" })).toBeVisible();
   await expect(page.getByText("Python", { exact: true })).toBeVisible();
   await expect(page.getByText("vFlash", { exact: true })).toBeVisible();
+
+  const moveRequest = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/api/profile/skills/python/group") &&
+      request.method() === "PUT",
+  );
+  await page.getByRole("button", { name: "Change group for Python" }).click();
+  await page.getByRole("menuitem", { name: "Other", exact: true }).click();
+  expect((await moveRequest).postDataJSON()).toEqual({ group: "other" });
+  const pinnedTrigger = page.getByRole("button", { name: "Change group for Python" });
+  await expect(pinnedTrigger.locator('[data-icon="inline-start"]')).toBeVisible();
+
+  const resetRequest = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/api/profile/skills/python/group") &&
+      request.method() === "DELETE",
+  );
+  await pinnedTrigger.click();
+  await page.getByRole("menuitem", { name: "Reset to automatic" }).click();
+  await resetRequest;
+  await expect(
+    page.getByRole("button", { name: "Change group for Python" }).locator(
+      '[data-icon="inline-start"]',
+    ),
+  ).toHaveCount(0);
   expect(consoleErrors).toEqual([]);
 });
 
