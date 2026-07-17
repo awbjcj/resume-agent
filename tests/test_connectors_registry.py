@@ -4,9 +4,13 @@ from resume_agent.config import Settings
 from resume_agent.discovery.connectors.adzuna import AdzunaConnector
 from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import ConnectorsConfig
+from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.registry import (
+    CONNECTOR_SPECS,
     build_connectors,
     build_source_connectors,
+    find_unit,
+    spec_for,
 )
 from resume_agent.discovery.connectors.remoteok import RemoteOKConnector
 from resume_agent.discovery.scraper.linkedin import LinkedInScraper
@@ -214,8 +218,6 @@ def test_build_source_connectors_skips_adzuna_without_keys():
 
 
 def test_spec_table_is_the_single_enumeration():
-    from resume_agent.discovery.connectors.registry import CONNECTOR_SPECS
-
     kinds = [spec.kind for spec in CONNECTOR_SPECS]
     assert kinds == [
         "greenhouse",
@@ -238,3 +240,86 @@ def test_spec_table_is_the_single_enumeration():
         "linkedin",
     ]  # canonical dedup order
     assert len(set(kinds)) == len(kinds)
+
+
+def _sample_config() -> ConnectorsConfig:
+    return ConnectorsConfig.model_validate(
+        {
+            "greenhouse": {"enabled": True, "boards": [{"token": "acme"}]},
+            "lever": {"enabled": True, "boards": [{"token": "lev"}]},
+            "ashby": {"enabled": True, "boards": [{"token": "ash"}]},
+            "workday": {
+                "enabled": True,
+                "boards": [
+                    {"url": "https://acme.wd5.myworkdayjobs.com/External"}
+                ],
+            },
+            "companies": {
+                "enabled": True,
+                "urls": ["https://example.com/careers"],
+            },
+            "scrape": {
+                "enabled": True,
+                "targets": [{"url": "https://jobs.example.org/list"}],
+            },
+            "adzuna": {"enabled": True},
+            "remoteok": {"enabled": True},
+            "linkedin": {"enabled": True},
+        }
+    )
+
+
+def test_find_unit_round_trips_every_unit():
+    config = _sample_config()
+    seen = 0
+    for spec in CONNECTOR_SPECS:
+        for unit in spec.units(config):
+            found = find_unit(config, unit.source_id)
+            assert found is not None, unit.source_id
+            found_spec, payload = found
+            assert found_spec.kind == spec.kind
+            assert payload is unit.payload
+            seen += 1
+    assert seen >= 9
+
+
+def test_find_unit_unknown_id_returns_none():
+    assert find_unit(_sample_config(), "greenhouse:nope") is None
+
+
+def test_every_spec_addresses_a_section_with_enabled():
+    config = ConnectorsConfig()
+    for spec in CONNECTOR_SPECS:
+        assert hasattr(spec.section(config), "enabled"), spec.kind
+
+
+def test_new_unit_produces_addressable_units():
+    config = ConnectorsConfig()
+    cases = {
+        "greenhouse": (
+            AtsTarget(ats="greenhouse", token="acme"),
+            "https://job-boards.greenhouse.io/acme",
+        ),
+        "workday": (
+            AtsTarget(
+                ats="workday", tenant="acme", datacenter="wd5", site="Ext"
+            ),
+            "https://acme.wd5.myworkdayjobs.com/Ext",
+        ),
+        "companies": (AtsTarget(ats="companies"), "https://example.com/careers"),
+        "scrape": (None, "https://jobs.example.org/list"),
+    }
+    for kind, (target, url) in cases.items():
+        spec = spec_for(kind)
+        assert spec is not None and spec.new_unit is not None
+        assert spec.unit_items is not None
+        source_id, payload = spec.new_unit(target, url, "Label")
+        spec.unit_items(config).append(payload)
+        assert any(unit.source_id == source_id for unit in spec.units(config)), kind
+
+
+def test_token_kinds_admit_only_tokened_targets():
+    spec = spec_for("greenhouse")
+    assert spec is not None
+    assert spec.admits(AtsTarget(ats="greenhouse", token="acme"))
+    assert not spec.admits(AtsTarget(ats="greenhouse"))
