@@ -384,6 +384,18 @@ _FORMAT_INSTRUCTIONS = [
     "Invent nothing. Quotes must be copied from quoted user text in the notes.",
 ]
 
+_OPENING_FORMAT_INSTRUCTION = (
+    "This is the opening turn: copy every agenda item the coach proposed into "
+    "`topics`, each with its gap, why it matters, and any related reference. "
+    "An opening turn with no topics is invalid."
+)
+
+
+def _formatter_instructions(schema: type[CoachTurn]) -> list[str]:
+    if issubclass(schema, OpeningTurn):
+        return [*_FORMAT_INSTRUCTIONS, _OPENING_FORMAT_INSTRUCTION]
+    return _FORMAT_INSTRUCTIONS
+
 
 def build_coach_agent(tools) -> Runner:
     settings = get_settings()
@@ -407,7 +419,7 @@ def build_coach_formatter_agent(schema: type[CoachTurn]) -> Runner:
         Agent(
             model=model,
             description="Convert coach notes into one structured coach turn.",
-            instructions=_FORMAT_INSTRUCTIONS,
+            instructions=_formatter_instructions(schema),
             output_schema=schema,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

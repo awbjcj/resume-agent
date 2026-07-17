@@ -8,6 +8,8 @@ from resume_agent.profile.coach import (
     OpeningTurn,
     TopicUpdate,
     TurnRejected,
+    _FORMAT_INSTRUCTIONS,
+    _formatter_instructions,
     normalize_opening,
     normalize_recap,
     normalize_turn,
@@ -15,6 +17,16 @@ from resume_agent.profile.coach import (
     render_agenda,
     render_transcript,
 )
+
+
+def test_opening_formatter_instructions_require_agenda_topics():
+    # The opening turn carries its agenda in `topics`; if the formatter is not
+    # told to copy that field it emits an empty agenda and every opening turn
+    # dies with "opening turn proposed no topics".
+    opening = " ".join(_formatter_instructions(OpeningTurn)).lower()
+    assert "topics" in opening
+    # Ongoing turns have no agenda field, so their instructions stay untouched.
+    assert _formatter_instructions(CoachTurn) == _FORMAT_INSTRUCTIONS
 
 
 def _session(user_texts=("I cut deploy time from 40 min to 6 min.",), n_topics=2):
