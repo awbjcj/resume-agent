@@ -9,6 +9,8 @@ const saveNote = vi.fn();
 const discardNote = vi.fn();
 const coachState = vi.hoisted(() => ({ status: "active", recap: null as string | null }));
 
+vi.mock("@/components/TranscribeButton", () => ({ TranscribeButton: () => null }));
+
 vi.mock("./use-coach", () => ({
   useCoachSessions: () => ({
     data: {

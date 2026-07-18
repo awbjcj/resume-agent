@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
+import { TranscribeButton } from "@/components/TranscribeButton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -272,7 +273,7 @@ export function CoachPage() {
                   <Field>
                     <FieldLabel htmlFor="coach-composer">Message your profile coach</FieldLabel>
                     <Textarea id="coach-composer" rows={4} className="text-base leading-7" value={composer} placeholder="Share the situation, what you did, and what changed…" onChange={(event) => setComposer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void sendMessage(); } }} />
-                    <FieldDescription className="flex items-center justify-between gap-3"><span>Press Ctrl/⌘ + Enter to send.</span><Button aria-label="Send message" disabled={!composer.trim() || runState === "running" || send.isPending} onClick={() => void sendMessage()}>{runState === "running" ? <Spinner data-icon="inline-start" /> : <Send aria-hidden="true" />}Send</Button></FieldDescription>
+                    <FieldDescription className="flex items-center justify-between gap-3"><span>Press Ctrl/⌘ + Enter to send.</span><span className="flex items-center gap-2"><TranscribeButton disabled={runState === "running" || send.isPending} onText={(text) => setComposer((prev) => (prev ? `${prev} ${text}` : text))} /><Button aria-label="Send message" disabled={!composer.trim() || runState === "running" || send.isPending} onClick={() => void sendMessage()}>{runState === "running" ? <Spinner data-icon="inline-start" /> : <Send aria-hidden="true" />}Send</Button></span></FieldDescription>
                   </Field>
                 </div>
               ) : null}
