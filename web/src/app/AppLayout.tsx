@@ -30,6 +30,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { RunActions } from "@/features/runs/RunActions";
+import { ActiveInterviewBanner } from "@/features/interview/ActiveInterviewBanner";
 import { RunPanel } from "@/features/runs/RunPanel";
 import { useRehydrateRuns } from "@/features/runs/use-rehydrate-runs";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -150,6 +151,7 @@ export function AppLayout() {
           </div>
         </header>
         <RunPanel />
+        <ActiveInterviewBanner />
         <main className="flex-1 px-5 py-6 md:px-8 lg:px-10 2xl:px-12">
           <div className="mx-auto w-full max-w-[1680px]">
             <Outlet />
