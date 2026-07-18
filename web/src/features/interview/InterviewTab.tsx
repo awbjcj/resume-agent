@@ -59,14 +59,12 @@ export function InterviewTab({
             );
             return (
               <li key={row.sessionId} className="flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
-                {row.status === "ended" ? (
-                  <Link to={`/interview?session=${row.sessionId}`} className="min-w-0 flex-1 hover:underline">
-                    {meta}
-                  </Link>
-                ) : (
-                  <div className="min-w-0 flex-1">{meta}</div>
-                )}
-                {row.overallScore != null ? (
+                <Link to={`/interview?session=${row.sessionId}`} className="min-w-0 flex-1 hover:underline">
+                  {meta}
+                </Link>
+                {row.status !== "ended" ? (
+                  <Badge variant="outline">Resume</Badge>
+                ) : row.overallScore != null ? (
                   <Badge variant="secondary">{row.overallScore}/5</Badge>
                 ) : null}
               </li>

@@ -84,4 +84,34 @@ describe("InterviewTab", () => {
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "/interview?session=s1");
   });
+
+  it("links an in-progress session so it can be resumed", () => {
+    mocks.sessions.mockReturnValue({
+      data: {
+        sessions: [
+          {
+            sessionId: "s2",
+            jobId: 7,
+            company: "Acme",
+            title: "Engineer",
+            startedAt: "2026-07-18T00:00:00Z",
+            endedAt: null,
+            status: "active",
+            askedCount: 2,
+            questionCount: 4,
+            overallScore: null,
+          },
+        ],
+      },
+    });
+    render(
+      <MemoryRouter>
+        <InterviewTab jobId={7} versions={[version] as never} hasJd />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole("link");
+    expect(link).toHaveAttribute("href", "/interview?session=s2");
+    expect(screen.getByText("Resume")).toBeInTheDocument();
+    expect(screen.getByText(/In progress/i)).toBeInTheDocument();
+  });
 });
