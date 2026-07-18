@@ -45,6 +45,12 @@ export function MatchGapContainer() {
   const [selection, setSelection] = useState<SuggestionTarget[]>([]);
   const [openSkill, setOpenSkill] = useState<SkillRow | null>(null);
   const view = useMemo(() => (data ? deriveView(data, filters) : null), [data, filters]);
+  // Taxonomy edits target the whole constellation, so their pickers must not be
+  // narrowed by the active filters that shape the *displayed* map/outline.
+  const editView = useMemo(
+    () => (data ? deriveView(data, DEFAULT_FILTERS) : null),
+    [data],
+  );
   const persistedStateOf = useCallback(
     (kind: "skill" | "domain", key: string) => view?.persistedStateOf(kind, key),
     [view],
@@ -159,6 +165,7 @@ export function MatchGapContainer() {
                 <TabsContent value="map">
                   <SkillMap
                     categoryRows={view.categoryRows}
+                    editCategoryRows={editView?.categoryRows ?? view.categoryRows}
                     categories={data.categories}
                     stateOf={suggestionRuns.stateOf}
                     selected={selectedIds}

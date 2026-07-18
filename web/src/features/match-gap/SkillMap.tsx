@@ -41,6 +41,7 @@ const DEFAULT_WIDTH = 900;
 
 export function SkillMap({
   categoryRows,
+  editCategoryRows,
   categories,
   stateOf,
   selected,
@@ -48,12 +49,16 @@ export function SkillMap({
   onOpenSkill,
 }: {
   categoryRows: CategoryRow[];
+  // Full, unfiltered taxonomy used to populate edit-dialog target lists so that
+  // an active map/outline filter never hides a valid move/merge destination.
+  editCategoryRows?: CategoryRow[];
   categories: { slug: string; label: string; kind: "hard" | "soft" }[];
   stateOf: (kind: "skill" | "domain", key: string) => SuggestionState;
   selected: Set<string>;
   onToggleSelect: (target: SuggestionTarget) => void;
   onOpenSkill: (skill: SkillRow) => void;
 }) {
+  const editRows = editCategoryRows ?? categoryRows;
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomBehaviorRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(
@@ -117,7 +122,7 @@ export function SkillMap({
   const focusedCategory = activeView.level === "galaxy" ? null : categoryRows.find((category) => category.slug === (activeView.level === "category" ? activeView.slug : activeView.categorySlug)) ?? null;
   const focusedDomain = activeView.level === "domain" ? focusedCategory?.domains.find((domain) => domain.id === activeView.domainId) ?? null : null;
   const transformStyle = `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`;
-  const allSkills = categoryRows.flatMap((category) => category.domains.flatMap((domain) => domain.skills));
+  const allSkills = editRows.flatMap((category) => category.domains.flatMap((domain) => domain.skills));
 
   const applyZoom = (action: "in" | "out" | "reset") => {
     if (!svgRef.current || !zoomBehaviorRef.current) return;
@@ -267,7 +272,7 @@ export function SkillMap({
                 </div>
                 {ready && <span className="text-[10px] font-semibold text-ready">Ready</span>}
                 {node.kind !== "skill" && Boolean(node.gapCount) && <span className="text-[10px] text-muted-foreground">{node.gapCount} gaps</span>}
-                <TaxonomyNodeMenu node={node} categoryRows={categoryRows} onAction={(action) => action.type === "open-details" ? onOpenSkill(action.skill) : setMenuAction(action)} />
+                <TaxonomyNodeMenu node={node} categoryRows={editRows} onAction={(action) => action.type === "open-details" ? onOpenSkill(action.skill) : setMenuAction(action)} />
               </div>
             );
           })}
@@ -285,13 +290,13 @@ export function SkillMap({
         <span><i className="mr-1 inline-block size-2 rounded-full bg-covered" />Covered</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-ready" />Advice ready</span>
       </footer>
-      {menuAction?.type === "add-skill" && <AddSkillDialog categoryRows={categoryRows} categories={categories} open onOpenChange={(open) => !open && setMenuAction(null)} />}
-      {menuAction?.type === "move-skill" && <MoveSkillDialog skill={menuAction.skill} categoryRows={categoryRows} categories={categories} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "add-skill" && <AddSkillDialog categoryRows={editRows} categories={categories} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "move-skill" && <MoveSkillDialog skill={menuAction.skill} categoryRows={editRows} categories={categories} open onOpenChange={(open) => !open && setMenuAction(null)} />}
       {menuAction?.type === "merge-skill" && <MergeSkillDialog skill={menuAction.skill} allSkills={allSkills} open onOpenChange={(open) => !open && setMenuAction(null)} />}
       {menuAction?.type === "remove-skill" && <RemoveSkillDialog skill={menuAction.skill} open onOpenChange={(open) => !open && setMenuAction(null)} />}
       {menuAction?.type === "rename-domain" && <RenameDomainDialog domainId={menuAction.domainId} currentLabel={menuAction.label} open onOpenChange={(open) => !open && setMenuAction(null)} />}
       {menuAction?.type === "change-category" && <ChangeCategoryDialog domainId={menuAction.domainId} currentSlug={menuAction.categorySlug} categories={categories} open onOpenChange={(open) => !open && setMenuAction(null)} />}
-      {menuAction?.type === "merge-domain" && <MergeDomainDialog domainId={menuAction.domainId} categoryRows={categoryRows} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "merge-domain" && <MergeDomainDialog domainId={menuAction.domainId} categoryRows={editRows} open onOpenChange={(open) => !open && setMenuAction(null)} />}
     </section>
   );
 }
