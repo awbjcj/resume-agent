@@ -59,7 +59,7 @@ export function InterviewSetupDialog({
   const navigate = useNavigate();
   const start = useStartInterview();
   const newestVersionId = useMemo(
-    () => (versions.length ? versions[0].id : 0),
+    () => versions.reduce((newest, version) => Math.max(newest, version.id), 0),
     [versions],
   );
   const [stage, setStage] = useState("hiring_manager");
