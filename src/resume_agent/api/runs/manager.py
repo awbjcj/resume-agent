@@ -550,4 +550,8 @@ class RunManager:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # Microsecond resolution so back-to-back runs (e.g. a failed revise and its
+    # immediate retry) get distinct created_at/updated_at values; second
+    # resolution tied them and forced the rehydration order onto the random
+    # run id, which could surface a stale failed attempt over its completed retry.
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
