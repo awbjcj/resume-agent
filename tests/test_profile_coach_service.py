@@ -185,6 +185,32 @@ def test_approval_requires_quote_and_is_exactly_once_under_concurrency(tmp_path)
     assert len(load_manifest(profile_dir).docs) == 2
 
 
+def test_recap_without_user_input_ends_deterministically_and_skips_llm(tmp_path):
+    # Ending a session the user never answered has no evidence to recap. Asking
+    # the LLM to summarize an empty conversation yields an empty message that
+    # normalize_recap rejects ("empty message"), surfacing as a run error. A
+    # no-input session must close deterministically without touching the LLM.
+    sid = _open(tmp_path)["sessionId"]
+
+    class Boom:
+        def run(self, prompt):
+            raise AssertionError("LLM must not run for a no-input session recap")
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    view = run_recap_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        session_id=sid,
+        coach_agent=Boom(),
+        formatter_agent=Boom(),
+    )
+    assert view["status"] == "ended"
+    assert view["recap"]
+    assert view["turns"][-1]["kind"] == "recap"
+
+
 def test_discard_recap_and_late_approval(tmp_path):
     profile_dir, sid = _drafted_session(tmp_path)
     view = run_recap_turn(

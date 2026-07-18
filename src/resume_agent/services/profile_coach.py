@@ -36,6 +36,10 @@ from resume_agent.profile.snapshot import profile_snapshot, snapshot_diff
 from resume_agent.services.profile_build import run_corpus_build
 
 _MAX_MESSAGE_CHARS = 100_000
+_EMPTY_SESSION_RECAP = (
+    "You ended this session before discussing any topics, so there was nothing to "
+    "recap. Start a new session whenever you're ready to add evidence."
+)
 
 
 def _camel_action(action: dict) -> dict:
@@ -279,6 +283,14 @@ def run_recap_turn(
     session = load_session(root, session_id)
     if session["status"] != "active":
         raise ValueError("session ended")
+    # A session the user never answered has no evidence to recap; asking the LLM
+    # to summarize an empty conversation yields an empty message that
+    # normalize_recap rejects ("empty message"). Close it deterministically.
+    if not any(turn["role"] == "user" for turn in session["turns"]):
+        reporter.begin(1, "Closing your session")
+        end_session(root, session_id, _EMPTY_SESSION_RECAP)
+        reporter.step(1)
+        return session_view(root, session_id)
     reporter.begin(1, "Writing your recap")
     coach, formatter = _agents(root, coach_agent, formatter_agent, CoachTurn)
     pending = [draft["title"] for draft in session["draft_notes"] if draft["status"] == "pending"]
