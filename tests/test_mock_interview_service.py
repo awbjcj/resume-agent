@@ -1,6 +1,7 @@
 """Scripted mock interviews through the service layer with fake runners."""
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -26,11 +27,14 @@ _ids: tuple[int, int] = (0, 0)
 
 
 class FakeRunner:
-    def __init__(self, outputs):
+    def __init__(self, outputs: list[Any]) -> None:
         self._outputs = list(outputs)
 
-    def run(self, prompt):
+    def run(self, prompt: str) -> Any:
         return SimpleNamespace(content=self._outputs.pop(0))
+
+    async def arun(self, prompt: str) -> Any:
+        return self.run(prompt)
 
 
 class FakeReporter:
@@ -50,10 +54,12 @@ def engine(tmp_path):
         db.add(job)
         db.commit()
         db.refresh(job)
+        assert job.id is not None
         version = ResumeVersion(job_id=job.id, content_json={"summary": "Builder"})
         db.add(version)
         db.commit()
         db.refresh(version)
+        assert version.id is not None
         globals()["_ids"] = (job.id, version.id)
     return engine
 
