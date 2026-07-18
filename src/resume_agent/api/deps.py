@@ -56,6 +56,12 @@ def get_profile_dir(request: Request):
     )
 
 
+def get_interview_dir(request: Request):
+    paths = get_workspace_paths(request)
+    root = paths.root if paths is not None else request.app.state.data_dir
+    return root / "interview"
+
+
 def get_env_path(request: Request):
     paths = get_workspace_paths(request)
     return paths.secrets_env if paths is not None else request.app.state.env_path
