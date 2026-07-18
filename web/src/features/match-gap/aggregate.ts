@@ -5,7 +5,7 @@ type JobLite = Payload["jobs"][number];
 type SuggestionKind = "skill" | "domain";
 
 export const SOURCE_WEIGHT = { must: 3, nice: 2, tech: 1 } as const;
-export const UNASSIGNED_ID = "__undomaind__";
+export const UNASSIGNED_ID = "__unassigned__";
 
 export interface Filters {
   q: string;

@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { CategoryRow, SkillRow } from "../aggregate";
+import { UNASSIGNED_ID, type CategoryRow, type SkillRow } from "../aggregate";
 import type { MapNode } from "../skill-map-layout";
 
 export type TaxonomyMenuAction =
@@ -30,6 +30,9 @@ export function TaxonomyNodeMenu({
   onAction: (action: TaxonomyMenuAction) => void;
 }) {
   if (node.kind === "category") return null;
+  // The synthetic "Unassigned" domain has no persisted id; domain edits on it
+  // would 404. Its skill leaves remain editable.
+  if (node.kind === "domain" && node.entityKey === UNASSIGNED_ID) return null;
   const categorySlug =
     categoryRows.find((category) =>
       category.domains.some((domain) => domain.id === node.entityKey),

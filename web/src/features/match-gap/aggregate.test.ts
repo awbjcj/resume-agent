@@ -5,6 +5,7 @@ import {
   deriveView,
   sortSkillsWithin,
   targetId,
+  UNASSIGNED_ID,
   type Filters,
   type SkillRow,
 } from "./aggregate";
@@ -160,7 +161,7 @@ describe("deriveView", () => {
     );
     expect(
       view.categoryRows.find((category) => category.slug === "other")?.domains[0].id,
-    ).toBe("__undomaind__");
+    ).toBe(UNASSIGNED_ID);
   });
 
   it("does not count or filter adjacent skills as true gaps", () => {

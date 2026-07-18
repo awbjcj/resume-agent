@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CategoryRow } from "../aggregate";
+import { UNASSIGNED_ID, type CategoryRow } from "../aggregate";
 import { useMergeDomains } from "../use-taxonomy";
 export function MergeDomainDialog({
   domainId,
@@ -33,10 +33,11 @@ export function MergeDomainDialog({
 }) {
   const [into, setInto] = useState("");
   const mutation = useMergeDomains();
+  // Exclude the source domain and the render-only "Unassigned" pseudo-domain,
+  // which has no persisted id and would 404 as a merge target.
+  const isTargetable = (id: string) => id !== domainId && id !== UNASSIGNED_ID;
   const items = categoryRows.flatMap((category) =>
-    category.domains
-      .filter((domain) => domain.id !== domainId)
-      .map((domain) => domain.id),
+    category.domains.filter((domain) => isTargetable(domain.id)).map((domain) => domain.id),
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,7 +63,7 @@ export function MergeDomainDialog({
                 <SelectGroup key={category.slug}>
                   <SelectLabel>{category.label}</SelectLabel>
                   {category.domains
-                    .filter((domain) => domain.id !== domainId)
+                    .filter((domain) => isTargetable(domain.id))
                     .map((domain) => (
                       <SelectItem key={domain.id} value={domain.id}>
                         {domain.label}

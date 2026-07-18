@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CategoryRow } from "../aggregate";
+import { UNASSIGNED_ID, type CategoryRow } from "../aggregate";
 import type { NewDomainInput } from "../use-taxonomy";
 
 type Category = { slug: string; label: string; kind: "hard" | "soft" };
@@ -30,7 +30,15 @@ export function DomainPicker({
   onDomainIdChange: (value: string) => void;
   onNewDomainChange: (value: NewDomainInput | null) => void;
 }) {
-  const domainItems = categoryRows.flatMap((category) =>
+  // The synthetic "Unassigned" domain is render-only and has no persisted id,
+  // so it must never be offered as a move/add target.
+  const pickableCategories = categoryRows
+    .map((category) => ({
+      ...category,
+      domains: category.domains.filter((domain) => domain.id !== UNASSIGNED_ID),
+    }))
+    .filter((category) => category.domains.length > 0);
+  const domainItems = pickableCategories.flatMap((category) =>
     category.domains.map((domain) => ({ label: domain.label, value: domain.id })),
   );
   const categoryItems = categories.map((category) => ({
@@ -53,7 +61,7 @@ export function DomainPicker({
               </SelectValue>
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false}>
-              {categoryRows.map((category) => (
+              {pickableCategories.map((category) => (
                 <SelectGroup key={category.slug}>
                   <SelectLabel>{category.label}</SelectLabel>
                   {category.domains.map((domain) => (
