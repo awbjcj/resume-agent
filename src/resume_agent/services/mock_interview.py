@@ -34,6 +34,20 @@ from resume_agent.llm_runner import Runner
 
 _MAX_MESSAGE_CHARS = 100_000
 
+# The interviewer writes free-form notes that a cheap formatter then projects into
+# the OpeningInterview schema. The formatter is told to invent nothing, so the plan
+# only survives if these notes spell it out explicitly — otherwise normalize_opening
+# rejects the turn with "opening turn proposed no plan". Force an enumerable plan block.
+_OPENING_INSTRUCTION = (
+    "First design an interview PLAN of up to {count} questions mapping the job's key "
+    "competencies to question types (behavioral, role_specific, system_design, and the "
+    "like). Write the plan as an explicit numbered list, one item per line, formatted as "
+    "`competency | question_type`. Then greet the candidate in character and ask only the "
+    "first question. Format your notes exactly as:\n"
+    "PLAN:\n1. <competency> | <question_type>\n2. ...\n\n"
+    "OPENING:\n<your in-character greeting and first question>"
+)
+
 
 def load_context(engine, job_id: int, resume_version_id: int) -> InterviewContext:
     from resume_agent.db import get_session
@@ -206,9 +220,7 @@ def run_opening_turn(
     prompt = "\n\n".join(
         [
             render_context(preview),
-            f"Plan up to {parsed_style.question_count} questions mapping the job's key "
-            "competencies to question types, then greet the candidate in character and "
-            "ask the first question.",
+            _OPENING_INSTRUCTION.format(count=parsed_style.question_count),
         ]
     )
     notes = interviewer.run(prompt).content

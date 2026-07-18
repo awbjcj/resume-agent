@@ -158,6 +158,41 @@ def test_formatter_retry_then_fail(tmp_path, engine):
     assert len(session_view(tmp_path, sid)["turns"]) == 1
 
 
+def test_opening_prompt_forces_extractable_plan(tmp_path, engine):
+    """Regression: the interviewer prompt must demand an explicit plan block.
+
+    The formatter is told to invent nothing, so without an enumerable plan in the
+    interviewer's notes it returns ``plan=[]`` and ``normalize_opening`` rejects the
+    turn with "opening turn proposed no plan" (the mock-interview-open run then errors
+    with no session created).
+    """
+    job_id, version_id = _ids
+    seen: list[str] = []
+
+    class RecordingRunner(FakeRunner):
+        def run(self, prompt: str) -> Any:
+            seen.append(prompt)
+            return super().run(prompt)
+
+    opening = OpeningInterview(
+        message="Welcome.",
+        plan=[NewPlanItem(competency="Python", question_type="role_specific")],
+    )
+    run_opening_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        engine=engine,
+        job_id=job_id,
+        resume_version_id=version_id,
+        style=_style(),
+        interviewer_agent=RecordingRunner(["notes"]),
+        formatter_agent=FakeRunner([opening]),
+    )
+    interviewer_prompt = seen[0]
+    assert "PLAN:" in interviewer_prompt
+    assert "competency | question_type" in interviewer_prompt
+
+
 def test_load_context_guards(engine):
     job_id, version_id = _ids
     with pytest.raises(ValueError, match="unknown job"):
