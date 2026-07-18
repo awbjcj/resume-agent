@@ -141,6 +141,8 @@ def send_answer(
         raise _value_error(exc) from exc
     if view["status"] != "active":
         raise ApiException(409, "CONFLICT", "session ended")
+    if view["concluded"]:
+        raise ApiException(409, "CONFLICT", "interview concluded; end the session for your debrief")
     return _submit(
         manager,
         "mock-interview-turn",

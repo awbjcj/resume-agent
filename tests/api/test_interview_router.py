@@ -1,8 +1,11 @@
 """Interview router: guards, singleton semantics, lifecycle, views."""
 
 import time
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
@@ -29,11 +32,14 @@ from resume_agent.tracking.tables import Job, ResumeVersion
 
 
 class FakeRunner:
-    def __init__(self, outputs):
+    def __init__(self, outputs: list[Any]) -> None:
         self._outputs = list(outputs)
 
-    def run(self, prompt):
+    def run(self, prompt: str) -> Any:
         return SimpleNamespace(content=self._outputs.pop(0))
+
+    async def arun(self, prompt: str) -> Any:
+        return self.run(prompt)
 
 
 def _client(tmp_path):
@@ -50,14 +56,20 @@ def _client(tmp_path):
     )
 
 
-def _seed(client, *, jd_text="Ship Python services", version_job=None):
+def _seed(
+    client: TestClient,
+    *,
+    jd_text: str = "Ship Python services",
+    version_job: int | None = None,
+) -> tuple[int, int]:
     """Insert a Job (+ ResumeVersion) via the app engine. Returns (job_id, version_id)."""
-    engine = client.app.state.engine
+    engine = cast(FastAPI, client.app).state.engine
     with get_session(engine) as db:
         job = Job(source="manual", company="Acme", title="Engineer", jd_text=jd_text)
         db.add(job)
         db.commit()
         db.refresh(job)
+        assert job.id is not None
         version = ResumeVersion(
             job_id=version_job if version_job is not None else job.id,
             content_json={"summary": "Builder"},
@@ -65,6 +77,7 @@ def _seed(client, *, jd_text="Ship Python services", version_job=None):
         db.add(version)
         db.commit()
         db.refresh(version)
+        assert version.id is not None
         return job.id, version.id
 
 
@@ -171,6 +184,12 @@ def test_full_lifecycle_and_singleton(monkeypatch, tmp_path):
         assert message.status_code == 202
         _wait(client, message.json()["runId"])
 
+        # the faked interviewer concluded; further answers are rejected up front
+        concluded = client.post(
+            f"/api/interview/sessions/{session_id}/messages", json={"message": "more"}
+        )
+        assert concluded.status_code == 409
+
         end = client.post(f"/api/interview/sessions/{session_id}/end", json={})
         assert end.status_code == 202
         _wait(client, end.json()["runId"])
@@ -189,7 +208,7 @@ def test_full_lifecycle_and_singleton(monkeypatch, tmp_path):
         assert listing["sessions"][0]["sessionId"] == session_id
 
 
-def _write_ended_session(interview_dir, job_id, session_id="ended01"):
+def _write_ended_session(interview_dir: Path, job_id: int, session_id: str = "ended01") -> str:
     create_session(
         interview_dir,
         session_id,
@@ -207,12 +226,13 @@ def _write_ended_session(interview_dir, job_id, session_id="ended01"):
 def test_job_delete_removes_interview_sessions(tmp_path):
     client = _client(tmp_path)
     with client:
-        engine = client.app.state.engine
+        engine = cast(FastAPI, client.app).state.engine
         with get_session(engine) as db:
             job = Job(source="manual", company="Acme", title="Engineer", jd_text="Build")
             db.add(job)
             db.commit()
             db.refresh(job)
+            assert job.id is not None
             job_id = job.id
         interview_dir = tmp_path / "data" / "interview"
         session_id = _write_ended_session(interview_dir, job_id)
