@@ -731,6 +731,20 @@
         "title": "Body_launch_import_urls_api_jobs_import_urls_post",
         "type": "object"
       },
+      "Body_transcribe_audio_api_transcribe_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_transcribe_audio_api_transcribe_post",
+        "type": "object"
+      },
       "Body_upload_document_api_profile_documents_post": {
         "properties": {
           "docType": {
@@ -1763,6 +1777,343 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InterviewDebriefOut": {
+        "properties": {
+          "improvements": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Improvements",
+            "type": "array"
+          },
+          "questionReviews": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionReviewOut"
+            },
+            "title": "Questionreviews",
+            "type": "array"
+          },
+          "starNotes": {
+            "default": "",
+            "title": "Starnotes",
+            "type": "string"
+          },
+          "strengths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Strengths",
+            "type": "array"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "title": "InterviewDebriefOut",
+        "type": "object"
+      },
+      "InterviewMessageIn": {
+        "properties": {
+          "message": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "InterviewMessageIn",
+        "type": "object"
+      },
+      "InterviewProgressOut": {
+        "properties": {
+          "asked": {
+            "default": 0,
+            "title": "Asked",
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "InterviewProgressOut",
+        "type": "object"
+      },
+      "InterviewSessionOut": {
+        "properties": {
+          "company": {
+            "default": "",
+            "title": "Company",
+            "type": "string"
+          },
+          "concluded": {
+            "default": false,
+            "title": "Concluded",
+            "type": "boolean"
+          },
+          "debrief": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterviewDebriefOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PlanItemOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/InterviewProgressOut"
+          },
+          "resumeVersionId": {
+            "title": "Resumeversionid",
+            "type": "integer"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "startedAt": {
+            "title": "Startedat",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "style": {
+            "$ref": "#/components/schemas/InterviewStyleIn"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewTurnOut"
+            },
+            "title": "Turns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessionId",
+          "jobId",
+          "resumeVersionId",
+          "startedAt",
+          "status",
+          "style",
+          "progress"
+        ],
+        "title": "InterviewSessionOut",
+        "type": "object"
+      },
+      "InterviewSessionSummaryOut": {
+        "properties": {
+          "askedCount": {
+            "default": 0,
+            "title": "Askedcount",
+            "type": "integer"
+          },
+          "company": {
+            "default": "",
+            "title": "Company",
+            "type": "string"
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "overallScore": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overallscore"
+          },
+          "questionCount": {
+            "default": 0,
+            "title": "Questioncount",
+            "type": "integer"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "startedAt": {
+            "title": "Startedat",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "jobId",
+          "startedAt",
+          "status"
+        ],
+        "title": "InterviewSessionSummaryOut",
+        "type": "object"
+      },
+      "InterviewSessionsOut": {
+        "properties": {
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewSessionSummaryOut"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "title": "InterviewSessionsOut",
+        "type": "object"
+      },
+      "InterviewStartIn": {
+        "properties": {
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "resumeVersionId": {
+            "title": "Resumeversionid",
+            "type": "integer"
+          },
+          "style": {
+            "$ref": "#/components/schemas/InterviewStyleIn"
+          }
+        },
+        "required": [
+          "jobId",
+          "resumeVersionId"
+        ],
+        "title": "InterviewStartIn",
+        "type": "object"
+      },
+      "InterviewStyleIn": {
+        "properties": {
+          "demeanor": {
+            "default": "neutral",
+            "title": "Demeanor",
+            "type": "string"
+          },
+          "difficulty": {
+            "default": "standard",
+            "title": "Difficulty",
+            "type": "string"
+          },
+          "extra": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Extra",
+            "type": "string"
+          },
+          "questionCount": {
+            "default": 8,
+            "maximum": 12.0,
+            "minimum": 4.0,
+            "title": "Questioncount",
+            "type": "integer"
+          },
+          "stage": {
+            "default": "hiring_manager",
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "title": "InterviewStyleIn",
+        "type": "object"
+      },
+      "InterviewTurnOut": {
+        "properties": {
+          "at": {
+            "default": "",
+            "title": "At",
+            "type": "string"
+          },
+          "isFollowup": {
+            "default": false,
+            "title": "Isfollowup",
+            "type": "boolean"
+          },
+          "questionId": {
+            "default": "",
+            "title": "Questionid",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ],
+        "title": "InterviewTurnOut",
         "type": "object"
       },
       "InviteInfo": {
@@ -3056,6 +3407,34 @@
         "title": "PipelineItem",
         "type": "object"
       },
+      "PlanItemOut": {
+        "properties": {
+          "competency": {
+            "default": "",
+            "title": "Competency",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "questionType": {
+            "default": "",
+            "title": "Questiontype",
+            "type": "string"
+          },
+          "status": {
+            "default": "pending",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "PlanItemOut",
+        "type": "object"
+      },
       "ProfileConfigDoc": {
         "properties": {
           "githubRepoAllow": {
@@ -3318,6 +3697,48 @@
           }
         },
         "title": "PullParams",
+        "type": "object"
+      },
+      "QuestionReviewOut": {
+        "properties": {
+          "improvements": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Improvements",
+            "type": "array"
+          },
+          "question": {
+            "default": "",
+            "title": "Question",
+            "type": "string"
+          },
+          "questionId": {
+            "title": "Questionid",
+            "type": "string"
+          },
+          "score": {
+            "default": 0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "strengths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Strengths",
+            "type": "array"
+          },
+          "suggestedAnswer": {
+            "default": "",
+            "title": "Suggestedanswer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "questionId"
+        ],
+        "title": "QuestionReviewOut",
         "type": "object"
       },
       "RefreshParams": {
@@ -5338,6 +5759,32 @@
           "tokens"
         ],
         "title": "TokenList",
+        "type": "object"
+      },
+      "TranscribeAvailabilityOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "TranscribeAvailabilityOut",
+        "type": "object"
+      },
+      "TranscribeOut": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "TranscribeOut",
         "type": "object"
       },
       "TriageItem": {
@@ -8151,6 +8598,297 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/interview/sessions": {
+      "get": {
+        "operationId": "list_interview_sessions_api_interview_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "jobId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jobid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Interview Sessions"
+      },
+      "post": {
+        "operationId": "start_interview_api_interview_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Interview"
+      }
+    },
+    "/api/interview/sessions/{session_id}": {
+      "get": {
+        "operationId": "get_interview_session_api_interview_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Interview Session"
+      }
+    },
+    "/api/interview/sessions/{session_id}/end": {
+      "post": {
+        "operationId": "end_interview_api_interview_sessions__session_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Interview"
+      }
+    },
+    "/api/interview/sessions/{session_id}/messages": {
+      "post": {
+        "operationId": "send_answer_api_interview_sessions__session_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Answer"
       }
     },
     "/api/jobs": {
@@ -12650,6 +13388,108 @@
           }
         },
         "summary": "Launch Tailor"
+      }
+    },
+    "/api/transcribe": {
+      "post": {
+        "operationId": "transcribe_audio_api_transcribe_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_transcribe_audio_api_transcribe_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscribeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Transcribe Audio"
+      }
+    },
+    "/api/transcribe/availability": {
+      "get": {
+        "operationId": "transcribe_availability_api_transcribe_availability_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscribeAvailabilityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Transcribe Availability"
       }
     },
     "/api/triage": {
