@@ -10,6 +10,7 @@ from resume_agent.tracking.tables import Job, JobStatus
 
 if TYPE_CHECKING:
     from resume_agent.taxonomy.clusters import ClusterMap
+    from resume_agent.taxonomy.corrections import TaxonomyCorrections
 
 _PUNCT = re.compile(r"[^a-z0-9+#. ]+")
 _WS = re.compile(r"\s+")
@@ -69,7 +70,7 @@ class DemandEdge:
 @dataclass
 class SkillNode:
     skill: str
-    theme_id: str | None
+    domain_id: str | None
     covered: bool
     key: str = ""
     members: dict[str, int] = field(default_factory=dict)
@@ -88,7 +89,7 @@ class SkillNode:
 
 
 @dataclass
-class ThemeNode:
+class DomainNode:
     id: str
     label: str
     essential_score: int = 0
@@ -97,6 +98,14 @@ class ThemeNode:
     skill_count: int = 0
     gap_count: int = 0
     adjacent_count: int = 0
+    category: str = "other"
+
+
+@dataclass
+class CategoryNode:
+    slug: str
+    label: str
+    kind: Literal["hard", "soft"]
 
 
 @dataclass
@@ -106,7 +115,8 @@ class DemandGraph:
     jobs: list[JobLite]
     skills: list[SkillNode]
     edges: list[DemandEdge]
-    themes: list[ThemeNode]
+    domains: list[DomainNode]
+    categories: list[CategoryNode] = field(default_factory=list)
 
 
 @dataclass
@@ -184,16 +194,28 @@ def build_demand_graph(
     session: Session,
     facts: ProfileFacts,
     cluster_map: "ClusterMap | None" = None,
+    *,
+    corrections: "TaxonomyCorrections | None" = None,
 ) -> DemandGraph:
     """Build normalized target-job skill demand for dashboard consumers."""
+    from resume_agent.taxonomy.corrections import (
+        TaxonomyCorrections,
+        added_canonical_tokens,
+        removed_canonical_tokens,
+    )
+    from resume_agent.taxonomy.vocabulary import SKILL_GROUPS, category_kind
+
+    corrections = corrections or TaxonomyCorrections()
     target_jobs = _target_jobs(session)
     profile_tokens = profile_skill_tokens(facts)
     aliases = cluster_map.aliases if cluster_map else {}
-    theme_of = cluster_map.theme_of if cluster_map else {}
-    theme_label = cluster_map.theme_label if cluster_map else {}
+    domain_of = cluster_map.domain_of if cluster_map else {}
+    domain_label = cluster_map.domain_label if cluster_map else {}
+    category_of = cluster_map.category_of if cluster_map else {}
+    removed = removed_canonical_tokens(corrections, aliases)
     profile_canonical = {aliases.get(token, token) for token in profile_tokens}
     covered_themes = {
-        theme_of[token] for token in profile_canonical if token in theme_of
+        domain_of[token] for token in profile_canonical if token in domain_of
     }
     jobs: list[JobLite] = []
     accumulators: dict[str, _SkillAccumulator] = {}
@@ -217,7 +239,7 @@ def build_demand_graph(
             for raw_skill in _criteria_skill_values(job, key):
                 token = normalize_skill(raw_skill)
                 canonical = aliases.get(token, token)
-                if not canonical:
+                if not canonical or canonical in removed:
                     continue
                 phrasing = raw_skill.strip()
                 accumulator = accumulators.setdefault(canonical, _SkillAccumulator())
@@ -227,6 +249,8 @@ def build_demand_graph(
                 edge_keys.add((job.id, canonical, source))
 
     display_by_key: dict[str, str] = {}
+    for canonical in sorted(added_canonical_tokens(corrections, aliases) - removed):
+        accumulators.setdefault(canonical, _SkillAccumulator())
     skill_nodes: list[SkillNode] = []
     for canonical, accumulator in sorted(accumulators.items()):
         members = {
@@ -235,21 +259,25 @@ def build_demand_graph(
                 accumulator.member_jobs.items(), key=lambda item: (item[0].casefold(), item[0])
             )
         }
-        display = min(
-            members,
-            key=lambda phrasing: (-members[phrasing], phrasing.casefold(), phrasing),
+        display = (
+            min(
+                members,
+                key=lambda phrasing: (-members[phrasing], phrasing.casefold(), phrasing),
+            )
+            if members
+            else canonical
         )
         display_by_key[canonical] = display
         if canonical in profile_canonical:
             coverage: Literal["covered", "adjacent", "gap"] = "covered"
-        elif theme_of.get(canonical) in covered_themes:
+        elif domain_of.get(canonical) in covered_themes:
             coverage = "adjacent"
         else:
             coverage = "gap"
         skill_nodes.append(
             SkillNode(
                 skill=display,
-                theme_id=theme_of.get(canonical),
+                domain_id=domain_of.get(canonical),
                 covered=coverage == "covered",
                 key=canonical,
                 members=members,
@@ -275,34 +303,42 @@ def build_demand_graph(
         )
     ]
 
-    nodes_by_theme: dict[str, list[SkillNode]] = {}
+    nodes_by_domain: dict[str, list[SkillNode]] = {}
     for node in skill_nodes:
-        if node.theme_id is not None:
-            nodes_by_theme.setdefault(node.theme_id, []).append(node)
-    themes = [
-        ThemeNode(
-            id=theme_id,
-            label=theme_label.get(theme_id, theme_id),
+        if node.domain_id is not None:
+            nodes_by_domain.setdefault(node.domain_id, []).append(node)
+    domains = [
+        DomainNode(
+            id=domain_id,
+            label=domain_label.get(domain_id, domain_id),
             essential_score=sum(
-                node.must * 3 + node.nice * 2 + node.tech for node in theme_nodes
+                node.must * 3 + node.nice * 2 + node.tech for node in domain_nodes
             ),
-            popular_score=sum(node.job_count for node in theme_nodes),
+            popular_score=sum(node.job_count for node in domain_nodes),
             job_count=len(
-                set().union(*(accumulators[node.key].job_ids for node in theme_nodes))
+                set().union(
+                    set(), *(accumulators[node.key].job_ids for node in domain_nodes)
+                )
             ),
-            skill_count=len(theme_nodes),
-            gap_count=sum(node.coverage == "gap" for node in theme_nodes),
-            adjacent_count=sum(node.coverage == "adjacent" for node in theme_nodes),
+            skill_count=len(domain_nodes),
+            gap_count=sum(node.coverage == "gap" for node in domain_nodes),
+            adjacent_count=sum(node.coverage == "adjacent" for node in domain_nodes),
+            category=category_of.get(domain_id, "other"),
         )
-        for theme_id, theme_nodes in sorted(nodes_by_theme.items())
+        for domain_id, domain_nodes in sorted(nodes_by_domain.items())
+    ]
+    categories = [
+        CategoryNode(slug=slug, label=label, kind=category_kind(slug))
+        for slug, label in SKILL_GROUPS.items()
     ]
     return DemandGraph(
         target_total=len(jobs),
-        clusters_stale=any(node.theme_id is None for node in skill_nodes),
+        clusters_stale=any(node.domain_id is None for node in skill_nodes),
         jobs=jobs,
         skills=skill_nodes,
         edges=edges,
-        themes=themes,
+        domains=domains,
+        categories=categories,
     )
 
 
@@ -344,9 +380,9 @@ def match_gap(
     profile_canonical = {canonical.get(token, token) for token in profile_tokens}
     covered_themes = (
         {
-            cluster_map.theme_of[token]
+            cluster_map.domain_of[token]
             for token in profile_canonical
-            if token in cluster_map.theme_of
+            if token in cluster_map.domain_of
         }
         if cluster_map is not None
         else set()
@@ -377,7 +413,7 @@ def match_gap(
             target_total=target_total,
             adjacent=(
                 cluster_map is not None
-                and cluster_map.theme_of.get(token) in covered_themes
+                and cluster_map.domain_of.get(token) in covered_themes
             ),
         )
         for token, count in demand.items()

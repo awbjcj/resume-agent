@@ -18,6 +18,11 @@ from resume_agent.services.suggestions import (
 )
 from resume_agent.suggestions.agents import build_formatter_agent, build_search_agent
 from resume_agent.taxonomy.clusters import load_cluster_map
+from resume_agent.taxonomy.corrections import (
+    apply_taxonomy_corrections,
+    corrections_file_path,
+    load_taxonomy_corrections,
+)
 from resume_agent.tracking.match_gap import DemandGraph, build_demand_graph
 from resume_agent.tenancy.paths import resolve_tenant_path
 
@@ -34,10 +39,17 @@ def load_suggestion_graph(
         if resolved_facts.exists()
         else ProfileFacts(contact=Contact(name=""))
     )
+    corrections = load_taxonomy_corrections(
+        resolve_tenant_path(corrections_file_path())
+    )
     graph = build_demand_graph(
         session,
         facts,
-        cluster_map=load_cluster_map(cluster_path),
+        cluster_map=apply_taxonomy_corrections(
+            load_cluster_map(cluster_path),
+            corrections,
+        ),
+        corrections=corrections,
     )
     return facts, graph
 

@@ -6,7 +6,7 @@ import type { components } from "@/lib/api/schema";
 import { useRunStore } from "@/lib/runs/store";
 
 export type SuggestionEnvelope = components["schemas"]["SuggestionEnvelope"];
-export type SuggestionKind = "skill" | "theme";
+export type SuggestionKind = "skill" | "domain";
 
 export function suggestionQueryKey(kind: SuggestionKind, key: string): string {
   return `suggestion:${kind}:${key}`;

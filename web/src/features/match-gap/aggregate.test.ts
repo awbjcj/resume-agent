@@ -22,6 +22,11 @@ const base: Filters = {
 const payload: Payload = {
   targetTotal: 2,
   clustersStale: false,
+  categories: [
+    { slug: "cloud-infrastructure", label: "Cloud & Infrastructure", kind: "hard" },
+    { slug: "programming-languages", label: "Programming Languages", kind: "hard" },
+    { slug: "other", label: "Other", kind: "soft" },
+  ],
   jobs: [
     { id: 1, company: "Stripe", title: "Backend", seniority: "senior" },
     { id: 2, company: "Datadog", title: "Platform", seniority: "mid" },
@@ -30,7 +35,7 @@ const payload: Payload = {
     {
       key: "kubernetes",
       skill: "Kubernetes",
-      themeId: "infra",
+      domainId: "infra",
       covered: false,
       coverage: "gap",
       members: { Kubernetes: 2, K8s: 1 },
@@ -42,7 +47,7 @@ const payload: Payload = {
     {
       key: "python",
       skill: "Python",
-      themeId: "language",
+      domainId: "language",
       covered: true,
       coverage: "covered",
       members: { Python: 1 },
@@ -57,10 +62,11 @@ const payload: Payload = {
     { jobId: 2, skillKey: "kubernetes", skill: "Kubernetes", source: "tech" },
     { jobId: 1, skillKey: "python", skill: "Python", source: "must" },
   ],
-  themes: [
+  domains: [
     {
       id: "infra",
       label: "Cloud / Infrastructure",
+      category: "cloud-infrastructure",
       essentialScore: 4,
       popularScore: 2,
       jobCount: 2,
@@ -71,6 +77,7 @@ const payload: Payload = {
     {
       id: "language",
       label: "Languages",
+      category: "programming-languages",
       essentialScore: 3,
       popularScore: 1,
       jobCount: 1,
@@ -99,20 +106,61 @@ describe("deriveView", () => {
     expect(view.persistedStateOf("skill", "kubernetes")).toBe("ready");
   });
 
-  it("recomputes theme scores and matching jobs after filtering", () => {
+  it("recomputes domain scores and matching jobs after filtering", () => {
     const view = deriveView(payload, { ...base, company: "Datadog" });
 
     expect(view.filteredJobCount).toBe(1);
-    expect(view.themeRows).toEqual([
+    expect(view.domainRows).toEqual([
       expect.objectContaining({ id: "infra", score: 1, jobCount: 1, gapCount: 1 }),
     ]);
   });
 
-  it("recomputes themes after gaps-only removes covered skills", () => {
+  it("recomputes domains after gaps-only removes covered skills", () => {
     const view = deriveView(payload, { ...base, gapsOnly: true });
 
     expect(view.skills.map((skill) => skill.key)).toEqual(["kubernetes"]);
-    expect(view.themeRows.map((theme) => theme.id)).toEqual(["infra"]);
+    expect(view.domainRows.map((domain) => domain.id)).toEqual(["infra"]);
+  });
+
+  it("groups domains under payload categories in authored order", () => {
+    const view = deriveView(payload, base);
+
+    expect(view.categoryRows.map((category) => category.slug)).toEqual([
+      "cloud-infrastructure",
+      "programming-languages",
+    ]);
+    expect(view.categoryRows[0]).toEqual(
+      expect.objectContaining({ kind: "hard", gapCount: 1 }),
+    );
+  });
+
+  it("keeps zero-count added skills visible under other when unassigned", () => {
+    const added: Payload = {
+      ...payload,
+      skills: [
+        ...payload.skills,
+        {
+          key: "graphql",
+          skill: "GraphQL",
+          domainId: null,
+          covered: false,
+          coverage: "gap",
+          members: {},
+          must: 0,
+          nice: 0,
+          tech: 0,
+          jobCount: 0,
+        },
+      ],
+    };
+    const view = deriveView(added, base);
+
+    expect(view.skills).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: "graphql", jobCount: 0 })]),
+    );
+    expect(
+      view.categoryRows.find((category) => category.slug === "other")?.domains[0].id,
+    ).toBe("__undomaind__");
   });
 
   it("does not count or filter adjacent skills as true gaps", () => {
@@ -130,7 +178,7 @@ describe("deriveView", () => {
     expect(all.skills.find((skill) => skill.key === "kubernetes")?.coverage).toBe(
       "adjacent",
     );
-    expect(all.themeRows.find((theme) => theme.id === "infra")).toEqual(
+    expect(all.domainRows.find((domain) => domain.id === "infra")).toEqual(
       expect.objectContaining({ gapCount: 0, adjacentCount: 1 }),
     );
     expect(gapsOnly.skills).toEqual([]);
@@ -148,7 +196,7 @@ describe("deriveView", () => {
 const row = (key: string, score: number): SkillRow => ({
   key,
   skill: key.toUpperCase(),
-  themeId: "theme",
+  domainId: "domain",
   covered: false,
   coverage: "gap",
   score,
@@ -173,6 +221,6 @@ it("floats only ready skills above demand order", () => {
 
 it("encodes typed target identity without delimiter collisions", () => {
   expect(targetId({ kind: "skill", key: "c:sharp" })).not.toBe(
-    targetId({ kind: "theme", key: "skill:c:sharp" }),
+    targetId({ kind: "domain", key: "skill:c:sharp" }),
   );
 });

@@ -2,12 +2,14 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.taxonomy.clusters import ClusterMap, merge_cluster_map
+from resume_agent.taxonomy.corrections import TaxonomyCorrections
 from resume_agent.tracking.match_gap import (
+    CategoryNode,
     DemandEdge,
     DemandGraph,
     JobLite,
     SkillNode,
-    ThemeNode,
+    DomainNode,
     build_demand_graph,
     collect_target_skill_tokens,
 )
@@ -87,7 +89,7 @@ def test_build_demand_graph_reads_all_sources_coverage_and_job_facets():
             DemandEdge(job.id, "Kubernetes", "nice", "kubernetes"),
             DemandEdge(job.id, "Linux", "tech", "linux"),
         ]
-        assert graph.themes == []
+        assert graph.domains == []
         assert graph.clusters_stale is True
 
 
@@ -201,8 +203,8 @@ def test_build_demand_graph_dedupes_flattened_alias_chain_with_coverage():
             ClusterMap.empty(),
             ClusterMap(
                 aliases={"a": "b", "b": "c"},
-                theme_of={"b": "terminal-theme"},
-                theme_label={"terminal-theme": "Terminal"},
+                domain_of={"b": "terminal-theme"},
+                domain_label={"terminal-theme": "Terminal"},
             ),
         )
 
@@ -234,12 +236,12 @@ def test_build_demand_graph_emits_only_used_sorted_themes_with_label_fallback():
             criteria={"must_have_skills": ["React", "Kubernetes"]},
         )
         cmap = ClusterMap(
-            theme_of={
+            domain_of={
                 "react": "z-frontend",
                 "kubernetes": "a-infra",
                 "unused": "unused-theme",
             },
-            theme_label={
+            domain_label={
                 "a-infra": "Cloud/Infra",
                 "unused-theme": "Unused",
             },
@@ -267,9 +269,9 @@ def test_build_demand_graph_emits_only_used_sorted_themes_with_label_fallback():
                 job_count=1,
             ),
         ]
-        assert graph.themes == [
-            ThemeNode("a-infra", "Cloud/Infra", 3, 1, 1, 1, 1),
-            ThemeNode("z-frontend", "z-frontend", 3, 1, 1, 1, 1),
+        assert graph.domains == [
+            DomainNode("a-infra", "Cloud/Infra", 3, 1, 1, 1, 1),
+            DomainNode("z-frontend", "z-frontend", 3, 1, 1, 1, 1),
         ]
         assert graph.clusters_stale is False
 
@@ -281,13 +283,13 @@ def test_build_demand_graph_is_stale_when_any_canonical_skill_is_unthemed():
             criteria={"must_have_skills": ["Kubernetes", "Rust"]},
         )
         cmap = ClusterMap(
-            theme_of={"kubernetes": "infra"},
-            theme_label={"infra": "Infrastructure"},
+            domain_of={"kubernetes": "infra"},
+            domain_label={"infra": "Infrastructure"},
         )
 
         graph = build_demand_graph(session, _facts(), cmap)
 
-        assert graph.themes == [ThemeNode("infra", "Infrastructure", 3, 1, 1, 1, 1)]
+        assert graph.domains == [DomainNode("infra", "Infrastructure", 3, 1, 1, 1, 1)]
         assert graph.clusters_stale is True
 
 
@@ -301,8 +303,61 @@ def test_build_demand_graph_empty_db_is_exact():
             jobs=[],
             skills=[],
             edges=[],
-            themes=[],
+            domains=[],
+            categories=[
+                CategoryNode(slug=slug, label=label, kind=kind)
+                for slug, label, kind in (
+                    ("languages", "Programming Languages", "hard"),
+                    ("frontend-web", "Frontend & Web", "hard"),
+                    ("backend-apis", "Backend & APIs", "hard"),
+                    ("mobile-desktop", "Mobile & Desktop", "hard"),
+                    ("data-engineering", "Data Engineering & Analytics", "hard"),
+                    ("ai-ml", "AI & Machine Learning", "hard"),
+                    ("databases-storage", "Databases & Storage", "hard"),
+                    ("cloud-infra", "Cloud & Infrastructure", "hard"),
+                    ("devops-automation", "DevOps & Automation", "hard"),
+                    ("testing-quality", "Testing & Quality", "hard"),
+                    ("security-compliance", "Security & Compliance", "hard"),
+                    ("systems-embedded", "Systems & Embedded", "hard"),
+                    ("architecture-design", "Architecture & Design", "hard"),
+                    ("tools-platforms", "Tools & Platforms", "hard"),
+                    ("leadership-management", "Leadership & Management", "soft"),
+                    (
+                        "collaboration-communication",
+                        "Collaboration & Communication",
+                        "soft",
+                    ),
+                    ("product-business", "Product & Business", "soft"),
+                    ("process-methodology", "Process & Methodology", "soft"),
+                    ("domain-knowledge", "Domain Knowledge", "soft"),
+                    ("other", "Other", "hard"),
+                )
+            ],
         )
+
+
+def test_corrections_hide_removed_and_show_explicit_zero_count_addition():
+    with _session() as session:
+        _job(session, criteria={"must_have_skills": ["Python"]})
+        graph = build_demand_graph(
+            session,
+            _facts(),
+            ClusterMap(
+                aliases={"python": "python", "graphql": "graphql"},
+                domain_of={"python": "scripting", "graphql": "apis"},
+                domain_label={"scripting": "Scripting", "apis": "APIs"},
+                category_of={"scripting": "languages", "apis": "backend-apis"},
+            ),
+            corrections=TaxonomyCorrections(
+                removed_skills=["python"], added_skills=["graphql"]
+            ),
+        )
+
+        assert [node.key for node in graph.skills] == ["graphql"]
+        assert graph.skills[0].job_count == 0
+        assert graph.skills[0].domain_id == "apis"
+        assert graph.edges == []
+        assert graph.domains[0].category == "backend-apis"
 
 
 def test_collect_target_skill_tokens_unions_sources_and_ignores_nontarget_jobs():
@@ -336,8 +391,8 @@ def test_build_demand_graph_uses_stable_keys_and_distinct_job_counts():
         second = _job(session, criteria={"must_have_skills": ["python3"]})
         cmap = ClusterMap(
             aliases={"python": "python", "python3": "python"},
-            theme_of={"python": "backend"},
-            theme_label={"backend": "Backend"},
+            domain_of={"python": "backend"},
+            domain_label={"backend": "Backend"},
         )
 
         graph = build_demand_graph(session, _facts(), cmap)
@@ -347,7 +402,7 @@ def test_build_demand_graph_uses_stable_keys_and_distinct_job_counts():
         assert graph.skills == [
             SkillNode(
                 skill="Python",
-                theme_id="backend",
+                domain_id="backend",
                 covered=False,
                 key="python",
                 members={"Python": 1, "python3": 1},
@@ -375,8 +430,8 @@ def test_build_demand_graph_theme_aggregates_have_named_weightings():
         )
         _job(session, criteria={"nice_to_have_skills": ["Python"]})
         cmap = ClusterMap(
-            theme_of={"python": "backend", "sql": "backend"},
-            theme_label={"backend": "Backend"},
+            domain_of={"python": "backend", "sql": "backend"},
+            domain_label={"backend": "Backend"},
         )
 
         graph = build_demand_graph(
@@ -385,8 +440,8 @@ def test_build_demand_graph_theme_aggregates_have_named_weightings():
             cmap,
         )
 
-        assert graph.themes == [
-            ThemeNode(
+        assert graph.domains == [
+            DomainNode(
                 id="backend",
                 label="Backend",
                 essential_score=9,

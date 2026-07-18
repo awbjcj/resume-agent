@@ -23,6 +23,11 @@ from resume_agent.profile.matrix import (
 from resume_agent.profile.store import load_facts
 from resume_agent.services.suggestions import suggestion_statuses
 from resume_agent.taxonomy.clusters import load_cluster_map
+from resume_agent.taxonomy.corrections import (
+    apply_taxonomy_corrections,
+    corrections_file_path,
+    load_taxonomy_corrections,
+)
 from resume_agent.tracking.match_gap import build_demand_graph, profile_skill_tokens
 from resume_agent.tenancy.paths import resolve_tenant_path
 
@@ -38,19 +43,25 @@ def _facts_or_empty() -> ProfileFacts:
     return ProfileFacts(contact=Contact(name=""))
 
 
-@router.get("/match-gap", response_model=MatchGapOut)
-def get_match_gap(session: Session = Depends(get_session)):
+def build_match_gap_payload(session: Session) -> MatchGapOut:
     facts = _facts_or_empty()
     facts_path = resolve_tenant_path(_FACTS_PATH)
     profile_dir = facts_path.parent
-    cluster_map = effective_cluster_map(
-        load_cluster_map(resolve_tenant_path(_CLUSTER_PATH)),
-        load_overrides(profile_dir / "overrides.yaml"),
+    corrections = load_taxonomy_corrections(
+        resolve_tenant_path(corrections_file_path())
+    )
+    cluster_map = apply_taxonomy_corrections(
+        effective_cluster_map(
+            load_cluster_map(resolve_tenant_path(_CLUSTER_PATH)),
+            load_overrides(profile_dir / "overrides.yaml"),
+        ),
+        corrections,
     )
     graph = build_demand_graph(
         session,
         facts,
         cluster_map=cluster_map,
+        corrections=corrections,
     )
     return MatchGapOut.model_validate(
         {
@@ -60,6 +71,11 @@ def get_match_gap(session: Session = Depends(get_session)):
             ),
         }
     )
+
+
+@router.get("/match-gap", response_model=MatchGapOut)
+def get_match_gap(session: Session = Depends(get_session)):
+    return build_match_gap_payload(session)
 
 
 @router.post("/match-gap/refresh-clusters", response_model=RunOut, status_code=202)
@@ -94,6 +110,7 @@ def refresh_match_gap_clusters(
                 path=resolve_tenant_path(_CLUSTER_PATH),
                 reporter=reporter,
                 extra_tokens=extra_tokens,
+                corrections_path=resolve_tenant_path(corrections_file_path()),
             )
         if facts is None:
             result["matrixRegenerated"] = False

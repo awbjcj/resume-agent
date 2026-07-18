@@ -45,7 +45,7 @@ def test_matrix_route_serves_rooted_rows_and_ordered_vocabulary(client):
         "strength": 2.5,
         "lastUsed": "current",
     }
-    assert len(body["groups"]) == 13
+    assert len(body["groups"]) == 20
     assert body["groups"][-1] == {"slug": "other", "label": "Other"}
 
 
@@ -54,4 +54,7 @@ def test_matrix_route_is_empty_but_self_describing_before_build(client):
     body = test_client.get("/api/profile/matrix").json()
     assert body["generatedAt"] == ""
     assert body["rows"] == []
-    assert body["groups"][0] == {"slug": "languages", "label": "Languages"}
+    assert body["groups"][0] == {
+        "slug": "languages",
+        "label": "Programming Languages",
+    }

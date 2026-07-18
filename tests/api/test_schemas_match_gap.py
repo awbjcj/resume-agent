@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
 
 from resume_agent.api.schemas.match_gap import (
+    CategoryOut,
     DemandEdgeOut,
+    DomainOut,
     MatchGapOut,
     SkillNodeOut,
     SuggestionStatusOut,
-    ThemeOut,
 )
-from resume_agent.tracking.match_gap import DemandEdge, SkillNode, ThemeNode
+from resume_agent.tracking.match_gap import DemandEdge, DomainNode, SkillNode
 
 
 def test_skill_node_out_camelizes_stable_identity_and_counts():
@@ -25,7 +26,7 @@ def test_skill_node_out_camelizes_stable_identity_and_counts():
     )
     assert out.model_dump(by_alias=True) == {
         "skill": "Kubernetes",
-        "themeId": "t1",
+        "domainId": "t1",
         "covered": False,
         "coverage": "gap",
         "key": "kubernetes",
@@ -47,8 +48,13 @@ def test_demand_edge_out_camelizes_stable_skill_key():
     }
 
 
-def test_theme_and_suggestion_status_out_use_named_fields():
-    theme = ThemeOut.model_validate(ThemeNode("backend", "Backend", 9, 3, 2, 2, 1))
+def test_domain_category_and_suggestion_status_use_named_fields():
+    domain = DomainOut.model_validate(
+        DomainNode("backend", "Backend", 9, 3, 2, 2, 1, category="backend-apis")
+    )
+    category = CategoryOut(
+        slug="backend-apis", label="Backend & APIs", kind="hard"
+    )
     generated_at = datetime(2026, 6, 27, tzinfo=timezone.utc)
     status = SuggestionStatusOut(
         kind="skill",
@@ -57,15 +63,21 @@ def test_theme_and_suggestion_status_out_use_named_fields():
         generated_at=generated_at,
     )
 
-    assert theme.model_dump(by_alias=True) == {
+    assert domain.model_dump(by_alias=True) == {
         "id": "backend",
         "label": "Backend",
+        "category": "backend-apis",
         "essentialScore": 9,
         "popularScore": 3,
         "jobCount": 2,
         "skillCount": 2,
         "gapCount": 1,
         "adjacentCount": 0,
+    }
+    assert category.model_dump(by_alias=True) == {
+        "slug": "backend-apis",
+        "label": "Backend & APIs",
+        "kind": "hard",
     }
     assert status.model_dump(by_alias=True)["generatedAt"] == generated_at
 
@@ -77,7 +89,8 @@ def test_match_gap_out_shape():
         jobs=[],
         skills=[],
         edges=[],
-        themes=[],
+        domains=[],
+        categories=[],
     )
     dumped = out.model_dump(by_alias=True)
     assert set(dumped) == {
@@ -86,7 +99,8 @@ def test_match_gap_out_shape():
         "jobs",
         "skills",
         "edges",
-        "themes",
+        "domains",
+        "categories",
         "suggestionStatuses",
     }
     assert dumped["suggestionStatuses"] == []

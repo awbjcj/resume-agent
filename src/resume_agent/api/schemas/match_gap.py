@@ -19,7 +19,7 @@ class JobLiteOut(CamelModel):
 
 class SkillNodeOut(CamelModel):
     skill: str
-    theme_id: str | None = None
+    domain_id: str | None = None
     covered: bool
     coverage: Literal["covered", "adjacent", "gap"] = "gap"
     key: str
@@ -46,9 +46,10 @@ class DemandEdgeOut(CamelModel):
     skill_key: str
 
 
-class ThemeOut(CamelModel):
+class DomainOut(CamelModel):
     id: str
     label: str
+    category: str
     essential_score: int
     popular_score: int
     job_count: int
@@ -58,10 +59,16 @@ class ThemeOut(CamelModel):
 
 
 class SuggestionStatusOut(CamelModel):
-    kind: Literal["skill", "theme"]
+    kind: Literal["skill", "domain"]
     key: str
     state: Literal["ready", "stale"]
     generated_at: datetime
+
+
+class CategoryOut(CamelModel):
+    slug: str
+    label: str
+    kind: Literal["hard", "soft"]
 
 
 class MatchGapOut(CamelModel):
@@ -70,5 +77,6 @@ class MatchGapOut(CamelModel):
     jobs: list[JobLiteOut]
     skills: list[SkillNodeOut]
     edges: list[DemandEdgeOut]
-    themes: list[ThemeOut]
+    domains: list[DomainOut]
+    categories: list[CategoryOut]
     suggestion_statuses: list[SuggestionStatusOut] = Field(default_factory=list)

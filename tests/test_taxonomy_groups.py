@@ -36,11 +36,11 @@ def assignments(*pairs: tuple[str, str]) -> SkillGroupAssignments:
     )
 
 
-def test_vocabulary_has_thirteen_slugs_with_other_last():
+def test_groups_reexports_twenty_slug_vocabulary_with_other_last():
     slugs = list(SKILL_GROUPS)
-    assert len(slugs) == 13
+    assert len(slugs) == 20
     assert slugs[-1] == "other"
-    assert SKILL_GROUPS["cloud-infra"] == "Cloud & Infra"
+    assert SKILL_GROUPS["cloud-infra"] == "Cloud & Infrastructure"
 
 
 def test_group_map_path_uses_active_data_root(tmp_path):
@@ -55,7 +55,7 @@ def test_group_map_normalizes_filters_merges_and_round_trips_atomically(tmp_path
         {" Python ": "languages", "bad": "invented", "": "other"},
         path,
     )
-    save_group_map({"python": "data-ml", "Kubernetes": "cloud-infra"}, path)
+    save_group_map({"python": "ai-ml", "Kubernetes": "cloud-infra"}, path)
 
     assert load_group_map(path) == {
         "kubernetes": "cloud-infra",
@@ -80,7 +80,7 @@ def test_classifier_accepts_only_exact_batch_tokens_and_known_slugs():
     runner = FakeRunner(
         assignments(
             ("python", "languages"),
-            ("Python", "data-ml"),
+            ("Python", "ai-ml"),
             ("not-asked", "languages"),
             ("k8s", "made-up"),
         )

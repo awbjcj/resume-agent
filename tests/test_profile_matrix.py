@@ -93,15 +93,15 @@ def test_overrides_ban_and_category():
 def test_effective_cluster_map_force_then_forbid_wins():
     cluster_map = ClusterMap(
         aliases={"golang": "golang", "java": "jvm", "kotlin": "jvm"},
-        theme_of={"golang": "languages", "jvm": "languages"},
+        domain_of={"golang": "languages", "jvm": "languages"},
     )
     overrides = Overrides(alias={"golang": "go"}, forbid_alias=[["java", "kotlin"]])
     fixed = effective_cluster_map(cluster_map, overrides)
     assert fixed.aliases["golang"] == "go"
     assert fixed.aliases["java"] == "java"
     assert fixed.aliases["kotlin"] == "kotlin"
-    assert fixed.theme_of["java"] == "languages"
-    assert fixed.theme_of["kotlin"] == "languages"
+    assert fixed.domain_of["java"] == "languages"
+    assert fixed.domain_of["kotlin"] == "languages"
 
 
 def test_override_tokens_covers_alias_forbid_and_category():
@@ -191,7 +191,7 @@ def test_build_skill_match_context_covers_alias_adjacent_gap_and_compounds():
     )
     cluster_map = ClusterMap(
         aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"},
-        theme_of={"fastapi": "web", "flask": "web", "django": "web"},
+        domain_of={"fastapi": "web", "flask": "web", "django": "web"},
     )
     criteria = JobCriteria(
         must_have_skills=["k8s", "FastAPI", "Rust and Go"],
@@ -238,7 +238,7 @@ def test_apply_groups_uses_taxonomy_and_alias_aware_override_precedence():
             MatrixRow(key="mystery", display="Mystery"),
         ]
     )
-    overrides = Overrides(group={"K8s": "devops-tooling"})
+    overrides = Overrides(group={"K8s": "devops-automation"})
     apply_skill_groups(
         matrix,
         {"python": "languages", "kubernetes": "cloud-infra"},
@@ -246,7 +246,7 @@ def test_apply_groups_uses_taxonomy_and_alias_aware_override_precedence():
     )
     assert {row.key: row.group for row in matrix.rows} == {
         "python": "languages",
-        "kubernetes": "devops-tooling",
+        "kubernetes": "devops-automation",
         "mystery": None,
     }
 
@@ -256,10 +256,10 @@ def test_group_validation_drops_unknown_values_without_expanding_override_tokens
         rows=[MatrixRow(key="python", display="Python", group="invented")]
     )
     overrides = Overrides(
-        group={"Python": "data-ml", "Terraform": "invented"},
+        group={"Python": "ai-ml", "Terraform": "invented"},
     )
     assert matrix.rows[0].group is None
-    assert overrides.group == {"python": "data-ml"}
+    assert overrides.group == {"python": "ai-ml"}
     assert "python" not in override_tokens(overrides)
     apply_skill_groups(matrix, {"python": "invented"}, Overrides())
     assert matrix.rows[0].group is None
@@ -271,12 +271,12 @@ def test_apply_groups_correction_beats_override_and_taxonomy():
     apply_skill_groups(
         matrix,
         {"python": "languages"},
-        Overrides(group={"python": "frameworks"}),
-        corrections={"python": "data-ml"},
+        Overrides(group={"python": "frontend-web"}),
+        corrections={"python": "ai-ml"},
     )
 
     assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
-        "data-ml",
+        "ai-ml",
         "correction",
     )
 
@@ -293,7 +293,7 @@ def test_apply_groups_records_override_taxonomy_and_none_sources():
     apply_skill_groups(
         matrix,
         {"python": "languages"},
-        Overrides(group={"sql": "databases"}),
+        Overrides(group={"sql": "databases-storage"}),
     )
 
     by_key = {row.key: row for row in matrix.rows}
@@ -302,7 +302,7 @@ def test_apply_groups_records_override_taxonomy_and_none_sources():
         "taxonomy",
     )
     assert (by_key["sql"].group, by_key["sql"].group_source) == (
-        "databases",
+        "databases-storage",
         "override",
     )
     assert (by_key["mystery"].group, by_key["mystery"].group_source) == (None, None)
@@ -319,11 +319,11 @@ def test_apply_groups_uses_aliases_for_corrections_and_taxonomy():
         matrix,
         {"k8s": "cloud-infra"},
         Overrides(),
-        corrections={"postgres": "databases"},
+        corrections={"postgres": "databases-storage"},
     )
 
     assert (correction_row.group, correction_row.group_source) == (
-        "databases",
+        "databases-storage",
         "correction",
     )
     assert (taxonomy_row.group, taxonomy_row.group_source) == (
@@ -350,7 +350,7 @@ def test_build_decorated_matrix_does_not_persist_and_rebuild_does(tmp_path):
     )
     save_group_corrections(
         GroupCorrections(
-            corrections={"python": GroupCorrection(group="data-ml")}
+            corrections={"python": GroupCorrection(group="ai-ml")}
         ),
         corrections_path(profile_dir),
     )
@@ -358,7 +358,7 @@ def test_build_decorated_matrix_does_not_persist_and_rebuild_does(tmp_path):
     matrix = build_decorated_matrix(profile_dir, facts)
 
     assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
-        "data-ml",
+        "ai-ml",
         "correction",
     )
     assert not (profile_dir / "matrix.json").exists()
@@ -368,6 +368,6 @@ def test_build_decorated_matrix_does_not_persist_and_rebuild_does(tmp_path):
     assert rebuilt.rows[0].group_source == "correction"
     assert reloaded is not None
     assert (reloaded.rows[0].group, reloaded.rows[0].group_source) == (
-        "data-ml",
+        "ai-ml",
         "correction",
     )

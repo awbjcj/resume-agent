@@ -10,7 +10,7 @@ import { SkillModal } from "./SkillModal";
 const skill: SkillRow = {
   key: "python",
   skill: "Python",
-  themeId: "backend",
+  domainId: "backend",
   covered: false,
   coverage: "adjacent",
   score: 9,
@@ -34,7 +34,7 @@ it("shows evidence and loads suggestions by stable key", async () => {
     <QueryClientProvider client={new QueryClient()}>
       <SkillModal
         skill={skill}
-        themeLabel="Backend"
+        domainLabel="Backend"
         state="none"
         jobs={[{ id: 1, company: "Acme", title: "Backend Engineer", seniority: "senior" }]}
         onClose={vi.fn()}

@@ -29,7 +29,7 @@ def test_round_trip_normalizes_tokens_and_drops_invalid_entries(tmp_path):
     ledger = GroupCorrections(
         corrections={
             "  DBT  ": GroupCorrection(
-                group="data-ml", corrected_at="2026-07-16T00:00:00+00:00"
+                group="ai-ml", corrected_at="2026-07-16T00:00:00+00:00"
             ),
             "mystery": GroupCorrection(group="not-a-real-group"),
             "   ": GroupCorrection(group="other"),
@@ -39,7 +39,7 @@ def test_round_trip_normalizes_tokens_and_drops_invalid_entries(tmp_path):
     save_group_corrections(ledger, path)
     loaded = load_group_corrections(path)
 
-    assert loaded.as_map() == {"dbt": "data-ml"}
+    assert loaded.as_map() == {"dbt": "ai-ml"}
     assert loaded.corrections["dbt"].corrected_at == "2026-07-16T00:00:00+00:00"
 
 
@@ -55,3 +55,25 @@ def test_save_writes_valid_json_without_abandoned_temp_files(tmp_path):
         "group"
     ] == "languages"
     assert list(tmp_path.glob(f".{path.name}.*.tmp")) == []
+
+
+def test_load_remaps_legacy_slugs_and_drops_dead_ones(tmp_path):
+    path = tmp_path / "group_corrections.json"
+    path.write_text(
+        json.dumps(
+            {
+                "corrections": {
+                    "python": {"group": "languages", "corrected_at": "2026-01-01"},
+                    "owasp": {"group": "security", "corrected_at": "2026-01-01"},
+                    "react": {"group": "frameworks", "corrected_at": "2026-01-01"},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ledger = load_group_corrections(path)
+
+    assert ledger.corrections["python"].group == "languages"
+    assert ledger.corrections["owasp"].group == "security-compliance"
+    assert "react" not in ledger.corrections

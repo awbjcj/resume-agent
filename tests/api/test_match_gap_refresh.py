@@ -13,8 +13,8 @@ from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import save_facts
 from resume_agent.tracking.canonicalize import (
-    IncrementalSkillThemes,
-    IncrementalThemeGroup,
+    IncrementalDomainGroup,
+    IncrementalSkillDomains,
     SkillClusters,
 )
 from resume_agent.tracking.repository import save_job
@@ -42,10 +42,12 @@ class _AsyncThemer:
     async def arun(self, prompt):
         payload = json.loads(prompt)
         return SimpleNamespace(
-            content=IncrementalSkillThemes(
-                themes=[
-                    IncrementalThemeGroup(
-                        new_label="Cloud / Infrastructure", skills=list(payload["new"])
+            content=IncrementalSkillDomains(
+                domains=[
+                    IncrementalDomainGroup(
+                        new_label="Cloud / Infrastructure",
+                        new_category="cloud-infra",
+                        skills=list(payload["new"]),
                     )
                 ]
             )

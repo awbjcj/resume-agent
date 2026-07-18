@@ -475,8 +475,16 @@ class RunManager:
                 continue
             key = (snapshot.kind, artifact_id)
             previous = latest_revision.get(key)
-            if previous is None or (snapshot.created_at, snapshot.run_id) > (
+            # Timestamps can tie on fast retries. Prefer the active retry over
+            # the failed attempt before using the random run id as a final
+            # deterministic tie-breaker.
+            if previous is None or (
+                snapshot.created_at,
+                snapshot.state in ACTIVE_RUN_STATES,
+                snapshot.run_id,
+            ) > (
                 previous.created_at,
+                previous.state in ACTIVE_RUN_STATES,
                 previous.run_id,
             ):
                 latest_revision[key] = snapshot

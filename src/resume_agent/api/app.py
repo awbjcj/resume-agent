@@ -43,6 +43,7 @@ from resume_agent.api.routers import secrets as secrets_router
 from resume_agent.api.routers import setup as setup_router
 from resume_agent.api.routers import sources as sources_router
 from resume_agent.api.routers import suggestions as suggestions_router
+from resume_agent.api.routers import taxonomy as taxonomy_router
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.rate_limit import FailedAttemptLimiter
 from resume_agent.config import Settings, get_settings
@@ -225,6 +226,7 @@ def create_app(
     app.include_router(sources_router.router, prefix="/api", dependencies=guarded)
     app.include_router(analytics_router.router, prefix="/api", dependencies=guarded)
     app.include_router(match_gap_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(taxonomy_router.router, prefix="/api", dependencies=guarded)
     app.include_router(suggestions_router.router, prefix="/api", dependencies=guarded)
     app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)
     app.include_router(config_router.router, prefix="/api", dependencies=guarded)

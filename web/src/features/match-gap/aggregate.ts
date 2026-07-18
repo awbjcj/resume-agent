@@ -2,10 +2,10 @@ import type { components } from "@/lib/api/schema";
 
 type Payload = components["schemas"]["MatchGapOut"];
 type JobLite = Payload["jobs"][number];
-type SuggestionKind = "skill" | "theme";
+type SuggestionKind = "skill" | "domain";
 
 export const SOURCE_WEIGHT = { must: 3, nice: 2, tech: 1 } as const;
-export const UNTHEMED_ID = "__unthemed__";
+export const UNASSIGNED_ID = "__undomaind__";
 
 export interface Filters {
   q: string;
@@ -34,7 +34,7 @@ export type SuggestionState =
 export interface SkillRow {
   key: string;
   skill: string;
-  themeId: string | null;
+  domainId: string | null;
   covered: boolean;
   coverage: "covered" | "adjacent" | "gap";
   score: number;
@@ -45,9 +45,10 @@ export interface SkillRow {
   members: Record<string, number>;
 }
 
-export interface ThemeRow {
+export interface DomainRow {
   id: string;
   label: string;
+  category: string;
   score: number;
   jobCount: number;
   skillCount: number;
@@ -56,12 +57,25 @@ export interface ThemeRow {
   skills: SkillRow[];
 }
 
+export interface CategoryRow {
+  slug: string;
+  label: string;
+  kind: "hard" | "soft";
+  score: number;
+  jobCount: number;
+  skillCount: number;
+  gapCount: number;
+  adjacentCount: number;
+  domains: DomainRow[];
+}
+
 export interface DerivedView {
   skills: SkillRow[];
-  themeRows: ThemeRow[];
+  domainRows: DomainRow[];
+  categoryRows: CategoryRow[];
   filteredJobCount: number;
   jobsForSkill: (key: string) => JobLite[];
-  jobsForTheme: (themeId: string) => JobLite[];
+  jobsForDomain: (domainId: string) => JobLite[];
   companies: string[];
   seniorities: string[];
   persistedStateOf: (kind: SuggestionKind, key: string) => "ready" | "stale" | undefined;
@@ -126,15 +140,22 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
   const q = filters.q.trim().toLowerCase();
   const skills = payload.skills
     .flatMap((node): SkillRow[] => {
-      const counts = countsBySkill.get(node.key);
+      const observedCounts = countsBySkill.get(node.key);
+      if (!observedCounts && node.jobCount > 0) return [];
+      const counts = observedCounts ?? {
+        must: 0,
+        nice: 0,
+        tech: 0,
+        jobs: new Set<number>(),
+      };
       const coverage = node.coverage ?? (node.covered ? "covered" : "gap");
-      if (!counts || (filters.gapsOnly && coverage !== "gap")) return [];
+      if (filters.gapsOnly && coverage !== "gap") return [];
       if (q && !node.skill.toLowerCase().includes(q)) return [];
       return [
         {
           key: node.key,
           skill: node.skill,
-          themeId: node.themeId ?? null,
+          domainId: node.domainId ?? null,
           covered: node.covered,
           coverage,
           score:
@@ -158,13 +179,15 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
         left.key.localeCompare(right.key),
     );
 
-  const themeLabels = new Map(payload.themes.map((theme) => [theme.id, theme.label]));
-  const themeGroups = new Map<string, ThemeRow & { jobs: Set<number> }>();
+  const domainLabels = new Map(payload.domains.map((domain) => [domain.id, domain.label]));
+  const domainCategory = new Map(payload.domains.map((domain) => [domain.id, domain.category]));
+  const domainGroups = new Map<string, DomainRow & { jobs: Set<number> }>();
   for (const skill of skills) {
-    const id = skill.themeId ?? UNTHEMED_ID;
-    const group = themeGroups.get(id) ?? {
+    const id = skill.domainId ?? UNASSIGNED_ID;
+    const group = domainGroups.get(id) ?? {
       id,
-      label: id === UNTHEMED_ID ? "Unthemed" : (themeLabels.get(id) ?? id),
+      label: id === UNASSIGNED_ID ? "Unassigned" : (domainLabels.get(id) ?? id),
+      category: id === UNASSIGNED_ID ? "other" : (domainCategory.get(id) ?? "other"),
       score: 0,
       jobCount: 0,
       skillCount: 0,
@@ -180,18 +203,19 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
     group.skills.push(skill);
     for (const jobId of jobsBySkill.get(skill.key) ?? []) group.jobs.add(jobId);
     group.jobCount = group.jobs.size;
-    themeGroups.set(id, group);
+    domainGroups.set(id, group);
   }
-  const themeRows = [...themeGroups.values()]
-    .map((theme) => ({
-      id: theme.id,
-      label: theme.label,
-      score: theme.score,
-      jobCount: theme.jobCount,
-      skillCount: theme.skillCount,
-      gapCount: theme.gapCount,
-      adjacentCount: theme.adjacentCount,
-      skills: theme.skills,
+  const domainRows = [...domainGroups.values()]
+    .map((domain) => ({
+      id: domain.id,
+      label: domain.label,
+      category: domain.category,
+      score: domain.score,
+      jobCount: domain.jobCount,
+      skillCount: domain.skillCount,
+      gapCount: domain.gapCount,
+      adjacentCount: domain.adjacentCount,
+      skills: domain.skills,
     }))
     .sort(
       (left, right) =>
@@ -200,15 +224,54 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
         left.id.localeCompare(right.id),
     );
 
+  const categoryMeta = new Map(payload.categories.map((category) => [category.slug, category]));
+  const domainsByCategory = new Map<string, DomainRow[]>();
+  for (const domain of domainRows) {
+    domainsByCategory.set(domain.category, [
+      ...(domainsByCategory.get(domain.category) ?? []),
+      domain,
+    ]);
+  }
+  const orderedSlugs = [
+    ...payload.categories.map((category) => category.slug),
+    ...(domainsByCategory.has("other") && !categoryMeta.has("other") ? ["other"] : []),
+  ];
+  const categoryRows: CategoryRow[] = orderedSlugs.flatMap((slug) => {
+    const domains = domainsByCategory.get(slug) ?? [];
+    if (domains.length === 0) return [];
+    const meta = categoryMeta.get(slug) ?? {
+      slug,
+      label: "Other",
+      kind: "hard" as const,
+    };
+    const jobs = new Set<number>();
+    for (const domain of domains) {
+      for (const skill of domain.skills) {
+        for (const jobId of jobsBySkill.get(skill.key) ?? []) jobs.add(jobId);
+      }
+    }
+    return [{
+      slug,
+      label: meta.label,
+      kind: meta.kind,
+      score: domains.reduce((total, domain) => total + domain.score, 0),
+      jobCount: jobs.size,
+      skillCount: domains.reduce((total, domain) => total + domain.skillCount, 0),
+      gapCount: domains.reduce((total, domain) => total + domain.gapCount, 0),
+      adjacentCount: domains.reduce((total, domain) => total + domain.adjacentCount, 0),
+      domains,
+    }];
+  });
+
   const jobsForSkill = (key: string): JobLite[] =>
     [...(jobsBySkill.get(key) ?? [])]
       .map((jobId) => jobById.get(jobId))
       .filter((job): job is JobLite => Boolean(job));
 
-  const jobsForTheme = (themeId: string): JobLite[] => {
+  const jobsForDomain = (domainId: string): JobLite[] => {
     const jobIds = new Set<number>();
     for (const skill of skills) {
-      if ((skill.themeId ?? UNTHEMED_ID) !== themeId) continue;
+      if ((skill.domainId ?? UNASSIGNED_ID) !== domainId) continue;
       for (const jobId of jobsBySkill.get(skill.key) ?? []) jobIds.add(jobId);
     }
     return [...jobIds]
@@ -225,10 +288,11 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
 
   return {
     skills,
-    themeRows,
+    domainRows,
+    categoryRows,
     filteredJobCount: filteredJobs.length,
     jobsForSkill,
-    jobsForTheme,
+    jobsForDomain,
     companies: uniqueSorted(payload.jobs.map((job) => job.company)),
     seniorities: uniqueSorted(payload.jobs.map((job) => job.seniority)),
     persistedStateOf: (kind, key) => persistedStatus.get(targetId({ kind, key })),

@@ -2,13 +2,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
-import { targetId, UNTHEMED_ID, type ThemeRow } from "./aggregate";
+import { targetId, UNASSIGNED_ID, type DomainRow } from "./aggregate";
 import { RankedList } from "./RankedList";
 
-const themes: ThemeRow[] = [
+const domains: DomainRow[] = [
   {
     id: "backend",
     label: "Backend",
+    category: "engineering",
     score: 12,
     jobCount: 3,
     skillCount: 2,
@@ -18,7 +19,7 @@ const themes: ThemeRow[] = [
       {
         key: "python",
         skill: "Python",
-        themeId: "backend",
+        domainId: "backend",
         covered: false,
         coverage: "adjacent",
         score: 9,
@@ -31,7 +32,7 @@ const themes: ThemeRow[] = [
       {
         key: "django",
         skill: "Django",
-        themeId: "backend",
+        domainId: "backend",
         covered: true,
         coverage: "covered",
         score: 3,
@@ -44,13 +45,15 @@ const themes: ThemeRow[] = [
     ],
   },
 ];
+const categoryRows = [{ slug: "engineering", label: "Engineering", kind: "hard" as const, score: 12, jobCount: 3, skillCount: 2, gapCount: 1, adjacentCount: 1, domains }];
 
 it("discloses skills with independent selection and detail controls", async () => {
   const onToggleSelect = vi.fn();
   const onOpenSkill = vi.fn();
   render(
     <RankedList
-      themeRows={themes}
+      domainRows={domains}
+      categoryRows={categoryRows}
       stateOf={(_kind, key) => (key === "django" ? "ready" : "none")}
       selected={new Set([targetId({ kind: "skill", key: "python" })])}
       onToggleSelect={onToggleSelect}
@@ -72,10 +75,11 @@ it("discloses skills with independent selection and detail controls", async () =
   );
 });
 
-it("does not allow selecting the synthetic unthemed group", () => {
+it("does not allow selecting the synthetic undomaind group", () => {
   render(
     <RankedList
-      themeRows={[{ ...themes[0], id: UNTHEMED_ID, label: "Unthemed" }]}
+      domainRows={[{ ...domains[0], id: UNASSIGNED_ID, label: "Unassigned" }]}
+      categoryRows={[{ ...categoryRows[0], slug: "other", label: "Other", domains: [{ ...domains[0], id: UNASSIGNED_ID, label: "Unassigned", category: "other" }] }]}
       stateOf={() => "none"}
       selected={new Set()}
       onToggleSelect={vi.fn()}
@@ -83,7 +87,7 @@ it("does not allow selecting the synthetic unthemed group", () => {
     />,
   );
 
-  expect(screen.getByRole("checkbox", { name: "Select Unthemed theme" })).toHaveAttribute(
+  expect(screen.getByRole("checkbox", { name: "Select Unassigned domain" })).toHaveAttribute(
     "aria-disabled",
     "true",
   );

@@ -35,7 +35,7 @@ def test_put_group_requires_a_built_profile(client):
 
     response = test_client.put(
         "/api/profile/skills/python/group",
-        json={"group": "data-ml"},
+        json={"group": "ai-ml"},
     )
 
     assert response.status_code == 400
@@ -74,17 +74,17 @@ def test_put_group_pins_alias_and_matrix_reports_source(client):
 
     response = test_client.put(
         "/api/profile/skills/py/group",
-        json={"group": "data-ml"},
+        json={"group": "ai-ml"},
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["key"] == "python"
-    assert body["group"] == "data-ml"
+    assert body["group"] == "ai-ml"
     assert body["groupSource"] == "correction"
     matrix = test_client.get("/api/profile/matrix").json()
     row = next(item for item in matrix["rows"] if item["key"] == "python")
-    assert (row["group"], row["groupSource"]) == ("data-ml", "correction")
+    assert (row["group"], row["groupSource"]) == ("ai-ml", "correction")
 
 
 def test_delete_group_reverts_to_taxonomy(client):
@@ -92,7 +92,7 @@ def test_delete_group_reverts_to_taxonomy(client):
     _seed(data_dir)
     test_client.put(
         "/api/profile/skills/python/group",
-        json={"group": "data-ml"},
+        json={"group": "ai-ml"},
     )
 
     response = test_client.delete("/api/profile/skills/python/group")

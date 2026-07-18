@@ -90,7 +90,7 @@ def test_match_gap_uses_effective_persisted_map_before_llm_fallback(tmp_path, mo
         facts_path,
     )
     save_cluster_map(
-        ClusterMap(theme_of={"flask": "web", "fastapi": "web"}),
+        ClusterMap(domain_of={"flask": "web", "fastapi": "web"}),
         profile_dir / "cluster_map.json",
     )
     monkeypatch.setattr(

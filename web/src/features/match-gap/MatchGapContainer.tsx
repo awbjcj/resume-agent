@@ -46,7 +46,7 @@ export function MatchGapContainer() {
   const [openSkill, setOpenSkill] = useState<SkillRow | null>(null);
   const view = useMemo(() => (data ? deriveView(data, filters) : null), [data, filters]);
   const persistedStateOf = useCallback(
-    (kind: "skill" | "theme", key: string) => view?.persistedStateOf(kind, key),
+    (kind: "skill" | "domain", key: string) => view?.persistedStateOf(kind, key),
     [view],
   );
   const suggestionRuns = useSuggestionRuns(persistedStateOf);
@@ -153,12 +153,13 @@ export function MatchGapContainer() {
                     </TabsTrigger>
                   </TabsList>
                   <span className="hidden text-xs text-muted-foreground sm:inline">
-                    Select any theme or skill to research it.
+                    Select any domain or skill to research it.
                   </span>
                 </div>
                 <TabsContent value="map">
                   <SkillMap
-                    themeRows={view.themeRows}
+                    categoryRows={view.categoryRows}
+                    categories={data.categories}
                     stateOf={suggestionRuns.stateOf}
                     selected={selectedIds}
                     onToggleSelect={toggleSelection}
@@ -167,7 +168,8 @@ export function MatchGapContainer() {
                 </TabsContent>
                 <TabsContent value="outline">
                   <RankedList
-                    themeRows={view.themeRows}
+                    domainRows={view.domainRows}
+                    categoryRows={view.categoryRows}
                     stateOf={suggestionRuns.stateOf}
                     selected={selectedIds}
                     onToggleSelect={toggleSelection}
@@ -193,9 +195,9 @@ export function MatchGapContainer() {
 
       <SkillModal
         skill={openSkill}
-        themeLabel={
+        domainLabel={
           openSkill
-            ? (view?.themeRows.find((theme) => theme.id === openSkill.themeId)?.label ?? null)
+            ? (view?.domainRows.find((domain) => domain.id === openSkill.domainId)?.label ?? null)
             : null
         }
         state={openSkill ? suggestionRuns.stateOf("skill", openSkill.key) : "none"}

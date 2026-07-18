@@ -82,7 +82,7 @@ def test_suggestion_runs_response_is_discriminated_and_camelized():
             ),
             SuggestionRunNotFoundOut(
                 outcome="not_found",
-                kind="theme",
+                kind="domain",
                 key="missing",
             ),
         ]
@@ -96,6 +96,6 @@ def test_suggestion_runs_response_is_discriminated_and_camelized():
                 "key": "python",
                 "runId": "r1",
             },
-            {"outcome": "not_found", "kind": "theme", "key": "missing"},
+            {"outcome": "not_found", "kind": "domain", "key": "missing"},
         ]
     }

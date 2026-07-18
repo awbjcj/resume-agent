@@ -19,7 +19,7 @@ from resume_agent.suggestions.agents import SuggestionDraft
 from resume_agent.tracking.match_gap import DemandGraph, profile_skill_tokens
 from resume_agent.tracking.tables import SkillSuggestion, utcnow
 
-SuggestionKind = Literal["skill", "theme"]
+SuggestionKind = Literal["skill", "domain"]
 RepoVerifier = Callable[[str, str], RepoMeta | None]
 _SQLITE_SUGGESTION_WRITE_LOCK = Lock()
 
@@ -71,13 +71,13 @@ def resolve_suggestion_context(
         members = tuple(sorted(skill.members, key=lambda item: (item.casefold(), item)))
         edge_keys = {skill.key}
     else:
-        theme = next((candidate for candidate in graph.themes if candidate.id == key), None)
+        theme = next((candidate for candidate in graph.domains if candidate.id == key), None)
         if theme is None:
             raise SuggestionTargetNotFound(kind, key)
         label = theme.label
         canonical_key = theme.id
         members = tuple(
-            sorted(skill.key for skill in graph.skills if skill.theme_id == theme.id)
+            sorted(skill.key for skill in graph.skills if skill.domain_id == theme.id)
         )
         edge_keys = set(members)
 
@@ -108,7 +108,7 @@ def find_suggestion_row(
         select(SkillSuggestion).where(SkillSuggestion.kind == context.kind)
     ).all()
     canonical = next((row for row in rows if row.key == context.key), None)
-    if canonical is not None or context.kind == "theme":
+    if canonical is not None or context.kind == "domain":
         return canonical
     legacy_keys = {context.label, *context.members}
     return next((row for row in rows if row.key in legacy_keys), None)
@@ -119,9 +119,10 @@ def suggestion_statuses(
     graph: DemandGraph,
     coverage: set[str],
 ) -> list[SuggestionStatus]:
+    purge_legacy_theme_suggestions(session)
     selected: dict[tuple[SuggestionKind, str], tuple[SkillSuggestion, SuggestionContext]] = {}
     for row in session.exec(select(SkillSuggestion)).all():
-        if row.kind not in ("skill", "theme"):
+        if row.kind not in ("skill", "domain"):
             continue
         kind: SuggestionKind = row.kind
         try:
@@ -146,6 +147,18 @@ def suggestion_statuses(
         )
         for (kind, key), (row, context) in sorted(selected.items())
     ]
+
+
+def purge_legacy_theme_suggestions(session: Session) -> int:
+    """Delete pre-taxonomy suggestion rows whose theme keys are now orphaned."""
+    rows = session.exec(
+        select(SkillSuggestion).where(SkillSuggestion.kind == "theme")
+    ).all()
+    for row in rows:
+        session.delete(row)
+    if rows:
+        session.commit()
+    return len(rows)
 
 
 def suggestion_fingerprint(
@@ -250,7 +263,7 @@ def _payload_from_evidence(
 
 
 def _search_prompt(context: SuggestionContext) -> str:
-    if context.kind == "theme":
+    if context.kind == "domain":
         return (
             f"Theme gap: {context.label}. Member skills: {', '.join(context.members)}.\n"
             f"Jobs demanding these skills: {context.jobs_context}\n"

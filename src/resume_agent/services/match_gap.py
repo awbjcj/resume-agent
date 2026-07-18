@@ -17,7 +17,11 @@ from resume_agent.taxonomy.clusters import (
     merge_cluster_map,
     prune_cluster_map,
     save_cluster_map,
-    slugify_theme as slugify_theme,
+    slugify_domain as slugify_domain,
+)
+from resume_agent.taxonomy.corrections import (
+    apply_taxonomy_corrections,
+    load_taxonomy_corrections,
 )
 from resume_agent.tracking.match_gap import collect_target_skill_tokens
 
@@ -34,6 +38,7 @@ def refresh_clusters(
     batch_size: int | None = None,
     concurrency: int | None = None,
     extra_tokens: frozenset[str] | set[str] = frozenset(),
+    corrections_path: str | Path | None = None,
 ) -> dict[str, object]:
     """Classify the current backlog, apply successes, prune, and save once."""
     settings = get_settings()
@@ -56,14 +61,22 @@ def refresh_clusters(
                     themer=themer,
                     batch_size=size,
                     concurrency=width,
+                    category_cap=settings.domains_per_category_cap,
                     reporter=reporter,
                 ),
                 canonicalizer,
                 themer,
             )
         )
-        final = prune_cluster_map(
-            merge_cluster_map(existing, outcome.additions), demanded
+        final = apply_taxonomy_corrections(
+            prune_cluster_map(
+                merge_cluster_map(existing, outcome.additions), demanded
+            ),
+            load_taxonomy_corrections(
+                corrections_path
+                if corrections_path is not None
+                else Path(path).with_name("taxonomy_corrections.json")
+            ),
         )
         if reporter is not None:
             reporter.checkpoint()
@@ -74,18 +87,18 @@ def refresh_clusters(
         for failure in outcome.failures
         if failure.phase == "canonicalize"
     )
-    theme_failures = sum(
+    domain_failures = sum(
         len(failure.tokens)
         for failure in outcome.failures
-        if failure.phase == "theme"
+        if failure.phase == "domain"
     )
     return {
         "skills": len(set(final.aliases.values())),
-        "themes": len(final.theme_label),
+        "domains": len(final.domain_label),
         "failedCanonicalTokens": canonical_failures,
-        "failedThemeTokens": theme_failures,
+        "failedDomainTokens": domain_failures,
         "canonicalBatches": outcome.metrics.canonical_batches,
-        "themeBatches": outcome.metrics.theme_batches,
+        "domainBatches": outcome.metrics.domain_batches,
         "promptBytes": outcome.metrics.prompt_bytes,
         "elapsedMs": outcome.metrics.elapsed_ms,
     }

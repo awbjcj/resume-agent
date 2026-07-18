@@ -1,7 +1,7 @@
 # Skill Constellation Three-Level Taxonomy — Design
 
 **Date:** 2026-07-18
-**Status:** Approved
+**Status:** Implemented
 **Supersedes:** the two-level theme layer of the 2026-06-27 match-gap dashboard redesign (SkillMap portion only)
 
 ## Problem

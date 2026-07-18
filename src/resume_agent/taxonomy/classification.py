@@ -13,17 +13,18 @@ from resume_agent.llm_runner import Runner, acall
 from resume_agent.progress import ProgressReporter
 from resume_agent.taxonomy.clusters import (
     ClusterMap,
-    allocate_theme_ids,
     merge_cluster_map,
+    slugify_domain,
 )
+from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
 from resume_agent.tracking.canonicalize import (
-    IncrementalSkillThemes,
-    IncrementalThemeGroup,
+    IncrementalDomainGroup,
+    IncrementalSkillDomains,
     SkillClusters,
 )
 from resume_agent.tracking.match_gap import normalize_skill
 
-ClassificationPhase = Literal["canonicalize", "theme"]
+ClassificationPhase = Literal["canonicalize", "domain"]
 
 
 @dataclass(frozen=True)
@@ -36,7 +37,7 @@ class ClassificationFailure:
 @dataclass(frozen=True)
 class ClassificationMetrics:
     canonical_batches: int
-    theme_batches: int
+    domain_batches: int
     prompt_bytes: int
     max_in_flight: int
     elapsed_ms: int
@@ -60,14 +61,15 @@ class _AliasBatchResult:
 
 
 @dataclass(frozen=True)
-class _ThemeIntent:
-    existing_theme_id: str | None = None
+class _DomainIntent:
+    existing_domain_id: str | None = None
     new_label: str | None = None
+    new_category: str | None = None
 
 
 @dataclass(frozen=True)
-class _ThemeBatchResult:
-    assignments: dict[str, _ThemeIntent]
+class _DomainBatchResult:
+    assignments: dict[str, _DomainIntent]
     failed_tokens: frozenset[str]
 
 
@@ -128,28 +130,39 @@ def _project_aliases(
     return _AliasBatchResult(assignments, frozenset(failed))
 
 
-def _project_themes(
+def _project_domains(
     content: object,
     *,
     batch: set[str],
-    existing_theme_ids: set[str],
-) -> _ThemeBatchResult:
-    if not isinstance(content, IncrementalSkillThemes):
-        return _ThemeBatchResult({}, frozenset(batch))
-    assignments: dict[str, _ThemeIntent] = {}
+    existing_domain_ids: set[str],
+    full_categories: set[str],
+) -> _DomainBatchResult:
+    if not isinstance(content, IncrementalSkillDomains):
+        return _DomainBatchResult({}, frozenset(batch))
+    assignments: dict[str, _DomainIntent] = {}
     rejected: set[str] = set()
 
-    for group in content.themes:
-        if not isinstance(group, IncrementalThemeGroup):
+    for group in content.domains:
+        if not isinstance(group, IncrementalDomainGroup):
             continue
-        existing_id = (group.existing_theme_id or "").strip() or None
+        existing_id = (group.existing_domain_id or "").strip() or None
         new_label = (group.new_label or "").strip() or None
+        new_category = (group.new_category or "").strip() or None
         valid_mode = (existing_id is None) != (new_label is None)
-        if existing_id is not None and existing_id not in existing_theme_ids:
+        if existing_id is not None and (
+            new_category is not None or existing_id not in existing_domain_ids
+        ):
             valid_mode = False
-        if new_label is not None and not any(char.isalnum() for char in new_label):
-            valid_mode = False
-        intent = _ThemeIntent(existing_theme_id=existing_id, new_label=new_label)
+        if new_label is not None:
+            if not any(char.isalnum() for char in new_label):
+                valid_mode = False
+            if new_category not in SKILL_GROUPS or new_category in full_categories:
+                valid_mode = False
+        intent = _DomainIntent(
+            existing_domain_id=existing_id,
+            new_label=new_label,
+            new_category=new_category,
+        )
         members = [normalize_skill(raw) for raw in group.skills]
         authoritative = [token for token in members if token in batch]
         if not valid_mode:
@@ -165,22 +178,92 @@ def _project_themes(
     for token in rejected:
         assignments.pop(token, None)
     failed = batch - assignments.keys()
-    return _ThemeBatchResult(assignments, frozenset(failed))
+    return _DomainBatchResult(assignments, frozenset(failed))
 
 
-def _existing_theme_context(cmap: ClusterMap) -> list[dict[str, Any]]:
+def _category_context(cmap: ClusterMap, cap: int) -> list[dict[str, Any]]:
     members: dict[str, list[str]] = {}
-    for skill, theme_id in cmap.theme_of.items():
-        members.setdefault(theme_id, []).append(skill)
-    theme_ids = set(cmap.theme_label) | set(members)
+    for skill, domain_id in cmap.domain_of.items():
+        members.setdefault(domain_id, []).append(skill)
+    domains_by_category: dict[str, list[dict[str, Any]]] = {}
+    domain_ids = set(cmap.domain_label) | set(members)
+    for domain_id in sorted(domain_ids):
+        slug = cmap.category_of.get(domain_id, "other")
+        domains_by_category.setdefault(slug, []).append(
+            {
+                "id": domain_id,
+                "label": cmap.domain_label.get(domain_id, domain_id),
+                "skills": sorted(members.get(domain_id, [])),
+            }
+        )
     return [
         {
-            "id": theme_id,
-            "label": cmap.theme_label.get(theme_id, theme_id),
-            "skills": sorted(members.get(theme_id, [])),
+            "slug": slug,
+            "label": label,
+            "full": len(domains_by_category.get(slug, [])) >= cap,
+            "domains": domains_by_category.get(slug, []),
         }
-        for theme_id in sorted(theme_ids)
+        for slug, label in SKILL_GROUPS.items()
     ]
+
+
+def _admit_new_domains(
+    existing: ClusterMap,
+    assignments: dict[str, _DomainIntent],
+    category_cap: int,
+) -> tuple[dict[str, _DomainIntent], set[str]]:
+    counts = {slug: 0 for slug in SKILL_GROUPS}
+    for domain_id in set(existing.domain_of.values()) | set(existing.domain_label):
+        counts[existing.category_of.get(domain_id, "other")] += 1
+    existing_identities = {
+        (normalize_skill(label), existing.category_of.get(domain_id, "other"))
+        for domain_id, label in existing.domain_label.items()
+    }
+    admitted_identities: set[tuple[str, str]] = set()
+    admitted: dict[str, _DomainIntent] = {}
+    rejected: set[str] = set()
+    for token, intent in assignments.items():
+        if intent.existing_domain_id is not None:
+            admitted[token] = intent
+            continue
+        assert intent.new_label is not None and intent.new_category is not None
+        identity = (normalize_skill(intent.new_label), intent.new_category)
+        if identity not in existing_identities and identity not in admitted_identities:
+            if counts[intent.new_category] >= category_cap:
+                rejected.add(token)
+                continue
+            counts[intent.new_category] += 1
+            admitted_identities.add(identity)
+        admitted[token] = intent
+    return admitted, rejected
+
+
+def _allocate_domain_proposals(
+    existing: ClusterMap, assignments: dict[str, _DomainIntent]
+) -> dict[tuple[str, str], str]:
+    existing_by_identity = {
+        (normalize_skill(label), existing.category_of.get(domain_id, "other")): domain_id
+        for domain_id, label in existing.domain_label.items()
+    }
+    proposals = {
+        (normalize_skill(intent.new_label), intent.new_category): intent.new_label.strip()
+        for intent in assignments.values()
+        if intent.new_label is not None and intent.new_category is not None
+    }
+    occupied = set(existing.domain_label) | set(existing.domain_of.values())
+    allocated: dict[tuple[str, str], str] = {}
+    for identity in sorted(proposals):
+        if identity in existing_by_identity:
+            allocated[identity] = existing_by_identity[identity]
+            continue
+        base = slugify_domain(proposals[identity])
+        domain_id, suffix = base, 2
+        while domain_id in occupied:
+            domain_id = f"{base}-{suffix}"
+            suffix += 1
+        occupied.add(domain_id)
+        allocated[identity] = domain_id
+    return allocated
 
 
 async def classify_incrementally(
@@ -191,12 +274,15 @@ async def classify_incrementally(
     themer: Runner,
     batch_size: int,
     concurrency: int,
+    category_cap: int,
     reporter: ProgressReporter | None = None,
 ) -> ClassificationOutcome:
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1")
     if concurrency < 1:
         raise ValueError("concurrency must be at least 1")
+    if category_cap < 1:
+        raise ValueError("category_cap must be at least 1")
 
     started = time.monotonic()
     semaphore = asyncio.Semaphore(concurrency)
@@ -282,16 +368,19 @@ async def classify_incrementally(
     demanded_canonicals = {
         merged_aliases[token] for token in demanded_tokens if token in merged_aliases
     }
-    theme_backlog = demanded_canonicals - existing.theme_of.keys()
-    theme_batches = _shard(theme_backlog, batch_size)
-    theme_assignments: dict[str, _ThemeIntent] = {}
-    existing_theme_ids = set(existing.theme_label) | set(existing.theme_of.values())
-    theme_context = _existing_theme_context(existing)
+    domain_backlog = demanded_canonicals - existing.domain_of.keys()
+    domain_batches = _shard(domain_backlog, batch_size)
+    domain_assignments: dict[str, _DomainIntent] = {}
+    existing_domain_ids = set(existing.domain_label) | set(existing.domain_of.values())
+    category_context = _category_context(existing, category_cap)
+    full_categories = {
+        entry["slug"] for entry in category_context if entry["full"]
+    }
 
-    async def theme(batch: list[str]):
+    async def classify_domains(batch: list[str]):
         nonlocal prompt_bytes
         prompt = json.dumps(
-            {"new": batch, "existing_themes": theme_context},
+            {"new": batch, "categories": category_context},
             separators=(",", ":"),
         )
         prompt_bytes += len(prompt.encode("utf-8"))
@@ -302,38 +391,39 @@ async def classify_incrementally(
             on_acquire=meter.acquire,
             on_release=meter.release,
         )
-        return _project_themes(
+        return _project_domains(
             response.content,
             batch=set(batch),
-            existing_theme_ids=existing_theme_ids,
+            existing_domain_ids=existing_domain_ids,
+            full_categories=full_categories,
         )
 
-    if theme_batches:
+    if domain_batches:
         if reporter is not None:
-            reporter.begin(len(theme_batches), "Grouping skills into themes")
-        theme_results = await gather_isolated(
-            theme_batches,
-            theme,
+            reporter.begin(len(domain_batches), "Grouping skills into domains")
+        domain_results = await gather_isolated(
+            domain_batches,
+            classify_domains,
             on_complete=(
-                (lambda completed: reporter.step(completed, label="Grouping skills into themes"))
+                (lambda completed: reporter.step(completed, label="Grouping skills into domains"))
                 if reporter is not None
                 else None
             ),
             checkpoint=reporter.checkpoint if reporter is not None else None,
         )
-        for batch, result in zip(theme_batches, theme_results, strict=True):
+        for batch, result in zip(domain_batches, domain_results, strict=True):
             if not result.ok or result.value is None:
                 failures.append(
                     ClassificationFailure(
-                        "theme", tuple(batch), str(result.error or "model call failed")
+                        "domain", tuple(batch), str(result.error or "model call failed")
                     )
                 )
                 continue
-            theme_assignments.update(result.value.assignments)
+            domain_assignments.update(result.value.assignments)
             if result.value.failed_tokens:
                 failures.append(
                     ClassificationFailure(
-                        "theme",
+                        "domain",
                         tuple(sorted(result.value.failed_tokens)),
                         "invalid or incomplete model output",
                     )
@@ -342,32 +432,38 @@ async def classify_incrementally(
         reporter.begin(1, "Checking skill clusters")
         reporter.step(1)
 
-    new_labels = [
-        intent.new_label
-        for intent in theme_assignments.values()
-        if intent.new_label is not None
-    ]
-    allocated = allocate_theme_ids(
-        existing_labels=existing.theme_label,
-        proposed_labels=new_labels,
+    domain_assignments, cap_rejected = _admit_new_domains(
+        existing, domain_assignments, category_cap
     )
-    theme_of: dict[str, str] = {}
-    theme_label: dict[str, str] = {}
-    for token, intent in theme_assignments.items():
-        if intent.existing_theme_id is not None:
-            theme_of[token] = intent.existing_theme_id
+    if cap_rejected:
+        failures.append(
+            ClassificationFailure(
+                "domain",
+                tuple(sorted(cap_rejected)),
+                "category domain cap reached during deterministic admission",
+            )
+        )
+    allocated = _allocate_domain_proposals(existing, domain_assignments)
+    domain_of: dict[str, str] = {}
+    domain_label: dict[str, str] = {}
+    category_of: dict[str, str] = {}
+    for token, intent in domain_assignments.items():
+        if intent.existing_domain_id is not None:
+            domain_of[token] = intent.existing_domain_id
             continue
-        assert intent.new_label is not None
-        label_key = normalize_skill(intent.new_label)
-        theme_id = allocated[label_key]
-        theme_of[token] = theme_id
-        theme_label.setdefault(theme_id, intent.new_label)
+        assert intent.new_label is not None and intent.new_category is not None
+        identity = (normalize_skill(intent.new_label), intent.new_category)
+        domain_id = allocated[identity]
+        domain_of[token] = domain_id
+        if domain_id not in existing.domain_label:
+            domain_label.setdefault(domain_id, intent.new_label)
+            category_of.setdefault(domain_id, intent.new_category)
 
     if reporter is not None:
         reporter.checkpoint()
     metrics = ClassificationMetrics(
         canonical_batches=len(alias_batches),
-        theme_batches=len(theme_batches),
+        domain_batches=len(domain_batches),
         prompt_bytes=prompt_bytes,
         max_in_flight=meter.maximum,
         elapsed_ms=round((time.monotonic() - started) * 1000),
@@ -375,8 +471,9 @@ async def classify_incrementally(
     return ClassificationOutcome(
         additions=ClusterMap(
             aliases=aliases,
-            theme_of=theme_of,
-            theme_label=theme_label,
+            domain_of=domain_of,
+            domain_label=domain_label,
+            category_of=category_of,
         ),
         failures=tuple(failures),
         metrics=metrics,

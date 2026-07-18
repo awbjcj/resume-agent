@@ -40,7 +40,7 @@ from resume_agent.config import get_settings
 
 router = APIRouter()
 
-SuggestionKind = Literal["skill", "theme"]
+SuggestionKind = Literal["skill", "domain"]
 _FACTS_PATH = "data/profile/facts.json"
 _CLUSTER_PATH = "data/profile/cluster_map.json"
 

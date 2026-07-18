@@ -1701,6 +1701,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/taxonomy/aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Alias */
+        post: operations["add_alias_api_taxonomy_aliases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/taxonomy/domains/{domain_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Domain */
+        patch: operations["patch_domain_api_taxonomy_domains__domain_id__patch"];
+        trace?: never;
+    };
+    "/api/taxonomy/domains/{domain_id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge Domain */
+        post: operations["merge_domain_api_taxonomy_domains__domain_id__merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/taxonomy/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Skill */
+        post: operations["add_skill_api_taxonomy_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/taxonomy/skills/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Skill */
+        delete: operations["remove_skill_api_taxonomy_skills__token__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/taxonomy/skills/{token}/domain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Move Skill */
+        put: operations["move_skill_api_taxonomy_skills__token__domain_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/transcribe": {
         parameters: {
             query?: never;
@@ -1799,13 +1901,6 @@ export interface components {
             /** Url */
             url: string;
         };
-        /** AddSkillIn */
-        AddSkillIn: {
-            /** Category */
-            category?: ("hard" | "soft" | "domain") | null;
-            /** Name */
-            name: string;
-        };
         /** AddSourceIn */
         AddSourceIn: {
             /**
@@ -1882,6 +1977,13 @@ export interface components {
             role?: string | null;
             /** Weeklytokenbudget */
             weeklyTokenBudget?: number | null;
+        };
+        /** AliasIn */
+        AliasIn: {
+            /** Canonical */
+            canonical: string;
+            /** Token */
+            token: string;
         };
         /** AnalyticsOut */
         AnalyticsOut: {
@@ -2095,6 +2197,18 @@ export interface components {
             };
             /** Skipped */
             skipped: number;
+        };
+        /** CategoryOut */
+        CategoryOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "hard" | "soft";
+            /** Label */
+            label: string;
+            /** Slug */
+            slug: string;
         };
         /** CoachDraftNoteOut */
         CoachDraftNoteOut: {
@@ -2390,6 +2504,42 @@ export interface components {
             sizeBytes: number;
             /** Uploadedat */
             uploadedAt: string;
+        };
+        /** DomainMergeIn */
+        DomainMergeIn: {
+            /** Into */
+            into: string;
+        };
+        /** DomainOut */
+        DomainOut: {
+            /**
+             * Adjacentcount
+             * @default 0
+             */
+            adjacentCount: number;
+            /** Category */
+            category: string;
+            /** Essentialscore */
+            essentialScore: number;
+            /** Gapcount */
+            gapCount: number;
+            /** Id */
+            id: string;
+            /** Jobcount */
+            jobCount: number;
+            /** Label */
+            label: string;
+            /** Popularscore */
+            popularScore: number;
+            /** Skillcount */
+            skillCount: number;
+        };
+        /** DomainPatchIn */
+        DomainPatchIn: {
+            /** Category */
+            category?: string | null;
+            /** Label */
+            label?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2800,8 +2950,12 @@ export interface components {
         };
         /** MatchGapOut */
         MatchGapOut: {
+            /** Categories */
+            categories: components["schemas"]["CategoryOut"][];
             /** Clustersstale */
             clustersStale: boolean;
+            /** Domains */
+            domains: components["schemas"]["DomainOut"][];
             /** Edges */
             edges: components["schemas"]["DemandEdgeOut"][];
             /** Jobs */
@@ -2812,8 +2966,6 @@ export interface components {
             suggestionStatuses?: components["schemas"]["SuggestionStatusOut"][];
             /** Targettotal */
             targetTotal: number;
-            /** Themes */
-            themes: components["schemas"]["ThemeOut"][];
         };
         /** MatrixOut */
         MatrixOut: {
@@ -2881,6 +3033,19 @@ export interface components {
              * @default claude-opus-4-8
              */
             premiumModel: string;
+        };
+        /** MoveSkillIn */
+        MoveSkillIn: {
+            /** Domainid */
+            domainId?: string | null;
+            newDomain?: components["schemas"]["NewDomainIn"] | null;
+        };
+        /** NewDomainIn */
+        NewDomainIn: {
+            /** Category */
+            category: string;
+            /** Label */
+            label: string;
         };
         /** NoteIn */
         NoteIn: {
@@ -3520,6 +3685,8 @@ export interface components {
             coverage: "covered" | "adjacent" | "gap";
             /** Covered */
             covered: boolean;
+            /** Domainid */
+            domainId?: string | null;
             /** Jobcount */
             jobCount: number;
             /** Key */
@@ -3536,8 +3703,6 @@ export interface components {
             skill: string;
             /** Tech */
             tech: number;
-            /** Themeid */
-            themeId?: string | null;
         };
         /** SkillTagOut */
         SkillTagOut: {
@@ -3649,7 +3814,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "skill" | "theme";
+            kind: "skill" | "domain";
             project?: components["schemas"]["ProjectOut"] | null;
             /** Repos */
             repos: components["schemas"]["RepoOut"][];
@@ -3664,7 +3829,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "skill" | "theme";
+            kind: "skill" | "domain";
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -3681,7 +3846,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "skill" | "theme";
+            kind: "skill" | "domain";
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -3711,7 +3876,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "skill" | "theme";
+            kind: "skill" | "domain";
             /**
              * State
              * @enum {string}
@@ -3726,7 +3891,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "skill" | "theme";
+            kind: "skill" | "domain";
         };
         /** SystemDefaults */
         SystemDefaults: {
@@ -3751,28 +3916,6 @@ export interface components {
             deep: boolean;
             /** Jobids */
             jobIds?: number[] | null;
-        };
-        /** ThemeOut */
-        ThemeOut: {
-            /**
-             * Adjacentcount
-             * @default 0
-             */
-            adjacentCount: number;
-            /** Essentialscore */
-            essentialScore: number;
-            /** Gapcount */
-            gapCount: number;
-            /** Id */
-            id: string;
-            /** Jobcount */
-            jobCount: number;
-            /** Label */
-            label: string;
-            /** Popularscore */
-            popularScore: number;
-            /** Skillcount */
-            skillCount: number;
         };
         /** TokenCreateRequest */
         TokenCreateRequest: {
@@ -3883,6 +4026,13 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** AddSkillIn */
+        resume_agent__api__schemas__profile__AddSkillIn: {
+            /** Category */
+            category?: ("hard" | "soft" | "domain") | null;
+            /** Name */
+            name: string;
+        };
         /** SourceOut */
         resume_agent__api__schemas__profile__SourceOut: {
             /** Addedat */
@@ -3927,6 +4077,14 @@ export interface components {
             pullable: boolean;
             /** Type */
             type: string;
+        };
+        /** AddSkillIn */
+        resume_agent__api__schemas__taxonomy__AddSkillIn: {
+            /** Domainid */
+            domainId?: string | null;
+            newDomain?: components["schemas"]["NewDomainIn"] | null;
+            /** Token */
+            token: string;
         };
     };
     responses: never;
@@ -6784,7 +6942,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddSkillIn"];
+                "application/json": components["schemas"]["resume_agent__api__schemas__profile__AddSkillIn"];
             };
         };
         responses: {
@@ -7949,7 +8107,7 @@ export interface operations {
     get_suggestion_api_suggestions_get: {
         parameters: {
             query: {
-                kind: "skill" | "theme";
+                kind: "skill" | "domain";
                 key: string;
             };
             header?: {
@@ -8037,6 +8195,220 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_alias_api_taxonomy_aliases_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AliasIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_domain_api_taxonomy_domains__domain_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                domain_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DomainPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    merge_domain_api_taxonomy_domains__domain_id__merge_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                domain_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DomainMergeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_skill_api_taxonomy_skills_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["resume_agent__api__schemas__taxonomy__AddSkillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_skill_api_taxonomy_skills__token__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_skill_api_taxonomy_skills__token__domain_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveSkillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchGapOut"];
                 };
             };
             /** @description Validation Error */

@@ -9,12 +9,15 @@ from resume_agent.taxonomy.classification import (
     ClassificationMetrics,
     ClassificationOutcome,
     ReconcileError,
+    _category_context,
+    _project_domains,
     classify_incrementally,
 )
 from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
 from resume_agent.tracking.canonicalize import (
-    IncrementalSkillThemes,
-    IncrementalThemeGroup,
+    IncrementalDomainGroup,
+    IncrementalSkillDomains,
     SkillClusters,
 )
 
@@ -25,7 +28,7 @@ def test_classification_contracts_hold_additions_failures_and_metrics():
     )
     metrics = ClassificationMetrics(
         canonical_batches=1,
-        theme_batches=0,
+        domain_batches=0,
         prompt_bytes=42,
         max_in_flight=1,
         elapsed_ms=10,
@@ -61,7 +64,11 @@ class _Themer:
     def __init__(self, respond=None):
         self.respond = respond or (
             lambda new, existing: [
-                IncrementalThemeGroup(new_label="Languages", skills=list(new))
+                IncrementalDomainGroup(
+                    new_label="Languages",
+                    new_category="languages",
+                    skills=list(new),
+                )
             ]
         )
         self.calls: list[dict] = []
@@ -69,10 +76,10 @@ class _Themer:
     async def arun(self, prompt):
         payload = json.loads(prompt)
         self.calls.append(payload)
-        response = self.respond(payload["new"], payload["existing_themes"])
+        response = self.respond(payload["new"], payload["categories"])
         if isinstance(response, Exception):
             raise response
-        return SimpleNamespace(content=IncrementalSkillThemes(themes=response))
+        return SimpleNamespace(content=IncrementalSkillDomains(domains=response))
 
     def run(self, prompt):
         raise AssertionError("async path expected")
@@ -87,6 +94,7 @@ def _classify(*, demanded, existing=None, canonicalizer=None, themer=None, **kwa
             themer=themer or _Themer(),
             batch_size=kwargs.pop("batch_size", 60),
             concurrency=kwargs.pop("concurrency", 4),
+            category_cap=kwargs.pop("category_cap", 12),
             **kwargs,
         )
     )
@@ -97,8 +105,8 @@ def test_warm_complete_map_makes_no_model_calls():
     themer = _Themer()
     existing = ClusterMap(
         aliases={"python": "python"},
-        theme_of={"python": "languages"},
-        theme_label={"languages": "Languages"},
+        domain_of={"python": "languages"},
+        domain_label={"languages": "Languages"},
     )
 
     outcome = _classify(
@@ -127,15 +135,15 @@ def test_reconcile_merges_cross_batch_synonyms_and_themes_the_head():
     )
 
     assert outcome.additions.aliases == {"k8s": "k8s", "kube": "k8s"}
-    assert outcome.additions.theme_of == {"k8s": "languages"}
+    assert outcome.additions.domain_of == {"k8s": "languages"}
     assert outcome.metrics.canonical_batches == 2
 
 
 def test_reconcile_preserves_aliases_that_already_target_a_stable_canonical():
     existing = ClusterMap(
         aliases={"kubernetes": "kubernetes"},
-        theme_of={"kubernetes": "cloud"},
-        theme_label={"cloud": "Cloud"},
+        domain_of={"kubernetes": "cloud"},
+        domain_label={"cloud": "Cloud"},
     )
 
     def respond(new, current):
@@ -163,7 +171,7 @@ def test_failed_canonical_batch_stays_absent_and_retryable():
     )
 
     assert outcome.additions.aliases == {"python": "python"}
-    assert "rust" not in outcome.additions.theme_of
+    assert "rust" not in outcome.additions.domain_of
     assert any(f.phase == "canonicalize" and f.tokens == ("rust",) for f in outcome.failures)
 
 
@@ -207,29 +215,29 @@ def test_existing_unthemed_canonical_is_themed_without_canonical_call():
     )
 
     assert canonicalizer.calls == []
-    assert outcome.additions.theme_of == {"python": "languages"}
+    assert outcome.additions.domain_of == {"python": "languages"}
 
 
-def test_failed_theme_batch_keeps_alias_but_not_theme():
+def test_failed_domain_batch_keeps_alias_but_not_domain():
     outcome = _classify(
         demanded={"python"},
         themer=_Themer(lambda new, existing: RuntimeError("theme down")),
     )
 
     assert outcome.additions.aliases == {"python": "python"}
-    assert outcome.additions.theme_of == {}
-    assert any(f.phase == "theme" and f.tokens == ("python",) for f in outcome.failures)
+    assert outcome.additions.domain_of == {}
+    assert any(f.phase == "domain" and f.tokens == ("python",) for f in outcome.failures)
 
 
 def test_existing_theme_id_is_reused():
     existing = ClusterMap(
         aliases={"kubernetes": "kubernetes"},
-        theme_of={"kubernetes": "cloud"},
-        theme_label={"cloud": "Cloud"},
+        domain_of={"kubernetes": "cloud"},
+        domain_label={"cloud": "Cloud"},
     )
     themer = _Themer(
         lambda new, themes: [
-            IncrementalThemeGroup(existing_theme_id="cloud", skills=list(new))
+            IncrementalDomainGroup(existing_domain_id="cloud", skills=list(new))
         ]
     )
 
@@ -237,18 +245,18 @@ def test_existing_theme_id_is_reused():
         demanded={"kubernetes", "terraform"}, existing=existing, themer=themer
     )
 
-    assert outcome.additions.theme_of == {"terraform": "cloud"}
-    assert outcome.additions.theme_label == {}
+    assert outcome.additions.domain_of == {"terraform": "cloud"}
+    assert outcome.additions.domain_label == {}
 
 
 def test_existing_theme_id_without_a_display_label_is_still_reused():
     existing = ClusterMap(
         aliases={"kubernetes": "kubernetes"},
-        theme_of={"kubernetes": "cloud"},
+        domain_of={"kubernetes": "cloud"},
     )
     themer = _Themer(
         lambda new, themes: [
-            IncrementalThemeGroup(existing_theme_id="cloud", skills=list(new))
+            IncrementalDomainGroup(existing_domain_id="cloud", skills=list(new))
         ]
     )
 
@@ -256,7 +264,7 @@ def test_existing_theme_id_without_a_display_label_is_still_reused():
         demanded={"kubernetes", "terraform"}, existing=existing, themer=themer
     )
 
-    assert outcome.additions.theme_of == {"terraform": "cloud"}
+    assert outcome.additions.domain_of == {"terraform": "cloud"}
 
 
 def test_invalid_sizes_are_rejected_at_the_interface():
@@ -264,6 +272,8 @@ def test_invalid_sizes_are_rejected_at_the_interface():
         _classify(demanded={"python"}, batch_size=0)
     with pytest.raises(ValueError, match="concurrency"):
         _classify(demanded={"python"}, concurrency=0)
+    with pytest.raises(ValueError, match="category_cap"):
+        _classify(demanded={"python"}, category_cap=0)
 
 
 def test_concurrency_metric_observes_the_semaphore_limit():
@@ -325,3 +335,113 @@ def test_prompt_metric_exposes_existing_context_growth():
     large_outcome = _classify(demanded={"rust"}, existing=large)
 
     assert large_outcome.metrics.prompt_bytes > small_outcome.metrics.prompt_bytes
+
+
+def _map_with_full_category(cap: int) -> ClusterMap:
+    domain_of = {}
+    domain_label = {}
+    category_of = {}
+    for index in range(cap):
+        domain_id = f"lang-domain-{index}"
+        domain_of[f"token{index}"] = domain_id
+        domain_label[domain_id] = f"Lang Domain {index}"
+        category_of[domain_id] = "languages"
+    return ClusterMap(
+        aliases={token: token for token in domain_of},
+        domain_of=domain_of,
+        domain_label=domain_label,
+        category_of=category_of,
+    )
+
+
+def test_project_domains_rejects_new_domain_in_full_category():
+    result = _project_domains(
+        IncrementalSkillDomains(
+            domains=[
+                IncrementalDomainGroup(
+                    new_label="Fresh Langs",
+                    new_category="languages",
+                    skills=["zig"],
+                )
+            ]
+        ),
+        batch={"zig"},
+        existing_domain_ids={"lang-domain-0"},
+        full_categories={"languages"},
+    )
+
+    assert result.assignments == {}
+    assert result.failed_tokens == frozenset({"zig"})
+
+
+def test_project_domains_accepts_reuse_in_full_category():
+    result = _project_domains(
+        IncrementalSkillDomains(
+            domains=[
+                IncrementalDomainGroup(
+                    existing_domain_id="lang-domain-0", skills=["zig"]
+                )
+            ]
+        ),
+        batch={"zig"},
+        existing_domain_ids={"lang-domain-0"},
+        full_categories={"languages"},
+    )
+
+    assert result.assignments["zig"].existing_domain_id == "lang-domain-0"
+
+
+def test_category_context_lists_all_categories_and_marks_full_ones():
+    context = _category_context(_map_with_full_category(3), cap=3)
+    by_slug = {entry["slug"]: entry for entry in context}
+
+    assert set(by_slug) == set(SKILL_GROUPS)
+    assert by_slug["languages"]["full"] is True
+    assert len(by_slug["languages"]["domains"]) == 3
+    assert by_slug["ai-ml"]["domains"] == []
+
+
+def test_concurrent_batches_cannot_overshoot_category_cap():
+    existing = _map_with_full_category(1)
+
+    def respond(new, _categories):
+        token = new[0]
+        return [
+            IncrementalDomainGroup(
+                new_label=f"Domain {token}",
+                new_category="languages",
+                skills=[token],
+            )
+        ]
+
+    outcome = _classify(
+        demanded={*existing.aliases, "alpha", "beta"},
+        existing=existing,
+        themer=_Themer(respond),
+        batch_size=1,
+        category_cap=2,
+    )
+
+    admitted = {token for token in ("alpha", "beta") if token in outcome.additions.domain_of}
+    assert admitted == {"alpha"}
+    assert any(f.phase == "domain" and f.tokens == ("beta",) for f in outcome.failures)
+
+
+def test_equal_new_labels_in_different_categories_get_distinct_ids():
+    def respond(new, _categories):
+        token = new[0]
+        category = "languages" if token == "alpha" else "cloud-infra"
+        return [
+            IncrementalDomainGroup(
+                new_label="Platform", new_category=category, skills=[token]
+            )
+        ]
+
+    outcome = _classify(
+        demanded={"alpha", "beta"},
+        themer=_Themer(respond),
+        batch_size=1,
+    )
+
+    assert len(set(outcome.additions.domain_of.values())) == 2
+    assert set(outcome.additions.category_of.values()) == {"languages", "cloud-infra"}

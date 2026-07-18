@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.taxonomy.groups import SKILL_GROUPS
+from resume_agent.taxonomy.vocabulary import LEGACY_GROUP_REMAP, SKILL_GROUPS
 from resume_agent.tracking.match_gap import normalize_skill
 
 
@@ -40,6 +40,7 @@ def load_group_corrections(path: str | Path) -> GroupCorrections:
     clean: dict[str, GroupCorrection] = {}
     for raw_token, entry in ledger.corrections.items():
         token = normalize_skill(raw_token)
+        entry.group = LEGACY_GROUP_REMAP.get(entry.group, entry.group)
         if token and entry.group in SKILL_GROUPS:
             clean.setdefault(token, entry)
     ledger.corrections = clean

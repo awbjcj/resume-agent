@@ -839,7 +839,7 @@ def match_gap_cmd(
     overrides = load_overrides(profile_dir / "overrides.yaml")
     cluster_map = effective_cluster_map(load_cluster_map(cluster_path), overrides)
     has_persisted_map = cluster_path.exists() and bool(
-        cluster_map.aliases or cluster_map.theme_of
+        cluster_map.aliases or cluster_map.domain_of
     )
     has_overrides = bool(overrides.alias or overrides.forbid_alias)
     use_cluster_map = has_persisted_map or has_overrides

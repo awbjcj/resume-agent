@@ -45,8 +45,8 @@ def _configure(monkeypatch, tmp_path):
     save_cluster_map(
         ClusterMap(
             aliases={"kubernetes": "kubernetes", "terraform": "terraform"},
-            theme_of={"kubernetes": "infra", "terraform": "infra"},
-            theme_label={"infra": "Cloud / Infrastructure"},
+            domain_of={"kubernetes": "infra", "terraform": "infra"},
+            domain_label={"infra": "Cloud / Infrastructure"},
         ),
         cluster_path,
     )
@@ -88,7 +88,7 @@ def test_unknown_targets_use_standard_not_found_envelope(monkeypatch, tmp_path):
         )
         post_response = client.post(
             "/api/suggestions/generate",
-            json={"kind": "theme", "key": "unknown"},
+            json={"kind": "domain", "key": "unknown"},
         )
 
     assert get_response.status_code == 404
@@ -168,14 +168,14 @@ def test_theme_cache_becomes_stale_when_demanding_jobs_change(monkeypatch, tmp_p
         _seed_job(app.state.engine)
         launched = client.post(
             "/api/suggestions/generate",
-            json={"kind": "theme", "key": "infra"},
+            json={"kind": "domain", "key": "infra"},
         )
         assert _wait_for_run(client, launched.json()["runId"])["state"] == "done"
 
         _seed_job(app.state.engine, company="D", skills=["Terraform"])
         cached = client.get(
             "/api/suggestions",
-            params={"kind": "theme", "key": "infra"},
+            params={"kind": "domain", "key": "infra"},
         )
 
     assert cached.json()["suggestion"]["key"] == "infra"
@@ -202,7 +202,7 @@ def test_suggestion_runs_dedupe_and_report_not_found_per_target(monkeypatch, tmp
                     {"kind": "skill", "key": "kubernetes"},
                     {"kind": "skill", "key": "kubernetes"},
                     {"kind": "skill", "key": "terraform"},
-                    {"kind": "theme", "key": "missing"},
+                    {"kind": "domain", "key": "missing"},
                 ]
             },
         )

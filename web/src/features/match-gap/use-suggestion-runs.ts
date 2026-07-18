@@ -15,12 +15,12 @@ import {
 } from "./suggestion-run-registry";
 
 type BatchResult =
-  | { outcome: "accepted"; kind: "skill" | "theme"; key: string; runId: string }
-  | { outcome: "not_found"; kind: "skill" | "theme"; key: string };
+  | { outcome: "accepted"; kind: "skill" | "domain"; key: string; runId: string }
+  | { outcome: "not_found"; kind: "skill" | "domain"; key: string };
 
 export function useSuggestionRuns(
   persistedStateOf: (
-    kind: "skill" | "theme",
+    kind: "skill" | "domain",
     key: string,
   ) => "ready" | "stale" | undefined,
 ) {
@@ -105,7 +105,7 @@ export function useSuggestionRuns(
   );
 
   const stateOf = useCallback(
-    (kind: "skill" | "theme", key: string): SuggestionState => {
+    (kind: "skill" | "domain", key: string): SuggestionState => {
       const entry = entries[targetId({ kind, key })];
       const live = entry?.runId ? runs[entry.runId]?.status : undefined;
       return effectiveSuggestionState(persistedStateOf(kind, key), entry, live);

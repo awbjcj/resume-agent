@@ -31,7 +31,7 @@ class ProjectOut(CamelModel):
 
 
 class SuggestionOut(CamelModel):
-    kind: Literal["skill", "theme"]
+    kind: Literal["skill", "domain"]
     key: str
     repos: list[RepoOut]
     resources: list[ResourceOut]
@@ -49,7 +49,7 @@ class SuggestionEnvelope(CamelModel):
 class SuggestionTarget(CamelModel):
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["skill", "theme"]
+    kind: Literal["skill", "domain"]
     key: str = Field(min_length=1, max_length=200)
 
     @field_validator("key", mode="before")
@@ -66,14 +66,14 @@ class SuggestionRunsRequest(CamelModel):
 
 class SuggestionRunAcceptedOut(CamelModel):
     outcome: Literal["accepted"]
-    kind: Literal["skill", "theme"]
+    kind: Literal["skill", "domain"]
     key: str
     run_id: str
 
 
 class SuggestionRunNotFoundOut(CamelModel):
     outcome: Literal["not_found"]
-    kind: Literal["skill", "theme"]
+    kind: Literal["skill", "domain"]
     key: str
 
 

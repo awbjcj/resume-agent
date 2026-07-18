@@ -250,8 +250,8 @@ aggressiveness determines how many detail fetches are issued.
   import validates and stages the archive, then uses rollback-safe child swaps
   because the mounted volume root itself cannot be renamed.
 - **Skill groups are a derived display axis.** `MatrixRow.group` comes from the
-  active data root's `taxonomy/skill_groups.json` (token → slug, fixed 13-slug
-  vocabulary in `taxonomy/groups.py`). Profile builds classify only missing
+  active data root's `taxonomy/skill_groups.json` (token → slug, fixed 20-slug
+  vocabulary in `taxonomy/vocabulary.py`). Profile builds classify only missing
   tokens with the cheap tier; failed batches remain absent and retry on the next
   build. Match-gap refreshes apply the saved map without an LLM, and
   `overrides.yaml`'s `group:` map wins over taxonomy. User re-categorizations
@@ -262,6 +262,16 @@ aggressiveness determines how many detail fetches are issued.
   correction, override, or taxonomy assigned the row. Groups never alter
   `facts.json` or the hard/soft/domain categories used by fact-lock; unassigned
   rows render as Other.
+- **Skill taxonomy is three-level and correction-locked.** The fixed 20-slug category
+  vocabulary lives in `taxonomy/vocabulary.py` (shared by the profile matrix group axis
+  and the constellation); LLM-clustered domains parent to exactly one category with a
+  deterministic per-category cap (`Settings.domains_per_category_cap`, default 12)
+  enforced in `classification._project_domains`, never trusted to the model. User edits
+  (move/rename/merge/add/remove/alias) write intent entries to
+  `data/taxonomy/taxonomy_corrections.json` via `services/taxonomy.py` and are replayed
+  last by `apply_taxonomy_corrections` on every load — corrections beat LLM output;
+  dangling references are inert. Legacy cluster files load aliases-only (themes ignored),
+  so the first refresh reclassifies once; legacy `theme`-kind suggestions are purged.
 - **GitHub depth is two-tier; dossiers win.** `profile/github_harvest.py` writes
   qualifying repositories' root docs (README files plus CLAUDE, CONTEXT, and
   AGENTS markdown, capped at 30 KB per file) as deterministic

@@ -14,30 +14,42 @@ import {
 import { cn } from "@/lib/utils";
 import {
   targetId,
-  UNTHEMED_ID,
+  UNASSIGNED_ID,
   type SkillRow,
   type SuggestionState,
   type SuggestionTarget,
-  type ThemeRow,
+  type CategoryRow,
 } from "./aggregate";
 import {
   buildGraph,
-  nextFocusedTheme,
+  drillTarget,
+  parentView,
   recommendedLayoutHeight,
   runLayout,
+  type MapView,
 } from "./skill-map-layout";
+import { AddSkillDialog } from "./taxonomy-edit/AddSkillDialog";
+import { ChangeCategoryDialog } from "./taxonomy-edit/ChangeCategoryDialog";
+import { MergeDomainDialog } from "./taxonomy-edit/MergeDomainDialog";
+import { MergeSkillDialog } from "./taxonomy-edit/MergeSkillDialog";
+import { MoveSkillDialog } from "./taxonomy-edit/MoveSkillDialog";
+import { RemoveSkillDialog } from "./taxonomy-edit/RemoveSkillDialog";
+import { RenameDomainDialog } from "./taxonomy-edit/RenameDomainDialog";
+import { TaxonomyNodeMenu, type TaxonomyMenuAction } from "./taxonomy-edit/TaxonomyNodeMenu";
 
 const DEFAULT_WIDTH = 900;
 
 export function SkillMap({
-  themeRows,
+  categoryRows,
+  categories,
   stateOf,
   selected,
   onToggleSelect,
   onOpenSkill,
 }: {
-  themeRows: ThemeRow[];
-  stateOf: (kind: "skill" | "theme", key: string) => SuggestionState;
+  categoryRows: CategoryRow[];
+  categories: { slug: string; label: string; kind: "hard" | "soft" }[];
+  stateOf: (kind: "skill" | "domain", key: string) => SuggestionState;
   selected: Set<string>;
   onToggleSelect: (target: SuggestionTarget) => void;
   onOpenSkill: (skill: SkillRow) => void;
@@ -48,8 +60,9 @@ export function SkillMap({
     null,
   );
   const [containerWidth, setContainerWidth] = useState(DEFAULT_WIDTH);
-  const [focusedThemeId, setFocusedThemeId] = useState<string | null>(null);
+  const [view, setView] = useState<MapView>({ level: "galaxy" });
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
+  const [menuAction, setMenuAction] = useState<TaxonomyMenuAction | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === "undefined") return;
@@ -75,13 +88,20 @@ export function SkillMap({
     };
   }, []);
 
-  const activeFocusedThemeId = themeRows.some((theme) => theme.id === focusedThemeId)
-    ? focusedThemeId
-    : null;
-  const graph = useMemo(
-    () => buildGraph(themeRows, activeFocusedThemeId),
-    [activeFocusedThemeId, themeRows],
+  const viewExists = view.level === "galaxy" || categoryRows.some((category) =>
+    category.slug === (view.level === "category" ? view.slug : view.categorySlug) &&
+    (view.level !== "domain" || category.domains.some((domain) => domain.id === view.domainId)),
   );
+  useEffect(() => {
+    if (viewExists) return;
+    const reset = window.setTimeout(() => setView({ level: "galaxy" }), 0);
+    return () => window.clearTimeout(reset);
+  }, [viewExists]);
+  const activeView = useMemo<MapView>(
+    () => (viewExists ? view : { level: "galaxy" }),
+    [view, viewExists],
+  );
+  const graph = useMemo(() => buildGraph(categoryRows, activeView), [activeView, categoryRows]);
   const dimensions = useMemo(
     () => ({
       width: containerWidth,
@@ -90,12 +110,14 @@ export function SkillMap({
     [containerWidth, graph.nodes],
   );
   const nodes = useMemo(
-    () => runLayout(graph.nodes, graph.links, dimensions.width, dimensions.height),
-    [dimensions, graph.links, graph.nodes],
+    () => runLayout(graph.nodes, graph.links, dimensions.width, dimensions.height, graph.rootId),
+    [dimensions, graph.links, graph.nodes, graph.rootId],
   );
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const focusedTheme = themeRows.find((theme) => theme.id === activeFocusedThemeId) ?? null;
+  const focusedCategory = activeView.level === "galaxy" ? null : categoryRows.find((category) => category.slug === (activeView.level === "category" ? activeView.slug : activeView.categorySlug)) ?? null;
+  const focusedDomain = activeView.level === "domain" ? focusedCategory?.domains.find((domain) => domain.id === activeView.domainId) ?? null : null;
   const transformStyle = `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`;
+  const allSkills = categoryRows.flatMap((category) => category.domains.flatMap((domain) => domain.skills));
 
   const applyZoom = (action: "in" | "out" | "reset") => {
     if (!svgRef.current || !zoomBehaviorRef.current) return;
@@ -108,11 +130,11 @@ export function SkillMap({
     else zoomBehaviorRef.current.scaleBy(svg, action === "in" ? 1.25 : 0.8);
   };
 
-  if (themeRows.length === 0) {
+  if (categoryRows.length === 0) {
     return (
       <Empty className="min-h-96 border">
         <EmptyHeader>
-          <EmptyTitle>No skill themes match these filters</EmptyTitle>
+          <EmptyTitle>No skill domains match these filters</EmptyTitle>
           <EmptyDescription>Clear a filter or refresh clustering to restore the map.</EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -127,23 +149,22 @@ export function SkillMap({
             Skill constellation
           </h2>
           <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            {focusedTheme
-              ? `Showing ${focusedTheme.skillCount} connected skills. Select a checkbox to add research.`
-              : "Choose a theme to focus its branches. Select a checkbox to add research."}
+            {focusedDomain ? `Showing ${focusedDomain.skillCount} connected skills.` : focusedCategory ? "Choose a domain to inspect its skills." : "Choose a category to explore its domains."}
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          {focusedTheme && (
+          <Button size="sm" variant="outline" onClick={() => setMenuAction({ type: "add-skill" })}>Add skill</Button>
+          {activeView.level !== "galaxy" && (
             <Button
               size="sm"
               variant="ghost"
               onClick={() => {
-                setFocusedThemeId(null);
+                setView(parentView(activeView) ?? { level: "galaxy" });
                 applyZoom("reset");
               }}
             >
               <ArrowLeftIcon data-icon="inline-start" />
-              All themes
+              {activeView.level === "domain" ? focusedCategory?.label : "All categories"}
             </Button>
           )}
           <div className="flex gap-1" aria-label="Map zoom controls">
@@ -165,7 +186,7 @@ export function SkillMap({
           ref={svgRef}
           className="absolute inset-0 size-full touch-none"
           role="img"
-          aria-label="Theme hubs connected to expanded generalized skills"
+          aria-label="Domain hubs connected to expanded generalized skills"
         >
           <g transform={transform.toString()}>
             {graph.links.map((link) => {
@@ -189,13 +210,13 @@ export function SkillMap({
           style={{ transform: transformStyle }}
         >
           {nodes.map((node) => {
-            const ready = stateOf(node.kind, node.entityKey) === "ready";
-            const target: SuggestionTarget = {
+            const ready = node.kind !== "category" && stateOf(node.kind, node.entityKey) === "ready";
+            const target: SuggestionTarget | null = node.kind === "category" ? null : {
               kind: node.kind,
               key: node.entityKey,
               label: node.label,
             };
-            const focused = node.kind === "theme" && activeFocusedThemeId === node.entityKey;
+            const focused = graph.rootId === node.id;
             return (
               <div
                 key={node.id}
@@ -203,26 +224,28 @@ export function SkillMap({
                 style={{ left: node.x, top: node.y }}
               >
                 <div className="relative flex items-center gap-2.5">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-card shadow-xs">
+                  {target && <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-card shadow-xs">
                     <Checkbox
                       aria-label={`Select ${node.label}`}
                       checked={selected.has(targetId(target))}
                       onCheckedChange={() => onToggleSelect(target)}
-                      disabled={node.kind === "theme" && node.entityKey === UNTHEMED_ID}
+                      disabled={node.kind === "domain" && node.entityKey === UNASSIGNED_ID}
                       className="size-5 bg-background"
                     />
-                  </span>
+                  </span>}
                   <Button
-                    variant={node.kind === "theme" ? "default" : "outline"}
-                    aria-pressed={node.kind === "theme" ? focused : undefined}
+                    variant={node.kind === "category" ? (node.categoryKind === "hard" ? "default" : "secondary") : node.kind === "domain" ? "default" : "outline"}
+                    aria-pressed={node.kind !== "skill" ? focused : undefined}
                     aria-label={
-                      node.kind === "theme"
-                        ? `${focused ? "Show all themes from" : "Focus"} ${node.label}`
+                      node.kind === "category"
+                        ? `Explore ${node.label}`
+                        : node.kind === "domain"
+                        ? `Explore ${node.label}`
                         : `Open ${node.label} details`
                     }
                     onClick={() => {
-                      if (node.kind === "theme") {
-                        setFocusedThemeId((current) => nextFocusedTheme(current, node.entityKey));
+                      if (node.kind !== "skill") {
+                        setView(drillTarget(activeView, node));
                         applyZoom("reset");
                       } else if (node.skill) {
                         onOpenSkill(node.skill);
@@ -243,6 +266,8 @@ export function SkillMap({
                   </Button>
                 </div>
                 {ready && <span className="text-[10px] font-semibold text-ready">Ready</span>}
+                {node.kind !== "skill" && Boolean(node.gapCount) && <span className="text-[10px] text-muted-foreground">{node.gapCount} gaps</span>}
+                <TaxonomyNodeMenu node={node} categoryRows={categoryRows} onAction={(action) => action.type === "open-details" ? onOpenSkill(action.skill) : setMenuAction(action)} />
               </div>
             );
           })}
@@ -251,18 +276,22 @@ export function SkillMap({
 
       <footer className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t px-4 py-3 text-xs text-muted-foreground sm:px-5">
         <span>
-          {focusedTheme ? `Focused on ${focusedTheme.label}` : `${themeRows.length} ${themeRows.length === 1 ? "theme" : "themes"}`} ·{" "}
-          {focusedTheme
-            ? focusedTheme.skillCount
-            : themeRows.reduce((total, theme) => total + theme.skillCount, 0)}{" "}
-          skills
+          {focusedDomain ? `Focused on ${focusedDomain.label} · ${focusedDomain.skillCount} skills` : focusedCategory ? `${focusedCategory.domains.length} domains · ${focusedCategory.skillCount} skills` : `${categoryRows.length} categories · ${categoryRows.reduce((total, category) => total + category.skillCount, 0)} skills`}
         </span>
-        <span><i className="mr-1 inline-block size-2 rounded-full bg-primary" />Theme</span>
+        {activeView.level === "galaxy" && <><span>● Hard</span><span>○ Soft</span></>}
+        <span><i className="mr-1 inline-block size-2 rounded-full bg-primary" />Domain</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-gap" />Gap</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-adjacent" />Adjacent</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-covered" />Covered</span>
         <span><i className="mr-1 inline-block size-2 rounded-full bg-ready" />Advice ready</span>
       </footer>
+      {menuAction?.type === "add-skill" && <AddSkillDialog categoryRows={categoryRows} categories={categories} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "move-skill" && <MoveSkillDialog skill={menuAction.skill} categoryRows={categoryRows} categories={categories} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "merge-skill" && <MergeSkillDialog skill={menuAction.skill} allSkills={allSkills} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "remove-skill" && <RemoveSkillDialog skill={menuAction.skill} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "rename-domain" && <RenameDomainDialog domainId={menuAction.domainId} currentLabel={menuAction.label} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "change-category" && <ChangeCategoryDialog domainId={menuAction.domainId} currentSlug={menuAction.categorySlug} categories={categories} open onOpenChange={(open) => !open && setMenuAction(null)} />}
+      {menuAction?.type === "merge-domain" && <MergeDomainDialog domainId={menuAction.domainId} categoryRows={categoryRows} open onOpenChange={(open) => !open && setMenuAction(null)} />}
     </section>
   );
 }

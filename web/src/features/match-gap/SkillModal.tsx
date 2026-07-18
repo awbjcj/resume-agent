@@ -28,13 +28,13 @@ function stateLabel(state: SuggestionState): string {
 
 export function SkillModal({
   skill,
-  themeLabel,
+  domainLabel,
   state,
   jobs,
   onClose,
 }: {
   skill: SkillRow | null;
-  themeLabel: string | null;
+  domainLabel: string | null;
   state: SuggestionState;
   jobs: Job[];
   onClose: () => void;
@@ -58,7 +58,7 @@ export function SkillModal({
           <div className="flex max-h-[92vh] flex-col">
             <DialogHeader className="border-b bg-accent/35 px-6 py-5 pr-14 sm:px-8 sm:py-6">
               <div className="flex flex-wrap items-center gap-2">
-                {themeLabel && <Badge variant="outline">{themeLabel}</Badge>}
+                {domainLabel && <Badge variant="outline">{domainLabel}</Badge>}
                 <Badge
                   variant={
                     skill.coverage === "covered"

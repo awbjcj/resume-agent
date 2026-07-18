@@ -28,7 +28,7 @@ export interface RunRecord {
   error?: string;
   result?: PullRunResult | Record<string, unknown> | null;
   meta?: RunMeta | null;
-  subject?: { kind: "skill" | "theme"; key: string };
+  subject?: { kind: "skill" | "domain"; key: string };
   /** Epoch ms of the last upsert for this run — client-side only. */
   updatedAt?: number;
 }

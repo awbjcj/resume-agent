@@ -93,7 +93,7 @@ function TrayContents({
         )}
         {targets.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Select themes or skills from the map or outline.
+            Select domains or skills from the map or outline.
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -107,7 +107,7 @@ function TrayContents({
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-sm font-medium">{target.label ?? target.key}</p>
                         <Badge variant="outline">
-                          {target.kind === "theme" ? "Theme" : "Skill"}
+                          {target.kind === "domain" ? "Domain" : "Skill"}
                         </Badge>
                       </div>
                       <div className="mt-1.5">
@@ -161,7 +161,7 @@ function TrayContents({
 
 interface SelectionTrayProps {
   targets: SuggestionTarget[];
-  stateOf: (kind: "skill" | "theme", key: string) => SuggestionState;
+  stateOf: (kind: "skill" | "domain", key: string) => SuggestionState;
   onRemove: (target: SuggestionTarget) => void;
   onClear: () => void;
   onGenerateAll: (targets: SuggestionTarget[]) => void;
@@ -206,7 +206,7 @@ export function SelectionTray(props: SelectionTrayProps) {
             <SheetHeader className="border-b pr-12">
               <SheetTitle>Research selection</SheetTitle>
               <SheetDescription>
-                Generate verified guidance for selected themes and skills.
+                Generate verified guidance for selected domains and skills.
               </SheetDescription>
             </SheetHeader>
             <TrayContents {...props} />

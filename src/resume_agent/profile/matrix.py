@@ -129,9 +129,9 @@ def effective_cluster_map(cluster_map: ClusterMap, overrides: Overrides) -> Clus
             aliases[normalized_token] = normalized_head
     aliases = _flatten_aliases(aliases)
 
-    theme_of = {
+    domain_of = {
         aliases.get(normalized_token, normalized_token): theme
-        for token, theme in cluster_map.theme_of.items()
+        for token, theme in cluster_map.domain_of.items()
         if (normalized_token := normalize_skill(token))
     }
     for pair in overrides.forbid_alias:
@@ -142,18 +142,19 @@ def effective_cluster_map(cluster_map: ClusterMap, overrides: Overrides) -> Clus
             continue
         old_first = aliases.get(first, first)
         old_second = aliases.get(second, second)
-        first_theme = theme_of.get(old_first)
-        second_theme = theme_of.get(old_second)
+        first_theme = domain_of.get(old_first)
+        second_theme = domain_of.get(old_second)
         aliases[first] = first
         aliases[second] = second
         if first_theme is not None:
-            theme_of[first] = first_theme
+            domain_of[first] = first_theme
         if second_theme is not None:
-            theme_of[second] = second_theme
+            domain_of[second] = second_theme
     return ClusterMap(
         aliases=aliases,
-        theme_of=theme_of,
-        theme_label=dict(cluster_map.theme_label),
+        domain_of=domain_of,
+        domain_label=dict(cluster_map.domain_label),
+        category_of=dict(cluster_map.category_of),
     )
 
 
@@ -168,8 +169,9 @@ def canonical_map_sha256(cluster_map: ClusterMap) -> str:
     payload = json.dumps(
         {
             "aliases": cluster_map.aliases,
-            "theme_of": cluster_map.theme_of,
-            "theme_label": cluster_map.theme_label,
+            "domain_of": cluster_map.domain_of,
+            "domain_label": cluster_map.domain_label,
+            "category_of": cluster_map.category_of,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -208,12 +210,12 @@ def build_skill_match_context(
             if row is not None:
                 coverage = "covered"
             else:
-                theme = cluster_map.theme_of.get(canonical)
+                theme = cluster_map.domain_of.get(canonical)
                 candidates = [
                     candidate
                     for candidate in matrix.rows
                     if theme is not None
-                    and cluster_map.theme_of.get(candidate.key) == theme
+                    and cluster_map.domain_of.get(candidate.key) == theme
                 ]
                 if candidates:
                     row = min(candidates, key=lambda candidate: (-candidate.strength, candidate.key))

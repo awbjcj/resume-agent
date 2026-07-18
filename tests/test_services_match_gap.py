@@ -9,15 +9,15 @@ import pytest
 
 import resume_agent.services.match_gap as match_gap_module
 from resume_agent.db import get_session, init_db, make_engine
-from resume_agent.services.match_gap import refresh_clusters, slugify_theme
+from resume_agent.services.match_gap import refresh_clusters, slugify_domain
 from resume_agent.taxonomy.classification import (
     ClassificationMetrics,
     ClassificationOutcome,
 )
 from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map, save_cluster_map
 from resume_agent.tracking.canonicalize import (
-    IncrementalSkillThemes,
-    IncrementalThemeGroup,
+    IncrementalDomainGroup,
+    IncrementalSkillDomains,
     SkillClusters,
 )
 from resume_agent.tracking.tables import Job, JobStatus
@@ -63,7 +63,11 @@ class _AsyncThemer:
     def __init__(self, respond=None):
         self.respond = respond or (
             lambda new, existing: [
-                IncrementalThemeGroup(new_label="Languages", skills=list(new))
+                IncrementalDomainGroup(
+                    new_label="Languages",
+                    new_category="languages",
+                    skills=list(new),
+                )
             ]
         )
         self.calls = 0
@@ -72,10 +76,10 @@ class _AsyncThemer:
     async def arun(self, prompt):
         self.calls += 1
         payload = json.loads(prompt)
-        response = self.respond(payload["new"], payload["existing_themes"])
+        response = self.respond(payload["new"], payload["categories"])
         if isinstance(response, Exception):
             raise response
-        return SimpleNamespace(content=IncrementalSkillThemes(themes=response))
+        return SimpleNamespace(content=IncrementalSkillDomains(domains=response))
 
     def run(self, prompt):
         raise AssertionError("async path expected")
@@ -84,9 +88,9 @@ class _AsyncThemer:
         self.closed = True
 
 
-def test_slugify_theme_uses_lowercase_hyphenated_alphanumeric_runs():
-    assert slugify_theme("  Cloud / Data & AI  ") == "cloud-data-ai"
-    assert slugify_theme("C++ / .NET") == "c-net"
+def test_slugify_domain_uses_lowercase_hyphenated_alphanumeric_runs():
+    assert slugify_domain("  Cloud / Data & AI  ") == "cloud-data-ai"
+    assert slugify_domain("C++ / .NET") == "c-net"
 
 
 def test_incremental_refresh_persists_success_and_returns_metrics(tmp_path):
@@ -119,8 +123,8 @@ def test_existing_alias_and_theme_choices_win(tmp_path):
     save_cluster_map(
         ClusterMap(
             aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"},
-            theme_of={"kubernetes": "infra"},
-            theme_label={"infra": "Infrastructure"},
+            domain_of={"kubernetes": "infra"},
+            domain_label={"infra": "Infrastructure"},
         ),
         path,
     )
@@ -135,8 +139,9 @@ def test_existing_alias_and_theme_choices_win(tmp_path):
 
     assert load_cluster_map(path) == ClusterMap(
         aliases={"go": "go", "k8s": "kubernetes", "kubernetes": "kubernetes"},
-        theme_of={"go": "languages", "kubernetes": "infra"},
-        theme_label={"infra": "Infrastructure", "languages": "Languages"},
+        domain_of={"go": "languages", "kubernetes": "infra"},
+        domain_label={"infra": "Infrastructure", "languages": "Languages"},
+        category_of={"infra": "other", "languages": "languages"},
     )
 
 
@@ -145,8 +150,8 @@ def test_reconcile_failure_preserves_last_good_cluster_file(tmp_path):
     path = tmp_path / "clusters.json"
     existing = ClusterMap(
         aliases={"go": "go"},
-        theme_of={"go": "languages"},
-        theme_label={"languages": "Languages"},
+        domain_of={"go": "languages"},
+        domain_label={"languages": "Languages"},
     )
     save_cluster_map(existing, path)
     before = path.read_text(encoding="utf-8")
@@ -179,8 +184,8 @@ def test_theme_failure_remains_unassigned_and_retries_next_refresh(tmp_path):
             themer=_AsyncThemer(lambda new, existing: RuntimeError("theme down")),
             path=path,
         )
-    assert load_cluster_map(path).theme_of == {}
-    assert first["failedThemeTokens"] == 1
+    assert load_cluster_map(path).domain_of == {}
+    assert first["failedDomainTokens"] == 1
 
     with get_session(engine) as session:
         second = refresh_clusters(
@@ -191,8 +196,8 @@ def test_theme_failure_remains_unassigned_and_retries_next_refresh(tmp_path):
         )
 
     assert canonicalizer.calls == 2
-    assert load_cluster_map(path).theme_of == {"python": "languages"}
-    assert second["failedThemeTokens"] == 0
+    assert load_cluster_map(path).domain_of == {"python": "languages"}
+    assert second["failedDomainTokens"] == 0
 
 
 def test_refresh_clusters_serializes_concurrent_calls(tmp_path, monkeypatch):

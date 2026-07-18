@@ -1,18 +1,20 @@
 import { expect, it } from "vitest";
 
-import type { ThemeRow } from "./aggregate";
+import type { CategoryRow, DomainRow } from "./aggregate";
 import {
   buildGraph,
-  nextFocusedTheme,
+  drillTarget,
+  parentView,
   recommendedLayoutHeight,
   runLayout,
   type MapNode,
 } from "./skill-map-layout";
 
-const themes: ThemeRow[] = [
+const domains: DomainRow[] = [
   {
     id: "backend",
     label: "Backend",
+    category: "engineering",
     score: 16,
     jobCount: 3,
     skillCount: 1,
@@ -22,7 +24,7 @@ const themes: ThemeRow[] = [
       {
         key: "python",
         skill: "Python",
-        themeId: "backend",
+        domainId: "backend",
         covered: false,
         coverage: "gap",
         score: 9,
@@ -37,6 +39,7 @@ const themes: ThemeRow[] = [
   {
     id: "cloud",
     label: "Cloud",
+    category: "engineering",
     score: 4,
     jobCount: 1,
     skillCount: 0,
@@ -45,38 +48,42 @@ const themes: ThemeRow[] = [
     skills: [],
   },
 ];
+const categories: CategoryRow[] = [{ slug: "engineering", label: "Engineering", kind: "hard", score: 20, jobCount: 3, skillCount: 1, gapCount: 1, adjacentCount: 0, domains }];
 
-it("builds all hubs in overview and isolates a focused theme with its leaves", () => {
-  const collapsed = buildGraph(themes, null);
-  const focused = buildGraph(themes, "backend");
+it("builds category, domain, and skill levels", () => {
+  const collapsed = buildGraph(categories, { level: "galaxy" });
+  const domainLevel = buildGraph(categories, { level: "category", slug: "engineering" });
+  const focused = buildGraph(categories, { level: "domain", domainId: "backend", categorySlug: "engineering" });
 
   expect(collapsed.nodes.map((node) => node.id)).toEqual([
-    "theme:backend",
-    "theme:cloud",
+    "category:engineering",
   ]);
+  expect(domainLevel.nodes.map((node) => node.id)).toEqual(["category:engineering", "domain:backend", "domain:cloud"]);
   expect(focused.nodes.map((node) => node.id)).toEqual([
-    "theme:backend",
+    "domain:backend",
     "skill:python",
   ]);
-  expect(focused.nodes.map((node) => node.id)).not.toContain("theme:cloud");
+  expect(focused.nodes.map((node) => node.id)).not.toContain("domain:cloud");
   expect(focused.links).toContainEqual({
-    source: "theme:backend",
+    source: "domain:backend",
     target: "skill:python",
   });
 });
 
-it("toggles a single focused theme", () => {
-  expect(nextFocusedTheme(null, "backend")).toBe("backend");
-  expect(nextFocusedTheme("backend", "backend")).toBeNull();
-  expect(nextFocusedTheme("backend", "cloud")).toBe("cloud");
+it("drills down and returns to parent views", () => {
+  const galaxy = { level: "galaxy" } as const;
+  const category = drillTarget(galaxy, buildGraph(categories, galaxy).nodes[0]);
+  expect(category).toEqual({ level: "category", slug: "engineering" });
+  expect(parentView(category)).toEqual(galaxy);
+  expect(buildGraph(categories, { level: "category", slug: "missing" }).nodes[0].kind).toBe("category");
 });
 
 it("lays out cloned inputs deterministically without mutating links", () => {
-  const graph = buildGraph(themes, "backend");
+  const graph = buildGraph(categories, { level: "domain", domainId: "backend", categorySlug: "engineering" });
   const linksBefore = structuredClone(graph.links);
   const height = recommendedLayoutHeight(graph.nodes, 800);
-  const forward = runLayout(graph.nodes, graph.links, 800, height);
-  const reverse = runLayout([...graph.nodes].reverse(), graph.links, 800, height);
+  const forward = runLayout(graph.nodes, graph.links, 800, height, graph.rootId);
+  const reverse = runLayout([...graph.nodes].reverse(), graph.links, 800, height, graph.rootId);
 
   expect(graph.links).toEqual(linksBefore);
   expect(forward.map(({ id, x, y }) => [id, Math.round(x), Math.round(y)]).sort()).toEqual(
@@ -95,13 +102,13 @@ function overlaps(left: MapNode, right: MapNode) {
 }
 
 it("keeps the rendered node boxes separated in overview and focus layouts", () => {
-  for (const graph of [buildGraph(themes, null), buildGraph(themes, "backend")]) {
+  for (const graph of [buildGraph(categories, { level: "galaxy" }), buildGraph(categories, { level: "domain", domainId: "backend", categorySlug: "engineering" })]) {
     const width = 800;
     const nodes = runLayout(
       graph.nodes,
       graph.links,
       width,
-      recommendedLayoutHeight(graph.nodes, width),
+      recommendedLayoutHeight(graph.nodes, width), graph.rootId,
     );
     for (let left = 0; left < nodes.length; left += 1) {
       for (let right = left + 1; right < nodes.length; right += 1) {

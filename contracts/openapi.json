@@ -147,37 +147,6 @@
         "title": "AddJobUrlParams",
         "type": "object"
       },
-      "AddSkillIn": {
-        "properties": {
-          "category": {
-            "anyOf": [
-              {
-                "enum": [
-                  "hard",
-                  "soft",
-                  "domain"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Category"
-          },
-          "name": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "AddSkillIn",
-        "type": "object"
-      },
       "AddSourceIn": {
         "properties": {
           "country": {
@@ -441,6 +410,28 @@
           }
         },
         "title": "AdminUserPatch",
+        "type": "object"
+      },
+      "AliasIn": {
+        "properties": {
+          "canonical": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Canonical",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "canonical"
+        ],
+        "title": "AliasIn",
         "type": "object"
       },
       "AnalyticsOut": {
@@ -1061,6 +1052,33 @@
           "reasons"
         ],
         "title": "BulkResultOut",
+        "type": "object"
+      },
+      "CategoryOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "hard",
+              "soft"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "label",
+          "kind"
+        ],
+        "title": "CategoryOut",
         "type": "object"
       },
       "CoachDraftNoteOut": {
@@ -1764,6 +1782,103 @@
           "uploadedAt"
         ],
         "title": "DocumentOut",
+        "type": "object"
+      },
+      "DomainMergeIn": {
+        "properties": {
+          "into": {
+            "minLength": 1,
+            "title": "Into",
+            "type": "string"
+          }
+        },
+        "required": [
+          "into"
+        ],
+        "title": "DomainMergeIn",
+        "type": "object"
+      },
+      "DomainOut": {
+        "properties": {
+          "adjacentCount": {
+            "default": 0,
+            "title": "Adjacentcount",
+            "type": "integer"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "essentialScore": {
+            "title": "Essentialscore",
+            "type": "integer"
+          },
+          "gapCount": {
+            "title": "Gapcount",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "jobCount": {
+            "title": "Jobcount",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "popularScore": {
+            "title": "Popularscore",
+            "type": "integer"
+          },
+          "skillCount": {
+            "title": "Skillcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "category",
+          "essentialScore",
+          "popularScore",
+          "jobCount",
+          "skillCount",
+          "gapCount"
+        ],
+        "title": "DomainOut",
+        "type": "object"
+      },
+      "DomainPatchIn": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "title": "DomainPatchIn",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2862,9 +2977,23 @@
       },
       "MatchGapOut": {
         "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
           "clustersStale": {
             "title": "Clustersstale",
             "type": "boolean"
+          },
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/DomainOut"
+            },
+            "title": "Domains",
+            "type": "array"
           },
           "edges": {
             "items": {
@@ -2897,13 +3026,6 @@
           "targetTotal": {
             "title": "Targettotal",
             "type": "integer"
-          },
-          "themes": {
-            "items": {
-              "$ref": "#/components/schemas/ThemeOut"
-            },
-            "title": "Themes",
-            "type": "array"
           }
         },
         "required": [
@@ -2912,7 +3034,8 @@
           "jobs",
           "skills",
           "edges",
-          "themes"
+          "domains",
+          "categories"
         ],
         "title": "MatchGapOut",
         "type": "object"
@@ -3075,6 +3198,55 @@
           }
         },
         "title": "ModelsConfigDoc",
+        "type": "object"
+      },
+      "MoveSkillIn": {
+        "properties": {
+          "domainId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domainid"
+          },
+          "newDomain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewDomainIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "MoveSkillIn",
+        "type": "object"
+      },
+      "NewDomainIn": {
+        "properties": {
+          "category": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Category",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "category"
+        ],
+        "title": "NewDomainIn",
         "type": "object"
       },
       "NoteIn": {
@@ -4944,6 +5116,17 @@
             "title": "Covered",
             "type": "boolean"
           },
+          "domainId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domainid"
+          },
           "jobCount": {
             "title": "Jobcount",
             "type": "integer"
@@ -4974,17 +5157,6 @@
           "tech": {
             "title": "Tech",
             "type": "integer"
-          },
-          "themeId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Themeid"
           }
         },
         "required": [
@@ -5353,7 +5525,7 @@
           "kind": {
             "enum": [
               "skill",
-              "theme"
+              "domain"
             ],
             "title": "Kind",
             "type": "string"
@@ -5404,7 +5576,7 @@
           "kind": {
             "enum": [
               "skill",
-              "theme"
+              "domain"
             ],
             "title": "Kind",
             "type": "string"
@@ -5437,7 +5609,7 @@
           "kind": {
             "enum": [
               "skill",
-              "theme"
+              "domain"
             ],
             "title": "Kind",
             "type": "string"
@@ -5519,7 +5691,7 @@
           "kind": {
             "enum": [
               "skill",
-              "theme"
+              "domain"
             ],
             "title": "Kind",
             "type": "string"
@@ -5554,7 +5726,7 @@
           "kind": {
             "enum": [
               "skill",
-              "theme"
+              "domain"
             ],
             "title": "Kind",
             "type": "string"
@@ -5621,54 +5793,6 @@
           }
         },
         "title": "TailorParams",
-        "type": "object"
-      },
-      "ThemeOut": {
-        "properties": {
-          "adjacentCount": {
-            "default": 0,
-            "title": "Adjacentcount",
-            "type": "integer"
-          },
-          "essentialScore": {
-            "title": "Essentialscore",
-            "type": "integer"
-          },
-          "gapCount": {
-            "title": "Gapcount",
-            "type": "integer"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "jobCount": {
-            "title": "Jobcount",
-            "type": "integer"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "popularScore": {
-            "title": "Popularscore",
-            "type": "integer"
-          },
-          "skillCount": {
-            "title": "Skillcount",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "label",
-          "essentialScore",
-          "popularScore",
-          "jobCount",
-          "skillCount",
-          "gapCount"
-        ],
-        "title": "ThemeOut",
         "type": "object"
       },
       "TokenCreateRequest": {
@@ -6015,6 +6139,37 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "resume_agent__api__schemas__profile__AddSkillIn": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "hard",
+                  "soft",
+                  "domain"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AddSkillIn",
+        "type": "object"
+      },
       "resume_agent__api__schemas__profile__SourceOut": {
         "properties": {
           "addedAt": {
@@ -6130,6 +6285,42 @@
           "detail"
         ],
         "title": "SourceOut",
+        "type": "object"
+      },
+      "resume_agent__api__schemas__taxonomy__AddSkillIn": {
+        "properties": {
+          "domainId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domainid"
+          },
+          "newDomain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewDomainIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "token": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "AddSkillIn",
         "type": "object"
       }
     }
@@ -11023,7 +11214,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddSkillIn"
+                "$ref": "#/components/schemas/resume_agent__api__schemas__profile__AddSkillIn"
               }
             }
           },
@@ -13219,7 +13410,7 @@
             "schema": {
               "enum": [
                 "skill",
-                "theme"
+                "domain"
               ],
               "title": "Kind",
               "type": "string"
@@ -13388,6 +13579,368 @@
           }
         },
         "summary": "Launch Tailor"
+      }
+    },
+    "/api/taxonomy/aliases": {
+      "post": {
+        "operationId": "add_alias_api_taxonomy_aliases_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchGapOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Alias"
+      }
+    },
+    "/api/taxonomy/domains/{domain_id}": {
+      "patch": {
+        "operationId": "patch_domain_api_taxonomy_domains__domain_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "domain_id",
+            "required": true,
+            "schema": {
+              "title": "Domain Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchGapOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Domain"
+      }
+    },
+    "/api/taxonomy/domains/{domain_id}/merge": {
+      "post": {
+        "operationId": "merge_domain_api_taxonomy_domains__domain_id__merge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "domain_id",
+            "required": true,
+            "schema": {
+              "title": "Domain Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainMergeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchGapOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Merge Domain"
+      }
+    },
+    "/api/taxonomy/skills": {
+      "post": {
+        "operationId": "add_skill_api_taxonomy_skills_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/resume_agent__api__schemas__taxonomy__AddSkillIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchGapOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Skill"
+      }
+    },
+    "/api/taxonomy/skills/{token}": {
+      "delete": {
+        "operationId": "remove_skill_api_taxonomy_skills__token__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchGapOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Skill"
+      }
+    },
+    "/api/taxonomy/skills/{token}/domain": {
+      "put": {
+        "operationId": "move_skill_api_taxonomy_skills__token__domain_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveSkillIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchGapOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Skill"
       }
     },
     "/api/transcribe": {

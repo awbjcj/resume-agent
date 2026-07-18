@@ -7,7 +7,7 @@ import type { SuggestionState, SuggestionTarget } from "./aggregate";
 import { SelectionTray } from "./SelectionTray";
 
 const targets: SuggestionTarget[] = [
-  { kind: "theme", key: "cloud:platform", label: "Cloud platform" },
+  { kind: "domain", key: "cloud:platform", label: "Cloud platform" },
   { kind: "skill", key: "c++", label: "C++" },
 ];
 
@@ -15,8 +15,8 @@ it("renders typed targets, statuses, removal, retry, and ordered generation acce
   const remove = vi.fn();
   const retry = vi.fn();
   const generateAll = vi.fn();
-  const stateOf = (kind: "skill" | "theme"): SuggestionState =>
-    kind === "theme" ? "failed" : "ready";
+  const stateOf = (kind: "skill" | "domain"): SuggestionState =>
+    kind === "domain" ? "failed" : "ready";
   const { container } = render(
     <SelectionTray
       targets={targets}
@@ -30,7 +30,7 @@ it("renders typed targets, statuses, removal, retry, and ordered generation acce
     />,
   );
 
-  expect(screen.getAllByText("Theme").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Domain").length).toBeGreaterThan(0);
   expect(screen.getAllByText("Skill").length).toBeGreaterThan(0);
   expect(screen.getAllByText("Failed").length).toBeGreaterThan(0);
   expect(screen.getAllByText("Ready").length).toBeGreaterThan(0);

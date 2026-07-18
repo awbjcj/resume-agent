@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import resume_agent.tracking.canonicalize as canonicalize_module
 from resume_agent.tracking.canonicalize import (
-    IncrementalSkillThemes,
-    IncrementalThemeGroup,
+    IncrementalDomainGroup,
+    IncrementalSkillDomains,
     SkillClusters,
     build_incremental_canonicalizer_agent,
     build_incremental_themer_agent,
@@ -128,16 +128,20 @@ def test_default_themer_uses_mid_model(monkeypatch):
     assert _capture_default_model(monkeypatch, canonicalize_module._default_themer_agent) == "mid"
 
 
-def test_incremental_theme_schema_distinguishes_existing_id_from_new_label():
-    content = IncrementalSkillThemes(
-        themes=[
-            IncrementalThemeGroup(existing_theme_id="cloud", skills=["kubernetes"]),
-            IncrementalThemeGroup(new_label="Languages", skills=["python"]),
+def test_incremental_domain_schema_distinguishes_existing_id_from_new_domain():
+    content = IncrementalSkillDomains(
+        domains=[
+            IncrementalDomainGroup(existing_domain_id="cloud", skills=["kubernetes"]),
+            IncrementalDomainGroup(
+                new_label="Languages",
+                new_category="languages",
+                skills=["python"],
+            ),
         ]
     )
 
-    assert content.themes[0].existing_theme_id == "cloud"
-    assert content.themes[1].new_label == "Languages"
+    assert content.domains[0].existing_domain_id == "cloud"
+    assert content.domains[1].new_category == "languages"
 
 
 def test_incremental_builders_use_expected_models_and_retry_policy(monkeypatch):
@@ -165,5 +169,5 @@ def test_incremental_builders_use_expected_models_and_retry_policy(monkeypatch):
 
     assert [entry["model"] for entry in captured] == ["premium", "mid"]
     assert captured[0]["output_schema"] is SkillClusters
-    assert captured[1]["output_schema"] is IncrementalSkillThemes
+    assert captured[1]["output_schema"] is IncrementalSkillDomains
     assert all(entry["retries"] == 3 for entry in captured)

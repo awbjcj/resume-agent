@@ -2,13 +2,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
-import { UNTHEMED_ID, type ThemeRow } from "./aggregate";
+import { UNASSIGNED_ID, type DomainRow } from "./aggregate";
 import { SkillMap } from "./SkillMap";
 
-const themeRows: ThemeRow[] = [
+const domainRows: DomainRow[] = [
   {
     id: "backend",
     label: "Backend",
+    category: "engineering",
     score: 16,
     jobCount: 3,
     skillCount: 1,
@@ -18,7 +19,7 @@ const themeRows: ThemeRow[] = [
       {
         key: "python",
         skill: "Python",
-        themeId: "backend",
+        domainId: "backend",
         covered: false,
         coverage: "gap",
         score: 9,
@@ -31,13 +32,16 @@ const themeRows: ThemeRow[] = [
     ],
   },
 ];
+const categoryRows = [{ slug: "engineering", label: "Engineering", kind: "hard" as const, score: 16, jobCount: 3, skillCount: 1, gapCount: 1, adjacentCount: 0, domains: domainRows }];
+const categories = [{ slug: "engineering", label: "Engineering", kind: "hard" as const }];
 
-it("focuses a theme and exposes real skill controls", async () => {
+it("focuses a domain and exposes real skill controls", async () => {
   const onToggleSelect = vi.fn();
   const onOpenSkill = vi.fn();
   render(
     <SkillMap
-      themeRows={themeRows}
+      categoryRows={categoryRows}
+      categories={categories}
       stateOf={(kind) => (kind === "skill" ? "ready" : "none")}
       selected={new Set()}
       onToggleSelect={onToggleSelect}
@@ -45,7 +49,9 @@ it("focuses a theme and exposes real skill controls", async () => {
     />,
   );
 
-  await userEvent.click(screen.getByRole("button", { name: /focus backend/i }));
+  expect(screen.queryByRole("checkbox", { name: /select engineering/i })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /explore engineering/i }));
+  await userEvent.click(screen.getByRole("button", { name: /explore backend/i }));
   expect(screen.getByRole("button", { name: /open python details/i })).toBeInTheDocument();
   expect(screen.getByText("Ready")).toBeInTheDocument();
   expect(screen.getByText("Adjacent")).toBeInTheDocument();
@@ -59,10 +65,11 @@ it("focuses a theme and exposes real skill controls", async () => {
   expect(onOpenSkill).toHaveBeenCalledWith(expect.objectContaining({ key: "python" }));
 });
 
-it("does not allow selecting the synthetic unthemed map node", () => {
+it("does not allow selecting the synthetic undomaind map node", async () => {
   render(
     <SkillMap
-      themeRows={[{ ...themeRows[0], id: UNTHEMED_ID, label: "Unthemed" }]}
+      categoryRows={[{ ...categoryRows[0], domains: [{ ...domainRows[0], id: UNASSIGNED_ID, label: "Unassigned" }] }]}
+      categories={categories}
       stateOf={() => "none"}
       selected={new Set()}
       onToggleSelect={vi.fn()}
@@ -70,7 +77,8 @@ it("does not allow selecting the synthetic unthemed map node", () => {
     />,
   );
 
-  expect(screen.getByRole("checkbox", { name: "Select Unthemed" })).toHaveAttribute(
+  await userEvent.click(screen.getByRole("button", { name: /explore engineering/i }));
+  expect(screen.getByRole("checkbox", { name: "Select Unassigned" })).toHaveAttribute(
     "aria-disabled",
     "true",
   );

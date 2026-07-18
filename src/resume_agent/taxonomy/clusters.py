@@ -1,4 +1,4 @@
-"""Persisted synonym aliases and thematic skill grouping."""
+"""Persisted synonym aliases and category-parented skill domains."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from resume_agent.taxonomy.vocabulary import SKILL_GROUPS
 from resume_agent.tracking.match_gap import normalize_skill
 
 _NONALNUM = re.compile(r"[^a-z0-9]+")
@@ -19,8 +20,9 @@ _NONALNUM = re.compile(r"[^a-z0-9]+")
 @dataclass
 class ClusterMap:
     aliases: dict[str, str] = field(default_factory=dict)
-    theme_of: dict[str, str] = field(default_factory=dict)
-    theme_label: dict[str, str] = field(default_factory=dict)
+    domain_of: dict[str, str] = field(default_factory=dict)
+    domain_label: dict[str, str] = field(default_factory=dict)
+    category_of: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def empty(cls) -> ClusterMap:
@@ -84,17 +86,65 @@ def _flatten_aliases(aliases: dict[str, str]) -> dict[str, str]:
     return {alias: flattened[alias] for alias in aliases}
 
 
-def _canonicalize_theme_keys(
-    theme_of: dict[str, str], aliases: dict[str, str]
+def _sanitize_aliases(aliases: dict[str, str]) -> dict[str, str]:
+    """Flatten valid alias components while dropping paths that enter a cycle."""
+    flattened: dict[str, str] = {}
+    invalid: set[str] = set()
+    for alias in aliases:
+        if alias in flattened or alias in invalid:
+            continue
+        path: list[str] = []
+        positions: set[str] = set()
+        token = alias
+        terminal: str | None = None
+        while True:
+            if token in flattened:
+                terminal = flattened[token]
+                break
+            if token in invalid or token in positions:
+                invalid.update(path)
+                break
+            target = aliases.get(token)
+            if target is None:
+                terminal = token
+                break
+            if target == token:
+                flattened[token] = token
+                terminal = token
+                break
+            positions.add(token)
+            path.append(token)
+            token = target
+        if terminal is not None:
+            for path_token in path:
+                flattened[path_token] = terminal
+    return {alias: flattened[alias] for alias in aliases if alias in flattened}
+
+
+def _canonicalize_domain_keys(
+    domain_of: dict[str, str], aliases: dict[str, str]
 ) -> dict[str, str]:
-    """Move themes to terminal tokens, preferring an explicit terminal theme."""
+    """Move domains to terminal tokens, preferring an explicit terminal domain."""
     canonical: dict[str, str] = {}
-    for token, theme_id in theme_of.items():
-        canonical.setdefault(aliases.get(token, token), theme_id)
-    for token, theme_id in theme_of.items():
+    for token, domain_id in domain_of.items():
+        canonical.setdefault(aliases.get(token, token), domain_id)
+    for token, domain_id in domain_of.items():
         if aliases.get(token, token) == token:
-            canonical[token] = theme_id
+            canonical[token] = domain_id
     return canonical
+
+
+def _sanitized_categories(
+    raw: object, domain_of: dict[str, str], domain_label: dict[str, str]
+) -> dict[str, str]:
+    category_of = {
+        domain_id: slug
+        for domain_id, slug in _validated_map(raw).items()
+        if slug in SKILL_GROUPS
+    }
+    for domain_id in set(domain_of.values()) | set(domain_label):
+        category_of.setdefault(domain_id, "other")
+    return category_of
 
 
 def load_cluster_map(path: str | Path) -> ClusterMap:
@@ -106,23 +156,29 @@ def load_cluster_map(path: str | Path) -> ClusterMap:
     if not isinstance(data, dict):
         return ClusterMap.empty()
 
-    aliases = _validated_map(
+    raw_aliases = _validated_map(
         data.get("aliases"),
         normalize_keys=True,
         normalize_values=True,
     )
-    try:
-        aliases = _flatten_aliases(aliases)
-    except ValueError:
-        return ClusterMap.empty()
-    theme_of = _canonicalize_theme_keys(
-        _validated_map(data.get("theme_of"), normalize_keys=True),
+    aliases = _sanitize_aliases(raw_aliases)
+    raw_domains = _validated_map(data.get("domain_of"), normalize_keys=True)
+    domain_of = _canonicalize_domain_keys(
+        {
+            token: domain_id
+            for token, domain_id in raw_domains.items()
+            if token not in raw_aliases or token in aliases
+        },
         aliases,
     )
+    domain_label = _validated_map(data.get("domain_label"))
     return ClusterMap(
         aliases=aliases,
-        theme_of=theme_of,
-        theme_label=_validated_map(data.get("theme_label")),
+        domain_of=domain_of,
+        domain_label=domain_label,
+        category_of=_sanitized_categories(
+            data.get("category_of"), domain_of, domain_label
+        ),
     )
 
 
@@ -132,8 +188,9 @@ def save_cluster_map(cmap: ClusterMap, path: str | Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "aliases": cmap.aliases,
-        "theme_of": cmap.theme_of,
-        "theme_label": cmap.theme_label,
+        "domain_of": cmap.domain_of,
+        "domain_label": cmap.domain_label,
+        "category_of": cmap.category_of,
     }
     content = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     temporary: Path | None = None
@@ -170,12 +227,13 @@ def merge_cluster_map(existing: ClusterMap, new: ClusterMap) -> ClusterMap:
     for terminal in existing_aliases.values():
         protected_aliases.setdefault(terminal, terminal)
     aliases = _flatten_aliases(merge_map(protected_aliases, new.aliases))
-    existing_themes = _canonicalize_theme_keys(existing.theme_of, aliases)
-    new_themes = _canonicalize_theme_keys(new.theme_of, aliases)
+    existing_domains = _canonicalize_domain_keys(existing.domain_of, aliases)
+    new_domains = _canonicalize_domain_keys(new.domain_of, aliases)
     return ClusterMap(
         aliases=aliases,
-        theme_of=merge_map(existing_themes, new_themes),
-        theme_label=merge_map(existing.theme_label, new.theme_label),
+        domain_of=merge_map(existing_domains, new_domains),
+        domain_label=merge_map(existing.domain_label, new.domain_label),
+        category_of=merge_map(existing.category_of, new.category_of),
     )
 
 
@@ -189,39 +247,50 @@ def prune_cluster_map(cmap: ClusterMap, demanded_tokens: set[str]) -> ClusterMap
     canonicals = set(aliases.values())
     for canonical in canonicals:
         aliases.setdefault(canonical, canonical)
-    theme_of = {
-        canonical: theme_id
-        for canonical, theme_id in cmap.theme_of.items()
+    domain_of = {
+        canonical: domain_id
+        for canonical, domain_id in cmap.domain_of.items()
         if canonical in canonicals
     }
-    used_theme_ids = set(theme_of.values())
-    theme_label = {
-        theme_id: label
-        for theme_id, label in cmap.theme_label.items()
-        if theme_id in used_theme_ids
+    used_domain_ids = set(domain_of.values())
+    domain_label = {
+        domain_id: label
+        for domain_id, label in cmap.domain_label.items()
+        if domain_id in used_domain_ids
     }
-    return ClusterMap(aliases=aliases, theme_of=theme_of, theme_label=theme_label)
+    category_of = {
+        domain_id: slug
+        for domain_id, slug in cmap.category_of.items()
+        if domain_id in used_domain_ids
+    }
+    return ClusterMap(
+        aliases=aliases,
+        domain_of=domain_of,
+        domain_label=domain_label,
+        category_of=category_of,
+    )
 
 
-def slugify_theme(label: str) -> str:
-    """Convert a theme label to a deterministic lowercase identifier."""
+def slugify_domain(label: str) -> str:
+    """Convert a domain label to a deterministic lowercase identifier."""
     return _NONALNUM.sub("-", label.lower()).strip("-")
 
 
-def allocate_theme_ids(
+def allocate_domain_ids(
     *,
     existing_labels: dict[str, str],
     proposed_labels: Collection[str],
 ) -> dict[str, str]:
     """Allocate deterministic IDs without overwriting stable existing labels."""
     existing_by_label = {
-        normalize_skill(label): theme_id for theme_id, label in existing_labels.items()
+        normalize_skill(label): domain_id
+        for domain_id, label in existing_labels.items()
     }
     proposed_by_key: dict[str, str] = {}
     for label in proposed_labels:
         label_key = normalize_skill(label)
-        if not label_key or not slugify_theme(label):
-            raise ValueError("theme label must contain an alphanumeric character")
+        if not label_key or not slugify_domain(label):
+            raise ValueError("domain label must contain an alphanumeric character")
         proposed_by_key.setdefault(label_key, label.strip())
     occupied = set(existing_labels)
     allocated: dict[str, str] = {}
@@ -229,14 +298,14 @@ def allocate_theme_ids(
         if label_key in existing_by_label:
             allocated[label_key] = existing_by_label[label_key]
             continue
-        base = slugify_theme(proposed_by_key[label_key])
+        base = slugify_domain(proposed_by_key[label_key])
         if not base:
-            raise ValueError("theme label must contain an alphanumeric character")
-        theme_id = base
+            raise ValueError("domain label must contain an alphanumeric character")
+        domain_id = base
         suffix = 2
-        while theme_id in occupied:
-            theme_id = f"{base}-{suffix}"
+        while domain_id in occupied:
+            domain_id = f"{base}-{suffix}"
             suffix += 1
-        occupied.add(theme_id)
-        allocated[label_key] = theme_id
+        occupied.add(domain_id)
+        allocated[label_key] = domain_id
     return allocated

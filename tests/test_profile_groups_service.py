@@ -35,7 +35,7 @@ def profile_dir(tmp_path):
 
 def test_set_group_raises_when_profile_not_built(tmp_path):
     with pytest.raises(ProfileNotBuiltError):
-        set_group(tmp_path / "profile", "python", "data-ml")
+        set_group(tmp_path / "profile", "python", "ai-ml")
 
 
 def test_set_group_rejects_unknown_slug(profile_dir):
@@ -54,44 +54,44 @@ def test_set_group_rejects_unknown_skill_without_persisting_matrix(profile_dir):
 
 
 def test_set_group_writes_ledger_and_matrix(profile_dir):
-    row = set_group(profile_dir, "python", "data-ml")
+    row = set_group(profile_dir, "python", "ai-ml")
 
-    assert (row.group, row.group_source) == ("data-ml", "correction")
+    assert (row.group, row.group_source) == ("ai-ml", "correction")
     ledger = load_group_corrections(corrections_path(profile_dir))
-    assert ledger.as_map() == {"python": "data-ml"}
+    assert ledger.as_map() == {"python": "ai-ml"}
     assert ledger.corrections["python"].corrected_at
     saved = load_matrix(profile_dir / "matrix.json")
     assert saved is not None
     assert (saved.rows[0].group, saved.rows[0].group_source) == (
-        "data-ml",
+        "ai-ml",
         "correction",
     )
 
 
 def test_set_group_resolves_aliases_to_the_canonical_token(profile_dir):
-    row = set_group(profile_dir, "py", "data-ml")
+    row = set_group(profile_dir, "py", "ai-ml")
 
     assert row.key == "python"
     assert load_group_corrections(corrections_path(profile_dir)).as_map() == {
-        "python": "data-ml"
+        "python": "ai-ml"
     }
 
 
 def test_correction_survives_taxonomy_reset_and_rebuild(profile_dir):
-    set_group(profile_dir, "python", "data-ml")
+    set_group(profile_dir, "python", "ai-ml")
     group_map_path(profile_dir).unlink()
 
     facts = load_facts(profile_dir / "facts.json")
     matrix = rebuild_saved_matrix(profile_dir, facts)
 
     assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
-        "data-ml",
+        "ai-ml",
         "correction",
     )
 
 
 def test_clear_group_reverts_to_taxonomy(profile_dir):
-    set_group(profile_dir, "python", "data-ml")
+    set_group(profile_dir, "python", "ai-ml")
 
     clear_group(profile_dir, "py")
 

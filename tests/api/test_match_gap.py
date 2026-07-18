@@ -29,18 +29,20 @@ def test_match_gap_empty_db_returns_empty_graph():
     assert body["jobs"] == []
     assert body["skills"] == []
     assert body["edges"] == []
-    assert body["themes"] == []
+    assert body["domains"] == []
+    assert len(body["categories"]) == 20
     assert body["suggestionStatuses"] == []
     assert body["clustersStale"] is False
 
 
-def test_match_gap_projects_jobs_skills_edges_and_themes(monkeypatch, tmp_path):
+def test_match_gap_projects_jobs_skills_edges_domains_and_categories(monkeypatch, tmp_path):
     cluster_path = tmp_path / "cluster_map.json"
     save_cluster_map(
         ClusterMap(
             aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"},
-            theme_of={"kubernetes": "infra"},
-            theme_label={"infra": "Cloud / Infrastructure"},
+            domain_of={"kubernetes": "infra"},
+            domain_label={"infra": "Cloud / Infrastructure"},
+            category_of={"infra": "cloud-infra"},
         ),
         cluster_path,
     )
@@ -67,7 +69,8 @@ def test_match_gap_projects_jobs_skills_edges_and_themes(monkeypatch, tmp_path):
         resp = client.get("/api/match-gap")
 
     assert resp.status_code == 200
-    assert resp.json() == {
+    body = resp.json()
+    assert {**body, "categories": []} == {
         "targetTotal": 1,
         "clustersStale": False,
         "jobs": [
@@ -81,9 +84,9 @@ def test_match_gap_projects_jobs_skills_edges_and_themes(monkeypatch, tmp_path):
         "skills": [
             {
                 "skill": "K8s",
-                "themeId": "infra",
-                    "covered": False,
-                    "coverage": "gap",
+                "domainId": "infra",
+                "covered": False,
+                "coverage": "gap",
                 "key": "kubernetes",
                 "members": {"K8s": 1, "Kubernetes": 1},
                 "must": 1,
@@ -106,19 +109,26 @@ def test_match_gap_projects_jobs_skills_edges_and_themes(monkeypatch, tmp_path):
                 "skillKey": "kubernetes",
             },
         ],
-        "themes": [
+        "domains": [
             {
                 "id": "infra",
                 "label": "Cloud / Infrastructure",
+                "category": "cloud-infra",
                 "essentialScore": 5,
                 "popularScore": 1,
                 "jobCount": 1,
                 "skillCount": 1,
-                    "gapCount": 1,
-                    "adjacentCount": 0,
-                }
+                "gapCount": 1,
+                "adjacentCount": 0,
+            }
         ],
+        "categories": [],
         "suggestionStatuses": [],
+    }
+    assert body["categories"][7] == {
+        "slug": "cloud-infra",
+        "label": "Cloud & Infrastructure",
+        "kind": "hard",
     }
 
 
@@ -126,8 +136,8 @@ def test_match_gap_includes_canonical_persisted_suggestion_status(monkeypatch, t
     cluster_path = tmp_path / "cluster_map.json"
     cluster_map = ClusterMap(
         aliases={"python": "python"},
-        theme_of={"python": "backend"},
-        theme_label={"backend": "Backend"},
+        domain_of={"python": "backend"},
+        domain_label={"backend": "Backend"},
     )
     save_cluster_map(cluster_map, cluster_path)
     monkeypatch.setattr(router_mod, "_CLUSTER_PATH", str(cluster_path))

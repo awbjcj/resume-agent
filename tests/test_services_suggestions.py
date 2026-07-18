@@ -8,6 +8,7 @@ from resume_agent.services.suggestions import (
     SuggestionContext,
     SuggestionTargetNotFound,
     generate_suggestion,
+    purge_legacy_theme_suggestions,
     resolve_suggestion_context,
     suggestion_fingerprint,
     suggestion_statuses,
@@ -23,7 +24,7 @@ from resume_agent.tracking.match_gap import (
     DemandGraph,
     JobLite,
     SkillNode,
-    ThemeNode,
+    DomainNode,
 )
 from resume_agent.tracking.tables import SkillSuggestion
 
@@ -73,14 +74,14 @@ def _graph():
             DemandEdge(2, "Kubernetes", "tech", "kubernetes"),
             DemandEdge(2, "Terraform", "must", "terraform"),
         ],
-        themes=[ThemeNode("infra", "Cloud / Infrastructure")],
+        domains=[DomainNode("infra", "Cloud / Infrastructure")],
     )
 
 
 def test_resolve_suggestion_context_uses_server_graph_for_skill_and_theme():
     skill = resolve_suggestion_context(_graph(), kind="skill", key="kubernetes")
     legacy = resolve_suggestion_context(_graph(), kind="skill", key="K8s")
-    theme = resolve_suggestion_context(_graph(), kind="theme", key="infra")
+    theme = resolve_suggestion_context(_graph(), kind="domain", key="infra")
 
     assert skill.key == "kubernetes"
     assert skill.members == ("K8s", "Kubernetes")
@@ -94,7 +95,7 @@ def test_resolve_suggestion_context_uses_server_graph_for_skill_and_theme():
 
 def test_resolve_suggestion_context_rejects_unknown_target():
     with pytest.raises(SuggestionTargetNotFound):
-        resolve_suggestion_context(_graph(), kind="theme", key="unknown")
+        resolve_suggestion_context(_graph(), kind="domain", key="unknown")
 
 
 def test_fingerprint_changes_with_coverage_members_and_jobs():
@@ -263,3 +264,16 @@ def test_suggestion_statuses_use_canonical_keys_and_prefer_canonical_rows():
     assert [(status.key, status.state) for status in statuses] == [
         ("kubernetes", "ready")
     ]
+
+
+def test_purge_legacy_theme_suggestions_deletes_only_theme_rows():
+    engine = _engine()
+    with Session(engine) as session:
+        session.add(SkillSuggestion(kind="theme", key="old-theme", payload_json={}))
+        session.add(SkillSuggestion(kind="skill", key="python", payload_json={}))
+        session.commit()
+
+        assert purge_legacy_theme_suggestions(session) == 1
+
+        remaining = session.exec(select(SkillSuggestion)).all()
+        assert [row.kind for row in remaining] == ["skill"]

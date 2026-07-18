@@ -590,7 +590,7 @@ def test_run_score_builds_context_from_each_jobs_criteria(tmp_path):
 
     agent = _CapturingFitAgent()
     matrix = SkillMatrix(rows=[MatrixRow(key="flask", display="Flask", strength=2.0)])
-    cluster_map = ClusterMap(theme_of={"flask": "web", "fastapi": "web"})
+    cluster_map = ClusterMap(domain_of={"flask": "web", "fastapi": "web"})
     with _session() as session:
         save_job(
             session,

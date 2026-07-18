@@ -6,7 +6,7 @@ import pytest
 from resume_agent.taxonomy import clusters
 from resume_agent.taxonomy.clusters import (
     ClusterMap,
-    allocate_theme_ids,
+    allocate_domain_ids,
     load_cluster_map,
     merge_cluster_map,
     prune_cluster_map,
@@ -42,12 +42,12 @@ def test_load_cluster_map_validates_trims_and_normalizes_maps(tmp_path):
                     "": "python",
                     "bad-value": 3,
                 },
-                "theme_of": {
+                "domain_of": {
                     " Kubernetes ": " infra ",
                     "Rust": "",
                     "bad-value": 7,
                 },
-                "theme_label": {
+                "domain_label": {
                     " infra ": " Cloud / Infra ",
                     "": "Missing id",
                     "bad-value": None,
@@ -59,8 +59,9 @@ def test_load_cluster_map_validates_trims_and_normalizes_maps(tmp_path):
 
     assert load_cluster_map(path) == ClusterMap(
         aliases={"k8s": "kubernetes", "node js": "node.js"},
-        theme_of={"kubernetes": "infra"},
-        theme_label={"infra": "Cloud / Infra"},
+        domain_of={"kubernetes": "infra"},
+        domain_label={"infra": "Cloud / Infra"},
+        category_of={"infra": "other"},
     )
 
 
@@ -70,8 +71,8 @@ def test_load_cluster_map_flattens_alias_chains_and_canonicalizes_themes(tmp_pat
         json.dumps(
             {
                 "aliases": {"a": "b", "b": "c", "c": "c"},
-                "theme_of": {"b": "terminal-theme"},
-                "theme_label": {"terminal-theme": "Terminal"},
+                "domain_of": {"b": "terminal-theme"},
+                "domain_label": {"terminal-theme": "Terminal"},
             }
         ),
         encoding="utf-8",
@@ -79,25 +80,73 @@ def test_load_cluster_map_flattens_alias_chains_and_canonicalizes_themes(tmp_pat
 
     assert load_cluster_map(path) == ClusterMap(
         aliases={"a": "c", "b": "c", "c": "c"},
-        theme_of={"c": "terminal-theme"},
-        theme_label={"terminal-theme": "Terminal"},
+        domain_of={"c": "terminal-theme"},
+        domain_label={"terminal-theme": "Terminal"},
+        category_of={"terminal-theme": "other"},
     )
 
 
-def test_load_cluster_map_cyclic_aliases_degrade_to_empty(tmp_path):
+def test_load_cluster_map_drops_only_cyclic_alias_component(tmp_path):
     path = tmp_path / "clusters.json"
     path.write_text(
         json.dumps(
             {
-                "aliases": {"a": "b", "b": "a"},
-                "theme_of": {"a": "cycle"},
-                "theme_label": {"cycle": "Cycle"},
+                "aliases": {"a": "b", "b": "a", "python": "python"},
+                "domain_of": {"a": "cycle", "python": "scripting"},
+                "domain_label": {"cycle": "Cycle", "scripting": "Scripting"},
+                "category_of": {"scripting": "languages"},
             }
         ),
         encoding="utf-8",
     )
 
-    assert load_cluster_map(path) == ClusterMap.empty()
+    assert load_cluster_map(path) == ClusterMap(
+        aliases={"python": "python"},
+        domain_of={"python": "scripting"},
+        domain_label={"cycle": "Cycle", "scripting": "Scripting"},
+        category_of={"cycle": "other", "scripting": "languages"},
+    )
+
+
+def test_load_ignores_legacy_theme_keys_but_keeps_aliases(tmp_path):
+    path = tmp_path / "cluster_map.json"
+    path.write_text(
+        json.dumps(
+            {
+                "aliases": {"js": "javascript", "javascript": "javascript"},
+                "theme_of": {"javascript": "frontend"},
+                "theme_label": {"frontend": "Frontend"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cmap = load_cluster_map(path)
+
+    assert cmap.aliases == {"js": "javascript", "javascript": "javascript"}
+    assert cmap.domain_of == {}
+    assert cmap.domain_label == {}
+    assert cmap.category_of == {}
+
+
+def test_load_sanitizes_categories_and_backfills_known_domains(tmp_path):
+    path = tmp_path / "cluster_map.json"
+    path.write_text(
+        json.dumps(
+            {
+                "aliases": {"python": "python"},
+                "domain_of": {"python": "scripting"},
+                "domain_label": {"scripting": "Scripting", "orphan": "Orphan"},
+                "category_of": {"scripting": "not-a-real-slug"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert load_cluster_map(path).category_of == {
+        "scripting": "other",
+        "orphan": "other",
+    }
 
 
 def test_load_cluster_map_flattens_deep_alias_chain_without_recursion(tmp_path):
@@ -118,8 +167,9 @@ def test_save_cluster_map_roundtrips_deterministically_without_fixed_temp(tmp_pa
     fixed_temp.write_text("leave me alone", encoding="utf-8")
     cmap = ClusterMap(
         aliases={"z": "zeta", "a": "alpha"},
-        theme_of={"zeta": "t2", "alpha": "t1"},
-        theme_label={"t2": "Zeta", "t1": "Alpha"},
+        domain_of={"zeta": "t2", "alpha": "t1"},
+        domain_label={"t2": "Zeta", "t1": "Alpha"},
+        category_of={"t2": "other", "t1": "languages"},
     )
 
     save_cluster_map(cmap, path)
@@ -131,8 +181,9 @@ def test_save_cluster_map_roundtrips_deterministically_without_fixed_temp(tmp_pa
     assert first == json.dumps(
         {
             "aliases": cmap.aliases,
-            "theme_of": cmap.theme_of,
-            "theme_label": cmap.theme_label,
+            "domain_of": cmap.domain_of,
+            "domain_label": cmap.domain_label,
+            "category_of": cmap.category_of,
         },
         indent=2,
         sort_keys=True,
@@ -172,13 +223,15 @@ def test_save_cluster_map_atomically_replaces_and_cleans_failed_temp(tmp_path, m
 def test_merge_cluster_map_is_monotonic_with_existing_values_winning():
     existing = ClusterMap(
         aliases={"k8s": "kubernetes"},
-        theme_of={"kubernetes": "infra"},
-        theme_label={"infra": "Infrastructure"},
+        domain_of={"kubernetes": "infra"},
+        domain_label={"infra": "Infrastructure"},
+        category_of={"infra": "cloud-infra"},
     )
     new = ClusterMap(
         aliases={"k8s": "k8s", "kube": "k8s"},
-        theme_of={"kubernetes": "platform", "react": "frontend"},
-        theme_label={"infra": "Renamed", "frontend": "Frontend"},
+        domain_of={"kubernetes": "platform", "react": "frontend"},
+        domain_label={"infra": "Renamed", "frontend": "Frontend"},
+        category_of={"infra": "tools-platforms", "frontend": "frontend-web"},
     )
 
     assert merge_cluster_map(existing, new) == ClusterMap(
@@ -187,8 +240,9 @@ def test_merge_cluster_map_is_monotonic_with_existing_values_winning():
             "kubernetes": "kubernetes",
             "kube": "kubernetes",
         },
-        theme_of={"kubernetes": "infra", "react": "frontend"},
-        theme_label={"infra": "Infrastructure", "frontend": "Frontend"},
+        domain_of={"kubernetes": "infra", "react": "frontend"},
+        domain_label={"infra": "Infrastructure", "frontend": "Frontend"},
+        category_of={"infra": "cloud-infra", "frontend": "frontend-web"},
     )
 
 
@@ -222,35 +276,37 @@ def test_prune_keeps_terminal_required_by_a_demanded_alias():
     pruned = prune_cluster_map(
         ClusterMap(
             aliases={"k8s": "kubernetes", "kubernetes": "kubernetes", "cobol": "cobol"},
-            theme_of={"kubernetes": "cloud", "cobol": "legacy"},
-            theme_label={"cloud": "Cloud", "legacy": "Legacy"},
+            domain_of={"kubernetes": "cloud", "cobol": "legacy"},
+            domain_label={"cloud": "Cloud", "legacy": "Legacy"},
+            category_of={"cloud": "cloud-infra", "legacy": "other"},
         ),
         {"k8s"},
     )
 
     assert pruned == ClusterMap(
         aliases={"k8s": "kubernetes", "kubernetes": "kubernetes"},
-        theme_of={"kubernetes": "cloud"},
-        theme_label={"cloud": "Cloud"},
+        domain_of={"kubernetes": "cloud"},
+        domain_label={"cloud": "Cloud"},
+        category_of={"cloud": "cloud-infra"},
     )
 
 
-def test_allocate_theme_ids_is_collision_safe_and_order_independent():
-    forward = allocate_theme_ids(existing_labels={"c": "C"}, proposed_labels=["C++", "C#"])
-    reverse = allocate_theme_ids(existing_labels={"c": "C"}, proposed_labels=["C#", "C++"])
+def test_allocate_domain_ids_is_collision_safe_and_order_independent():
+    forward = allocate_domain_ids(existing_labels={"c": "C"}, proposed_labels=["C++", "C#"])
+    reverse = allocate_domain_ids(existing_labels={"c": "C"}, proposed_labels=["C#", "C++"])
 
     assert forward == reverse
     assert set(forward.values()) == {"c-2", "c-3"}
 
 
-def test_allocate_theme_ids_reuses_equal_normalized_labels():
-    allocated = allocate_theme_ids(
+def test_allocate_domain_ids_reuses_equal_normalized_labels():
+    allocated = allocate_domain_ids(
         existing_labels={}, proposed_labels=["Cloud / Infra", " cloud-infra "]
     )
 
     assert allocated == {"cloud infra": "cloud-infra"}
 
 
-def test_allocate_theme_ids_rejects_empty_slug():
-    with pytest.raises(ValueError, match="theme label"):
-        allocate_theme_ids(existing_labels={}, proposed_labels=["---"])
+def test_allocate_domain_ids_rejects_empty_slug():
+    with pytest.raises(ValueError, match="domain label"):
+        allocate_domain_ids(existing_labels={}, proposed_labels=["---"])

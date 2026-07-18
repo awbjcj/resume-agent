@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     prompt_cache_enabled: bool = True
     suggestion_batch_concurrency: int = Field(default=3, ge=1, le=16)
     cluster_batch_size: int = Field(default=60, ge=1, le=500)
+    domains_per_category_cap: int = Field(default=12, ge=3, le=15)
     search_mode: Literal["auto", "native", "tool", "off"] = "auto"
     advisor_model: str = ""
 

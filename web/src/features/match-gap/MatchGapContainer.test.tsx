@@ -19,6 +19,7 @@ const wrap = (ui: ReactNode) => {
 const populated = {
   targetTotal: 2,
   clustersStale: false,
+  categories: [{ slug: "cloud-infrastructure", label: "Cloud & Infrastructure", kind: "hard" }],
   jobs: [
     { id: 1, company: "Stripe", title: "Backend", seniority: "senior" },
     { id: 2, company: "Datadog", title: "Platform", seniority: "mid" },
@@ -27,7 +28,7 @@ const populated = {
     {
       key: "kubernetes",
       skill: "Kubernetes",
-      themeId: "infra",
+      domainId: "infra",
       covered: false,
       coverage: "adjacent",
       members: { Kubernetes: 2 },
@@ -39,7 +40,7 @@ const populated = {
     {
       key: "terraform",
       skill: "Terraform",
-      themeId: "infra",
+      domainId: "infra",
       covered: true,
       coverage: "covered",
       members: { Terraform: 1 },
@@ -54,10 +55,11 @@ const populated = {
     { jobId: 2, skill: "Kubernetes", skillKey: "kubernetes", source: "tech" },
     { jobId: 2, skill: "Terraform", skillKey: "terraform", source: "must" },
   ],
-  themes: [
+  domains: [
     {
       id: "infra",
       label: "Cloud / Infrastructure",
+      category: "cloud-infrastructure",
       essentialScore: 7,
       popularScore: 3,
       jobCount: 2,
@@ -80,22 +82,24 @@ describe("MatchGapContainer", () => {
 
     expect(await screen.findByText("Skill constellation")).toBeInTheDocument();
     expect(screen.getAllByText("2", { selector: "div.text-3xl" })).toHaveLength(2);
+    await userEvent.click(screen.getByRole("button", { name: "Explore Cloud & Infrastructure" }));
     await userEvent.click(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure" }));
     expect(screen.getByRole("button", { name: "Open selection tray" })).toHaveTextContent("1");
 
     await userEvent.click(screen.getByRole("tab", { name: "Outline" }));
-    expect(screen.getByText("Ranked skill themes")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure theme" })).toBeChecked();
+    expect(screen.getByText("Ranked skill domains")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure domain" })).toBeChecked();
 
     await userEvent.click(screen.getByRole("tab", { name: "Map" }));
+    await userEvent.click(screen.getByRole("button", { name: "Explore Cloud & Infrastructure" }));
     expect(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure" })).toBeChecked();
   });
 
-  it("focuses one theme and hides unrelated branches until returning to the overview", async () => {
+  it("focuses one domain and hides unrelated branches until returning to the overview", async () => {
     const backendSkill = {
       key: "python",
       skill: "Python",
-      themeId: "backend",
+      domainId: "backend",
       covered: true,
       coverage: "covered",
       members: { Python: 1 },
@@ -113,11 +117,12 @@ describe("MatchGapContainer", () => {
             ...populated.edges,
             { jobId: 1, skill: "Python", skillKey: "python", source: "must" },
           ],
-          themes: [
-            ...populated.themes,
+          domains: [
+            ...populated.domains,
             {
               id: "backend",
               label: "Backend systems",
+              category: "cloud-infrastructure",
               essentialScore: 3,
               popularScore: 1,
               jobCount: 1,
@@ -131,20 +136,19 @@ describe("MatchGapContainer", () => {
     );
     wrap(<MatchGapContainer />);
 
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Focus Cloud / Infrastructure" }),
-    );
-    expect(screen.queryByRole("button", { name: "Focus Backend systems" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Explore Cloud & Infrastructure" }));
+    await userEvent.click(screen.getByRole("button", { name: "Explore Cloud / Infrastructure" }));
+    expect(screen.queryByRole("button", { name: "Explore Backend systems" })).not.toBeInTheDocument();
     expect(screen.getByText(/showing 2 connected skills/i)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /^All themes$/ }));
-    expect(screen.getByRole("button", { name: "Focus Backend systems" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Cloud & Infrastructure$/ }));
+    expect(screen.getByRole("button", { name: "Explore Backend systems" })).toBeInTheDocument();
   });
 
   it("shows accessible no-jobs and request-error states", async () => {
     server.use(
       http.get("/api/match-gap", () =>
-        HttpResponse.json({ ...populated, targetTotal: 0, jobs: [], skills: [], edges: [], themes: [], suggestionStatuses: [] }),
+        HttpResponse.json({ ...populated, targetTotal: 0, jobs: [], skills: [], edges: [], domains: [], suggestionStatuses: [] }),
       ),
     );
     const first = wrap(<MatchGapContainer />);

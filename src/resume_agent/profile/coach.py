@@ -231,7 +231,7 @@ def _market_gaps_report(profile_dir: Path, session):
     overrides = load_overrides(profile_dir / "overrides.yaml")
     cluster_map = effective_cluster_map(load_cluster_map(cluster_path), overrides)
     use_map = (
-        cluster_path.exists() and bool(cluster_map.aliases or cluster_map.theme_of)
+        cluster_path.exists() and bool(cluster_map.aliases or cluster_map.domain_of)
     ) or bool(overrides.alias or overrides.forbid_alias)
     return match_gap(
         session,
