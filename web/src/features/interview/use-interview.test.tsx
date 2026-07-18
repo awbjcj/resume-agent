@@ -50,17 +50,24 @@ describe("interview hooks", () => {
   it("useStartInterview POSTs the camelCase body and invalidates on completion", async () => {
     const { wrapper, invalidate } = wrap();
     const { result } = renderHook(() => useStartInterview(), { wrapper });
+    const style = {
+      stage: "technical",
+      demeanor: "neutral",
+      difficulty: "standard",
+      questionCount: 4,
+      extra: "",
+    };
 
     await act(async () => {
       await result.current.mutateAsync({
         jobId: 7,
         resumeVersionId: 3,
-        style: { stage: "technical" },
+        style,
       });
     });
 
     expect(mocks.post).toHaveBeenCalledWith("/api/interview/sessions", {
-      body: { jobId: 7, resumeVersionId: 3, style: { stage: "technical" } },
+      body: { jobId: 7, resumeVersionId: 3, style },
     });
 
     const onDone = mocks.trackRun.mock.calls[0][1];
