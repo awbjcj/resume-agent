@@ -24,6 +24,69 @@
 - All JSON writes use the existing atomic pattern: `tempfile.NamedTemporaryFile` in the destination dir + `os.fsync` + `os.replace`, cleanup in `finally`.
 - Every task ends with the full backend suite green; tasks that touch `web/` also end with the web suite green.
 
+## Correctness Amendments (binding)
+
+These amendments override conflicting snippets later in this plan. They were found by
+reviewing the plan and design against the current repository contracts before
+implementation.
+
+1. **The category cap is a hard postcondition across concurrent batches.** Model calls
+   may remain concurrent, but projection must perform one deterministic admission pass
+   over all returned new-domain intents. Count distinct live domains plus distinct
+   admitted `(normalized label, category)` proposals, in stable batch/token order, and
+   reject every token whose proposal would exceed the category cap. Rejected tokens are
+   `ClassificationFailure(phase="domain", ...)` entries. Two equal labels in different
+   categories are different domain proposals and must receive different stable ids;
+   equal label/category proposals may share one new domain. The Task 3 note that
+   concurrent batches may overshoot is deleted.
+2. **Boundary sanitization salvages valid entries.** Cluster maps and correction ledgers
+   are loaded from raw JSON and sanitize maps/lists entry-by-entry. A bad value or one
+   cyclic alias/merge component must not empty an otherwise valid file. Alias
+   canonicalization always gives an explicit terminal-token domain assignment
+   precedence over an alias member's assignment, independent of JSON insertion order.
+3. **A ledger edit is one serialized read-modify-write transaction.** Add
+   `update_taxonomy_corrections(path, mutate)` (or an equivalent context-managed helper)
+   whose lock covers loading the latest file, applying one endpoint's complete intent,
+   sanitizing, fsyncing, and atomic replacement. Locking only `save_*` is insufficient
+   because two requests can otherwise lose one another's updates. Every service mutator
+   uses this helper.
+4. **One API request performs one ledger write.** `add_skill` may not call `move_skill`
+   and save again. A domain PATCH containing both label and category uses one
+   `patch_domain(...)` service mutation after validating both fields; it must never
+   persist the rename if category validation fails. Tests assert one save and no partial
+   update for these compound operations.
+5. **Alias means merge two existing visible skills.** The alias service validates both
+   normalized source and canonical target against the current corrections-aware demand
+   graph/map (including explicitly added skills), rejects self/cycles, and returns a
+   stable `UNKNOWN_SKILL` 404 for an unknown endpoint. Replaying aliases uses the same
+   terminal-precedence canonicalization as `ClusterMap` so dictionary order cannot move
+   the surviving skill to the loser's domain.
+6. **The server remains the only category-vocabulary source.** `MatchGapOut.categories`
+   carries all 20 fixed category metadata records in authored order. `categoryRows` and
+   the galaxy hide categories with no rendered domains, but edit dialogs use the full
+   payload list. Delete the Task 12 client-side `category-options.ts` mirror and never
+   hardcode the slugs in the web app.
+7. **Leaves are demanded skills plus explicit user additions.** An item in
+   `added_skills` is an intentional demand-view override and remains visible with zero
+   job counts until removed. This is the sole exception to the demanded-leaves rule;
+   ordinary profile-only skills still do not appear.
+8. **Avoid the corrections/import cycle.** `taxonomy.corrections` depends on
+   `ClusterMap`, whose normalization currently comes from `tracking.match_gap`.
+   Therefore `tracking.match_gap` must import correction helpers locally inside
+   `build_demand_graph` (or normalization must first move to a lower-level module); it
+   must not import `taxonomy.corrections` at module import time.
+9. **Visual semantics match the design.** Hard category hubs use the filled/default
+   treatment and soft category hubs use the outlined treatment. Dialogs use the
+   repository's existing Base UI-backed shadcn primitives, grouped menu/select items,
+   accessible titles/descriptions, semantic tokens, and inline destructive confirmation.
+
+Add focused red tests for every amendment before its implementation. In particular,
+Task 3 needs a two-batch cap race and same-label/different-category case; Task 4 needs
+mixed-validity and partial-cycle load cases plus concurrent update coverage; Tasks 6-7
+need compound-write atomicity and unknown-alias-target cases; Tasks 8/12 need proof that
+empty categories are hidden from the galaxy but remain selectable without a client
+vocabulary constant.
+
 ---
 
 ### Task 1: Shared category vocabulary + legacy group remap
@@ -760,7 +823,7 @@ def _category_context(cmap: ClusterMap, cap: int) -> list[dict[str, Any]]:
 In `classify_incrementally`:
 - Add required keyword `category_cap: int`; validate `category_cap < 1 → ValueError`.
 - Rename `theme_backlog/theme_batches/theme_assignments/theme(batch)` → `domain_backlog/domain_batches/domain_assignments/classify_domains(batch)`; failures use phase `"domain"`.
-- Prompt payload: `{"new": batch, "categories": category_context}` where `category_context = _category_context(existing, category_cap)` and `full_categories = {entry["slug"] for entry in category_context if entry["full"]}` are computed once before the fan-out (cap is enforced against pre-refresh state; concurrent batches may overshoot by design — document with a comment).
+- Prompt payload: `{"new": batch, "categories": category_context}` where `category_context = _category_context(existing, category_cap)` and `full_categories = {entry["slug"] for entry in category_context if entry["full"]}` are computed once before fan-out. After isolated results return, run the binding deterministic admission pass from the Correctness Amendments before allocating ids; concurrent batches must never overshoot the cap.
 - Final assembly: replace the `theme_of`/`theme_label` block with:
 
 ```python
@@ -1254,7 +1317,8 @@ def test_graph_exposes_domains_and_ordered_categories(session_with_target_jobs, 
     graph = build_demand_graph(session_with_target_jobs, facts, cluster_map=cmap)
     domain = next(d for d in graph.domains if d.id == "scripting")
     assert domain.category == "languages"
-    assert [c.slug for c in graph.categories] == ["languages"]  # only non-empty
+    assert len(graph.categories) == 20
+    assert graph.categories[0].slug == "languages"
     assert graph.categories[0].kind == "hard"
     assert graph.categories[0].label == "Programming Languages"
 
@@ -1335,16 +1399,12 @@ class CategoryNode:
 
 (Match the actual accumulator construction used earlier in the function — the added skill contributes zero `must/nice/tech` and no jobs; coverage computes normally so a profile-held added skill shows `covered`.)
 - Domain assembly renames (`nodes_by_theme` → `nodes_by_domain`, etc.); `DomainNode(category=cluster_map.category_of.get(domain_id, "other"), ...)`. Guard the `job_count` union against zero-job domains: `set().union(*(...)) if domain_nodes else set()` — an added-skill-only domain has no job ids (use `set().union(set(), *(accumulators[node.key].job_ids for node in domain_nodes))`).
-- Categories, preserving `SKILL_GROUPS` authored order, only non-empty ones:
+- Categories always preserve the complete `SKILL_GROUPS` authored order; the client-derived view hides empty categories:
 
 ```python
-    used_slugs = {domain.category for domain in domains}
-    if any(node.domain_id is None for node in skill_nodes):
-        used_slugs.add("other")  # unassigned leaves render under Other client-side
     categories = [
         CategoryNode(slug=slug, label=label, kind=category_kind(slug))
         for slug, label in SKILL_GROUPS.items()
-        if slug in used_slugs
     ]
 ```
 
@@ -2012,7 +2072,7 @@ export interface CategoryRow {
 }
 ```
 
-  `DomainRow` gains `category: string`. `DerivedView` gains `categoryRows: CategoryRow[]` (existing `domainRows` stays — the flat list feeds RankedList and tests). `UNASSIGNED_ID` domains attach to the `other` category (synthesizing an `other` CategoryRow if the payload omitted it).
+  `DomainRow` gains `category: string`. `DerivedView` gains `categoryRows: CategoryRow[]` (existing `domainRows` stays — the flat list feeds RankedList and tests). `UNASSIGNED_ID` domains attach to the server-provided `other` category. Empty category metadata remains available to edit pickers but produces no `CategoryRow`.
 - Consumes: `MatchGapOut.domains[].category`, `MatchGapOut.categories` (Task 5).
 
 - [ ] **Step 1: Write failing tests** in `aggregate.test.ts`:
@@ -2290,7 +2350,7 @@ export type TaxonomyMenuAction =
 
 **Interfaces:**
 - `RenameDomainDialog({ domainId, currentLabel, open, onOpenChange })` → `usePatchDomain({ domainId, body: { label } })`.
-- `ChangeCategoryDialog({ domainId, currentSlug, categories, open, onOpenChange })` → `usePatchDomain({ domainId, body: { category } })`; `categories` prop is the payload `categories` list (only populated slugs) **plus** the remaining fixed slugs — hardcode the full 20-slug list in a `web/src/features/match-gap/taxonomy-edit/category-options.ts` constant mirroring `vocabulary.py` (single source client-side; a comment points at `vocabulary.py`).
+- `ChangeCategoryDialog({ domainId, currentSlug, categories, open, onOpenChange })` → `usePatchDomain({ domainId, body: { category } })`; `categories` is the full server-provided payload list. Do not create a client-side vocabulary constant.
 - `MergeDomainDialog({ domainId, categoryRows, open, onOpenChange })` → `useMergeDomains({ domainId, into })`; target select excludes `domainId` itself; confirm copy "Skills in this domain move to the target; this domain disappears."
 - `AddSkillDialog({ categoryRows, open, onOpenChange })` → `useAddSkill`; token `Input` + the same domain picker composite as `MoveSkillDialog` (extract that picker into `taxonomy-edit/DomainPicker.tsx` and reuse it in both — refactor `MoveSkillDialog` to consume it in this task).
 - SkillMap header gains `<Button size="sm" variant="outline" onClick={() => setMenuAction({ type: "add-skill" })}>Add skill</Button>` — extend `TaxonomyMenuAction` with `{ type: "add-skill" }`.
@@ -2350,5 +2410,3 @@ git commit -m "docs: three-level taxonomy design notes"
 - **Sequencing constraint:** Tasks 1→7 are strictly ordered; 8→12 are strictly ordered after 7; 13 is last.
 - **Known intentional mid-states:** after T2, refreshed maps put every domain in `other` until T3 lands; after T5 the map UI is two-level (domain hubs) until T10.
 - **`build_incremental_themer_agent` keeps its name** (router + `run_with_cleanup` call sites) even though it now emits domains — renaming it is pure churn across the run-manager seam; a docstring notes the naming.
-
-

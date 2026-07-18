@@ -31,9 +31,33 @@ SkillGroupsPanel, ManualSkillsPanel) are invisible from the map.
 6. **Approach A:** evolve `ClusterMap` in place, keep aliases, discard the old theme
    layer, reclassify fresh on the first refresh after upgrade.
 
+## Correctness amendments
+
+The implementation review made the following contracts explicit:
+
+- The per-category cap is a hard final invariant across all concurrent LLM batches.
+  Model calls may fan out, but a deterministic post-projection admission pass prevents
+  aggregate overshoot. Equal labels under different categories remain distinct domains.
+- Correction files salvage valid entries when neighboring values are malformed or
+  cyclic. Explicit terminal-token assignments win over alias-member assignments,
+  independent of serialized map order.
+- Each API mutation is one locked read-modify-write ledger transaction. Compound add
+  and patch operations validate completely and persist once, so failures cannot leave a
+  partial edit and concurrent requests cannot overwrite each other's intents.
+- Skill aliases merge two existing visible skills. Unknown alias endpoints are rejected
+  rather than creating dangling canonical tokens.
+- `MatchGapOut.categories` is the authoritative full 20-entry vocabulary for both
+  rendering metadata and edit pickers. Empty categories are hidden by the derived view,
+  not omitted from the wire contract; the web app never mirrors the slug list.
+- Constellation leaves are demanded skills plus explicit `added_skills` overrides.
+  Explicit additions may have zero job counts; unrelated profile-only skills remain out
+  of scope.
+- Corrections-aware demand-graph imports must not create a `tracking.match_gap` ↔
+  `taxonomy.corrections` module cycle.
+
 ## Category vocabulary (top level)
 
-Defined in `taxonomy/groups.py`, replacing `SKILL_GROUPS`. Display + parenting only —
+Defined in `taxonomy/vocabulary.py` and re-exported by `taxonomy/groups.py`. Display + parenting only —
 fact-lock and the hard/soft/domain categories in `facts.json` are untouched.
 
 Hard (14): `languages` Programming Languages, `frontend-web` Frontend & Web,
@@ -134,9 +158,9 @@ corrections** → save.
 OpenAPI drift gate covers it):
 
 - `ThemeOut` → `DomainOut` (same aggregates + `category: str`).
-- New `CategoryOut { slug, label, kind: "hard" | "soft" }`; payload carries
-  `categories` (empty ones omitted server-side) so the web app never hardcodes the
-  vocabulary.
+- New `CategoryOut { slug, label, kind: "hard" | "soft" }`; payload carries all
+  categories in authored order so the web app never hardcodes the vocabulary. The
+  derived view omits empty categories from galaxy rendering.
 - `SkillNodeOut.theme_id` → `domain_id`; the `covered` sync validator stays.
 - Suggestion kinds rename `"theme"` → `"domain"` across the four suggestion schemas
   and `SuggestionStatusOut` in the match-gap schema.
