@@ -22,6 +22,7 @@ from resume_agent.api.schemas.taxonomy import (
 from resume_agent.services import taxonomy as service
 from resume_agent.taxonomy.corrections import corrections_file_path
 from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_agent.tracking.match_gap import collect_target_skill_tokens
 
 router = APIRouter()
 _CLUSTER_PATH = "data/profile/cluster_map.json"
@@ -74,6 +75,7 @@ def move_skill(
             token,
             domain_id=body.domain_id,
             new_domain=_spec(body.new_domain),
+            known_tokens=collect_target_skill_tokens(session),
         )
     return build_match_gap_payload(session)
 
@@ -141,5 +143,6 @@ def add_alias(body: AliasIn, session: Session = Depends(get_session)):
             cluster_path,
             body.token,
             body.canonical,
+            known_tokens=collect_target_skill_tokens(session),
         )
     return build_match_gap_payload(session)

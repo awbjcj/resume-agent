@@ -166,3 +166,30 @@ def test_alias_requires_two_known_skills_and_rejects_cycles(tmp_path):
     add_skill_alias(corrections_path, cluster_path, "js", "javascript")
     with pytest.raises(AliasCycleError):
         add_skill_alias(corrections_path, cluster_path, "javascript", "js")
+
+
+def test_move_accepts_demanded_but_unclustered_skill(tmp_path):
+    corrections_path, cluster_path = _paths(tmp_path)
+    # "rust" is demanded (shown in the graph) but not yet in the cluster map.
+    with pytest.raises(UnknownSkillError):
+        move_skill(corrections_path, cluster_path, "rust", domain_id="web")
+    move_skill(
+        corrections_path,
+        cluster_path,
+        "rust",
+        domain_id="web",
+        known_tokens={"rust"},
+    )
+    assert load_taxonomy_corrections(corrections_path).skill_domain["rust"] == "web"
+
+
+def test_alias_accepts_demanded_but_unclustered_skills(tmp_path):
+    corrections_path, cluster_path = _paths(tmp_path)
+    add_skill_alias(
+        corrections_path,
+        cluster_path,
+        "rustlang",
+        "rust",
+        known_tokens={"rust", "rustlang"},
+    )
+    assert load_taxonomy_corrections(corrections_path).aliases["rustlang"] == "rust"

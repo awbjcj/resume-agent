@@ -121,12 +121,14 @@ def move_skill(
     *,
     domain_id: str | None = None,
     new_domain: NewDomainSpec | None = None,
+    known_tokens: set[str] | frozenset[str] = frozenset(),
 ) -> None:
     token = _require_token(token)
+    demanded = {normalize_skill(item) for item in known_tokens}
 
     def mutate(ledger: TaxonomyCorrections) -> None:
         cmap = _corrected_map(cluster_path, ledger)
-        if token not in _known_skill_tokens(cmap, ledger):
+        if token not in _known_skill_tokens(cmap, ledger) | demanded:
             raise UnknownSkillError(f"Unknown skill {token!r}")
         _assign_skill(
             ledger,
@@ -260,15 +262,18 @@ def add_skill_alias(
     cluster_path: str | Path,
     token: str,
     canonical: str,
+    *,
+    known_tokens: set[str] | frozenset[str] = frozenset(),
 ) -> None:
     token = _require_token(token)
     canonical = _require_token(canonical)
     if token == canonical:
         raise AliasCycleError("a skill cannot alias itself")
+    demanded = {normalize_skill(item) for item in known_tokens}
 
     def mutate(ledger: TaxonomyCorrections) -> None:
         cmap = _corrected_map(cluster_path, ledger)
-        known = _known_skill_tokens(cmap, ledger)
+        known = _known_skill_tokens(cmap, ledger) | demanded
         if token not in known:
             raise UnknownSkillError(f"Unknown skill {token!r}")
         if canonical not in known:
