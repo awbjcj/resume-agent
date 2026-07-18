@@ -142,6 +142,32 @@ def test_full_interview_flow(tmp_path, engine):
     assert summary["overallScore"] == 3.5
 
 
+def test_debrief_without_answers_ends_deterministically_and_skips_llm(tmp_path, engine):
+    # Ending an interview the candidate never answered has nothing to score.
+    # Asking the LLM to debrief an empty transcript yields an empty summary that
+    # normalize_debrief rejects ("empty debrief summary"), surfacing as a run
+    # error. A no-answer session must close deterministically without the LLM.
+    sid = _open(tmp_path, engine)["sessionId"]
+
+    class Boom(FakeRunner):
+        def __init__(self) -> None:
+            super().__init__([])
+
+        def run(self, prompt: str) -> Any:
+            raise AssertionError("LLM must not run for a no-answer debrief")
+
+    view = run_debrief_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        session_id=sid,
+        interviewer_agent=Boom(),
+        formatter_agent=Boom(),
+    )
+    assert view["status"] == "ended"
+    assert view["debrief"]["summary"]
+    assert view["debrief"]["questionReviews"] == []
+
+
 def test_formatter_retry_then_fail(tmp_path, engine):
     sid = _open(tmp_path, engine)["sessionId"]
     bad = InterviewTurn(message="", action="ask", question_id="q2")

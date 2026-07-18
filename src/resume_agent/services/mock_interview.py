@@ -23,6 +23,7 @@ from resume_agent.interview.agent import (
 )
 from resume_agent.interview.store import (
     InterviewContext,
+    InterviewDebrief,
     InterviewStyle,
     apply_answer_delta,
     create_session,
@@ -33,6 +34,10 @@ from resume_agent.interview.store import (
 from resume_agent.llm_runner import Runner
 
 _MAX_MESSAGE_CHARS = 100_000
+_EMPTY_DEBRIEF_SUMMARY = (
+    "You ended this interview before answering any questions, so there was nothing "
+    "to score. Start a new session whenever you're ready to practice."
+)
 
 # The interviewer writes free-form notes that a cheap formatter then projects into
 # the OpeningInterview schema. The formatter is told to invent nothing, so the plan
@@ -314,6 +319,14 @@ def run_debrief_turn(
     session = load_session(root, session_id)
     if session["status"] != "active":
         raise ValueError("session ended")
+    # An interview the candidate never answered has nothing to score; asking the
+    # LLM to debrief an empty transcript yields an empty summary that
+    # normalize_debrief rejects ("empty debrief summary"). Close it deterministically.
+    if not any(turn["role"] == "candidate" for turn in session["turns"]):
+        reporter.begin(1, "Closing your interview")
+        end_with_debrief(root, session_id, InterviewDebrief(summary=_EMPTY_DEBRIEF_SUMMARY))
+        reporter.step(1)
+        return session_view(root, session_id)
     reporter.begin(1, "Writing your debrief")
     coach = interviewer_agent or build_debrief_agent()
     formatter = formatter_agent or build_interview_formatter_agent(DebriefTurn)
