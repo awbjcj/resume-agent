@@ -214,6 +214,7 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/profile/github_harvest.py`          | Deterministic GitHub project-source selection, materialization, supersession, and cleanup                                  |
 | `src/resume_agent/profile/project_extractor.py`       | Project-only structured extraction that cannot emit employment or education facts                                        |
 | `src/resume_agent/profile/coach.py`                   | Coach turn validation, topic-aware context, and structured-output agents                                                  |
+| `src/resume_agent/interview/agent.py`                 | Mock interviewer persona, turn/debrief validation, transcript elision                                                     |
 | `src/resume_agent/services/profile_coach.py`          | Coach session turns, draft approval, recap, rebuild, and impact orchestration                                             |
 | `src/resume_agent/discovery/connectors/detect.py`    | ATS detection (singleton → L1 → L2)                                                                                       |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation                                                                                   |
@@ -351,3 +352,13 @@ aggressiveness determines how many detail fetches are issued.
 - **Board bulk actions are transactional.** `bulk_apply` uses one batched load plus the
   `progressed_job_ids` gate, then one commit. `delete_job_row` is the unguarded cascade shared
   with guarded `delete_job` and prune.
+- **Mock interviews are practice artifacts, not progress.** `interview/store.py`
+  keeps one durable session JSON per interview under `data/interview/`
+  (turn-per-run, ADR 0006), with the JD + tailored-resume snapshot frozen at
+  opening. The interviewer stays in character (no mid-session coaching); the
+  debrief run scores only questions actually asked. No corpus writes — fact-lock
+  untouched — and sessions never gate job deletion (`has_progress` unchanged);
+  the job delete endpoint removes the job's session files. Voice input rides
+  `llm_runner.transcribe` (`Settings.transcribe_model`, Gemini/OpenAI only,
+  default `gemini:gemini-2.5-flash`) through `POST /api/transcribe`; audio is
+  never persisted.

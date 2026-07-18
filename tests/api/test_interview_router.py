@@ -8,6 +8,15 @@ from fastapi.testclient import TestClient
 from resume_agent.api.app import create_app
 from resume_agent.api.routers import interview as interview_router
 from resume_agent.db import get_session
+from resume_agent.interview.store import (
+    InterviewContext,
+    InterviewDebrief,
+    InterviewStyle,
+    InterviewTurnRecord,
+    PlanItem,
+    create_session,
+    end_with_debrief,
+)
 from resume_agent.interview.agent import (
     DebriefTurn,
     InterviewTurn,
@@ -178,3 +187,35 @@ def test_full_lifecycle_and_singleton(monkeypatch, tmp_path):
 
         listing = client.get(f"/api/interview/sessions?jobId={job_id}").json()
         assert listing["sessions"][0]["sessionId"] == session_id
+
+
+def _write_ended_session(interview_dir, job_id, session_id="ended01"):
+    create_session(
+        interview_dir,
+        session_id,
+        job_id=job_id,
+        resume_version_id=0,
+        style=InterviewStyle(),
+        context=InterviewContext(company="Acme", title="Engineer", jd_text="Build"),
+        plan=[PlanItem(id="q1", competency="Python", question_type="role_specific")],
+        opening_turn=InterviewTurnRecord(role="interviewer", text="Hi", question_id="q1"),
+    )
+    end_with_debrief(interview_dir, session_id, InterviewDebrief(summary="done"))
+    return session_id
+
+
+def test_job_delete_removes_interview_sessions(tmp_path):
+    client = _client(tmp_path)
+    with client:
+        engine = client.app.state.engine
+        with get_session(engine) as db:
+            job = Job(source="manual", company="Acme", title="Engineer", jd_text="Build")
+            db.add(job)
+            db.commit()
+            db.refresh(job)
+            job_id = job.id
+        interview_dir = tmp_path / "data" / "interview"
+        session_id = _write_ended_session(interview_dir, job_id)
+
+        assert client.delete(f"/api/jobs/{job_id}").status_code == 204
+        assert client.get(f"/api/interview/sessions/{session_id}").status_code == 404

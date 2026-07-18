@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, UploadFile
+from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
+from resume_agent.api.deps import get_interview_dir, get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.bulk import BulkRequest, BulkResultOut
 from resume_agent.api.schemas.jobs import (
@@ -89,12 +89,15 @@ def patch_job(job_id: int, patch: JobPatch, session: Session = Depends(get_sessi
 
 @router.delete("/jobs/{job_id}", status_code=204)
 def delete_job_endpoint(
-    job_id: int, session: Session = Depends(get_session)
+    job_id: int, request: Request, session: Session = Depends(get_session)
 ) -> Response:
     if get_job(session, job_id) is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     if not board.delete(session, job_id):
         raise ApiException(409, "CONFLICT", "Job has progress and cannot be deleted")
+    from resume_agent.interview.store import delete_sessions_for_job
+
+    delete_sessions_for_job(get_interview_dir(request), job_id)
     return Response(status_code=204)
 
 
