@@ -9,6 +9,7 @@ import { DrawerSkeleton } from "./skeletons";
 import { ApplicationEditor } from "@/features/job/ApplicationEditor";
 import { CoverLettersTab } from "@/features/job/CoverLettersTab";
 import { StageManager } from "@/features/job/StageManager";
+import { InterviewTab } from "@/features/interview/InterviewTab";
 import { VersionRow } from "@/features/job/VersionRow";
 import { RevisionRunPlaceholders } from "@/features/job/RevisionRunPlaceholders";
 import { useJobDetail } from "@/features/job/use-job-detail";
@@ -107,6 +108,7 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
                       )}
                     </TabsTrigger>
                     <TabsTrigger value="application" className={tabTriggerClass}>Application</TabsTrigger>
+                    <TabsTrigger value="interview" className={tabTriggerClass}>Interview</TabsTrigger>
                     <TabsTrigger value="manage" className={tabTriggerClass}>Manage</TabsTrigger>
                   </TabsList>
 
@@ -174,6 +176,14 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
 
                     <TabsContent value="application" className="mt-0">
                       <ApplicationEditor jobId={jobId} application={job.application} />
+                    </TabsContent>
+
+                    <TabsContent value="interview" className="mt-0">
+                      <InterviewTab
+                        jobId={jobId}
+                        versions={job.resumeVersions}
+                        hasJd={Boolean(job.jdText?.trim())}
+                      />
                     </TabsContent>
 
                     <TabsContent value="manage" className="mt-0">
