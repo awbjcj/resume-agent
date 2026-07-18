@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     cheap_model: str = "claude-haiku-4-5-20251001"
     mid_model: str = "claude-sonnet-5"
     premium_model: str = "claude-opus-4-8"
+    transcribe_model: str = "gemini:gemini-2.5-flash"
     api_token: str = (
         ""  # when non-empty, the API requires Authorization: Bearer <token>
     )

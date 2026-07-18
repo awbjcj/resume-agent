@@ -335,3 +335,62 @@ def retry_kwargs() -> dict[str, Any]:
 def tool_kwargs() -> dict[str, Any]:
     """Bound tool calls across one complete agno agent run."""
     return {"tool_call_limit": 15}
+
+
+_TRANSCRIBE_PROVIDERS = ("gemini", "openai")
+_TRANSCRIBE_PROMPT = (
+    "Transcribe this audio verbatim. Return only the spoken words as plain text, "
+    "with normal punctuation and no commentary."
+)
+_OPENAI_AUDIO_NAMES = {
+    "audio/webm": "audio.webm",
+    "audio/ogg": "audio.ogg",
+    "audio/mpeg": "audio.mp3",
+    "audio/mp4": "audio.mp4",
+    "audio/wav": "audio.wav",
+    "audio/x-wav": "audio.wav",
+}
+
+
+def transcription_available() -> bool:
+    """Whether the configured transcribe model's provider has audio support and a key."""
+    model_id = get_settings().transcribe_model
+    provider, _ = split_provider(model_id)
+    return provider in _TRANSCRIBE_PROVIDERS and bool(resolve_api_key(model_id))
+
+
+def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> str:
+    """Transcribe audio via the configured provider. The only audio-SDK seam.
+
+    Claude models cannot accept audio; Gemini uses inline-audio generation and
+    OpenAI its transcription API. SDK imports are lazy, per branch.
+    """
+    resolved = model_id or get_settings().transcribe_model
+    provider, model = split_provider(resolved)
+    if provider not in _TRANSCRIBE_PROVIDERS:
+        raise ValueError(f"provider {provider!r} does not support audio transcription")
+    key = resolve_api_key(resolved)
+    if not key:
+        raise ValueError(f"no API key configured for transcription provider {provider!r}")
+    if provider == "gemini":
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=key)
+        response = client.models.generate_content(
+            model=model,
+            contents=[
+                types.Part.from_bytes(data=audio, mime_type=mime_type),
+                _TRANSCRIBE_PROMPT,
+            ],
+        )
+        return (response.text or "").strip()
+    import io
+
+    from openai import OpenAI
+
+    client = OpenAI(api_key=key)
+    buffer = io.BytesIO(audio)
+    buffer.name = _OPENAI_AUDIO_NAMES.get(mime_type, "audio.webm")
+    result = client.audio.transcriptions.create(model=model, file=buffer)
+    return result.text.strip()

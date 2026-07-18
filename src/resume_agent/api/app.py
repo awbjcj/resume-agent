@@ -30,6 +30,7 @@ from resume_agent.api.routers import config as config_router
 from resume_agent.api.routers import cover_letters as cover_letters_router
 from resume_agent.api.routers import coach as coach_router
 from resume_agent.api.routers import interview as interview_router
+from resume_agent.api.routers import transcribe as transcribe_router
 from resume_agent.api.routers import dashboard as dashboard_router
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
@@ -231,6 +232,7 @@ def create_app(
     app.include_router(profile_router.router, prefix="/api", dependencies=guarded)
     app.include_router(coach_router.router, prefix="/api", dependencies=guarded)
     app.include_router(interview_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(transcribe_router.router, prefix="/api", dependencies=guarded)
     app.include_router(setup_router.router, prefix="/api", dependencies=guarded)
     app.include_router(dashboard_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_router.router, prefix="/api", dependencies=guarded)
