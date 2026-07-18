@@ -223,9 +223,17 @@ def apply_taxonomy_corrections(
         if target in known_ids:
             category_of[target] = slug
 
-    for domain_id in set(domain_of.values()):
-        domain_label.setdefault(domain_id, domain_id)
-        category_of.setdefault(domain_id, "other")
+    # Keep labels/categories only for domains a skill still references. This
+    # drops phantom domains left behind when a reconstructed (renamed +
+    # categorized) domain loses its last skill, so they never linger in the map
+    # or count against the per-category cap.
+    referenced = set(domain_of.values())
+    domain_label = {
+        domain_id: domain_label.get(domain_id, domain_id) for domain_id in referenced
+    }
+    category_of = {
+        domain_id: category_of.get(domain_id, "other") for domain_id in referenced
+    }
 
     return ClusterMap(
         aliases=aliases,

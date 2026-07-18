@@ -89,6 +89,21 @@ def test_apply_moves_skill_and_reconstructs_user_domain():
     assert corrected.category_of["ui-toolkits"] == "frontend-web"
 
 
+def test_apply_drops_orphan_reconstructed_domain():
+    # Mirrors add-skill-to-new-domain then remove-skill: the rename + category
+    # linger with no skill pointing at the domain, so it must not persist.
+    corrected = apply_taxonomy_corrections(
+        _base_map(),
+        TaxonomyCorrections(
+            domain_renames={"orphan": "Orphan"},
+            domain_category={"orphan": "frontend-web"},
+        ),
+    )
+    assert "orphan" not in corrected.domain_label
+    assert "orphan" not in corrected.category_of
+    assert set(corrected.domain_label) == set(corrected.domain_of.values())
+
+
 def test_apply_dangling_move_is_inert():
     corrected = apply_taxonomy_corrections(
         _base_map(), TaxonomyCorrections(skill_domain={"react": "ghost"})
