@@ -120,6 +120,21 @@ class Notification(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 
 
+class EmailDraft(SQLModel, table=True):
+    __tablename__ = cast(Any, "email_drafts")
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: int = Field(foreign_key="jobs.id", index=True)
+    draft_type: str  # follow_up | thank_you | withdrawal | cold_outreach
+    subject: str
+    body: str
+    to_addr: str = ""
+    gmail_thread_id: str | None = None
+    gmail_draft_id: str | None = None
+    state: str = Field(default="generated")  # generated | saved
+    created_at: datetime = Field(default_factory=utcnow)
+
+
 class SkillSuggestion(SQLModel, table=True):
     __tablename__ = cast(Any, "skill_suggestions")
     __table_args__ = (

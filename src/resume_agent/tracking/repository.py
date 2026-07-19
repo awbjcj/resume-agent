@@ -23,6 +23,7 @@ from resume_agent.tracking.tables import (
     Application,
     ApplicationStatus,
     CoverLetter,
+    EmailDraft,
     Job,
     JobStatus,
     Notification,
@@ -339,6 +340,28 @@ def pending_notifications(session: Session) -> list[Notification]:
     return list(session.exec(select(Notification).where(Notification.state == "pending")).all())
 
 
+def save_email_draft(session: Session, draft: EmailDraft) -> EmailDraft:
+    session.add(draft)
+    session.commit()
+    session.refresh(draft)
+    return draft
+
+
+def get_email_draft(session: Session, draft_id: int) -> EmailDraft | None:
+    return session.get(EmailDraft, draft_id)
+
+
+def email_drafts_for_job(session: Session, job_id: int) -> list[EmailDraft]:
+    id_col = cast(Any, EmailDraft.id)
+    return list(
+        session.exec(
+            select(EmailDraft)
+            .where(EmailDraft.job_id == job_id)
+            .order_by(id_col.desc())
+        ).all()
+    )
+
+
 _PROGRESS_STATUSES = {
     JobStatus.approved.value,
     JobStatus.tailored.value,
@@ -375,7 +398,7 @@ def delete_job_row(session: Session, job: Job, *, commit: bool = True) -> None:
 
     Unguarded: callers must have already applied the has_progress gate.
     """
-    for model in (CoverLetter, Application, ResumeVersion):
+    for model in (CoverLetter, Application, ResumeVersion, EmailDraft):
         for child in session.exec(select(model).where(model.job_id == job.id)).all():
             session.delete(child)
     session.delete(job)
