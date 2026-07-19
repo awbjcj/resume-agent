@@ -11,4 +11,7 @@ export const SUMMARY = {
   },
   queues: { triage: 2, approve: 4, tailor: 1, apply: 1 },
   applied: 5,
+  openErrorCount: 0,
+  activeInterviews: [],
+  activeCoachSession: null,
 };

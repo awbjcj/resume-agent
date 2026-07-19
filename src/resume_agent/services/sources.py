@@ -15,13 +15,13 @@ import yaml
 from resume_agent.config import Settings, get_settings
 from resume_agent.discovery.connectors.companies import CompaniesConnector
 from resume_agent.discovery.connectors.config import (
-    AshbyBoard,
-    CompanyUrl,
+    AshbyBoard as AshbyBoard,
+    CompanyUrl as CompanyUrl,
     ConnectorsConfig,
     GreenhouseBoard,
     LeverBoard,
-    NativeUrlBoard,
-    ScrapeTarget,
+    NativeUrlBoard as NativeUrlBoard,
+    ScrapeTarget as ScrapeTarget,
     load_connectors_config,
 )
 from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, inspect_ats
@@ -29,12 +29,12 @@ from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
 from resume_agent.discovery.connectors.registry import ConnectorSpec, find_unit, spec_for
 from resume_agent.discovery.connectors.sources import (
+    NATIVE_URL_KINDS as NATIVE_URL_KINDS,
     SourceView,
-    company_url_id,
+    company_url_id as company_url_id,
     list_source_views,
-    native_url_id,
-    NATIVE_URL_KINDS,
-    scrape_target_id,
+    native_url_id as native_url_id,
+    scrape_target_id as scrape_target_id,
 )
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.profile.intake import _resolve_host

@@ -28,6 +28,7 @@ import type { RunRecord } from "@/lib/runs/store";
 import { cn } from "@/lib/utils";
 
 import { DebriefCard } from "./DebriefCard";
+import { SessionsRail } from "./SessionsRail";
 import {
   useEndInterview,
   useInterviewSession,
@@ -93,28 +94,26 @@ export function InterviewPage() {
 
   if (session.isLoading && displayedSessionId) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-[32rem] w-full" />
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
+        <SessionsRail selectedId={displayedSessionId} />
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-[32rem] w-full" />
+        </div>
       </div>
     );
   }
 
   if (!active) {
     return (
-      <Card className="min-h-[28rem] border-dashed">
-        <CardContent className="flex min-h-[28rem] items-center justify-center py-14">
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon"><MessagesSquare aria-hidden="true" /></EmptyMedia>
-              <EmptyTitle>No interview selected</EmptyTitle>
-              <EmptyDescription>
-                Start a mock interview from a job's Interview tab. Rehearse against the real job description and your tailored resume.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        </CardContent>
-      </Card>
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
+        <SessionsRail selectedId={displayedSessionId} />
+        <Card className="min-h-[28rem] min-w-0 flex-1 border-dashed">
+          <CardContent className="flex min-h-[28rem] items-center justify-center py-14">
+            <Empty><EmptyHeader><EmptyMedia variant="icon"><MessagesSquare aria-hidden="true" /></EmptyMedia><EmptyTitle>No interview selected</EmptyTitle><EmptyDescription>Select a session or start a new interview.</EmptyDescription></EmptyHeader></Empty>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -122,7 +121,9 @@ export function InterviewPage() {
   const canAnswer = active.status === "active" && !active.concluded;
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
+      <SessionsRail selectedId={displayedSessionId} />
+      <main className="flex min-w-0 flex-1 flex-col gap-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
@@ -242,6 +243,7 @@ export function InterviewPage() {
       </Card>
 
       {ended && active.debrief ? <DebriefCard debrief={active.debrief} plan={active.plan ?? []} /> : null}
+      </main>
     </div>
   );
 }

@@ -45,7 +45,13 @@ describe("ActiveInterviewBanner", () => {
       "href",
       "/interview?session=s9",
     );
-    expect(screen.getByRole("button", { name: /^end$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^end$/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the active-interview count and links to the hub", () => {
+    renderAt("/dashboard", [activeSession, { ...activeSession, sessionId: "s10", jobId: 8 }]);
+    expect(screen.getByText("2 mock interviews in progress")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open interviews/i })).toHaveAttribute("href", "/interview");
   });
 
   it("renders nothing when no session is active", () => {

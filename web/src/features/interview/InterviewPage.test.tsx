@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   end: vi.fn(),
   start: vi.fn(),
+  archive: vi.fn(),
+  unarchive: vi.fn(),
+  remove: vi.fn(),
 }));
 
 vi.mock("./use-interview", () => ({
@@ -21,9 +24,16 @@ vi.mock("./use-interview", () => ({
   useSendInterviewAnswer: () => mocks.send(),
   useEndInterview: () => mocks.end(),
   useStartInterview: () => mocks.start(),
+  useArchiveInterviewSession: () => ({ mutate: mocks.archive }),
+  useUnarchiveInterviewSession: () => ({ mutate: mocks.unarchive }),
+  useDeleteInterviewSession: () => ({ mutate: mocks.remove, isPending: false }),
 }));
 
 vi.mock("@/components/TranscribeButton", () => ({ TranscribeButton: () => null }));
+vi.mock("./NewInterviewDialog", () => ({
+  NewInterviewDialog: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog">New mock interview</div> : null,
+}));
 
 function activeSession(overrides = {}) {
   return {
@@ -70,6 +80,24 @@ describe("InterviewPage", () => {
     expect(screen.getByText(/Acme/)).toBeInTheDocument();
     expect(screen.getByText(/Engineer/)).toBeInTheDocument();
     expect(screen.getByText(/Question 2 of 4/)).toBeInTheDocument();
+  });
+
+  it("shows the sessions rail and selects the active session by default", () => {
+    mocks.sessions.mockReturnValue({
+      data: { sessions: [{ ...activeSession(), askedCount: 2, questionCount: 4, overallScore: null, archivedAt: null }] },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderPage("/interview");
+    expect(screen.getByRole("heading", { name: "Sessions" })).toBeInTheDocument();
+    expect(screen.getAllByText(/Question 2 of 4/)).toHaveLength(2);
+  });
+
+  it("opens the new interview dialog from the rail", async () => {
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: /new interview/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   it("disables the composer while an answer run is pending", () => {

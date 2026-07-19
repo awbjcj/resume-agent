@@ -7,14 +7,24 @@ import { CoachPage } from "./CoachPage";
 const sendMessage = vi.fn();
 const saveNote = vi.fn();
 const discardNote = vi.fn();
-const coachState = vi.hoisted(() => ({ status: "active", recap: null as string | null }));
+const archiveSession = vi.fn();
+const unarchiveSession = vi.fn();
+const deleteSession = vi.fn();
+const coachState = vi.hoisted(() => ({
+  status: "active",
+  recap: null as string | null,
+  includeArchived: false,
+  sessions: [] as Array<Record<string, unknown>>,
+}));
 
 vi.mock("@/components/TranscribeButton", () => ({ TranscribeButton: () => null }));
 
 vi.mock("./use-coach", () => ({
-  useCoachSessions: () => ({
+  useCoachSessions: (includeArchived = false) => {
+    coachState.includeArchived = includeArchived;
+    return ({
     data: {
-      sessions: [
+      sessions: coachState.sessions.length ? coachState.sessions : [
         {
           sessionId: "session-1",
           status: coachState.status,
@@ -28,7 +38,8 @@ vi.mock("./use-coach", () => ({
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
-  }),
+  });
+  },
   useCoachSession: () => ({
     data: {
       sessionId: "session-1",
@@ -76,6 +87,9 @@ vi.mock("./use-coach", () => ({
   useEndCoachSession: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useSaveCoachNote: () => ({ mutateAsync: saveNote, isPending: false }),
   useDiscardCoachNote: () => ({ mutateAsync: discardNote, isPending: false }),
+  useArchiveCoachSession: () => ({ mutate: archiveSession }),
+  useUnarchiveCoachSession: () => ({ mutate: unarchiveSession }),
+  useDeleteCoachSession: () => ({ mutate: deleteSession, isPending: false }),
 }));
 
 describe("CoachPage", () => {
@@ -83,6 +97,8 @@ describe("CoachPage", () => {
     vi.clearAllMocks();
     coachState.status = "active";
     coachState.recap = null;
+    coachState.includeArchived = false;
+    coachState.sessions = [];
     sendMessage.mockImplementation(async ({ onDone }) => {
       onDone?.({ status: "succeeded" });
       return { runId: "run-1" };
@@ -124,5 +140,38 @@ describe("CoachPage", () => {
     expect(screen.queryByLabelText("Message your profile coach")).not.toBeInTheDocument();
     expect(screen.getByText(coachState.recap)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start another session/i })).toBeInTheDocument();
+  });
+
+  it("archives an ended session from its past-session row", async () => {
+    coachState.sessions = [
+      { sessionId: "session-1", status: "active", startedAt: "2026-07-18T12:00:00Z", endedAt: null, topicCount: 1, savedNoteCount: 0, archivedAt: null },
+      { sessionId: "c1", status: "ended", startedAt: "2026-07-15T12:00:00Z", endedAt: "2026-07-15T13:00:00Z", topicCount: 2, savedNoteCount: 1, archivedAt: null },
+    ];
+    const user = userEvent.setup();
+    render(<CoachPage />);
+    await user.click(screen.getByRole("button", { name: /actions for coaching session/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Archive" }));
+    expect(archiveSession).toHaveBeenCalledWith({ sessionId: "c1" });
+  });
+
+  it("warns that saved notes survive deletion", async () => {
+    coachState.sessions = [
+      { sessionId: "session-1", status: "active", startedAt: "2026-07-18T12:00:00Z", endedAt: null, topicCount: 1, savedNoteCount: 0, archivedAt: null },
+      { sessionId: "c1", status: "ended", startedAt: "2026-07-15T12:00:00Z", endedAt: "2026-07-15T13:00:00Z", topicCount: 2, savedNoteCount: 1, archivedAt: null },
+    ];
+    const user = userEvent.setup();
+    render(<CoachPage />);
+    await user.click(screen.getByRole("button", { name: /actions for coaching session/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    expect(await screen.findByText(/Saved notes are kept in your profile/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(deleteSession).toHaveBeenCalledWith({ sessionId: "c1" }, expect.any(Object));
+  });
+
+  it("includes archived sessions when toggled", async () => {
+    const user = userEvent.setup();
+    render(<CoachPage />);
+    await user.click(screen.getByRole("switch", { name: "Show archived" }));
+    expect(coachState.includeArchived).toBe(true);
   });
 });

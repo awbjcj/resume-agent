@@ -3,17 +3,24 @@ import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useSendInterviewAnswer, useStartInterview } from "./use-interview";
+import {
+  useArchiveInterviewSession,
+  useInterviewSessions,
+  useSendInterviewAnswer,
+  useStartInterview,
+} from "./use-interview";
 
 const mocks = vi.hoisted(() => ({
   post: vi.fn(),
+  get: vi.fn(),
+  delete: vi.fn(),
   trackRun: vi.fn(),
   unwrap: vi.fn(),
   upsert: vi.fn(),
 }));
 
 vi.mock("@/lib/api/client", () => ({
-  api: { POST: mocks.post },
+  api: { GET: mocks.get, POST: mocks.post, DELETE: mocks.delete },
   unwrap: mocks.unwrap,
 }));
 
@@ -90,5 +97,37 @@ describe("interview hooks", () => {
       "/api/interview/sessions/{session_id}/messages",
       { params: { path: { session_id: "s1" } }, body: { message: "My answer" } },
     );
+  });
+
+  it("archives a session and invalidates session queries", async () => {
+    const { wrapper, invalidate } = wrap();
+    const { result } = renderHook(() => useArchiveInterviewSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionId: "s1" });
+    });
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/interview/sessions/{session_id}/archive",
+      { params: { path: { session_id: "s1" } } },
+    );
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["interview-sessions"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["dashboard-summary"] });
+  });
+
+  it("passes includeArchived to the sessions list", async () => {
+    mocks.unwrap.mockResolvedValueOnce({ sessions: [] });
+    const { wrapper } = wrap();
+    const { result } = renderHook(() => useInterviewSessions(undefined, true), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect(mocks.get).toHaveBeenCalledWith("/api/interview/sessions", {
+      params: { query: { includeArchived: true } },
+    });
   });
 });

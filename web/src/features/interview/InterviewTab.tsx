@@ -24,6 +24,7 @@ export function InterviewTab({
   const sessions = useInterviewSessions(jobId);
   const canStart = versions.length > 0 && hasJd;
   const rows = sessions.data?.sessions ?? [];
+  const activeRow = rows.find((row) => row.status === "active");
 
   return (
     <div className="space-y-5">
@@ -34,10 +35,12 @@ export function InterviewTab({
         <p className="text-sm text-muted-foreground">
           Rehearse against this job description and one of your tailored resumes, then get a scored debrief.
         </p>
-        <Button disabled={!canStart} onClick={() => setOpen(true)}>
-          <MessagesSquare aria-hidden="true" />Start mock interview
-        </Button>
-        {!canStart ? (
+        {activeRow ? (
+          <p className="text-sm text-muted-foreground">An interview for this job is in progress — resume it from the list below.</p>
+        ) : (
+          <Button disabled={!canStart} onClick={() => setOpen(true)}><MessagesSquare aria-hidden="true" />Start mock interview</Button>
+        )}
+        {!activeRow && !canStart ? (
           <p className="text-xs text-muted-foreground">
             {hasJd ? "Tailor a resume first to run a mock interview." : "This job has no description to interview against."}
           </p>
@@ -73,7 +76,7 @@ export function InterviewTab({
         </ul>
       ) : null}
 
-      {canStart ? (
+      {canStart && !activeRow ? (
         <InterviewSetupDialog jobId={jobId} versions={versions} open={open} onOpenChange={setOpen} />
       ) : null}
     </div>

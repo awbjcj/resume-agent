@@ -15,7 +15,9 @@ import { ImportJobsButton } from "@/features/runs/ImportJobsDialog";
 import { DiscoverDialog, PullDialog } from "@/features/runs/RunLaunchDialogs";
 
 import { ActionQueue } from "./ActionQueue";
+import { AttentionCard } from "./AttentionCard";
 import { DeskHealth } from "./DeskHealth";
+import { InProgressCard } from "./InProgressCard";
 import { RecentRuns } from "./RecentRuns";
 import { StageRail } from "./StageRail";
 import { useDashboardSummary } from "./use-dashboard-summary";
@@ -79,6 +81,8 @@ export function DashboardPage() {
               <StageRail summary={summary} />
             </>
           )}
+          <InProgressCard summary={summary} />
+          <AttentionCard />
           <RecentRuns />
         </div>
         <div className="flex min-w-0 flex-col gap-6">

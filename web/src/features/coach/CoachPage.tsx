@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Bot, ChevronDown, Clock3, History, Send, Sparkles, SquareCheckBig, UserRound } from "lucide-react";
+import { Archive, ArchiveRestore, Bot, ChevronDown, Clock3, EllipsisVertical, History, Send, Sparkles, SquareCheckBig, Trash2, UserRound } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -24,9 +24,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { RunRecord } from "@/lib/runs/store";
 import { cn } from "@/lib/utils";
@@ -38,12 +40,26 @@ import { ResearchActionCard } from "./ResearchActionCard";
 import {
   useCoachSession,
   useCoachSessions,
+  useArchiveCoachSession,
+  useDeleteCoachSession,
   useDiscardCoachNote,
   useEndCoachSession,
   useSaveCoachNote,
   useSendCoachMessage,
   useStartCoachSession,
+  useUnarchiveCoachSession,
+  type CoachSessionSummary,
 } from "./use-coach";
+
+function CoachSessionActions({ row, current = false, onArchived, onDelete }: { row: CoachSessionSummary; current?: boolean; onArchived?: () => void; onDelete: (row: CoachSessionSummary) => void }) {
+  const archive = useArchiveCoachSession();
+  const unarchive = useUnarchiveCoachSession();
+  return <DropdownMenu><DropdownMenuTrigger render={<Button size="icon" variant="ghost" aria-label={current ? "Actions for current coaching session" : `Actions for coaching session ${row.sessionId}`}><EllipsisVertical /></Button>} /><DropdownMenuContent align="end"><DropdownMenuGroup>
+    {row.status === "ended" && !row.archivedAt ? <DropdownMenuItem onClick={() => { const input = { sessionId: row.sessionId }; if (onArchived) archive.mutate(input, { onSuccess: onArchived }); else archive.mutate(input); }}><Archive />Archive</DropdownMenuItem> : null}
+    {row.archivedAt ? <DropdownMenuItem onClick={() => unarchive.mutate({ sessionId: row.sessionId })}><ArchiveRestore />Unarchive</DropdownMenuItem> : null}
+    <DropdownMenuItem variant="destructive" onClick={() => onDelete(row)}><Trash2 />Delete</DropdownMenuItem>
+  </DropdownMenuGroup></DropdownMenuContent></DropdownMenu>;
+}
 
 function RunError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -60,6 +76,7 @@ function RunError({ message, onRetry }: { message: string; onRetry: () => void }
 function PastSession({ sessionId }: { sessionId: string }) {
   const session = useCoachSession(sessionId);
   if (session.isLoading) return <Skeleton className="h-24 w-full" />;
+  if (session.isError) return <div className="flex items-center justify-between gap-3 pt-3 text-sm text-muted-foreground"><span>Could not load session details.</span><Button size="sm" variant="outline" onClick={() => void session.refetch()}>Try again</Button></div>;
   if (!session.data) return <p className="text-sm text-muted-foreground">Session details unavailable.</p>;
   return (
     <div className="space-y-4 pt-3">
@@ -76,7 +93,9 @@ function PastSession({ sessionId }: { sessionId: string }) {
 }
 
 export function CoachPage() {
-  const sessions = useCoachSessions();
+  const [showArchived, setShowArchived] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<CoachSessionSummary | null>(null);
+  const sessions = useCoachSessions(showArchived);
   const activeSummary = sessions.data?.sessions?.find((session) => session.status === "active");
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const displayedSessionId = activeSummary?.sessionId ?? currentSessionId;
@@ -86,6 +105,7 @@ export function CoachPage() {
   const end = useEndCoachSession();
   const saveNote = useSaveCoachNote();
   const discardNote = useDiscardCoachNote();
+  const remove = useDeleteCoachSession();
   const [composer, setComposer] = useState("");
   const [lastMessage, setLastMessage] = useState("");
   const [runState, setRunState] = useState<"idle" | "running" | "error">("idle");
@@ -188,7 +208,7 @@ export function CoachPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Profile coach</h1>
           <p className="mt-2 max-w-3xl text-base leading-relaxed text-muted-foreground">Turn overlooked outcomes, scope, and project evidence into grounded profile notes.</p>
         </div>
-        {active?.status === "active" ? (
+        <div className="flex items-center gap-2">{active?.status === "active" ? (
           <AlertDialog>
             <AlertDialogTrigger render={<Button variant="outline"><SquareCheckBig aria-hidden="true" />End session</Button>} />
             <AlertDialogContent>
@@ -211,7 +231,7 @@ export function CoachPage() {
             {starting || start.isPending ? <Spinner data-icon="inline-start" /> : <Sparkles aria-hidden="true" />}
             Start another session
           </Button>
-        ) : null}
+        ) : null}{active ? <CoachSessionActions current row={{ sessionId: active.sessionId, status: active.status, startedAt: active.startedAt, endedAt: active.endedAt, topicCount: active.topics?.length ?? 0, savedNoteCount: active.draftNotes?.filter((note) => note.status === "saved").length ?? 0, archivedAt: active.archivedAt }} onArchived={() => setCurrentSessionId(null)} onDelete={setPendingDelete} /> : null}</div>
       </header>
 
       {runError && runState !== "error" ? <Alert variant="destructive"><AlertTitle>Profile coach error</AlertTitle><AlertDescription>{runError}</AlertDescription></Alert> : null}
@@ -291,17 +311,20 @@ export function CoachPage() {
         </div>
       )}
 
-      {pastSessions.length ? (
-        <section className="space-y-3">
+      <section className="flex flex-col gap-3">
+        {pastSessions.length ? <>
           <div className="flex items-center gap-2"><History className="size-4 text-muted-foreground" aria-hidden="true" /><h2 className="text-base font-semibold">Past sessions</h2><Badge variant="secondary">{pastSessions.length}</Badge></div>
           {pastSessions.map((past) => (
             <Collapsible key={past.sessionId} className="rounded-xl border bg-card px-4">
-              <CollapsibleTrigger className="flex w-full items-center justify-between gap-4 py-4 text-left"><span><span className="block text-sm font-medium">{new Date(past.startedAt).toLocaleDateString()}</span><span className="text-xs text-muted-foreground">{past.topicCount} topics · {past.savedNoteCount} saved notes</span></span><ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" /></CollapsibleTrigger>
+              <div className="flex items-center gap-2"><CollapsibleTrigger className="flex min-w-0 flex-1 items-center justify-between gap-4 py-4 text-left"><span><span className="block text-sm font-medium">{new Date(past.startedAt).toLocaleDateString()}</span><span className="text-xs text-muted-foreground">{past.topicCount} topics · {past.savedNoteCount} saved notes</span></span><span className="flex items-center gap-2">{past.archivedAt ? <Badge variant="outline">Archived</Badge> : null}<ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" /></span></CollapsibleTrigger><CoachSessionActions row={past} onDelete={setPendingDelete} /></div>
               <CollapsibleContent className="border-t pb-4"><PastSession sessionId={past.sessionId} /></CollapsibleContent>
             </Collapsible>
           ))}
-        </section>
-      ) : null}
+        </> : <p className="text-sm text-muted-foreground">No past coaching sessions.</p>}
+        <Field orientation="horizontal"><Switch id="show-archived-coach" checked={showArchived} onCheckedChange={setShowArchived} /><FieldLabel htmlFor="show-archived-coach">Show archived</FieldLabel></Field>
+      </section>
+
+      <AlertDialog open={pendingDelete != null} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this coaching session?</AlertDialogTitle><AlertDialogDescription>The conversation transcript and recap will be permanently removed. Saved notes are kept in your profile.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep it</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={remove.isPending} onClick={() => { if (!pendingDelete) return; const deletingDisplayed = pendingDelete.sessionId === displayedSessionId; remove.mutate({ sessionId: pendingDelete.sessionId }, { onSuccess: () => { if (deletingDisplayed) setCurrentSessionId(null); } }); setPendingDelete(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }

@@ -30,12 +30,66 @@ function seedRun(run: RunOut, onDone?: RunDone): void {
   trackRun({ runId: run.runId, kind: run.kind }, onDone);
 }
 
-export function useCoachSessions() {
+export function useCoachSessions(includeArchived = false) {
   return useQuery({
-    queryKey: ["coach-sessions"],
+    queryKey: ["coach-sessions", includeArchived],
     queryFn: () =>
-      unwrap(api.GET("/api/profile/coach/sessions", {} as never)) as Promise<CoachSessions>,
+      unwrap(
+        api.GET("/api/profile/coach/sessions", {
+          params: {
+            query: includeArchived ? { includeArchived: true } : {},
+          },
+        }),
+      ) as Promise<CoachSessions>,
   });
+}
+
+function useCoachSessionInvalidation() {
+  const queryClient = useQueryClient();
+  return async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["coach-sessions"] }),
+      queryClient.invalidateQueries({ queryKey: ["coach-session"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+    ]);
+  };
+}
+
+function useCoachSessionMutation(action: "archive" | "unarchive" | "delete") {
+  const invalidate = useCoachSessionInvalidation();
+  return useMutation({
+    mutationFn: ({ sessionId }: { sessionId: string }) => {
+      const params = { params: { path: { session_id: sessionId } } };
+      if (action === "delete") {
+        return unwrap(
+          api.DELETE("/api/profile/coach/sessions/{session_id}", params),
+        );
+      }
+      return unwrap(
+        api.POST(
+          `/api/profile/coach/sessions/{session_id}/${action}`,
+          params,
+        ),
+      );
+    },
+    onSuccess: async () => {
+      await invalidate();
+      if (action === "delete") toast.success("Coaching session deleted");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useArchiveCoachSession() {
+  return useCoachSessionMutation("archive");
+}
+
+export function useUnarchiveCoachSession() {
+  return useCoachSessionMutation("unarchive");
+}
+
+export function useDeleteCoachSession() {
+  return useCoachSessionMutation("delete");
 }
 
 export function useCoachSession(sessionId: string | null) {

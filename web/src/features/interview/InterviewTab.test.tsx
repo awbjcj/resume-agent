@@ -112,6 +112,8 @@ describe("InterviewTab", () => {
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "/interview?session=s2");
     expect(screen.getByText("Resume")).toBeInTheDocument();
-    expect(screen.getByText(/In progress/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/In progress/i)).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /start mock interview/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/interview for this job is in progress/i)).toBeInTheDocument();
   });
 });

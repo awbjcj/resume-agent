@@ -30,16 +30,66 @@ function seedRun(run: RunOut, onDone?: RunDone): void {
   trackRun({ runId: run.runId, kind: run.kind }, onDone);
 }
 
-export function useInterviewSessions(jobId?: number) {
+export function useInterviewSessions(jobId?: number, includeArchived = false) {
   return useQuery({
-    queryKey: ["interview-sessions", jobId ?? null],
+    queryKey: ["interview-sessions", jobId ?? null, includeArchived],
     queryFn: () =>
       unwrap(
         api.GET("/api/interview/sessions", {
-          params: { query: jobId != null ? { jobId } : {} },
+          params: {
+            query: {
+              ...(jobId != null ? { jobId } : {}),
+              ...(includeArchived ? { includeArchived: true } : {}),
+            },
+          },
         }),
       ) as Promise<components["schemas"]["InterviewSessionsOut"]>,
   });
+}
+
+function useInterviewSessionInvalidation() {
+  const queryClient = useQueryClient();
+  return async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["interview-sessions"] }),
+      queryClient.invalidateQueries({ queryKey: ["interview-session"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+    ]);
+  };
+}
+
+function useInterviewSessionMutation(
+  action: "archive" | "unarchive" | "delete",
+) {
+  const invalidate = useInterviewSessionInvalidation();
+  return useMutation({
+    mutationFn: ({ sessionId }: { sessionId: string }) => {
+      const params = { params: { path: { session_id: sessionId } } };
+      if (action === "delete") {
+        return unwrap(api.DELETE("/api/interview/sessions/{session_id}", params));
+      }
+      return unwrap(
+        api.POST(`/api/interview/sessions/{session_id}/${action}`, params),
+      );
+    },
+    onSuccess: async () => {
+      await invalidate();
+      if (action === "delete") toast.success("Interview deleted");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useArchiveInterviewSession() {
+  return useInterviewSessionMutation("archive");
+}
+
+export function useUnarchiveInterviewSession() {
+  return useInterviewSessionMutation("unarchive");
+}
+
+export function useDeleteInterviewSession() {
+  return useInterviewSessionMutation("delete");
 }
 
 export function useInterviewSession(sessionId: string | null) {
