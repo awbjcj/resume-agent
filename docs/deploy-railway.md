@@ -59,15 +59,16 @@ client type from the **Desktop app** client used by the local CLI's
    `http://localhost:8000/api/gmail/callback`.
 5. Add Railway variables:
 
-   | Variable                    | Value                              |
-   | ---------------------------- | ----------------------------------- |
-   | `GOOGLE_OAUTH_CLIENT_ID`     | From the credential you just made   |
-   | `GOOGLE_OAUTH_CLIENT_SECRET` | From the credential you just made   |
+   | Variable                     | Value                             |
+   | ---------------------------- | --------------------------------- |
+   | `GOOGLE_OAUTH_CLIENT_ID`     | From the credential you just made |
+   | `GOOGLE_OAUTH_CLIENT_SECRET` | From the credential you just made |
 
    This becomes the **platform client** every workspace connects through by
    default; any signed-in user can instead paste their own client id/secret
    under Settings → Keys, which overrides the platform client for their
    workspace only.
+
 6. Sign in to the app, open **Settings → Keys**, and click **Connect Gmail**
    on the Gmail card to run the consent flow.
 
