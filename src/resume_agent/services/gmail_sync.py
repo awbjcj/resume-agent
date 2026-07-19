@@ -25,7 +25,7 @@ def run_gmail_sync(
     reporter: Any,
     *,
     service: Any | None = None,
-    llm: Runner | None | Any = _UNSET,
+    llm: Runner | None | object = _UNSET,
 ) -> dict:
     reporter.begin(2, "Scanning Gmail")
     if service is None:

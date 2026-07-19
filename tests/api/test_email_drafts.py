@@ -129,3 +129,36 @@ def test_save_creates_gmail_draft(client, monkeypatch):
     assert body["gmailDraftId"] == "draft-123"
     assert body["state"] == "saved"
     assert created["payload"]["message"]["threadId"] == "t1"
+
+
+def test_save_wraps_gmail_api_error_in_envelope(client, monkeypatch):
+    from sqlmodel import Session
+
+    from resume_agent.api.routers import email_drafts as router_module
+    from resume_agent.tracking.repository import save_email_draft
+    from resume_agent.tracking.tables import EmailDraft
+
+    class _Drafts:
+        def create(self, userId, body):
+            def _boom():
+                raise RuntimeError("HTTP 503 from Gmail")
+
+            return SimpleNamespace(execute=_boom)
+
+    class _Service:
+        def users(self):
+            drafts = _Drafts()
+            return SimpleNamespace(drafts=lambda: drafts)
+
+    monkeypatch.setattr(router_module, "_compose_service", lambda request: _Service())
+    job_id = _seed_job(client)
+    with Session(client.app.state.engine) as session:
+        draft = save_email_draft(
+            session,
+            EmailDraft(job_id=job_id, draft_type="follow_up", subject="s", body="b"),
+        )
+        draft_id = draft.id
+
+    response = client.post(f"/api/email-drafts/{draft_id}/save")
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "GMAIL_API_ERROR"

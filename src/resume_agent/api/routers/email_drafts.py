@@ -17,7 +17,12 @@ from resume_agent.api.schemas.email_drafts import EmailDraftOut, EmailDraftReque
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
 from resume_agent.gmail import auth as gmail_auth
-from resume_agent.gmail.errors import GmailError, GmailNotConnected, GmailScopeMissing
+from resume_agent.gmail.errors import (
+    GmailApiError,
+    GmailError,
+    GmailNotConnected,
+    GmailScopeMissing,
+)
 from resume_agent.services.email_writer import DRAFT_TYPES, generate_email_draft
 from resume_agent.tracking.repository import (
     email_drafts_for_job,
@@ -117,25 +122,30 @@ def save_to_gmail(
         raise ApiException(404, "NOT_FOUND", f"Draft #{draft_id} not found")
     try:
         service = _compose_service(request)
-        mime = MimeMessage()
-        if draft.to_addr:
-            mime["To"] = draft.to_addr
-        mime["Subject"] = draft.subject
-        mime.set_content(draft.body)
-        raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
-        message: dict[str, Any] = {"raw": raw}
-        if draft.gmail_thread_id:
-            message["threadId"] = draft.gmail_thread_id
-        payload = {"message": message}
-        drafts_api = service.users().drafts()
+    except GmailError as error:
+        raise _gmail_409(error) from error
+    mime = MimeMessage()
+    if draft.to_addr:
+        mime["To"] = draft.to_addr
+    mime["Subject"] = draft.subject
+    mime.set_content(draft.body)
+    raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
+    message: dict[str, Any] = {"raw": raw}
+    if draft.gmail_thread_id:
+        message["threadId"] = draft.gmail_thread_id
+    payload = {"message": message}
+    drafts_api = service.users().drafts()
+    try:
         if draft.gmail_draft_id:
             response = drafts_api.update(
                 userId="me", id=draft.gmail_draft_id, body=payload
             ).execute()
         else:
             response = drafts_api.create(userId="me", body=payload).execute()
-    except GmailError as error:
-        raise _gmail_409(error) from error
+    except Exception as exc:  # noqa: BLE001 — surface a typed Gmail API failure
+        raise ApiException(
+            502, GmailApiError.code, "Failed to save the draft to Gmail"
+        ) from exc
     draft.gmail_draft_id = response.get("id")
     draft.state = "saved"
     return EmailDraftOut.model_validate(save_email_draft(session, draft))
