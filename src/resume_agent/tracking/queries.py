@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from sqlalchemy.orm import defer
 from sqlmodel import Session, select
 
 from resume_agent.discovery.connectors.text import clean_job_description_text
@@ -201,6 +202,7 @@ def shortlist_rows(
     archived_col = cast(Any, Job.archived_at)
     jobs = session.exec(
         select(Job)
+        .options(defer(cast(Any, Job.jd_text)))
         .where(Job.status == JobStatus.shortlisted.value, archived_col.is_(None))
         .order_by(fit_score_col.desc().nullslast())
     ).all()
@@ -362,6 +364,7 @@ def triage_rows(session: Session) -> list[TriageRow]:
     status_col = cast(Any, Job.status)
     jobs = session.exec(
         select(Job)
+        .options(defer(cast(Any, Job.jd_text)))
         .where(status_col.in_(_TRIAGE_STATUSES), archived_col.is_(None))
         .order_by(cast(Any, Job.fit_score).asc().nullsfirst())
     ).all()
@@ -372,7 +375,10 @@ def triage_rows(session: Session) -> list[TriageRow]:
 def archived_rows(session: Session) -> list[TriageRow]:
     archived_col = cast(Any, Job.archived_at)
     jobs = session.exec(
-        select(Job).where(archived_col.is_not(None)).order_by(archived_col.desc())
+        select(Job)
+        .options(defer(cast(Any, Job.jd_text)))
+        .where(archived_col.is_not(None))
+        .order_by(archived_col.desc())
     ).all()
     progressed = progressed_job_ids(session)
     return [_triage_row(job, progressed) for job in jobs]

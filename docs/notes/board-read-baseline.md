@@ -20,4 +20,21 @@ record "within budget" here.
 Result: **exceeded** — shortlist p95 178.4 ms and triage p95 147.2 ms at 5,000
 rows are both over the 100 ms budget. Task 9 deferral applied.
 
-**Post-fix table (fill in after Task 9, or write "skipped — within budget"):**
+**Post-fix table (after Task 9 — `defer(jd_text)` on shortlist/triage/archived list queries):**
+
+```
+   rows      board   p50 ms   p95 ms
+   1000  shortlist     14.7     29.0
+   1000     triage     15.0     24.7
+   5000  shortlist     78.9    124.1
+   5000     triage     78.0    132.6
+  10000  shortlist    176.3    218.9
+  10000     triage    159.7    215.3
+```
+
+Deferral kept: p95 at 5,000 rows improved for both boards (shortlist
+178.4 → 124.1 ms, triage 147.2 → 132.6 ms), and p50 nearly halved. Deferring
+the ~4.4 KB `jd_text` column — never shipped by `ShortlistItem`/`TriageItem` —
+removes it from every row's hydration. The guard test
+(`test_shortlist_and_triage_rows_never_touch_jd_text`) keeps the invariant from
+silently regressing into an N+1.

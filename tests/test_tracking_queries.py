@@ -549,3 +549,21 @@ def test_triage_rows_query_count_is_constant():
     small = _select_count(_seeded_engine(2), triage_rows)
     large = _select_count(_seeded_engine(12), triage_rows)
     assert small == large
+
+
+def test_shortlist_and_triage_rows_never_touch_jd_text():
+    """Pins the invariant that lets jd_text stay deferred on list queries.
+
+    ShortlistItem and TriageItem never ship jd_text on the wire; if a future
+    row field starts reading job.jd_text, the defer() in these queries would
+    silently issue one lazy SELECT per row (N+1). Fail here first.
+    """
+    import inspect
+
+    import resume_agent.tracking.queries as queries_module
+
+    for fn in (queries_module._shortlist_row, queries_module._triage_row):
+        assert "jd_text" not in inspect.getsource(fn), (
+            f"{fn.__name__} reads jd_text; remove defer() from its query "
+            "before shipping this change"
+        )
