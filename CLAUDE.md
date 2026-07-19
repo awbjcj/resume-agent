@@ -37,7 +37,10 @@ logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
   (`api/runs/manager.py`), keyed by `run_id`, reusing `ProgressReporter` under
   `data/runs/`. **Each worker opens its OWN DB session** bound to the app engine —
   never the request session (not thread-safe). Clients watch `GET /api/runs/{id}/events`
-  (sse-starlette) or poll `GET /api/runs/{id}`.
+  (sse-starlette) or poll `GET /api/runs/{id}`. Every router starts its run through
+  the **launch seam** (`api/runs/launch.py`): `launch()` submits + maps the three
+  launch-time errors onto the API envelope (singleton→409, reset→409, quota→429),
+  and `session_work()` owns the worker-opens-its-own-session rule.
 - **Errors** use one envelope `{ "error": { code, message, details? } }` via
   `ApiException` + handlers in `api/errors.py`.
 - **Auth/CORS:** optional static bearer via `Settings.api_token` (guards every
@@ -83,7 +86,11 @@ to `build_model` with a lazy import. Nothing else changes.
 Multi-user state rides a `contextvars.ContextVar` holding the active
 `UserContext` (`tenancy/context.py`). Its set-points are the API dependency,
 `RunManager.submit` (which copies the caller context into its worker), and the
-CLI callback (`--user`). `get_settings()` returns effective request settings or
+CLI callback (`--user`). The Workspace layout is named once: the relative-path
+constants (`FACTS_PATH`, `SEARCH_PATH`, `CONNECTORS_PATH`, `REVIEW_PATH`,
+`REVIEW_DEEP_PATH`, `TELEMETRY_PATH`, `SKILL_ALIASES_PATH`) live in
+`tenancy/paths.py`, and `resolve_tenant_path` rebases them into the active
+Workspace at the leaves — so callers pass defaults, not hand-threaded absolute paths. `get_settings()` returns effective request settings or
 environment settings and must never be cached across requests. System tables
 use separate SQLAlchemy metadata and never appear in workspace databases.
 Session cookies and PATs resolve only to that context. Short-lived query tokens
@@ -172,6 +179,9 @@ To add a new backend: write `fetch_<name>(target, search, limit, skip_seen=None)
 in a new module, add detection logic to `detect.py`, register in `_BACKENDS`.
 Connector construction itself is table-driven: `CONNECTOR_SPECS` in `registry.py` is the
 single enumeration of connector kinds; adding an ATS appends one `ConnectorSpec`.
+Source Manager CRUD (`services/sources.py`) rides that same table: `ConnectorSpec`'s
+unit-addressing half (`section`/`unit_items`/`admits`/`new_unit`) plus `find_unit`/
+`spec_for` mean enable/limit/remove/add walk the specs instead of hand-enumerating kinds.
 
 ---
 
