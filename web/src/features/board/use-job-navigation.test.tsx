@@ -75,4 +75,37 @@ describe("useJobNavigation", () => {
     expect(nav).toHaveBeenCalledWith(3);
     expect(result.current.isLoadingNext).toBe(false);
   });
+
+  it("clears a pending advance if the modal closes before the page lands, instead of firing later", () => {
+    const nav = vi.fn();
+    const fetchNextPage = vi.fn();
+    const pagination: JobNavPagination = {
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      fetchNextPage,
+    };
+    const { result, rerender } = renderHook(
+      ({ ids, currentId }: { ids: number[]; currentId: number | null }) =>
+        useJobNavigation(ids, currentId, nav, pagination),
+      { initialProps: { ids: [1, 2], currentId: 2 } },
+    );
+
+    // At the loaded edge: request the next page.
+    act(() => result.current.goNext());
+    expect(result.current.isLoadingNext).toBe(true);
+
+    // The modal closes before the page arrives.
+    rerender({ ids: [1, 2], currentId: null });
+
+    // The page lands while nothing is open: the stale request must not
+    // linger, and nothing should navigate since no job is open.
+    rerender({ ids: [1, 2, 3], currentId: null });
+    expect(nav).not.toHaveBeenCalled();
+    expect(result.current.isLoadingNext).toBe(false);
+
+    // Opening an earlier job afterwards must not auto-jump forward because
+    // of the abandoned request.
+    rerender({ ids: [1, 2, 3], currentId: 1 });
+    expect(nav).not.toHaveBeenCalled();
+  });
 });

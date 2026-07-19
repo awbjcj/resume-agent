@@ -41,10 +41,15 @@ export function useJobNavigation(
     index >= 0 &&
     (index < orderedIds.length - 1 || (pagination?.hasNextPage ?? false));
 
-  // A page we requested has landed: advance to the row after the current one.
+  // A page we requested has landed: advance to the row after the current
+  // one. If the modal closed (or jumped elsewhere) while the fetch was in
+  // flight, there is nothing to advance from, so drop the request instead of
+  // leaving it to fire a surprise navigation whenever the index next lines up.
   useEffect(() => {
     if (!pendingAdvance) return;
-    if (index >= 0 && index < orderedIds.length - 1) {
+    if (index < 0) {
+      setPendingAdvance(false);
+    } else if (index < orderedIds.length - 1) {
       setPendingAdvance(false);
       onNavigate(orderedIds[index + 1]);
     }
