@@ -348,8 +348,8 @@ def test_corrections_hide_removed_and_show_explicit_zero_count_addition():
                 domain_label={"scripting": "Scripting", "apis": "APIs"},
                 category_of={"scripting": "languages", "apis": "backend-apis"},
             ),
-            corrections=TaxonomyCorrections(
-                removed_skills=["python"], added_skills=["graphql"]
+            corrections=TaxonomyCorrections.model_validate(
+                {"removed_skills": ["python"], "added_skills": ["graphql"]}
             ),
         )
 
