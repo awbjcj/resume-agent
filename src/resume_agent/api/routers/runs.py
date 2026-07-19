@@ -1,15 +1,15 @@
 """Run launch endpoints + GET run. Each launch returns 202 with the run record.
 
-The work callables open their OWN session inside the worker thread — never the
-request session, which is not safe to share across threads. The session is bound
-to the app engine so `create_app(db_url=...)` and in-memory test databases are
-honored.
+Every launch goes through the shared seam in ``api/runs/launch.py``: ``launch``
+submits and maps the launch-time errors, and ``session_work`` owns the one
+threading invariant — the worker opens its OWN session bound to the app engine,
+never the request session (not safe to share across threads) — so
+`create_app(db_url=...)` and in-memory test databases are honored.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypedDict
 
 from fastapi import APIRouter, Depends, Query, Request, UploadFile
 
@@ -19,7 +19,8 @@ from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.api.mappers import to_page
 from sse_starlette.sse import EventSourceResponse
 
-from resume_agent.api.runs.manager import RunManager, RunQuotaError, RunSingletonConflict
+from resume_agent.api.runs.launch import launch, session_work
+from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.jobs import ReviseRequest
 from resume_agent.api.runs.sse import record_to_run, run_events
 from resume_agent.api.schemas.runs import (
@@ -51,7 +52,6 @@ from resume_agent.services.pagination import paginate
 from resume_agent.services.revision import revise_resume_version
 from resume_agent.tracking.repository import get_cover_letter, get_resume_version
 from resume_agent.tenancy.context import current_context
-from resume_agent.tenancy.limits import DEFAULT_MAX_CONCURRENT_RUNS, active_limit
 
 router = APIRouter()
 link_router = APIRouter()
@@ -59,57 +59,6 @@ link_router = APIRouter()
 
 def _engine(request: Request):
     return get_engine(request)
-
-
-class _WorkspaceArgs(TypedDict):
-    search_path: str
-    facts_path: str
-
-
-def _workspace_args() -> _WorkspaceArgs:
-    context = current_context()
-    if context is None:
-        return {
-            "search_path": "config/search.yaml",
-            "facts_path": "data/profile/facts.json",
-        }
-    return {
-        "search_path": str(context.paths.config_dir / "search.yaml"),
-        "facts_path": str(context.paths.profile_dir / "facts.json"),
-    }
-
-
-def _submit(
-    mgr: RunManager,
-    kind: str,
-    work,
-    *,
-    singleton_key: str | None = None,
-    singleton_conflict: str = "join",
-    meta: dict[str, object] | None = None,
-) -> str:
-    context = current_context()
-    try:
-        return mgr.submit(
-            kind,
-            work,
-            singleton_key=singleton_key,
-            singleton_conflict=singleton_conflict,
-            meta=meta,
-            user_id=context.user_id if context is not None else None,
-            max_concurrent=active_limit(
-                "max_concurrent_runs", DEFAULT_MAX_CONCURRENT_RUNS
-            ),
-        )
-    except RunSingletonConflict as error:
-        raise ApiException(
-            409,
-            error.code,
-            "A revision is already running for this item",
-            details={"runId": error.run_id},
-        ) from error
-    except RunQuotaError as error:
-        raise ApiException(429, error.code, str(error)) from error
 
 
 def _owned_record(mgr: RunManager, run_id: str):
@@ -134,26 +83,20 @@ def launch_resume_revise(
             raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
         job_id = parent.job_id
 
-    def work(reporter):
+    def do_revise(session, reporter):
         reporter.begin(1, f"Revising resume version #{version_id}")
-        with get_session(engine) as session:
-            context = current_context()
-            child = revise_resume_version(
-                session,
-                version_id,
-                body.instruction,
-                re_review=body.re_review,
-                review_path=str(context.paths.config_dir / "review.yaml") if context else "config/review.yaml",
-                facts_path=_workspace_args()["facts_path"],
-            )
+        child = revise_resume_version(
+            session, version_id, body.instruction, re_review=body.re_review
+        )
         reporter.step(1)
         return {"versionId": child.id if child else None, "jobId": child.job_id if child else job_id}
 
     meta = {"versionId": version_id, "jobId": job_id, "instruction": body.instruction, "reReview": body.re_review}
-    run_id = _submit(mgr, "revise", work, singleton_key=f"revise:{version_id}", singleton_conflict="raise", meta=meta)
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(
+        mgr, "revise", session_work(engine, do_revise),
+        singleton_key=f"revise:{version_id}", singleton_conflict="raise", meta=meta,
+        busy_message="A revision is already running for this item",
+    )
 
 
 @router.post("/cover-letters/{cover_letter_id}/revise", response_model=RunOut, status_code=202)
@@ -170,23 +113,18 @@ def launch_cover_letter_revise(
             raise ApiException(404, "NOT_FOUND", f"Cover letter #{cover_letter_id} not found")
         job_id = parent.job_id
 
-    def work(reporter):
+    def do_revise(session, reporter):
         reporter.begin(1, f"Revising cover letter #{cover_letter_id}")
-        with get_session(engine) as session:
-            child = revise_cover_letter_version(
-                session,
-                cover_letter_id,
-                body.instruction,
-                facts_path=_workspace_args()["facts_path"],
-            )
+        child = revise_cover_letter_version(session, cover_letter_id, body.instruction)
         reporter.step(1)
         return {"coverLetterId": child.id if child else None, "jobId": child.job_id if child else job_id}
 
     meta = {"coverLetterId": cover_letter_id, "jobId": job_id, "instruction": body.instruction}
-    run_id = _submit(mgr, "coverLetterRevise", work, singleton_key=f"cover-letter-revise:{cover_letter_id}", singleton_conflict="raise", meta=meta)
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(
+        mgr, "coverLetterRevise", session_work(engine, do_revise),
+        singleton_key=f"cover-letter-revise:{cover_letter_id}", singleton_conflict="raise", meta=meta,
+        busy_message="A revision is already running for this item",
+    )
 
 
 @router.post("/jobs/import-urls", response_model=RunOut, status_code=202)
@@ -247,10 +185,7 @@ def launch_import_urls(
             "failures": failures,
         }
 
-    run_id = _submit(mgr, "importUrls", work)
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "importUrls", work)
 
 
 @router.post("/discover", response_model=RunOut, status_code=202)
@@ -261,18 +196,10 @@ def launch_discover(
 ):
     engine = _engine(request)
 
-    def work(reporter):
-        with get_session(engine) as session:
-            return {
-                "statusCounts": discover_jobs(
-                    session, reporter=reporter, **_workspace_args()
-                )
-            }
+    def do_discover(session, reporter):
+        return {"statusCounts": discover_jobs(session, reporter=reporter)}
 
-    run_id = _submit(mgr, "discover", work)
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "discover", session_work(engine, do_discover))
 
 
 @router.post("/reprocess", response_model=RunOut, status_code=202)
@@ -284,18 +211,10 @@ def launch_reprocess(
     engine = _engine(request)
     scopes = params.scopes if params is not None and params.scopes else ["shortlisted"]
 
-    def work(reporter):
-        with get_session(engine) as session:
-            return {
-                "statusCounts": reprocess_jobs(
-                    session, scopes=scopes, reporter=reporter, **_workspace_args()
-                )
-            }
+    def do_reprocess(session, reporter):
+        return {"statusCounts": reprocess_jobs(session, scopes=scopes, reporter=reporter)}
 
-    run_id = _submit(mgr, "reprocess", work)
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "reprocess", session_work(engine, do_reprocess))
 
 
 @router.post("/refresh", response_model=RunOut, status_code=202)
@@ -307,27 +226,10 @@ def launch_refresh(
     engine = _engine(request)
     limit = params.limit if params is not None else None
 
-    def work(reporter):
-        with get_session(engine) as session:
-            paths = _workspace_args()
-            context = current_context()
-            report = refresh_jobs(
-                session,
-                limit=limit,
-                reporter=reporter,
-                connectors_path=str(context.paths.config_dir / "connectors.yaml")
-                if context is not None
-                else "config/connectors.yaml",
-                telemetry_path=str(context.workspace / "connector_runs.json")
-                if context is not None
-                else "data/connector_runs.json",
-                **paths,
-            )
+    def do_refresh(session, reporter):
+        report = refresh_jobs(session, limit=limit, reporter=reporter)
         if report.failures:
-            with get_session(engine) as error_session:
-                record_source_failures(
-                    error_session, report.failures, run_id=reporter.run_id
-                )
+            record_source_failures(session, report.failures, run_id=reporter.run_id)
         return {
             "pulled": report.pulled,
             "totals": report.totals,
@@ -335,10 +237,7 @@ def launch_refresh(
             "failures": report.failures,
         }
 
-    run_id = _submit(mgr, "refresh", work, singleton_key="refresh")
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "refresh", session_work(engine, do_refresh), singleton_key="refresh")
 
 
 @router.post("/pull", response_model=RunOut, status_code=202)
@@ -347,28 +246,16 @@ def launch_pull(
 ):
     engine = _engine(request)
 
-    def work(reporter):
-        with get_session(engine) as session:
-            context = current_context()
-            report = pull_jobs(
-                session,
-                search_path=_workspace_args()["search_path"],
-                connectors_path=str(context.paths.config_dir / "connectors.yaml")
-                if context is not None
-                else "config/connectors.yaml",
-                telemetry_path=str(context.workspace / "connector_runs.json")
-                if context is not None
-                else "data/connector_runs.json",
-                limit=params.limit,
-                source_ids=params.source_ids,
-                reporter=reporter,
-                skip_known=not bool(params.refresh),
-            )
+    def do_pull(session, reporter):
+        report = pull_jobs(
+            session,
+            limit=params.limit,
+            source_ids=params.source_ids,
+            reporter=reporter,
+            skip_known=not bool(params.refresh),
+        )
         if report.failures:
-            with get_session(engine) as error_session:
-                record_source_failures(
-                    error_session, report.failures, run_id=reporter.run_id
-                )
+            record_source_failures(session, report.failures, run_id=reporter.run_id)
         return {
             "totals": report.totals,
             "upgraded": report.upgraded,
@@ -376,10 +263,7 @@ def launch_pull(
             "failures": report.failures,
         }
 
-    run_id = _submit(mgr, "pull", work, singleton_key="pull")
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "pull", session_work(engine, do_pull), singleton_key="pull")
 
 
 @router.post("/tailor", response_model=RunOut, status_code=202)
@@ -388,38 +272,27 @@ def launch_tailor(
 ):
     engine = _engine(request)
 
-    def work(reporter):
-        with get_session(engine) as session:
-            context = current_context()
-            results = tailor(
-                session,
-                job_ids=params.job_ids,
-                approved=params.approved,
-                review_path=str(
-                    context.paths.config_dir
-                    / ("review_deep.yaml" if params.deep else "review.yaml")
-                )
-                if context is not None
-                else (DEFAULT_REVIEW_DEEP if params.deep else DEFAULT_REVIEW),
-                facts_path=_workspace_args()["facts_path"],
-                reporter=reporter,
-                fail_on_partial=True,
-            )
-            return {
-                "jobs": [
-                    {
-                        "jobId": jid,
-                        "versionCount": len(v),
-                        "factCheckPassed": v[-1].fact_check_passed if v else False,
-                    }
-                    for jid, v in results.items()
-                ]
-            }
+    def do_tailor(session, reporter):
+        results = tailor(
+            session,
+            job_ids=params.job_ids,
+            approved=params.approved,
+            review_path=DEFAULT_REVIEW_DEEP if params.deep else DEFAULT_REVIEW,
+            reporter=reporter,
+            fail_on_partial=True,
+        )
+        return {
+            "jobs": [
+                {
+                    "jobId": jid,
+                    "versionCount": len(v),
+                    "factCheckPassed": v[-1].fact_check_passed if v else False,
+                }
+                for jid, v in results.items()
+            ]
+        }
 
-    run_id = _submit(mgr, "tailor", work)
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "tailor", session_work(engine, do_tailor))
 
 
 @router.post("/cover-letters", response_model=RunOut, status_code=202)
@@ -430,30 +303,22 @@ def launch_cover_letters(
 ):
     engine = _engine(request)
 
-    def work(reporter):
-        with get_session(engine) as session:
-            results = write_cover_letters(
-                session,
-                job_ids=params.job_ids,
-                approved=params.approved,
-                reporter=reporter,
-                facts_path=_workspace_args()["facts_path"],
-            )
-            return {
-                "coverLetters": [
-                    {
-                        "jobId": r.job_id,
-                        "coverLetterId": r.cover_letter_id,
-                        "factCheckPassed": r.fact_check_passed,
-                    }
-                    for r in results
-                ]
-            }
+    def do_write(session, reporter):
+        results = write_cover_letters(
+            session, job_ids=params.job_ids, approved=params.approved, reporter=reporter
+        )
+        return {
+            "coverLetters": [
+                {
+                    "jobId": r.job_id,
+                    "coverLetterId": r.cover_letter_id,
+                    "factCheckPassed": r.fact_check_passed,
+                }
+                for r in results
+            ]
+        }
 
-    run_id = _submit(mgr, "coverLetter", work)
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "coverLetter", session_work(engine, do_write))
 
 
 @router.post("/gmail/sync", response_model=RunOut, status_code=202)
@@ -471,10 +336,7 @@ def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manage
 
         return run_gmail_sync(engine, reporter)
 
-    run_id = _submit(mgr, "gmailSync", work, singleton_key="gmailSync")
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "gmailSync", work, singleton_key="gmailSync")
 
 
 def _linkedin_ready() -> bool:
@@ -505,18 +367,10 @@ def launch_linkedin_scrape(
         )
     engine = _engine(request)
 
-    def work(reporter):
-        with get_session(engine) as session:
-            return scrape_linkedin_jobs(
-                session,
-                reporter=reporter,
-                search_path=_workspace_args()["search_path"],
-            )
+    def do_scrape(session, reporter):
+        return scrape_linkedin_jobs(session, reporter=reporter)
 
-    run_id = _submit(mgr, "linkedinScrape", work, singleton_key="linkedinScrape")
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "linkedinScrape", session_work(engine, do_scrape), singleton_key="linkedinScrape")
 
 
 @router.post("/jobs/from-url", response_model=RunOut, status_code=202)
@@ -527,26 +381,20 @@ def launch_add_from_url(
 ):
     engine = _engine(request)
 
-    def work(reporter):
+    def do_add(session, reporter):
         reporter.begin(1, f"Fetching {params.url}")
-        with get_session(engine) as session:
-            job = add_job_from_url(
-                session,
-                url=params.url,
-                company=params.company,
-                title=params.title,
-                location=params.location,
-                allow_browser=params.allow_browser,
-            )
-            job_id = job.id if job else None
-            duplicate = job is None
+        job = add_job_from_url(
+            session,
+            url=params.url,
+            company=params.company,
+            title=params.title,
+            location=params.location,
+            allow_browser=params.allow_browser,
+        )
         reporter.step(1)
-        return {"jobId": job_id, "duplicate": duplicate}
+        return {"jobId": job.id if job else None, "duplicate": job is None}
 
-    run_id = _submit(mgr, "addJobUrl", work)
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "addJobUrl", session_work(engine, do_add))
 
 
 @router.get("/runs", response_model=Page[RunOut])

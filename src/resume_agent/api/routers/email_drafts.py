@@ -12,7 +12,6 @@ from sqlmodel import Session
 from resume_agent.api.deps import get_run_manager, get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.email_drafts import EmailDraftOut, EmailDraftRequest
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
@@ -73,10 +72,10 @@ def launch_email_draft(
         raise ApiException(400, "INVALID_DRAFT_TYPE", f"Unknown type {body.draft_type}")
     if get_job(session, job_id) is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
-    from resume_agent.api.routers.runs import _engine, _submit, _workspace_args
+    from resume_agent.api.routers.runs import _engine
+    from resume_agent.api.runs.launch import launch
 
     engine = _engine(request)
-    facts_path = _workspace_args()["facts_path"]
     draft_type, instructions = body.draft_type, body.instructions
 
     def work(reporter):
@@ -88,22 +87,18 @@ def launch_email_draft(
                 job_id,
                 draft_type,
                 instructions,
-                facts_path=facts_path,
                 service=service,
             )
         reporter.step(1)
         return {"draftId": draft.id}
 
-    run_id = _submit(
+    return launch(
         mgr,
         "emailDraft",
         work,
         singleton_key=f"emailDraft:{job_id}",
         meta={"jobId": job_id},
     )
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
 
 
 @router.get("/jobs/{job_id}/email-drafts", response_model=list[EmailDraftOut])
