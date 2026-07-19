@@ -8,6 +8,7 @@ in-memory state (app.state.gmail_oauth_states) replaces the signature.
 
 from __future__ import annotations
 
+import logging
 import secrets as pysecrets
 import time
 from typing import Any
@@ -22,6 +23,8 @@ from resume_agent.api.schemas.gmail import GmailConnectOut, GmailStatusOut
 from resume_agent.config import Settings, get_settings
 from resume_agent.gmail import auth as gmail_auth
 from resume_agent.tenancy.context import current_context, use_context
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 callback_router = APIRouter()
@@ -143,9 +146,13 @@ def gmail_callback(request: Request, code: str = "", state: str = "", error: str
                 flow = _build_flow(settings, _redirect_uri(request))
                 flow.fetch_token(code=code)
                 gmail_auth.save_token_json(flow.credentials.to_json())
-    except ApiException:
+    except ApiException as exc:
+        logger.exception(
+            "Gmail callback rejected (config/client): %s %s", exc.code, exc.message
+        )
         return _finish("error")
     except Exception:  # noqa: BLE001 — never render a raw OAuth error page
+        logger.exception("Gmail callback token exchange failed")
         return _finish("error")
     return _finish("connected")
 
