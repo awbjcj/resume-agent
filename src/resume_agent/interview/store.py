@@ -2,22 +2,15 @@
 
 from __future__ import annotations
 
-import json
-import re
-import threading
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from datetime import datetime, timezone
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.progress import atomic_write_text
-
-_INTERVIEW_LOCK = threading.RLock()
-_SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
+from resume_agent.sessions.store import SessionStore, now_iso, valid_session_id
 
 STYLE_EXTRA_CAP = 2_000
 
@@ -90,43 +83,28 @@ class InterviewSession(ExtensibleModel):
     debrief: InterviewDebrief | None = None
 
 
+_STORE: SessionStore[InterviewSession] = SessionStore(InterviewSession, label="interview")
+
+
 def _valid_session_id(session_id: str) -> bool:
-    return bool(_SESSION_ID.fullmatch(session_id))
+    return valid_session_id(session_id)
 
 
 def _session_path(interview_dir: Path | str, session_id: str) -> Path:
-    if not _valid_session_id(session_id):
-        raise ValueError(f"unknown session: {session_id}")
-    return Path(interview_dir) / f"session-{session_id}.json"
+    return _STORE.path(interview_dir, session_id)
 
 
-@contextmanager
-def interview_lock() -> Iterator[None]:
+def interview_lock() -> AbstractContextManager[None]:
     """Serialize interview session mutations in this process."""
-    with _INTERVIEW_LOCK:
-        yield
+    return _STORE.lock()
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def _read(path: Path) -> dict:
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        return InterviewSession.model_validate(raw).model_dump(mode="json")
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
-        raise ValueError(f"invalid interview session: {path}") from exc
+    return now_iso()
 
 
 def _write(interview_dir: Path | str, session: dict) -> None:
-    validated = InterviewSession.model_validate(session)
-    if not _valid_session_id(validated.session_id):
-        raise ValueError("invalid session id")
-    atomic_write_text(
-        _session_path(interview_dir, validated.session_id),
-        validated.model_dump_json(indent=2) + "\n",
-    )
+    _STORE.write(interview_dir, session)
 
 
 def list_sessions(
@@ -135,28 +113,18 @@ def list_sessions(
     *,
     include_archived: bool = False,
 ) -> list[dict]:
-    root = Path(interview_dir)
-    if not root.exists():
-        return []
-    sessions = [_read(path) for path in root.glob("session-*.json")]
+    sessions = _STORE.list(interview_dir, include_archived=include_archived)
     if job_id is not None:
         sessions = [row for row in sessions if row["job_id"] == job_id]
-    if not include_archived:
-        sessions = [row for row in sessions if not row["archived_at"]]
-    return sorted(sessions, key=lambda row: (row["started_at"], row["session_id"]))
+    return sessions
 
 
 def load_session(interview_dir: Path | str, session_id: str) -> dict:
-    path = _session_path(interview_dir, session_id)
-    if not path.exists():
-        raise ValueError(f"unknown session: {session_id}")
-    return _read(path)
+    return _STORE.load(interview_dir, session_id)
 
 
 def active_sessions(interview_dir: Path | str) -> list[dict]:
-    return [
-        row for row in list_sessions(interview_dir) if row["status"] == "active"
-    ]
+    return _STORE.active(interview_dir)
 
 
 def active_session_for_job(interview_dir: Path | str, job_id: int) -> dict | None:
@@ -219,11 +187,7 @@ def mutate_session(
     session_id: str,
     fn: Callable[[dict], None],
 ) -> dict:
-    with interview_lock():
-        session = load_session(interview_dir, session_id)
-        fn(session)
-        _write(interview_dir, session)
-        return load_session(interview_dir, session_id)
+    return _STORE.mutate(interview_dir, session_id, fn)
 
 
 def apply_answer_delta(
@@ -285,41 +249,23 @@ def end_with_debrief(
 
 
 def archive_session(interview_dir: Path | str, session_id: str) -> dict:
-    def apply(session: dict) -> None:
-        if session["status"] != "ended":
-            raise ValueError("only ended sessions can be archived")
-        if session["archived_at"]:
-            raise ValueError("session already archived")
-        session["archived_at"] = _now()
-
-    return mutate_session(interview_dir, session_id, apply)
+    return _STORE.archive(interview_dir, session_id)
 
 
 def unarchive_session(interview_dir: Path | str, session_id: str) -> dict:
-    def apply(session: dict) -> None:
-        if not session["archived_at"]:
-            raise ValueError("session not archived")
-        session["archived_at"] = None
-
-    return mutate_session(interview_dir, session_id, apply)
+    return _STORE.unarchive(interview_dir, session_id)
 
 
 def delete_session(interview_dir: Path | str, session_id: str) -> None:
     """Permanently remove a session; deleting an active session abandons it."""
-    with interview_lock():
-        path = _session_path(interview_dir, session_id)
-        if not path.exists():
-            raise ValueError(f"unknown session: {session_id}")
-        path.unlink()
+    _STORE.delete(interview_dir, session_id)
 
 
 def delete_sessions_for_job(interview_dir: Path | str, job_id: int) -> int:
     """Remove all interview session files for a deleted job. Returns count removed."""
     removed = 0
-    with interview_lock():
-        for row in list_sessions(
-            interview_dir, job_id=job_id, include_archived=True
-        ):
-            _session_path(interview_dir, row["session_id"]).unlink(missing_ok=True)
+    with _STORE.lock():
+        for row in list_sessions(interview_dir, job_id=job_id, include_archived=True):
+            _STORE.path(interview_dir, row["session_id"]).unlink(missing_ok=True)
             removed += 1
     return removed
