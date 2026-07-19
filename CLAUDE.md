@@ -48,6 +48,10 @@ logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
 - **In-memory sqlite tests** need a shared connection: `make_engine` gives
   `sqlite://` a `StaticPool` + `check_same_thread=False` so the request threadpool
   sees the schema the lifespan thread created.
+- **Board filters are declared once.** `board_filter_query(default_sort)` in
+  `api/routers/boards.py` owns the shared query surface for
+  shortlist/pipeline/triage; a new board filter is added in exactly one place.
+  Triage's extra `archived` flag stays endpoint-local via `dataclasses.replace`.
 
 ---
 
@@ -226,6 +230,7 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/profile/coach.py`                   | Coach turn validation, topic-aware context, and structured-output agents                                                  |
 | `src/resume_agent/interview/agent.py`                 | Mock interviewer persona, turn/debrief validation, transcript elision                                                     |
 | `src/resume_agent/services/profile_coach.py`          | Coach session turns, draft approval, recap, rebuild, and impact orchestration                                             |
+| `src/resume_agent/sessions/store.py`                  | Session substrate: file custody every turn-per-run session kind rides (ADR 0006)                                          |
 | `src/resume_agent/discovery/connectors/detect.py`    | ATS detection (singleton → L1 → L2)                                                                                       |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation                                                                                   |
 | `src/resume_agent/discovery/scraper/dashboard.py`    | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/`                                                    |
@@ -382,6 +387,9 @@ aggressiveness determines how many detail fetches are issued.
   `llm_runner.transcribe` (`Settings.transcribe_model`, Gemini/OpenAI only,
   default `gemini:gemini-2.5-flash`) through `POST /api/transcribe`; audio is
   never persisted.
+  Both the coach and interview stores are adapters of the Session substrate
+  (`sessions/store.py`); custody bugs are fixed there, once. `TurnRejected` and
+  `format_with_retry` live in `sessions/turns.py`, shared by both stacks.
 - **Gmail is multi-user; drafts only, never send.** The platform OAuth client
   (`GOOGLE_OAUTH_CLIENT_ID/SECRET`) can be overridden per user via
   `secrets.env`; per-user tokens live at `{workspace}/gmail_token.json`

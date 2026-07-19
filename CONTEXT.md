@@ -193,6 +193,28 @@ ids are stable choices; incremental additions may point to them but do not rewri
 them.
 _Avoid_: taxonomy cache, classification result
 
+## Sessions
+
+**Session substrate**:
+The deep custody seam for every turn-per-run session kind (ADR 0006) —
+`sessions/store.py`. One `SessionStore` per kind owns id validation, the
+`session-<id>.json` naming, the process-wide mutation lock, validated atomic
+read/write, listing/active filtering, delta-under-lock mutation, and the
+archive/unarchive/delete lifecycle. The Coach session store and the Mock
+Interview store are its two adapters; kind-specific turn schemas and creation
+invariants stay in the kind's module.
+_Avoid_: session manager (it manages files, not conversations), base store
+(it is the seam, not a superclass grab-bag)
+
+**Launch seam**:
+`api/runs/launch.py` — the single tail every router uses to start a background
+run: submit through RunManager (UserContext-derived), map the three
+launch-time errors onto the API envelope (singleton → 409, reset → 409,
+quota → 429), return the created record as `RunOut`. `session_work` rides it
+and owns the one threading invariant: the worker opens its OWN DB session.
+_Avoid_: submit helper (seven routers had one of those; this is the seam),
+run starter
+
 ## Profile corpus
 
 **Fragment cache walk**:
