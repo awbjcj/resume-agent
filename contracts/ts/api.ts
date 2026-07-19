@@ -7157,6 +7157,9 @@ export interface operations {
     get_pipeline_api_pipeline_get: {
         parameters: {
             query?: {
+                page?: number;
+                pageSize?: number;
+                q?: string | null;
                 source?: string | null;
                 status?: string | null;
                 remote?: string | null;
@@ -7174,10 +7177,7 @@ export interface operations {
                 minSalary?: number | null;
                 staleDays?: number | null;
                 staleMinDays?: number | null;
-                q?: string | null;
                 sortBy?: string;
-                page?: number;
-                pageSize?: number;
             };
             header?: {
                 authorization?: string | null;
@@ -8684,6 +8684,8 @@ export interface operations {
     get_shortlist_api_shortlist_get: {
         parameters: {
             query?: {
+                page?: number;
+                pageSize?: number;
                 q?: string | null;
                 source?: string | null;
                 status?: string | null;
@@ -8703,8 +8705,6 @@ export interface operations {
                 staleDays?: number | null;
                 staleMinDays?: number | null;
                 sortBy?: string;
-                page?: number;
-                pageSize?: number;
             };
             header?: {
                 authorization?: string | null;
@@ -9392,6 +9392,8 @@ export interface operations {
         parameters: {
             query?: {
                 archived?: boolean;
+                page?: number;
+                pageSize?: number;
                 q?: string | null;
                 source?: string | null;
                 status?: string | null;
@@ -9411,8 +9413,6 @@ export interface operations {
                 staleDays?: number | null;
                 staleMinDays?: number | null;
                 sortBy?: string;
-                page?: number;
-                pageSize?: number;
             };
             header?: {
                 authorization?: string | null;
