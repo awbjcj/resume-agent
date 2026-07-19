@@ -9,7 +9,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
-from resume_agent.api.routers import interview as interview_router
 from resume_agent.db import get_session
 from resume_agent.interview.store import (
     InterviewContext,
