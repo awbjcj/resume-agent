@@ -14,3 +14,6 @@ class NotificationOut(CamelModel):
     message_id: str
     state: str
     created_at: datetime
+    job_id: int | None = None
+    company: str | None = None
+    title: str | None = None

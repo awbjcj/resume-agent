@@ -3477,6 +3477,17 @@
             "title": "Applicationid",
             "type": "integer"
           },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
           "createdAt": {
             "format": "date-time",
             "title": "Createdat",
@@ -3489,6 +3500,17 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
           },
           "kind": {
             "title": "Kind",
@@ -3505,6 +3527,17 @@
           "state": {
             "title": "State",
             "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           }
         },
         "required": [

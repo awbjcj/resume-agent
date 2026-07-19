@@ -49,7 +49,11 @@ def accept_notification(session: Session, notification_id: int) -> Notification 
     notification = get_notification(session, notification_id)
     if notification is None:
         return None
-    update_application_status(session, notification.application_id, notification.proposed_status)
+    # Reminder kinds carry no status proposal — accepting only acknowledges.
+    if notification.proposed_status:
+        update_application_status(
+            session, notification.application_id, notification.proposed_status
+        )
     notification.state = "accepted"
     return save_notification(session, notification)
 

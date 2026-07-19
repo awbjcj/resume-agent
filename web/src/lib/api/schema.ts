@@ -3342,6 +3342,8 @@ export interface components {
         NotificationOut: {
             /** Applicationid */
             applicationId: number;
+            /** Company */
+            company?: string | null;
             /**
              * Createdat
              * Format: date-time
@@ -3351,6 +3353,8 @@ export interface components {
             evidence: string;
             /** Id */
             id: number;
+            /** Jobid */
+            jobId?: number | null;
             /** Kind */
             kind: string;
             /** Messageid */
@@ -3359,6 +3363,8 @@ export interface components {
             proposedStatus: string;
             /** State */
             state: string;
+            /** Title */
+            title?: string | null;
         };
         /** Page[RunOut] */
         Page_RunOut_: {
