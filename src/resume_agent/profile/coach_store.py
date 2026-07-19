@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import json
-import re
-import threading
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from datetime import datetime, timezone
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Literal
 
@@ -15,10 +11,7 @@ from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.profile.interview import ResearchAction
-from resume_agent.progress import atomic_write_text
-
-_COACH_LOCK = threading.RLock()
-_SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
+from resume_agent.sessions.store import SessionStore, now_iso, valid_session_id
 
 
 class CoachTopic(ExtensibleModel):
@@ -60,73 +53,46 @@ class CoachSession(ExtensibleModel):
     impact: dict | None = None
 
 
+_STORE: SessionStore[CoachSession] = SessionStore(CoachSession, label="coach")
+
+
 def coach_dir(profile_dir: Path | str) -> Path:
     return Path(profile_dir) / "coach"
 
 
 def _valid_session_id(session_id: str) -> bool:
-    return bool(_SESSION_ID.fullmatch(session_id))
+    return valid_session_id(session_id)
 
 
 def _session_path(profile_dir: Path | str, session_id: str) -> Path:
-    if not _valid_session_id(session_id):
-        raise ValueError(f"unknown session: {session_id}")
-    return coach_dir(profile_dir) / f"session-{session_id}.json"
+    return _STORE.path(coach_dir(profile_dir), session_id)
 
 
-@contextmanager
-def coach_lock() -> Iterator[None]:
+def coach_lock() -> AbstractContextManager[None]:
     """Serialize coach session and approval mutations in this process."""
-    with _COACH_LOCK:
-        yield
+    return _STORE.lock()
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def _read(path: Path) -> dict:
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        return CoachSession.model_validate(raw).model_dump(mode="json")
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
-        raise ValueError(f"invalid coach session: {path}") from exc
+    return now_iso()
 
 
 def _write(profile_dir: Path | str, session: dict) -> None:
-    validated = CoachSession.model_validate(session)
-    if not _valid_session_id(validated.session_id):
-        raise ValueError("invalid session id")
-    atomic_write_text(
-        _session_path(profile_dir, validated.session_id),
-        validated.model_dump_json(indent=2) + "\n",
-    )
+    _STORE.write(coach_dir(profile_dir), session)
 
 
 def list_sessions(
     profile_dir: Path | str, *, include_archived: bool = False
 ) -> list[dict]:
-    root = coach_dir(profile_dir)
-    if not root.exists():
-        return []
-    sessions = [_read(path) for path in root.glob("session-*.json")]
-    if not include_archived:
-        sessions = [row for row in sessions if not row["archived_at"]]
-    return sorted(sessions, key=lambda row: (row["started_at"], row["session_id"]))
+    return _STORE.list(coach_dir(profile_dir), include_archived=include_archived)
 
 
 def load_session(profile_dir: Path | str, session_id: str) -> dict:
-    path = _session_path(profile_dir, session_id)
-    if not path.exists():
-        raise ValueError(f"unknown session: {session_id}")
-    return _read(path)
+    return _STORE.load(coach_dir(profile_dir), session_id)
 
 
 def active_session(profile_dir: Path | str) -> dict | None:
-    return next(
-        (session for session in list_sessions(profile_dir) if session["status"] == "active"),
-        None,
-    )
+    return next(iter(_STORE.active(coach_dir(profile_dir))), None)
 
 
 def create_session(
@@ -162,11 +128,7 @@ def mutate_session(
     session_id: str,
     fn: Callable[[dict], None],
 ) -> dict:
-    with coach_lock():
-        session = load_session(profile_dir, session_id)
-        fn(session)
-        _write(profile_dir, session)
-        return load_session(profile_dir, session_id)
+    return _STORE.mutate(coach_dir(profile_dir), session_id, fn)
 
 
 def apply_turn_delta(
@@ -255,32 +217,16 @@ def end_session(profile_dir: Path | str, session_id: str, recap: str) -> dict:
 
 
 def archive_session(profile_dir: Path | str, session_id: str) -> dict:
-    def apply(session: dict) -> None:
-        if session["status"] != "ended":
-            raise ValueError("only ended sessions can be archived")
-        if session["archived_at"]:
-            raise ValueError("session already archived")
-        session["archived_at"] = _now()
-
-    return mutate_session(profile_dir, session_id, apply)
+    return _STORE.archive(coach_dir(profile_dir), session_id)
 
 
 def unarchive_session(profile_dir: Path | str, session_id: str) -> dict:
-    def apply(session: dict) -> None:
-        if not session["archived_at"]:
-            raise ValueError("session not archived")
-        session["archived_at"] = None
-
-    return mutate_session(profile_dir, session_id, apply)
+    return _STORE.unarchive(coach_dir(profile_dir), session_id)
 
 
 def delete_session(profile_dir: Path | str, session_id: str) -> None:
     """Remove the transcript record without touching saved profile notes."""
-    with coach_lock():
-        path = _session_path(profile_dir, session_id)
-        if not path.exists():
-            raise ValueError(f"unknown session: {session_id}")
-        path.unlink()
+    _STORE.delete(coach_dir(profile_dir), session_id)
 
 
 def set_impact(profile_dir: Path | str, session_id: str, impact: dict) -> dict:
