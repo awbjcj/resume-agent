@@ -69,9 +69,7 @@ def _fake_agent_builders(monkeypatch) -> None:
         "build_tailor_bundle",
         lambda config, style_guide=None: object(),
     )
-    monkeypatch.setattr(
-        run_eval, "build_judge_agent", lambda model_id=None: object()
-    )
+    monkeypatch.setattr(run_eval, "build_judge_agent", lambda model_id=None: object())
 
 
 def test_main_writes_report(tmp_path: Path, monkeypatch):
@@ -80,9 +78,7 @@ def test_main_writes_report(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         run_eval,
         "run_case",
-        lambda case, profile, config, bundle, judge_agent, **kwargs: _case_result(
-            case
-        ),
+        lambda case, profile, config, bundle, judge_agent, **kwargs: _case_result(case),
     )
 
     out = tmp_path / "report.md"
@@ -189,25 +185,19 @@ def test_build_eval_bundle_applies_model_override_to_every_lane(monkeypatch):
     monkeypatch.setattr(
         run_eval,
         "build_tailor_agent",
-        lambda model_id, style_guide: calls.append(
-            ("tailor", model_id, style_guide)
-        )
+        lambda model_id, style_guide: calls.append(("tailor", model_id, style_guide))
         or "tailor",
     )
     monkeypatch.setattr(
         run_eval,
         "build_reviser_agent",
-        lambda model_id, style_guide: calls.append(
-            ("reviser", model_id, style_guide)
-        )
+        lambda model_id, style_guide: calls.append(("reviser", model_id, style_guide))
         or "reviser",
     )
     monkeypatch.setattr(
         run_eval,
         "build_revision_agent",
-        lambda model_id, style_guide: calls.append(
-            ("revision", model_id, style_guide)
-        )
+        lambda model_id, style_guide: calls.append(("revision", model_id, style_guide))
         or "revision",
     )
     monkeypatch.setattr(

@@ -52,9 +52,7 @@ class _Reviewer:
                     ],
                 )
             )
-        return _Result(
-            ReviewCritique(reviewer="fact-check", score=100, passed=True)
-        )
+        return _Result(ReviewCritique(reviewer="fact-check", score=100, passed=True))
 
     async def arun(self, prompt):
         return self.run(prompt)
@@ -68,9 +66,7 @@ class _ProbeFailReviewer:
         self._calls += 1
         if self._calls == 2:
             raise RuntimeError("probe provider failed")
-        return _Result(
-            ReviewCritique(reviewer="fact-check", score=100, passed=True)
-        )
+        return _Result(ReviewCritique(reviewer="fact-check", score=100, passed=True))
 
     async def arun(self, prompt):
         return self.run(prompt)
@@ -81,9 +77,7 @@ class _Judge:
         verdict = JudgeVerdict(
             output_quality=91,
             dimensions=[
-                DimensionScore(
-                    dimension="relevance", score=91, rationale="good"
-                )
+                DimensionScore(dimension="relevance", score=91, rationale="good")
             ],
             summary="good",
         )
@@ -179,14 +173,18 @@ def test_run_case_records_probe_failure_and_keeps_case_result():
 def test_run_case_judges_the_surfaced_best_clean_round():
     class _Draft:
         def run(self, prompt):
-            return _Result(ResumeContent(contact=Contact(name="Ada"), summary="Best round"))
+            return _Result(
+                ResumeContent(contact=Contact(name="Ada"), summary="Best round")
+            )
 
         async def arun(self, prompt):
             return self.run(prompt)
 
     class _Revision:
         def run(self, prompt):
-            return _Result(ResumeContent(contact=Contact(name="Ada"), summary="Worse round"))
+            return _Result(
+                ResumeContent(contact=Contact(name="Ada"), summary="Worse round")
+            )
 
         async def arun(self, prompt):
             return self.run(prompt)
@@ -245,7 +243,9 @@ def test_run_case_judges_the_surfaced_best_clean_round():
     )
     judge = _CapturingJudge()
 
-    result = run_case(case, ProfileFacts(contact=Contact(name="Ada")), config, bundle, judge)
+    result = run_case(
+        case, ProfileFacts(contact=Contact(name="Ada")), config, bundle, judge
+    )
 
     assert result.surfaced_round_num == 1
     assert result.regressed is True

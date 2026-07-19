@@ -58,18 +58,24 @@ def test_revise_resume_version_persists_lineage_and_fact_flag(monkeypatch):
     engine = make_engine("sqlite://")
     init_db(engine)
     exports = []
-    monkeypatch.setattr("resume_agent.services.revision.load_facts", lambda path: _facts())
+    monkeypatch.setattr(
+        "resume_agent.services.revision.load_facts", lambda path: _facts()
+    )
     monkeypatch.setattr(
         "resume_agent.services.revision.export_job_artifacts",
         lambda session, job_id: exports.append(job_id),
     )
 
     with Session(engine) as session:
-        job = save_job(session, Job(source="manual", jd_text="jd", company="Acme", title="Eng"))
+        job = save_job(
+            session, Job(source="manual", jd_text="jd", company="Acme", title="Eng")
+        )
         assert job.id is not None
         parent = save_resume_version(
             session,
-            ResumeVersion(job_id=job.id, round=1, content_json=_content().model_dump(mode="json")),
+            ResumeVersion(
+                job_id=job.id, round=1, content_json=_content().model_dump(mode="json")
+            ),
         )
         assert parent.id is not None
         bundle = TailorBundle(
@@ -79,7 +85,9 @@ def test_revise_resume_version_persists_lineage_and_fact_flag(monkeypatch):
             revision=_Agent(_content(provenance="ghost")),
         )
 
-        child = revise_resume_version(session, parent.id, "make it sharper", bundle=bundle)
+        child = revise_resume_version(
+            session, parent.id, "make it sharper", bundle=bundle
+        )
 
         assert child is not None
         assert child.origin == "revision"

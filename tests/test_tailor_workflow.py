@@ -33,8 +33,19 @@ class _FactCheck:
     def run(self, prompt):
         self.calls += 1
         passed = self.calls > 1
-        issues = [] if passed else [ReviewIssue(severity=Severity.blocking, message="unsupported claim")]
-        return _Result(ReviewCritique(reviewer="fact-check", score=100 if passed else 0, passed=passed, issues=issues))
+        issues = (
+            []
+            if passed
+            else [ReviewIssue(severity=Severity.blocking, message="unsupported claim")]
+        )
+        return _Result(
+            ReviewCritique(
+                reviewer="fact-check",
+                score=100 if passed else 0,
+                passed=passed,
+                issues=issues,
+            )
+        )
 
     async def arun(self, prompt):
         return self.run(prompt)
@@ -103,7 +114,9 @@ def test_rounds_record_stage_seconds_on_the_round_the_content_enters():
 
     assert rounds[0].stage_seconds.keys() >= {"draft", "panel"}
     assert rounds[1].stage_seconds.keys() >= {"revise", "panel"}
-    assert all(seconds >= 0 for round_ in rounds for seconds in round_.stage_seconds.values())
+    assert all(
+        seconds >= 0 for round_ in rounds for seconds in round_.stage_seconds.values()
+    )
 
 
 def test_arun_tailor_review_passes_with_async_agents():
@@ -123,7 +136,9 @@ def test_arun_tailor_review_passes_with_async_agents():
             raise NotImplementedError
 
         async def arun(self, prompt):
-            return _Result(ReviewCritique(reviewer="fact-check", score=100, passed=True))
+            return _Result(
+                ReviewCritique(reviewer="fact-check", score=100, passed=True)
+            )
 
     config = ReviewConfig(
         max_rounds=1,
@@ -316,9 +331,7 @@ def test_early_stop_halts_after_clean_score_regression():
         def run(self, prompt):
             score = next(self.scores)
             return _Result(
-                ReviewCritique(
-                    reviewer="ats-keyword", score=score, passed=False
-                )
+                ReviewCritique(reviewer="ats-keyword", score=score, passed=False)
             )
 
         async def arun(self, prompt):

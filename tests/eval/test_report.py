@@ -15,9 +15,7 @@ from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
 
 def _result(case_id: str, quality: int, ats_score: int) -> CaseResult:
     content = ResumeContent(contact=Contact(name="Ada"), summary=f"Resume {case_id}")
-    critiques = [
-        ReviewCritique(reviewer="ats-keyword", score=ats_score, passed=True)
-    ]
+    critiques = [ReviewCritique(reviewer="ats-keyword", score=ats_score, passed=True)]
     return CaseResult(
         case_id=case_id,
         jd_text="Backend role",
@@ -32,9 +30,7 @@ def _result(case_id: str, quality: int, ats_score: int) -> CaseResult:
         judge=JudgeVerdict(
             output_quality=quality,
             dimensions=[
-                DimensionScore(
-                    dimension="relevance", score=quality, rationale="x"
-                )
+                DimensionScore(dimension="relevance", score=quality, rationale="x")
             ],
             summary="s",
         ),
@@ -45,10 +41,10 @@ def _result(case_id: str, quality: int, ats_score: int) -> CaseResult:
 
 
 def test_report_has_table_and_aggregate():
-    config = ReviewConfig(
-        reviewers=[ReviewerSpec(name="ats-keyword", weight=1)]
-    )
-    results = [_result(f"c{index}", 50 + index * 5, 50 + index * 5) for index in range(1, 6)]
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="ats-keyword", weight=1)])
+    results = [
+        _result(f"c{index}", 50 + index * 5, 50 + index * 5) for index in range(1, 6)
+    ]
 
     markdown = render_report(results, config)
 
@@ -61,9 +57,7 @@ def test_report_has_table_and_aggregate():
 
 
 def test_report_insufficient_data_for_correlation():
-    config = ReviewConfig(
-        reviewers=[ReviewerSpec(name="ats-keyword", weight=1)]
-    )
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="ats-keyword", weight=1)])
 
     markdown = render_report([_result("c1", 90, 90)], config)
 
@@ -71,9 +65,7 @@ def test_report_insufficient_data_for_correlation():
 
 
 def test_report_does_not_pair_stale_reviewer_score_with_final_judge_score():
-    config = ReviewConfig(
-        reviewers=[ReviewerSpec(name="ats-keyword", weight=1)]
-    )
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="ats-keyword", weight=1)])
     result = _result("c1", 90, 10)
     final_content = ResumeContent(contact=Contact(name="Ada"), summary="final")
     result.rounds.append(
@@ -110,13 +102,9 @@ def test_render_artifact_preserves_complete_result_data():
 
 
 def test_report_shows_cache_token_aggregates_and_surface_state():
-    config = ReviewConfig(
-        reviewers=[ReviewerSpec(name="ats-keyword", weight=1)]
-    )
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="ats-keyword", weight=1)])
     result = _result("c1", 90, 90)
-    result.usage = replace(
-        result.usage, cache_read_tokens=120, cache_write_tokens=30
-    )
+    result.usage = replace(result.usage, cache_read_tokens=120, cache_write_tokens=30)
     result.surfaced_round_num = 1
     result.needs_attention = True
     result.regressed = True

@@ -83,9 +83,7 @@ def build_probe_resume(trap: Trap, profile: ProfileFacts) -> ResumeContent:
                         )
                     ],
                 )
-    raise ValueError(
-        f"{trap.id}: probe_provenance must reference an Experience Bullet"
-    )
+    raise ValueError(f"{trap.id}: probe_provenance must reference an Experience Bullet")
 
 
 def run_case(
@@ -115,7 +113,9 @@ def run_case(
     )
     if live_criteria or case.criteria is None:
         if extract_agent is None:
-            raise ValueError("an extract_agent is required for live or missing criteria")
+            raise ValueError(
+                "an extract_agent is required for live or missing criteria"
+            )
         criteria = extract_job_criteria(
             case.jd_text, MeteredRunner(extract_agent, usage)
         )
@@ -133,9 +133,7 @@ def run_case(
         match_plan_agent=metered_bundle.match_plan,
     )
     scored_reviewers = {
-        spec.name
-        for spec in config.reviewers
-        if not spec.gate and spec.weight > 0
+        spec.name for spec in config.reviewers if not spec.gate and spec.weight > 0
     }
     rounds = [
         RoundRecord(
@@ -176,8 +174,7 @@ def run_case(
                 ProbeRecord(
                     trap_id=trap.id,
                     detected=any(
-                        issue.severity == Severity.blocking
-                        for issue in critique.issues
+                        issue.severity == Severity.blocking for issue in critique.issues
                     ),
                 )
             )
@@ -190,9 +187,11 @@ def run_case(
                 )
             )
 
-    verdict = MeteredRunner(judge_agent, usage).run(
-        compose_judge_input(final, case.jd_text, case.rubric)
-    ).content
+    verdict = (
+        MeteredRunner(judge_agent, usage)
+        .run(compose_judge_input(final, case.jd_text, case.rubric))
+        .content
+    )
     if not isinstance(verdict, JudgeVerdict):
         raise TypeError(
             f"Expected JudgeVerdict from judge, got {type(verdict).__name__}"
