@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Mail } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmailDraftDialog } from "@/features/job/EmailDraftDialog";
@@ -36,16 +37,93 @@ const tabTriggerClass =
 const tabCountClass =
   "ml-1.5 inline-flex min-w-5 justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground";
 
-export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => void }) {
+export function JobModal({
+  jobId,
+  onClose,
+  onPrev,
+  onNext,
+  hasPrev = false,
+  hasNext = false,
+  isLoadingNext = false,
+}: {
+  jobId: number;
+  onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  isLoadingNext?: boolean;
+}) {
   const { data: job, isLoading } = useJobDetail(jobId);
   const closedLoopJob = job as (NonNullable<typeof job> & ClosedLoopJob) | undefined;
   const coverLetters = closedLoopJob?.coverLetters ?? [];
   const [emailDraftOpen, setEmailDraftOpen] = useState(false);
+  const navEnabled = Boolean(onPrev || onNext);
+
+  // Arrow keys step through the list, but never while the user is typing in a
+  // field (Application tab, cover-letter editors, etc.).
+  useEffect(() => {
+    if (!navEnabled) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return;
+      }
+      if (event.key === "ArrowLeft" && hasPrev) {
+        event.preventDefault();
+        onPrev?.();
+      } else if (event.key === "ArrowRight" && hasNext && !isLoadingNext) {
+        event.preventDefault();
+        onNext?.();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [navEnabled, hasPrev, hasNext, isLoadingNext, onPrev, onNext]);
 
   return (
     <>
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="block max-h-[92vh] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:max-w-6xl">
+        {navEnabled && (
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label="Previous job"
+              title="Previous job (←)"
+              className="absolute top-1/2 left-3 z-20 size-9 -translate-y-1/2 rounded-full shadow-md"
+              disabled={!hasPrev}
+              onClick={onPrev}
+            >
+              <ChevronLeft className="size-5" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label="Next job"
+              title="Next job (→)"
+              className="absolute top-1/2 right-3 z-20 size-9 -translate-y-1/2 rounded-full shadow-md"
+              disabled={!hasNext || isLoadingNext}
+              onClick={onNext}
+            >
+              {isLoadingNext ? (
+                <Spinner className="size-5" />
+              ) : (
+                <ChevronRight className="size-5" aria-hidden="true" />
+              )}
+            </Button>
+          </>
+        )}
         {isLoading || !job ? (
           <div className="p-6">
             <DrawerSkeleton />

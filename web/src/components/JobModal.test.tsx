@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { server } from "@/test/server";
 import { JobModal } from "./JobModal";
@@ -87,5 +87,76 @@ describe("JobModal", () => {
     expect(screen.getByText("Python")).toBeInTheDocument();
     expect(screen.getByText("Rust")).toBeInTheDocument();
     expect(screen.getByText("1/3 covered")).toBeInTheDocument();
+  });
+
+  it("renders prev/next buttons and reflects disabled boundaries", async () => {
+    server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
+    wrap(
+      <JobModal
+        jobId={42}
+        onClose={() => {}}
+        onPrev={() => {}}
+        onNext={() => {}}
+        hasPrev={false}
+        hasNext={true}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: /previous job/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /next job/i })).toBeEnabled();
+  });
+
+  it("calls onPrev/onNext when the buttons are clicked", async () => {
+    server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
+    const onPrev = vi.fn();
+    const onNext = vi.fn();
+    wrap(
+      <JobModal
+        jobId={42}
+        onClose={() => {}}
+        onPrev={onPrev}
+        onNext={onNext}
+        hasPrev
+        hasNext
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /next job/i })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /next job/i }));
+    fireEvent.click(screen.getByRole("button", { name: /previous job/i }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(onPrev).toHaveBeenCalledTimes(1);
+  });
+
+  it("navigates with arrow keys but ignores them while editing a field", async () => {
+    server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
+    const onNext = vi.fn();
+    wrap(
+      <JobModal jobId={42} onClose={() => {}} onPrev={() => {}} onNext={onNext} hasPrev hasNext />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /next job/i })).toBeInTheDocument(),
+    );
+
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(onNext).toHaveBeenCalledTimes(1);
+
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    fireEvent.keyDown(input, { key: "ArrowRight" });
+    expect(onNext).toHaveBeenCalledTimes(1); // still 1 — ignored inside an input
+    input.remove();
+  });
+
+  it("omits the nav buttons when no handlers are provided", async () => {
+    server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
+    wrap(<JobModal jobId={42} onClose={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: /next job/i })).not.toBeInTheDocument();
   });
 });
