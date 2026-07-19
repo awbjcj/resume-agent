@@ -87,7 +87,7 @@ describe("MatchGapContainer", () => {
     expect(screen.getByRole("button", { name: "Open selection tray" })).toHaveTextContent("1");
 
     await userEvent.click(screen.getByRole("tab", { name: "Outline" }));
-    expect(screen.getByText("Ranked skill domains")).toBeInTheDocument();
+    expect(screen.getByText("Skill outline")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Select Cloud / Infrastructure domain" })).toBeChecked();
 
     await userEvent.click(screen.getByRole("tab", { name: "Map" }));

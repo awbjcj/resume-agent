@@ -26,10 +26,16 @@ export interface MapNode {
 
 export interface MapLink { source: string; target: string }
 
-const HORIZONTAL_PADDING = 24;
-const VERTICAL_PADDING = 40;
-const NODE_GAP = 28;
-const ROW_HEIGHT = 72;
+const HORIZONTAL_PADDING = 40;
+const VERTICAL_PADDING = 48;
+// Horizontal breathing room reserved between adjacent nodes in the overview
+// grid. Kept wide enough that a node's floating menu and its "N gaps" label
+// never reach into the neighbouring column.
+const NODE_GAP = 56;
+// Vertical stride per node in a focused column. Must clear the tallest pill
+// plus the meta label row beneath it so labels are never covered by the next
+// node down.
+const ROW_HEIGHT = 92;
 
 function nodeRadius(score: number, kind: MapNode["kind"]): number {
   const base = kind === "category" ? 20 : kind === "domain" ? 18 : 12;
@@ -87,7 +93,7 @@ export function recommendedLayoutHeight(nodes: MapNode[], width: number): number
     if (width < 480) return Math.max(520, 164 + leaves * ROW_HEIGHT);
     return Math.max(width < 760 ? 560 : 540, 180 + Math.ceil(leaves / 2) * ROW_HEIGHT);
   }
-  return Math.max(width < 640 ? 460 : 500, 100 + Math.ceil(nodes.length / overviewColumns(nodes, width)) * 88);
+  return Math.max(width < 640 ? 460 : 500, 108 + Math.ceil(nodes.length / overviewColumns(nodes, width)) * 104);
 }
 
 function spreadVertically(nodes: MapNode[], x: number, height: number): MapNode[] {
@@ -104,8 +110,8 @@ function layoutFocused(nodes: MapNode[], width: number, height: number, rootId: 
   if (width < 480) return [{ ...root, x: width / 2, y: 68 }, ...leaves.map((node, index) => ({ ...node, x: width / 2, y: 164 + index * ROW_HEIGHT }))];
   const left = leaves.filter((_, index) => index % 2 === 0);
   const right = leaves.filter((_, index) => index % 2 === 1);
-  if (width < 760) return [{ ...root, x: width / 2, y: 68 }, ...spreadVertically(left, width * 0.25, height), ...spreadVertically(right, width * 0.75, height)];
-  return [{ ...root, x: width / 2, y: height / 2 }, ...spreadVertically(left, Math.max(112, width * 0.17), height), ...spreadVertically(right, Math.min(width - 112, width * 0.83), height)];
+  if (width < 760) return [{ ...root, x: width / 2, y: 76 }, ...spreadVertically(left, Math.max(128, width * 0.24), height), ...spreadVertically(right, Math.min(width - 128, width * 0.76), height)];
+  return [{ ...root, x: width / 2, y: height / 2 }, ...spreadVertically(left, Math.max(136, width * 0.16), height), ...spreadVertically(right, Math.min(width - 136, width * 0.84), height)];
 }
 
 function layoutOverview(nodes: MapNode[], width: number, height: number): MapNode[] {

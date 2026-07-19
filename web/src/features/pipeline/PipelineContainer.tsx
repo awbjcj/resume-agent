@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { BulkActionBar } from "@/components/BulkActionBar";
@@ -53,35 +53,62 @@ export function PipelineContainer() {
   const [openStages, setOpenStages] = useState(() =>
     openStagesFromParam(params.get("stage")),
   );
-  const { rows, facets, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
-    useBoardQuery<PipelineItem>("pipeline", filter);
+  // A lightweight overview query drives the facets (which stages exist and how
+  // many jobs each holds) and the overall matching total. Rows come from the
+  // per-stage sections, so this query only needs a single row.
+  const { facets, total, isLoading } = useBoardQuery<PipelineItem>("pipeline", filter, {
+    pageSize: 1,
+  });
   const selection = useSelection();
   const { reconcile } = selection;
   const bulk = useBulkAction("pipeline");
   const runs = useBulkRun();
   const launchJobs = useApprovedLaunchJobs(launchMode !== null);
   const [view, setView] = useViewMode("pipeline-view");
+  // Rows loaded by each open stage section, mirrored here so bulk selection and
+  // the metric row can reason across the whole board.
+  const [loadedByStage, setLoadedByStage] = useState<Record<string, PipelineItem[]>>({});
+
+  const reportRows = useCallback((stage: string, rows: PipelineItem[]) => {
+    setLoadedByStage((prev) => {
+      const existing = prev[stage];
+      if (
+        existing &&
+        existing.length === rows.length &&
+        existing.every((row, index) => row.jobId === rows[index].jobId)
+      ) {
+        return prev;
+      }
+      return { ...prev, [stage]: rows };
+    });
+  }, []);
+
+  const stageCounts = (facets.status ?? {}) as Record<string, number>;
+  const stages = useMemo(() => {
+    const counts = (facets.status ?? {}) as Record<string, number>;
+    // A status filter narrows which stage sections show; without one, every
+    // stage that has jobs renders.
+    const allow = filter.status.size ? filter.status : null;
+    return orderPipelineStages(
+      Object.keys(counts).filter(
+        (stage) => counts[stage] > 0 && (!allow || allow.has(stage)),
+      ),
+    );
+  }, [facets, filter.status]);
+  const loadedRows = useMemo(
+    () => stages.flatMap((stage) => loadedByStage[stage] ?? []),
+    [stages, loadedByStage],
+  );
+  const loadedIds = useMemo(() => loadedRows.map((row) => row.jobId), [loadedRows]);
 
   useEffect(() => {
-    reconcile(rows.map((row) => row.jobId), total);
-  }, [rows, total, reconcile]);
-
-  const byStage = useMemo(() => {
-    const grouped = new Map<string, PipelineItem[]>();
-    for (const row of rows) {
-      const bucket = grouped.get(row.status);
-      if (bucket) bucket.push(row);
-      else grouped.set(row.status, [row]);
-    }
-    return grouped;
-  }, [rows]);
+    reconcile(loadedIds, total);
+  }, [loadedIds, total, reconcile]);
 
   if (isLoading) return <BoardSkeleton />;
 
-  const stages = orderPipelineStages(byStage.keys());
-  const rendered = byStage.get("rendered")?.length ?? 0;
+  const rendered = loadedByStage.rendered?.length ?? 0;
   const openId = params.get("job");
-  const loadedIds = rows.map((row) => row.jobId);
   const bulkSelection = { mode: selection.mode, ids: selection.ids };
   const bulkArgs = { selection: bulkSelection, filter };
   const setStageOpen = (stage: string, open: boolean) => {
@@ -128,10 +155,10 @@ export function PipelineContainer() {
       </div>
       <MetricRow
         items={[
-          ["Loaded", rows.length.toLocaleString()],
+          ["Loaded", loadedRows.length.toLocaleString()],
           ["Matching", total.toLocaleString()],
           ["Rendered in view", String(rendered)],
-          ["Stages active", String(byStage.size)],
+          ["Stages active", String(stages.length)],
         ]}
       />
       <FilterDesk
@@ -142,7 +169,7 @@ export function PipelineContainer() {
         statusOptions={PIPELINE_STAGE_ORDER}
         statusLabel={pipelineStageLabel}
       />
-      {!rows.length ? (
+      {!stages.length ? (
         <EmptyState
           title="No jobs in the pipeline"
           body="Start by adding a job or running a pull."
@@ -152,7 +179,7 @@ export function PipelineContainer() {
           <BulkActionBar
             count={selection.count}
             isAllMatching={selection.isAllMatching}
-            pageCount={rows.length}
+            pageCount={loadedRows.length}
             total={total}
             onSelectAllMatching={() => selection.selectAllMatching(total)}
             onClear={selection.clear}
@@ -205,30 +232,22 @@ export function PipelineContainer() {
             <PipelineStageSection
               key={stage}
               stage={stage}
-              rows={byStage.get(stage)!}
+              filter={filter}
+              total={stageCounts[stage] ?? 0}
               open={openStages.has(stage)}
               onOpenChange={(open) => setStageOpen(stage, open)}
               isSelected={selection.isSelected}
-              onSelect={(row) =>
-                selection.toggle(row.jobId, loadedIds.indexOf(row.jobId), false, loadedIds)
+              onToggle={(jobId, index, ordered) =>
+                selection.toggle(jobId, index, false, ordered)
               }
-              onToggleAll={(checked) =>
-                checked
-                  ? selection.selectPage(byStage.get(stage)!.map((row) => row.jobId))
-                  : selection.clear()
-              }
+              onSelectAll={(ids) => selection.selectPage(ids)}
+              onClear={selection.clear}
               onOpen={(row) => openJob(row.jobId)}
+              onRowsChange={reportRows}
               view={view}
               actions={(row) => <JobQuickActions jobId={row.jobId} url={row.url} />}
             />
           ))}
-          {hasNextPage && (
-            <div className="mt-5 flex justify-center">
-              <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-                {isFetchingNextPage ? "Loading..." : "Load more"}
-              </Button>
-            </div>
-          )}
         </>
       )}
       {openId && <JobModal jobId={Number(openId)} onClose={closeJob} />}

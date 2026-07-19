@@ -225,7 +225,7 @@ export function SkillMap({
             return (
               <div
                 key={node.id}
-                className="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+                className="group pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
                 style={{ left: node.x, top: node.y }}
               >
                 <div className="relative flex items-center gap-2.5">
@@ -269,10 +269,21 @@ export function SkillMap({
                   >
                     {node.label}
                   </Button>
+                  <TaxonomyNodeMenu
+                    node={node}
+                    categoryRows={editRows}
+                    onAction={(action) => action.type === "open-details" ? onOpenSkill(action.skill) : setMenuAction(action)}
+                    className="absolute -top-2.5 -right-2.5 z-10"
+                  />
                 </div>
-                {ready && <span className="text-[10px] font-semibold text-ready">Ready</span>}
-                {node.kind !== "skill" && Boolean(node.gapCount) && <span className="text-[10px] text-muted-foreground">{node.gapCount} gaps</span>}
-                <TaxonomyNodeMenu node={node} categoryRows={editRows} onAction={(action) => action.type === "open-details" ? onOpenSkill(action.skill) : setMenuAction(action)} />
+                {(ready || (node.kind !== "skill" && Boolean(node.gapCount))) && (
+                  <div className="mt-1.5 flex items-center gap-2 text-[10px] leading-none">
+                    {ready && <span className="font-semibold text-ready">Ready</span>}
+                    {node.kind !== "skill" && Boolean(node.gapCount) && (
+                      <span className="text-muted-foreground">{node.gapCount} gaps</span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

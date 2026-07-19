@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import { UNASSIGNED_ID, type CategoryRow, type SkillRow } from "../aggregate";
 import type { MapNode } from "../skill-map-layout";
 
@@ -24,10 +25,12 @@ export function TaxonomyNodeMenu({
   node,
   categoryRows,
   onAction,
+  className,
 }: {
   node: MapNode;
   categoryRows: CategoryRow[];
   onAction: (action: TaxonomyMenuAction) => void;
+  className?: string;
 }) {
   if (node.kind === "category") return null;
   // The synthetic "Unassigned" domain has no persisted id; domain edits on it
@@ -45,10 +48,17 @@ export function TaxonomyNodeMenu({
             size="icon-sm"
             variant="ghost"
             aria-label={`Edit ${node.label}`}
+            // A compact bordered chip pinned to the node's corner: legible over
+            // any pill colour, dimmed until the node is hovered/focused so a
+            // dense map stays calm, and always reachable by keyboard.
+            className={cn(
+              "size-6 rounded-full border border-border bg-card text-muted-foreground opacity-70 shadow-sm transition hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100",
+              className,
+            )}
           />
         }
       >
-        <MoreHorizontalIcon />
+        <MoreHorizontalIcon className="size-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>

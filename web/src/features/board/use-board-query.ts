@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/lib/api/client";
@@ -28,7 +29,7 @@ export type PipelineItem = components["schemas"]["PipelineItem"];
 export function useBoardQuery<T>(
   board: Board,
   filter: FilterState,
-  opts: { archived?: boolean; pageSize?: number } = {},
+  opts: { archived?: boolean; pageSize?: number; enabled?: boolean } = {},
 ) {
   const pageSize = opts.pageSize ?? 50;
   const baseParams = boardFilterToParams(filter, { pageSize, archived: opts.archived });
@@ -47,13 +48,18 @@ export function useBoardQuery<T>(
     getNextPageParam: (last) =>
       last.pagination.page < last.pagination.totalPages ? last.pagination.page + 1 : undefined,
     placeholderData: keepPreviousData,
+    enabled: opts.enabled ?? true,
   });
 
-  const pages = query.data?.pages ?? [];
+  const pages = query.data?.pages;
+  // Memoise the flattened rows so their identity is stable across renders that
+  // don't change the underlying pages. Callers that mirror rows into their own
+  // state (e.g. per-stage selection) rely on this to avoid effect loops.
+  const rows = useMemo(() => (pages ?? []).flatMap((page) => page.data), [pages]);
   return {
-    rows: pages.flatMap((page) => page.data),
-    facets: pages[0]?.facets ?? {},
-    total: pages[0]?.total ?? 0,
+    rows,
+    facets: pages?.[0]?.facets ?? {},
+    total: pages?.[0]?.total ?? 0,
     fetchNextPage: query.fetchNextPage,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,

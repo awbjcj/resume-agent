@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { ChevronDownIcon } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -9,38 +9,69 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { JobTable } from "@/components/JobTable";
+import { useBoardQuery } from "@/features/board/use-board-query";
 import type { ViewMode } from "@/features/board/use-view-mode";
+import type { FilterState } from "@/lib/filters/types";
 
 import { PipelineCard } from "./PipelineCard";
 import { pipelineStageLabel } from "./pipeline-stages";
 import type { PipelineItem } from "./use-pipeline";
 
+const STAGE_PAGE_SIZE = 20;
+
 type PipelineStageSectionProps = {
   stage: string;
-  rows: PipelineItem[];
+  filter: FilterState;
+  /** Total jobs in this stage (from the board facets) — accurate even when the
+   * section is collapsed and its rows have not been fetched. */
+  total: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isSelected: (jobId: number) => boolean;
-  onSelect: (row: PipelineItem) => void;
-  onToggleAll: (checked: boolean) => void;
+  onToggle: (jobId: number, index: number, ordered: number[]) => void;
+  onSelectAll: (ids: number[]) => void;
+  onClear: () => void;
   onOpen: (row: PipelineItem) => void;
+  onRowsChange: (stage: string, rows: PipelineItem[]) => void;
   view: ViewMode;
   actions: (row: PipelineItem) => ReactNode;
 };
 
 export function PipelineStageSection({
   stage,
-  rows,
+  filter,
+  total,
   open,
   onOpenChange,
   isSelected,
-  onSelect,
-  onToggleAll,
+  onToggle,
+  onSelectAll,
+  onClear,
   onOpen,
+  onRowsChange,
   view,
   actions,
 }: PipelineStageSectionProps) {
-  const countLabel = `${rows.length.toLocaleString()} ${rows.length === 1 ? "job" : "jobs"}`;
+  // Each stage owns an independent, status-scoped query so every stage that has
+  // jobs always renders — no stage can be paginated out of view by another.
+  // Rows are fetched lazily on first expand to avoid N queries up front.
+  const stageFilter = useMemo<FilterState>(
+    () => ({ ...filter, status: new Set([stage]) }),
+    [filter, stage],
+  );
+  const { rows, hasNextPage, fetchNextPage, isFetchingNextPage, isLoading } =
+    useBoardQuery<PipelineItem>("pipeline", stageFilter, {
+      pageSize: STAGE_PAGE_SIZE,
+      enabled: open,
+    });
+
+  useEffect(() => {
+    onRowsChange(stage, rows);
+  }, [stage, rows, onRowsChange]);
+
+  const orderedIds = rows.map((row) => row.jobId);
+  const allChecked = rows.length > 0 && rows.every((row) => isSelected(row.jobId));
+  const countLabel = `${total.toLocaleString()} ${total === 1 ? "job" : "jobs"}`;
 
   return (
     <section className="mb-6">
@@ -63,26 +94,59 @@ export function PipelineStageSection({
           />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          {view === "list" ? <div className="pt-4"><JobTable
-            rows={rows}
-            selection={{ isSelected }}
-            onToggle={(id) => { const row = rows.find((item) => item.jobId === id); if (row) onSelect(row); }}
-            onToggleAll={onToggleAll}
-            allChecked={rows.every((row) => isSelected(row.jobId))}
-            onOpen={(id) => { const row = rows.find((item) => item.jobId === id); if (row) onOpen(row); }}
-            actions={(row) => actions(row as PipelineItem)}
-          /></div> : <div className="grid grid-cols-1 gap-4 pt-4 xl:grid-cols-2 2xl:grid-cols-3">
-            {rows.map((row) => (
-              <PipelineCard
-                key={row.jobId}
-                row={row}
-                selected={isSelected(row.jobId)}
-                onSelect={() => onSelect(row)}
-                onOpen={() => onOpen(row)}
-                footer={actions(row)}
+          {isLoading ? (
+            <p className="px-1 pt-4 text-sm text-muted-foreground" role="status">
+              Loading {pipelineStageLabel(stage).toLowerCase()} jobs…
+            </p>
+          ) : view === "list" ? (
+            <div className="pt-4">
+              <JobTable
+                rows={rows}
+                selection={{ isSelected }}
+                onToggle={(id) => {
+                  const index = orderedIds.indexOf(id);
+                  if (index >= 0) onToggle(id, index, orderedIds);
+                }}
+                onToggleAll={(checked) => (checked ? onSelectAll(orderedIds) : onClear())}
+                allChecked={allChecked}
+                onOpen={(id) => {
+                  const row = rows.find((item) => item.jobId === id);
+                  if (row) onOpen(row);
+                }}
+                actions={(row) => actions(row as PipelineItem)}
               />
-            ))}
-          </div>}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 pt-4 xl:grid-cols-2 2xl:grid-cols-3">
+              {rows.map((row) => (
+                <PipelineCard
+                  key={row.jobId}
+                  row={row}
+                  selected={isSelected(row.jobId)}
+                  onSelect={() => {
+                    const index = orderedIds.indexOf(row.jobId);
+                    onToggle(row.jobId, index, orderedIds);
+                  }}
+                  onOpen={() => onOpen(row)}
+                  footer={actions(row)}
+                />
+              ))}
+            </div>
+          )}
+          {hasNextPage && (
+            <div className="mt-4 flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage
+                  ? "Loading…"
+                  : `Load more ${pipelineStageLabel(stage).toLowerCase()}`}
+              </Button>
+            </div>
+          )}
         </CollapsibleContent>
       </Collapsible>
     </section>

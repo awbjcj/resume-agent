@@ -31,6 +31,28 @@ const pipelineItem = (jobId: number, status: string, title: string) => ({
   hasProgress: status === "tailored" || status === "rendered",
 });
 
+// Each stage section fetches its own rows with a `status` filter, while the
+// container's overview query (no status) supplies facets + total. This handler
+// mirrors that contract: facets always reflect the whole dataset, rows are only
+// returned for status-scoped section queries.
+const statusAware = (dataset: Array<Record<string, unknown>>) =>
+  http.get("/api/pipeline", ({ request }) => {
+    const status = new URL(request.url).searchParams.get("status");
+    const wanted = status ? new Set(status.split(",")) : null;
+    const counts: Record<string, number> = {};
+    for (const item of dataset) {
+      const key = item.status as string;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    const rows = wanted ? dataset.filter((item) => wanted.has(item.status as string)) : [];
+    return HttpResponse.json({
+      data: rows,
+      pagination: { page: 1, pageSize: 20, totalItems: rows.length, totalPages: 1 },
+      facets: { status: counts },
+      total: wanted ? rows.length : dataset.length,
+    });
+  });
+
 describe("PipelineContainer", () => {
   beforeEach(() => localStorage.clear());
   it("opens tailoring with the complete approved-job query", async () => {
@@ -43,7 +65,9 @@ describe("PipelineContainer", () => {
         return HttpResponse.json({
           data: approved ? [pipelineItem(7, "approved", "Platform Engineer")] : [],
           pagination: { page: 1, pageSize: 200, totalItems: approved ? 1 : 0, totalPages: 1 },
-          facets: { status: { approved: 1 } },
+          // The overview query (no status) sees an empty board; only the
+          // launch dialog's status=approved query surfaces the approved job.
+          facets: { status: approved ? { approved: 1 } : {} },
           total: approved ? 1 : 0,
         });
       }),
@@ -61,41 +85,34 @@ describe("PipelineContainer", () => {
 
   it("groups cards by stage", async () => {
     server.use(
-      http.get("/api/pipeline", () =>
-        HttpResponse.json({
-          data: [
-            {
-              jobId: 1,
-              company: "A",
-              title: "Eng",
-              status: "approved",
-              fitScore: 70,
-              jdText:
-                "Google \\_corporate\\_fare\\_ Google \\_place\\_ San Francisco, CA " +
-                "\\_laptop\\_windows\\_ Remote eligible \\*\\*Mid\\*\\*",
-              critiqueJson: null,
-              pdfPath: null,
-              applicationStatus: null,
-              hasProgress: false,
-            },
-            {
-              jobId: 2,
-              company: "B",
-              title: "Dev",
-              status: "rendered",
-              fitScore: 88,
-              jdText: "y",
-              critiqueJson: null,
-              pdfPath: null,
-              applicationStatus: null,
-              hasProgress: true,
-            },
-          ],
-          pagination: { page: 1, pageSize: 200, totalItems: 2, totalPages: 1 },
-          facets: { status: { approved: 1, rendered: 1 } },
-          total: 2,
-        }),
-      ),
+      statusAware([
+        {
+          jobId: 1,
+          company: "A",
+          title: "Eng",
+          status: "approved",
+          fitScore: 70,
+          jdText:
+            "Google \\_corporate\\_fare\\_ Google \\_place\\_ San Francisco, CA " +
+            "\\_laptop\\_windows\\_ Remote eligible \\*\\*Mid\\*\\*",
+          critiqueJson: null,
+          pdfPath: null,
+          applicationStatus: null,
+          hasProgress: false,
+        },
+        {
+          jobId: 2,
+          company: "B",
+          title: "Dev",
+          status: "rendered",
+          fitScore: 88,
+          jdText: "y",
+          critiqueJson: null,
+          pdfPath: null,
+          applicationStatus: null,
+          hasProgress: true,
+        },
+      ]),
     );
     wrap(<PipelineContainer />);
     await waitFor(() => expect(screen.getByText("Dev")).toBeInTheDocument());
@@ -112,11 +129,9 @@ describe("PipelineContainer", () => {
 
   it("renders quick actions in per-stage list view", async () => {
     localStorage.setItem("pipeline-view", "list");
-    server.use(http.get("/api/pipeline", () => HttpResponse.json({
-      data: [{ ...pipelineItem(9, "tailored", "Operator"), url: "https://example.test/9" }],
-      pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 },
-      facets: { status: { tailored: 1 } }, total: 1,
-    })));
+    server.use(
+      statusAware([{ ...pipelineItem(9, "tailored", "Operator"), url: "https://example.test/9" }]),
+    );
     wrap(<PipelineContainer />);
     expect(await screen.findByRole("button", { name: "Archive job" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open posting" })).toBeInTheDocument();
@@ -124,14 +139,12 @@ describe("PipelineContainer", () => {
 
   it("selects every job in a stage from the list header checkbox", async () => {
     localStorage.setItem("pipeline-view", "list");
-    server.use(http.get("/api/pipeline", () => HttpResponse.json({
-      data: [
+    server.use(
+      statusAware([
         pipelineItem(9, "tailored", "Operator"),
         pipelineItem(10, "tailored", "Architect"),
-      ],
-      pagination: { page: 1, pageSize: 50, totalItems: 2, totalPages: 1 },
-      facets: { status: { tailored: 2 } }, total: 2,
-    })));
+      ]),
+    );
     const user = userEvent.setup();
     wrap(<PipelineContainer />);
     const selectAll = await screen.findByRole("checkbox", { name: "Select all loaded jobs" });
@@ -144,39 +157,32 @@ describe("PipelineContainer", () => {
 
   it("puts the tailored stage before every other status", async () => {
     server.use(
-      http.get("/api/pipeline", () =>
-        HttpResponse.json({
-          data: [
-            {
-              jobId: 1,
-              company: "Raw Co",
-              title: "Raw role",
-              status: "raw",
-              fitScore: 40,
-              jdText: "raw",
-              critiqueJson: null,
-              pdfPath: null,
-              applicationStatus: null,
-              hasProgress: false,
-            },
-            {
-              jobId: 2,
-              company: "Tailored Co",
-              title: "Tailored role",
-              status: "tailored",
-              fitScore: 90,
-              jdText: "tailored",
-              critiqueJson: [],
-              pdfPath: null,
-              applicationStatus: null,
-              hasProgress: true,
-            },
-          ],
-          pagination: { page: 1, pageSize: 200, totalItems: 2, totalPages: 1 },
-          facets: { status: { raw: 1, tailored: 1 } },
-          total: 2,
-        }),
-      ),
+      statusAware([
+        {
+          jobId: 1,
+          company: "Raw Co",
+          title: "Raw role",
+          status: "raw",
+          fitScore: 40,
+          jdText: "raw",
+          critiqueJson: null,
+          pdfPath: null,
+          applicationStatus: null,
+          hasProgress: false,
+        },
+        {
+          jobId: 2,
+          company: "Tailored Co",
+          title: "Tailored role",
+          status: "tailored",
+          fitScore: 90,
+          jdText: "tailored",
+          critiqueJson: [],
+          pdfPath: null,
+          applicationStatus: null,
+          hasProgress: true,
+        },
+      ]),
     );
 
     wrap(<PipelineContainer />);
@@ -188,22 +194,13 @@ describe("PipelineContainer", () => {
 
   it("orders stages by post-processing priority and collapses inactive groups", async () => {
     server.use(
-      http.get("/api/pipeline", () =>
-        HttpResponse.json({
-          data: [
-            pipelineItem(1, "raw", "Raw role"),
-            pipelineItem(2, "approved", "Approved role"),
-            pipelineItem(3, "rendered", "Rendered role"),
-            pipelineItem(4, "tailored", "Tailored role"),
-            pipelineItem(5, "screening", "Screening role"),
-          ],
-          pagination: { page: 1, pageSize: 200, totalItems: 5, totalPages: 1 },
-          facets: {
-            status: { raw: 1, approved: 1, rendered: 1, tailored: 1, screening: 1 },
-          },
-          total: 5,
-        }),
-      ),
+      statusAware([
+        pipelineItem(1, "raw", "Raw role"),
+        pipelineItem(2, "approved", "Approved role"),
+        pipelineItem(3, "rendered", "Rendered role"),
+        pipelineItem(4, "tailored", "Tailored role"),
+        pipelineItem(5, "screening", "Screening role"),
+      ]),
     );
     const user = userEvent.setup();
 
@@ -224,14 +221,15 @@ describe("PipelineContainer", () => {
     expect(tailored).toHaveAttribute("aria-expanded", "true");
     expect(rendered).toHaveAttribute("aria-expanded", "true");
     expect(approved).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByText("Tailored role")).toBeInTheDocument();
-    expect(screen.getByText("Rendered role")).toBeInTheDocument();
+    // Open stages fetch their rows independently, so await the first arrival.
+    expect(await screen.findByText("Tailored role")).toBeInTheDocument();
+    expect(await screen.findByText("Rendered role")).toBeInTheDocument();
     expect(screen.queryByText("Approved role")).not.toBeInTheDocument();
     expect(screen.queryByText("Raw role")).not.toBeInTheDocument();
     expect(screen.queryByText("Screening role")).not.toBeInTheDocument();
 
     await user.click(approved);
-    expect(screen.getByText("Approved role")).toBeInTheDocument();
+    expect(await screen.findByText("Approved role")).toBeInTheDocument();
     await user.click(approved);
     expect(screen.queryByText("Approved role")).not.toBeInTheDocument();
   });
@@ -244,7 +242,9 @@ describe("PipelineContainer", () => {
         return HttpResponse.json({
           data: [],
           pagination: { page: 1, pageSize: 200, totalItems: 0, totalPages: 1 },
-          facets: { status: { tailored: 1, rendered: 1 } },
+          // Empty facets keep the board in its empty state so only the overview
+          // query runs — the test asserts on the status param it carries.
+          facets: { status: {} },
           total: 0,
         });
       }),
