@@ -87,7 +87,7 @@ describe("useJobNavigation", () => {
     const { result, rerender } = renderHook(
       ({ ids, currentId }: { ids: number[]; currentId: number | null }) =>
         useJobNavigation(ids, currentId, nav, pagination),
-      { initialProps: { ids: [1, 2], currentId: 2 } },
+      { initialProps: { ids: [1, 2], currentId: 2 as number | null } },
     );
 
     // At the loaded edge: request the next page.
