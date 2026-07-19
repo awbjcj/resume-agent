@@ -15,6 +15,8 @@ SECRET_FIELDS: dict[str, str] = {
     "adzuna_app_key": "ADZUNA_APP_KEY",
     "linkedin_email": "LINKEDIN_EMAIL",
     "linkedin_password": "LINKEDIN_PASSWORD",
+    "google_oauth_client_id": "GOOGLE_OAUTH_CLIENT_ID",
+    "google_oauth_client_secret": "GOOGLE_OAUTH_CLIENT_SECRET",
 }
 
 # Any one of these satisfies "an LLM key is configured" — profile build and
@@ -44,6 +46,8 @@ class SecretsUpdate(CamelModel):
     adzuna_app_key: str | None = None
     linkedin_email: str | None = None
     linkedin_password: str | None = None
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None
 
 
 class ModelsConfigDoc(CamelModel):

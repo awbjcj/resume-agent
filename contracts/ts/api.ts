@@ -3787,6 +3787,10 @@ export interface components {
             geminiApiKey?: string | null;
             /** Githubtoken */
             githubToken?: string | null;
+            /** Googleoauthclientid */
+            googleOauthClientId?: string | null;
+            /** Googleoauthclientsecret */
+            googleOauthClientSecret?: string | null;
             /** Linkedinemail */
             linkedinEmail?: string | null;
             /** Linkedinpassword */

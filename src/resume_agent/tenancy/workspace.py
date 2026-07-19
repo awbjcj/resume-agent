@@ -55,6 +55,10 @@ class WorkspacePaths:
         return self.root / "secrets.env"
 
     @property
+    def gmail_token(self) -> Path:
+        return self.root / "gmail_token.json"
+
+    @property
     def output_dir(self) -> Path:
         return self.root / "output"
 

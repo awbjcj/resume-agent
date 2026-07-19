@@ -4850,6 +4850,28 @@
             ],
             "title": "Githubtoken"
           },
+          "googleOauthClientId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Googleoauthclientid"
+          },
+          "googleOauthClientSecret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Googleoauthclientsecret"
+          },
           "linkedinEmail": {
             "anyOf": [
               {

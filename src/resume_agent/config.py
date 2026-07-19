@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     search_mode: Literal["auto", "native", "tool", "off"] = "auto"
     advisor_model: str = ""
 
+    # Gmail integration (platform OAuth client; users may override the client
+    # via their workspace secrets.env — str fields join the overlay for free).
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    gmail_sync_interval_hours: int = Field(default=6, ge=0)  # 0 = scheduler off
+    follow_up_days: int = Field(default=14, ge=0)  # 0 = reminders off
+    gmail_max_messages: int = Field(default=50, ge=1)
+
 
 @lru_cache
 def env_settings() -> Settings:
