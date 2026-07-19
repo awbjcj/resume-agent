@@ -372,3 +372,17 @@ aggressiveness determines how many detail fetches are issued.
   `llm_runner.transcribe` (`Settings.transcribe_model`, Gemini/OpenAI only,
   default `gemini:gemini-2.5-flash`) through `POST /api/transcribe`; audio is
   never persisted.
+- **Gmail is multi-user; drafts only, never send.** The platform OAuth client
+  (`GOOGLE_OAUTH_CLIENT_ID/SECRET`) can be overridden per user via
+  `secrets.env`; per-user tokens live at `{workspace}/gmail_token.json`
+  (`gmail/auth.py` is the only credential seam; scopes = readonly + compose).
+  The web callback authenticates via a signed link-token state, never the
+  session cookie. An in-process scheduler (`gmail/scheduler.py`, every
+  `gmail_sync_interval_hours`) runs `services/gmail_sync.run_gmail_sync`
+  per connected user — sync proposals and deterministic stale-application
+  reminders (`services/reminders.py`, episode-keyed dedupe in
+  `Notification.message_id`) land in the notification bell; nothing
+  auto-applies. `services/email_writer.py` grounds drafts in facts.json
+  only (human gate, no LLM fact-check round) and saves them as in-thread
+  Gmail drafts via `EmailDraft` rows; drafts never gate job deletion but
+  cascade on delete. `gmail.send` is permanently out of scope.
