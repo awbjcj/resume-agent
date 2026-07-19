@@ -2,10 +2,12 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from resume_agent.tenancy.paths import resolve_tenant_path
+
 
 def read_runs(path: str | Path) -> dict[str, dict]:
     """Return the per-connector run record, or {} if the file does not exist."""
-    p = Path(path)
+    p = resolve_tenant_path(path)
     if not p.exists():
         return {}
     return json.loads(p.read_text(encoding="utf-8"))
@@ -13,7 +15,7 @@ def read_runs(path: str | Path) -> dict[str, dict]:
 
 def record_run(path: str | Path, name: str, added: int, error: str | None) -> None:
     """Upsert one connector's last run."""
-    p = Path(path)
+    p = resolve_tenant_path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     runs = read_runs(p)
     runs[name] = {

@@ -1,9 +1,46 @@
 from resume_agent.config import Settings
+from resume_agent.discovery.connectors.telemetry import read_runs, record_run
+from resume_agent.taxonomy.skills import load_aliases
+from resume_agent.tenancy.context import UserContext, use_context
 from resume_agent.tenancy.workspace import (
+    WorkspacePaths,
     effective_settings,
     provision_workspace,
     workspace_paths,
 )
+
+
+def _context(tmp_path):
+    return UserContext(
+        user_id="abc123def456",
+        username="alice",
+        role="user",
+        paths=WorkspacePaths(tmp_path / "users" / "alice"),
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        engine=None,
+        system_engine=None,
+        own_key_providers=frozenset(),
+    )
+
+
+def test_record_run_lands_in_the_active_workspace(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    context = _context(tmp_path)
+    with use_context(context):
+        record_run("data/connector_runs.json", "greenhouse", added=3, error=None)
+        assert read_runs("data/connector_runs.json")["greenhouse"]["added"] == 3
+    telemetry_file = context.paths.root / "connector_runs.json"
+    assert telemetry_file.exists()
+
+
+def test_load_aliases_resolves_the_active_workspace(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    context = _context(tmp_path)
+    aliases_file = context.paths.root / "skill_aliases.json"
+    aliases_file.parent.mkdir(parents=True, exist_ok=True)
+    aliases_file.write_text('{"reactjs": "react"}', encoding="utf-8")
+    with use_context(context):
+        assert load_aliases("data/skill_aliases.json") == {"reactjs": "react"}
 
 
 def test_workspace_paths_include_all_tenant_roots(tmp_path):

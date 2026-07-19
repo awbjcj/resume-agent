@@ -62,7 +62,9 @@ def load_aliases(path: str | Path) -> dict[str, str]:
     Cached on (mtime_ns, size); the returned dict is shared — treat it as
     read-only (merge_aliases already copies before mutating).
     """
-    p = Path(path)
+    from resume_agent.tenancy.paths import resolve_tenant_path
+
+    p = resolve_tenant_path(path)
     try:
         stat = p.stat()
     except OSError:

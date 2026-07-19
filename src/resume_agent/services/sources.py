@@ -6,7 +6,6 @@ import os
 import re
 from dataclasses import dataclass
 from ipaddress import ip_address
-from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
@@ -39,6 +38,7 @@ from resume_agent.discovery.connectors.sources import (
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.profile.intake import _resolve_host
 from resume_agent.services.discovery import DEFAULT_CONNECTORS, DEFAULT_SEARCH
+from resume_agent.tenancy.paths import resolve_tenant_path
 
 _PREVIEW_LIMIT = 50
 _UNSET = object()
@@ -76,7 +76,7 @@ class SourcePreview:
 
 
 def _save(path: str, config: ConnectorsConfig) -> None:
-    target = Path(path)
+    target = resolve_tenant_path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(target.suffix + ".tmp")
     with tmp.open("w", encoding="utf-8") as stream:
@@ -370,7 +370,7 @@ def add_source(
             raise SourceError(preview.error or "Could not validate this source.")
         config = (
             load_connectors_config(connectors_path)
-            if Path(connectors_path).exists()
+            if resolve_tenant_path(connectors_path).exists()
             else ConnectorsConfig()
         )
         scrape_spec = spec_for("scrape")
