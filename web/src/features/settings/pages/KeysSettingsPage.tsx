@@ -2,6 +2,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GmailCard } from "../GmailCard";
 import { SecretsForm } from "../forms/SecretsForm";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
@@ -50,6 +51,11 @@ export function KeysSettingsPage() {
         <SaveBar dirty={dirty} saving={saveModels.isPending}
           onSave={() => saveModels.mutate(draft as never)}
           onDiscard={reset} />
+      </section>
+      <Separator />
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-medium">Connected accounts</h2>
+        <GmailCard />
       </section>
     </div>
   );
