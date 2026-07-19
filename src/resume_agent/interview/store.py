@@ -90,10 +90,6 @@ def _valid_session_id(session_id: str) -> bool:
     return valid_session_id(session_id)
 
 
-def _session_path(interview_dir: Path | str, session_id: str) -> Path:
-    return _STORE.path(interview_dir, session_id)
-
-
 def interview_lock() -> AbstractContextManager[None]:
     """Serialize interview session mutations in this process."""
     return _STORE.lock()

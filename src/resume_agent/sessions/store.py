@@ -68,7 +68,7 @@ class SessionStore(Generic[M]):
 
     def write(self, root: Path | str, session: dict) -> None:
         validated = self.model.model_validate(session)
-        session_id = validated.model_dump(mode="json")["session_id"]
+        session_id = validated.session_id
         if not valid_session_id(session_id):
             raise ValueError("invalid session id")
         atomic_write_text(

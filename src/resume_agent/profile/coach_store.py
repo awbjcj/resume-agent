@@ -64,10 +64,6 @@ def _valid_session_id(session_id: str) -> bool:
     return valid_session_id(session_id)
 
 
-def _session_path(profile_dir: Path | str, session_id: str) -> Path:
-    return _STORE.path(coach_dir(profile_dir), session_id)
-
-
 def coach_lock() -> AbstractContextManager[None]:
     """Serialize coach session and approval mutations in this process."""
     return _STORE.lock()
