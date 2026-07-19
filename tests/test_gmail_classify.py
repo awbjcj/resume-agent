@@ -19,6 +19,17 @@ def test_interview_and_assessment():
     assert classify_email(_email("Next step: a take-home coding challenge")) == "assessment"
 
 
+def test_classify_prefers_body_over_snippet():
+    email = EmailMessage(
+        sender="hr@acme.com",
+        sender_domain="acme.com",
+        subject="Update",
+        snippet="no keywords here",
+        body="We are pleased to offer you the position.",
+    )
+    assert classify_email(email) == "offer"
+
+
 def test_inconclusive_returns_none_without_llm():
     assert classify_email(_email("Thanks for your time")) == "none"
 
