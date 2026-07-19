@@ -1,3 +1,5 @@
+from typing import Literal
+
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
@@ -294,6 +296,29 @@ def test_build_demand_graph_is_stale_when_any_canonical_skill_is_unthemed():
 
 
 def test_build_demand_graph_empty_db_is_exact():
+    expected_categories: tuple[tuple[str, str, Literal["hard", "soft"]], ...] = (
+        ("languages", "Programming Languages", "hard"),
+        ("frontend-web", "Frontend & Web", "hard"),
+        ("backend-apis", "Backend & APIs", "hard"),
+        ("mobile-desktop", "Mobile & Desktop", "hard"),
+        ("data-engineering", "Data Engineering & Analytics", "hard"),
+        ("ai-ml", "AI & Machine Learning", "hard"),
+        ("databases-storage", "Databases & Storage", "hard"),
+        ("cloud-infra", "Cloud & Infrastructure", "hard"),
+        ("devops-automation", "DevOps & Automation", "hard"),
+        ("testing-quality", "Testing & Quality", "hard"),
+        ("security-compliance", "Security & Compliance", "hard"),
+        ("systems-embedded", "Systems & Embedded", "hard"),
+        ("architecture-design", "Architecture & Design", "hard"),
+        ("tools-platforms", "Tools & Platforms", "hard"),
+        ("leadership-management", "Leadership & Management", "soft"),
+        ("collaboration-communication", "Collaboration & Communication", "soft"),
+        ("product-business", "Product & Business", "soft"),
+        ("process-methodology", "Process & Methodology", "soft"),
+        ("domain-knowledge", "Domain Knowledge", "soft"),
+        ("other", "Other", "hard"),
+    )
+
     with _session() as session:
         graph = build_demand_graph(session, _facts())
 
@@ -306,32 +331,7 @@ def test_build_demand_graph_empty_db_is_exact():
             domains=[],
             categories=[
                 CategoryNode(slug=slug, label=label, kind=kind)
-                for slug, label, kind in (
-                    ("languages", "Programming Languages", "hard"),
-                    ("frontend-web", "Frontend & Web", "hard"),
-                    ("backend-apis", "Backend & APIs", "hard"),
-                    ("mobile-desktop", "Mobile & Desktop", "hard"),
-                    ("data-engineering", "Data Engineering & Analytics", "hard"),
-                    ("ai-ml", "AI & Machine Learning", "hard"),
-                    ("databases-storage", "Databases & Storage", "hard"),
-                    ("cloud-infra", "Cloud & Infrastructure", "hard"),
-                    ("devops-automation", "DevOps & Automation", "hard"),
-                    ("testing-quality", "Testing & Quality", "hard"),
-                    ("security-compliance", "Security & Compliance", "hard"),
-                    ("systems-embedded", "Systems & Embedded", "hard"),
-                    ("architecture-design", "Architecture & Design", "hard"),
-                    ("tools-platforms", "Tools & Platforms", "hard"),
-                    ("leadership-management", "Leadership & Management", "soft"),
-                    (
-                        "collaboration-communication",
-                        "Collaboration & Communication",
-                        "soft",
-                    ),
-                    ("product-business", "Product & Business", "soft"),
-                    ("process-methodology", "Process & Methodology", "soft"),
-                    ("domain-knowledge", "Domain Knowledge", "soft"),
-                    ("other", "Other", "hard"),
-                )
+                for slug, label, kind in expected_categories
             ],
         )
 
