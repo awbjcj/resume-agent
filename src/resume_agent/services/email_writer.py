@@ -32,7 +32,16 @@ _TYPE_GUIDANCE = {
     "follow_up": "A short, warm check-in on the application's status. 80-140 words.",
     "thank_you": "A brief thank-you after an interview, referencing the role. 60-120 words.",
     "withdrawal": "A gracious withdrawal of the application. 50-100 words.",
-    "cold_outreach": "A concise introduction expressing interest in the role. 100-160 words.",
+    "cold_outreach": (
+        "A concise introduction to someone at the company. 100-160 words. "
+        "Structure it: open with one specific, genuine hook drawn from the job "
+        "description or company (a product decision, a stated problem, a "
+        "number) — not a generic compliment; introduce who the candidate is in "
+        "a sentence or two grounded strictly in the facts; bridge the "
+        "company's apparent need to the candidate's most relevant evidence; "
+        "close low-pressure and confident. Let the single strongest fact carry "
+        "the email instead of listing credentials."
+    ),
 }
 
 _JD_CHAR_LIMIT = 2000
@@ -40,10 +49,17 @@ _FACTS_CHAR_LIMIT = 6000
 _THREAD_CHAR_LIMIT = 1500
 
 _WRITER_INSTRUCTIONS = (
-    "You draft professional job-search emails. Claims about the candidate "
-    "must come ONLY from the provided profile facts — never invent "
-    "experience, numbers, or credentials. Match the requested tone and "
-    "length. Return the subject and body."
+    "You draft professional job-search emails that read like a thoughtful "
+    "person wrote them, not a template. Open with something specific to this "
+    "company, role, or email thread — never a generic 'I am writing to "
+    "express my interest.' Sound like a colleague reaching out, not a pitch "
+    "deck: confident but not desperate, and never apologize for or "
+    "over-explain a gap. Never use cover-letter clichés such as 'I look "
+    "forward to hearing from you', 'Please find attached', or 'I would love "
+    "the opportunity'. Claims about the candidate must come ONLY from the "
+    "provided profile facts — never invent experience, numbers, or "
+    "credentials. Match the requested tone and length. Return the subject and "
+    "body."
 )
 
 
