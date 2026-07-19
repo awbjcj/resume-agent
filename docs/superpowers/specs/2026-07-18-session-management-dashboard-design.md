@@ -3,6 +3,34 @@
 **Date:** 2026-07-18
 **Status:** Approved for planning
 
+## Correctness Amendments
+
+The implementation review against the current repository makes these details
+binding:
+
+- Session list status filters accept only `active` or `ended`; invalid values are
+  422 validation errors.
+- `active_session()` remains as a compatibility projection while consumers move
+  to the explicit plural/per-job APIs. New logic must not use it to enforce a
+  global interview singleton.
+- Source error records retain the producing run id. Concurrent writers serialize
+  deduplication so a single process cannot create duplicate open identities or
+  lose occurrence counts.
+- Startup interruption recovery resolves the stored user id to that user's
+  workspace database after validating it in the system database. It never drops a
+  user record merely because no request context exists.
+- The current shadcn `base-nova`/Base UI component contract governs the web UI:
+  grouped menu/select items, labelled controls, semantic tokens, accessible
+  overlay titles, and explicit loading/error/empty states.
+- Deleting or hiding the selected session clears its UI selection. Coach controls
+  cover active abandonment and the currently displayed ended session, not only
+  rows that happen to appear in the Past sessions block.
+- The existing application-managed, evidence-locked transcripts remain the sole
+  history source passed to interview and coach agents. Agno persistence/session
+  memory is not enabled by this feature.
+- Completion requires backend, contract, frontend lint/type/test/build, and real
+  browser flow verification; unit tests alone are insufficient for the new UI.
+
 ## Goal
 
 Let the user manage past Mock Interview and Profile Coach sessions
@@ -86,9 +114,9 @@ Routers stay thin adapters over `services/`; schemas in `api/schemas/`
 
 ### Coach (`api/routers/coach.py`)
 
-- `POST /api/coach/sessions/{id}/archive`, `/unarchive`,
-  `DELETE /api/coach/sessions/{id}` — same semantics.
-- `GET /api/coach/sessions` gains the same filters. Start-session keeps its
+- `POST /api/profile/coach/sessions/{id}/archive`, `/unarchive`,
+  `DELETE /api/profile/coach/sessions/{id}` — same semantics.
+- `GET /api/profile/coach/sessions` gains the same filters. Start-session keeps its
   existing single-active 409.
 
 ### Errors (new `api/routers/errors.py` + `services/errors.py`)
@@ -167,8 +195,10 @@ interview".
 
 ### Coach page (`/coach`)
 
-History drawer (sheet): resume the active session, review ended ones read-only
-(transcript + recap + saved-note markers), archive/delete.
+Extend the existing coaching thread and Past sessions surface rather than adding
+a second competing history container: resume the active session, review ended
+ones read-only (transcript + recap + saved-note markers), and expose
+archive/unarchive/delete from both the displayed-session header and history rows.
 
 ### Dashboard
 

@@ -1,6 +1,6 @@
 # Session Management + Dashboard Upgrade Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution mode:** Implement task-by-task in one agent with test-driven development. Do not delegate this plan to subagents. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Session management (resume/archive/delete) for Mock Interview and Profile Coach, per-job concurrent interviews with an Interview hub page, and durable user-clearable error records surfaced on the dashboard.
 
@@ -20,9 +20,60 @@
 - Archive is **ended-sessions-only**; deleting an active session is the abandon path.
 - Coach stays single-active globally; interviews are one-active-per-job.
 - Errors use the `ApiException` envelope; 404 unknown / 409 conflict / 422 validation.
-- Every task ends with a commit trailer:
-  `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>` and
-  `Claude-Session: https://claude.ai/code/session_012KeSbeviqxiuvibbnPgtoU`
+- Keep commits truthful and scoped. Do not add third-party co-author or session
+  provenance trailers unless that party actually contributed to the commit.
+
+## Correctness Amendments (binding)
+
+These amendments override conflicting snippets in the tasks below.
+
+1. **Keep intermediate commits import-safe.** Task 1 retains `active_session()` as
+   a compatibility projection over `active_sessions()` while Task 3 migrates the
+   router to `active_session_for_job()`. Do not deliberately leave the repository
+   with a broken import between tasks.
+2. **Validate list filters at the HTTP boundary.** Interview and coach `status`
+   query parameters are typed as `Literal["active", "ended"] | None`; invalid
+   values return the standard 422 envelope instead of a misleading empty list.
+3. **Preserve source-run attribution.** `record_source_failures` accepts and
+   persists the producing `run_id`; pull and refresh pass `reporter.run_id` so
+   `ErrorRecord.run_id` satisfies the design contract.
+4. **Make in-process dedup atomic.** Error-record lookup/increment/insert is
+   serialized around the complete transaction so concurrent RunManager workers
+   cannot create duplicate open `(kind, source_label)` rows or lose increments.
+   Add a concurrency regression test.
+5. **Recovery must use the correct user database.** The app error hook may use
+   `current_context().engine` for a live worker, but startup recovery has no active
+   request context. For a recovery payload with `userId`, first validate the user
+   against the system database, then resolve that user's workspace engine through
+   `EngineRegistry`; do not silently discard the record or write it to the admin
+   workspace.
+6. **Base UI composition is authoritative.** This repository uses shadcn
+   `base-nova` + Base UI. New selects provide `items` on `<Select>`, put
+   `SelectItem` inside `SelectGroup`, and use a null placeholder item. Menu items
+   live inside `DropdownMenuGroup`; link-rendered Buttons set
+   `nativeButton={false}`; Switch controls use labelled `Field` composition; new
+   layout uses `gap-*`, not `space-y-*`, and icons inside shadcn controls use
+   `data-icon` without manual sizing classes.
+7. **Every new query surface has loading, error, and empty states.** In
+   particular, SessionsRail, NewInterviewDialog's job/detail queries, coach
+   history management, and AttentionCard must expose retryable errors rather than
+   collapsing failures into empty UI.
+8. **Session actions clear stale selection.** After deleting the selected
+   interview, navigate to `/interview` (replace history) after the mutation
+   succeeds. Coach archive/delete actions cover the currently displayed ended
+   session and active-session abandonment as well as past rows, and clear local
+   selection after a successful mutation so removed/hidden detail is not retained.
+9. **Preserve the existing Agno boundary.** Interview and coach history remains
+   the application's validated file transcript rendered into each turn. Do not
+   introduce Agno DB history or reuse an Agno `session_id`; per-session RunManager
+   singleton keys provide concurrency without changing agent memory semantics.
+10. **Final verification is broader than Task 15's draft commands.** Run the full
+    Python suite, `ruff check`, OpenAPI regeneration/drift check, full Vitest,
+    TypeScript, web lint, production web build, `git diff --check`, and a Playwright
+    browser walkthrough of the dashboard, interview hub, and coach management
+    flows at representative desktop and mobile widths. Review the final diff on
+    correctness, security, performance, accessibility, and simplicity, then rerun
+    affected checks after any refactor.
 
 ---
 
