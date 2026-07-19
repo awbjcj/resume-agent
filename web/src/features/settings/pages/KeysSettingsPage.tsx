@@ -7,6 +7,7 @@ import { SecretsForm } from "../forms/SecretsForm";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import { useDraft } from "../use-draft";
+import { useGmailConnectOutcome } from "../use-gmail";
 import { useSaveSecrets, useSecrets } from "../use-secrets";
 
 type ModelsDoc = { cheapModel: string; midModel: string; premiumModel: string };
@@ -23,6 +24,7 @@ export function KeysSettingsPage() {
   const models = useConfig("/api/config/models");
   const saveModels = useSaveConfig("/api/config/models");
   const { draft, setDraft, dirty, reset } = useDraft(models.data as ModelsDoc | undefined);
+  useGmailConnectOutcome();
 
   if (!secrets.data || !draft) return <Skeleton className="h-64 w-full" />;
 
