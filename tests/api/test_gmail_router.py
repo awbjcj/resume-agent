@@ -60,6 +60,24 @@ def _patch_flow(monkeypatch):
     return flow
 
 
+def test_build_flow_disables_pkce():
+    """Connect and callback build separate Flow objects, so a PKCE code_verifier
+    generated at connect cannot survive to the callback's token exchange. For a
+    confidential web client (client_secret) PKCE must be off, else Google rejects
+    with invalid_grant 'Missing code verifier'."""
+    from resume_agent.api.routers.gmail import _build_flow
+    from resume_agent.config import Settings
+
+    settings = Settings(
+        google_oauth_client_id="cid", google_oauth_client_secret="cs"
+    )
+    flow = _build_flow(settings, "https://example.test/api/gmail/callback")
+
+    assert flow.autogenerate_code_verifier is False
+    url, _state = flow.authorization_url(state="s")
+    assert "code_challenge" not in url
+
+
 def test_connect_requires_client(client):
     response = client.get("/api/gmail/connect")
     assert response.status_code == 409
