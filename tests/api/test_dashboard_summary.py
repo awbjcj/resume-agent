@@ -7,6 +7,14 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from resume_agent.api.app import create_app
+from resume_agent.interview.store import (
+    InterviewContext,
+    InterviewStyle,
+    InterviewTurnRecord,
+    PlanItem,
+    create_session,
+)
+from resume_agent.services.errors import record_error
 from resume_agent.tracking.tables import Application, Job
 
 
@@ -62,3 +70,28 @@ def test_applied_excludes_archived_jobs(client):
 
     body = client.get("/api/dashboard/summary").json()
     assert body["applied"] == 0  # the only Application belongs to an archived job
+
+
+def test_summary_includes_active_sessions_and_open_error_count(client):
+    with Session(client.app.state.engine) as session:
+        record_error(
+            session, kind="run", source_label="pull", message="failed"
+        )
+    create_session(
+        client.app.state.data_dir / "interview",
+        "active01",
+        job_id=1,
+        resume_version_id=1,
+        style=InterviewStyle(),
+        context=InterviewContext(company="Acme", title="Engineer"),
+        plan=[PlanItem(id="q1", competency="Python", question_type="technical")],
+        opening_turn=InterviewTurnRecord(
+            role="interviewer", text="Question", question_id="q1"
+        ),
+    )
+
+    body = client.get("/api/dashboard/summary").json()
+
+    assert body["openErrorCount"] == 1
+    assert body["activeInterviews"][0]["sessionId"] == "active01"
+    assert body["activeCoachSession"] is None

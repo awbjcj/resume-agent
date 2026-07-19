@@ -64,6 +64,7 @@ class CoachSessionOut(CamelModel):
     started_at: str
     ended_at: str | None = None
     status: str
+    archived_at: str | None = None
     turns: list[CoachTurnOut] = Field(default_factory=list)
     topics: list[CoachTopicOut] = Field(default_factory=list)
     draft_notes: list[CoachDraftNoteOut] = Field(default_factory=list)
@@ -76,6 +77,7 @@ class CoachSessionSummaryOut(CamelModel):
     started_at: str
     ended_at: str | None = None
     status: str
+    archived_at: str | None = None
     topic_count: int = 0
     saved_note_count: int = 0
 

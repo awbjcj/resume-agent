@@ -11,6 +11,7 @@ from resume_agent.profile.coach_store import (
     CoachTurnRecord,
     apply_turn_delta,
     create_session,
+    end_session,
 )
 
 
@@ -171,3 +172,38 @@ def test_end_run_returns_nested_build_id(monkeypatch, tmp_path):
         run = _wait(client, response.json()["runId"])
         assert run["state"] == "done"
         assert run["result"]["buildRunId"]
+
+
+def test_coach_archive_filters_unarchive_and_delete(tmp_path):
+    client = _client(tmp_path)
+    with client:
+        _seed_draft(tmp_path)
+        end_session(tmp_path / "data" / "profile", "s1", "recap")
+
+        archived = client.post("/api/profile/coach/sessions/s1/archive")
+        assert archived.status_code == 200
+        assert archived.json()["archivedAt"]
+        assert client.get("/api/profile/coach/sessions").json()["sessions"] == []
+        included = client.get(
+            "/api/profile/coach/sessions", params={"includeArchived": "true"}
+        ).json()["sessions"]
+        assert included[0]["sessionId"] == "s1"
+
+        assert client.post("/api/profile/coach/sessions/s1/unarchive").status_code == 200
+        assert client.post("/api/profile/coach/sessions/s1/unarchive").status_code == 409
+        assert client.delete("/api/profile/coach/sessions/s1").status_code == 204
+        assert client.delete("/api/profile/coach/sessions/s1").status_code == 404
+
+
+def test_coach_archive_rejects_active_and_invalid_status_filter(tmp_path):
+    client = _client(tmp_path)
+    with client:
+        _seed_draft(tmp_path)
+
+        assert client.post("/api/profile/coach/sessions/s1/archive").status_code == 409
+        assert (
+            client.get(
+                "/api/profile/coach/sessions", params={"status": "paused"}
+            ).status_code
+            == 422
+        )

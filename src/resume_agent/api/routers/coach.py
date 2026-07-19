@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Literal, cast
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from resume_agent.api.deps import (
     get_config_store,
@@ -32,7 +32,12 @@ from resume_agent.api.schemas.config import ProfileConfigDoc
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.config import Settings
 from resume_agent.llm_runner import resolve_api_key
-from resume_agent.profile.coach_store import active_session
+from resume_agent.profile.coach_store import (
+    active_session,
+    archive_session,
+    delete_session,
+    unarchive_session,
+)
 from resume_agent.profile.corpus import load_manifest
 from resume_agent.services.profile_coach import (
     approve_draft,
@@ -100,7 +105,16 @@ def _value_error(exc: ValueError) -> ApiException:
     message = str(exc)
     if "unknown" in message:
         return ApiException(404, "NOT_FOUND", message)
-    if any(token in message for token in ("already resolved", "session ended", "active session")):
+    if any(
+        token in message
+        for token in (
+            "already resolved",
+            "session ended",
+            "active session",
+            "archived",
+            "only ended",
+        )
+    ):
         return ApiException(409, "CONFLICT", message)
     return ApiException(422, "VALIDATION_ERROR", message)
 
@@ -258,8 +272,52 @@ def end_coach_session(
 
 
 @router.get("/profile/coach/sessions", response_model=CoachSessionsOut)
-def list_coach_sessions(request: Request):
-    return CoachSessionsOut.model_validate(sessions_view(get_profile_dir(request)))
+def list_coach_sessions(
+    request: Request,
+    include_archived: bool = Query(False, alias="includeArchived"),
+    status: Literal["active", "ended"] | None = Query(None),
+):
+    return CoachSessionsOut.model_validate(
+        sessions_view(
+            get_profile_dir(request),
+            include_archived=include_archived,
+            status=status,
+        )
+    )
+
+
+@router.post(
+    "/profile/coach/sessions/{session_id}/archive",
+    response_model=CoachSessionOut,
+)
+def archive_coach_session(session_id: str, request: Request):
+    profile_dir = get_profile_dir(request)
+    try:
+        archive_session(profile_dir, session_id)
+        return CoachSessionOut.model_validate(session_view(profile_dir, session_id))
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.post(
+    "/profile/coach/sessions/{session_id}/unarchive",
+    response_model=CoachSessionOut,
+)
+def unarchive_coach_session(session_id: str, request: Request):
+    profile_dir = get_profile_dir(request)
+    try:
+        unarchive_session(profile_dir, session_id)
+        return CoachSessionOut.model_validate(session_view(profile_dir, session_id))
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.delete("/profile/coach/sessions/{session_id}", status_code=204)
+def delete_coach_session(session_id: str, request: Request) -> None:
+    try:
+        delete_session(get_profile_dir(request), session_id)
+    except ValueError as exc:
+        raise _value_error(exc) from exc
 
 
 @router.get("/profile/coach/sessions/{session_id}", response_model=CoachSessionOut)

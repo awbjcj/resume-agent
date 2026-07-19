@@ -2,11 +2,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
 from resume_agent.api.app import create_app
 from resume_agent.api.auth import hash_password
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.config import Settings
+from resume_agent.services.errors import list_error_records
 from resume_agent.tenancy.bootstrap import BootstrapError
 from resume_agent.tenancy.context import UserContext, current_context, use_context
 from resume_agent.tenancy.workspace import WorkspacePaths
@@ -92,3 +94,37 @@ def test_run_manager_propagates_context_and_uses_workspace_root(tmp_path):
     assert seen == [context]
     assert (context.paths.runs_root / f"{run_id}.json").is_file()
     assert not (tmp_path / "legacy" / f"{run_id}.json").exists()
+
+
+def test_startup_recovery_records_error_in_the_owner_workspace(tmp_path):
+    data_root = tmp_path / "data"
+    env_path = _env(tmp_path)
+    first_app = create_app(
+        db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        data_dir=data_root,
+        env_path=env_path,
+        config_dir=tmp_path / "templates",
+    )
+    with TestClient(first_app, base_url="https://testserver"):
+        user_id = first_app.state.default_context.user_id
+        runs_root = first_app.state.default_context.paths.runs_root
+
+    writer = RunManager(root=runs_root)
+    run_id = writer.create(
+        "pull", user_id=user_id, storage_root=runs_root
+    )
+    writer.shutdown()
+
+    recovered_app = create_app(
+        db_url=f"sqlite:///{(data_root / 'ignored.db').as_posix()}",
+        data_dir=data_root,
+        env_path=env_path,
+        config_dir=tmp_path / "templates",
+    )
+    with TestClient(recovered_app, base_url="https://testserver"):
+        with Session(recovered_app.state.default_context.engine) as database:
+            records = list_error_records(database)
+
+    assert len(records) == 1
+    assert records[0].run_id == run_id
+    assert records[0].source_label == "pull"

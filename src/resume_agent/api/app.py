@@ -32,6 +32,7 @@ from resume_agent.api.routers import coach as coach_router
 from resume_agent.api.routers import interview as interview_router
 from resume_agent.api.routers import transcribe as transcribe_router
 from resume_agent.api.routers import dashboard as dashboard_router
+from resume_agent.api.routers import errors as errors_router
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
 from resume_agent.api.routers import notifications as notifications_router
@@ -54,6 +55,7 @@ from resume_agent.tenancy.bootstrap import build_context, ensure_bootstrapped
 from resume_agent.tenancy.engines import EngineRegistry
 from resume_agent.tenancy.system_db import init_system_db, make_system_engine
 from resume_agent.tenancy.context import current_context
+from resume_agent.tenancy.workspace import workspace_paths
 
 
 def spa_dist_dir() -> Path:
@@ -163,12 +165,47 @@ def create_app(
         if resolved_db in {"sqlite://", "sqlite://:memory:", "sqlite:///:memory:"}
         else resolved_settings.suggestion_batch_concurrency
     )
+
+    def _record_run_error(payload: dict) -> None:
+        from sqlalchemy.orm import Session as SystemSession
+        from sqlmodel import Session as DbSession
+
+        from resume_agent.services.errors import record_error
+        from resume_agent.tenancy.system_db import User
+
+        context = current_context()
+        engine = context.engine if context is not None else None
+        user_id = payload.get("userId")
+        if engine is None and user_id:
+            system_engine = getattr(app.state, "system_engine", None)
+            registry = getattr(app.state, "engine_registry", None)
+            if system_engine is None or registry is None:
+                return
+            with SystemSession(system_engine) as system_session:
+                if system_session.get(User, str(user_id)) is None:
+                    return
+            paths = workspace_paths(app.state.data_dir, str(user_id))
+            engine = registry.get(str(user_id), paths.db_url)
+        if engine is None:
+            engine = getattr(app.state, "engine", None)
+        if engine is None:
+            return
+        with DbSession(engine) as database:
+            record_error(
+                database,
+                kind="run",
+                source_label=str(payload.get("kind") or "run"),
+                message=str(payload.get("error") or "unknown error"),
+                run_id=str(payload.get("runId") or "") or None,
+            )
+
     app.state.run_manager = RunManager(
         root=manager_root,
         executor=run_executor,
         kind_workers=(
             {"suggestion": suggestion_workers} if run_executor is None else None
         ),
+        on_error=_record_run_error,
     )
 
     def _settings_override() -> Settings:
@@ -237,6 +274,7 @@ def create_app(
     app.include_router(transcribe_router.router, prefix="/api", dependencies=guarded)
     app.include_router(setup_router.router, prefix="/api", dependencies=guarded)
     app.include_router(dashboard_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(errors_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_users_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_invites_router.router, prefix="/api", dependencies=guarded)

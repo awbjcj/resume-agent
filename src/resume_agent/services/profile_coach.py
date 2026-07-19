@@ -66,6 +66,7 @@ def session_view(profile_dir: Path | str, session_id: str) -> dict:
         "startedAt": session["started_at"],
         "endedAt": session["ended_at"],
         "status": session["status"],
+        "archivedAt": session["archived_at"],
         "turns": [_camel_turn(turn) for turn in session["turns"]],
         "topics": [
             {
@@ -93,7 +94,15 @@ def session_view(profile_dir: Path | str, session_id: str) -> dict:
     }
 
 
-def sessions_view(profile_dir: Path | str) -> dict:
+def sessions_view(
+    profile_dir: Path | str,
+    *,
+    include_archived: bool = False,
+    status: str | None = None,
+) -> dict:
+    rows = list_sessions(profile_dir, include_archived=include_archived)
+    if status is not None:
+        rows = [row for row in rows if row["status"] == status]
     return {
         "sessions": [
             {
@@ -101,12 +110,13 @@ def sessions_view(profile_dir: Path | str) -> dict:
                 "startedAt": session["started_at"],
                 "endedAt": session["ended_at"],
                 "status": session["status"],
+                "archivedAt": session["archived_at"],
                 "topicCount": len(session["topics"]),
                 "savedNoteCount": sum(
                     draft["status"] == "saved" for draft in session["draft_notes"]
                 ),
             }
-            for session in list_sessions(profile_dir)
+            for session in rows
         ]
     }
 

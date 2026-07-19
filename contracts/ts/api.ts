@@ -593,6 +593,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Errors */
+        get: operations["list_errors_api_errors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/errors/dismiss-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss All Errors */
+        post: operations["dismiss_all_errors_api_errors_dismiss_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/errors/{record_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Error */
+        post: operations["dismiss_error_api_errors__record_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/errors/{record_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Error */
+        post: operations["resolve_error_api_errors__record_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/gmail/sync": {
         parameters: {
             query?: never;
@@ -656,6 +724,24 @@ export interface paths {
         get: operations["get_interview_session_api_interview_sessions__session_id__get"];
         put?: never;
         post?: never;
+        /** Delete Interview Session */
+        delete: operations["delete_interview_session_api_interview_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview/sessions/{session_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Interview Session */
+        post: operations["archive_interview_session_api_interview_sessions__session_id__archive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -690,6 +776,23 @@ export interface paths {
         put?: never;
         /** Send Answer */
         post: operations["send_answer_api_interview_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview/sessions/{session_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Interview Session */
+        post: operations["unarchive_interview_session_api_interview_sessions__session_id__unarchive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -999,6 +1102,24 @@ export interface paths {
         get: operations["get_coach_session_api_profile_coach_sessions__session_id__get"];
         put?: never;
         post?: never;
+        /** Delete Coach Session */
+        delete: operations["delete_coach_session_api_profile_coach_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/coach/sessions/{session_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Coach Session */
+        post: operations["archive_coach_session_api_profile_coach_sessions__session_id__archive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1052,6 +1173,23 @@ export interface paths {
         post: operations["save_note_api_profile_coach_sessions__session_id__notes__topic_id__post"];
         /** Discard Note */
         delete: operations["discard_note_api_profile_coach_sessions__session_id__notes__topic_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/coach/sessions/{session_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Coach Session */
+        post: operations["unarchive_coach_session_api_profile_coach_sessions__session_id__unarchive_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2298,6 +2436,8 @@ export interface components {
         };
         /** CoachSessionOut */
         CoachSessionOut: {
+            /** Archivedat */
+            archivedAt?: string | null;
             /** Draftnotes */
             draftNotes?: components["schemas"]["CoachDraftNoteOut"][];
             /** Endedat */
@@ -2318,6 +2458,8 @@ export interface components {
         };
         /** CoachSessionSummaryOut */
         CoachSessionSummaryOut: {
+            /** Archivedat */
+            archivedAt?: string | null;
             /** Endedat */
             endedAt?: string | null;
             /**
@@ -2460,8 +2602,16 @@ export interface components {
         };
         /** DashboardSummaryOut */
         DashboardSummaryOut: {
+            activeCoachSession?: components["schemas"]["CoachSessionSummaryOut"] | null;
+            /** Activeinterviews */
+            activeInterviews?: components["schemas"]["InterviewSessionSummaryOut"][];
             /** Applied */
             applied: number;
+            /**
+             * Openerrorcount
+             * @default 0
+             */
+            openErrorCount: number;
             /** Queues */
             queues: {
                 [key: string]: number;
@@ -2491,6 +2641,14 @@ export interface components {
         DiscoverSourcesIn: {
             /** Prompt */
             prompt: string;
+        };
+        /** DismissAllOut */
+        DismissAllOut: {
+            /**
+             * Dismissed
+             * @default 0
+             */
+            dismissed: number;
         };
         /** DocumentOut */
         DocumentOut: {
@@ -2541,6 +2699,49 @@ export interface components {
             /** Label */
             label?: string | null;
         };
+        /** ErrorRecordOut */
+        ErrorRecordOut: {
+            /**
+             * Count
+             * @default 1
+             */
+            count: number;
+            /**
+             * Firstseenat
+             * Format: date-time
+             */
+            firstSeenAt: string;
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /**
+             * Lastseenat
+             * Format: date-time
+             */
+            lastSeenAt: string;
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /** Runid */
+            runId?: string | null;
+            /** Sourcelabel */
+            sourceLabel: string;
+            /** Status */
+            status: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /** ErrorRecordsOut */
+        ErrorRecordsOut: {
+            /** Records */
+            records?: components["schemas"]["ErrorRecordOut"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2585,6 +2786,8 @@ export interface components {
         };
         /** InterviewSessionOut */
         InterviewSessionOut: {
+            /** Archivedat */
+            archivedAt?: string | null;
             /**
              * Company
              * @default
@@ -2622,6 +2825,8 @@ export interface components {
         };
         /** InterviewSessionSummaryOut */
         InterviewSessionSummaryOut: {
+            /** Archivedat */
+            archivedAt?: string | null;
             /**
              * Askedcount
              * @default 0
@@ -5590,6 +5795,136 @@ export interface operations {
             };
         };
     };
+    list_errors_api_errors_get: {
+        parameters: {
+            query?: {
+                status?: "open" | "dismissed" | "resolved";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRecordsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_all_errors_api_errors_dismiss_all_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DismissAllOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_error_api_errors__record_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_error_api_errors__record_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     launch_gmail_sync_api_gmail_sync_post: {
         parameters: {
             query?: never;
@@ -5647,6 +5982,8 @@ export interface operations {
         parameters: {
             query?: {
                 jobId?: number | null;
+                includeArchived?: boolean;
+                status?: ("active" | "ended") | null;
             };
             header?: {
                 authorization?: string | null;
@@ -5744,6 +6081,70 @@ export interface operations {
             };
         };
     };
+    delete_interview_session_api_interview_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_interview_session_api_interview_sessions__session_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     end_interview_api_interview_sessions__session_id__end_post: {
         parameters: {
             query?: never;
@@ -5801,6 +6202,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_interview_session_api_interview_sessions__session_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewSessionOut"];
                 };
             };
             /** @description Validation Error */
@@ -6440,7 +6874,10 @@ export interface operations {
     };
     list_coach_sessions_api_profile_coach_sessions_get: {
         parameters: {
-            query?: never;
+            query?: {
+                includeArchived?: boolean;
+                status?: ("active" | "ended") | null;
+            };
             header?: {
                 authorization?: string | null;
             };
@@ -6501,6 +6938,70 @@ export interface operations {
         };
     };
     get_coach_session_api_profile_coach_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_coach_session_api_profile_coach_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_coach_session_api_profile_coach_sessions__session_id__archive_post: {
         parameters: {
             query?: never;
             header?: {
@@ -6654,6 +7155,39 @@ export interface operations {
             path: {
                 session_id: string;
                 topic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_coach_session_api_profile_coach_sessions__session_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
             };
             cookie?: never;
         };

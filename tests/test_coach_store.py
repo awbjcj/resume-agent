@@ -7,13 +7,16 @@ from resume_agent.profile.coach_store import (
     CoachTopic,
     CoachTurnRecord,
     active_session,
+    archive_session,
     apply_turn_delta,
     create_session,
+    delete_session,
     end_session,
     list_sessions,
     load_session,
     set_draft_status,
     set_impact,
+    unarchive_session,
 )
 from resume_agent.profile.interview import ResearchAction
 
@@ -129,3 +132,37 @@ def test_concurrent_deltas_do_not_lose_updates(tmp_path):
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(turn, range(4)))
     assert len(load_session(tmp_path, sid)["turns"]) == 9
+
+
+def test_archive_unarchive_and_delete_session(tmp_path):
+    sid = _seed(tmp_path)
+    with pytest.raises(ValueError, match="only ended sessions"):
+        archive_session(tmp_path, sid)
+
+    end_session(tmp_path, sid, "recap")
+    archived = archive_session(tmp_path, sid)
+    assert archived["archived_at"]
+    assert list_sessions(tmp_path) == []
+    assert [
+        row["session_id"]
+        for row in list_sessions(tmp_path, include_archived=True)
+    ] == [sid]
+
+    assert unarchive_session(tmp_path, sid)["archived_at"] is None
+    with pytest.raises(ValueError, match="not archived"):
+        unarchive_session(tmp_path, sid)
+
+    delete_session(tmp_path, sid)
+    assert list_sessions(tmp_path, include_archived=True) == []
+    with pytest.raises(ValueError, match="unknown session"):
+        delete_session(tmp_path, sid)
+
+
+def test_archived_session_does_not_block_new_active_session(tmp_path):
+    sid = _seed(tmp_path)
+    end_session(tmp_path, sid, "recap")
+    archive_session(tmp_path, sid)
+
+    _seed(tmp_path, "s2")
+
+    assert active_session(tmp_path)["session_id"] == "s2"

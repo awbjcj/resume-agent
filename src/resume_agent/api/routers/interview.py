@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Query, Request
 from sqlmodel import Session
 
@@ -27,7 +29,12 @@ from resume_agent.api.schemas.interview import (
 )
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.config import Settings
-from resume_agent.interview.store import active_session
+from resume_agent.interview.store import (
+    active_session_for_job,
+    archive_session,
+    delete_session,
+    unarchive_session,
+)
 from resume_agent.llm_runner import resolve_api_key
 from resume_agent.services.mock_interview import (
     run_answer_turn,
@@ -39,9 +46,6 @@ from resume_agent.services.mock_interview import (
 from resume_agent.tracking.tables import Job, ResumeVersion
 
 router = APIRouter()
-_SINGLETON = "mock-interview"
-
-
 def _guard_keys(settings: Settings) -> None:
     configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
     missing = [
@@ -55,10 +59,12 @@ def _guard_keys(settings: Settings) -> None:
         )
 
 
-def _submit(manager: RunManager, kind: str, work) -> RunOut:
+def _submit(
+    manager: RunManager, kind: str, work, *, singleton: str
+) -> RunOut:
     try:
         run_id = manager.submit(
-            kind, work, singleton_key=_SINGLETON, singleton_conflict="raise"
+            kind, work, singleton_key=singleton, singleton_conflict="raise"
         )
     except RunSingletonConflict as exc:
         raise ApiException(
@@ -80,7 +86,16 @@ def _value_error(exc: ValueError) -> ApiException:
     message = str(exc)
     if "unknown" in message:
         return ApiException(404, "NOT_FOUND", message)
-    if any(token in message for token in ("session ended", "active session", "concluded")):
+    if any(
+        token in message
+        for token in (
+            "session ended",
+            "active session",
+            "concluded",
+            "archived",
+            "only ended",
+        )
+    ):
         return ApiException(409, "CONFLICT", message)
     return ApiException(422, "VALIDATION_ERROR", message)
 
@@ -95,8 +110,14 @@ def start_interview(
 ):
     _guard_keys(settings)
     interview_dir = get_interview_dir(request)
-    if active_session(interview_dir) is not None:
-        raise ApiException(409, "SESSION_ACTIVE", "An active interview session exists")
+    existing = active_session_for_job(interview_dir, payload.job_id)
+    if existing is not None:
+        raise ApiException(
+            409,
+            "SESSION_ACTIVE_FOR_JOB",
+            "An active interview session already exists for this job",
+            details={"sessionId": existing["session_id"]},
+        )
     job = db.get(Job, payload.job_id)
     if job is None:
         raise ApiException(404, "NOT_FOUND", f"unknown job: {payload.job_id}")
@@ -120,6 +141,7 @@ def start_interview(
             resume_version_id=payload.resume_version_id,
             style=style,
         ),
+        singleton=f"mock-interview-open:{payload.job_id}",
     )
 
 
@@ -152,6 +174,7 @@ def send_answer(
             session_id=session_id,
             message=payload.message,
         ),
+        singleton=f"mock-interview:{session_id}",
     )
 
 
@@ -178,16 +201,63 @@ def end_interview(
         lambda reporter: run_debrief_turn(
             reporter, interview_dir=interview_dir, session_id=session_id
         ),
+        singleton=f"mock-interview:{session_id}",
     )
 
 
 @router.get("/interview/sessions", response_model=InterviewSessionsOut)
 def list_interview_sessions(
-    request: Request, job_id: int | None = Query(None, alias="jobId")
+    request: Request,
+    job_id: int | None = Query(None, alias="jobId"),
+    include_archived: bool = Query(False, alias="includeArchived"),
+    status: Literal["active", "ended"] | None = Query(None),
 ):
     return InterviewSessionsOut.model_validate(
-        sessions_view(get_interview_dir(request), job_id=job_id)
+        sessions_view(
+            get_interview_dir(request),
+            job_id=job_id,
+            include_archived=include_archived,
+            status=status,
+        )
     )
+
+
+@router.post(
+    "/interview/sessions/{session_id}/archive",
+    response_model=InterviewSessionOut,
+)
+def archive_interview_session(session_id: str, request: Request):
+    interview_dir = get_interview_dir(request)
+    try:
+        archive_session(interview_dir, session_id)
+        return InterviewSessionOut.model_validate(
+            session_view(interview_dir, session_id)
+        )
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.post(
+    "/interview/sessions/{session_id}/unarchive",
+    response_model=InterviewSessionOut,
+)
+def unarchive_interview_session(session_id: str, request: Request):
+    interview_dir = get_interview_dir(request)
+    try:
+        unarchive_session(interview_dir, session_id)
+        return InterviewSessionOut.model_validate(
+            session_view(interview_dir, session_id)
+        )
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.delete("/interview/sessions/{session_id}", status_code=204)
+def delete_interview_session(session_id: str, request: Request) -> None:
+    try:
+        delete_session(get_interview_dir(request), session_id)
+    except ValueError as exc:
+        raise _value_error(exc) from exc
 
 
 @router.get("/interview/sessions/{session_id}", response_model=InterviewSessionOut)

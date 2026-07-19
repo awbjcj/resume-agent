@@ -223,6 +223,99 @@ def _write_ended_session(interview_dir: Path, job_id: int, session_id: str = "en
     return session_id
 
 
+def _write_active_session(
+    interview_dir: Path, job_id: int, session_id: str = "active01"
+) -> str:
+    create_session(
+        interview_dir,
+        session_id,
+        job_id=job_id,
+        resume_version_id=0,
+        style=InterviewStyle(),
+        context=InterviewContext(company="Acme", title="Engineer", jd_text="Build"),
+        plan=[PlanItem(id="q1", competency="Python", question_type="role_specific")],
+        opening_turn=InterviewTurnRecord(
+            role="interviewer", text="Hi", question_id="q1"
+        ),
+    )
+    return session_id
+
+
+def test_start_conflicts_only_for_the_same_job(monkeypatch, tmp_path):
+    client = _client(tmp_path)
+    _fake_agents(monkeypatch)
+    with client:
+        first_job, _ = _seed(client)
+        second_job, second_version = _seed(client)
+        interview_dir = tmp_path / "data" / "interview"
+        _write_active_session(interview_dir, first_job, "blocking01")
+
+        conflict = client.post(
+            "/api/interview/sessions",
+            json={"jobId": first_job, "resumeVersionId": 0, "style": {}},
+        )
+        assert conflict.status_code == 409
+        assert conflict.json()["error"] == {
+            "code": "SESSION_ACTIVE_FOR_JOB",
+            "message": "An active interview session already exists for this job",
+            "details": {"sessionId": "blocking01"},
+        }
+
+        started = client.post(
+            "/api/interview/sessions",
+            json={
+                "jobId": second_job,
+                "resumeVersionId": second_version,
+                "style": {"questionCount": 4},
+            },
+        )
+        assert started.status_code == 202
+        assert _wait(client, started.json()["runId"])["state"] == "done"
+
+
+def test_interview_archive_filters_unarchive_and_delete(tmp_path):
+    client = _client(tmp_path)
+    with client:
+        interview_dir = tmp_path / "data" / "interview"
+        session_id = _write_ended_session(interview_dir, 1)
+
+        archived = client.post(f"/api/interview/sessions/{session_id}/archive")
+        assert archived.status_code == 200
+        assert archived.json()["archivedAt"]
+        assert client.get("/api/interview/sessions").json()["sessions"] == []
+        included = client.get(
+            "/api/interview/sessions", params={"includeArchived": "true"}
+        ).json()["sessions"]
+        assert [row["sessionId"] for row in included] == [session_id]
+
+        assert (
+            client.post(f"/api/interview/sessions/{session_id}/unarchive").status_code
+            == 200
+        )
+        assert (
+            client.post(f"/api/interview/sessions/{session_id}/unarchive").status_code
+            == 409
+        )
+        assert client.delete(f"/api/interview/sessions/{session_id}").status_code == 204
+        assert client.delete(f"/api/interview/sessions/{session_id}").status_code == 404
+
+
+def test_interview_archive_rejects_active_and_invalid_status_filter(tmp_path):
+    client = _client(tmp_path)
+    with client:
+        interview_dir = tmp_path / "data" / "interview"
+        session_id = _write_active_session(interview_dir, 1)
+
+        assert (
+            client.post(f"/api/interview/sessions/{session_id}/archive").status_code
+            == 409
+        )
+        assert (
+            client.get("/api/interview/sessions", params={"status": "paused"}).status_code
+            == 422
+        )
+
+
 def test_job_delete_removes_interview_sessions(tmp_path):
     client = _client(tmp_path)
     with client:

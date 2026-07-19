@@ -91,6 +91,7 @@ class RunProgressReporter(ProgressReporter):
         meta: dict[str, object] | None = None,
     ) -> None:
         super().__init__(run_id, root=root)
+        self.run_id = run_id
         self.kind = kind
         self.created_at = created_at or _now()
         self.user_id = user_id
@@ -158,6 +159,7 @@ class RunManager:
         root: Path | str = RUNS_ROOT,
         executor: Executor | None = None,
         kind_workers: dict[str, int] | None = None,
+        on_error: Callable[[dict], None] | None = None,
     ) -> None:
         self.root = Path(root)
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
@@ -185,6 +187,24 @@ class RunManager:
         self._active_singletons: dict[str, str] = {}
         self._roots: set[Path] = {self.root}
         self._run_roots: dict[str, Path] = {}
+        self.on_error = on_error
+
+    def _emit_error(
+        self, run_id: str, kind: str, error: str, user_id: str | None
+    ) -> None:
+        if self.on_error is None:
+            return
+        try:
+            self.on_error(
+                {
+                    "runId": run_id,
+                    "kind": kind,
+                    "error": error,
+                    "userId": user_id,
+                }
+            )
+        except Exception:  # noqa: BLE001 - bookkeeping never masks run failure
+            pass
 
     def register_root(self, root: Path | str) -> None:
         resolved = Path(root)
@@ -343,15 +363,19 @@ class RunManager:
                 except RunCancelled:  # cooperative stop — terminal but not a failure
                     reporter.cancelled()
                 except Exception as exc:  # noqa: BLE001 — surface any failure as run error
+                    error = f"{type(exc).__name__}: {exc}"
                     reporter.done(
-                        error=f"{type(exc).__name__}: {exc}",
+                        error=error,
                         error_code=getattr(exc, "code", None),
                         result=None,
                     )
+                    self._emit_error(run_id, kind, error, reporter.user_id)
                 except (
                     BaseException
                 ) as exc:  # interpreter exit/interrupt: still stamp, then re-raise
-                    reporter.done(error=f"{type(exc).__name__}: {exc}", result=None)
+                    error = f"{type(exc).__name__}: {exc}"
+                    reporter.done(error=error, result=None)
+                    self._emit_error(run_id, kind, error, reporter.user_id)
                     raise
                 finally:
                     self._cancel_requested.discard(run_id)
@@ -506,6 +530,12 @@ class RunManager:
                 updated_at=_now(),
             )
             self._write(snapshot.run_id, record)
+            self._emit_error(
+                snapshot.run_id,
+                snapshot.kind,
+                "Backend restarted before this run completed",
+                snapshot.user_id,
+            )
             recovered += 1
         return recovered
 

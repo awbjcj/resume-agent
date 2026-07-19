@@ -71,6 +71,7 @@ class InterviewSessionOut(CamelModel):
     started_at: str
     ended_at: str | None = None
     status: str
+    archived_at: str | None = None
     concluded: bool = False
     style: InterviewStyleIn
     progress: InterviewProgressOut
@@ -87,6 +88,7 @@ class InterviewSessionSummaryOut(CamelModel):
     started_at: str
     ended_at: str | None = None
     status: str
+    archived_at: str | None = None
     asked_count: int = 0
     question_count: int = 0
     overall_score: float | None = None

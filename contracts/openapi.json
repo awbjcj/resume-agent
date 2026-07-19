@@ -1279,6 +1279,17 @@
       },
       "CoachSessionOut": {
         "properties": {
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
           "draftNotes": {
             "items": {
               "$ref": "#/components/schemas/CoachDraftNoteOut"
@@ -1355,6 +1366,17 @@
       },
       "CoachSessionSummaryOut": {
         "properties": {
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
           "endedAt": {
             "anyOf": [
               {
@@ -1671,8 +1693,30 @@
       },
       "DashboardSummaryOut": {
         "properties": {
+          "activeCoachSession": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoachSessionSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activeInterviews": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewSessionSummaryOut"
+            },
+            "title": "Activeinterviews",
+            "type": "array"
+          },
           "applied": {
             "title": "Applied",
+            "type": "integer"
+          },
+          "openErrorCount": {
+            "default": 0,
+            "title": "Openerrorcount",
             "type": "integer"
           },
           "queues": {
@@ -1749,6 +1793,17 @@
           "prompt"
         ],
         "title": "DiscoverSourcesIn",
+        "type": "object"
+      },
+      "DismissAllOut": {
+        "properties": {
+          "dismissed": {
+            "default": 0,
+            "title": "Dismissed",
+            "type": "integer"
+          }
+        },
+        "title": "DismissAllOut",
         "type": "object"
       },
       "DocumentOut": {
@@ -1881,6 +1936,86 @@
         "title": "DomainPatchIn",
         "type": "object"
       },
+      "ErrorRecordOut": {
+        "properties": {
+          "count": {
+            "default": 1,
+            "title": "Count",
+            "type": "integer"
+          },
+          "firstSeenAt": {
+            "format": "date-time",
+            "title": "Firstseenat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "title": "Lastseenat",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runid"
+          },
+          "sourceLabel": {
+            "title": "Sourcelabel",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "sourceLabel",
+          "status",
+          "firstSeenAt",
+          "lastSeenAt",
+          "updatedAt"
+        ],
+        "title": "ErrorRecordOut",
+        "type": "object"
+      },
+      "ErrorRecordsOut": {
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorRecordOut"
+            },
+            "title": "Records",
+            "type": "array"
+          }
+        },
+        "title": "ErrorRecordsOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1964,6 +2099,17 @@
       },
       "InterviewSessionOut": {
         "properties": {
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
           "company": {
             "default": "",
             "title": "Company",
@@ -2062,6 +2208,17 @@
       },
       "InterviewSessionSummaryOut": {
         "properties": {
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
           "askedCount": {
             "default": 0,
             "title": "Askedcount",
@@ -8723,6 +8880,223 @@
         "summary": "Launch Discover"
       }
     },
+    "/api/errors": {
+      "get": {
+        "operationId": "list_errors_api_errors_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "open",
+              "enum": [
+                "open",
+                "dismissed",
+                "resolved"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRecordsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Errors"
+      }
+    },
+    "/api/errors/dismiss-all": {
+      "post": {
+        "operationId": "dismiss_all_errors_api_errors_dismiss_all_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DismissAllOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss All Errors"
+      }
+    },
+    "/api/errors/{record_id}/dismiss": {
+      "post": {
+        "operationId": "dismiss_error_api_errors__record_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Error"
+      }
+    },
+    "/api/errors/{record_id}/resolve": {
+      "post": {
+        "operationId": "resolve_error_api_errors__record_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Error"
+      }
+    },
     "/api/gmail/sync": {
       "post": {
         "operationId": "launch_gmail_sync_api_gmail_sync_post",
@@ -8809,6 +9183,36 @@
                 }
               ],
               "title": "Jobid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeArchived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Includearchived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "ended"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
             }
           },
           {
@@ -8908,6 +9312,52 @@
       }
     },
     "/api/interview/sessions/{session_id}": {
+      "delete": {
+        "operationId": "delete_interview_session_api_interview_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Interview Session"
+      },
       "get": {
         "operationId": "get_interview_session_api_interview_sessions__session_id__get",
         "parameters": [
@@ -8960,6 +9410,61 @@
           }
         },
         "summary": "Get Interview Session"
+      }
+    },
+    "/api/interview/sessions/{session_id}/archive": {
+      "post": {
+        "operationId": "archive_interview_session_api_interview_sessions__session_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Interview Session"
       }
     },
     "/api/interview/sessions/{session_id}/end": {
@@ -9080,6 +9585,61 @@
           }
         },
         "summary": "Send Answer"
+      }
+    },
+    "/api/interview/sessions/{session_id}/unarchive": {
+      "post": {
+        "operationId": "unarchive_interview_session_api_interview_sessions__session_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Interview Session"
       }
     },
     "/api/jobs": {
@@ -10389,6 +10949,36 @@
         "operationId": "list_coach_sessions_api_profile_coach_sessions_get",
         "parameters": [
           {
+            "in": "query",
+            "name": "includeArchived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Includearchived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "ended"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -10475,6 +11065,52 @@
       }
     },
     "/api/profile/coach/sessions/{session_id}": {
+      "delete": {
+        "operationId": "delete_coach_session_api_profile_coach_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Coach Session"
+      },
       "get": {
         "operationId": "get_coach_session_api_profile_coach_sessions__session_id__get",
         "parameters": [
@@ -10527,6 +11163,61 @@
           }
         },
         "summary": "Get Coach Session"
+      }
+    },
+    "/api/profile/coach/sessions/{session_id}/archive": {
+      "post": {
+        "operationId": "archive_coach_session_api_profile_coach_sessions__session_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Coach Session"
       }
     },
     "/api/profile/coach/sessions/{session_id}/end": {
@@ -10793,6 +11484,61 @@
           }
         },
         "summary": "Save Note"
+      }
+    },
+    "/api/profile/coach/sessions/{session_id}/unarchive": {
+      "post": {
+        "operationId": "unarchive_coach_session_api_profile_coach_sessions__session_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Coach Session"
       }
     },
     "/api/profile/documents": {

@@ -3,10 +3,12 @@ from threading import Event
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
 from resume_agent.api.app import create_app
 from resume_agent.api.routers import runs as runs_router
 from resume_agent.progress import ProgressReporter
+from resume_agent.services.errors import list_error_records
 
 
 class InlineExecutor(Executor):
@@ -214,6 +216,28 @@ def test_pull_refresh_disables_skip_known(monkeypatch, tmp_path):
 
     assert response.status_code == 202
     assert captured["skip_known"] is False
+
+
+def test_pull_source_failures_are_recorded_with_the_run_id(monkeypatch, tmp_path):
+    def fake_pull_jobs(_session, **_kwargs):
+        from resume_agent.discovery.connectors.runner import PullReport
+
+        return PullReport(
+            failures={"companies": {"https://x.example": "detect failed"}}
+        )
+
+    monkeypatch.setattr(runs_router, "pull_jobs", fake_pull_jobs)
+    client = _client(tmp_path)
+    with client:
+        response = client.post("/api/pull", json={})
+        assert response.status_code == 202
+        run_id = response.json()["runId"]
+        with Session(client.app.state.engine) as database:
+            records = list_error_records(database)
+
+    assert len(records) == 1
+    assert records[0].source_label == "companies:https://x.example"
+    assert records[0].run_id == run_id
 
 
 def test_linkedin_scrape_launch_returns_run(monkeypatch, tmp_path):

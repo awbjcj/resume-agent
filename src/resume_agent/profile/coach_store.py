@@ -52,6 +52,7 @@ class CoachSession(ExtensibleModel):
     started_at: str = ""
     ended_at: str | None = None
     status: Literal["active", "ended"] = "active"
+    archived_at: str | None = None
     turns: list[CoachTurnRecord] = Field(default_factory=list)
     topics: list[CoachTopic] = Field(default_factory=list)
     draft_notes: list[CoachDraftNote] = Field(default_factory=list)
@@ -102,11 +103,15 @@ def _write(profile_dir: Path | str, session: dict) -> None:
     )
 
 
-def list_sessions(profile_dir: Path | str) -> list[dict]:
+def list_sessions(
+    profile_dir: Path | str, *, include_archived: bool = False
+) -> list[dict]:
     root = coach_dir(profile_dir)
     if not root.exists():
         return []
     sessions = [_read(path) for path in root.glob("session-*.json")]
+    if not include_archived:
+        sessions = [row for row in sessions if not row["archived_at"]]
     return sorted(sessions, key=lambda row: (row["started_at"], row["session_id"]))
 
 
@@ -247,6 +252,35 @@ def end_session(profile_dir: Path | str, session_id: str, recap: str) -> dict:
         )
 
     return mutate_session(profile_dir, session_id, apply)
+
+
+def archive_session(profile_dir: Path | str, session_id: str) -> dict:
+    def apply(session: dict) -> None:
+        if session["status"] != "ended":
+            raise ValueError("only ended sessions can be archived")
+        if session["archived_at"]:
+            raise ValueError("session already archived")
+        session["archived_at"] = _now()
+
+    return mutate_session(profile_dir, session_id, apply)
+
+
+def unarchive_session(profile_dir: Path | str, session_id: str) -> dict:
+    def apply(session: dict) -> None:
+        if not session["archived_at"]:
+            raise ValueError("session not archived")
+        session["archived_at"] = None
+
+    return mutate_session(profile_dir, session_id, apply)
+
+
+def delete_session(profile_dir: Path | str, session_id: str) -> None:
+    """Remove the transcript record without touching saved profile notes."""
+    with coach_lock():
+        path = _session_path(profile_dir, session_id)
+        if not path.exists():
+            raise ValueError(f"unknown session: {session_id}")
+        path.unlink()
 
 
 def set_impact(profile_dir: Path | str, session_id: str, impact: dict) -> dict:

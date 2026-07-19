@@ -79,6 +79,50 @@ def test_submit_records_error(tmp_path):
     assert rec.error is not None and "nope" in rec.error
 
 
+def test_error_hook_fires_once_for_a_failed_run(tmp_path):
+    events = []
+    mgr = RunManager(
+        root=tmp_path, executor=InlineExecutor(), on_error=events.append
+    )
+
+    run_id = mgr.submit("pull", lambda _reporter: 1 / 0)
+
+    assert events == [
+        {
+            "runId": run_id,
+            "kind": "pull",
+            "error": "ZeroDivisionError: division by zero",
+            "userId": None,
+        }
+    ]
+
+
+def test_error_hook_is_not_fired_for_success_or_cancel(tmp_path):
+    events = []
+    mgr = RunManager(
+        root=tmp_path, executor=InlineExecutor(), on_error=events.append
+    )
+
+    mgr.submit("pull", lambda _reporter: {"ok": True})
+    mgr.submit("pull", lambda _reporter: (_ for _ in ()).throw(RunCancelled))
+
+    assert events == []
+
+
+def test_error_hook_failure_never_masks_the_run_failure(tmp_path):
+    def broken_hook(_payload):
+        raise RuntimeError("hook failed")
+
+    mgr = RunManager(
+        root=tmp_path, executor=InlineExecutor(), on_error=broken_hook
+    )
+    run_id = mgr.submit("pull", lambda _reporter: 1 / 0)
+
+    snapshot = mgr.get(run_id)
+    assert snapshot is not None
+    assert snapshot.state is RunState.error
+
+
 def test_reporter_checkpoint_raises_when_cancel_requested(tmp_path):
     flag = {"cancel": False}
     rep = RunProgressReporter("rid", "pull", tmp_path, cancel_check=lambda: flag["cancel"])
@@ -310,6 +354,29 @@ def test_recover_interrupted_terminalizes_active_records_only(tmp_path):
     assert running.state is RunState.error
     assert done.state is RunState.done
     assert mgr.list_active() == []
+
+
+def test_recover_interrupted_emits_user_attributed_errors(tmp_path):
+    import json
+
+    events = []
+    mgr = RunManager(
+        root=tmp_path, executor=InlineExecutor(), on_error=events.append
+    )
+    (tmp_path / "pending.json").write_text(
+        json.dumps(_run_record(state="pending", user_id="user123")),
+        encoding="utf-8",
+    )
+
+    assert mgr.recover_interrupted() == 1
+    assert events == [
+        {
+            "runId": "pending",
+            "kind": "pull",
+            "error": "Backend restarted before this run completed",
+            "userId": "user123",
+        }
+    ]
 
 
 def test_submit_singleton_coalesces_racing_calls_and_releases_after_completion(tmp_path):

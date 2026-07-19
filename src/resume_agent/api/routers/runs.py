@@ -45,6 +45,7 @@ from resume_agent.services.discovery import (
     reprocess_jobs,
     scrape_linkedin_jobs,
 )
+from resume_agent.services.errors import record_source_failures
 from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP, tailor
 from resume_agent.services.pagination import paginate
 from resume_agent.services.revision import revise_resume_version
@@ -322,12 +323,17 @@ def launch_refresh(
                 else "data/connector_runs.json",
                 **paths,
             )
-            return {
-                "pulled": report.pulled,
-                "totals": report.totals,
-                "statusCounts": report.status_counts,
-                "failures": report.failures,
-            }
+        if report.failures:
+            with get_session(engine) as error_session:
+                record_source_failures(
+                    error_session, report.failures, run_id=reporter.run_id
+                )
+        return {
+            "pulled": report.pulled,
+            "totals": report.totals,
+            "statusCounts": report.status_counts,
+            "failures": report.failures,
+        }
 
     run_id = _submit(mgr, "refresh", work, singleton_key="refresh")
     record = mgr.get(run_id)
@@ -358,12 +364,17 @@ def launch_pull(
                 reporter=reporter,
                 skip_known=not bool(params.refresh),
             )
-            return {
-                "totals": report.totals,
-                "upgraded": report.upgraded,
-                "skipped": report.skipped,
-                "failures": report.failures,
-            }
+        if report.failures:
+            with get_session(engine) as error_session:
+                record_source_failures(
+                    error_session, report.failures, run_id=reporter.run_id
+                )
+        return {
+            "totals": report.totals,
+            "upgraded": report.upgraded,
+            "skipped": report.skipped,
+            "failures": report.failures,
+        }
 
     run_id = _submit(mgr, "pull", work, singleton_key="pull")
     record = mgr.get(run_id)

@@ -82,6 +82,7 @@ class InterviewSession(ExtensibleModel):
     ended_at: str | None = None
     status: Literal["active", "ended"] = "active"
     concluded: bool = False
+    archived_at: str | None = None
     style: InterviewStyle = Field(default_factory=InterviewStyle)
     context: InterviewContext = Field(default_factory=InterviewContext)
     plan: list[PlanItem] = Field(default_factory=list)
@@ -128,13 +129,20 @@ def _write(interview_dir: Path | str, session: dict) -> None:
     )
 
 
-def list_sessions(interview_dir: Path | str, job_id: int | None = None) -> list[dict]:
+def list_sessions(
+    interview_dir: Path | str,
+    job_id: int | None = None,
+    *,
+    include_archived: bool = False,
+) -> list[dict]:
     root = Path(interview_dir)
     if not root.exists():
         return []
     sessions = [_read(path) for path in root.glob("session-*.json")]
     if job_id is not None:
         sessions = [row for row in sessions if row["job_id"] == job_id]
+    if not include_archived:
+        sessions = [row for row in sessions if not row["archived_at"]]
     return sorted(sessions, key=lambda row: (row["started_at"], row["session_id"]))
 
 
@@ -145,11 +153,22 @@ def load_session(interview_dir: Path | str, session_id: str) -> dict:
     return _read(path)
 
 
-def active_session(interview_dir: Path | str) -> dict | None:
+def active_sessions(interview_dir: Path | str) -> list[dict]:
+    return [
+        row for row in list_sessions(interview_dir) if row["status"] == "active"
+    ]
+
+
+def active_session_for_job(interview_dir: Path | str, job_id: int) -> dict | None:
     return next(
-        (row for row in list_sessions(interview_dir) if row["status"] == "active"),
+        (row for row in active_sessions(interview_dir) if row["job_id"] == job_id),
         None,
     )
+
+
+def active_session(interview_dir: Path | str) -> dict | None:
+    """Compatibility projection for callers that only need any active session."""
+    return next(iter(active_sessions(interview_dir)), None)
 
 
 def create_session(
@@ -171,8 +190,8 @@ def create_session(
     if opening_turn.question_id not in set(plan_ids):
         raise ValueError("opening turn references unknown question")
     with interview_lock():
-        if active_session(interview_dir) is not None:
-            raise ValueError("active session exists")
+        if active_session_for_job(interview_dir, job_id) is not None:
+            raise ValueError(f"active session exists for job {job_id}")
         now = _now()
         opened = [
             item.model_copy(
@@ -265,11 +284,42 @@ def end_with_debrief(
     return mutate_session(interview_dir, session_id, apply)
 
 
+def archive_session(interview_dir: Path | str, session_id: str) -> dict:
+    def apply(session: dict) -> None:
+        if session["status"] != "ended":
+            raise ValueError("only ended sessions can be archived")
+        if session["archived_at"]:
+            raise ValueError("session already archived")
+        session["archived_at"] = _now()
+
+    return mutate_session(interview_dir, session_id, apply)
+
+
+def unarchive_session(interview_dir: Path | str, session_id: str) -> dict:
+    def apply(session: dict) -> None:
+        if not session["archived_at"]:
+            raise ValueError("session not archived")
+        session["archived_at"] = None
+
+    return mutate_session(interview_dir, session_id, apply)
+
+
+def delete_session(interview_dir: Path | str, session_id: str) -> None:
+    """Permanently remove a session; deleting an active session abandons it."""
+    with interview_lock():
+        path = _session_path(interview_dir, session_id)
+        if not path.exists():
+            raise ValueError(f"unknown session: {session_id}")
+        path.unlink()
+
+
 def delete_sessions_for_job(interview_dir: Path | str, job_id: int) -> int:
     """Remove all interview session files for a deleted job. Returns count removed."""
     removed = 0
     with interview_lock():
-        for row in list_sessions(interview_dir, job_id=job_id):
+        for row in list_sessions(
+            interview_dir, job_id=job_id, include_archived=True
+        ):
             _session_path(interview_dir, row["session_id"]).unlink(missing_ok=True)
             removed += 1
     return removed

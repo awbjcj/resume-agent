@@ -10,12 +10,17 @@ from resume_agent.interview.store import (
     PlanItem,
     QuestionReview,
     active_session,
+    active_session_for_job,
+    active_sessions,
+    archive_session,
     apply_answer_delta,
     create_session,
+    delete_session,
     delete_sessions_for_job,
     end_with_debrief,
     list_sessions,
     load_session,
+    unarchive_session,
 )
 
 
@@ -52,6 +57,18 @@ def test_second_active_session_rejected(tmp_path):
     _make(tmp_path)
     with pytest.raises(ValueError, match="active session exists"):
         _make(tmp_path, session_id="other99")
+
+
+def test_active_sessions_are_scoped_per_job(tmp_path):
+    _make(tmp_path, session_id="first01", job_id=7)
+    _make(tmp_path, session_id="second02", job_id=8)
+
+    assert {row["session_id"] for row in active_sessions(tmp_path)} == {
+        "first01",
+        "second02",
+    }
+    assert active_session_for_job(tmp_path, 7)["session_id"] == "first01"
+    assert active_session_for_job(tmp_path, 9) is None
 
 
 def test_answer_delta_advances_plan(tmp_path):
@@ -137,6 +154,38 @@ def test_list_sessions_filters_by_job_and_delete(tmp_path):
     assert len(list_sessions(tmp_path)) == 2
     assert delete_sessions_for_job(tmp_path, 7) == 1
     assert list_sessions(tmp_path, job_id=7) == []
+
+
+def test_archive_unarchive_and_delete_session(tmp_path):
+    sid = _make(tmp_path)
+    with pytest.raises(ValueError, match="only ended sessions"):
+        archive_session(tmp_path, sid)
+
+    end_with_debrief(tmp_path, sid, InterviewDebrief(summary="done"))
+    archived = archive_session(tmp_path, sid)
+    assert archived["archived_at"]
+    assert list_sessions(tmp_path) == []
+    assert [
+        row["session_id"]
+        for row in list_sessions(tmp_path, include_archived=True)
+    ] == [sid]
+
+    assert unarchive_session(tmp_path, sid)["archived_at"] is None
+    with pytest.raises(ValueError, match="not archived"):
+        unarchive_session(tmp_path, sid)
+
+    delete_session(tmp_path, sid)
+    assert list_sessions(tmp_path, include_archived=True) == []
+    with pytest.raises(ValueError, match="unknown session"):
+        delete_session(tmp_path, sid)
+
+
+def test_delete_sessions_for_job_includes_archived(tmp_path):
+    sid = _make(tmp_path)
+    end_with_debrief(tmp_path, sid, InterviewDebrief(summary="done"))
+    archive_session(tmp_path, sid)
+
+    assert delete_sessions_for_job(tmp_path, 7) == 1
 
 
 def test_unknown_session_raises(tmp_path):

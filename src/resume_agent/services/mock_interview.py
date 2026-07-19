@@ -127,6 +127,7 @@ def _view(session: dict) -> dict:
         "startedAt": session["started_at"],
         "endedAt": session["ended_at"],
         "status": session["status"],
+        "archivedAt": session["archived_at"],
         "concluded": session["concluded"],
         "style": {
             "stage": session["style"]["stage"],
@@ -161,7 +162,18 @@ def session_view(interview_dir: Path | str, session_id: str) -> dict:
     return _view(load_session(interview_dir, session_id))
 
 
-def sessions_view(interview_dir: Path | str, job_id: int | None = None) -> dict:
+def sessions_view(
+    interview_dir: Path | str,
+    job_id: int | None = None,
+    *,
+    include_archived: bool = False,
+    status: str | None = None,
+) -> dict:
+    rows = list_sessions(
+        interview_dir, job_id=job_id, include_archived=include_archived
+    )
+    if status is not None:
+        rows = [row for row in rows if row["status"] == status]
     return {
         "sessions": [
             {
@@ -172,13 +184,14 @@ def sessions_view(interview_dir: Path | str, job_id: int | None = None) -> dict:
                 "startedAt": session["started_at"],
                 "endedAt": session["ended_at"],
                 "status": session["status"],
+                "archivedAt": session["archived_at"],
                 "askedCount": sum(
                     1 for item in session["plan"] if item["status"] in {"asked", "done"}
                 ),
                 "questionCount": session["style"]["question_count"],
                 "overallScore": _overall_score(session),
             }
-            for session in list_sessions(interview_dir, job_id=job_id)
+            for session in rows
         ]
     }
 

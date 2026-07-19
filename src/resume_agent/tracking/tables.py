@@ -136,3 +136,21 @@ class SkillSuggestion(SQLModel, table=True):
     fingerprint: str = ""
     generated_at: datetime = Field(default_factory=utcnow)
     schema_version: int = 1
+
+
+class ErrorRecord(SQLModel, table=True):
+    """A durable failure record that the user can dismiss or resolve."""
+
+    __tablename__ = cast(Any, "error_records")
+
+    id: int | None = Field(default=None, primary_key=True)
+    kind: str = Field(index=True)
+    source_label: str = Field(index=True)
+    run_id: str | None = None
+    message: str = ""
+    details_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    status: str = Field(default="open", index=True)
+    count: int = 1
+    first_seen_at: datetime = Field(default_factory=utcnow)
+    last_seen_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
