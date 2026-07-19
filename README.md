@@ -55,7 +55,7 @@ points where _you_ (not the agent) make the call.
 - _Optional:_ a **GitHub token** (enriches your profile from your repos)
 - _Optional:_ a **burner LinkedIn account** (only needed for `scrape`)
 - _Optional:_ **job-board connector keys** for `pull` — e.g. [Adzuna API](https://developer.adzuna.com/) credentials (Greenhouse and RemoteOK need no key)
-- _Optional:_ **Gmail OAuth credentials** (only needed for `sync-status`; read-only access — see [Gmail setup](#gmail-setup-for-sync-status))
+- _Optional:_ **Gmail OAuth credentials** (only needed for `sync-status`, scheduled sync, reminders, and email drafts — see [Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts))
 
 ---
 
@@ -109,11 +109,16 @@ concurrent-run caps. Members manage their own keys, tokens, password, and
 workspace export in the web UI. The remote member workflow is web-first; the
 local domain CLI can select an existing workspace with `--user USERNAME`.
 
-### Gmail setup (for `sync-status`)
+### Gmail setup (for `sync-status`, sync, reminders, and email drafts)
 
-`sync-status` reads your inbox **read-only** to propose application-status
-updates. It authenticates with a Google OAuth client — there is no password in
-`.env`:
+Gmail powers the CLI's `sync-status`, plus (in the API/web app) scheduled
+background inbox sync, stale-application follow-up reminders, and the
+email-draft writer. It only ever **reads** mail (readonly scope) and
+**creates drafts** (compose scope) — it never sends anything. There's no
+password in `.env`; it authenticates via a Google OAuth client, and which
+*type* of client you create depends on how you run the app:
+
+**CLI, single machine** — an OAuth **Desktop app** client, stored as a file:
 
 1. In the [Google Cloud console](https://console.cloud.google.com/), create (or
    reuse) a project, enable the **Gmail API**, and create an **OAuth client ID**
@@ -122,7 +127,30 @@ updates. It authenticates with a Google OAuth client — there is no password in
 3. The first `sync-status` run opens a browser consent screen once; the granted
    token is cached to `data/gmail_token.json` (git-ignored) and reused after that.
 
-Skip this entirely if you'd rather track statuses by hand in the web app.
+**Web app / API server** (this is what a Railway deployment needs) — an OAuth
+**Web application** client, configured via env vars instead of a file:
+
+1. Create an OAuth client ID of type _Web application_ (the same Cloud console
+   project as above is fine). Add an **authorized redirect URI** of
+   `<your-domain>/api/gmail/callback` — e.g. `http://localhost:8000/api/gmail/callback`
+   for local `resume-agent serve`, or your Railway domain for a cloud deploy
+   (see [Deploying to Railway](docs/deploy-railway.md#gmail-oauth-optional)).
+2. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` in `.env` (or
+   as platform environment variables on Railway). This is the **platform
+   client** every workspace connects through by default; any signed-in user
+   can instead paste their own client id/secret under Settings → Keys, which
+   overrides the platform client for their workspace only.
+3. Sign in to the web app, open **Settings → Keys**, and click **Connect
+   Gmail** on the Gmail card to run the consent flow. The granted token is
+   stored per-workspace (never shared across users).
+
+Either way, while your OAuth consent screen is in **Testing** publishing
+status (the default), add every Gmail address that will connect as a **test
+user** in the Cloud console — Google caps testing apps at 100 users and
+rejects sign-in for anyone not on that list.
+
+Skip this entirely if you'd rather track statuses by hand in the web app —
+everything else works without it.
 
 All commands below are shown as `uv run resume-agent …`. If you'd rather not
 prefix every call, activate the venv first (`source .venv/bin/activate`, or
@@ -325,7 +353,8 @@ application by company, classifies it (rejection / interview / assessment /
 offer) with deterministic rules plus an optional cheap-LLM fallback, and
 **proposes** forward-only status moves. Nothing changes until you re-run with
 `--apply` — statuses are never flipped silently. Requires
-[Gmail setup](#gmail-setup-for-sync-status).
+[Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts) (the
+CLI, Desktop-app path).
 
 ```bash
 uv run resume-agent sync-status                 # list proposals only
@@ -356,8 +385,9 @@ uv run resume-agent serve --host 0.0.0.0 --port 8080
   route except `/api/health`; set `CORS_ORIGINS` (comma-separated) for your
   frontend dev server. Both are off-by-default-friendly for local single-user use.
 
-Deferred (not yet exposed over HTTP): Gmail `sync-status`, `profile build`, and
-LinkedIn `scrape`.
+Gmail sync (`POST /api/gmail/sync`), connect/status/disconnect
+(`/api/gmail/connect|status|token`), and email drafts are exposed over HTTP.
+Deferred (not yet exposed over HTTP): `profile build` and LinkedIn `scrape`.
 
 ---
 
@@ -377,6 +407,7 @@ Copied from `.env.example`. Loaded automatically.
 | `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`     | Optional; enable the Adzuna connector for `pull`.                            |
 | `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | Burner credentials for `scrape`.                                             |
 | `LINKEDIN_USER_DATA_DIR`               | Where the logged-in browser session is cached (default `.linkedin_profile`). |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Platform Gmail OAuth **Web application** client for the API/web app (CLI-only use skips these — see [Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts)). |
 | `DB_URL`                               | Database location (default `sqlite:///data/resume_agent.db`).                |
 
 #### Choosing an LLM provider
@@ -396,8 +427,9 @@ PREMIUM_MODEL=claude-opus-4-8           # bare id → Anthropic for the tailor w
 Set only the keys for the providers you actually use; a provider's SDK is loaded
 lazily, so a Claude-only run never touches the OpenAI or Gemini libraries.
 
-> **Gmail** uses an OAuth client file (`config/gmail_credentials.json`), not an
-> `.env` key — see [Gmail setup](#gmail-setup-for-sync-status).
+> **Gmail** authenticates via `config/gmail_credentials.json` for the CLI only;
+> the API/web app instead uses the `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` env vars
+> above — see [Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts).
 
 ### `config/*.yaml`
 
@@ -413,9 +445,11 @@ lazily, so a Claude-only run never touches the OpenAI or Gemini libraries.
 Each `*.yaml.example` is annotated — copy it, then edit.
 
 The cover-letter and resume templates live in `templates/` (`cover_letter.typ`,
-`resume.typ`) and can be edited directly. `config/gmail_credentials.json` (for
-`sync-status`) is the one config file with no example — it's the OAuth
-client-secret you download from Google Cloud (see [Gmail setup](#gmail-setup-for-sync-status)).
+`resume.typ`) and can be edited directly. `config/gmail_credentials.json`
+(CLI-only `sync-status`) is the one config file with no example — it's the
+Desktop-app OAuth client secret you download from Google Cloud (see
+[Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts)).
+The API/web app uses `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` in `.env` instead.
 
 ### Source priority
 
@@ -447,10 +481,10 @@ silently re-based).
 | `data/resume_agent.db`                                | All jobs, resume versions, cover letters, and applications (SQLite).             |
 | `data/profile/facts.json`                             | Your fact-lock profile.                                                          |
 | `data/connector_runs.json`                            | Per-connector run history that `sources` reads.                                  |
-| `data/gmail_token.json`                               | Cached Gmail OAuth token for `sync-status` (git-ignored).                        |
+| `data/gmail_token.json`                               | Cached Gmail OAuth token for CLI/local-mode `sync-status` (git-ignored). The API/web app stores each user's token inside their own workspace instead. |
 | `output/`                                             | Rendered resume **and** cover-letter PDFs (cover letters are suffixed `cl<id>`). |
 | `.linkedin_profile/`                                  | Cached LinkedIn browser session (git-ignored).                                   |
-| `config/gmail_credentials.json`                       | Your Gmail OAuth client secret (git-ignored; you provide it).                    |
+| `config/gmail_credentials.json`                       | Your Gmail OAuth **Desktop app** client secret for CLI-only use (git-ignored; you provide it). The API/web app uses `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` instead. |
 | `templates/resume.typ` / `templates/cover_letter.typ` | The Typst templates the renderers use.                                           |
 
 `data/`, `output/`, `.env`, `.linkedin_profile/`, and `config/gmail_credentials.json`

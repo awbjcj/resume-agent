@@ -16,9 +16,6 @@ replica, and one owner login.
    python -c "import secrets; print(secrets.token_hex(32))"
    ```
 
-   .venv\Scripts\python.exe -m resume_agent.cli hash-password --password "Wjj20140665!"
-   python -c "import secrets; print(secrets.token_hex(32))"
-
 4. Add Railway variables:
 
    | Variable             | Value                             |
@@ -34,6 +31,48 @@ replica, and one owner login.
    Railway, because platform environment variables take precedence.
 
 5. Deploy and sign in at the Railway-provided domain.
+
+## Gmail OAuth (optional)
+
+Gmail powers scheduled inbox sync, stale-application reminders, and the
+email-draft writer (readonly + compose scopes only — it never sends mail).
+It needs a Google OAuth **Web application** client; this is a different
+client type from the **Desktop app** client used by the local CLI's
+`config/gmail_credentials.json` flow, which doesn't apply to a deployed app.
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), open (or
+   create) a project and enable the **Gmail API** (APIs & Services → Library).
+2. Configure the **OAuth consent screen** (APIs & Services → OAuth consent
+   screen): External user type, with the `gmail.readonly` and `gmail.compose`
+   scopes added. While the app is in **Testing** publishing status (the
+   default, and fine for personal/family use), add every Gmail address that
+   will connect as a **test user** — Google caps testing apps at 100
+   explicitly-added users and refuses sign-in for anyone else.
+3. Create credentials (APIs & Services → Credentials → Create Credentials →
+   OAuth client ID) of type **Web application**.
+4. Add an **Authorized redirect URI**:
+   `https://YOUR-APP.up.railway.app/api/gmail/callback`. The app derives this
+   URL itself from the request's `X-Forwarded-Proto`/`X-Forwarded-Host`
+   headers, which Railway sets automatically — nothing else to configure on
+   the app side. Add a second redirect URI for local testing if you also run
+   `resume-agent serve` on your machine, e.g.
+   `http://localhost:8000/api/gmail/callback`.
+5. Add Railway variables:
+
+   | Variable                    | Value                              |
+   | ---------------------------- | ----------------------------------- |
+   | `GOOGLE_OAUTH_CLIENT_ID`     | From the credential you just made   |
+   | `GOOGLE_OAUTH_CLIENT_SECRET` | From the credential you just made   |
+
+   This becomes the **platform client** every workspace connects through by
+   default; any signed-in user can instead paste their own client id/secret
+   under Settings → Keys, which overrides the platform client for their
+   workspace only.
+6. Sign in to the app, open **Settings → Keys**, and click **Connect Gmail**
+   on the Gmail card to run the consent flow.
+
+Skip this entirely if you'd rather track application statuses by hand — the
+rest of the app works fine without it.
 
 ## Seed data
 
