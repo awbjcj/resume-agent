@@ -36,12 +36,12 @@ from resume_agent.services.suggestions import (
 )
 from resume_agent.tracking.match_gap import profile_skill_tokens
 from resume_agent.tenancy.context import current_context
+from resume_agent.tenancy.paths import FACTS_PATH as _FACTS_PATH
 from resume_agent.config import get_settings
 
 router = APIRouter()
 
 SuggestionKind = Literal["skill", "domain"]
-_FACTS_PATH = "data/profile/facts.json"
 _CLUSTER_PATH = "data/profile/cluster_map.json"
 
 

@@ -22,11 +22,12 @@ from resume_agent.tracking.repository import get_job, jobs_by_status
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 from resume_agent.taxonomy.clusters import load_cluster_map
 from resume_agent.tenancy.limits import enforce_active_budget
-from resume_agent.tenancy.paths import resolve_tenant_path
-
-DEFAULT_REVIEW = "config/review.yaml"
-DEFAULT_REVIEW_DEEP = "config/review_deep.yaml"
-DEFAULT_FACTS = "data/profile/facts.json"
+from resume_agent.tenancy.paths import (
+    FACTS_PATH as DEFAULT_FACTS,
+    REVIEW_DEEP_PATH as DEFAULT_REVIEW_DEEP,  # noqa: F401  (re-exported for the runs router)
+    REVIEW_PATH as DEFAULT_REVIEW,
+    resolve_tenant_path,
+)
 
 
 def resolve_targets(

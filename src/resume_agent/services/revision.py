@@ -17,8 +17,10 @@ from resume_agent.tailor.verdict import aggregate
 from resume_agent.tracking.repository import get_job, get_resume_version, save_resume_version
 from resume_agent.tracking.tables import ResumeVersion
 
-DEFAULT_REVIEW = "config/review.yaml"
-DEFAULT_FACTS = "data/profile/facts.json"
+from resume_agent.tenancy.paths import (
+    FACTS_PATH as DEFAULT_FACTS,
+    REVIEW_PATH as DEFAULT_REVIEW,
+)
 
 
 def revise_resume_version(

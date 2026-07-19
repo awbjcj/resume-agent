@@ -15,6 +15,7 @@ from typing import Any
 from sqlmodel import Session
 
 from resume_agent.config import get_settings
+from resume_agent.tenancy.paths import FACTS_PATH
 from resume_agent.gmail.client import fetch_message_body, fetch_recent_messages
 from resume_agent.gmail.match import match_email_to_application
 from resume_agent.llm_runner import Runner
@@ -153,7 +154,7 @@ def generate_email_draft(
     draft_type: str,
     instructions: str | None = None,
     *,
-    facts_path: str = "data/profile/facts.json",
+    facts_path: str = FACTS_PATH,
     agent: Runner | None = None,
     service: Any | None = None,
 ) -> EmailDraft:

@@ -50,12 +50,13 @@ from resume_agent.tenancy.limits import (
     active_limit,
     enforce_active_budget,
 )
-from resume_agent.tenancy.paths import resolve_tenant_path
-
-DEFAULT_SEARCH = "config/search.yaml"
-DEFAULT_FACTS = "data/profile/facts.json"
-DEFAULT_CONNECTORS = "config/connectors.yaml"
-CONNECTOR_RUNS_PATH = "data/connector_runs.json"
+from resume_agent.tenancy.paths import (
+    CONNECTORS_PATH as DEFAULT_CONNECTORS,
+    FACTS_PATH as DEFAULT_FACTS,
+    SEARCH_PATH as DEFAULT_SEARCH,
+    TELEMETRY_PATH as CONNECTOR_RUNS_PATH,
+    resolve_tenant_path,
+)
 
 
 @dataclass(frozen=True)

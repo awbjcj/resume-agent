@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 
 from resume_agent.profile.store import load_facts
 from resume_agent.services.pagination import Page, paginate
-from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_agent.tenancy.paths import FACTS_PATH as DEFAULT_FACTS, resolve_tenant_path
 from resume_agent.tracking.queries import (
     PipelineRow,
     ShortlistRow,
@@ -45,7 +45,6 @@ from resume_agent.tracking.repository import (
 )
 from resume_agent.tracking.tables import Application, Job, JobStatus, utcnow
 
-DEFAULT_FACTS = "data/profile/facts.json"
 BoardName = Literal["shortlist", "triage", "pipeline"]
 BulkAction = Literal["archive", "restore", "delete", "approve", "setStatus"]
 SelectionScope = Literal["ids", "query"]

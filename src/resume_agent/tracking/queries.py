@@ -9,6 +9,7 @@ from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.taxonomy.company_size import snap as snap_size
 from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_skills
+from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.tracking.match_gap import profile_skill_tokens
 from resume_agent.tracking.repository import (
     application_for_job,
@@ -210,7 +211,7 @@ def _shortlist_row(job: Job, tokens: set[str], aliases: dict[str, str]) -> Short
 def shortlist_rows(
     session: Session,
     facts: ProfileFacts | None = None,
-    aliases_path: str | Path = "data/skill_aliases.json",
+    aliases_path: str | Path = SKILL_ALIASES_PATH,
 ) -> list[ShortlistRow]:
     fit_score_col = cast(Any, Job.fit_score)
     archived_col = cast(Any, Job.archived_at)
@@ -228,7 +229,7 @@ def job_facets(
     session: Session,
     job_id: int,
     facts: ProfileFacts | None = None,
-    aliases_path: str | Path = "data/skill_aliases.json",
+    aliases_path: str | Path = SKILL_ALIASES_PATH,
 ) -> ShortlistRow | None:
     """Build the skill + meta facets for a single job (detail modal).
 
@@ -248,7 +249,7 @@ def job_detail_row(
     session: Session,
     job_id: int,
     facts: ProfileFacts | None = None,
-    aliases_path: str | Path = "data/skill_aliases.json",
+    aliases_path: str | Path = SKILL_ALIASES_PATH,
 ) -> JobDetailRow | None:
     """Assemble the full detail read-model for one job."""
     job = session.get(Job, job_id)

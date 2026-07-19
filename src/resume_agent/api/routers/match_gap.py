@@ -29,11 +29,10 @@ from resume_agent.taxonomy.corrections import (
     load_taxonomy_corrections,
 )
 from resume_agent.tracking.match_gap import build_demand_graph, profile_skill_tokens
-from resume_agent.tenancy.paths import resolve_tenant_path
+from resume_agent.tenancy.paths import FACTS_PATH as _FACTS_PATH, resolve_tenant_path
 
 router = APIRouter()
 
-_FACTS_PATH = "data/profile/facts.json"
 _CLUSTER_PATH = "data/profile/cluster_map.json"
 
 

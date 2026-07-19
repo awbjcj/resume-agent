@@ -12,8 +12,7 @@ from resume_agent.profile.store import load_facts
 from resume_agent.services.agents import CoverLetterBundle, build_cover_letter_bundle
 from resume_agent.tracking.repository import get_cover_letter, save_cover_letter
 from resume_agent.tracking.tables import CoverLetter
-
-DEFAULT_FACTS = "data/profile/facts.json"
+from resume_agent.tenancy.paths import FACTS_PATH as DEFAULT_FACTS
 
 
 def revise_cover_letter_version(

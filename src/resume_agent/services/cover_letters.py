@@ -14,8 +14,7 @@ from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.agents import build_cover_letter_bundle
 from resume_agent.services.tailoring import resolve_targets
 from resume_agent.tenancy.limits import enforce_active_budget
-
-DEFAULT_FACTS = "data/profile/facts.json"
+from resume_agent.tenancy.paths import FACTS_PATH as DEFAULT_FACTS
 
 
 @dataclass

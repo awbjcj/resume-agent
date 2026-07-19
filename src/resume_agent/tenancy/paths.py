@@ -4,6 +4,17 @@ from pathlib import Path
 
 from resume_agent.tenancy.context import current_context
 
+# Canonical Workspace layout. Every artifact a service or adapter defaults to
+# is named exactly once here, as the relative path resolve_tenant_path rebases
+# into the active Workspace (or leaves CWD-relative in legacy single-user mode).
+FACTS_PATH = "data/profile/facts.json"
+SEARCH_PATH = "config/search.yaml"
+CONNECTORS_PATH = "config/connectors.yaml"
+REVIEW_PATH = "config/review.yaml"
+REVIEW_DEEP_PATH = "config/review_deep.yaml"
+TELEMETRY_PATH = "data/connector_runs.json"
+SKILL_ALIASES_PATH = "data/skill_aliases.json"
+
 
 def resolve_tenant_path(path: Path | str) -> Path:
     """Rebase historical mutable defaults into the active Workspace."""

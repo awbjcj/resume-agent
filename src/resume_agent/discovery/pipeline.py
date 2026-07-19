@@ -8,6 +8,7 @@ from sqlmodel import Session, select
 
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
+from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.discovery.extract import (  # noqa: F401
     Runner,
     aextract_job_criteria,
@@ -46,8 +47,6 @@ from resume_agent.tracking.repository import has_progress, jobs_by_status, statu
 from resume_agent.tracking.tables import Job, JobStatus
 
 logger = logging.getLogger(__name__)
-
-SKILL_ALIASES_PATH = Path("data/skill_aliases.json")
 
 
 # The LLM-bound discover phases surfaced to progress consumers; the cheap,

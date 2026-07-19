@@ -38,6 +38,12 @@ from resume_agent.tracking.repository import (
 from resume_agent.tracking.canonicalize import build_skill_canonicalizer
 from resume_agent.tracking.match_gap import match_gap
 from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.tenancy.paths import (
+    CONNECTORS_PATH as DEFAULT_CONNECTORS,
+    FACTS_PATH as DEFAULT_FACTS,
+    SEARCH_PATH as DEFAULT_SEARCH,
+    TELEMETRY_PATH as CONNECTOR_RUNS_PATH,
+)
 
 app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
 profile_app = typer.Typer(help="Build and manage your fact-lock profile.")
@@ -79,7 +85,6 @@ def _main(
 
 
 DEFAULT_SOURCES = "config/profile_sources.yaml"
-DEFAULT_FACTS = "data/profile/facts.json"
 DEFAULT_PROFILE_DIR = "data/profile"
 
 
@@ -451,10 +456,6 @@ def profile_coach_cmd(
     )
     typer.echo("Rebuilt profile with the new coach evidence.")
 
-
-DEFAULT_SEARCH = "config/search.yaml"
-DEFAULT_CONNECTORS = "config/connectors.yaml"
-CONNECTOR_RUNS_PATH = "data/connector_runs.json"
 
 
 def _engine(db_url: str | None):
