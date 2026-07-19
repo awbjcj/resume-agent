@@ -31,7 +31,7 @@ from resume_agent.api.schemas.coach import (
 from resume_agent.api.schemas.config import ProfileConfigDoc
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.config import Settings
-from resume_agent.llm_runner import resolve_api_key
+from resume_agent.llm_runner import missing_model_keys
 from resume_agent.profile.coach_store import (
     active_session,
     archive_session,
@@ -64,10 +64,7 @@ def _guard_setup(request: Request, settings: Settings):
             "SETUP_INCOMPLETE",
             "Upload a primary resume before coaching",
         )
-    configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
-    missing = [
-        f"{tier} ({model})" for tier, model in configured if not resolve_api_key(model)
-    ]
+    missing = missing_model_keys(settings)
     if missing:
         raise ApiException(
             400,

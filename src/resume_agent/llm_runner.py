@@ -215,6 +215,18 @@ def resolve_api_key(model_id: str) -> str:
     }.get(provider, "")
 
 
+def missing_model_keys(settings) -> list[str]:
+    """Configured mid/cheap tier models whose provider key is absent.
+
+    Returns ``"tier (model)"`` labels for surfaces that gate LLM features on
+    key presence (coach router, interview router, coach CLI).
+    """
+    configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
+    return [
+        f"{tier} ({model})" for tier, model in configured if not resolve_api_key(model)
+    ]
+
+
 def use_json_mode_for(model: Any) -> bool:
     """Whether an ``output_schema`` agent over ``model`` must use JSON mode.
 

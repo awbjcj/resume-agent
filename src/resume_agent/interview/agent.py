@@ -25,6 +25,7 @@ from resume_agent.llm_runner import (
     use_json_mode_for,
 )
 from resume_agent.models.base import ExtensibleModel
+from resume_agent.sessions.turns import TurnRejected
 
 FOLLOWUP_CAP = 2
 TRANSCRIPT_CHAR_CAP = 12_000
@@ -62,10 +63,6 @@ class DebriefTurn(ExtensibleModel):
     strengths: list[str] = Field(default_factory=list)
     improvements: list[str] = Field(default_factory=list)
     star_notes: str = ""
-
-
-class TurnRejected(ValueError):
-    """Structured formatter output failed deterministic validation."""
 
 
 @dataclass

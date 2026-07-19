@@ -30,6 +30,7 @@ from resume_agent.profile.corpus import load_manifest
 from resume_agent.profile.interview import ResearchAction, asked_questions
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
+from resume_agent.sessions.turns import TurnRejected
 
 AGENDA_CAP = 12
 TRANSCRIPT_CHAR_CAP = 12_000
@@ -70,10 +71,6 @@ class CoachTurn(ExtensibleModel):
 
 class OpeningTurn(CoachTurn):
     topics: list[NewTopic] = Field(default_factory=list)
-
-
-class TurnRejected(ValueError):
-    """Structured formatter output failed deterministic validation."""
 
 
 @dataclass

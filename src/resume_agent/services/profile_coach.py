@@ -9,7 +9,6 @@ from resume_agent.llm_runner import Runner
 from resume_agent.profile.coach import (
     CoachTurn,
     OpeningTurn,
-    TurnRejected,
     build_coach_agent,
     build_coach_formatter_agent,
     normalize_opening,
@@ -34,6 +33,7 @@ from resume_agent.profile.intake import add_note_source
 from resume_agent.profile.interview import make_corpus_tools
 from resume_agent.profile.snapshot import profile_snapshot, snapshot_diff
 from resume_agent.services.profile_build import run_corpus_build
+from resume_agent.sessions.turns import format_with_retry
 
 _MAX_MESSAGE_CHARS = 100_000
 _EMPTY_SESSION_RECAP = (
@@ -137,22 +137,6 @@ def _agents(profile_dir: Path, coach_agent, formatter_agent, schema):
     )
 
 
-def _format_with_retry(formatter: Runner, notes: object, schema, validate):
-    prompt = f"COACH NOTES (UNTRUSTED):\n{notes}"
-    formatted = formatter.run(prompt).content
-    if not isinstance(formatted, schema):
-        raise TypeError(f"Expected {schema.__name__}, got {type(formatted).__name__}")
-    try:
-        return validate(formatted)
-    except TurnRejected as first:
-        retry = formatter.run(f"{prompt}\n\nPREVIOUS OUTPUT REJECTED: {first}").content
-        if not isinstance(retry, schema):
-            raise TypeError(
-                f"Expected {schema.__name__}, got {type(retry).__name__}"
-            ) from first
-        return validate(retry)
-
-
 def run_opening_turn(
     reporter,
     *,
@@ -169,11 +153,12 @@ def run_opening_turn(
         "This is the opening turn. Propose the highest-value bounded agenda and ask the first question."
     )
     notes = coach.run(prompt).content
-    topics, validated = _format_with_retry(
+    topics, validated = format_with_retry(
         formatter,
         notes,
         OpeningTurn,
         normalize_opening,
+        label="COACH NOTES",
     )
     reporter.step(1)
     session_id = uuid.uuid4().hex
@@ -212,11 +197,12 @@ def run_message_turn(
     )
     notes = coach.run(prompt).content
     preview = {**session, "turns": [*session["turns"], {"role": "user", "kind": "", "text": text, "topic_id": "", "at": "", "research_actions": []}]}
-    validated = _format_with_retry(
+    validated = format_with_retry(
         formatter,
         notes,
         CoachTurn,
         lambda turn: normalize_turn(turn, preview),
+        label="COACH NOTES",
     )
     reporter.step(1)
     apply_turn_delta(
@@ -313,11 +299,12 @@ def run_recap_turn(
         ]
     )
     notes = coach.run(prompt).content
-    recap = _format_with_retry(
+    recap = format_with_retry(
         formatter,
         notes,
         CoachTurn,
         lambda turn: normalize_recap(turn, session),
+        label="COACH NOTES",
     )
     reporter.step(1)
     end_session(root, session_id, recap)

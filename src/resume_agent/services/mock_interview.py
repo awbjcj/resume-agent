@@ -10,7 +10,6 @@ from resume_agent.interview.agent import (
     DebriefTurn,
     InterviewTurn,
     OpeningInterview,
-    TurnRejected,
     build_debrief_agent,
     build_interview_formatter_agent,
     build_interviewer_agent,
@@ -32,6 +31,7 @@ from resume_agent.interview.store import (
     load_session,
 )
 from resume_agent.llm_runner import Runner
+from resume_agent.sessions.turns import format_with_retry
 
 _MAX_MESSAGE_CHARS = 100_000
 _EMPTY_DEBRIEF_SUMMARY = (
@@ -196,20 +196,6 @@ def sessions_view(
     }
 
 
-def _format_with_retry(formatter: Runner, notes: object, schema, validate):
-    prompt = f"INTERVIEWER NOTES (UNTRUSTED):\n{notes}"
-    formatted = formatter.run(prompt).content
-    if not isinstance(formatted, schema):
-        raise TypeError(f"Expected {schema.__name__}, got {type(formatted).__name__}")
-    try:
-        return validate(formatted)
-    except TurnRejected as first:
-        retry = formatter.run(f"{prompt}\n\nPREVIOUS OUTPUT REJECTED: {first}").content
-        if not isinstance(retry, schema):
-            raise TypeError(
-                f"Expected {schema.__name__}, got {type(retry).__name__}"
-            ) from first
-        return validate(retry)
 
 
 def run_opening_turn(
@@ -242,11 +228,12 @@ def run_opening_turn(
         ]
     )
     notes = interviewer.run(prompt).content
-    plan, opening_turn = _format_with_retry(
+    plan, opening_turn = format_with_retry(
         formatter,
         notes,
         OpeningInterview,
         lambda turn: normalize_opening(turn, parsed_style.question_count),
+        label="INTERVIEWER NOTES",
     )
     reporter.step(1)
     session_id = uuid.uuid4().hex
@@ -303,11 +290,12 @@ def run_answer_turn(
             {"role": "candidate", "text": text, "question_id": "", "is_followup": False, "at": ""},
         ],
     }
-    validated = _format_with_retry(
+    validated = format_with_retry(
         formatter,
         notes,
         InterviewTurn,
         lambda turn: normalize_turn(turn, preview),
+        label="INTERVIEWER NOTES",
     )
     reporter.step(1)
     apply_answer_delta(
@@ -352,11 +340,12 @@ def run_debrief_turn(
         ]
     )
     notes = coach.run(prompt).content
-    debrief = _format_with_retry(
+    debrief = format_with_retry(
         formatter,
         notes,
         DebriefTurn,
         lambda turn: normalize_debrief(turn, session),
+        label="INTERVIEWER NOTES",
     )
     reporter.step(1)
     end_with_debrief(root, session_id, debrief)

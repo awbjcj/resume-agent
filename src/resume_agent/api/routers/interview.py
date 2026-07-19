@@ -30,7 +30,7 @@ from resume_agent.interview.store import (
     delete_session,
     unarchive_session,
 )
-from resume_agent.llm_runner import resolve_api_key
+from resume_agent.llm_runner import missing_model_keys
 from resume_agent.services.mock_interview import (
     run_answer_turn,
     run_debrief_turn,
@@ -42,10 +42,7 @@ from resume_agent.tracking.tables import Job, ResumeVersion
 
 router = APIRouter()
 def _guard_keys(settings: Settings) -> None:
-    configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
-    missing = [
-        f"{tier} ({model})" for tier, model in configured if not resolve_api_key(model)
-    ]
+    missing = missing_model_keys(settings)
     if missing:
         raise ApiException(
             400,

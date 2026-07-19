@@ -11,7 +11,7 @@ from resume_agent.discovery.connectors.telemetry import read_runs
 from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
 from resume_agent.gmail.propose import propose_transitions
-from resume_agent.llm_runner import plan_search, resolve_api_key
+from resume_agent.llm_runner import missing_model_keys, plan_search, resolve_api_key
 from resume_agent.progress import ProgressReporter
 from resume_agent.profile.store import load_facts
 from resume_agent.render.export import export_job_artifacts
@@ -334,10 +334,7 @@ def profile_coach_cmd(
         typer.echo("Upload a primary resume before starting a coach session.")
         raise typer.Exit(code=1)
     settings = get_settings()
-    configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
-    missing = [
-        f"{tier} ({model})" for tier, model in configured if not resolve_api_key(model)
-    ]
+    missing = missing_model_keys(settings)
     if missing:
         typer.echo(f"Missing API key for configured model(s): {', '.join(missing)}")
         raise typer.Exit(code=1)

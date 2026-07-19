@@ -91,7 +91,7 @@ def _wait(client, run_id):
 
 
 def _fake_agents(monkeypatch):
-    monkeypatch.setattr(interview_router, "resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
     monkeypatch.setattr(service, "build_interviewer_agent", lambda style: FakeRunner(["notes"]))
     monkeypatch.setattr(service, "build_debrief_agent", lambda: FakeRunner(["debrief notes"]))
 
@@ -122,7 +122,7 @@ def _fake_agents(monkeypatch):
 
 def test_start_requires_known_job(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr(interview_router, "resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
     with client:
         response = client.post(
             "/api/interview/sessions",
@@ -133,7 +133,7 @@ def test_start_requires_known_job(monkeypatch, tmp_path):
 
 def test_start_rejects_version_from_other_job(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr(interview_router, "resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
     with client:
         job_id, _ = _seed(client)
         other_job_id, other_version_id = _seed(client)
@@ -146,7 +146,7 @@ def test_start_rejects_version_from_other_job(monkeypatch, tmp_path):
 
 def test_start_rejects_job_without_jd(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr(interview_router, "resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
     with client:
         job_id, version_id = _seed(client, jd_text="")
         response = client.post(
