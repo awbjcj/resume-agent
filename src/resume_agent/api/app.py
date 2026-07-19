@@ -33,6 +33,7 @@ from resume_agent.api.routers import coach as coach_router
 from resume_agent.api.routers import interview as interview_router
 from resume_agent.api.routers import transcribe as transcribe_router
 from resume_agent.api.routers import dashboard as dashboard_router
+from resume_agent.api.routers import email_drafts as email_drafts_router
 from resume_agent.api.routers import errors as errors_router
 from resume_agent.api.routers import gmail as gmail_router
 from resume_agent.api.routers import jobs as jobs_router
@@ -285,6 +286,7 @@ def create_app(
     app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)
     app.include_router(gmail_router.router, prefix="/api", dependencies=guarded)
     app.include_router(gmail_router.callback_router, prefix="/api")
+    app.include_router(email_drafts_router.router, prefix="/api", dependencies=guarded)
     app.include_router(config_router.router, prefix="/api", dependencies=guarded)
     app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)
     app.include_router(profile_router.router, prefix="/api", dependencies=guarded)

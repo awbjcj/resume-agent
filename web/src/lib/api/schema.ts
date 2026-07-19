@@ -593,6 +593,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/email-drafts/{draft_id}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save To Gmail */
+        post: operations["save_to_gmail_api_email_drafts__draft_id__save_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/errors": {
         parameters: {
             query?: never;
@@ -964,6 +981,40 @@ export interface paths {
         get?: never;
         /** Upsert Application */
         put: operations["upsert_application_api_jobs__job_id__application_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/email-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Email Draft */
+        post: operations["launch_email_draft_api_jobs__job_id__email_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/email-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Email Drafts */
+        get: operations["list_email_drafts_api_jobs__job_id__email_drafts_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2749,6 +2800,39 @@ export interface components {
             category?: string | null;
             /** Label */
             label?: string | null;
+        };
+        /** EmailDraftOut */
+        EmailDraftOut: {
+            /** Body */
+            body: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Drafttype */
+            draftType: string;
+            /** Gmaildraftid */
+            gmailDraftId?: string | null;
+            /** Gmailthreadid */
+            gmailThreadId?: string | null;
+            /** Id */
+            id: number;
+            /** Jobid */
+            jobId: number;
+            /** State */
+            state: string;
+            /** Subject */
+            subject: string;
+            /** Toaddr */
+            toAddr: string;
+        };
+        /** EmailDraftRequest */
+        EmailDraftRequest: {
+            /** Drafttype */
+            draftType: string;
+            /** Instructions */
+            instructions?: string | null;
         };
         /** ErrorRecordOut */
         ErrorRecordOut: {
@@ -5881,6 +5965,39 @@ export interface operations {
             };
         };
     };
+    save_to_gmail_api_email_drafts__draft_id__save_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_errors_api_errors_get: {
         parameters: {
             query?: {
@@ -6727,6 +6844,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_email_draft_api_jobs__job_id__email_draft_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_email_drafts_api_jobs__job_id__email_drafts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailDraftOut"][];
                 };
             };
             /** @description Validation Error */

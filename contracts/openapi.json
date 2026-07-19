@@ -1936,6 +1936,101 @@
         "title": "DomainPatchIn",
         "type": "object"
       },
+      "EmailDraftOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "draftType": {
+            "title": "Drafttype",
+            "type": "string"
+          },
+          "gmailDraftId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gmaildraftid"
+          },
+          "gmailThreadId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gmailthreadid"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "toAddr": {
+            "title": "Toaddr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "jobId",
+          "draftType",
+          "subject",
+          "body",
+          "toAddr",
+          "state",
+          "createdAt"
+        ],
+        "title": "EmailDraftOut",
+        "type": "object"
+      },
+      "EmailDraftRequest": {
+        "properties": {
+          "draftType": {
+            "title": "Drafttype",
+            "type": "string"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          }
+        },
+        "required": [
+          "draftType"
+        ],
+        "title": "EmailDraftRequest",
+        "type": "object"
+      },
       "ErrorRecordOut": {
         "properties": {
           "count": {
@@ -8979,6 +9074,61 @@
         "summary": "Launch Discover"
       }
     },
+    "/api/email-drafts/{draft_id}/save": {
+      "post": {
+        "operationId": "save_to_gmail_api_email_drafts__draft_id__save_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "title": "Draft Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save To Gmail"
+      }
+    },
     "/api/errors": {
       "get": {
         "operationId": "list_errors_api_errors_get",
@@ -10386,6 +10536,130 @@
           }
         },
         "summary": "Upsert Application"
+      }
+    },
+    "/api/jobs/{job_id}/email-draft": {
+      "post": {
+        "operationId": "launch_email_draft_api_jobs__job_id__email_draft_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Email Draft"
+      }
+    },
+    "/api/jobs/{job_id}/email-drafts": {
+      "get": {
+        "operationId": "list_email_drafts_api_jobs__job_id__email_drafts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EmailDraftOut"
+                  },
+                  "title": "Response List Email Drafts Api Jobs  Job Id  Email Drafts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Email Drafts"
       }
     },
     "/api/jobs/{job_id}/select-cover-letter/{cover_letter_id}": {
