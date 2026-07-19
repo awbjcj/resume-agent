@@ -92,12 +92,14 @@ vocabulary constant.
 ### Task 1: Shared category vocabulary + legacy group remap
 
 **Files:**
+
 - Create: `src/resume_agent/taxonomy/vocabulary.py`
 - Modify: `src/resume_agent/taxonomy/groups.py` (delete its `SKILL_GROUPS` literal, re-export from vocabulary)
 - Modify: `src/resume_agent/profile/group_corrections.py` (apply legacy remap in `load_group_corrections`)
 - Test: `tests/test_taxonomy_vocabulary.py` (new), `tests/test_group_corrections.py` (extend)
 
 **Interfaces:**
+
 - Produces: `resume_agent.taxonomy.vocabulary.SKILL_GROUPS: dict[str, str]` (20 slugs → labels, authored in display order: 14 hard, 5 soft, then `other`), `SOFT_CATEGORY_SLUGS: frozenset[str]`, `category_kind(slug: str) -> Literal["hard", "soft"]`, `LEGACY_GROUP_REMAP: dict[str, str]`. `resume_agent.taxonomy.groups.SKILL_GROUPS` keeps working for every existing importer (re-export).
 - Consumes: nothing new. `vocabulary.py` must have **zero** heavy imports (no agno, no config) — Tasks 2 and 4 import it from low-level modules.
 
@@ -272,18 +274,18 @@ from resume_agent.taxonomy.vocabulary import LEGACY_GROUP_REMAP
 
 - [ ] **Step 5: Fix tests that reference dead slugs**
 
-Run: `.venv/Scripts/python.exe -m pytest -q 2>&1 | tail -30` and fix every failure caused by an old slug in test data using this mapping (test data only needs *a* valid slug):
+Run: `.venv/Scripts/python.exe -m pytest -q 2>&1 | tail -30` and fix every failure caused by an old slug in test data using this mapping (test data only needs _a_ valid slug):
 
-| Old slug | Use instead |
-|---|---|
-| `frameworks` | `frontend-web` |
-| `data-ml` | `ai-ml` |
-| `databases` | `databases-storage` |
-| `devops-tooling` | `devops-automation` |
-| `practices` | `process-methodology` |
-| `security` | `security-compliance` |
-| `leadership` | `leadership-management` |
-| `communication` | `collaboration-communication` |
+| Old slug         | Use instead                   |
+| ---------------- | ----------------------------- |
+| `frameworks`     | `frontend-web`                |
+| `data-ml`        | `ai-ml`                       |
+| `databases`      | `databases-storage`           |
+| `devops-tooling` | `devops-automation`           |
+| `practices`      | `process-methodology`         |
+| `security`       | `security-compliance`         |
+| `leadership`     | `leadership-management`       |
+| `communication`  | `collaboration-communication` |
 
 Find them with: `rg -l "frameworks|devops-tooling|data-ml|'practices'|\"practices\"" tests/ src/` — expect hits in `tests/test_profile_matrix.py`, `tests/test_profile_groups_service.py`, `tests/test_group_corrections.py`, and possibly `web` fixtures (leave web for its own tasks; web tests are not run in this task).
 
@@ -304,6 +306,7 @@ git commit -m "feat(taxonomy): fixed 20-slug shared category vocabulary + legacy
 ### Task 2: ClusterMap domain layer (schema + mechanical rename)
 
 **Files:**
+
 - Modify: `src/resume_agent/taxonomy/clusters.py` (field renames + `category_of` + sanitize/merge/prune)
 - Modify: `src/resume_agent/taxonomy/classification.py` (rename field accesses only — behavior unchanged)
 - Modify: `src/resume_agent/tracking/match_gap.py:192-193,196,245,252,280-301,347-380` (rename `cluster_map.theme_of/theme_label` accesses; keep `SkillNode.theme_id` and `ThemeNode` names for now — the wire flip is Task 5)
@@ -313,6 +316,7 @@ git commit -m "feat(taxonomy): fixed 20-slug shared category vocabulary + legacy
 - Test: `tests/test_taxonomy_clusters.py` (extend + rename)
 
 **Interfaces:**
+
 - Produces: `ClusterMap(aliases, domain_of, domain_label, category_of)`; JSON keys `"domain_of"`, `"domain_label"`, `"category_of"` (legacy `"theme_of"`/`"theme_label"` silently ignored on load); `slugify_domain(label) -> str` (was `slugify_theme`); `allocate_domain_ids(*, existing_labels, proposed_labels) -> dict[str, str]` (was `allocate_theme_ids`); `_canonicalize_domain_keys` (was `_canonicalize_theme_keys`); `_flatten_aliases` unchanged and still importable (Task 4 reuses it).
 - Consumes: `resume_agent.taxonomy.vocabulary.SKILL_GROUPS` (Task 1).
 
@@ -571,6 +575,7 @@ git commit -m "refactor(taxonomy): ClusterMap domain layer with category_of; leg
 ### Task 3: Category-aware classification with deterministic cap
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py` (add `domains_per_category_cap` beside `cluster_batch_size`)
 - Modify: `src/resume_agent/tracking/canonicalize.py` (domain output models + instructions)
 - Modify: `src/resume_agent/taxonomy/classification.py` (category context, `_project_domains`, cap enforcement, `category_of` additions)
@@ -578,6 +583,7 @@ git commit -m "refactor(taxonomy): ClusterMap domain layer with category_of; leg
 - Test: `tests/test_taxonomy_classification.py` (extend), `tests/test_services_match_gap.py` (result keys)
 
 **Interfaces:**
+
 - Produces: `IncrementalDomainGroup(existing_domain_id, new_label, new_category, skills)` and `IncrementalSkillDomains(domains: list[IncrementalDomainGroup])` in `canonicalize.py`; `build_incremental_themer_agent()` keeps its name but emits `IncrementalSkillDomains`; `classify_incrementally(..., category_cap: int)` (new required keyword) whose additions now populate `category_of`; `ClassificationPhase` literal becomes `Literal["canonicalize", "domain"]`; `refresh_clusters` result keys: `"domains"`, `"failedDomainTokens"`, `"domainBatches"` (replacing `"themes"`, `"failedThemeTokens"`, `"themeBatches"`).
 - Consumes: `SKILL_GROUPS`, `category_kind` (Task 1); `ClusterMap.domain_of/domain_label/category_of`, `allocate_domain_ids` (Task 2); `Settings.domains_per_category_cap`.
 
@@ -821,6 +827,7 @@ def _category_context(cmap: ClusterMap, cap: int) -> list[dict[str, Any]]:
 ```
 
 In `classify_incrementally`:
+
 - Add required keyword `category_cap: int`; validate `category_cap < 1 → ValueError`.
 - Rename `theme_backlog/theme_batches/theme_assignments/theme(batch)` → `domain_backlog/domain_batches/domain_assignments/classify_domains(batch)`; failures use phase `"domain"`.
 - Prompt payload: `{"new": batch, "categories": category_context}` where `category_context = _category_context(existing, category_cap)` and `full_categories = {entry["slug"] for entry in category_context if entry["full"]}` are computed once before fan-out. After isolated results return, run the binding deterministic admission pass from the Correctness Amendments before allocating ids; concurrent batches must never overshoot the cap.
@@ -909,10 +916,12 @@ git commit -m "feat(taxonomy): category-aware domain classification with determi
 ### Task 4: Taxonomy corrections ledger
 
 **Files:**
+
 - Create: `src/resume_agent/taxonomy/corrections.py`
 - Test: `tests/test_taxonomy_corrections.py` (new)
 
 **Interfaces:**
+
 - Produces:
   - `TaxonomyCorrections(skill_domain, domain_renames, domain_merges, domain_category, added_skills, removed_skills, aliases)` (pydantic `ExtensibleModel`)
   - `corrections_file_path() -> str` returning the constant `"data/taxonomy/taxonomy_corrections.json"` (callers tenant-resolve it)
@@ -1288,6 +1297,7 @@ git commit -m "feat(taxonomy): user corrections ledger with pure idempotent repl
 This is the contract cut-over. It is mechanical but wide; the UI stays functionally two-level (domain hubs → skills) until Tasks 9–10.
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/match_gap.py` (SkillNode.domain_id, DomainNode, CategoryNode, corrections-aware graph)
 - Modify: `src/resume_agent/api/schemas/match_gap.py` (DomainOut, CategoryOut, domain_id, kind literal)
 - Modify: `src/resume_agent/api/schemas/suggestions.py` (kind literals `"skill" | "domain"`)
@@ -1298,6 +1308,7 @@ This is the contract cut-over. It is mechanical but wide; the UI stays functiona
 - Test: `tests/test_tracking_match_gap.py`, `tests/api/test_schemas_match_gap.py`, `tests/api/test_match_gap.py`, `tests/test_services_suggestions.py` (or the file that covers `services/suggestions.py` — find with `rg -l "resolve_suggestion_context" tests/`), `tests/api/test_openapi_contract.py`
 
 **Interfaces:**
+
 - Produces (backend): `SkillNode.domain_id: str | None`; `DomainNode(id, label, category, essential_score, popular_score, job_count, skill_count, gap_count, adjacent_count)`; `CategoryNode(slug, label, kind)`; `DemandGraph.domains: list[DomainNode]`, `DemandGraph.categories: list[CategoryNode]` (field `themes` deleted); `build_demand_graph(session, facts, *, cluster_map, corrections: TaxonomyCorrections | None = None)`; `SuggestionKind = Literal["skill", "domain"]`; `purge_legacy_theme_suggestions(session) -> int`; `build_match_gap_payload(session) -> MatchGapOut` in `api/routers/match_gap.py` (Task 7's taxonomy router imports this).
 - Produces (wire, camelCase): `MatchGapOut.domains`, `MatchGapOut.categories`, `SkillNodeOut.domainId`, `CategoryOut.kind: "hard" | "soft"`, suggestion `kind: "skill" | "domain"`.
 - Consumes: `TaxonomyCorrections`, `apply_taxonomy_corrections`, `added_canonical_tokens`, `removed_canonical_tokens`, `corrections_file_path` (Task 4); `category_kind`, `SKILL_GROUPS` (Task 1).
@@ -1398,6 +1409,7 @@ class CategoryNode:
 ```
 
 (Match the actual accumulator construction used earlier in the function — the added skill contributes zero `must/nice/tech` and no jobs; coverage computes normally so a profile-held added skill shows `covered`.)
+
 - Domain assembly renames (`nodes_by_theme` → `nodes_by_domain`, etc.); `DomainNode(category=cluster_map.category_of.get(domain_id, "other"), ...)`. Guard the `job_count` union against zero-job domains: `set().union(*(...)) if domain_nodes else set()` — an added-skill-only domain has no job ids (use `set().union(set(), *(accumulators[node.key].job_ids for node in domain_nodes))`).
 - Categories always preserve the complete `SKILL_GROUPS` authored order; the client-derived view hides empty categories:
 
@@ -1564,11 +1576,11 @@ const counts = countsBySkill.get(node.key) ?? {
 if (filters.gapsOnly && coverage !== "gap") return [];
 ```
 
-2. `skill-map-layout.ts` + `SkillMap.tsx`: `kind: "theme"` → `"domain"` in `MapNode`, prop `themeRows` → `domainRows`, `focusedThemeId` → `focusedDomainId`, `nextFocusedTheme` → `nextFocusedDomain`, user-facing copy "theme(s)" → "domain(s)".
-3. `MatchGapContainer.tsx`: prop/state renames (`view.domainRows`, `persistedStateOf` kind type `"skill" | "domain"`, `SkillModal` prop `themeLabel` → `domainLabel` sourced from `domainRows`/`domainId`), copy "Select any theme or skill" → "Select any domain or skill".
-4. `RankedList.tsx`, `SelectionTray.tsx`, `SkillModal.tsx`, `use-suggestion.ts`, `use-suggestion-runs.ts`, `lib/runs/store.ts`: replace `"theme"` kind literals with `"domain"` and prop renames to match.
-5. Update the co-located `.test.ts(x)` files for the renamed props/ids (fixtures gain `category` on domain rows and a `categories` array on payloads — use `{ slug: "languages", label: "Programming Languages", kind: "hard" }`).
-6. `web/src/features/match-gap/use-match-gap.ts`: export the key for Task 11: `export const MATCH_GAP_QUERY_KEY = ["match-gap"] as const;` and use it in both `useQuery` and `useRefreshClusters`.
+1. `skill-map-layout.ts` + `SkillMap.tsx`: `kind: "theme"` → `"domain"` in `MapNode`, prop `themeRows` → `domainRows`, `focusedThemeId` → `focusedDomainId`, `nextFocusedTheme` → `nextFocusedDomain`, user-facing copy "theme(s)" → "domain(s)".
+2. `MatchGapContainer.tsx`: prop/state renames (`view.domainRows`, `persistedStateOf` kind type `"skill" | "domain"`, `SkillModal` prop `themeLabel` → `domainLabel` sourced from `domainRows`/`domainId`), copy "Select any theme or skill" → "Select any domain or skill".
+3. `RankedList.tsx`, `SelectionTray.tsx`, `SkillModal.tsx`, `use-suggestion.ts`, `use-suggestion-runs.ts`, `lib/runs/store.ts`: replace `"theme"` kind literals with `"domain"` and prop renames to match.
+4. Update the co-located `.test.ts(x)` files for the renamed props/ids (fixtures gain `category` on domain rows and a `categories` array on payloads — use `{ slug: "languages", label: "Programming Languages", kind: "hard" }`).
+5. `web/src/features/match-gap/use-match-gap.ts`: export the key for Task 11: `export const MATCH_GAP_QUERY_KEY = ["match-gap"] as const;` and use it in both `useQuery` and `useRefreshClusters`.
 
 Verify no stragglers: `rg -i "theme" web/src/features/match-gap web/src/lib/runs` → Expected: no hits (excluding `web/src/app/theme.tsx`, which is color theming and untouched).
 
@@ -1590,10 +1602,12 @@ git commit -m "feat(match-gap): domain/category wire contract with corrections-a
 ### Task 6: Taxonomy edit service
 
 **Files:**
+
 - Create: `src/resume_agent/services/taxonomy.py`
 - Test: `tests/test_services_taxonomy.py` (new)
 
 **Interfaces:**
+
 - Produces (all functions take explicit paths; the router tenant-resolves them):
   - `NewDomainSpec(label: str, category: str)` dataclass
   - `move_skill(corrections_path, cluster_path, token, *, domain_id: str | None = None, new_domain: NewDomainSpec | None = None) -> None`
@@ -1607,7 +1621,8 @@ git commit -m "feat(match-gap): domain/category wire contract with corrections-a
 - Consumes: `load_taxonomy_corrections`/`save_taxonomy_corrections`/`apply_taxonomy_corrections`/`TaxonomyCorrections` (Task 4); `load_cluster_map`, `slugify_domain` (Task 2); `SKILL_GROUPS` (Task 1); `normalize_skill`.
 
 **Behavioral rules (encode each as a test):**
-1. Every mutator loads the ledger, mutates one intent, saves atomically. The *current corrected map* (`apply_taxonomy_corrections(load_cluster_map(cluster_path), ledger)`) is the validation baseline.
+
+1. Every mutator loads the ledger, mutates one intent, saves atomically. The _current corrected map_ (`apply_taxonomy_corrections(load_cluster_map(cluster_path), ledger)`) is the validation baseline.
 2. `move_skill`/`add_skill` with `new_domain`: allocate `domain_id = slugify_domain(label)` suffixed `-2`, `-3`, … while colliding with any known id; write `skill_domain[token] = id`, `domain_renames[id] = label`, `domain_category[id] = category` in **one** save (user-created-domain durability).
 3. `move_skill`/`add_skill` require exactly one of `domain_id` / `new_domain` (`ValueError` otherwise); `domain_id` must exist in the corrected map (`UnknownDomainError`); `new_domain.category` must be in `SKILL_GROUPS` (`UnknownCategoryError`).
 4. `add_skill` also appends the token to `added_skills` and removes it from `removed_skills` (re-add clears removal).
@@ -1780,6 +1795,7 @@ git commit -m "feat(taxonomy): edit-service use-cases writing the corrections le
 ### Task 7: Taxonomy router, schemas, and registration
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/taxonomy.py`
 - Create: `src/resume_agent/api/routers/taxonomy.py`
 - Modify: `src/resume_agent/api/app.py` (register router with the guarded prefix, next to `match_gap_router` at line ~227)
@@ -1787,6 +1803,7 @@ git commit -m "feat(taxonomy): edit-service use-cases writing the corrections le
 - Test: `tests/api/test_taxonomy_router.py` (new)
 
 **Interfaces:**
+
 - Produces endpoints (all return the refreshed `MatchGapOut`):
   - `PUT /api/taxonomy/skills/{token}/domain` body `MoveSkillIn`
   - `POST /api/taxonomy/skills` body `AddSkillIn`
@@ -2051,11 +2068,13 @@ git commit -m "feat(api): taxonomy edit endpoints returning the refreshed match-
 ### Task 8: `aggregate.ts` — three-level derived view
 
 **Files:**
+
 - Modify: `web/src/features/match-gap/aggregate.ts`
 - Modify: `web/src/features/match-gap/MatchGapContainer.tsx`, `RankedList.tsx` (consume `categoryRows` minimally — outline view groups by category → domain)
 - Test: `web/src/features/match-gap/aggregate.test.ts`
 
 **Interfaces:**
+
 - Produces:
 
 ```ts
@@ -2072,7 +2091,8 @@ export interface CategoryRow {
 }
 ```
 
-  `DomainRow` gains `category: string`. `DerivedView` gains `categoryRows: CategoryRow[]` (existing `domainRows` stays — the flat list feeds RankedList and tests). `UNASSIGNED_ID` domains attach to the server-provided `other` category. Empty category metadata remains available to edit pickers but produces no `CategoryRow`.
+`DomainRow` gains `category: string`. `DerivedView` gains `categoryRows: CategoryRow[]` (existing `domainRows` stays — the flat list feeds RankedList and tests). `UNASSIGNED_ID` domains attach to the server-provided `other` category. Empty category metadata remains available to edit pickers but produces no `CategoryRow`.
+
 - Consumes: `MatchGapOut.domains[].category`, `MatchGapOut.categories` (Task 5).
 
 - [ ] **Step 1: Write failing tests** in `aggregate.test.ts`:
@@ -2080,7 +2100,10 @@ export interface CategoryRow {
 ```ts
 it("groups domains under payload categories in authored order", () => {
   const view = deriveView(payloadWith2Categories, DEFAULT_FILTERS);
-  expect(view.categoryRows.map((c) => c.slug)).toEqual(["languages", "frontend-web"]);
+  expect(view.categoryRows.map((c) => c.slug)).toEqual([
+    "languages",
+    "frontend-web",
+  ]);
   const languages = view.categoryRows[0];
   expect(languages.kind).toBe("hard");
   expect(languages.domains.map((d) => d.id)).toContain("scripting");
@@ -2099,7 +2122,9 @@ it("attaches unassigned skills to an Unassigned domain under other", () => {
 
 it("keeps zero-count added skills visible", () => {
   const view = deriveView(payloadWithZeroCountSkill, DEFAULT_FILTERS);
-  expect(view.skills.some((s) => s.key === "graphql" && s.jobCount === 0)).toBe(true);
+  expect(view.skills.some((s) => s.key === "graphql" && s.jobCount === 0)).toBe(
+    true,
+  );
 });
 ```
 
@@ -2112,22 +2137,34 @@ it("keeps zero-count added skills visible", () => {
 After `domainRows` is computed in `deriveView`, add:
 
 ```ts
-const domainCategory = new Map(payload.domains.map((d) => [d.id, d.category] as const));
-const categoryMeta = new Map(payload.categories.map((c) => [c.slug, c] as const));
+const domainCategory = new Map(
+  payload.domains.map((d) => [d.id, d.category] as const),
+);
+const categoryMeta = new Map(
+  payload.categories.map((c) => [c.slug, c] as const),
+);
 const rowsByCategory = new Map<string, DomainRow[]>();
 for (const domain of domainRows) {
   const slug =
-    domain.id === UNASSIGNED_ID ? "other" : (domainCategory.get(domain.id) ?? "other");
+    domain.id === UNASSIGNED_ID
+      ? "other"
+      : (domainCategory.get(domain.id) ?? "other");
   rowsByCategory.set(slug, [...(rowsByCategory.get(slug) ?? []), domain]);
 }
 const orderedSlugs = [
   ...payload.categories.map((c) => c.slug),
-  ...(rowsByCategory.has("other") && !categoryMeta.has("other") ? ["other"] : []),
+  ...(rowsByCategory.has("other") && !categoryMeta.has("other")
+    ? ["other"]
+    : []),
 ];
 const categoryRows: CategoryRow[] = orderedSlugs.flatMap((slug) => {
   const domains = rowsByCategory.get(slug) ?? [];
   if (domains.length === 0) return [];
-  const meta = categoryMeta.get(slug) ?? { slug, label: "Other", kind: "hard" as const };
+  const meta = categoryMeta.get(slug) ?? {
+    slug,
+    label: "Other",
+    kind: "hard" as const,
+  };
   const jobs = new Set<number>();
   for (const domain of domains)
     for (const skill of domain.skills)
@@ -2139,9 +2176,15 @@ const categoryRows: CategoryRow[] = orderedSlugs.flatMap((slug) => {
       kind: meta.kind,
       score: domains.reduce((total, domain) => total + domain.score, 0),
       jobCount: jobs.size,
-      skillCount: domains.reduce((total, domain) => total + domain.skillCount, 0),
+      skillCount: domains.reduce(
+        (total, domain) => total + domain.skillCount,
+        0,
+      ),
       gapCount: domains.reduce((total, domain) => total + domain.gapCount, 0),
-      adjacentCount: domains.reduce((total, domain) => total + domain.adjacentCount, 0),
+      adjacentCount: domains.reduce(
+        (total, domain) => total + domain.adjacentCount,
+        0,
+      ),
       domains,
     },
   ];
@@ -2159,10 +2202,12 @@ const categoryRows: CategoryRow[] = orderedSlugs.flatMap((slug) => {
 ### Task 9: `skill-map-layout.ts` — three-level graph + view state
 
 **Files:**
+
 - Modify: `web/src/features/match-gap/skill-map-layout.ts`
 - Test: `web/src/features/match-gap/skill-map-layout.test.ts`
 
 **Interfaces:**
+
 - Produces:
 
 ```ts
@@ -2172,7 +2217,7 @@ export type MapView =
   | { level: "domain"; domainId: string; categorySlug: string };
 
 export interface MapNode {
-  id: string;                                   // "category:slug" | "domain:id" | "skill:key"
+  id: string; // "category:slug" | "domain:id" | "skill:key"
   entityKey: string;
   kind: "category" | "domain" | "skill";
   label: string;
@@ -2180,8 +2225,8 @@ export interface MapNode {
   width: number;
   height: number;
   score: number;
-  categoryKind?: "hard" | "soft";               // set on category nodes
-  gapCount?: number;                            // set on category + domain nodes
+  categoryKind?: "hard" | "soft"; // set on category nodes
+  gapCount?: number; // set on category + domain nodes
   covered?: boolean;
   coverage?: SkillRow["coverage"];
   domainId?: string;
@@ -2194,14 +2239,21 @@ export function buildGraph(
   categoryRows: CategoryRow[],
   view: MapView,
 ): { nodes: MapNode[]; links: MapLink[]; rootId: string | null };
-export function runLayout(nodes, links, width, height, rootId: string | null): MapNode[];
+export function runLayout(
+  nodes,
+  links,
+  width,
+  height,
+  rootId: string | null,
+): MapNode[];
 export function drillTarget(view: MapView, node: MapNode): MapView; // click transition
-export function parentView(view: MapView): MapView | null;          // breadcrumb "back"
+export function parentView(view: MapView): MapView | null; // breadcrumb "back"
 ```
 
 - Consumes: `CategoryRow`/`DomainRow` (Task 8).
 
 **Behavior:**
+
 - `galaxy`: one node per category (`kind: "category"`, `categoryKind`, `gapCount`), no links, `rootId: null` → `runLayout` uses the existing grid `layoutOverview`.
 - `category`: root = that category node, leaves = its domains (each with `gapCount`), links root→leaf, `rootId = "category:" + slug` → existing hub-and-spokes `layoutFocused`, generalized to take `rootId` instead of "the theme node".
 - `domain`: root = domain node, leaves = its skills (identical shape to today's focused view), `rootId = "domain:" + id`.
@@ -2223,15 +2275,18 @@ export function parentView(view: MapView): MapView | null;          // breadcrum
 ### Task 10: SkillMap drill-down UI
 
 **Files:**
+
 - Modify: `web/src/features/match-gap/SkillMap.tsx`
 - Modify: `web/src/features/match-gap/MatchGapContainer.tsx` (pass `categoryRows`)
 - Test: `web/src/features/match-gap/SkillMap.test.tsx`
 
 **Interfaces:**
+
 - Produces: `SkillMap({ categoryRows, stateOf, selected, onToggleSelect, onOpenSkill })` — prop `domainRows` replaced by `categoryRows: CategoryRow[]`.
 - Consumes: `buildGraph`/`runLayout`/`drillTarget`/`parentView`/`MapView` (Task 9).
 
 **Behavior to implement and test:**
+
 1. State: `const [view, setView] = useState<MapView>({ level: "galaxy" })`; node clicks route through `drillTarget`; every transition calls the existing `applyZoom("reset")`.
 2. Breadcrumb in the header: galaxy shows nothing; category view shows `‹ All categories`; domain view shows `‹ {category label}` (uses `parentView`). Reuse the existing ghost-Button pattern.
 3. Category nodes: hard = `variant="default"` (filled), soft = `variant="secondary"`; a small gap badge (`{gapCount} gaps`, hidden when 0) under the label; **no checkbox** (research is domain/skill only — render the checkbox span only for `kind !== "category"`).
@@ -2251,6 +2306,7 @@ export function parentView(view: MapView): MapView | null;          // breadcrum
 ### Task 11: Taxonomy mutations + node menu + skill dialogs
 
 **Files:**
+
 - Create: `web/src/features/match-gap/use-taxonomy.ts`
 - Create: `web/src/features/match-gap/taxonomy-edit/TaxonomyNodeMenu.tsx`
 - Create: `web/src/features/match-gap/taxonomy-edit/MoveSkillDialog.tsx`
@@ -2260,6 +2316,7 @@ export function parentView(view: MapView): MapView | null;          // breadcrum
 - Test: `web/src/features/match-gap/use-taxonomy.test.ts`, `web/src/features/match-gap/taxonomy-edit/MoveSkillDialog.test.tsx`, `.../TaxonomyNodeMenu.test.tsx`
 
 **Interfaces:**
+
 - Produces `use-taxonomy.ts` (every mutation writes the returned payload straight into the cache — no invalidation round-trip):
 
 ```ts
@@ -2290,25 +2347,43 @@ function useTaxonomyMutation<V>(
 
 export function useMoveSkill() {
   return useTaxonomyMutation(
-    (variables: { token: string; domainId?: string; newDomain?: NewDomainInput }) =>
+    (variables: {
+      token: string;
+      domainId?: string;
+      newDomain?: NewDomainInput;
+    }) =>
       unwrap(
         api.PUT("/api/taxonomy/skills/{token}/domain", {
           params: { path: { token: variables.token } },
-          body: { domainId: variables.domainId, newDomain: variables.newDomain },
+          body: {
+            domainId: variables.domainId,
+            newDomain: variables.newDomain,
+          },
         }),
       ) as Promise<MatchGap>,
     "Skill moved",
   );
 }
 
-export function useAddSkill() { /* POST /api/taxonomy/skills — same shape, "Skill added" */ }
-export function useRemoveSkill() { /* DELETE /api/taxonomy/skills/{token} — "Skill removed" */ }
-export function useMergeSkills() { /* POST /api/taxonomy/aliases — "Skills merged" */ }
-export function usePatchDomain() { /* PATCH /api/taxonomy/domains/{domainId} — "Domain updated" */ }
-export function useMergeDomains() { /* POST /api/taxonomy/domains/{domainId}/merge — "Domains merged" */ }
+export function useAddSkill() {
+  /* POST /api/taxonomy/skills — same shape, "Skill added" */
+}
+export function useRemoveSkill() {
+  /* DELETE /api/taxonomy/skills/{token} — "Skill removed" */
+}
+export function useMergeSkills() {
+  /* POST /api/taxonomy/aliases — "Skills merged" */
+}
+export function usePatchDomain() {
+  /* PATCH /api/taxonomy/domains/{domainId} — "Domain updated" */
+}
+export function useMergeDomains() {
+  /* POST /api/taxonomy/domains/{domainId}/merge — "Domains merged" */
+}
 ```
 
 (Write each stub out fully — they are four-line variations of `useMoveSkill`.)
+
 - Produces `TaxonomyNodeMenu`: kebab `DropdownMenu` (same imports as `SkillGroupsPanel.tsx`) rendered beside a node, props `{ node: MapNode; categoryRows: CategoryRow[]; onAction: (action: TaxonomyMenuAction) => void }` where
 
 ```ts
@@ -2322,12 +2397,14 @@ export type TaxonomyMenuAction =
   | { type: "merge-domain"; domainId: string };
 ```
 
-  Skill nodes get the four skill items; domain nodes the three domain items (wired in Task 12); category nodes render no menu.
+Skill nodes get the four skill items; domain nodes the three domain items (wired in Task 12); category nodes render no menu.
+
 - Consumes: `MATCH_GAP_QUERY_KEY` (Task 5 step 8), Task 7 endpoints (regenerated schema).
 
 **Dialog specs (all use the shadcn `Dialog` components already in the repo — copy the import block from any existing feature dialog):**
+
 - `MoveSkillDialog({ skill, categoryRows, open, onOpenChange })`: a domain `Select` grouped by category label, plus a "New domain…" toggle revealing label `Input` + category `Select` (options = `categoryRows` metadata plus all 20 slugs from a `categories` prop — pass the payload categories through); submit calls `useMoveSkill` with exactly one of `domainId`/`newDomain`; disabled while pending.
-- `MergeSkillDialog({ skill, allSkills, open, onOpenChange })`: a searchable `Select` of other skill keys; submit calls `useMergeSkills({ token: skill.key, canonical: selectedKey })`. Copy explains the direction: "*{skill.skill}* becomes an alias of the selected skill."
+- `MergeSkillDialog({ skill, allSkills, open, onOpenChange })`: a searchable `Select` of other skill keys; submit calls `useMergeSkills({ token: skill.key, canonical: selectedKey })`. Copy explains the direction: "_{skill.skill}_ becomes an alias of the selected skill."
 - `RemoveSkillDialog({ skill, open, onOpenChange })`: confirm copy "Hides {skill.skill} from the constellation. You can re-add it anytime." Confirm button calls `useRemoveSkill`.
 
 - [ ] **Step 1: Write failing tests** — `use-taxonomy.test.ts`: mock `api.PUT` to resolve a payload and assert `setQueryData` cache content equals it (initialize a `QueryClient` with a stale payload first); `MoveSkillDialog.test.tsx`: renders grouped domains, toggling "New domain" swaps inputs, submit posts the right body (spy on the mutation); `TaxonomyNodeMenu.test.tsx`: skill node shows 4 items, category node renders nothing.
@@ -2341,6 +2418,7 @@ export type TaxonomyMenuAction =
 ### Task 12: Domain dialogs + Add-skill + full wiring
 
 **Files:**
+
 - Create: `web/src/features/match-gap/taxonomy-edit/RenameDomainDialog.tsx`
 - Create: `web/src/features/match-gap/taxonomy-edit/ChangeCategoryDialog.tsx`
 - Create: `web/src/features/match-gap/taxonomy-edit/MergeDomainDialog.tsx`
@@ -2349,6 +2427,7 @@ export type TaxonomyMenuAction =
 - Test: one `.test.tsx` per dialog (same folder)
 
 **Interfaces:**
+
 - `RenameDomainDialog({ domainId, currentLabel, open, onOpenChange })` → `usePatchDomain({ domainId, body: { label } })`.
 - `ChangeCategoryDialog({ domainId, currentSlug, categories, open, onOpenChange })` → `usePatchDomain({ domainId, body: { category } })`; `categories` is the full server-provided payload list. Do not create a client-side vocabulary constant.
 - `MergeDomainDialog({ domainId, categoryRows, open, onOpenChange })` → `useMergeDomains({ domainId, into })`; target select excludes `domainId` itself; confirm copy "Skills in this domain move to the target; this domain disappears."
@@ -2366,6 +2445,7 @@ export type TaxonomyMenuAction =
 ### Task 13: Docs, final verification, and knowledge capture
 
 **Files:**
+
 - Modify: `CLAUDE.md` (design-notes bullet)
 - Modify: `docs/superpowers/specs/2026-07-18-skill-constellation-taxonomy-design.md` (status → Implemented)
 

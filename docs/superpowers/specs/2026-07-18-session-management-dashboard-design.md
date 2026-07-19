@@ -147,8 +147,8 @@ error-list reads. Open records live until acted on.
 
 ### Interview hub (`/interview`)
 
-- **Left rail — session list**, grouped *In progress* (job title/company, stage
-  badge, "question N of M", started-ago) then *Completed* (debrief score
+- **Left rail — session list**, grouped _In progress_ (job title/company, stage
+  badge, "question N of M", started-ago) then _Completed_ (debrief score
   summary), with an "Archived" toggle revealing archived rows. Kebab actions:
   Resume/Review (open), Archive/Unarchive (ended only), Delete (confirm dialog;
   warns about abandoning when the session is active).

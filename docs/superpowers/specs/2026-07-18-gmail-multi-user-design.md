@@ -17,14 +17,14 @@ and an LLM email writer that produces Gmail drafts.
 
 ## Decisions made
 
-| Decision | Choice |
-| --- | --- |
-| OAuth architecture | Platform OAuth client + per-user client override (mirrors shared-LLM-key + own-key pattern) |
-| Feature set | Scheduled inbox sync, follow-up reminders, email writer (drafts). Recruiter contact tracking dropped — replies address the matched Gmail thread instead |
-| Reminder scope | Stale applications only — deterministic, no date parsing |
-| Writer entry points | Both: "Draft email" on job/application detail AND "Draft follow-up" on reminders |
-| Background machinery | In-process asyncio scheduler in the FastAPI lifespan (Approach A; no external cron, no sync-on-activity) |
-| Sending email | Never. `gmail.compose` (drafts) only; `gmail.send` is permanently out of scope |
+| Decision             | Choice                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OAuth architecture   | Platform OAuth client + per-user client override (mirrors shared-LLM-key + own-key pattern)                                                             |
+| Feature set          | Scheduled inbox sync, follow-up reminders, email writer (drafts). Recruiter contact tracking dropped — replies address the matched Gmail thread instead |
+| Reminder scope       | Stale applications only — deterministic, no date parsing                                                                                                |
+| Writer entry points  | Both: "Draft email" on job/application detail AND "Draft follow-up" on reminders                                                                        |
+| Background machinery | In-process asyncio scheduler in the FastAPI lifespan (Approach A; no external cron, no sync-on-activity)                                                |
+| Sending email        | Never. `gmail.compose` (drafts) only; `gmail.send` is permanently out of scope                                                                          |
 
 ## 1. Credential management & OAuth flow
 
@@ -44,16 +44,16 @@ and an LLM email writer that produces Gmail drafts.
 - **Web connect flow:**
   - `GET /api/gmail/connect` → builds the Google authorization URL (offline
     access, consent prompt) with a signed `state` parameter — HMAC over user id
-    + expiry using `session_secret` (same signing material as session cookies).
-    Returns `{authUrl}`; the web UI opens it.
+    - expiry using `session_secret` (same signing material as session cookies).
+      Returns `{authUrl}`; the web UI opens it.
   - `GET /api/gmail/callback?code=&state=` → verifies `state`, exchanges the
-    code using the *effective* (overlay-resolved) client, writes the token JSON
+    code using the _effective_ (overlay-resolved) client, writes the token JSON
     into that user's workspace, redirects back to Settings with a
     success/failure flag. The callback authenticates via the signed state, not
     the session cookie (Google's top-level redirect may not carry SameSite
     cookies); a forged state fails the HMAC.
   - `GET /api/gmail/status` → `{connected, email?, scopes, clientSource:
-    "platform"|"own"}` for the Settings card.
+"platform"|"own"}` for the Settings card.
   - `DELETE /api/gmail/token` → disconnect (revoke best-effort, then delete the
     token file).
 - **Scopes:** `gmail.readonly` + `gmail.compose` requested at connect time. An
@@ -90,7 +90,7 @@ the API lifespan alongside `init_db`.
 
 **Classification upgrade.** Today classification sees only subject + snippet.
 
-- `fetch_recent_messages` gains a second phase: only for messages that *match*
+- `fetch_recent_messages` gains a second phase: only for messages that _match_
   an application, fetch `format="full"` and extract text/plain (or html →
   `html_to_text`), truncated to a few KB. Match first, fetch bodies second —
   most inbox mail matches nothing.
@@ -124,7 +124,7 @@ stays non-null; no migration). `NotificationOut` gains `kind` plus
 
 **Action semantics branch by kind:**
 
-- `kind="follow_up"` + accept → does *not* touch status
+- `kind="follow_up"` + accept → does _not_ touch status
   (`accept_notification` branches: status-proposal kinds apply the transition;
   reminder kinds just mark `accepted`). The UI renders accept as **"Draft
   follow-up"** — marks the reminder accepted and opens the email writer
@@ -138,7 +138,7 @@ stays non-null; no migration). `NotificationOut` gains `kind` plus
 (`follow_up` | `thank_you` | `withdrawal` | `cold_outreach`) + optional
 free-text instruction. The prompt grounds on:
 
-- profile facts (`facts.json`) as the *only* permitted source for claims about
+- profile facts (`facts.json`) as the _only_ permitted source for claims about
   the user — same evidence discipline as tailoring, but with a **human gate
   instead of an LLM gate**: no fact-check reviewer round, because the output is
   a Gmail draft the user must open, edit, and send themselves.

@@ -57,10 +57,12 @@ snippets below:
 ### Task 1: Corrections ledger module
 
 **Files:**
+
 - Create: `src/resume_agent/profile/group_corrections.py`
 - Test: `tests/test_group_corrections.py`
 
 **Interfaces:**
+
 - Consumes: `SKILL_GROUPS` (`taxonomy/groups.py`), `normalize_skill` (`tracking/match_gap.py`), `ExtensibleModel` (`models/base.py`).
 - Produces (used by Tasks 2–3):
   - `corrections_path(profile_dir: str | Path) -> Path`
@@ -220,6 +222,7 @@ git commit -m "feat: add skill-group corrections ledger"
 ### Task 2: Precedence + `group_source` + shared decorate/rebuild helpers
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/matrix.py` (`MatrixRow`, `apply_skill_groups`, new `decorate_matrix_groups` / `rebuild_saved_matrix`)
 - Modify: `src/resume_agent/services/profile_build.py` (use `decorate_matrix_groups`)
 - Modify: `src/resume_agent/services/profile_skills.py` (replace `_rebuild_matrix` with `rebuild_saved_matrix`)
@@ -227,6 +230,7 @@ git commit -m "feat: add skill-group corrections ledger"
 - Test: `tests/test_profile_matrix.py` (append)
 
 **Interfaces:**
+
 - Consumes (Task 1): `corrections_path`, `load_group_corrections` (`.as_map()`).
 - Produces (used by Tasks 3–4):
   - `MatrixRow.group_source: Literal["correction", "override", "taxonomy"] | None`
@@ -512,10 +516,12 @@ git commit -m "feat: correction-aware group precedence with group_source provena
 ### Task 3: `services/profile_groups.py`
 
 **Files:**
+
 - Create: `src/resume_agent/services/profile_groups.py`
 - Test: `tests/test_profile_groups_service.py`
 
 **Interfaces:**
+
 - Consumes (Tasks 1–2): `corrections_path`, `load_group_corrections`, `save_group_corrections`, `GroupCorrection`, `rebuild_saved_matrix`, `MatrixRow`; also `manual_skills_lock`, `load_facts`, `SKILL_GROUPS`, `normalize_skill`, and `ProfileNotBuiltError` / `SkillNotFoundError` from `services/profile_skills.py`.
 - Produces (used by Task 4):
   - `set_group(profile_dir: str | Path, key: str, group: str) -> MatrixRow`
@@ -748,12 +754,14 @@ git commit -m "feat: profile_groups service for durable group corrections"
 ### Task 4: API endpoints + contract regeneration
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/profile.py` (`MatrixRowOut.group_source`, new `SetGroupIn`)
 - Modify: `src/resume_agent/api/routers/profile.py` (two endpoints)
 - Modify (generated): `contracts/openapi.json`, `contracts/ts/api.ts`, `web/src/lib/api/schema.ts`
 - Test: `tests/api/test_profile_groups_router.py`
 
 **Interfaces:**
+
 - Consumes (Task 3): `profile_groups.set_group` / `clear_group` / `UnknownGroupError` / `GroupCorrectionNotFoundError`; `profile_skills.ProfileNotBuiltError` / `SkillNotFoundError`.
 - Produces (used by Task 5): wire routes `PUT /api/profile/skills/{key}/group` (body `{"group": "<slug>"}`, 200 → `MatrixRowOut` incl. `groupSource`) and `DELETE /api/profile/skills/{key}/group` (204); `MatrixOut` rows now carry `groupSource`.
 
@@ -937,11 +945,13 @@ git commit -m "feat: PUT/DELETE skill-group correction endpoints with groupSourc
 ### Task 5: Editable SkillGroupsPanel
 
 **Files:**
+
 - Modify: `web/src/features/settings/use-matrix.ts` (two mutations)
 - Modify: `web/src/features/settings/SkillGroupsPanel.tsx` (badge → dropdown, pin, reset)
 - Test: `web/src/features/settings/SkillGroupsPanel.test.tsx` (extend)
 
 **Interfaces:**
+
 - Consumes (Task 4): generated schema paths `PUT/DELETE /api/profile/skills/{key}/group`; `MatrixRowOut.groupSource`.
 - Produces: `useSetSkillGroup()` / `useClearSkillGroup()` TanStack mutations (both invalidate `["profile-matrix"]`).
 
@@ -967,58 +977,91 @@ vi.mock("./use-matrix", () => ({
 Reset the new mocks in `beforeEach` (`state.setGroup.mockReset(); state.clearGroup.mockReset();`) and append:
 
 ```tsx
-  it("moves a skill to another group and resets a pinned one", async () => {
-    state.value = {
-      isPending: false,
-      isError: false,
-      data: {
-        generatedAt: "2026-07-16T00:00:00Z",
-        groups,
-        rows: [
-          { key: "python", display: "Python", category: "hard", group: "languages",
-            groupSource: "taxonomy", inferred: false, strength: 3, lastUsed: "current" },
-          { key: "dbt", display: "dbt", category: "hard", group: "languages",
-            groupSource: "correction", inferred: false, strength: 1, lastUsed: null },
-        ],
-      },
-    };
-    render(<SkillGroupsPanel />);
+it("moves a skill to another group and resets a pinned one", async () => {
+  state.value = {
+    isPending: false,
+    isError: false,
+    data: {
+      generatedAt: "2026-07-16T00:00:00Z",
+      groups,
+      rows: [
+        {
+          key: "python",
+          display: "Python",
+          category: "hard",
+          group: "languages",
+          groupSource: "taxonomy",
+          inferred: false,
+          strength: 3,
+          lastUsed: "current",
+        },
+        {
+          key: "dbt",
+          display: "dbt",
+          category: "hard",
+          group: "languages",
+          groupSource: "correction",
+          inferred: false,
+          strength: 1,
+          lastUsed: null,
+        },
+      ],
+    },
+  };
+  render(<SkillGroupsPanel />);
 
-    await userEvent.click(
-      screen.getByRole("button", { name: /change group for python/i }),
-    );
-    await userEvent.click(await screen.findByRole("menuitem", { name: /^other$/i }));
-    expect(state.setGroup).toHaveBeenCalledWith({ key: "python", group: "other" });
-
-    await userEvent.click(
-      screen.getByRole("button", { name: /change group for dbt/i }),
-    );
-    await userEvent.click(
-      await screen.findByRole("menuitem", { name: /reset to automatic/i }),
-    );
-    expect(state.clearGroup).toHaveBeenCalledWith("dbt");
+  await userEvent.click(
+    screen.getByRole("button", { name: /change group for python/i }),
+  );
+  await userEvent.click(
+    await screen.findByRole("menuitem", { name: /^other$/i }),
+  );
+  expect(state.setGroup).toHaveBeenCalledWith({
+    key: "python",
+    group: "other",
   });
 
-  it("does not offer reset for an automatic assignment", async () => {
-    state.value = {
-      isPending: false,
-      isError: false,
-      data: {
-        generatedAt: "2026-07-16T00:00:00Z",
-        groups,
-        rows: [
-          { key: "python", display: "Python", category: "hard", group: "languages",
-            groupSource: "taxonomy", inferred: false, strength: 3, lastUsed: "current" },
-        ],
-      },
-    };
-    render(<SkillGroupsPanel />);
-    await userEvent.click(
-      screen.getByRole("button", { name: /change group for python/i }),
-    );
-    expect(await screen.findByRole("menuitem", { name: /^other$/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /reset to automatic/i })).toBeNull();
-  });
+  await userEvent.click(
+    screen.getByRole("button", { name: /change group for dbt/i }),
+  );
+  await userEvent.click(
+    await screen.findByRole("menuitem", { name: /reset to automatic/i }),
+  );
+  expect(state.clearGroup).toHaveBeenCalledWith("dbt");
+});
+
+it("does not offer reset for an automatic assignment", async () => {
+  state.value = {
+    isPending: false,
+    isError: false,
+    data: {
+      generatedAt: "2026-07-16T00:00:00Z",
+      groups,
+      rows: [
+        {
+          key: "python",
+          display: "Python",
+          category: "hard",
+          group: "languages",
+          groupSource: "taxonomy",
+          inferred: false,
+          strength: 3,
+          lastUsed: "current",
+        },
+      ],
+    },
+  };
+  render(<SkillGroupsPanel />);
+  await userEvent.click(
+    screen.getByRole("button", { name: /change group for python/i }),
+  );
+  expect(
+    await screen.findByRole("menuitem", { name: /^other$/i }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("menuitem", { name: /reset to automatic/i }),
+  ).toBeNull();
+});
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -1043,7 +1086,9 @@ export function useMatrix() {
   return useQuery({
     queryKey: ["profile-matrix"],
     queryFn: () =>
-      unwrap(api.GET("/api/profile/matrix", {} as never)) as Promise<ProfileMatrix>,
+      unwrap(
+        api.GET("/api/profile/matrix", {} as never),
+      ) as Promise<ProfileMatrix>,
   });
 }
 
@@ -1105,62 +1150,70 @@ import { useClearSkillGroup, useMatrix, useSetSkillGroup } from "./use-matrix";
 Inside the component (after `const matrix = useMatrix();`):
 
 ```tsx
-  const setGroup = useSetSkillGroup();
-  const clearGroup = useClearSkillGroup();
+const setGroup = useSetSkillGroup();
+const clearGroup = useClearSkillGroup();
 ```
 
 Replace the member badge rendering (`members.map((row) => (<Badge …>{row.display}</Badge>))`) with:
 
 ```tsx
-                  {members.length > 0 ? members.map((row) => {
-                    const current = row.group && known.has(row.group) ? row.group : "other";
-                    return (
-                      <DropdownMenu key={row.key}>
-                        <DropdownMenuTrigger
-                          render={<Badge render={<button type="button" />} variant="outline" />}
-                          aria-label={`Change group for ${row.display}`}
-                        >
-                          {row.groupSource === "correction" ? (
-                            <Pin aria-hidden data-icon="inline-start" />
-                          ) : null}
-                          {row.display}
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuGroup>
-                            <DropdownMenuLabel>Move to…</DropdownMenuLabel>
-                            {orderedGroups.map((target) => (
-                              <DropdownMenuItem
-                                key={target.slug}
-                                disabled={setGroup.isPending || target.slug === current}
-                                onClick={() =>
-                                  setGroup.mutate({ key: row.key, group: target.slug })
-                                }
-                              >
-                                {target.label}
-                                {target.slug === current ? <Check aria-hidden /> : null}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuGroup>
-                          {row.groupSource === "correction" ? (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuGroup>
-                                <DropdownMenuItem
-                                  disabled={clearGroup.isPending}
-                                  onClick={() => clearGroup.mutate(row.key)}
-                                >
-                                  <Undo2 aria-hidden />
-                                  Reset to automatic
-                                </DropdownMenuItem>
-                              </DropdownMenuGroup>
-                            </>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    );
-                  }) : (
-                    <span className="text-xs text-muted-foreground">No skills in this group.</span>
-                  )}
+{
+  members.length > 0 ? (
+    members.map((row) => {
+      const current = row.group && known.has(row.group) ? row.group : "other";
+      return (
+        <DropdownMenu key={row.key}>
+          <DropdownMenuTrigger
+            render={
+              <Badge render={<button type="button" />} variant="outline" />
+            }
+            aria-label={`Change group for ${row.display}`}
+          >
+            {row.groupSource === "correction" ? (
+              <Pin aria-hidden data-icon="inline-start" />
+            ) : null}
+            {row.display}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Move to…</DropdownMenuLabel>
+              {orderedGroups.map((target) => (
+                <DropdownMenuItem
+                  key={target.slug}
+                  disabled={setGroup.isPending || target.slug === current}
+                  onClick={() =>
+                    setGroup.mutate({ key: row.key, group: target.slug })
+                  }
+                >
+                  {target.label}
+                  {target.slug === current ? <Check aria-hidden /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
+            {row.groupSource === "correction" ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    disabled={clearGroup.isPending}
+                    onClick={() => clearGroup.mutate(row.key)}
+                  >
+                    <Undo2 aria-hidden />
+                    Reset to automatic
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    })
+  ) : (
+    <span className="text-xs text-muted-foreground">
+      No skills in this group.
+    </span>
+  );
+}
 ```
 
 Note: `orderedGroups` and `known` are computed before the accordion renders — move both computations above the `return` if they aren't already in scope where members render. Update the panel's description copy to: `Profile skills grouped by their primary professional use. Click a skill to move it; corrections are pinned and survive profile rebuilds.`
@@ -1183,6 +1236,7 @@ git commit -m "feat: editable skill groups with pinned corrections in settings p
 ### Task 6: Document the invariant
 
 **Files:**
+
 - Modify: `CLAUDE.md` (the "Skill groups are a derived display axis" bullet in Known design notes)
 
 **Interfaces:** none (docs only).

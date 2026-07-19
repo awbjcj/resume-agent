@@ -26,11 +26,13 @@
 ### Task 1: Interview session store
 
 **Files:**
+
 - Create: `src/resume_agent/interview/__init__.py` (empty)
 - Create: `src/resume_agent/interview/store.py`
 - Test: `tests/test_interview_store.py`
 
 **Interfaces:**
+
 - Consumes: `resume_agent.models.base.ExtensibleModel`, `resume_agent.progress.atomic_write_text` (both exist).
 - Produces (used by Tasks 2–4, 11):
   - Models: `InterviewStyle`, `InterviewContext`, `PlanItem`, `InterviewTurnRecord`, `QuestionReview`, `InterviewDebrief`, `InterviewSession`
@@ -498,10 +500,12 @@ git commit -m "feat: add durable mock interview session store"
 ### Task 2: Turn schemas, validation, context rendering, agent builders
 
 **Files:**
+
 - Create: `src/resume_agent/interview/agent.py`
 - Test: `tests/test_interview_agent.py`
 
 **Interfaces:**
+
 - Consumes: Task 1 store models; `llm_runner.build_model/AgentRunner/retry_kwargs/use_json_mode_for`; `config.get_settings`.
 - Produces (used by Task 3):
   - `TurnRejected(ValueError)`
@@ -1009,10 +1013,12 @@ git commit -m "feat: add interviewer schemas, validation, and agent builders"
 ### Task 3: Mock interview service
 
 **Files:**
+
 - Create: `src/resume_agent/services/mock_interview.py`
 - Test: `tests/test_mock_interview_service.py`
 
 **Interfaces:**
+
 - Consumes: Tasks 1–2; `resume_agent.db.get_session`; `resume_agent.tracking.tables.Job/ResumeVersion`.
 - Produces (used by Task 4 router):
   - `run_opening_turn(reporter, *, interview_dir, engine, job_id: int, resume_version_id: int, style: dict, interviewer_agent=None, formatter_agent=None) -> dict` (session view incl. `sessionId`)
@@ -1543,6 +1549,7 @@ git commit -m "feat: add mock interview service turns and views"
 ### Task 4: API schemas, interview router, registration
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/interview.py`
 - Create: `src/resume_agent/api/routers/interview.py`
 - Modify: `src/resume_agent/api/deps.py` (add `get_interview_dir`)
@@ -1550,6 +1557,7 @@ git commit -m "feat: add mock interview service turns and views"
 - Test: `tests/api/test_interview_router.py`
 
 **Interfaces:**
+
 - Consumes: Task 3 service; `get_run_manager`, `get_settings_dep`, `get_session`, `get_workspace_paths` from `api/deps.py`; `record_to_run`; `ApiException`; run singleton conflict classes (mirror `api/routers/coach.py`).
 - Produces: routes `POST /api/interview/sessions`, `POST /api/interview/sessions/{session_id}/messages`, `POST /api/interview/sessions/{session_id}/end`, `GET /api/interview/sessions`, `GET /api/interview/sessions/{session_id}`; run kinds `mock-interview-open|turn|end`; singleton key `"mock-interview"`; error codes `INTERVIEW_BUSY`, `SESSION_ACTIVE`; dep `get_interview_dir(request) -> Path`.
 
@@ -1981,6 +1989,7 @@ git commit -m "feat: expose mock interview endpoints"
 ### Task 5: Transcription seam + endpoint
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py` (add `transcribe_model: str = "gemini:gemini-2.5-flash"` next to the tier models at ~line 30)
 - Modify: `src/resume_agent/llm_runner.py` (add `transcribe`, `transcription_available`)
 - Create: `src/resume_agent/api/routers/transcribe.py`
@@ -1988,6 +1997,7 @@ git commit -m "feat: expose mock interview endpoints"
 - Test: `tests/test_llm_runner_transcribe.py`, `tests/api/test_transcribe_router.py`
 
 **Interfaces:**
+
 - Produces:
   - `llm_runner.transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> str` — raises `ValueError` for missing key / unsupported provider; provider SDK errors propagate.
   - `llm_runner.transcription_available() -> bool`
@@ -2222,6 +2232,7 @@ git commit -m "feat: add LLM voice transcription seam and endpoint"
 ### Task 6: Contract regeneration
 
 **Files:**
+
 - Modify: `contracts/openapi.json`, `contracts/ts/api.ts` (generated)
 
 - [ ] **Step 1: Regenerate**
@@ -2248,10 +2259,12 @@ git commit -m "chore: regenerate API contracts for interview + transcribe routes
 ### Task 7: Web data hooks (`use-interview.ts`)
 
 **Files:**
+
 - Create: `web/src/features/interview/use-interview.ts`
 - Test: `web/src/features/interview/use-interview.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `api`, `unwrap` from `@/lib/api/client`; `seedRun`-style tracking (`useRunStore`, `trackRun` from `@/lib/runs/*`) — copy the `seedRun` helper pattern from `web/src/features/coach/use-coach.ts`.
 - Produces (used by Tasks 8–9): `useInterviewSessions(jobId?: number)`, `useInterviewSession(sessionId: string | null)`, `useStartInterview()`, `useSendInterviewAnswer()`, `useEndInterview()`; exported types `InterviewSession`, `InterviewSessionSummary`, `InterviewStyleIn`, `InterviewDebrief` from `components["schemas"]`.
 
@@ -2278,7 +2291,8 @@ import { useRunStore } from "@/lib/runs/store";
 import { trackRun } from "@/lib/runs/tracker";
 
 export type InterviewSession = components["schemas"]["InterviewSessionOut"];
-export type InterviewSessionSummary = components["schemas"]["InterviewSessionSummaryOut"];
+export type InterviewSessionSummary =
+  components["schemas"]["InterviewSessionSummaryOut"];
 export type InterviewStyleIn = components["schemas"]["InterviewStyleIn"];
 export type InterviewDebrief = components["schemas"]["InterviewDebriefOut"];
 
@@ -2406,6 +2420,7 @@ git commit -m "feat(web): add interview session hooks"
 ### Task 8: Interview page, setup dialog, debrief card, route
 
 **Files:**
+
 - Create: `web/src/features/interview/InterviewPage.tsx`
 - Create: `web/src/features/interview/InterviewSetupDialog.tsx`
 - Create: `web/src/features/interview/DebriefCard.tsx`
@@ -2413,6 +2428,7 @@ git commit -m "feat(web): add interview session hooks"
 - Test: `web/src/features/interview/InterviewPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 7 hooks; chat-bubble/composer patterns from `web/src/features/coach/CoachPage.tsx` (reuse its message-list markup and composer state discipline: composer disabled + preserved text while a run is in flight).
 - Produces: `InterviewPage` (reads `?session=<id>` else the active session from `useInterviewSessions()`), `InterviewSetupDialog({ jobId, versions, open, onOpenChange })` (Task 9 opens it from JobModal; on opening-run completion it navigates to `/interview?session=<sessionId>` using `completed.result.sessionId`), `DebriefCard({ debrief, plan })`.
 
@@ -2457,11 +2473,13 @@ git commit -m "feat(web): add mock interview page, setup dialog, and debrief car
 ### Task 9: JobModal "Interview" tab
 
 **Files:**
+
 - Create: `web/src/features/interview/InterviewTab.tsx`
 - Modify: `web/src/components/JobModal.tsx` (add tab trigger + content)
 - Test: `web/src/features/interview/InterviewTab.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useInterviewSessions(jobId)`, `InterviewSetupDialog` (Task 8); JobModal's existing tabs (`jd`, `versions`, `coverLetters`, `application`, `manage`) and the job-detail versions data already loaded for the Versions tab (pass the same versions array down).
 - Produces: `InterviewTab({ jobId, versions, hasJd })`.
 
@@ -2501,12 +2519,14 @@ git commit -m "feat(web): launch mock interviews from the job detail modal"
 ### Task 10: Shared TranscribeButton in both composers
 
 **Files:**
+
 - Create: `web/src/components/TranscribeButton.tsx`
 - Modify: `web/src/features/interview/InterviewPage.tsx` (composer)
 - Modify: `web/src/features/coach/CoachPage.tsx` (composer)
 - Test: `web/src/components/TranscribeButton.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `GET /api/transcribe/availability`, `POST /api/transcribe` (Task 5); browser `MediaRecorder` + `navigator.mediaDevices.getUserMedia`.
 - Produces: `TranscribeButton({ onText, disabled }: { onText: (text: string) => void; disabled?: boolean })` — appends transcript text into the host composer via `onText`; renders nothing when unavailable.
 
@@ -2534,7 +2554,11 @@ type Phase = "idle" | "recording" | "uploading" | "failed";
 async function upload(blob: Blob): Promise<string> {
   const body = new FormData();
   body.append("file", blob, "clip.webm");
-  const response = await fetch("/api/transcribe", { method: "POST", body, credentials: "include" });
+  const response = await fetch("/api/transcribe", {
+    method: "POST",
+    body,
+    credentials: "include",
+  });
   if (!response.ok) throw new Error("Transcription failed");
   const data = (await response.json()) as { text: string };
   return data.text;
@@ -2618,7 +2642,13 @@ export function TranscribeButton({
   }
   if (phase === "uploading") {
     return (
-      <Button type="button" variant="ghost" size="sm" disabled aria-label="Transcribing">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled
+        aria-label="Transcribing"
+      >
         <Loader2 className="h-4 w-4 animate-spin" />
       </Button>
     );
@@ -2679,11 +2709,13 @@ git commit -m "feat(web): shared voice transcription button in coach and intervi
 ### Task 11: Job-delete cleanup + documentation
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/jobs.py` (delete endpoint, ~line 90)
 - Modify: `CLAUDE.md` (known design notes + hot paths)
 - Test: extend `tests/api/test_interview_router.py`
 
 **Interfaces:**
+
 - Consumes: `delete_sessions_for_job` (Task 1), `get_interview_dir` (Task 4).
 
 - [ ] **Step 1: Write the failing test** (append to `tests/api/test_interview_router.py`)
@@ -2732,7 +2764,7 @@ delete_sessions_for_job(get_interview_dir(request), job_id)
 Hot-path table row:
 
 ```markdown
-| `src/resume_agent/interview/agent.py`                | Mock interviewer persona, turn/debrief validation, transcript elision                                                     |
+| `src/resume_agent/interview/agent.py` | Mock interviewer persona, turn/debrief validation, transcript elision |
 ```
 
 - [ ] **Step 5: Run the full suites**

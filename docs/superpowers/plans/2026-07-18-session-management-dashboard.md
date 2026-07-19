@@ -29,10 +29,12 @@
 ### Task 1: Interview store — archived_at, per-job active, archive/unarchive/delete
 
 **Files:**
+
 - Modify: `src/resume_agent/interview/store.py`
 - Test: `tests/test_interview_store.py` (exists — append tests)
 
 **Interfaces:**
+
 - Produces: `active_sessions(interview_dir) -> list[dict]`, `active_session_for_job(interview_dir, job_id: int) -> dict | None`, `archive_session(interview_dir, session_id) -> dict`, `unarchive_session(interview_dir, session_id) -> dict`, `delete_session(interview_dir, session_id) -> None`, `list_sessions(interview_dir, job_id=None, *, include_archived=False) -> list[dict]`. `InterviewSession` gains `archived_at: str | None`. **Removes** `active_session()` (Task 3 updates its one caller, `api/routers/interview.py` — expect that module's tests to fail until Task 3; run only the store tests here).
 
 - [ ] **Step 1: Write failing tests**
@@ -138,7 +140,7 @@ In `src/resume_agent/interview/store.py`:
     archived_at: str | None = None
 ```
 
-2. Replace `list_sessions` and `active_session` with:
+1. Replace `list_sessions` and `active_session` with:
 
 ```python
 def list_sessions(
@@ -171,14 +173,14 @@ def active_session_for_job(interview_dir: Path | str, job_id: int) -> dict | Non
     )
 ```
 
-3. In `create_session`, replace the guard `if active_session(interview_dir) is not None: raise ValueError("active session exists")` with:
+1. In `create_session`, replace the guard `if active_session(interview_dir) is not None: raise ValueError("active session exists")` with:
 
 ```python
         if active_session_for_job(interview_dir, job_id) is not None:
             raise ValueError(f"active session exists for job {job_id}")
 ```
 
-4. Add after `end_with_debrief`:
+1. Add after `end_with_debrief`:
 
 ```python
 def archive_session(interview_dir: Path | str, session_id: str) -> dict:
@@ -210,7 +212,7 @@ def delete_session(interview_dir: Path | str, session_id: str) -> None:
         path.unlink()
 ```
 
-5. In `delete_sessions_for_job`, change the loop source to include archived rows:
+1. In `delete_sessions_for_job`, change the loop source to include archived rows:
 
 ```python
         for row in list_sessions(interview_dir, job_id=job_id, include_archived=True):
@@ -233,10 +235,12 @@ git commit -m "feat(interview): per-job active sessions + archive/unarchive/dele
 ### Task 2: Coach store — archived_at + archive/unarchive/delete
 
 **Files:**
+
 - Modify: `src/resume_agent/profile/coach_store.py`
 - Test: `tests/test_coach_store.py` (exists — append tests)
 
 **Interfaces:**
+
 - Produces: `archive_session(profile_dir, session_id) -> dict`, `unarchive_session(profile_dir, session_id) -> dict`, `delete_session(profile_dir, session_id) -> None`, `list_sessions(profile_dir, *, include_archived=False)`. `CoachSession` gains `archived_at: str | None`. `active_session()` and single-active `create_session` guard are **unchanged**.
 
 - [ ] **Step 1: Write failing tests**
@@ -313,7 +317,7 @@ def list_sessions(
 
 Note: `active_session()` filters on `status == "active"`, and archive requires `status == "ended"`, so an archived row can never be active — the single-active guard is unaffected.
 
-3. Append the same three mutations as the interview store, but locked with `coach_lock()` and pathed with this module's `_session_path`:
+1. Append the same three mutations as the interview store, but locked with `coach_lock()` and pathed with this module's `_session_path`:
 
 ```python
 def archive_session(profile_dir: Path | str, session_id: str) -> dict:
@@ -362,12 +366,14 @@ git commit -m "feat(coach): session archive/unarchive/delete with archived_at"
 ### Task 3: Interview service views + router management endpoints
 
 **Files:**
+
 - Modify: `src/resume_agent/services/mock_interview.py`
 - Modify: `src/resume_agent/api/routers/interview.py`
 - Modify: `src/resume_agent/api/schemas/interview.py`
 - Test: `tests/api/test_interview_router.py` (append), `tests/test_mock_interview_service.py` (fix imports if any)
 
 **Interfaces:**
+
 - Consumes: Task 1 store functions.
 - Produces: `sessions_view(interview_dir, job_id=None, *, include_archived=False, status=None) -> dict` (rows gain `"archivedAt"`); `session_view` detail gains `"archivedAt"`. Endpoints: `POST /api/interview/sessions/{session_id}/archive|unarchive` → `InterviewSessionOut`; `DELETE /api/interview/sessions/{session_id}` → 204; `GET /api/interview/sessions?jobId&includeArchived&status`; start conflict → 409 `SESSION_ACTIVE_FOR_JOB` with `details={"sessionId": ...}`. Schemas: `InterviewSessionOut.archived_at: str | None = None`, `InterviewSessionSummaryOut.archived_at: str | None = None`.
 
@@ -449,6 +455,7 @@ Expected: new tests FAIL (404 on archive route / wrong conflict code); pre-exist
 - [ ] **Step 3: Implement**
 
 `src/resume_agent/services/mock_interview.py`:
+
 - Add `"archivedAt": session["archived_at"],` to both `_view` (after `"status"`) and each row in `sessions_view`.
 - Change `sessions_view` signature and listing call:
 
@@ -469,9 +476,11 @@ def sessions_view(
 (The per-row dict already exists in this function — keep every existing key and add `"archivedAt": session["archived_at"]`; only the listing/filter lines above are new.)
 
 `src/resume_agent/api/schemas/interview.py`:
+
 - Add `archived_at: str | None = None` to `InterviewSessionOut` and `InterviewSessionSummaryOut`.
 
 `src/resume_agent/api/routers/interview.py`:
+
 - Replace the `active_session` import with `active_session_for_job`, and import `archive_session, delete_session, unarchive_session` from the store.
 - Change `_submit` to accept the key: `def _submit(manager, kind, work, *, singleton: str) -> RunOut:` and pass `singleton_key=singleton`. Call sites:
   - start: `_submit(manager, "mock-interview-open", ..., singleton=f"mock-interview-open:{payload.job_id}")`
@@ -564,12 +573,14 @@ git commit -m "feat(api): interview session management endpoints + per-job concu
 ### Task 4: Coach service views + router management endpoints
 
 **Files:**
+
 - Modify: `src/resume_agent/services/profile_coach.py` (`sessions_view` at line ~96, `session_view`)
 - Modify: `src/resume_agent/api/routers/coach.py`
 - Modify: `src/resume_agent/api/schemas/coach.py`
 - Test: `tests/api/test_coach_router.py` (append)
 
 **Interfaces:**
+
 - Consumes: Task 2 store functions.
 - Produces: `POST /api/profile/coach/sessions/{session_id}/archive|unarchive` → `CoachSessionOut`; `DELETE /api/profile/coach/sessions/{session_id}` → 204; `GET /api/profile/coach/sessions?includeArchived&status`. `CoachSessionSummaryOut.archived_at: str | None = None`, `CoachSessionOut.archived_at: str | None = None`.
 
@@ -615,6 +626,7 @@ Expected: new tests FAIL with 404/405 on the new routes.
 - [ ] **Step 3: Implement**
 
 `src/resume_agent/services/profile_coach.py`:
+
 - `sessions_view` gains the same keyword filters and an `"archivedAt"` row field:
 
 ```python
@@ -685,11 +697,13 @@ git commit -m "feat(api): coach session archive/unarchive/delete endpoints"
 ### Task 5: ErrorRecord table + errors service
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py`
 - Create: `src/resume_agent/services/errors.py`
 - Test: `tests/test_errors_service.py` (new)
 
 **Interfaces:**
+
 - Produces: `ErrorRecord` SQLModel table (`error_records`); `record_error(session, *, kind, source_label, message, run_id=None, details=None) -> ErrorRecord`; `record_source_failures(session, failures: dict[str, dict[str, str]]) -> int`; `list_error_records(session, status: str | None = "open") -> list[ErrorRecord]`; `set_error_status(session, record_id: int, status: str) -> ErrorRecord`; `dismiss_all(session) -> int`; `count_open(session) -> int`; `RETENTION_DAYS = 30`. `init_db` auto-creates the table (`create_all` adds missing tables to existing DBs — no migration).
 
 - [ ] **Step 1: Write failing tests**
@@ -957,11 +971,13 @@ git commit -m "feat(errors): error_records table + dedup/dismiss/resolve service
 ### Task 6: RunManager error hook + app wiring
 
 **Files:**
+
 - Modify: `src/resume_agent/api/runs/manager.py`
 - Modify: `src/resume_agent/api/app.py`
 - Test: `tests/api/test_run_manager.py` (append)
 
 **Interfaces:**
+
 - Consumes: `record_error` (Task 5).
 - Produces: `RunManager(..., on_error: Callable[[dict], None] | None = None)`. Hook payload: `{"runId": str, "kind": str, "error": str, "userId": str | None}`. Fired from the worker's `except Exception` branch (inside the copied contextvars context, so `current_context()` resolves the right workspace) and from `recover_interrupted`. Hook failures are swallowed — error bookkeeping must never mask the original failure.
 
@@ -1037,7 +1053,7 @@ Expected: TypeError — `RunManager.__init__` has no `on_error`.
             pass
 ```
 
-2. In `submit`'s `_runner`, in the `except Exception as exc:` branch, after `reporter.done(...)`:
+1. In `submit`'s `_runner`, in the `except Exception as exc:` branch, after `reporter.done(...)`:
 
 ```python
                     self._emit_error(
@@ -1047,7 +1063,7 @@ Expected: TypeError — `RunManager.__init__` has no `on_error`.
 
 (`RunProgressReporter.__init__` already receives `user_id=` — confirm it stores `self.user_id`; if it doesn't, add `self.user_id = user_id` there.)
 
-3. In `recover_interrupted`, where a record is stamped `state="error"` with "Backend restarted before this run completed", add:
+1. In `recover_interrupted`, where a record is stamped `state="error"` with "Backend restarted before this run completed", add:
 
 ```python
             self._emit_error(
@@ -1114,10 +1130,12 @@ git commit -m "feat(runs): on_error hook writes durable run-failure records"
 ### Task 7: Source-failure writer in pull/refresh launches
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/runs.py` (`launch_pull` ~line 338, `launch_refresh` ~line 300)
 - Test: `tests/api/test_runs_launch.py` (append)
 
 **Interfaces:**
+
 - Consumes: `record_source_failures` (Task 5); `RefreshReport.failures` / `PullReport.failures` (`dict[str, dict[str, str]]`).
 - Produces: every API pull/refresh that completes with per-source failures leaves `kind="source"` records. CLI paths untouched.
 
@@ -1179,11 +1197,13 @@ git commit -m "feat(runs): record per-source pull failures as error records"
 ### Task 8: Errors router + dashboard summary extension
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/errors.py`, `src/resume_agent/api/schemas/errors.py`
 - Modify: `src/resume_agent/api/routers/dashboard.py`, `src/resume_agent/api/schemas/dashboard.py`, `src/resume_agent/api/app.py` (router include)
 - Test: `tests/api/test_errors_router.py` (new), `tests/api/test_dashboard_summary.py` (append)
 
 **Interfaces:**
+
 - Consumes: Task 5 service; `sessions_view` (interview, Task 3) and `sessions_view` (coach, Task 4); schemas `InterviewSessionSummaryOut`, `CoachSessionSummaryOut`.
 - Produces: `GET /api/errors?status=`, `POST /api/errors/{record_id}/dismiss`, `POST /api/errors/{record_id}/resolve`, `POST /api/errors/dismiss-all`. `DashboardSummaryOut` gains `open_error_count: int = 0`, `active_interviews: list[InterviewSessionSummaryOut]`, `active_coach_session: CoachSessionSummaryOut | None`.
 
@@ -1483,12 +1503,14 @@ git add -A && git commit -m "test: backend sweep after session/error-record chan
 ### Task 10: Web hooks — session management + errors
 
 **Files:**
+
 - Modify: `web/src/features/interview/use-interview.ts`
 - Modify: `web/src/features/coach/use-coach.ts`
 - Create: `web/src/features/errors/use-errors.ts`
 - Test: `web/src/features/interview/use-interview.test.tsx` (append), `web/src/features/errors/use-errors.test.tsx` (new)
 
 **Interfaces:**
+
 - Consumes: regenerated `web/src/lib/api/schema.ts` (Tasks 3/4/8).
 - Produces: `useInterviewSessions(jobId?, includeArchived?)`; `useArchiveInterviewSession()`, `useUnarchiveInterviewSession()`, `useDeleteInterviewSession()` (each `mutate({ sessionId })`); coach equivalents `useArchiveCoachSession()`, `useUnarchiveCoachSession()`, `useDeleteCoachSession()`; `useErrorRecords(status?)`, `useDismissError()`, `useResolveError()`, `useDismissAllErrors()`; `export type ErrorRecord = components["schemas"]["ErrorRecordOut"]`.
 
@@ -1580,13 +1602,15 @@ import type { components } from "@/lib/api/schema";
 
 export type ErrorRecord = components["schemas"]["ErrorRecordOut"];
 
-export function useErrorRecords(status: "open" | "dismissed" | "resolved" = "open") {
+export function useErrorRecords(
+  status: "open" | "dismissed" | "resolved" = "open",
+) {
   return useQuery({
     queryKey: ["error-records", status],
     queryFn: () =>
-      unwrap(api.GET("/api/errors", { params: { query: { status } } })) as Promise<
-        components["schemas"]["ErrorRecordsOut"]
-      >,
+      unwrap(
+        api.GET("/api/errors", { params: { query: { status } } }),
+      ) as Promise<components["schemas"]["ErrorRecordsOut"]>,
   });
 }
 
@@ -1655,11 +1679,13 @@ git commit -m "feat(web): session-management and error-record hooks"
 ### Task 11: Interview hub — SessionsRail + page integration + NewInterviewDialog
 
 **Files:**
+
 - Create: `web/src/features/interview/SessionsRail.tsx`, `web/src/features/interview/NewInterviewDialog.tsx`
 - Modify: `web/src/features/interview/InterviewPage.tsx`, `web/src/features/interview/InterviewSetupDialog.tsx`
 - Test: `web/src/features/interview/SessionsRail.test.tsx` (new), `web/src/features/interview/InterviewPage.test.tsx` (extend)
 
 **Interfaces:**
+
 - Consumes: Task 10 hooks; existing `InterviewSetupDialog` (gains an optional `onStarted` no-behavior-change refactor is NOT needed — it already navigates on success).
 - Produces: `SessionsRail({ selectedId }: { selectedId: string | null })` — self-fetching via `useInterviewSessions(undefined, showArchived)`; `NewInterviewDialog({ open, onOpenChange })` — job picker over `/api/pipeline` statuses `tailored` + `rendered`, then renders `InterviewSetupDialog` for the chosen job.
 
@@ -1698,30 +1724,49 @@ Expected: FAIL (component missing).
 
 ```tsx
 import { useState } from "react";
-import { Archive, ArchiveRestore, EllipsisVertical, Plus, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  EllipsisVertical,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 import { NewInterviewDialog } from "./NewInterviewDialog";
 import {
-  useArchiveInterviewSession, useDeleteInterviewSession,
-  useInterviewSessions, useUnarchiveInterviewSession,
+  useArchiveInterviewSession,
+  useDeleteInterviewSession,
+  useInterviewSessions,
+  useUnarchiveInterviewSession,
   type InterviewSessionSummary,
 } from "./use-interview";
 
 function SessionRow({
-  row, selected, onDelete,
+  row,
+  selected,
+  onDelete,
 }: {
   row: InterviewSessionSummary;
   selected: boolean;
@@ -1729,10 +1774,19 @@ function SessionRow({
 }) {
   const archive = useArchiveInterviewSession();
   const unarchive = useUnarchiveInterviewSession();
-  const label = [row.company, row.title].filter(Boolean).join(" · ") || "Mock interview";
+  const label =
+    [row.company, row.title].filter(Boolean).join(" · ") || "Mock interview";
   return (
-    <li className={cn("flex items-center gap-2 rounded-lg border px-3 py-2", selected && "border-primary bg-primary/5")}>
-      <Link to={`/interview?session=${row.sessionId}`} className="min-w-0 flex-1 hover:underline">
+    <li
+      className={cn(
+        "flex items-center gap-2 rounded-lg border px-3 py-2",
+        selected && "border-primary bg-primary/5",
+      )}
+    >
+      <Link
+        to={`/interview?session=${row.sessionId}`}
+        className="min-w-0 flex-1 hover:underline"
+      >
         <span className="block truncate text-sm font-medium">{label}</span>
         <span className="text-xs text-muted-foreground">
           {row.status === "active"
@@ -1740,27 +1794,43 @@ function SessionRow({
             : row.overallScore != null
               ? `Scored ${row.overallScore}/5`
               : "Completed"}
-          {" · "}{new Date(row.startedAt).toLocaleDateString()}
+          {" · "}
+          {new Date(row.startedAt).toLocaleDateString()}
         </span>
       </Link>
       {row.archivedAt ? <Badge variant="outline">Archived</Badge> : null}
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<Button size="icon" variant="ghost" aria-label={`Actions for ${label}`}><EllipsisVertical /></Button>}
+          render={
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={`Actions for ${label}`}
+            >
+              <EllipsisVertical />
+            </Button>
+          }
         />
         <DropdownMenuContent align="end">
           {row.status === "ended" && !row.archivedAt ? (
-            <DropdownMenuItem onClick={() => archive.mutate({ sessionId: row.sessionId })}>
-              <Archive aria-hidden="true" />Archive
+            <DropdownMenuItem
+              onClick={() => archive.mutate({ sessionId: row.sessionId })}
+            >
+              <Archive aria-hidden="true" />
+              Archive
             </DropdownMenuItem>
           ) : null}
           {row.archivedAt ? (
-            <DropdownMenuItem onClick={() => unarchive.mutate({ sessionId: row.sessionId })}>
-              <ArchiveRestore aria-hidden="true" />Unarchive
+            <DropdownMenuItem
+              onClick={() => unarchive.mutate({ sessionId: row.sessionId })}
+            >
+              <ArchiveRestore aria-hidden="true" />
+              Unarchive
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem variant="destructive" onClick={() => onDelete(row)}>
-            <Trash2 aria-hidden="true" />Delete
+            <Trash2 aria-hidden="true" />
+            Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -1771,7 +1841,8 @@ function SessionRow({
 export function SessionsRail({ selectedId }: { selectedId: string | null }) {
   const [showArchived, setShowArchived] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<InterviewSessionSummary | null>(null);
+  const [pendingDelete, setPendingDelete] =
+    useState<InterviewSessionSummary | null>(null);
   const sessions = useInterviewSessions(undefined, showArchived);
   const remove = useDeleteInterviewSession();
 
@@ -1783,35 +1854,58 @@ export function SessionsRail({ selectedId }: { selectedId: string | null }) {
     <aside className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">Sessions</h2>
-        <Button size="sm" onClick={() => setNewOpen(true)}><Plus aria-hidden="true" />New interview</Button>
+        <Button size="sm" onClick={() => setNewOpen(true)}>
+          <Plus aria-hidden="true" />
+          New interview
+        </Button>
       </div>
       {inProgress.length ? (
         <section aria-label="In progress" className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">In progress</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            In progress
+          </h3>
           <ul className="space-y-2">
             {inProgress.map((row) => (
-              <SessionRow key={row.sessionId} row={row} selected={row.sessionId === selectedId} onDelete={setPendingDelete} />
+              <SessionRow
+                key={row.sessionId}
+                row={row}
+                selected={row.sessionId === selectedId}
+                onDelete={setPendingDelete}
+              />
             ))}
           </ul>
         </section>
       ) : null}
       {completed.length ? (
         <section aria-label="Completed" className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Completed</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Completed
+          </h3>
           <ul className="space-y-2">
             {completed.map((row) => (
-              <SessionRow key={row.sessionId} row={row} selected={row.sessionId === selectedId} onDelete={setPendingDelete} />
+              <SessionRow
+                key={row.sessionId}
+                row={row}
+                selected={row.sessionId === selectedId}
+                onDelete={setPendingDelete}
+              />
             ))}
           </ul>
         </section>
       ) : null}
       <label className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Switch checked={showArchived} onCheckedChange={setShowArchived} />Show archived
+        <Switch checked={showArchived} onCheckedChange={setShowArchived} />
+        Show archived
       </label>
 
       <NewInterviewDialog open={newOpen} onOpenChange={setNewOpen} />
 
-      <AlertDialog open={pendingDelete != null} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+      <AlertDialog
+        open={pendingDelete != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this interview?</AlertDialogTitle>
@@ -1825,7 +1919,8 @@ export function SessionsRail({ selectedId }: { selectedId: string | null }) {
             <AlertDialogCancel>Keep it</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (pendingDelete) remove.mutate({ sessionId: pendingDelete.sessionId });
+                if (pendingDelete)
+                  remove.mutate({ sessionId: pendingDelete.sessionId });
                 setPendingDelete(null);
               }}
             >
@@ -1846,11 +1941,19 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { api, fetchAllPages, unwrap } from "@/lib/api/client";
@@ -1871,7 +1974,9 @@ function useInterviewableJobs(enabled: boolean) {
         (["tailored", "rendered"] as const).map((status) =>
           fetchAllPages<PipelineItem>((page) =>
             api.GET("/api/pipeline", {
-              params: { query: { status, sortBy: "stage", page, pageSize: 200 } },
+              params: {
+                query: { status, sortBy: "stage", page, pageSize: 200 },
+              },
             }),
           ),
         ),
@@ -1882,22 +1987,35 @@ function useInterviewableJobs(enabled: boolean) {
 }
 
 export function NewInterviewDialog({
-  open, onOpenChange,
-}: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [jobId, setJobId] = useState<number | null>(null);
   const jobs = useInterviewableJobs(open);
   const sessions = useInterviewSessions();
   const activeJobIds = useMemo(
-    () => new Set((sessions.data?.sessions ?? []).filter((s) => s.status === "active").map((s) => s.jobId)),
+    () =>
+      new Set(
+        (sessions.data?.sessions ?? [])
+          .filter((s) => s.status === "active")
+          .map((s) => s.jobId),
+      ),
     [sessions.data],
   );
-  const candidates = (jobs.data ?? []).filter((job) => !activeJobIds.has(job.jobId));
+  const candidates = (jobs.data ?? []).filter(
+    (job) => !activeJobIds.has(job.jobId),
+  );
   const detail = useQuery({
     queryKey: ["job-detail", jobId],
     enabled: jobId != null,
     queryFn: () =>
       unwrap(
-        api.GET("/api/jobs/{job_id}", { params: { path: { job_id: jobId as number } } }),
+        api.GET("/api/jobs/{job_id}", {
+          params: { path: { job_id: jobId as number } },
+        }),
       ) as Promise<JobDetail>,
   });
   const versions = detail.data?.resumeVersions ?? [];
@@ -1908,7 +2026,10 @@ export function NewInterviewDialog({
         jobId={jobId}
         versions={versions}
         open={open}
-        onOpenChange={(next) => { if (!next) setJobId(null); onOpenChange(next); }}
+        onOpenChange={(next) => {
+          if (!next) setJobId(null);
+          onOpenChange(next);
+        }}
       />
     );
   }
@@ -1919,18 +2040,29 @@ export function NewInterviewDialog({
         <DialogHeader>
           <DialogTitle>New mock interview</DialogTitle>
           <DialogDescription>
-            Pick a job with a tailored resume. Jobs with an interview already in progress are hidden — resume those from the sessions list.
+            Pick a job with a tailored resume. Jobs with an interview already in
+            progress are hidden — resume those from the sessions list.
           </DialogDescription>
         </DialogHeader>
         {jobs.isPending ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />Loading jobs…</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner />
+            Loading jobs…
+          </div>
         ) : candidates.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No interviewable jobs yet — tailor a resume first.</p>
+          <p className="text-sm text-muted-foreground">
+            No interviewable jobs yet — tailor a resume first.
+          </p>
         ) : (
           <Field>
             <FieldLabel htmlFor="new-interview-job">Job</FieldLabel>
-            <Select value={jobId != null ? String(jobId) : undefined} onValueChange={(v) => setJobId(Number(v))}>
-              <SelectTrigger id="new-interview-job" className="w-full"><SelectValue placeholder="Choose a job" /></SelectTrigger>
+            <Select
+              value={jobId != null ? String(jobId) : undefined}
+              onValueChange={(v) => setJobId(Number(v))}
+            >
+              <SelectTrigger id="new-interview-job" className="w-full">
+                <SelectValue placeholder="Choose a job" />
+              </SelectTrigger>
               <SelectContent>
                 {candidates.map((job) => (
                   <SelectItem key={job.jobId} value={String(job.jobId)}>
@@ -1942,7 +2074,10 @@ export function NewInterviewDialog({
           </Field>
         )}
         {jobId != null && detail.isPending ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />Loading resume versions…</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner />
+            Loading resume versions…
+          </div>
         ) : null}
       </DialogContent>
     </Dialog>
@@ -1984,11 +2119,13 @@ git commit -m "feat(web): interview hub with sessions rail and job-picker dialog
 ### Task 12: InterviewTab per-job semantics + banner aggregate
 
 **Files:**
+
 - Modify: `web/src/features/interview/InterviewTab.tsx`
 - Modify: `web/src/features/interview/ActiveInterviewBanner.tsx`
 - Test: `web/src/features/interview/InterviewTab.test.tsx`, `web/src/features/interview/ActiveInterviewBanner.test.tsx` (extend)
 
 **Interfaces:**
+
 - Consumes: Task 10 hooks.
 - Produces: tab hides Start when this job has an active session (shows a resume hint instead); banner shows the count of active interviews app-wide and links to `/interview` (no End button — ending belongs to the hub/page now).
 
@@ -2021,15 +2158,18 @@ Expected: FAIL.
 `InterviewTab.tsx`: compute `const activeRow = rows.find((row) => row.status === "active");` and replace the Start button block:
 
 ```tsx
-{activeRow ? (
-  <p className="text-sm text-muted-foreground">
-    An interview for this job is in progress — resume it from the list below.
-  </p>
-) : (
-  <Button disabled={!canStart} onClick={() => setOpen(true)}>
-    <MessagesSquare aria-hidden="true" />Start mock interview
-  </Button>
-)}
+{
+  activeRow ? (
+    <p className="text-sm text-muted-foreground">
+      An interview for this job is in progress — resume it from the list below.
+    </p>
+  ) : (
+    <Button disabled={!canStart} onClick={() => setOpen(true)}>
+      <MessagesSquare aria-hidden="true" />
+      Start mock interview
+    </Button>
+  );
+}
 ```
 
 Keep the existing list rows (they already deep-link with Resume badges). Render `InterviewSetupDialog` only when `canStart && !activeRow`.
@@ -2040,7 +2180,9 @@ Keep the existing list rows (they already deep-link with Resume badges). Render 
 export function ActiveInterviewBanner() {
   const location = useLocation();
   const sessions = useInterviewSessions();
-  const active = (sessions.data?.sessions ?? []).filter((s) => s.status === "active");
+  const active = (sessions.data?.sessions ?? []).filter(
+    (s) => s.status === "active",
+  );
 
   if (active.length === 0 || location.pathname === "/interview") return null;
 
@@ -2051,16 +2193,27 @@ export function ActiveInterviewBanner() {
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2.5 text-sm md:px-8 lg:px-10">
-      <MessagesSquare className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+      <MessagesSquare
+        className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
+        aria-hidden="true"
+      />
       <span className="min-w-0">
-        <span className="font-medium">{single ? "Mock interview in progress" : label}</span>
-        {single && label ? <span className="text-muted-foreground"> — {label}</span> : null}
+        <span className="font-medium">
+          {single ? "Mock interview in progress" : label}
+        </span>
+        {single && label ? (
+          <span className="text-muted-foreground"> — {label}</span>
+        ) : null}
       </span>
       <div className="ml-auto">
         <Button
           size="sm"
           render={
-            <Link to={single ? `/interview?session=${single.sessionId}` : "/interview"}>
+            <Link
+              to={
+                single ? `/interview?session=${single.sessionId}` : "/interview"
+              }
+            >
               {single ? "Resume" : "Open interviews"}
             </Link>
           }
@@ -2090,10 +2243,12 @@ git commit -m "feat(web): per-job interview tab semantics + aggregate active ban
 ### Task 13: Coach Past-sessions actions
 
 **Files:**
+
 - Modify: `web/src/features/coach/CoachPage.tsx` (the existing "Past sessions" block at ~line 296)
 - Test: `web/src/features/coach/CoachPage.test.tsx` (extend)
 
 **Interfaces:**
+
 - Consumes: Task 10 coach mutations; existing past-sessions rendering.
 - Produces: each ended-session row gains a kebab (Archive/Unarchive/Delete with confirm); a "Show archived" switch below the list; archived rows show an Archived badge. Reviewing an ended session (whatever affordance the block already has for opening one — extend it to show transcript + recap read-only if it currently doesn't) stays read-only.
 
@@ -2132,7 +2287,8 @@ Add below the list:
 
 ```tsx
 <label className="flex items-center gap-2 text-sm text-muted-foreground">
-  <Switch checked={showArchived} onCheckedChange={setShowArchived} />Show archived
+  <Switch checked={showArchived} onCheckedChange={setShowArchived} />
+  Show archived
 </label>
 ```
 
@@ -2153,11 +2309,13 @@ git commit -m "feat(web): coach past-session archive/delete management"
 ### Task 14: Dashboard cards — In progress + Attention needed
 
 **Files:**
+
 - Create: `web/src/features/dashboard/InProgressCard.tsx`, `web/src/features/dashboard/AttentionCard.tsx`
 - Modify: `web/src/features/dashboard/DashboardPage.tsx`, `web/src/features/dashboard/fixtures.ts`
 - Test: `web/src/features/dashboard/InProgressCard.test.tsx`, `web/src/features/dashboard/AttentionCard.test.tsx` (new)
 
 **Interfaces:**
+
 - Consumes: extended `DashboardSummaryOut` (Task 8) via `useDashboardSummary()`; `useErrorRecords`/`useDismissError`/`useResolveError`/`useDismissAllErrors` (Task 10); `timeAgo` from `./time-ago`.
 - Produces: `InProgressCard({ summary })` and `AttentionCard()` rendered on `DashboardPage`.
 
@@ -2214,35 +2372,57 @@ export function InProgressCard({ summary }: { summary: DashboardSummary }) {
       </CardHeader>
       <CardContent>
         {empty ? (
-          <p className="text-sm text-muted-foreground">Nothing in progress — start a mock interview or a coaching session.</p>
+          <p className="text-sm text-muted-foreground">
+            Nothing in progress — start a mock interview or a coaching session.
+          </p>
         ) : (
           <ul className="space-y-3">
             {interviews.map((row) => (
               <li key={row.sessionId} className="flex items-center gap-3">
-                <MessagesSquare className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                <MessagesSquare
+                  className="size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">
-                    {[row.company, row.title].filter(Boolean).join(" · ") || "Mock interview"}
+                    {[row.company, row.title].filter(Boolean).join(" · ") ||
+                      "Mock interview"}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    Question {row.askedCount} of {row.questionCount} · started {timeAgo(row.startedAt)}
+                    Question {row.askedCount} of {row.questionCount} · started{" "}
+                    {timeAgo(row.startedAt)}
                   </span>
                 </div>
-                <Link className="text-sm font-medium text-primary hover:underline" to={`/interview?session=${row.sessionId}`}>
+                <Link
+                  className="text-sm font-medium text-primary hover:underline"
+                  to={`/interview?session=${row.sessionId}`}
+                >
                   Resume
                 </Link>
               </li>
             ))}
             {coach ? (
               <li className="flex items-center gap-3">
-                <Bot className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                <Bot
+                  className="size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
                 <div className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">Profile coaching in progress</span>
+                  <span className="block text-sm font-medium">
+                    Profile coaching in progress
+                  </span>
                   <span className="text-xs text-muted-foreground">
-                    {coach.savedNoteCount} note{coach.savedNoteCount === 1 ? "" : "s"} saved · started {timeAgo(coach.startedAt)}
+                    {coach.savedNoteCount} note
+                    {coach.savedNoteCount === 1 ? "" : "s"} saved · started{" "}
+                    {timeAgo(coach.startedAt)}
                   </span>
                 </div>
-                <Link className="text-sm font-medium text-primary hover:underline" to="/coach">Resume</Link>
+                <Link
+                  className="text-sm font-medium text-primary hover:underline"
+                  to="/coach"
+                >
+                  Resume
+                </Link>
               </li>
             ) : null}
           </ul>
@@ -2263,7 +2443,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 
-import { useDismissAllErrors, useDismissError, useErrorRecords, useResolveError } from "../errors/use-errors";
+import {
+  useDismissAllErrors,
+  useDismissError,
+  useErrorRecords,
+  useResolveError,
+} from "../errors/use-errors";
 import { timeAgo } from "./time-ago";
 
 export function AttentionCard() {
@@ -2279,17 +2464,28 @@ export function AttentionCard() {
         <CardTitle className="flex items-center gap-2 text-base">
           <CircleAlert className="size-4 text-destructive" aria-hidden="true" />
           Attention needed
-          {rows.length ? <Badge variant="destructive">{rows.length}</Badge> : null}
+          {rows.length ? (
+            <Badge variant="destructive">{rows.length}</Badge>
+          ) : null}
         </CardTitle>
         {rows.length ? (
-          <Button size="sm" variant="outline" disabled={clearAll.isPending} onClick={() => clearAll.mutate()}>
-            {clearAll.isPending ? <Spinner data-icon="inline-start" /> : null}Clear all
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={clearAll.isPending}
+            onClick={() => clearAll.mutate()}
+          >
+            {clearAll.isPending ? <Spinner data-icon="inline-start" /> : null}
+            Clear all
           </Button>
         ) : null}
       </CardHeader>
       <CardContent>
         {records.isPending ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />Loading…</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner />
+            Loading…
+          </div>
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">No open errors.</p>
         ) : (
@@ -2297,14 +2493,29 @@ export function AttentionCard() {
             {rows.map((row) => (
               <li key={row.id} className="flex flex-wrap items-center gap-2">
                 <div className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{row.sourceLabel}</span>
+                  <span className="block truncate text-sm font-medium">
+                    {row.sourceLabel}
+                  </span>
                   <span className="text-xs text-muted-foreground">
                     {row.message}
-                    {row.count > 1 ? ` · seen ${row.count}×` : ""} · {timeAgo(row.lastSeenAt)}
+                    {row.count > 1 ? ` · seen ${row.count}×` : ""} ·{" "}
+                    {timeAgo(row.lastSeenAt)}
                   </span>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => dismiss.mutate({ id: row.id })}>Dismiss</Button>
-                <Button size="sm" variant="outline" onClick={() => resolve.mutate({ id: row.id })}>Resolve</Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => dismiss.mutate({ id: row.id })}
+                >
+                  Dismiss
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => resolve.mutate({ id: row.id })}
+                >
+                  Resolve
+                </Button>
               </li>
             ))}
           </ul>

@@ -24,12 +24,14 @@
 ### Task 1: Settings fields, workspace token path, secrets contract
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py` (Settings class, after `advisor_model`)
 - Modify: `src/resume_agent/tenancy/workspace.py` (WorkspacePaths)
 - Modify: `src/resume_agent/api/schemas/secrets.py` (SECRET_FIELDS, SecretsUpdate)
 - Test: `tests/test_gmail_credentials.py` (create)
 
 **Interfaces:**
+
 - Consumes: existing `Settings`, `WorkspacePaths`, `effective_settings` overlay.
 - Produces: `Settings.google_oauth_client_id/google_oauth_client_secret: str`, `Settings.gmail_sync_interval_hours: int` (default 6, ge=0), `Settings.follow_up_days: int` (default 14, ge=0), `Settings.gmail_max_messages: int` (default 50, ge=1), `WorkspacePaths.gmail_token: Path`.
 
@@ -138,12 +140,14 @@ git commit -m "feat(gmail): settings, workspace token path, and secrets contract
 ### Task 2: Gmail error taxonomy + tenant-aware auth module
 
 **Files:**
+
 - Create: `src/resume_agent/gmail/errors.py`
 - Create: `src/resume_agent/gmail/auth.py`
 - Modify: `src/resume_agent/gmail/client.py` (delete `GMAIL_SCOPES`/`CREDENTIALS_PATH`/`TOKEN_PATH`/`build_gmail_service`; re-export the CLI builder)
 - Test: `tests/test_gmail_auth.py` (create)
 
 **Interfaces:**
+
 - Consumes: `WorkspacePaths.gmail_token` (Task 1), `current_context()` from `tenancy/context.py`.
 - Produces:
   - `gmail.errors.GmailError` (base, `code="GMAIL_ERROR"`), `GmailNotConnected` (`code="GMAIL_NOT_CONNECTED"`), `GmailScopeMissing` (`code="GMAIL_SCOPE_MISSING"`), `GmailApiError` (`code="GMAIL_API_ERROR"`).
@@ -401,12 +405,14 @@ git commit -m "feat(gmail): tenant-aware auth module + typed error taxonomy"
 ### Task 3: OAuth web flow endpoints (connect / callback / status / disconnect)
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/gmail.py`
 - Create: `src/resume_agent/api/routers/gmail.py`
 - Modify: `src/resume_agent/api/app.py` (register routers; init `app.state.gmail_oauth_states = {}` right after `app.state.login_limiter = FailedAttemptLimiter()`)
 - Test: `tests/api/test_gmail_router.py` (create)
 
 **Interfaces:**
+
 - Consumes: `issue_link_token`/`verify_link_token` (`api/auth.py`, purpose `"gmail-oauth"`), `gmail.auth` (Task 2), `get_data_dir`/`get_settings_dep` (`api/deps.py`), `build_context` + `use_context` (tenancy).
 - Produces:
   - `GET /api/gmail/connect` → `GmailConnectOut {authUrl: str}` (guarded)
@@ -740,6 +746,7 @@ def gmail_disconnect(request: Request):
 ```
 
 In `src/resume_agent/api/app.py`:
+
 - add `from resume_agent.api.routers import gmail as gmail_router` to the router imports;
 - add `app.state.gmail_oauth_states = {}` right after the `app.state.login_limiter = FailedAttemptLimiter()` line;
 - register (next to the notifications router registration):
@@ -767,11 +774,13 @@ git commit -m "feat(gmail): OAuth web flow — connect, signed-state callback, s
 ### Task 4: Body-aware classification + wired cheap-tier LLM fallback
 
 **Files:**
+
 - Modify: `src/resume_agent/gmail/client.py` (EmailMessage.body, body extraction)
 - Modify: `src/resume_agent/gmail/classify.py` (body in rules text, `build_classifier_llm`, `hydrating_classifier`)
 - Test: `tests/test_gmail_body.py` (create), extend `tests/test_gmail_classify.py`
 
 **Interfaces:**
+
 - Consumes: `html_to_text` from `resume_agent.discovery.connectors.text`, `model_for_tier` from `resume_agent.tailor.agents`, `AgentRunner`, `build_model`, `resolve_api_key`, `retry_kwargs` from `llm_runner`.
 - Produces:
   - `EmailMessage.body: str | None = None` (new dataclass field, default keeps all callers working)
@@ -996,6 +1005,7 @@ git commit -m "feat(gmail): body-aware classification with wired cheap-tier LLM 
 ### Task 5: Follow-up reminders + kind-aware notifications API
 
 **Files:**
+
 - Create: `src/resume_agent/services/reminders.py`
 - Modify: `src/resume_agent/services/notifications.py` (`accept_notification` branches on kind)
 - Modify: `src/resume_agent/api/schemas/notifications.py` (job projection fields)
@@ -1003,6 +1013,7 @@ git commit -m "feat(gmail): body-aware classification with wired cheap-tier LLM 
 - Test: `tests/test_services_reminders.py` (create)
 
 **Interfaces:**
+
 - Consumes: `application_job_pairs` (`tracking/queries.py`), `notification_by_key`, `save_notification` (`tracking/repository.py`), `Settings.follow_up_days` (Task 1).
 - Produces:
   - `services.reminders.FOLLOW_UP_KIND = "follow_up"`
@@ -1221,11 +1232,13 @@ git commit -m "feat(gmail): deterministic follow-up reminders riding the notific
 ### Task 6: Shared sync work unit + rewired manual sync endpoint
 
 **Files:**
+
 - Create: `src/resume_agent/services/gmail_sync.py`
 - Modify: `src/resume_agent/api/routers/runs.py` (`launch_gmail_sync`)
 - Test: `tests/test_services_gmail_sync.py` (create)
 
 **Interfaces:**
+
 - Consumes: `gmail.auth.build_service`/`load_credentials` (Task 2), `hydrating_classifier`/`build_classifier_llm` (Task 4), `sync_notifications` (services), `create_follow_up_reminders` (Task 5), `Settings.gmail_max_messages` (Task 1).
 - Produces: `services.gmail_sync.run_gmail_sync(engine, reporter, *, service=None, llm=None) -> dict` — the single sync work unit used by the manual endpoint (this task) and the scheduler (Task 7). `service`/`llm` params exist for tests and default to real construction.
 
@@ -1428,11 +1441,13 @@ git commit -m "feat(gmail): shared sync work unit; manual sync pre-checks connec
 ### Task 7: In-process scheduler
 
 **Files:**
+
 - Create: `src/resume_agent/gmail/scheduler.py`
 - Modify: `src/resume_agent/api/app.py` (lifespan start/stop)
 - Test: `tests/test_gmail_scheduler.py` (create)
 
 **Interfaces:**
+
 - Consumes: `run_gmail_sync` (Task 6), `RunManager.submit`, `build_context` (`tenancy/bootstrap.py`), `workspace_paths`, `use_context`, `ACTIVE_RUN_STATES` (`api/runs/models.py`), `token_path` (Task 2).
 - Produces:
   - `gmail.scheduler.tick(state, *, work=run_gmail_sync) -> dict[str, str]` — one async pass over all connected users; `state` is any object exposing `system_engine`, `engine_registry`, `settings`, `template_config_dir`, `data_dir`, `run_manager`, `engine` (the FastAPI `app.state` in production, a `SimpleNamespace` in tests). Returns `{owner: run_id | "error: ..."}`; `"local"` is the owner key in no-tenancy mode.
@@ -1676,11 +1691,13 @@ git commit -m "feat(gmail): in-process scheduler with per-user isolation and run
 ### Task 8: EmailDraft table, repository helpers, delete cascade
 
 **Files:**
+
 - Modify: `src/resume_agent/tracking/tables.py` (new model after `Notification`)
 - Modify: `src/resume_agent/tracking/repository.py` (CRUD + cascade)
 - Test: `tests/test_email_draft_repository.py` (create)
 
 **Interfaces:**
+
 - Consumes: existing SQLModel table conventions (`utcnow`, `cast(Any, ...)` tablename).
 - Produces:
   - `tracking.tables.EmailDraft` — fields: `id: int | None` (pk), `job_id: int` (FK jobs.id, indexed), `draft_type: str`, `subject: str`, `body: str`, `to_addr: str = ""`, `gmail_thread_id: str | None`, `gmail_draft_id: str | None`, `state: str = "generated"` (`generated|saved`), `created_at: datetime`.
@@ -1806,10 +1823,12 @@ git commit -m "feat(gmail): EmailDraft table with FK-safe cascade, no progress g
 ### Task 9: Email writer service
 
 **Files:**
+
 - Create: `src/resume_agent/services/email_writer.py`
 - Test: `tests/test_email_writer.py` (create)
 
 **Interfaces:**
+
 - Consumes: `EmailDraft` + repository (Task 8), `fetch_recent_messages`/`fetch_message_body` (Task 4), `match_email_to_application` (`gmail/match.py`), `AgentRunner`/`build_model`/`retry_kwargs`/`use_json_mode_for` (`llm_runner`), `model_for_tier` (`tailor/agents.py`), `ExtensibleModel` (`models/base.py`).
 - Produces:
   - `DRAFT_TYPES = ("follow_up", "thank_you", "withdrawal", "cold_outreach")`
@@ -2128,12 +2147,14 @@ git commit -m "feat(gmail): fact-grounded email writer service (drafts, human ga
 ### Task 10: Email draft API — generate run, list, save to Gmail
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/email_drafts.py`
 - Create: `src/resume_agent/api/routers/email_drafts.py`
 - Modify: `src/resume_agent/api/app.py` (register router with `guarded`)
 - Test: `tests/api/test_email_drafts.py` (create)
 
 **Interfaces:**
+
 - Consumes: `generate_email_draft`/`DRAFT_TYPES` (Task 9), `EmailDraft` repository (Task 8), `gmail.auth.build_service`/`load_credentials`/`has_compose` (Task 2), `GmailError` family, `RunManager` `_submit` pattern (`api/routers/runs.py`), `_workspace_args` for the facts path.
 - Produces:
   - `POST /api/jobs/{job_id}/email-draft` body `EmailDraftRequest {draftType, instructions?}` → 202 `RunOut`, kind `"emailDraft"`, singleton `f"emailDraft:{job_id}"`; run result `{"draftId": id}`.
@@ -2468,12 +2489,14 @@ git commit -m "feat(gmail): email draft endpoints — generate run, list, save t
 ### Task 11: Web — Gmail connect card in Settings
 
 **Files:**
+
 - Create: `web/src/features/settings/use-gmail.ts`
 - Create: `web/src/features/settings/GmailCard.tsx`
 - Create: `web/src/features/settings/GmailCard.test.tsx`
 - Modify: `web/src/features/settings/pages/KeysSettingsPage.tsx` (render `<GmailCard />`)
 
 **Interfaces:**
+
 - Consumes: `/api/gmail/status`, `/api/gmail/connect`, `DELETE /api/gmail/token` from the regenerated `web/src/lib/api/schema.ts`; `api`/`unwrap` from `@/lib/api/client`.
 - Produces: `useGmailStatus()`, `useGmailConnect()`, `useGmailDisconnect()` hooks; `<GmailCard />` component.
 
@@ -2521,7 +2544,11 @@ export function useGmailDisconnect() {
 import { Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useGmailConnect, useGmailDisconnect, useGmailStatus } from "./use-gmail";
+import {
+  useGmailConnect,
+  useGmailDisconnect,
+  useGmailStatus,
+} from "./use-gmail";
 
 export function GmailCard() {
   const { data: status, isLoading } = useGmailStatus();
@@ -2548,16 +2575,30 @@ export function GmailCard() {
         {status?.connected ? (
           <div className="flex gap-2">
             {!status.draftCapable && (
-              <Button size="sm" variant="outline" disabled={connect.isPending} onClick={() => connect.mutate()}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={connect.isPending}
+                onClick={() => connect.mutate()}
+              >
                 Reconnect
               </Button>
             )}
-            <Button size="sm" variant="outline" disabled={disconnect.isPending} onClick={() => disconnect.mutate()}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={disconnect.isPending}
+              onClick={() => disconnect.mutate()}
+            >
               Disconnect
             </Button>
           </div>
         ) : (
-          <Button size="sm" disabled={connect.isPending || isLoading} onClick={() => connect.mutate()}>
+          <Button
+            size="sm"
+            disabled={connect.isPending || isLoading}
+            onClick={() => connect.mutate()}
+          >
             Connect Gmail
           </Button>
         )}
@@ -2577,7 +2618,12 @@ import { describe, expect, it, vi } from "vitest";
 import { GmailCard } from "./GmailCard";
 
 const mocks = vi.hoisted(() => ({
-  status: { connected: false, scopes: [], draftCapable: false, clientSource: "platform" },
+  status: {
+    connected: false,
+    scopes: [],
+    draftCapable: false,
+    clientSource: "platform",
+  },
 }));
 
 vi.mock("./use-gmail", () => ({
@@ -2589,14 +2635,25 @@ vi.mock("./use-gmail", () => ({
 describe("GmailCard", () => {
   it("offers connect when disconnected", () => {
     render(<GmailCard />);
-    expect(screen.getByRole("button", { name: /connect gmail/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /connect gmail/i }),
+    ).toBeInTheDocument();
   });
 
   it("offers reconnect when compose scope is missing", () => {
-    mocks.status = { connected: true, scopes: ["readonly"], draftCapable: false, clientSource: "own" };
+    mocks.status = {
+      connected: true,
+      scopes: ["readonly"],
+      draftCapable: false,
+      clientSource: "own",
+    };
     render(<GmailCard />);
-    expect(screen.getByRole("button", { name: /reconnect/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /disconnect/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /reconnect/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /disconnect/i }),
+    ).toBeInTheDocument();
   });
 });
 ```
@@ -2620,6 +2677,7 @@ git commit -m "feat(web): Gmail connect card in Settings > Keys"
 ### Task 12: Web — kind-aware bell + email draft dialog
 
 **Files:**
+
 - Create: `web/src/features/job/use-email-drafts.ts`
 - Create: `web/src/features/job/EmailDraftDialog.tsx`
 - Modify: `web/src/features/notifications/NotificationsBell.tsx` (kind-aware rendering + Draft follow-up)
@@ -2627,6 +2685,7 @@ git commit -m "feat(web): Gmail connect card in Settings > Keys"
 - Test: `web/src/features/notifications/NotificationsBell.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: `NotificationOut` now carrying `kind`/`jobId`/`company`/`title`; `/api/jobs/{job_id}/email-draft` + `/email-drafts` + `/api/email-drafts/{draft_id}/save` endpoints (Task 10); `watchRun` pattern from `use-notifications.ts`.
 - Produces: `useEmailDrafts(jobId)`, `useGenerateEmailDraft(jobId)`, `useSaveEmailDraft(jobId)` hooks; `<EmailDraftDialog jobId defaultType open onOpenChange />`.
 
@@ -2661,7 +2720,10 @@ export function useEmailDrafts(jobId: number, enabled = true) {
 export function useGenerateEmailDraft(jobId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { draftType: string; instructions?: string }): Promise<RunOut> =>
+    mutationFn: (body: {
+      draftType: string;
+      instructions?: string;
+    }): Promise<RunOut> =>
       unwrap(
         api.POST("/api/jobs/{job_id}/email-draft", {
           params: { path: { job_id: jobId } },
@@ -2765,7 +2827,10 @@ export function EmailDraftDialog({
         <Button
           disabled={generate.isPending}
           onClick={() =>
-            generate.mutate({ draftType, instructions: instructions || undefined })
+            generate.mutate({
+              draftType,
+              instructions: instructions || undefined,
+            })
           }
         >
           {generate.isPending && (
@@ -2794,7 +2859,9 @@ export function EmailDraftDialog({
                 onClick={() => latest.id && save.mutate(latest.id)}
               >
                 <Save className="size-4" aria-hidden="true" />
-                {latest.state === "saved" ? "Saved to Gmail" : "Save to Gmail drafts"}
+                {latest.state === "saved"
+                  ? "Saved to Gmail"
+                  : "Save to Gmail drafts"}
               </Button>
             </div>
           </div>
@@ -2810,6 +2877,7 @@ export function EmailDraftDialog({
 - [ ] **Step 3: Kind-aware bell**
 
 In `web/src/features/notifications/NotificationsBell.tsx`:
+
 - add local state `const [draftJobId, setDraftJobId] = useState<number | null>(null);` (import `useState` from react, `EmailDraftDialog` from `@/features/job/EmailDraftDialog`);
 - replace the item body (`<div className="font-medium">Move to {item.proposedStatus}</div>`) with kind-aware copy:
 
@@ -2842,14 +2910,16 @@ In `web/src/features/notifications/NotificationsBell.tsx`:
 - render the dialog after the `</Popover>` close (wrap the component return in a fragment):
 
 ```tsx
-{draftJobId != null && (
-  <EmailDraftDialog
-    jobId={draftJobId}
-    defaultType="follow_up"
-    open
-    onOpenChange={(open) => !open && setDraftJobId(null)}
-  />
-)}
+{
+  draftJobId != null && (
+    <EmailDraftDialog
+      jobId={draftJobId}
+      defaultType="follow_up"
+      open
+      onOpenChange={(open) => !open && setDraftJobId(null)}
+    />
+  );
+}
 ```
 
 - update the popover subtitle from "Gmail-derived status proposals" to "Status proposals & follow-up reminders".
@@ -2929,6 +2999,7 @@ git commit -m "feat(web): kind-aware notification bell + email draft dialog"
 ### Task 13: Full-suite verification + docs
 
 **Files:**
+
 - Modify: `CLAUDE.md` (add a Gmail design note)
 - Modify: `.env.example` if present (document new env vars)
 

@@ -64,9 +64,9 @@ discipline.
 - `session_id`, `job_id`, `resume_version_id`, `started_at`, `ended_at`,
   `status: active | ended`
 - `style`: `{stage: recruiter_screen | hiring_manager | technical |
-  behavioral, demeanor: warm | neutral | stress, difficulty: easy | standard |
-  hard, question_count: 4–12 (default 8), extra: str (length-capped free
-  text)}`
+behavioral, demeanor: warm | neutral | stress, difficulty: easy | standard |
+hard, question_count: 4–12 (default 8), extra: str (length-capped free
+text)}`
 - `context`: JD text, extracted criteria, and the tailored resume content
   **snapshotted at opening** — a later job edit or re-tailor never re-bases a
   transcript (the same frozen-text principle as `jd_text` after tailoring).
@@ -77,7 +77,7 @@ discipline.
 - `turns`: `{role: interviewer | candidate, text, question_id, at}`
 - `debrief`: structured report filled by the end-turn — overall summary,
   per-question `{question, score: 1–5, strengths, improvements,
-  suggested_answer}`, cross-cutting strengths and areas-to-improve, STAR
+suggested_answer}`, cross-cutting strengths and areas-to-improve, STAR
   coaching notes.
 
 **Lifecycle:** setup → opening run (agent reads the snapshot, builds the plan,
@@ -159,13 +159,13 @@ New service module `services/mock_interview.py` (turn functions + camelCase
 views; a DB session is used only at session start to load the job and resume
 version) and thin router `api/routers/interview.py`.
 
-| Endpoint                                   | Behavior                                                                                                                                                                                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/interview/sessions`             | Body `{jobId, resumeVersionId, style}`. Runs the guards, snapshots JD + criteria + resume content into the opening context, submits the opening-turn run. `202` + run record. `409` if an active session or opening run exists.       |
-| `POST /api/interview/sessions/{sid}/messages` | Appends the candidate turn, submits an interviewer-turn run. `409` if a turn run is active or the session ended. `202` + run record.                                                                                                 |
-| `POST /api/interview/sessions/{sid}/end`   | Submits the debrief run — drops character, scores asked questions, marks the session ended. Allowed anytime while active; an early end scores fewer questions. `202` + run record.                                                     |
-| `GET /api/interview/sessions?jobId=`       | Session list (id, job, dates, status, progress; when ended, an overall score computed by the view as the mean of the debrief's per-question scores).                                                                                                                                                            |
-| `GET /api/interview/sessions/{sid}`        | Full state: style, transcript, progress, debrief. The `plan` is included only when the session has ended.                                                                                                                             |
+| Endpoint                                      | Behavior                                                                                                                                                                                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/interview/sessions`                | Body `{jobId, resumeVersionId, style}`. Runs the guards, snapshots JD + criteria + resume content into the opening context, submits the opening-turn run. `202` + run record. `409` if an active session or opening run exists. |
+| `POST /api/interview/sessions/{sid}/messages` | Appends the candidate turn, submits an interviewer-turn run. `409` if a turn run is active or the session ended. `202` + run record.                                                                                            |
+| `POST /api/interview/sessions/{sid}/end`      | Submits the debrief run — drops character, scores asked questions, marks the session ended. Allowed anytime while active; an early end scores fewer questions. `202` + run record.                                              |
+| `GET /api/interview/sessions?jobId=`          | Session list (id, job, dates, status, progress; when ended, an overall score computed by the view as the mean of the debrief's per-question scores).                                                                            |
+| `GET /api/interview/sessions/{sid}`           | Full state: style, transcript, progress, debrief. The `plan` is included only when the session has ended.                                                                                                                       |
 
 **Turn data flow** is the coach's, verbatim: client POSTs → run id → existing
 SSE run tracker → on completion re-fetch the session. Run workers open their

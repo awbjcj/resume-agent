@@ -8,7 +8,7 @@
 Skill-group assignments (the 13-slug display axis: Languages, Data & ML, …) are made
 once by the cheap-tier LLM classifier and frozen in `data/taxonomy/skill_groups.json`.
 `save_group_map` merges first-writer-wins and `classify_missing_groups` only classifies
-tokens *missing* from the cache, so a wrong guess is permanent. The only correction path
+tokens _missing_ from the cache, so a wrong guess is permanent. The only correction path
 today is hand-editing `data/profile/overrides.yaml`'s `group:` map on disk — no UI, no
 API, no way to enumerate or revert corrections.
 
@@ -19,7 +19,7 @@ API, no way to enumerate or revert corrections.
 2. **Surface: Web UI + API.** No CLI command.
 3. **Reach: pin corrected tokens only.** A correction permanently fixes that exact
    canonical token across all future rebuilds. New, never-seen tokens are still
-   classified fresh by the LLM; corrections are *not* injected as few-shot examples.
+   classified fresh by the LLM; corrections are _not_ injected as few-shot examples.
 4. **Storage: a dedicated corrections ledger** (Approach A), not programmatic
    `overrides.yaml` writes (comment/format-destroying YAML round-trips) and not direct
    `skill_groups.json` mutation (corrections would vanish on cache reset and be
@@ -104,10 +104,10 @@ New `services/profile_groups.py`, mirroring `services/profile_skills.py`:
 
 Endpoints in `api/routers/profile.py`, same error mapping as the manual-skills endpoints:
 
-| Route | Body | Success | Errors |
-| --- | --- | --- | --- |
-| `PUT /api/profile/skills/{key}/group` | `{ "group": "data-ml" }` | 200 + updated row (key, display, group, groupSource) | 422 unknown slug, 404 unknown skill, 400 `SETUP_INCOMPLETE` profile not built |
-| `DELETE /api/profile/skills/{key}/group` | — | 204 | 404 no correction for key, 400 `SETUP_INCOMPLETE` profile not built |
+| Route                                    | Body                     | Success                                              | Errors                                                                        |
+| ---------------------------------------- | ------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `PUT /api/profile/skills/{key}/group`    | `{ "group": "data-ml" }` | 200 + updated row (key, display, group, groupSource) | 422 unknown slug, 404 unknown skill, 400 `SETUP_INCOMPLETE` profile not built |
+| `DELETE /api/profile/skills/{key}/group` | —                        | 204                                                  | 404 no correction for key, 400 `SETUP_INCOMPLETE` profile not built           |
 
 ("Profile not built" maps to 400 `SETUP_INCOMPLETE`, not 409, matching every
 existing manual-skills endpoint in `routers/profile.py`.)

@@ -123,13 +123,13 @@ always winning; the LLM never reads or writes it (mirrors `group_corrections`):
 
 ```json
 {
-  "skill_domain":    { "<canonical token>": "<domain_id>" },
-  "domain_renames":  { "<domain_id>": "New Label" },
-  "domain_merges":   { "<loser_domain_id>": "<winner_domain_id>" },
+  "skill_domain": { "<canonical token>": "<domain_id>" },
+  "domain_renames": { "<domain_id>": "New Label" },
+  "domain_merges": { "<loser_domain_id>": "<winner_domain_id>" },
   "domain_category": { "<domain_id>": "<category_slug>" },
-  "added_skills":    [ "<token>" ],
-  "removed_skills":  [ "<token>" ],
-  "aliases":         { "<token>": "<canonical token>" }
+  "added_skills": ["<token>"],
+  "removed_skills": ["<token>"],
+  "aliases": { "<token>": "<canonical token>" }
 }
 ```
 
@@ -137,7 +137,7 @@ always winning; the LLM never reads or writes it (mirrors `group_corrections`):
   load point, after LLM refresh output merges. Precedence: corrections > LLM output.
 - `domain_merges` reuses the `_flatten_aliases` cycle-rejection approach.
 - `removed_skills` hides leaves from views but never blocks re-adding: `POST
-  /api/taxonomy/skills` for a removed token deletes it from `removed_skills` in the
+/api/taxonomy/skills` for a removed token deletes it from `removed_skills` in the
   same ledger update.
 - User aliases merge into the alias map with user entries winning.
 - **User-created domain durability:** creating a domain via "Move → New domain…" writes
@@ -172,14 +172,14 @@ New edit endpoints — thin `api/routers/taxonomy.py` over `services/taxonomy.py
 all synchronous (no LLM, no Run/SSE), each validating against the current map,
 appending to the ledger atomically, and returning the updated map:
 
-| Endpoint | Ledger write |
-|---|---|
-| `PUT /api/taxonomy/skills/{token}/domain` | `skill_domain` |
+| Endpoint                                                   | Ledger write                         |
+| ---------------------------------------------------------- | ------------------------------------ |
+| `PUT /api/taxonomy/skills/{token}/domain`                  | `skill_domain`                       |
 | `PATCH /api/taxonomy/domains/{id}` (label and/or category) | `domain_renames` / `domain_category` |
-| `POST /api/taxonomy/domains/{id}/merge` | `domain_merges` |
-| `POST /api/taxonomy/skills` (token + target domain) | `added_skills` + `skill_domain` |
-| `DELETE /api/taxonomy/skills/{token}` | `removed_skills` |
-| `POST /api/taxonomy/aliases` (token → canonical) | `aliases` |
+| `POST /api/taxonomy/domains/{id}/merge`                    | `domain_merges`                      |
+| `POST /api/taxonomy/skills` (token + target domain)        | `added_skills` + `skill_domain`      |
+| `DELETE /api/taxonomy/skills/{token}`                      | `removed_skills`                     |
+| `POST /api/taxonomy/aliases` (token → canonical)           | `aliases`                            |
 
 No create-empty-domain endpoint: domains exist only when a skill lives there; moving a
 skill to a new label + category creates the domain implicitly. Validation failures

@@ -17,7 +17,7 @@ So the highest-leverage fix is **inferring US-ness from the region/metro**, not 
 
 ## Layer 2 — deterministic taxonomy (`taxonomy/location.py`), primary lift
 
-The crux is an **ordering inversion**: today country gates region. To infer US *from* a state, region must resolve first and feed back into country. This is a `build_location` restructure, not just a bigger dict.
+The crux is an **ordering inversion**: today country gates region. To infer US _from_ a state, region must resolve first and feed back into country. This is a `build_location` restructure, not just a bigger dict.
 
 1. **US inference (state + curated metros).** When the country field does not resolve:
    - If the region resolves to a real US state/USPS code → `country="US"`, `is_us=True`.
@@ -34,6 +34,7 @@ The crux is an **ordering inversion**: today country gates region. To infer US *
 ## Layer 1 — LLM prompt (`discovery/fit.py`), the assist
 
 Append 2–3 lines to `_INSTRUCTIONS` (matching existing terse style):
+
 - Split a combined location string into city, region (US state, full name or 2-letter), and country.
 - Set `country="US"` when the location names a US state or a clearly-US city, even when the country is unwritten.
 - For remote roles, capture any country qualifier (`"Remote (US)"` → country US); leave city/region null unless a specific hub is named.
@@ -49,6 +50,7 @@ The deterministic layer remains the backstop, so a prompt miss is still caught. 
 ## Testing
 
 Pure-logic, offline. Extend `tests/test_taxonomy_location.py`:
+
 - US inferred from state when country absent: `("San Francisco","CA",None)` → US/CA.
 - US inferred from metro: `("NYC",None,None)` → US/NY, city New York.
 - Abbreviation variants: `Calif.`, `Mass.`, `Tex.` → CA/MA/TX.
