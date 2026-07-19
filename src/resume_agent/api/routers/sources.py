@@ -19,8 +19,8 @@ from resume_agent.api.schemas.sources import (
     SourcePreviewIn,
     SourcePreviewOut,
 )
+from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.config import Settings
 from resume_agent.llm_runner import plan_search, resolve_api_key
@@ -121,10 +121,7 @@ def discover_sources_route(
             browser_enabled=settings.browser_enabled,
         )
 
-    run_id = mgr.submit("source-discovery", work, singleton_key="source-discovery")
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "source-discovery", work, singleton_key="source-discovery")
 
 
 @router.patch("/sources/{source_id}", response_model=SourceOut)

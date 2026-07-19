@@ -19,8 +19,8 @@ from resume_agent.api.deps import (
 )
 from resume_agent.api.errors import ApiException
 from resume_agent.api.uploads import UploadTooLargeError, read_upload_async
+from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.config import ProfileConfigDoc
 from resume_agent.api.schemas.profile import (
     AddAliasIn,
@@ -147,15 +147,13 @@ def _launch_build(
             github_limit=profile_cfg.github_repo_limit,
         )
 
-    run_id = mgr.submit(
+    return launch(
+        mgr,
         "profile-build",
         work,
         singleton_key="profile-build",
         singleton_conflict=singleton_conflict,
     )
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
 
 
 _MAX_SOURCE_BYTES = 15 * 1024 * 1024
@@ -269,10 +267,7 @@ def launch_github_sync(
             "warnings": report.warnings,
         }
 
-    run_id = mgr.submit("github-sync", work, singleton_key="github-sync")
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "github-sync", work, singleton_key="github-sync")
 
 
 @router.get("/profile/matrix", response_model=MatrixOut)

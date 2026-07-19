@@ -13,13 +13,13 @@ from resume_agent.api.deps import (
     get_settings_dep,
 )
 from resume_agent.api.errors import ApiException
+from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import (
     RunManager,
     RunQuotaError,
     RunResetConflict,
     RunSingletonConflict,
 )
-from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.coach import (
     CoachEndIn,
     CoachMessageIn,
@@ -78,27 +78,15 @@ def _guard_setup(request: Request, settings: Settings):
 
 
 def _submit(manager: RunManager, kind: str, work) -> RunOut:
-    try:
-        run_id = manager.submit(
-            kind,
-            work,
-            singleton_key=_SINGLETON,
-            singleton_conflict="raise",
-        )
-    except RunSingletonConflict as exc:
-        raise ApiException(
-            409,
-            "COACH_BUSY",
-            "A coach turn is already running",
-            details={"runId": exc.run_id},
-        ) from exc
-    except RunResetConflict as exc:
-        raise ApiException(409, exc.code, str(exc)) from exc
-    except RunQuotaError as exc:
-        raise ApiException(429, exc.code, str(exc)) from exc
-    record = manager.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(
+        manager,
+        kind,
+        work,
+        singleton_key=_SINGLETON,
+        singleton_conflict="raise",
+        busy_code="COACH_BUSY",
+        busy_message="A coach turn is already running",
+    )
 
 
 def _value_error(exc: ValueError) -> ApiException:

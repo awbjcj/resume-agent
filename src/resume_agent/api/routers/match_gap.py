@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
 from resume_agent.api.deps import get_engine, get_run_manager, get_session
+from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.runs.sse import record_to_run
 from resume_agent.api.schemas.match_gap import MatchGapOut
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
@@ -125,7 +125,4 @@ def refresh_match_gap_clusters(
         result["matrixRegenerated"] = True
         return result
 
-    run_id = mgr.submit("refreshClusters", work, singleton_key="refreshClusters")
-    record = mgr.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(mgr, "refreshClusters", work, singleton_key="refreshClusters")
