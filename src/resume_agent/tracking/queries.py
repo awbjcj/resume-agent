@@ -65,12 +65,16 @@ class ShortlistRow:
     url: str | None = None
 
 
-@dataclass
-class JobDetailRow:
-    # Detail-only columns (named to match the JobDetail schema: id, not job_id).
+@dataclass(kw_only=True)
+class JobDetailRow(ShortlistRow):
+    """Flat read-model for one job's detail view.
+
+    Inherits the facet half from ShortlistRow (declared once, projected by
+    _shortlist_row) and adds the detail-only columns, named to match the
+    JobDetail schema: id, not job_id.
+    """
+
     id: int
-    source: str
-    url: str | None
     jd_text: str
     status: str
     criteria_json: dict[str, Any] | None
@@ -80,26 +84,6 @@ class JobDetailRow:
     application: Application | None
     resume_versions: list[ResumeVersion]
     cover_letters: list[CoverLetter]
-    # Facet half mirrors ShortlistRow and is reused via _shortlist_row.
-    company: str | None
-    title: str | None
-    location: str | None
-    fit_score: int | None
-    fit_rationale: str | None
-    sponsorship_signal: str | None
-    salary_min: float | None
-    salary_max: float | None
-    salary_currency: str | None
-    remote_policy: str | None
-    seniority: str | None
-    employment_type: str | None
-    industry: str | None
-    company_size: str | None
-    posted_at: datetime | None
-    skills: list[SkillTag]
-    location_country: str | None = None
-    location_region: str | None = None
-    location_city: str | None = None
     best_resume_version_id: int | None = None
     needs_attention: bool = False
     regressed: bool = False
@@ -262,9 +246,8 @@ def job_detail_row(
     versions = resume_versions_for_job(session, jid)
     best = pick_best(versions)
     return JobDetailRow(
+        **vars(facets),
         id=jid,
-        source=job.source,
-        url=job.url,
         jd_text=clean_job_description_text(job.jd_text),
         status=job.status,
         criteria_json=(
@@ -278,25 +261,6 @@ def job_detail_row(
         application=application_for_job(session, jid),
         resume_versions=versions,
         cover_letters=cover_letters_for_job(session, jid),
-        company=facets.company,
-        title=facets.title,
-        location=facets.location,
-        fit_score=facets.fit_score,
-        fit_rationale=facets.fit_rationale,
-        sponsorship_signal=facets.sponsorship_signal,
-        salary_min=facets.salary_min,
-        salary_max=facets.salary_max,
-        salary_currency=facets.salary_currency,
-        remote_policy=facets.remote_policy,
-        seniority=facets.seniority,
-        employment_type=facets.employment_type,
-        industry=facets.industry,
-        company_size=facets.company_size,
-        posted_at=facets.posted_at,
-        skills=facets.skills,
-        location_country=facets.location_country,
-        location_region=facets.location_region,
-        location_city=facets.location_city,
         best_resume_version_id=best.version.id if best.version else None,
         needs_attention=best.no_clean_round,
         regressed=best.regressed,
