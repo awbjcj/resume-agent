@@ -67,7 +67,9 @@ def test_active_sessions_are_scoped_per_job(tmp_path):
         "first01",
         "second02",
     }
-    assert active_session_for_job(tmp_path, 7)["session_id"] == "first01"
+    first = active_session_for_job(tmp_path, 7)
+    assert first is not None
+    assert first["session_id"] == "first01"
     assert active_session_for_job(tmp_path, 9) is None
 
 

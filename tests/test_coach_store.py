@@ -165,4 +165,6 @@ def test_archived_session_does_not_block_new_active_session(tmp_path):
 
     _seed(tmp_path, "s2")
 
-    assert active_session(tmp_path)["session_id"] == "s2"
+    current = active_session(tmp_path)
+    assert current is not None
+    assert current["session_id"] == "s2"

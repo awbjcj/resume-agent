@@ -232,7 +232,7 @@ def test_pull_source_failures_are_recorded_with_the_run_id(monkeypatch, tmp_path
         response = client.post("/api/pull", json={})
         assert response.status_code == 202
         run_id = response.json()["runId"]
-        with Session(client.app.state.engine) as database:
+        with Session(client.app.state.engine) as database:  # type: ignore[union-attr]
             records = list_error_records(database)
 
     assert len(records) == 1
