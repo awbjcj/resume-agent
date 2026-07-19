@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Bell, Check, Inbox, Loader2, RefreshCw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { EmailDraftDialog } from "@/features/job/EmailDraftDialog";
 import {
   useAcceptNotification,
   useDismissNotification,
@@ -14,9 +16,11 @@ export function NotificationsBell() {
   const accept = useAcceptNotification();
   const dismiss = useDismissNotification();
   const sync = useGmailSync();
+  const [draftJobId, setDraftJobId] = useState<number | null>(null);
   const count = items.length;
 
   return (
+    <>
     <Popover>
       <PopoverTrigger
         render={
@@ -40,7 +44,7 @@ export function NotificationsBell() {
           <div>
             <div className="text-sm font-semibold">Notifications</div>
             <div className="text-xs text-muted-foreground">
-              Gmail-derived status proposals
+              Status proposals & follow-up reminders
             </div>
           </div>
           <Button
@@ -70,7 +74,11 @@ export function NotificationsBell() {
               <li key={item.id} className="rounded-lg border bg-background p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium">Move to {item.proposedStatus}</div>
+                    <div className="font-medium">
+                      {item.kind === "follow_up"
+                        ? `Follow up: ${item.company ?? "application"}`
+                        : `Move to ${item.proposedStatus}`}
+                    </div>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       {item.evidence}
                     </p>
@@ -89,10 +97,15 @@ export function NotificationsBell() {
                   <Button
                     size="sm"
                     disabled={accept.isPending}
-                    onClick={() => accept.mutate(item.id)}
+                    onClick={() => {
+                      accept.mutate(item.id);
+                      if (item.kind === "follow_up" && item.jobId != null) {
+                        setDraftJobId(item.jobId);
+                      }
+                    }}
                   >
                     <Check className="size-4" aria-hidden="true" />
-                    Accept
+                    {item.kind === "follow_up" ? "Draft follow-up" : "Accept"}
                   </Button>
                 </div>
               </li>
@@ -101,5 +114,14 @@ export function NotificationsBell() {
         )}
       </PopoverContent>
     </Popover>
+    {draftJobId != null && (
+      <EmailDraftDialog
+        jobId={draftJobId}
+        defaultType="follow_up"
+        open
+        onOpenChange={(o) => !o && setDraftJobId(null)}
+      />
+    )}
+    </>
   );
 }

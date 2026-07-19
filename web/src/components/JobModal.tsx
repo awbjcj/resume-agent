@@ -1,5 +1,10 @@
+import { useState } from "react";
+import { Mail } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmailDraftDialog } from "@/features/job/EmailDraftDialog";
 import type { CoverLetterItem } from "@/features/job/CoverLetterRow";
 import { StatusBadge } from "./StatusBadge";
 import { FitDial } from "./FitDial";
@@ -35,8 +40,10 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
   const { data: job, isLoading } = useJobDetail(jobId);
   const closedLoopJob = job as (NonNullable<typeof job> & ClosedLoopJob) | undefined;
   const coverLetters = closedLoopJob?.coverLetters ?? [];
+  const [emailDraftOpen, setEmailDraftOpen] = useState(false);
 
   return (
+    <>
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="block max-h-[92vh] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-2xl p-0 shadow-[0_40px_120px_-24px_rgba(8,32,40,0.55)] sm:max-w-6xl">
         {isLoading || !job ? (
@@ -58,16 +65,27 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
                   <span aria-hidden>·</span>
                   <span>{job.location ?? "location n/a"}</span>
                   <StatusBadge status={job.status} />
-                  {job.url && (
-                    <a
-                      href={job.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-auto inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-background/60 px-3.5 py-1.5 text-sm font-semibold backdrop-blur-sm transition-colors hover:bg-background"
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full bg-background/60 backdrop-blur-sm"
+                      onClick={() => setEmailDraftOpen(true)}
                     >
-                      Open posting ↗
-                    </a>
-                  )}
+                      <Mail className="size-4" aria-hidden="true" />
+                      Draft email
+                    </Button>
+                    {job.url && (
+                      <a
+                        href={job.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-background/60 px-3.5 py-1.5 text-sm font-semibold backdrop-blur-sm transition-colors hover:bg-background"
+                      >
+                        Open posting ↗
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             </header>
@@ -197,5 +215,11 @@ export function JobModal({ jobId, onClose }: { jobId: number; onClose: () => voi
         )}
       </DialogContent>
     </Dialog>
+    <EmailDraftDialog
+      jobId={jobId}
+      open={emailDraftOpen}
+      onOpenChange={setEmailDraftOpen}
+    />
+    </>
   );
 }
