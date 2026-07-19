@@ -25,6 +25,7 @@ import { useBulkAction } from "@/features/board/use-bulk-action";
 import { useSelection } from "@/features/board/use-selection";
 import { BoardViewToggle } from "@/features/board/BoardViewToggle";
 import { JobQuickActions } from "@/features/board/JobQuickActions";
+import { useJobNavigation } from "@/features/board/use-job-navigation";
 import { useViewMode } from "@/features/board/use-view-mode";
 import { useBulkRun } from "@/features/runs/use-bulk-run";
 import { LaunchDialog } from "@/features/runs/LaunchDialog";
@@ -105,20 +106,7 @@ export function PipelineContainer() {
     reconcile(loadedIds, total);
   }, [loadedIds, total, reconcile]);
 
-  if (isLoading) return <BoardSkeleton />;
-
-  const rendered = loadedByStage.rendered?.length ?? 0;
   const openId = params.get("job");
-  const bulkSelection = { mode: selection.mode, ids: selection.ids };
-  const bulkArgs = { selection: bulkSelection, filter };
-  const setStageOpen = (stage: string, open: boolean) => {
-    setOpenStages((current) => {
-      const next = new Set(current);
-      if (open) next.add(stage);
-      else next.delete(stage);
-      return next;
-    });
-  };
 
   const openJob = (id: number) =>
     setParams(
@@ -136,6 +124,22 @@ export function PipelineContainer() {
       },
       { replace: true },
     );
+
+  const nav = useJobNavigation(loadedIds, openId ? Number(openId) : null, openJob);
+
+  if (isLoading) return <BoardSkeleton />;
+
+  const rendered = loadedByStage.rendered?.length ?? 0;
+  const bulkSelection = { mode: selection.mode, ids: selection.ids };
+  const bulkArgs = { selection: bulkSelection, filter };
+  const setStageOpen = (stage: string, open: boolean) => {
+    setOpenStages((current) => {
+      const next = new Set(current);
+      if (open) next.add(stage);
+      else next.delete(stage);
+      return next;
+    });
+  };
 
   return (
     <>
@@ -250,7 +254,17 @@ export function PipelineContainer() {
           ))}
         </>
       )}
-      {openId && <JobModal jobId={Number(openId)} onClose={closeJob} />}
+      {openId && (
+        <JobModal
+          jobId={Number(openId)}
+          onClose={closeJob}
+          onPrev={nav.goPrev}
+          onNext={nav.goNext}
+          hasPrev={nav.hasPrev}
+          hasNext={nav.hasNext}
+          isLoadingNext={nav.isLoadingNext}
+        />
+      )}
       <LaunchDialog
         mode={launchMode ?? "tailor"}
         jobs={launchJobs.jobs}

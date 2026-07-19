@@ -18,6 +18,7 @@ import {
   useBoardQuery,
 } from "@/features/board/use-board-query";
 import { useBulkAction } from "@/features/board/use-bulk-action";
+import { useJobNavigation } from "@/features/board/use-job-navigation";
 import { useSelection } from "@/features/board/use-selection";
 import { JobQuickActions } from "@/features/board/JobQuickActions";
 import { useBoardFilters } from "@/features/shortlist/use-board-filters";
@@ -39,15 +40,8 @@ export function TriageContainer() {
     reconcile(rows.map((row) => row.jobId), total);
   }, [rows, total, reconcile]);
 
-  if (isLoading) return <BoardSkeleton />;
-
   const openId = params.get("job");
   const loadedIds = rows.map((row) => row.jobId);
-  const allLoadedSelected =
-    rows.length > 0 && rows.every((row) => selection.isSelected(row.jobId));
-  const bulkSelection = { mode: selection.mode, ids: selection.ids };
-  const bulkArgs = { selection: bulkSelection, filter, archived };
-  const action: "restore" | "archive" = archived ? "restore" : "archive";
 
   const openJob = (id: number) =>
     setParams(
@@ -65,6 +59,21 @@ export function TriageContainer() {
       },
       { replace: true },
     );
+
+  const nav = useJobNavigation(
+    loadedIds,
+    openId ? Number(openId) : null,
+    openJob,
+    { hasNextPage, isFetchingNextPage, fetchNextPage },
+  );
+
+  if (isLoading) return <BoardSkeleton />;
+
+  const allLoadedSelected =
+    rows.length > 0 && rows.every((row) => selection.isSelected(row.jobId));
+  const bulkSelection = { mode: selection.mode, ids: selection.ids };
+  const bulkArgs = { selection: bulkSelection, filter, archived };
+  const action: "restore" | "archive" = archived ? "restore" : "archive";
 
   return (
     <>
@@ -160,7 +169,17 @@ export function TriageContainer() {
           )}
         </>
       )}
-      {openId && <JobModal jobId={Number(openId)} onClose={closeJob} />}
+      {openId && (
+        <JobModal
+          jobId={Number(openId)}
+          onClose={closeJob}
+          onPrev={nav.goPrev}
+          onNext={nav.goNext}
+          hasPrev={nav.hasPrev}
+          hasNext={nav.hasNext}
+          isLoadingNext={nav.isLoadingNext}
+        />
+      )}
     </>
   );
 }

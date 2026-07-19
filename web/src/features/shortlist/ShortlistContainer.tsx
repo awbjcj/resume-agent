@@ -20,6 +20,7 @@ import { useBulkAction } from "@/features/board/use-bulk-action";
 import { useSelection } from "@/features/board/use-selection";
 import { BoardViewToggle } from "@/features/board/BoardViewToggle";
 import { JobQuickActions } from "@/features/board/JobQuickActions";
+import { useJobNavigation } from "@/features/board/use-job-navigation";
 import { useViewMode } from "@/features/board/use-view-mode";
 
 import { useApprove } from "./use-approve";
@@ -40,17 +41,8 @@ export function ShortlistContainer() {
     reconcile(rows.map((row) => row.jobId), total);
   }, [rows, total, reconcile]);
 
-  if (isLoading) return <BoardSkeleton />;
-  if (error) return <EmptyState title="Failed to load" body={(error as Error).message} />;
-
-  const avg = rows.length
-    ? Math.round(rows.reduce((sum, row) => sum + (row.fitScore ?? 0), 0) / rows.length)
-    : 0;
-  const sponsored = rows.filter((row) => row.sponsorshipSignal === "offered").length;
   const openId = params.get("job");
   const loadedIds = rows.map((row) => row.jobId);
-  const bulkSelection = { mode: selection.mode, ids: selection.ids };
-  const bulkArgs = { selection: bulkSelection, filter: filters };
 
   const openJob = (id: number) =>
     setParams(
@@ -68,6 +60,23 @@ export function ShortlistContainer() {
       },
       { replace: true },
     );
+
+  const nav = useJobNavigation(
+    loadedIds,
+    openId ? Number(openId) : null,
+    openJob,
+    { hasNextPage, isFetchingNextPage, fetchNextPage },
+  );
+
+  if (isLoading) return <BoardSkeleton />;
+  if (error) return <EmptyState title="Failed to load" body={(error as Error).message} />;
+
+  const avg = rows.length
+    ? Math.round(rows.reduce((sum, row) => sum + (row.fitScore ?? 0), 0) / rows.length)
+    : 0;
+  const sponsored = rows.filter((row) => row.sponsorshipSignal === "offered").length;
+  const bulkSelection = { mode: selection.mode, ids: selection.ids };
+  const bulkArgs = { selection: bulkSelection, filter: filters };
 
   return (
     <>
@@ -164,7 +173,17 @@ export function ShortlistContainer() {
           )}
         </>
       )}
-      {openId && <JobModal jobId={Number(openId)} onClose={closeJob} />}
+      {openId && (
+        <JobModal
+          jobId={Number(openId)}
+          onClose={closeJob}
+          onPrev={nav.goPrev}
+          onNext={nav.goNext}
+          hasPrev={nav.hasPrev}
+          hasNext={nav.hasNext}
+          isLoadingNext={nav.isLoadingNext}
+        />
+      )}
     </>
   );
 }
