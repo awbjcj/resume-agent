@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from concurrent.futures import Executor
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
@@ -132,7 +133,21 @@ def create_app(
                 app.state.run_manager.register_root(root)
         app.state.run_manager.recover_interrupted()
         app.state.run_manager.sweep()  # drop stale run records (unbounded otherwise)
+        app.state.gmail_scheduler_task = None
+        if (
+            not _is_memory_db(resolved_db)
+            and resolved_settings.gmail_sync_interval_hours > 0
+        ):
+            from resume_agent.gmail.scheduler import scheduler_loop
+
+            app.state.gmail_scheduler_task = asyncio.create_task(
+                scheduler_loop(app.state)
+            )
         yield
+        if app.state.gmail_scheduler_task is not None:
+            app.state.gmail_scheduler_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await app.state.gmail_scheduler_task
         app.state.run_manager.shutdown()
         if app.state.engine_registry is not None:
             app.state.engine_registry.close_all()
