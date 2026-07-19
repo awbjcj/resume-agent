@@ -458,19 +458,18 @@ def launch_cover_letters(
 
 @router.post("/gmail/sync", response_model=RunOut, status_code=202)
 def launch_gmail_sync(request: Request, mgr: RunManager = Depends(get_run_manager)):
+    from resume_agent.gmail.auth import load_credentials
+
     engine = _engine(request)
+    if load_credentials() is None:
+        raise ApiException(
+            409, "GMAIL_NOT_CONNECTED", "Connect Gmail in Settings before syncing"
+        )
 
     def work(reporter):
-        from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
-        from resume_agent.services.notifications import sync_notifications
+        from resume_agent.services.gmail_sync import run_gmail_sync
 
-        reporter.begin(1, "Scanning Gmail")
-        service = build_gmail_service()
-        emails = fetch_recent_messages(service)
-        with get_session(engine) as session:
-            pending = sync_notifications(session, emails)
-        reporter.step(1)
-        return {"pending": len(pending)}
+        return run_gmail_sync(engine, reporter)
 
     run_id = _submit(mgr, "gmailSync", work, singleton_key="gmailSync")
     record = mgr.get(run_id)
