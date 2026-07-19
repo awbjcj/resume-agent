@@ -11,6 +11,9 @@
 
 ## Global Constraints
 
+> **Status 2026-07-19:** Phase A (Tasks 1–3) shipped in `72dc10c`. Phases B–D
+> executed via `2026-07-19-architecture-deepening-round-4.md` Task 1.
+
 - Test command: `.venv/Scripts/python.exe -m pytest` (offline; no API key, no network). Lint: `ruff check`.
 - `contracts/openapi.json` must not change in any task (`tests/api/test_openapi_contract.py` is the drift gate). No schema, route, or wire-shape edits anywhere in this plan.
 - Behavior-preserving: every existing test must pass unmodified unless a task explicitly says otherwise (no task in this plan modifies an existing test's assertions).
@@ -77,7 +80,7 @@ Today `CONNECTOR_SPECS` is documented as "the single enumeration of connector ki
   - `find_unit(config: ConnectorsConfig, source_id: str) -> tuple[ConnectorSpec, Any] | None` — payload is `None` for singleton kinds.
   - `spec_for(kind: str) -> ConnectorSpec | None`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/test_connectors_registry.py`:
 
@@ -161,12 +164,12 @@ def test_token_kinds_admit_only_tokened_targets():
 
 (`ConnectorsConfig` is already imported at the top of this test file; `AtsTarget` and the registry names are the only new imports.)
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_connectors_registry.py -q`
 Expected: FAIL with `ImportError: cannot import name 'find_unit'`.
 
-- [ ] **Step 3: Implement the registry additions**
+- [x] **Step 3: Implement the registry additions**
 
 In `src/resume_agent/discovery/connectors/registry.py`:
 
@@ -317,12 +320,12 @@ def find_unit(config: ConnectorsConfig, source_id: str) -> tuple[ConnectorSpec, 
     return None
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_connectors_registry.py -q`
 Expected: PASS (all, including pre-existing tests).
 
-- [ ] **Step 5: Lint and commit**
+- [x] **Step 5: Lint and commit**
 
 ```bash
 ruff check src/resume_agent/discovery/connectors/registry.py tests/test_connectors_registry.py
@@ -346,7 +349,7 @@ git commit -m "feat(registry): ConnectorSpec owns source-unit addressing (sectio
   - Enabling a board also enables its section; disabling a board does **not** disable the section.
   - Singleton kinds (adzuna/remoteok/linkedin) toggle/limit the section itself and can never be removed (`_remove` returns `False` → `remove_source` raises `SourceError("Unknown source '...'")`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/test_services_sources.py`. The file already has `import pytest` and `from resume_agent.services import sources as svc` at the top — the `svc.` references below match its existing style; only the two imports shown need adding:
 
@@ -407,12 +410,12 @@ def test_remove_source_removes_boards_but_never_singletons(tmp_path):
             svc.remove_source(source_id, connectors_path=path)
 ```
 
-- [ ] **Step 2: Run the new tests to verify current behavior (they should PASS against the old code)**
+- [x] **Step 2: Run the new tests to verify current behavior (they should PASS against the old code)**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_sources.py -q`
 Expected: PASS. These are characterization tests — they pin today's behavior so the rewrite in Step 3 can't drift. (If either fails here, stop: the sample config or an assumption is wrong; fix the test before touching the implementation.)
 
-- [ ] **Step 3: Replace the three functions**
+- [x] **Step 3: Replace the three functions**
 
 In `src/resume_agent/services/sources.py`, add to the imports:
 
@@ -461,12 +464,12 @@ def _remove(config: ConnectorsConfig, source_id: str) -> bool:
 
 Then remove any imports that became unused (run `ruff check` — it will name them; `NATIVE_URL_KINDS`, `native_url_id`, `company_url_id`, `scrape_target_id` may still be used elsewhere in the file, so trust ruff, not this list).
 
-- [ ] **Step 4: Run the sources test files**
+- [x] **Step 4: Run the sources test files**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_sources.py tests/test_services_sources_preview.py tests/test_cli_sources.py tests/api/test_schemas_sources.py tests/test_connector_sources.py -q`
 Expected: PASS.
 
-- [ ] **Step 5: Lint and commit**
+- [x] **Step 5: Lint and commit**
 
 ```bash
 ruff check src/resume_agent/services/sources.py tests/test_services_sources.py
@@ -492,7 +495,7 @@ git commit -m "refactor(sources): enable/limit/remove walk CONNECTOR_SPECS inste
   - companies: `"This URL is already a source."`
   - scrape: `"This URL is already a scrape target."`
 
-- [ ] **Step 1: Add helpers and rewrite `add_source`**
+- [x] **Step 1: Add helpers and rewrite `add_source`**
 
 Add above `add_source` (imports: extend the registry import to `from resume_agent.discovery.connectors.registry import find_unit, spec_for`, and make sure `ConnectorSpec` is imported for type hints: `from resume_agent.discovery.connectors.registry import ConnectorSpec, find_unit, spec_for`; `Any` from `typing`):
 
@@ -593,17 +596,17 @@ Replace the body of `add_source` from the `if provider == "scrape":` block throu
 
 Then delete now-unused imports (`GreenhouseBoard`? — no: `_preview_connector` still uses `GreenhouseBoard`/`LeverBoard`; `AshbyBoard`, `NativeUrlBoard`, `CompanyUrl`, `ScrapeTarget` become unused — again trust `ruff check` to name the dead ones).
 
-- [ ] **Step 2: Run the sources tests**
+- [x] **Step 2: Run the sources tests**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_services_sources.py tests/test_services_sources_preview.py tests/test_cli_sources.py tests/api/test_schemas_sources.py -q`
 Expected: PASS with zero test edits. If a duplicate-message assertion fails, fix `_duplicate_message` to match the asserted string — the old messages are the contract.
 
-- [ ] **Step 3: Run the full suite**
+- [x] **Step 3: Run the full suite**
 
 Run: `.venv/Scripts/python.exe -m pytest -q`
 Expected: PASS.
 
-- [ ] **Step 4: Lint and commit**
+- [x] **Step 4: Lint and commit**
 
 ```bash
 ruff check src/resume_agent/services/sources.py
@@ -631,7 +634,7 @@ git commit -m "refactor(sources): add_source appends units through CONNECTOR_SPE
 - Consumes: `resolve_tenant_path(path: Path | str) -> Path` (`tenancy/paths.py`).
 - Produces: `read_runs` / `record_run` / `load_aliases` / `_save` accept the same arguments but rebase relative `data/` / `config/` paths into the active Workspace when a `UserContext` is set. With no context: byte-identical behavior (resolve is a pass-through).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/tenancy/test_workspace.py`:
 
@@ -678,12 +681,12 @@ def test_load_aliases_resolves_the_active_workspace(tmp_path, monkeypatch):
 
 Note: `resolve_tenant_path` maps the `data/` prefix to `context.paths.root`, so `data/connector_runs.json` → `<workspace>/connector_runs.json`. That matches what `api/routers/runs.py` threads today (`context.workspace / "connector_runs.json"`).
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/tenancy/test_workspace.py -q`
 Expected: the two new tests FAIL (file written to CWD-relative `data/`, not the workspace). If they accidentally write into the repo's `data/` directory, delete the stray file: `git status` must stay clean of `data/connector_runs.json`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/resume_agent/discovery/connectors/telemetry.py` — full new content:
 
@@ -736,12 +739,12 @@ with a lazy import at the top of the function (matches the pattern `config.load_
 
 and add the import `from resume_agent.tenancy.paths import resolve_tenant_path`. Also in `add_source`'s scrape branch (written in Task 3), change `Path(connectors_path).exists()` to `resolve_tenant_path(connectors_path).exists()` so the load/save pair can never split across directories.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/tenancy -q && .venv/Scripts/python.exe -m pytest -q`
 Expected: PASS (full suite — these are leaf functions with many indirect callers).
 
-- [ ] **Step 5: Lint and commit**
+- [x] **Step 5: Lint and commit**
 
 ```bash
 ruff check src/resume_agent/discovery/connectors/telemetry.py src/resume_agent/taxonomy/skills.py src/resume_agent/services/sources.py tests/tenancy/test_workspace.py
@@ -779,7 +782,7 @@ SKILL_ALIASES_PATH = "data/skill_aliases.json"
 
 - Existing public names (`DEFAULT_FACTS`, `DEFAULT_SEARCH`, `DEFAULT_CONNECTORS`, `CONNECTOR_RUNS_PATH`, `DEFAULT_REVIEW`, `DEFAULT_REVIEW_DEEP`) **stay importable from their current modules** — they become aliases so no caller or test breaks.
 
-- [ ] **Step 1: Add the constants block**
+- [x] **Step 1: Add the constants block**
 
 Append to `src/resume_agent/tenancy/paths.py` (below the imports, above `resolve_tenant_path`):
 
@@ -796,7 +799,7 @@ TELEMETRY_PATH = "data/connector_runs.json"
 SKILL_ALIASES_PATH = "data/skill_aliases.json"
 ```
 
-- [ ] **Step 2: Migrate each declaration site to an aliasing import**
+- [x] **Step 2: Migrate each declaration site to an aliasing import**
 
 `src/resume_agent/services/discovery.py` — replace lines 55-58:
 
@@ -857,7 +860,7 @@ from resume_agent.tenancy.paths import (
 string, which remains valid for the existing `Path | str` parameter and is
 resolved by `load_aliases` at the leaf.
 
-- [ ] **Step 3: Run the full suite and lint**
+- [x] **Step 3: Run the full suite and lint**
 
 Run: `.venv/Scripts/python.exe -m pytest -q && ruff check`
 Expected: PASS / clean. Grep-verify no stray declarations remain:
@@ -865,7 +868,7 @@ Expected: PASS / clean. Grep-verify no stray declarations remain:
 Run: `grep -rn "data/profile/facts.json\|config/search.yaml\|config/connectors.yaml\|data/connector_runs.json" src/resume_agent --include="*.py" | grep -v tenancy/paths.py | grep -v "\.example\|Copy config"`
 Expected: only `tenancy/paths.py` declares the strings; remaining hits are user-facing help text in `cli.py`/`setup/screens.py` (leave those) and `search_config.py`'s docstring (leave it).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -906,7 +909,7 @@ def launch(
 def session_work(engine, fn):   # fn(session, reporter) -> dict
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/api/test_launch_helper.py`:
 
@@ -1020,12 +1023,12 @@ def test_session_work_opens_its_own_session(tmp_path):
 
 Attribute names verified against `api/errors.py:28`: the constructor is `ApiException(status_code, code, message, details=None)` and stores each under the same name — the test's `excinfo.value.status_code` / `.code` / `.message` / `.details` are correct as written.
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_launch_helper.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'resume_agent.api.runs.launch'`.
 
-- [ ] **Step 3: Implement `src/resume_agent/api/runs/launch.py`**
+- [x] **Step 3: Implement `src/resume_agent/api/runs/launch.py`**
 
 ```python
 """The run-launch seam shared by every router that starts a background run.
@@ -1102,12 +1105,12 @@ def session_work(engine, fn: Callable[[Any, Any], dict]) -> Callable[[Any], dict
 
 (Verified: `make_engine`, `init_db`, and `get_session` are all defined in `src/resume_agent/db.py`.)
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_launch_helper.py -q`
 Expected: PASS.
 
-- [ ] **Step 5: Lint and commit**
+- [x] **Step 5: Lint and commit**
 
 ```bash
 ruff check src/resume_agent/api/runs/launch.py tests/api/test_launch_helper.py
@@ -1131,7 +1134,7 @@ git commit -m "feat(api): shared launch() + session_work() run-launch seam"
 
 **Why dropping the path kwargs is safe:** `_workspace_args()` and the inline ternaries compute exactly the absolute paths that `resolve_tenant_path` now produces from the services' own relative defaults (Background facts 1–2 + Task 4). The RunManager worker restores the caller's `UserContext` (ADR-0003), so resolution inside the worker sees the same workspace.
 
-- [ ] **Step 1: Delete the shallow helpers**
+- [x] **Step 1: Delete the shallow helpers**
 
 In `src/resume_agent/api/routers/runs.py` delete:
 
@@ -1144,7 +1147,7 @@ and their now-unused imports (`TypedDict`, `active_limit`, `DEFAULT_MAX_CONCURRE
 from resume_agent.api.runs.launch import launch, session_work
 ```
 
-- [ ] **Step 2: Rewrite each endpoint**
+- [x] **Step 2: Rewrite each endpoint**
 
 The twelve launch endpoints become (complete replacements — signatures and decorators unchanged unless shown):
 
@@ -1393,14 +1396,14 @@ def launch_add_from_url(
 
 Leave `list_runs`, `get_run`, `cancel_run`, `stream_run`, `_owned_record`, `_engine`, `_linkedin_ready` untouched. Update the module docstring's session note to point at `session_work` as the owner of the rule.
 
-- [ ] **Step 3: Run the runs and tenancy API tests, then the full suite**
+- [x] **Step 3: Run the runs and tenancy API tests, then the full suite**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_runs_launch.py tests/api/test_runs_list.py tests/api/test_runs_sse.py tests/api/test_run_tenancy_quota.py -q`
 Expected: PASS unmodified.
 Run: `.venv/Scripts/python.exe -m pytest -q && ruff check src/resume_agent/api/routers/runs.py`
 Expected: PASS / clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/resume_agent/api/routers/runs.py
@@ -1424,7 +1427,7 @@ git commit -m "refactor(api): runs router launches through the shared seam; work
 - Consumes: `launch` from Task 6 (exact signature in Task 6's Produces block).
 - Produces: no router-level interface changes. Intentional delta: routers that previously called `mgr.submit` bare now surface `RunSingletonConflict`/`RunQuotaError`/`RunResetConflict` as 409/429 envelopes instead of 500s.
 
-- [ ] **Step 1: coach.py — reimplement `_submit` as a delegate**
+- [x] **Step 1: coach.py — reimplement `_submit` as a delegate**
 
 Replace the whole `_submit` function body (keep the name and the three call sites unchanged):
 
@@ -1443,7 +1446,7 @@ def _submit(manager: RunManager, kind: str, work) -> RunOut:
 
 Add `from resume_agent.api.runs.launch import launch`; delete the now-unused imports (`RunSingletonConflict`, `RunResetConflict`, `RunQuotaError`, `record_to_run` — keep any still used elsewhere in the file; trust ruff).
 
-- [ ] **Step 2: profile.py, sources.py, match_gap.py — replace the tails**
+- [x] **Step 2: profile.py, sources.py, match_gap.py — replace the tails**
 
 In each, add `from resume_agent.api.runs.launch import launch` and replace the four-line tail pattern:
 
@@ -1481,14 +1484,14 @@ In each, add `from resume_agent.api.runs.launch import launch` and replace the f
 
 Delete each file's now-unused `record_to_run` import where the tail was removed (ruff will flag).
 
-- [ ] **Step 3: Run the affected API tests, then the full suite**
+- [x] **Step 3: Run the affected API tests, then the full suite**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api -q`
 Expected: PASS unmodified.
 Run: `.venv/Scripts/python.exe -m pytest -q && ruff check`
 Expected: PASS / clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/resume_agent/api/routers
@@ -1513,7 +1516,7 @@ git commit -m "refactor(api): coach/profile/sources/match_gap routers launch thr
 
 **Design note:** the wire shape is flat and contract-pinned, so composition-with-flattening at the mapper would move the hand-mapping, not delete it. Inheritance deletes it: the facet fields are declared once in `ShortlistRow`, and `job_detail_row` splats `vars(facets)` instead of copying twenty fields by name.
 
-- [ ] **Step 1: Replace the dataclass**
+- [x] **Step 1: Replace the dataclass**
 
 ```python
 @dataclass(kw_only=True)
@@ -1543,7 +1546,7 @@ class JobDetailRow(ShortlistRow):
 
 (`source` and `url` disappear from the child — they are inherited, and `_shortlist_row` already fills them from the same `Job` columns.)
 
-- [ ] **Step 2: Replace the construction in `job_detail_row`**
+- [x] **Step 2: Replace the construction in `job_detail_row`**
 
 ```python
 def job_detail_row(
@@ -1587,12 +1590,12 @@ def job_detail_row(
 
 (Keep the `aliases_path` default as whatever Task 5 set — `SKILL_ALIASES_PATH`. If Phase B was skipped or reordered, keep the current literal; this task does not depend on Phase B.)
 
-- [ ] **Step 3: Run the detail tests and the contract gate**
+- [x] **Step 3: Run the detail tests and the contract gate**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_job_detail_row.py tests/test_tracking_queries.py tests/api/test_job_detail.py tests/api/test_openapi_contract.py -q`
 Expected: PASS unmodified — the schema and OpenAPI output are untouched because every attribute the schema reads still exists on the row.
 
-- [ ] **Step 4: Run the full suite, lint, commit**
+- [x] **Step 4: Run the full suite, lint, commit**
 
 Run: `.venv/Scripts/python.exe -m pytest -q && ruff check src/resume_agent/tracking/queries.py`
 Expected: PASS / clean.
@@ -1606,21 +1609,21 @@ git commit -m "refactor(tracking): JobDetailRow inherits the facet half from Sho
 
 ## Final verification (after all tasks)
 
-- [ ] Full suite: `.venv/Scripts/python.exe -m pytest -q` → PASS
-- [ ] Lint: `ruff check` → clean
-- [ ] Web unit suite: `npm run test:run --prefix web` → PASS
-- [ ] Web lint: `npm run lint --prefix web` → clean
-- [ ] Web production build: `npm run build --prefix web` → PASS
-- [ ] Browser smoke: start the local API and Vite app with the webapp-testing
+- [x] Full suite: `.venv/Scripts/python.exe -m pytest -q` → PASS
+- [x] Lint: `ruff check` → clean
+- [x] Web unit suite: `npm run test:run --prefix web` → PASS
+- [x] Web lint: `npm run lint --prefix web` → clean
+- [x] Web production build: `npm run build --prefix web` → PASS
+- [x] Browser smoke: start the local API and Vite app with the webapp-testing
       server helper, then use headless Playwright to load the board, exercise a
       representative run-launch action available in the offline fixture state,
       and confirm the rendered response plus a clean browser console. If the
       fixture has no safe launch action, verify board render + `/api/health` and
       record that bounded scope explicitly.
-- [ ] Contract drift: `git diff --stat contracts/` → empty (no OpenAPI/TS regeneration was needed or performed)
-- [ ] Patch hygiene: `git diff --check` → clean
-- [ ] Grep gates:
+- [x] Contract drift: `git diff --stat contracts/` → empty (no OpenAPI/TS regeneration was needed or performed)
+- [x] Patch hygiene: `git diff --check` → clean
+- [x] Grep gates:
   - `grep -rn "for board in config.greenhouse.boards" src/resume_agent/services/sources.py` → no hits
   - `grep -rn "_workspace_args" src/resume_agent` → no hits
   - `grep -rn "record = mgr.get(run_id)" src/resume_agent/api/routers | grep -v suggestions` → no hits (suggestions.py keeps its service-seam tail by design)
-- [ ] Update `CLAUDE.md`: in the Companies-connector section, the sentence "adding an ATS appends one `ConnectorSpec`" now also covers Source Manager CRUD; add one line to the API-layer section naming `api/runs/launch.py` as the launch seam; add one line under Core invariants → Tenancy noting the layout constants in `tenancy/paths.py`. Commit as `docs: record round-3 deepenings in CLAUDE.md`.
+- [x] Update `CLAUDE.md`: in the Companies-connector section, the sentence "adding an ATS appends one `ConnectorSpec`" now also covers Source Manager CRUD; add one line to the API-layer section naming `api/runs/launch.py` as the launch seam; add one line under Core invariants → Tenancy noting the layout constants in `tenancy/paths.py`. Commit as `docs: record round-3 deepenings in CLAUDE.md`.
