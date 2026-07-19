@@ -48,3 +48,75 @@ def test_as_dict_roundtrips():
     assert loc.as_dict() == {
         "city": "Austin", "region": "TX", "country": "US", "is_us": True, "raw": None
     }
+
+
+def test_infers_us_from_state_when_country_absent():
+    # The dominant US posting shape: "San Francisco, CA" with no country written.
+    loc = location.build_location("San Francisco", "CA", None)
+    assert loc.country == "US"
+    assert loc.region == "CA"
+    assert loc.is_us is True
+
+
+def test_does_not_infer_us_from_bare_city():
+    loc = location.build_location("Boston", None, None)
+    assert loc.country is None
+    assert loc.region is None
+    assert loc.is_us is False
+
+
+def test_region_state_abbreviation_variants():
+    assert location.normalize_region("Calif.", "US") == "CA"
+    assert location.normalize_region("Mass.", "US") == "MA"
+    assert location.normalize_region("Tex.", "US") == "TX"
+    assert location.normalize_region("Wash.", "US") == "WA"
+    assert location.normalize_region("Fla.", "US") == "FL"
+    # Two-letter forms that double as USPS codes still resolve after a period.
+    assert location.normalize_region("Ga.", "US") == "GA"
+
+
+def test_splits_city_state_leaked_into_city_field():
+    loc = location.build_location("San Francisco, CA", None, None)
+    assert loc.city == "San Francisco"
+    assert loc.region == "CA"
+    assert loc.country == "US"
+
+
+def test_strips_trailing_zip_from_region():
+    loc = location.build_location("Austin", "TX 78701", None)
+    assert loc.region == "TX"
+    assert loc.country == "US"
+
+
+def test_infers_us_from_curated_metro_nyc():
+    loc = location.build_location("NYC", None, None)
+    assert loc.city == "New York"
+    assert loc.region == "NY"
+    assert loc.country == "US"
+    assert loc.is_us is True
+
+
+def test_infers_us_from_bay_area_metro():
+    loc = location.build_location("Bay Area", None, None)
+    assert loc.region == "CA"
+    assert loc.country == "US"
+    assert loc.is_us is True
+
+
+def test_la_is_louisiana_never_los_angeles():
+    # "LA" is the USPS code for Louisiana; it must never expand to Los Angeles/CA.
+    loc = location.build_location("New Orleans", "LA", None)
+    assert loc.region == "LA"
+    assert loc.country == "US"
+    # "LA" as a bare city is not a state and is not a curated metro: no inference.
+    bare = location.build_location("LA", None, None)
+    assert bare.region is None
+    assert bare.country is None
+
+
+def test_foreign_country_keeps_region_null_even_with_state_like_field():
+    # A resolved non-US country must not trigger US inference from a stray token.
+    loc = location.build_location("Ontario", "CA", "Canada")
+    assert loc.country == "CA"
+    assert loc.region is None
+    assert loc.is_us is False
