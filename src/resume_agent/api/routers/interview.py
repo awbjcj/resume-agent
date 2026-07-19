@@ -14,13 +14,8 @@ from resume_agent.api.deps import (
     get_settings_dep,
 )
 from resume_agent.api.errors import ApiException
-from resume_agent.api.runs.manager import (
-    RunManager,
-    RunQuotaError,
-    RunResetConflict,
-    RunSingletonConflict,
-)
-from resume_agent.api.runs.sse import record_to_run
+from resume_agent.api.runs.launch import launch
+from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.interview import (
     InterviewMessageIn,
     InterviewSessionOut,
@@ -62,24 +57,15 @@ def _guard_keys(settings: Settings) -> None:
 def _submit(
     manager: RunManager, kind: str, work, *, singleton: str
 ) -> RunOut:
-    try:
-        run_id = manager.submit(
-            kind, work, singleton_key=singleton, singleton_conflict="raise"
-        )
-    except RunSingletonConflict as exc:
-        raise ApiException(
-            409,
-            "INTERVIEW_BUSY",
-            "An interview turn is already running",
-            details={"runId": exc.run_id},
-        ) from exc
-    except RunResetConflict as exc:
-        raise ApiException(409, exc.code, str(exc)) from exc
-    except RunQuotaError as exc:
-        raise ApiException(429, exc.code, str(exc)) from exc
-    record = manager.get(run_id)
-    assert record is not None
-    return record_to_run(record)
+    return launch(
+        manager,
+        kind,
+        work,
+        singleton_key=singleton,
+        singleton_conflict="raise",
+        busy_code="INTERVIEW_BUSY",
+        busy_message="An interview turn is already running",
+    )
 
 
 def _value_error(exc: ValueError) -> ApiException:
