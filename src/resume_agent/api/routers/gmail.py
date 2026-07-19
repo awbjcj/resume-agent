@@ -44,8 +44,15 @@ def _build_flow(settings: Settings, redirect_uri: str) -> Any:
             "token_uri": "https://oauth2.googleapis.com/token",
         }
     }
+    # PKCE off: connect and callback build independent Flow objects, so an
+    # auto-generated code_verifier can't survive to the token exchange (Google
+    # would reject with invalid_grant "Missing code verifier"). This is a
+    # confidential web client — the client_secret authenticates fetch_token.
     return Flow.from_client_config(
-        client_config, scopes=gmail_auth.GMAIL_SCOPES, redirect_uri=redirect_uri
+        client_config,
+        scopes=gmail_auth.GMAIL_SCOPES,
+        redirect_uri=redirect_uri,
+        autogenerate_code_verifier=False,
     )
 
 
