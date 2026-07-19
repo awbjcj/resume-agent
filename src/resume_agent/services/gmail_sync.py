@@ -17,7 +17,11 @@ from resume_agent.llm_runner import Runner
 from resume_agent.services.notifications import sync_notifications
 from resume_agent.services.reminders import create_follow_up_reminders
 
-_UNSET = object()
+class _Unset:
+    __slots__ = ()
+
+
+_UNSET = _Unset()
 
 
 def run_gmail_sync(
@@ -25,17 +29,16 @@ def run_gmail_sync(
     reporter: Any,
     *,
     service: Any | None = None,
-    llm: Runner | None | object = _UNSET,
+    llm: Runner | None | _Unset = _UNSET,
 ) -> dict:
     reporter.begin(2, "Scanning Gmail")
     if service is None:
         service = build_service()
-    if llm is _UNSET:
-        llm = build_classifier_llm()
+    resolved_llm = build_classifier_llm() if isinstance(llm, _Unset) else llm
     emails = fetch_recent_messages(
         service, max_results=get_settings().gmail_max_messages
     )
-    classify = hydrating_classifier(service, llm)
+    classify = hydrating_classifier(service, resolved_llm)
     with get_session(engine) as session:
         pending = sync_notifications(session, emails, classify=classify)
         reporter.step(1, label="Checking follow-ups")

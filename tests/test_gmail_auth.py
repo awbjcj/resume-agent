@@ -18,7 +18,7 @@ def _context(tmp_path: Path) -> UserContext:
         username="u1",
         role="member",
         paths=paths,
-        settings=Settings(_env_file=None),
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
         engine=None,
         system_engine=None,
         own_key_providers=frozenset(),

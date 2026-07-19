@@ -9,7 +9,7 @@ from resume_agent.tenancy.workspace import (
 
 
 def test_settings_have_gmail_fields():
-    s = Settings(_env_file=None)
+    s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.google_oauth_client_id == ""
     assert s.google_oauth_client_secret == ""
     assert s.gmail_sync_interval_hours == 6
@@ -29,7 +29,9 @@ def test_google_client_overlays_from_secrets_env(tmp_path: Path):
         "GOOGLE_OAUTH_CLIENT_ID=own-client\nGOOGLE_OAUTH_CLIENT_SECRET=own-secret\n",
         encoding="utf-8",
     )
-    base = Settings(_env_file=None, google_oauth_client_id="platform-client")
+    base = Settings(  # type: ignore[call-arg]
+        _env_file=None, google_oauth_client_id="platform-client"
+    )
     overlay = effective_settings(base, paths)
     assert overlay.settings.google_oauth_client_id == "own-client"
     assert overlay.settings.google_oauth_client_secret == "own-secret"
