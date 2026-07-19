@@ -2016,6 +2016,50 @@
         "title": "ErrorRecordsOut",
         "type": "object"
       },
+      "GmailConnectOut": {
+        "properties": {
+          "authUrl": {
+            "title": "Authurl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authUrl"
+        ],
+        "title": "GmailConnectOut",
+        "type": "object"
+      },
+      "GmailStatusOut": {
+        "properties": {
+          "clientSource": {
+            "default": "platform",
+            "title": "Clientsource",
+            "type": "string"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "draftCapable": {
+            "default": false,
+            "title": "Draftcapable",
+            "type": "boolean"
+          },
+          "scopes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connected"
+        ],
+        "title": "GmailStatusOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -9119,6 +9163,98 @@
         "summary": "Resolve Error"
       }
     },
+    "/api/gmail/connect": {
+      "get": {
+        "operationId": "gmail_connect_api_gmail_connect_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GmailConnectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gmail Connect"
+      }
+    },
+    "/api/gmail/status": {
+      "get": {
+        "operationId": "gmail_status_api_gmail_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GmailStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gmail Status"
+      }
+    },
     "/api/gmail/sync": {
       "post": {
         "operationId": "launch_gmail_sync_api_gmail_sync_post",
@@ -9163,6 +9299,52 @@
           }
         },
         "summary": "Launch Gmail Sync"
+      }
+    },
+    "/api/gmail/token": {
+      "delete": {
+        "operationId": "gmail_disconnect_api_gmail_token_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GmailStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gmail Disconnect"
       }
     },
     "/api/health": {

@@ -33,6 +33,7 @@ from resume_agent.api.routers import interview as interview_router
 from resume_agent.api.routers import transcribe as transcribe_router
 from resume_agent.api.routers import dashboard as dashboard_router
 from resume_agent.api.routers import errors as errors_router
+from resume_agent.api.routers import gmail as gmail_router
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
 from resume_agent.api.routers import notifications as notifications_router
@@ -151,6 +152,7 @@ def create_app(
         app.state.data_dir / "profile" / "documents"
     )
     app.state.login_limiter = FailedAttemptLimiter()
+    app.state.gmail_oauth_states = {}
     # Falls back to a path under data_dir (not the separate RUNS_ROOT constant) so
     # that overriding data_dir — as most tests do to avoid touching the real repo —
     # also isolates the run manager; otherwise runs launched with no active
@@ -266,6 +268,8 @@ def create_app(
     app.include_router(taxonomy_router.router, prefix="/api", dependencies=guarded)
     app.include_router(suggestions_router.router, prefix="/api", dependencies=guarded)
     app.include_router(notifications_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(gmail_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(gmail_router.callback_router, prefix="/api")
     app.include_router(config_router.router, prefix="/api", dependencies=guarded)
     app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)
     app.include_router(profile_router.router, prefix="/api", dependencies=guarded)

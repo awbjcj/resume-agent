@@ -661,6 +661,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/gmail/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gmail Connect */
+        get: operations["gmail_connect_api_gmail_connect_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gmail/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gmail Status */
+        get: operations["gmail_status_api_gmail_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/gmail/sync": {
         parameters: {
             query?: never;
@@ -673,6 +707,23 @@ export interface paths {
         /** Launch Gmail Sync */
         post: operations["launch_gmail_sync_api_gmail_sync_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gmail/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Gmail Disconnect */
+        delete: operations["gmail_disconnect_api_gmail_token_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2741,6 +2792,31 @@ export interface components {
         ErrorRecordsOut: {
             /** Records */
             records?: components["schemas"]["ErrorRecordOut"][];
+        };
+        /** GmailConnectOut */
+        GmailConnectOut: {
+            /** Authurl */
+            authUrl: string;
+        };
+        /** GmailStatusOut */
+        GmailStatusOut: {
+            /**
+             * Clientsource
+             * @default platform
+             */
+            clientSource: string;
+            /** Connected */
+            connected: boolean;
+            /**
+             * Draftcapable
+             * @default false
+             */
+            draftCapable: boolean;
+            /**
+             * Scopes
+             * @default []
+             */
+            scopes: string[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5929,6 +6005,68 @@ export interface operations {
             };
         };
     };
+    gmail_connect_api_gmail_connect_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GmailConnectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gmail_status_api_gmail_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GmailStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     launch_gmail_sync_api_gmail_sync_post: {
         parameters: {
             query?: never;
@@ -5947,6 +6085,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gmail_disconnect_api_gmail_token_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GmailStatusOut"];
                 };
             };
             /** @description Validation Error */
