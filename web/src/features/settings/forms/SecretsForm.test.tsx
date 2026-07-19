@@ -33,4 +33,28 @@ describe("SecretsForm", () => {
     await user.click(screen.getByRole("button", { name: "Clear Anthropic API key" }));
     expect(onSave).toHaveBeenCalledWith({ anthropicApiKey: null });
   });
+
+  it("shows a readable label, description, and plain-text input for the Google OAuth client ID", async () => {
+    const user = userEvent.setup();
+    render(
+      <SecretsForm
+        statuses={[
+          { key: "googleOauthClientId", isSet: false, hint: null },
+          { key: "googleOauthClientSecret", isSet: false, hint: null },
+        ]}
+        saving={false}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Google OAuth client ID")).toBeInTheDocument();
+    expect(screen.getByText("Google OAuth client secret")).toBeInTheDocument();
+    expect(screen.queryByText("googleOauthClientId")).not.toBeInTheDocument();
+    expect(screen.getByText(/Web application OAuth client/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add Google OAuth client ID" }));
+    expect(screen.getByLabelText("Google OAuth client ID new value")).toHaveAttribute(
+      "type",
+      "text",
+    );
+  });
 });
