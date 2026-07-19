@@ -76,6 +76,32 @@ def test_load_group_map_drops_unknown_slugs_and_invalid_files(tmp_path):
     assert load_group_map(tmp_path / "missing.json") == {}
 
 
+def test_load_group_map_upgrades_clean_legacy_slugs_and_drops_ambiguous(tmp_path):
+    path = tmp_path / "skill_groups.json"
+    path.write_text(
+        json.dumps(
+            {
+                "Bash": "devops-tooling",  # clean 1:1 -> devops-automation
+                "Postgres": "databases",  # clean 1:1 -> databases-storage
+                "OAuth": "security",  # clean 1:1 -> security-compliance
+                "Slack": "communication",  # clean 1:1 -> collaboration-communication
+                "Mentoring": "leadership",  # clean 1:1 -> leadership-management
+                "Pandas": "data-ml",  # ambiguous split -> dropped, re-classified
+                "React": "frameworks",  # ambiguous split -> dropped, re-classified
+                "Agile": "practices",  # ambiguous split -> dropped, re-classified
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert load_group_map(path) == {
+        "bash": "devops-automation",
+        "postgres": "databases-storage",
+        "oauth": "security-compliance",
+        "slack": "collaboration-communication",
+        "mentoring": "leadership-management",
+    }
+
+
 def test_classifier_accepts_only_exact_batch_tokens_and_known_slugs():
     runner = FakeRunner(
         assignments(

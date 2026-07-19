@@ -41,7 +41,13 @@ LEGACY_GROUP_REMAP: dict[str, str] = {
     "security": "security-compliance",
     "leadership": "leadership-management",
     "communication": "collaboration-communication",
+    "devops-tooling": "devops-automation",
+    "databases": "databases-storage",
 }
+# Note: the old "data-ml", "frameworks", and "practices" slugs are intentionally
+# NOT remapped. Each split across several new slugs, so a deterministic 1:1
+# upgrade would miscategorize; they are dropped on load and re-classified by the
+# incremental LLM pass (classify_missing_groups) on the next profile build.
 
 
 def category_kind(slug: str) -> Literal["hard", "soft"]:

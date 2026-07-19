@@ -33,6 +33,16 @@ def test_legacy_remap_targets_live_slugs_and_sources_are_dead():
         assert new in SKILL_GROUPS
 
 
+def test_legacy_remap_covers_clean_renames_but_not_ambiguous_splits():
+    # Clean 1:1 renames must upgrade deterministically.
+    assert LEGACY_GROUP_REMAP["devops-tooling"] == "devops-automation"
+    assert LEGACY_GROUP_REMAP["databases"] == "databases-storage"
+    assert LEGACY_GROUP_REMAP["security"] == "security-compliance"
+    # Ambiguous splits are deliberately absent so they drop and get re-classified.
+    for ambiguous in ("data-ml", "frameworks", "practices"):
+        assert ambiguous not in LEGACY_GROUP_REMAP
+
+
 def test_groups_module_reexports_vocabulary():
     from resume_agent.taxonomy import groups
 

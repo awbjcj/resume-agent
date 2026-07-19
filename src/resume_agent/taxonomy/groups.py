@@ -20,7 +20,10 @@ from resume_agent.llm_runner import (
     use_json_mode_for,
 )
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.taxonomy.vocabulary import SKILL_GROUPS as SKILL_GROUPS
+from resume_agent.taxonomy.vocabulary import (
+    LEGACY_GROUP_REMAP,
+    SKILL_GROUPS as SKILL_GROUPS,
+)
 from resume_agent.tracking.match_gap import normalize_skill
 
 DEFAULT_GROUPS_PATH = Path("data/taxonomy/skill_groups.json")
@@ -42,8 +45,9 @@ def sanitize_group_map(value: object) -> dict[str, str]:
         if not isinstance(raw_token, str) or not isinstance(raw_group, str):
             continue
         token = normalize_skill(raw_token)
-        if token and raw_group in SKILL_GROUPS:
-            clean.setdefault(token, raw_group)
+        group = LEGACY_GROUP_REMAP.get(raw_group, raw_group)
+        if token and group in SKILL_GROUPS:
+            clean.setdefault(token, group)
     return clean
 
 
