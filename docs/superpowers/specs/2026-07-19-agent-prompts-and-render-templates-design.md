@@ -142,7 +142,7 @@ fit_one_page: bool = True        # maps to render_pdf fit_pages=1 vs None
 ### Custom template endpoints (service logic in `services/rendering.py`)
 
 - `GET /api/config/render/templates` → bundled + custom entries
-  `{id, title, kind, valid}` for the picker.
+  `{id, title, description, kind}` for the picker.
 - `POST /api/config/render/templates` — multipart `.typ`, ≤ 200 KB. Stored
   under `{workspace}/config/templates/` **only after a validation compile**:
   the server compiles the candidate against a bundled sample `ResumeContent`
