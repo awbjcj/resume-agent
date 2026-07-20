@@ -1,0 +1,91 @@
+"""Resolve public template identifiers to trusted filesystem paths."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from resume_agent.tenancy.paths import resolve_tenant_path
+
+
+CUSTOM_TEMPLATES_DIR = "config/templates"
+_CUSTOM_STEM = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+
+@dataclass(frozen=True)
+class TemplateInfo:
+    id: str
+    title: str
+    description: str
+    kind: str
+    path: Path
+
+
+BUNDLED = {
+    "classic": TemplateInfo(
+        id="classic",
+        title="Classic",
+        description="Compact single-column resume with clear section hierarchy.",
+        kind="bundled",
+        path=_REPOSITORY_ROOT / "templates" / "resume.typ",
+    )
+}
+
+
+class TemplateNotFoundError(ValueError):
+    """The public template id does not resolve to an available template."""
+
+
+def validate_custom_stem(stem: str) -> str:
+    if not _CUSTOM_STEM.fullmatch(stem):
+        raise TemplateNotFoundError(
+            "Custom template names may contain letters, digits, hyphens, and underscores."
+        )
+    return stem
+
+
+def custom_template_path(stem: str) -> Path:
+    safe_stem = validate_custom_stem(stem)
+    directory = resolve_tenant_path(CUSTOM_TEMPLATES_DIR).resolve()
+    path = (directory / f"{safe_stem}.typ").resolve()
+    if not path.is_relative_to(directory):
+        raise TemplateNotFoundError("Custom template path escapes the workspace.")
+    return path
+
+
+def _custom_info(stem: str, path: Path) -> TemplateInfo:
+    return TemplateInfo(
+        id=f"custom:{stem}",
+        title=stem,
+        description="Uploaded template",
+        kind="custom",
+        path=path,
+    )
+
+
+def resolve_template(template_id: str) -> TemplateInfo:
+    bundled = BUNDLED.get(template_id)
+    if bundled is not None:
+        return bundled
+    if template_id.startswith("custom:"):
+        stem = template_id.removeprefix("custom:")
+        path = custom_template_path(stem)
+        if path.is_file():
+            return _custom_info(stem, path)
+    raise TemplateNotFoundError(
+        f"Template {template_id!r} does not exist. Pick a bundled template or "
+        "re-upload the custom file."
+    )
+
+
+def list_templates() -> list[TemplateInfo]:
+    directory = resolve_tenant_path(CUSTOM_TEMPLATES_DIR)
+    custom_paths = sorted(directory.glob("*.typ"), key=lambda path: path.stem)
+    custom = [
+        _custom_info(path.stem, path)
+        for path in custom_paths
+        if _CUSTOM_STEM.fullmatch(path.stem)
+    ]
+    return [*BUNDLED.values(), *custom]
