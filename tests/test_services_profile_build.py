@@ -107,7 +107,8 @@ def test_run_corpus_build_replays_manual_skills_onto_fresh_facts(tmp_path, monke
     run_corpus_build(profile_dir=profile_dir, github_username=None, facts_out=facts_out)
 
     rebuilt = load_facts(facts_out)
-    assert any(s.name == "Rust" for s in rebuilt.skills["Manually added"])
+    assert "Manually added" not in rebuilt.skills
+    assert any(s.name == "Rust" for s in rebuilt.skills["hard"])
 
 
 def test_run_corpus_build_validates_repo_limit(tmp_path):

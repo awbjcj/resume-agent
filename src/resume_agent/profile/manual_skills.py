@@ -26,7 +26,7 @@ from resume_agent.models.base import ExtensibleModel, new_id
 from resume_agent.models.profile import ProfileFacts, Skill
 from resume_agent.tracking.match_gap import normalize_skill
 
-MANUAL_SKILLS_BUCKET = "Manually added"
+_DEFAULT_CATEGORY = "hard"
 _MANUAL_SKILLS_LOCKS: dict[Path, threading.RLock] = {}
 _MANUAL_SKILLS_LOCKS_GUARD = threading.Lock()
 
@@ -58,8 +58,17 @@ class ManualAliasEntry(ExtensibleModel):
     added_at: str = ""
 
 
+class ManualSuppressEntry(ExtensibleModel):
+    id: str = Field(default_factory=new_id)
+    kind: Literal["suppress"] = "suppress"
+    token: str
+    display: str
+    added_at: str = ""
+
+
 ManualEntry = Annotated[
-    Union[ManualSkillEntry, ManualAliasEntry], Field(discriminator="kind")
+    Union[ManualSkillEntry, ManualAliasEntry, ManualSuppressEntry],
+    Field(discriminator="kind"),
 ]
 
 
@@ -77,8 +86,17 @@ def _find_skill(
     return None
 
 
+def _drop_token(facts: ProfileFacts, token: str) -> None:
+    """Remove any skill matching ``token`` from every bucket, pruning empties."""
+    for bucket_name in list(facts.skills):
+        bucket = facts.skills[bucket_name]
+        bucket[:] = [s for s in bucket if normalize_skill(s.name) != token]
+        if not bucket:
+            del facts.skills[bucket_name]
+
+
 def apply_manual_skill_entry(
-    facts: ProfileFacts, entry: ManualSkillEntry | ManualAliasEntry
+    facts: ProfileFacts, entry: ManualSkillEntry | ManualAliasEntry | ManualSuppressEntry
 ) -> tuple[ProfileFacts, str | None]:
     """Apply one ledger entry to ``facts``, returning (facts, warning|None).
 
@@ -86,6 +104,10 @@ def apply_manual_skill_entry(
     ledger can always be replayed onto facts that already reflect it.
     """
     updated = facts.model_copy(deep=True)
+    if isinstance(entry, ManualSuppressEntry):
+        _drop_token(updated, normalize_skill(entry.token))
+        return updated, None
+
     if isinstance(entry, ManualSkillEntry):
         token = normalize_skill(entry.name)
         existing = {
@@ -96,8 +118,9 @@ def apply_manual_skill_entry(
         }
         if token in existing:
             return updated, None
-        bucket = updated.skills.setdefault(MANUAL_SKILLS_BUCKET, [])
-        bucket.append(Skill(name=entry.name, category=entry.category))
+        category = entry.category or _DEFAULT_CATEGORY
+        bucket = updated.skills.setdefault(category, [])
+        bucket.append(Skill(name=entry.name, category=category))
         return updated, None
 
     found = _find_skill(updated, entry.target_skill_token)
@@ -118,9 +141,15 @@ def apply_manual_skill_entry(
 def apply_manual_skills(
     facts: ProfileFacts, ledger: ManualSkillsLedger
 ) -> tuple[ProfileFacts, list[str]]:
-    """Replay every ledger entry onto ``facts``, collecting skip warnings."""
+    """Replay adds/aliases first, then suppressions, collecting skip warnings.
+
+    Suppressions run last so a deleted synthesized/inferred/manual skill stays
+    gone even when an additive entry for the same token was recorded earlier.
+    """
     warnings: list[str] = []
-    for entry in ledger.entries:
+    additive = [e for e in ledger.entries if e.kind != "suppress"]
+    suppressive = [e for e in ledger.entries if e.kind == "suppress"]
+    for entry in (*additive, *suppressive):
         facts, warning = apply_manual_skill_entry(facts, entry)
         if warning is not None:
             warnings.append(warning)
@@ -133,12 +162,7 @@ def remove_manual_skill_entry(
     """Best-effort reversal of one entry's effect on ``facts``."""
     updated = facts.model_copy(deep=True)
     if isinstance(entry, ManualSkillEntry):
-        token = normalize_skill(entry.name)
-        bucket = updated.skills.get(MANUAL_SKILLS_BUCKET)
-        if bucket is not None:
-            bucket[:] = [s for s in bucket if normalize_skill(s.name) != token]
-            if not bucket:
-                del updated.skills[MANUAL_SKILLS_BUCKET]
+        _drop_token(updated, normalize_skill(entry.name))
         return updated
 
     found = _find_skill(updated, entry.target_skill_token)

@@ -1,9 +1,9 @@
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.profile.manual_skills import (
-    MANUAL_SKILLS_BUCKET,
     ManualAliasEntry,
     ManualSkillEntry,
     ManualSkillsLedger,
+    ManualSuppressEntry,
     apply_manual_skill_entry,
     apply_manual_skills,
     load_manual_skills,
@@ -20,18 +20,28 @@ def _facts():
     )
 
 
-def test_new_skill_entry_adds_a_skill_to_the_manual_bucket():
+def test_new_skill_entry_adds_a_skill_to_its_real_category_bucket():
     facts = _facts()
     entry = ManualSkillEntry(name="Rust", category="hard", added_at="2026-07-16T00:00:00+00:00")
 
     updated, warning = apply_manual_skill_entry(facts, entry)
 
     assert warning is None
-    added = updated.skills[MANUAL_SKILLS_BUCKET]
+    assert "Manually added" not in updated.skills
+    added = updated.skills["hard"]
     assert len(added) == 1
     assert added[0].name == "Rust"
     assert added[0].category == "hard"
     assert added[0].inferred is False
+
+
+def test_new_skill_without_category_defaults_to_hard():
+    facts, _ = apply_manual_skill_entry(
+        ProfileFacts(contact=Contact(name="Ada")), ManualSkillEntry(name="GraphQL")
+    )
+    assert any(
+        s.name == "GraphQL" and s.category == "hard" for s in facts.skills["hard"]
+    )
 
 
 def test_new_skill_entry_is_a_noop_when_the_skill_already_exists():
@@ -41,7 +51,7 @@ def test_new_skill_entry_is_a_noop_when_the_skill_already_exists():
     updated, warning = apply_manual_skill_entry(facts, entry)
 
     assert warning is None
-    assert MANUAL_SKILLS_BUCKET not in updated.skills
+    assert "hard" not in updated.skills
 
 
 def test_alias_entry_attaches_to_the_matching_skill_by_normalized_name():
@@ -109,19 +119,19 @@ def test_apply_manual_skills_replays_every_entry_and_is_idempotent():
 
     assert warnings_once == []
     assert warnings_twice == []
-    assert len(once.skills[MANUAL_SKILLS_BUCKET]) == 1
-    assert len(twice.skills[MANUAL_SKILLS_BUCKET]) == 1
+    assert len(once.skills["hard"]) == 1
+    assert len(twice.skills["hard"]) == 1
     assert twice.skills["Languages"][0].aliases == ["py", "Python3"]
 
 
-def test_remove_new_skill_entry_deletes_it_from_the_manual_bucket():
+def test_remove_new_skill_entry_deletes_it_from_its_category_bucket():
     facts = _facts()
-    entry = ManualSkillEntry(name="Rust", added_at="2026-07-16T00:00:00+00:00")
+    entry = ManualSkillEntry(name="Rust", category="hard", added_at="2026-07-16T00:00:00+00:00")
     with_skill, _ = apply_manual_skill_entry(facts, entry)
 
     reverted = remove_manual_skill_entry(with_skill, entry)
 
-    assert MANUAL_SKILLS_BUCKET not in reverted.skills
+    assert reverted.skills.get("hard", []) == []
 
 
 def test_remove_alias_entry_strips_the_alias_but_keeps_the_skill():
@@ -139,18 +149,46 @@ def test_remove_alias_entry_strips_the_alias_but_keeps_the_skill():
     assert reverted.skills["Languages"][0].aliases == ["py"]
 
 
+def test_suppress_removes_matching_skill_after_adds():
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"hard": [Skill(name="Kubernetes", category="hard")]},
+    )
+    ledger = ManualSkillsLedger(
+        entries=[ManualSuppressEntry(token="kubernetes", display="Kubernetes")]
+    )
+    facts, warnings = apply_manual_skills(facts, ledger)
+    assert warnings == []
+    assert all(s.name != "Kubernetes" for s in facts.skills.get("hard", []))
+
+
+def test_suppress_applies_after_add_of_same_token():
+    ledger = ManualSkillsLedger(
+        entries=[
+            ManualSkillEntry(name="Rust", category="hard"),
+            ManualSuppressEntry(token="rust", display="Rust"),
+        ]
+    )
+    facts, _ = apply_manual_skills(ProfileFacts(contact=Contact(name="Ada")), ledger)
+    assert all(s.name != "Rust" for s in facts.skills.get("hard", []))
+
+
 def test_save_and_load_manual_skills_roundtrip(tmp_path):
     path = tmp_path / "manual_skills.json"
     ledger = ManualSkillsLedger(
-        entries=[ManualSkillEntry(name="Rust", added_at="2026-07-16T00:00:00+00:00")]
+        entries=[
+            ManualSkillEntry(name="Rust", added_at="2026-07-16T00:00:00+00:00"),
+            ManualSuppressEntry(token="kubernetes", display="Kubernetes"),
+        ]
     )
 
     save_manual_skills(ledger, path)
     loaded = load_manual_skills(path)
 
-    loaded_entry = loaded.entries[0]
-    assert isinstance(loaded_entry, ManualSkillEntry)
-    assert loaded_entry.name == "Rust"
+    assert isinstance(loaded.entries[0], ManualSkillEntry)
+    assert loaded.entries[0].name == "Rust"
+    assert isinstance(loaded.entries[1], ManualSuppressEntry)
+    assert loaded.entries[1].token == "kubernetes"
 
 
 def test_load_manual_skills_missing_file_returns_empty_ledger(tmp_path):

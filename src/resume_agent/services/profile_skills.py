@@ -17,6 +17,7 @@ from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.manual_skills import (
     ManualAliasEntry,
     ManualSkillEntry,
+    ManualSuppressEntry,
     apply_manual_skills,
     load_manual_skills,
     manual_skills_lock,
@@ -93,11 +94,22 @@ def add_skill(
         token = normalize_skill(name)
         if not token:
             raise ValueError("skill name is required")
-        if token in _known_tokens(facts):
-            raise SkillAlreadyExistsError(f"'{name}' is already in your profile")
 
-        entry = ManualSkillEntry(name=name, category=category, added_at=_utcnow())
         ledger = load_manual_skills(_ledger_path(profile_dir))
+        # Re-adding a currently-suppressed skill restores it rather than erroring:
+        # dropping the suppress entry lets the name reappear on the next rebuild.
+        was_suppressed = any(
+            e.kind == "suppress" and normalize_skill(e.token) == token
+            for e in ledger.entries
+        )
+        if token in _known_tokens(facts) and not was_suppressed:
+            raise SkillAlreadyExistsError(f"'{name}' is already in your profile")
+        ledger.entries = [
+            e
+            for e in ledger.entries
+            if not (e.kind == "suppress" and normalize_skill(e.token) == token)
+        ]
+        entry = ManualSkillEntry(name=name, category=category, added_at=_utcnow())
         ledger.entries.append(entry)
         updated_facts, _warnings = apply_manual_skills(facts, ledger)
         save_facts(updated_facts, _facts_path(profile_dir))
@@ -157,6 +169,77 @@ def remove_manual_entry(profile_dir: str | Path, entry_id: str) -> None:
 
         updated_facts = remove_manual_skill_entry(facts, entry)
         ledger.entries = [e for e in ledger.entries if e.id != entry_id]
+        save_facts(updated_facts, _facts_path(profile_dir))
+        save_manual_skills(ledger, _ledger_path(profile_dir))
+        rebuild_saved_matrix(profile_dir, updated_facts)
+
+
+def list_suppressed(profile_dir: str | Path) -> list[ManualSuppressEntry]:
+    """Return the durable suppress entries (deleted skills awaiting restore)."""
+    ledger = load_manual_skills(_ledger_path(profile_dir))
+    return [e for e in ledger.entries if isinstance(e, ManualSuppressEntry)]
+
+
+def delete_skill(profile_dir: str | Path, key: str) -> None:
+    """Durably delete any live skill by matrix key / normalized token.
+
+    Records a suppress entry so the skill stays gone across rebuilds, drops any
+    additive ``new_skill`` add of the same token (it would fight the suppress),
+    removes it from live facts, and rebuilds the saved matrix.
+    """
+    with manual_skills_lock(profile_dir):
+        facts = _load_facts_or_raise(profile_dir)
+        token = normalize_skill(key)
+        match = next(
+            (
+                skill
+                for skills in facts.skills.values()
+                for skill in skills
+                if normalize_skill(skill.name) == token
+                or token in {normalize_skill(a) for a in skill.aliases}
+            ),
+            None,
+        )
+        if match is None:
+            raise SkillNotFoundError(f"No skill '{key}'")
+        ledger = load_manual_skills(_ledger_path(profile_dir))
+        ledger.entries = [
+            e
+            for e in ledger.entries
+            if not (e.kind == "new_skill" and normalize_skill(e.name) == token)
+        ]
+        if not any(
+            e.kind == "suppress" and normalize_skill(e.token) == token
+            for e in ledger.entries
+        ):
+            ledger.entries.append(
+                ManualSuppressEntry(
+                    token=token, display=match.name, added_at=_utcnow()
+                )
+            )
+        updated_facts, _warnings = apply_manual_skills(facts, ledger)
+        save_facts(updated_facts, _facts_path(profile_dir))
+        save_manual_skills(ledger, _ledger_path(profile_dir))
+        rebuild_saved_matrix(profile_dir, updated_facts)
+
+
+def restore_skill(profile_dir: str | Path, token: str) -> None:
+    """Lift a suppression so the skill reappears on the next profile build."""
+    with manual_skills_lock(profile_dir):
+        facts = _load_facts_or_raise(profile_dir)
+        norm = normalize_skill(token)
+        ledger = load_manual_skills(_ledger_path(profile_dir))
+        if not any(
+            e.kind == "suppress" and normalize_skill(e.token) == norm
+            for e in ledger.entries
+        ):
+            raise ManualEntryNotFoundError(f"'{token}' is not suppressed")
+        ledger.entries = [
+            e
+            for e in ledger.entries
+            if not (e.kind == "suppress" and normalize_skill(e.token) == norm)
+        ]
+        updated_facts, _warnings = apply_manual_skills(facts, ledger)
         save_facts(updated_facts, _facts_path(profile_dir))
         save_manual_skills(ledger, _ledger_path(profile_dir))
         rebuild_saved_matrix(profile_dir, updated_facts)
