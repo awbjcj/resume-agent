@@ -39,6 +39,7 @@ def render_pdf(
     fit_pages: int | None = 1,
     min_zoom: float = 0.82,
     zoom_step: float = 0.03,
+    root: str | Path | None = None,
 ) -> Path:
     """Compile the Typst template with the resume JSON into a PDF file.
 
@@ -51,12 +52,15 @@ def render_pdf(
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     data = content.model_dump_json()
+    source = Path(template_path).resolve()
+    resolved_root = Path(root).resolve() if root is not None else source.parent
 
     zoom = 1.0
     while True:
         typst.compile(
-            str(template_path),
+            str(source),
             output=str(out),
+            root=str(resolved_root),
             sys_inputs={"data": data, "zoom": f"{zoom:.4f}"},
         )
         if fit_pages is None or _page_count(out) <= fit_pages or zoom <= min_zoom:

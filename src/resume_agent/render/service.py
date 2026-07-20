@@ -7,11 +7,17 @@ from resume_agent.models.resume import ResumeContent
 from resume_agent.render.export import export_job_artifacts, job_dir, resume_pdf_name
 from resume_agent.render.render_config import RenderConfig
 from resume_agent.render.renderer import render_pdf
+from resume_agent.render.templates import template_path_for
 from resume_agent.tenancy.paths import resolve_tenant_path
-from resume_agent.tracking.repository import get_job, get_resume_version, save_job, save_resume_version
+from resume_agent.tracking.repository import (
+    get_job,
+    get_resume_version,
+    save_job,
+    save_resume_version,
+)
 from resume_agent.tracking.tables import JobStatus, ResumeVersion
 
-RenderFn = Callable[[ResumeContent, str | Path, str | Path], Path]
+RenderFn = Callable[..., Path]
 
 
 def render_version(
@@ -34,7 +40,12 @@ def render_version(
     )
     out_path = out_dir / resume_pdf_name(version)
 
-    render_fn(content, out_path, config.template_path)
+    render_fn(
+        content,
+        out_path,
+        template_path_for(config),
+        fit_pages=1 if config.fit_one_page else None,
+    )
 
     version.pdf_path = str(out_path)
     save_resume_version(session, version)

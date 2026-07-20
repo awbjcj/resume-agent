@@ -89,3 +89,12 @@ def list_templates() -> list[TemplateInfo]:
         if _CUSTOM_STEM.fullmatch(path.stem)
     ]
     return [*BUNDLED.values(), *custom]
+
+
+def template_path_for(config) -> Path:
+    """Resolve new template ids while retaining the legacy CLI path escape hatch."""
+    if config.template:
+        return resolve_template(config.template).path
+    if config.template_path:
+        return Path(config.template_path)
+    return resolve_template("classic").path

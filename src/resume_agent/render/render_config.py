@@ -5,7 +5,9 @@ from resume_agent.models.base import ExtensibleModel
 
 
 class RenderConfig(ExtensibleModel):
-    template_path: str = "templates/resume.typ"
+    template: str | None = None
+    fit_one_page: bool = True
+    template_path: str | None = None
     output_dir: str = "output"
 
 
