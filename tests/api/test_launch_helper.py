@@ -1,12 +1,16 @@
+from typing import cast
+
 import pytest
 
 from resume_agent.api.errors import ApiException
 from resume_agent.api.runs.launch import launch, session_work
 from resume_agent.api.runs.manager import (
+    RunManager,
     RunQuotaError,
     RunResetConflict,
     RunSingletonConflict,
 )
+from resume_agent.progress import ProgressReporter
 
 
 class _RecordStub:
@@ -50,7 +54,9 @@ class _ManagerStub:
 
 def test_launch_submits_and_returns_runout():
     mgr = _ManagerStub()
-    out = launch(mgr, "pull", lambda reporter: {}, singleton_key="pull", meta={"a": 1})
+    out = launch(
+        cast(RunManager, mgr), "pull", lambda reporter: {}, singleton_key="pull", meta={"a": 1}
+    )
     assert out.run_id == "run-1"
     assert mgr.submitted == {
         "kind": "pull",
@@ -63,7 +69,7 @@ def test_launch_submits_and_returns_runout():
 def test_launch_maps_singleton_conflict_to_409():
     mgr = _ManagerStub(error=RunSingletonConflict("run-9"))
     with pytest.raises(ApiException) as excinfo:
-        launch(mgr, "pull", lambda reporter: {}, singleton_key="pull",
+        launch(cast(RunManager, mgr), "pull", lambda reporter: {}, singleton_key="pull",
                singleton_conflict="raise")
     assert excinfo.value.status_code == 409
     assert excinfo.value.details == {"runId": "run-9"}
@@ -72,7 +78,7 @@ def test_launch_maps_singleton_conflict_to_409():
 def test_launch_busy_code_overrides_default():
     mgr = _ManagerStub(error=RunSingletonConflict("run-9"))
     with pytest.raises(ApiException) as excinfo:
-        launch(mgr, "coach", lambda reporter: {}, busy_code="COACH_BUSY",
+        launch(cast(RunManager, mgr), "coach", lambda reporter: {}, busy_code="COACH_BUSY",
                busy_message="A coach turn is already running")
     assert excinfo.value.code == "COACH_BUSY"
     assert excinfo.value.message == "A coach turn is already running"
@@ -80,10 +86,10 @@ def test_launch_busy_code_overrides_default():
 
 def test_launch_maps_quota_to_429_and_reset_to_409():
     with pytest.raises(ApiException) as excinfo:
-        launch(_ManagerStub(error=RunQuotaError("too many")), "pull", lambda r: {})
+        launch(cast(RunManager, _ManagerStub(error=RunQuotaError("too many"))), "pull", lambda r: {})
     assert excinfo.value.status_code == 429
     with pytest.raises(ApiException) as excinfo:
-        launch(_ManagerStub(error=RunResetConflict("reset underway")), "pull", lambda r: {})
+        launch(cast(RunManager, _ManagerStub(error=RunResetConflict("reset underway"))), "pull", lambda r: {})
     assert excinfo.value.status_code == 409
 
 
@@ -100,6 +106,6 @@ def test_session_work_opens_its_own_session(tmp_path):
         return {"ok": True}
 
     work = session_work(engine, fn)
-    assert work("REPORTER") == {"ok": True}
+    assert work(cast(ProgressReporter, "REPORTER")) == {"ok": True}
     assert seen["reporter"] == "REPORTER"
     assert seen["session"] is not None

@@ -15,6 +15,7 @@ from typing import Any, Callable
 
 from resume_agent.api.errors import ApiException
 from resume_agent.api.runs.manager import (
+    RunFn,
     RunManager,
     RunQuotaError,
     RunResetConflict,
@@ -28,7 +29,7 @@ from resume_agent.db import get_session
 def launch(
     mgr: RunManager,
     kind: str,
-    work: Callable[[Any], dict],
+    work: RunFn,
     *,
     singleton_key: str | None = None,
     singleton_conflict: str = "join",
@@ -60,7 +61,7 @@ def launch(
     return record_to_run(record)
 
 
-def session_work(engine, fn: Callable[[Any, Any], dict]) -> Callable[[Any], dict]:
+def session_work(engine, fn: Callable[[Any, Any], object]) -> RunFn:
     """Wrap ``fn(session, reporter)`` in a worker-owned session."""
 
     def work(reporter):
