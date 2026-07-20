@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,24 @@ def job_dir(base: str | Path, job: Job) -> Path:
 
 def _origin(value: str | None, fallback: str) -> str:
     return _slug(value or "") or fallback
+
+
+def _friendly_part(text: str, fallback: str) -> str:
+    cleaned = re.sub(r"[^\w\s-]", "", text or "", flags=re.UNICODE).strip()
+    cleaned = re.sub(r"[\s-]+", "_", cleaned).strip("_")
+    return cleaned or fallback
+
+
+def resume_download_name(job: Job, version: ResumeVersion) -> str:
+    company = _friendly_part(job.company or "", "Company")
+    title = _friendly_part(job.title or "", "Role")
+    return f"{company}-{title}-Resume-v{version.id}.pdf"
+
+
+def cover_letter_download_name(job: Job, cover_letter: CoverLetter) -> str:
+    company = _friendly_part(job.company or "", "Company")
+    title = _friendly_part(job.title or "", "Role")
+    return f"{company}-{title}-CoverLetter-v{cover_letter.id}.pdf"
 
 
 def resume_pdf_name(version: ResumeVersion) -> str:

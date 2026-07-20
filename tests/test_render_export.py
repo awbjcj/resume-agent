@@ -7,10 +7,12 @@ from resume_agent.db import init_db, make_engine
 from resume_agent.config import Settings
 from resume_agent.render.export import (
     build_manifest,
+    cover_letter_download_name,
     cover_letter_pdf_name,
     export_job_artifacts,
     job_dir,
     job_slug,
+    resume_download_name,
     resume_json_name,
     resume_pdf_name,
 )
@@ -35,6 +37,45 @@ def test_job_slug_and_version_filenames():
     assert resume_pdf_name(version) == "resume-v7-revision.pdf"
     assert resume_json_name(version) == "resume-v7-revision.content.json"
     assert cover_letter_pdf_name(cover) == "cover-letter-v3-draft.pdf"
+
+
+def test_resume_download_name_uses_company_and_title():
+    job = Job(id=42, source="manual", company="Acme Corp", title="Senior Engineer")
+    version = ResumeVersion(id=7, job_id=42, round=1, origin="revision")
+
+    assert resume_download_name(job, version) == "Acme_Corp-Senior_Engineer-Resume-v7.pdf"
+
+
+def test_cover_letter_download_name_uses_company_and_title():
+    job = Job(id=42, source="manual", company="Acme Corp", title="Senior Engineer")
+    cover = CoverLetter(id=3, job_id=42, origin="draft")
+
+    assert (
+        cover_letter_download_name(job, cover)
+        == "Acme_Corp-Senior_Engineer-CoverLetter-v3.pdf"
+    )
+
+
+def test_download_name_falls_back_when_company_or_title_missing():
+    job = Job(id=42, source="manual", company=None, title="")
+    version = ResumeVersion(id=7, job_id=42, round=1, origin="tailor")
+
+    assert resume_download_name(job, version) == "Company-Role-Resume-v7.pdf"
+
+
+def test_download_name_strips_special_characters_and_collapses_whitespace():
+    job = Job(
+        id=42,
+        source="manual",
+        company="Acme, Inc.  (Remote)",
+        title="C++  Engineer -- Backend",
+    )
+    version = ResumeVersion(id=9, job_id=42, round=1, origin="tailor")
+
+    assert (
+        resume_download_name(job, version)
+        == "Acme_Inc_Remote-C_Engineer_Backend-Resume-v9.pdf"
+    )
 
 
 def test_job_dir_rebases_default_output_into_active_workspace(tmp_path):
