@@ -1,5 +1,7 @@
 from agno.agent import Agent
 
+from resume_agent.prompts.guidance import with_guidance
+
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
@@ -62,7 +64,7 @@ def build_cover_letter_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Write a targeted cover letter under a strict candidate-profile fact-lock.",
-            instructions=_DRAFT_INSTRUCTIONS,
+            instructions=with_guidance("cover-letter-draft", _DRAFT_INSTRUCTIONS),
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -76,7 +78,7 @@ def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Repair unsupported cover-letter claims and provenance without adding facts.",
-            instructions=_REVISE_INSTRUCTIONS,
+            instructions=with_guidance("cover-letter-revise", _REVISE_INSTRUCTIONS),
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -90,7 +92,7 @@ def build_cover_letter_revision_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Apply one user-requested cover-letter edit without weakening its fact-lock.",
-            instructions=_REVISION_INSTRUCTIONS,
+            instructions=with_guidance("cover-letter-revision", _REVISION_INSTRUCTIONS),
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

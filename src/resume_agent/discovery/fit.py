@@ -15,6 +15,7 @@ from resume_agent.llm_runner import (
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import SkillMatchContext
+from resume_agent.prompts.guidance import with_guidance
 
 
 class FitLocation(BaseModel):
@@ -48,9 +49,9 @@ _INSTRUCTIONS = [
     "using the description only to clarify it. Return location=null when no meaningful work location "
     "is supported; otherwise leave unsupported city, region, or country members null.",
     "Split a combined location into its parts: put the city in city, the US state (full name or "
-    "2-letter code) in region, and the nation in country. Set country to \"US\" whenever the location "
+    '2-letter code) in region, and the nation in country. Set country to "US" whenever the location '
     "names a US state or a clearly US city, even when the country is not written.",
-    "For remote roles, capture any country qualifier (for example \"Remote (US)\" means country US) "
+    'For remote roles, capture any country qualifier (for example "Remote (US)" means country US) '
     "and leave city and region null unless the posting names a specific hub.",
     "When a SKILL MATCH CONTEXT section is present, use its deterministic tiers. Award full "
     "skill credit only to covered rows, lower partial credit to adjacent rows, and no skill "
@@ -65,7 +66,7 @@ def build_fit_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Score evidence-based candidate fit and parse the job location.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("fit-score", _INSTRUCTIONS),
             output_schema=FitScore,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

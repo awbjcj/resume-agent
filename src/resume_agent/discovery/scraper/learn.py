@@ -1,5 +1,6 @@
 import re
 
+from agno.agent import Agent
 from bs4 import BeautifulSoup, Comment
 
 from resume_agent.config import get_settings
@@ -11,6 +12,7 @@ from resume_agent.llm_runner import (
     retry_kwargs,
     use_json_mode_for,
 )
+from resume_agent.prompts.guidance import with_guidance
 from resume_agent.tracking.tables import utcnow
 
 MAX_LEARN_CHARS = 60_000
@@ -42,15 +44,13 @@ def prune_html(html: str) -> str:
 
 
 def build_learn_agent(model_id: str | None = None) -> Runner:
-    from agno.agent import Agent
-
     settings = get_settings()
     model = build_model(model_id or settings.mid_model)
     return AgentRunner(
         Agent(
             model=model,
             description="Infer a reusable CSS-selector recipe for one job board.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("scraper-learn", _INSTRUCTIONS),
             output_schema=ScrapeRecipe,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -62,7 +62,9 @@ def learn_recipe(pruned_html: str, agent: Runner) -> ScrapeRecipe:
     result = agent.run(pruned_html)
     recipe = result.content
     if not isinstance(recipe, ScrapeRecipe):
-        raise TypeError(f"Expected ScrapeRecipe from learn agent, got {type(recipe).__name__}")
+        raise TypeError(
+            f"Expected ScrapeRecipe from learn agent, got {type(recipe).__name__}"
+        )
     return recipe.model_copy(
         update={"schema_version": RECIPE_SCHEMA_VERSION, "learned_at": utcnow()}
     )

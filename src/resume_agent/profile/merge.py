@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import Field
 
 from resume_agent.config import get_settings
@@ -137,7 +139,7 @@ def build_bullet_dedup_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Group near-duplicate resume bullets by index.",
-            instructions=_DEDUP_INSTRUCTIONS,
+            instructions=with_guidance("profile-dedup", _DEDUP_INSTRUCTIONS),
             output_schema=BulletDupGroups,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -302,7 +304,9 @@ def _dedup_bullets(
 ) -> list[Bullet]:
     if len(bullets) < 2:
         return bullets
-    listing = "\n".join(f"{index}: {bullet.text}" for index, bullet in enumerate(bullets))
+    listing = "\n".join(
+        f"{index}: {bullet.text}" for index, bullet in enumerate(bullets)
+    )
     try:
         groups = agent.run(listing).content
     except Exception:
@@ -361,7 +365,9 @@ def merge_fragments(
                 f"from {doc.filename}"
             )
         merged.interests.extend(
-            interest for interest in fragment.interests if interest not in merged.interests
+            interest
+            for interest in fragment.interests
+            if interest not in merged.interests
         )
 
         for experience in fragment.experience:
@@ -382,10 +388,15 @@ def merge_fragments(
         _merge_entity_list(
             merged.education,
             fragment.education,
-            key=lambda education: (_norm(education.institution), _norm(education.degree or "")),
+            key=lambda education: (
+                _norm(education.institution),
+                _norm(education.degree or ""),
+            ),
             scalar_fields=("field", "start", "end", "gpa"),
             collection_fields=("honors", "relevant_coursework", "activities"),
-            label=lambda education: f"education {education.institution}/{education.degree or ''}",
+            label=lambda education: (
+                f"education {education.institution}/{education.degree or ''}"
+            ),
             doc=doc,
             report=report,
         )

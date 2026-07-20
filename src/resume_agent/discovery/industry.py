@@ -6,6 +6,8 @@ import json
 from dataclasses import dataclass
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import BaseModel, ConfigDict
 
 from resume_agent.config import get_settings
@@ -78,7 +80,9 @@ def classify_industries(
     runner: Runner,
 ) -> IndustryClassificationOutcome:
     authoritative = {
-        key for candidate in candidates if (key := _candidate_key(candidate)) is not None
+        key
+        for candidate in candidates
+        if (key := _candidate_key(candidate)) is not None
     }
     if not authoritative:
         return IndustryClassificationOutcome({}, set())
@@ -123,7 +127,9 @@ def classify_industries(
     for (company, _industry), canonical in assignments.items():
         canonicals_by_company.setdefault(company, set()).add(canonical)
     conflicting_companies = {
-        company for company, canonicals in canonicals_by_company.items() if len(canonicals) > 1
+        company
+        for company, canonicals in canonicals_by_company.items()
+        if len(canonicals) > 1
     }
     if conflicting_companies:
         for key in list(assignments):
@@ -145,7 +151,9 @@ def classify_industries(
                 assignments.pop(key)
                 rejected.add(key)
 
-    return IndustryClassificationOutcome(assignments, authoritative - assignments.keys())
+    return IndustryClassificationOutcome(
+        assignments, authoritative - assignments.keys()
+    )
 
 
 def build_industry_classifier() -> AgentRunner:
@@ -155,7 +163,7 @@ def build_industry_classifier() -> AgentRunner:
         Agent(
             model=model,
             description="Map new employer-industry candidates to stable readable canonicals.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("industry-classifier", _INSTRUCTIONS),
             output_schema=IndustryClassification,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

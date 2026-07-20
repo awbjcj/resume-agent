@@ -1,4 +1,6 @@
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from bs4 import BeautifulSoup
 
 from resume_agent.config import get_settings
@@ -32,7 +34,7 @@ def build_url_extract_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Recover one structured job posting from cleaned web-page text.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("url-ingest", _INSTRUCTIONS),
             output_schema=ExtractedJob,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -44,7 +46,9 @@ def extract_fields(text: str, agent: Runner) -> ExtractedJob:
     result = agent.run(text)
     extracted = result.content
     if not isinstance(extracted, ExtractedJob):
-        raise TypeError(f"Expected ExtractedJob from agent, got {type(extracted).__name__}")
+        raise TypeError(
+            f"Expected ExtractedJob from agent, got {type(extracted).__name__}"
+        )
     return extracted
 
 

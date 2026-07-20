@@ -65,9 +65,7 @@ def classify_email(email: EmailMessage, llm: Runner | None = None) -> str:
 
 def _prompt(email: EmailMessage) -> str:
     return (
-        "Classify this recruiting email as exactly one word: "
-        "rejection, interview, assessment, offer, or none.\n\n"
-        f"Subject: {email.subject}\nBody: {email.body or email.snippet}"
+        f"EMAIL SUBJECT:\n{email.subject}\n\nEMAIL BODY:\n{email.body or email.snippet}"
     )
 
 
@@ -86,7 +84,15 @@ def build_classifier_llm() -> Runner | None:
         return None
     from agno.agent import Agent
 
-    return AgentRunner(Agent(model=build_model(model_id), **retry_kwargs()))
+    from resume_agent.prompts.guidance import with_guidance
+
+    return AgentRunner(
+        Agent(
+            model=build_model(model_id),
+            instructions=with_guidance("email-classifier", _CLASSIFIER_INSTRUCTIONS),
+            **retry_kwargs(),
+        )
+    )
 
 
 def hydrating_classifier(service, llm: Runner | None):

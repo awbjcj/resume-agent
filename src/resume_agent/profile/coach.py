@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Literal
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import Field
 
 from resume_agent.config import get_settings
@@ -211,7 +213,9 @@ def normalize_recap(turn: CoachTurn, session: dict) -> str:
         raise TurnRejected("empty message")
     if turn.draft_note is not None or turn.topic_updates:
         raise TurnRejected("recap cannot mutate topics or drafts")
-    if turn.topic_id and turn.topic_id not in {topic["id"] for topic in session["topics"]}:
+    if turn.topic_id and turn.topic_id not in {
+        topic["id"] for topic in session["topics"]
+    }:
         raise TurnRejected(f"unknown topic: {turn.topic_id!r}")
     return message
 
@@ -261,7 +265,9 @@ def profile_overview(profile_dir: Path | str, session=None) -> str:
     if facts_path.exists():
         facts = load_facts(facts_path)
         for experience in facts.experience:
-            metrics = sum(1 for bullet in experience.bullets if _METRIC.search(bullet.text))
+            metrics = sum(
+                1 for bullet in experience.bullets if _METRIC.search(bullet.text)
+            )
             fact_lines.append(
                 f"experience {experience.id}: {experience.company} — {experience.title} | "
                 f"{len(experience.bullets)} bullets, {metrics} with metrics"
@@ -322,7 +328,9 @@ def render_transcript(session: dict, char_cap: int = TRANSCRIPT_CHAR_CAP) -> str
     if char_cap <= 0:
         return ""
     completed = {
-        topic["id"] for topic in session["topics"] if topic["status"] in {"saved", "skipped"}
+        topic["id"]
+        for topic in session["topics"]
+        if topic["status"] in {"saved", "skipped"}
     }
     notes = {row["topic_id"]: row for row in session["draft_notes"]}
     collapsed = [
@@ -403,7 +411,7 @@ def build_coach_agent(tools) -> Runner:
             model=model,
             tools=list(tools),
             description="Coach one conversational turn against a profile corpus.",
-            instructions=_COACH_INSTRUCTIONS,
+            instructions=with_guidance("coach", _COACH_INSTRUCTIONS),
             **tool_kwargs(),
             **retry_kwargs(),
         )
@@ -417,7 +425,9 @@ def build_coach_formatter_agent(schema: type[CoachTurn]) -> Runner:
         Agent(
             model=model,
             description="Convert coach notes into one structured coach turn.",
-            instructions=_formatter_instructions(schema),
+            instructions=with_guidance(
+                "coach-formatter", _formatter_instructions(schema)
+            ),
             output_schema=schema,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

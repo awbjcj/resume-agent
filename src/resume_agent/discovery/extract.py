@@ -2,6 +2,8 @@ import asyncio
 
 from agno.agent import Agent
 
+from resume_agent.prompts.guidance import with_guidance
+
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
     AgentRunner,
@@ -57,7 +59,7 @@ def build_extract_agent(model_id: str | None = None) -> AgentRunner:
         Agent(
             model=model,
             description="Extract a job posting into the application's hiring-criteria schema.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("extract-criteria", _INSTRUCTIONS),
             output_schema=JobCriteriaExtract,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

@@ -2,8 +2,16 @@ import asyncio
 
 from agno.agent import Agent
 
+from resume_agent.prompts.guidance import with_guidance
+
 from resume_agent.config import get_settings
-from resume_agent.llm_runner import AgentRunner, Runner, acall, build_model, use_json_mode_for
+from resume_agent.llm_runner import (
+    AgentRunner,
+    Runner,
+    acall,
+    build_model,
+    use_json_mode_for,
+)
 from resume_agent.models.profile import ProfileFacts
 
 # Bump whenever _INSTRUCTIONS change so cached fragments re-extract.
@@ -40,7 +48,7 @@ def build_extractor_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Convert raw resume text into the application's immutable candidate fact record.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("profile-extractor", _INSTRUCTIONS),
             output_schema=ProfileFacts,
             use_json_mode=use_json_mode_for(model),
         )

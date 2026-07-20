@@ -20,6 +20,7 @@ from resume_agent.gmail.client import fetch_message_body, fetch_recent_messages
 from resume_agent.gmail.match import match_email_to_application
 from resume_agent.llm_runner import Runner
 from resume_agent.models.base import ExtensibleModel
+from resume_agent.prompts.guidance import with_guidance
 from resume_agent.tracking.repository import (
     application_for_job,
     get_job,
@@ -85,7 +86,7 @@ def build_writer_agent() -> Runner:
         Agent(
             model=model,
             description="Draft one professional job-search email.",
-            instructions=_WRITER_INSTRUCTIONS,
+            instructions=with_guidance("email-writer", _WRITER_INSTRUCTIONS),
             output_schema=EmailDraftContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -167,7 +168,9 @@ def generate_email_draft(
     thread = _thread_context(service, job) if service is not None else None
     agent = agent or build_writer_agent()
     response = agent.run(
-        _prompt(job, application, draft_type, instructions, _load_facts(facts_path), thread)
+        _prompt(
+            job, application, draft_type, instructions, _load_facts(facts_path), thread
+        )
     )
     content = response.content
     if not isinstance(content, EmailDraftContent):

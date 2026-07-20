@@ -9,6 +9,8 @@ from pathlib import Path
 from threading import Lock
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import Field
 
 from resume_agent.config import get_settings
@@ -114,7 +116,7 @@ def build_group_classifier_agent() -> Runner:
         Agent(
             model=model,
             description="Assign skill tokens to fixed profile-dashboard groups.",
-            instructions=_GROUP_INSTRUCTIONS,
+            instructions=with_guidance("skill-groups", _GROUP_INSTRUCTIONS),
             output_schema=SkillGroupAssignments,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

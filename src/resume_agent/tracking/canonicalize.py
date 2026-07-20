@@ -2,6 +2,8 @@ import json
 from typing import Callable
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import Field
 
 from resume_agent.config import get_settings
@@ -98,7 +100,9 @@ def clusters_to_mapping(clusters: list[list[str]], tokens: set[str]) -> dict[str
         # token (case/punctuation) or invents one, so project each member back
         # onto an input token and ignore anything that does not land there — the
         # canonical must remain a real input token at the model-output seam.
-        members = [token for raw in cluster if (token := normalize_skill(raw)) in tokens]
+        members = [
+            token for raw in cluster if (token := normalize_skill(raw)) in tokens
+        ]
         if not members:
             continue
         canonical = next(
@@ -177,7 +181,7 @@ def _default_agent() -> Runner:
         Agent(
             model=model,
             description="Partition technical-skill tokens into conservative synonym clusters.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("taxonomy-clusters", _INSTRUCTIONS),
             output_schema=SkillClusters,
             use_json_mode=use_json_mode_for(model),
         )
@@ -191,14 +195,16 @@ def _default_themer_agent() -> Runner:
         Agent(
             model=model,
             description="Partition canonical technical skills into dashboard-ready themes.",
-            instructions=_THEME_INSTRUCTIONS,
+            instructions=with_guidance("taxonomy-themes", _THEME_INSTRUCTIONS),
             output_schema=SkillThemes,
             use_json_mode=use_json_mode_for(model),
         )
     )
 
 
-def build_skill_canonicalizer(agent: Runner | None = None) -> Callable[[set[str]], dict[str, str]]:
+def build_skill_canonicalizer(
+    agent: Runner | None = None,
+) -> Callable[[set[str]], dict[str, str]]:
     runner = agent or _default_agent()
 
     def canonicalize(tokens: set[str]) -> dict[str, str]:
@@ -233,7 +239,9 @@ def build_incremental_canonicalizer_agent() -> Runner:
         Agent(
             model=model,
             description="Map new skill tokens to stable canonicals.",
-            instructions=_INCREMENTAL_INSTRUCTIONS,
+            instructions=with_guidance(
+                "taxonomy-clusters-incremental", _INCREMENTAL_INSTRUCTIONS
+            ),
             output_schema=SkillClusters,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -249,7 +257,9 @@ def build_incremental_themer_agent() -> Runner:
         Agent(
             model=model,
             description="Assign new canonical skills to capped category domains.",
-            instructions=_INCREMENTAL_DOMAIN_INSTRUCTIONS,
+            instructions=with_guidance(
+                "taxonomy-domains-incremental", _INCREMENTAL_DOMAIN_INSTRUCTIONS
+            ),
             output_schema=IncrementalSkillDomains,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

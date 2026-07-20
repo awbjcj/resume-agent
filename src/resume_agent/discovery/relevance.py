@@ -1,6 +1,8 @@
 import asyncio
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import BaseModel, ConfigDict
 
 from resume_agent.config import get_settings
@@ -46,7 +48,7 @@ def build_relevance_agent(model_id: str | None = None) -> Runner | None:
         Agent(
             model=model,
             description="Apply a high-recall role-family relevance gate to a job title and snippet.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("relevance-judge", _INSTRUCTIONS),
             output_schema=RelevanceVerdict,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

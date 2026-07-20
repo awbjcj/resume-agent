@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Literal
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import Field
 
 from resume_agent.config import get_settings
@@ -91,7 +93,7 @@ def build_search_agent() -> Runner:
             model=model,
             tools=tools,
             description="Research current, verifiable resources for closing one candidate skill gap.",
-            instructions=_SEARCH_INSTRUCTIONS,
+            instructions=with_guidance("suggestions-research", _SEARCH_INSTRUCTIONS),
             **retry_kwargs(),
         )
     )
@@ -104,7 +106,7 @@ def build_formatter_agent() -> Runner:
         Agent(
             model=model,
             description="Transform grounded research into the application's suggestion schema.",
-            instructions=_FORMAT_INSTRUCTIONS,
+            instructions=with_guidance("suggestions-format", _FORMAT_INSTRUCTIONS),
             output_schema=SuggestionDraft,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

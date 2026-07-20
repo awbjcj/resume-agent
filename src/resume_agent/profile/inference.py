@@ -3,6 +3,8 @@
 from typing import Literal
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import Field
 
 from resume_agent.config import get_settings
@@ -53,7 +55,7 @@ def build_inference_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Derive evidence-linked skills the candidate's facts demonstrate.",
-            instructions=_INSTRUCTIONS,
+            instructions=with_guidance("skill-inference", _INSTRUCTIONS),
             output_schema=InferredSkills,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -64,7 +66,9 @@ def build_inference_agent(model_id: str | None = None) -> Runner:
 def infer_skills(facts: ProfileFacts, agent: Runner) -> list[InferredSkill]:
     content = agent.run(facts.model_dump_json()).content
     if not isinstance(content, InferredSkills):
-        raise TypeError(f"Expected InferredSkills from agent, got {type(content).__name__}")
+        raise TypeError(
+            f"Expected InferredSkills from agent, got {type(content).__name__}"
+        )
     return content.skills
 
 

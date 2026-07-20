@@ -24,6 +24,7 @@ from resume_agent.llm_runner import (
     retry_kwargs,
     use_json_mode_for,
 )
+from resume_agent.prompts.guidance import with_guidance
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.sessions.turns import TurnRejected
 
@@ -315,7 +316,7 @@ def build_interviewer_agent(style: InterviewStyle) -> Runner:
         Agent(
             model=build_model(settings.mid_model),
             description="Conduct one mock interview turn in character.",
-            instructions=persona_instructions(style),
+            instructions=with_guidance("interviewer", persona_instructions(style)),
             **retry_kwargs(),
         )
     )
@@ -327,7 +328,7 @@ def build_debrief_agent() -> Runner:
         Agent(
             model=build_model(settings.mid_model),
             description="Write a structured mock interview debrief.",
-            instructions=_DEBRIEF_INSTRUCTIONS,
+            instructions=with_guidance("interview-debrief", _DEBRIEF_INSTRUCTIONS),
             **retry_kwargs(),
         )
     )
@@ -340,7 +341,7 @@ def build_interview_formatter_agent(schema: type[ExtensibleModel]) -> Runner:
         Agent(
             model=model,
             description="Convert interviewer notes into one structured turn.",
-            instructions=_FORMAT_INSTRUCTIONS,
+            instructions=with_guidance("interview-format", _FORMAT_INSTRUCTIONS),
             output_schema=schema,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Literal
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import Field
 
 from resume_agent.config import get_settings
@@ -27,7 +29,14 @@ from resume_agent.llm_runner import (
     use_json_mode_for,
 )
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts, Project, Skill
+from resume_agent.models.profile import (
+    Bullet,
+    Contact,
+    Experience,
+    ProfileFacts,
+    Project,
+    Skill,
+)
 from resume_agent.profile.corpus import SourceDoc
 from resume_agent.profile.ids import deterministic_id
 
@@ -123,7 +132,7 @@ def build_synthesis_agent(model_id: str | None = None) -> Runner:
             model=model,
             description="Condense a candidate-authored supporting document into "
             "excerpt-backed resume facts.",
-            instructions=_SYNTHESIS_INSTRUCTIONS,
+            instructions=with_guidance("profile-synthesis", _SYNTHESIS_INSTRUCTIONS),
             output_schema=SynthesizedFragment,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -149,7 +158,7 @@ def build_entailment_agent(model_id: str | None = None) -> Runner:
         Agent(
             model=model,
             description="Judge whether source excerpts fully support synthesized claims.",
-            instructions=_ENTAILMENT_INSTRUCTIONS,
+            instructions=with_guidance("profile-entailment", _ENTAILMENT_INSTRUCTIONS),
             output_schema=ClaimVerdicts,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -281,13 +290,17 @@ def _apply_verdicts(
     failures: dict[tuple[int, int], str],
 ) -> None:
     if not isinstance(content, ClaimVerdicts):
-        raise TypeError(f"Expected ClaimVerdicts from agent, got {type(content).__name__}")
+        raise TypeError(
+            f"Expected ClaimVerdicts from agent, got {type(content).__name__}"
+        )
     verdicts = {verdict.index: verdict for verdict in content.verdicts}
     for index, (key, _) in enumerate(pending):
         verdict = verdicts.get(index)
         if verdict is None or verdict.verdict != "supported":
             failures[key] = (
-                verdict.reason if verdict and verdict.reason else "not confirmed by verifier"
+                verdict.reason
+                if verdict and verdict.reason
+                else "not confirmed by verifier"
             )
 
 
@@ -367,7 +380,8 @@ def _drop_failed(
     for entry_index, entry in enumerate(fragment.entries):
         failed = failed_by_entry.get(entry_index, set())
         entry.claims = [
-            claim for claim_index, claim in enumerate(entry.claims)
+            claim
+            for claim_index, claim in enumerate(entry.claims)
             if claim_index not in failed
         ]
         bad_tech = tech_failures.get(entry_index)
@@ -433,12 +447,16 @@ async def asynthesize_document(
 ) -> tuple[SynthesizedFragment, list[str]]:
     """Async sibling of synthesize_document for the fragment fan-out."""
     content = (
-        await acall(synthesis_agent, compose_synthesis_input(doc_text, skeleton), sem=sem)
+        await acall(
+            synthesis_agent, compose_synthesis_input(doc_text, skeleton), sem=sem
+        )
     ).content
     fragment = _expect_fragment(content).model_copy(deep=True)
     _apply_pinned_anchor(fragment, doc)
 
-    failures, tech_failures = await _averify(fragment, doc_text, entailment_agent, sem=sem)
+    failures, tech_failures = await _averify(
+        fragment, doc_text, entailment_agent, sem=sem
+    )
     if failures or tech_failures:
         repaired = (
             await acall(
@@ -478,9 +496,7 @@ def fragment_to_facts(
         ):
             anchor_id = entry.anchor_id
             assert anchor_id is not None
-            stub = next(
-                (e for e in facts.experience if e.id == anchor_id), None
-            )
+            stub = next((e for e in facts.experience if e.id == anchor_id), None)
             if stub is None:
                 stub = Experience(
                     id=anchor_id,
@@ -493,7 +509,10 @@ def fragment_to_facts(
             for claim in entry.claims:
                 bullet = Bullet(
                     id=deterministic_id(
-                        doc.id, "synth-bullet", entry.anchor_id or "", claim.text.casefold()
+                        doc.id,
+                        "synth-bullet",
+                        entry.anchor_id or "",
+                        claim.text.casefold(),
                     ),
                     text=claim.text,
                     source_ref=doc.id,

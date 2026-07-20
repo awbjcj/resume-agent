@@ -12,6 +12,7 @@ from resume_agent.llm_runner import (
 )
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import MergedPanelReview, ReviewCritique
+from resume_agent.prompts.guidance import guidance_for, with_guidance
 from resume_agent.tailor.craft import CRAFT_REVIEWERS, CRAFT_WRITER
 from resume_agent.tailor.style_guide import compose_instructions
 
@@ -180,8 +181,11 @@ def build_tailor_agent(
         Agent(
             model=model,
             description="Write a job-targeted, schema-valid resume under a strict profile fact-lock.",
-            instructions=compose_instructions(
-                _writer_instructions(_TAILOR_INSTRUCTIONS), style_guide
+            instructions=with_guidance(
+                "tailor-writer",
+                compose_instructions(
+                    _writer_instructions(_TAILOR_INSTRUCTIONS), style_guide
+                ),
             ),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model),
@@ -201,8 +205,11 @@ def build_reviser_agent(
         Agent(
             model=model,
             description="Repair a reviewed resume while preserving its profile fact-lock.",
-            instructions=compose_instructions(
-                _writer_instructions(_REVISER_INSTRUCTIONS), style_guide
+            instructions=with_guidance(
+                "tailor-reviser",
+                compose_instructions(
+                    _writer_instructions(_REVISER_INSTRUCTIONS), style_guide
+                ),
             ),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model),
@@ -222,7 +229,10 @@ def build_revision_agent(
         Agent(
             model=model,
             description="Apply one user-requested resume edit without weakening the profile fact-lock.",
-            instructions=compose_instructions(_REVISION_INSTRUCTIONS, style_guide),
+            instructions=with_guidance(
+                "tailor-revision",
+                compose_instructions(_REVISION_INSTRUCTIONS, style_guide),
+            ),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
@@ -245,8 +255,11 @@ def build_reviewer_agent(
         Agent(
             model=model,
             description=f"Produce the {name!r} structured review for a tailored resume.",
-            instructions=compose_instructions(
-                _reviewer_instructions(name, score_bands=score_bands), style_guide
+            instructions=with_guidance(
+                f"reviewer-{name}",
+                compose_instructions(
+                    _reviewer_instructions(name, score_bands=score_bands), style_guide
+                ),
             ),
             output_schema=ReviewCritique,
             use_json_mode=use_json_mode_for(model),
@@ -260,19 +273,22 @@ def _merged_advisory_instructions(
 ) -> list[str]:
     bands = score_bands or {}
     listed = ", ".join(repr(name) for name in names)
-    instructions = [
-        "Return one MergedPanelReview with exactly one ReviewCritique per "
-        f"configured reviewer, in this order: {listed}. Set every reviewer field exactly.",
-        "Judge each dimension independently against its own rubric; do not let one "
-        "dimension's score bleed into another.",
-        *_COMMON_REVIEWER_INSTRUCTIONS,
-    ]
+    instructions = [*_MERGED_ADVISORY_BASE_INSTRUCTIONS]
+    instructions[0] = (
+        "Return one MergedPanelReview with exactly one ReviewCritique per configured "
+        f"reviewer, in this order: {listed}. Set every reviewer field exactly."
+    )
     for name in names:
         rubric = [
             *([_SCORE_BAND_INSTRUCTION] if bands.get(name, False) else []),
             *REVIEWER_INSTRUCTIONS.get(name, _DEFAULT_REVIEWER_INSTRUCTIONS),
             *CRAFT_REVIEWERS.get(name, []),
         ]
+        if guidance := guidance_for(f"reviewer-{name}"):
+            rubric.append(
+                f"User guidance for {name!r} (governs HOW, never WHAT is true): "
+                f"{guidance}"
+            )
         instructions.append(f"Rubric for {name!r}: " + " ".join(rubric))
     return instructions
 
@@ -292,9 +308,12 @@ def build_merged_advisory_agent(
         Agent(
             model=model,
             description="Produce every advisory review dimension for a tailored resume.",
-            instructions=compose_instructions(
-                _merged_advisory_instructions(names, score_bands=score_bands),
-                style_guide,
+            instructions=with_guidance(
+                "reviewer-merged-advisory",
+                compose_instructions(
+                    _merged_advisory_instructions(names, score_bands=score_bands),
+                    style_guide,
+                ),
             ),
             output_schema=MergedPanelReview,
             use_json_mode=use_json_mode_for(model),

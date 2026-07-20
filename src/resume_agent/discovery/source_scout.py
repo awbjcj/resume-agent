@@ -7,6 +7,8 @@ from collections.abc import Callable
 from typing import Literal
 
 from agno.agent import Agent
+
+from resume_agent.prompts.guidance import with_guidance
 from pydantic import Field
 
 from resume_agent.config import get_settings
@@ -101,7 +103,7 @@ def build_scout_research_agent(check_source: Callable[[str], str]) -> Runner:
             model=model,
             tools=[*search_tools, check_source],
             description="Research careers boards matching a user's company prompt.",
-            instructions=_RESEARCH_INSTRUCTIONS,
+            instructions=with_guidance("source-scout-research", _RESEARCH_INSTRUCTIONS),
             **tool_kwargs(),
             **retry_kwargs(),
         )
@@ -115,7 +117,7 @@ def build_scout_formatter_agent() -> Runner:
         Agent(
             model=model,
             description="Convert grounded Source Scout notes into a ScoutReport.",
-            instructions=_FORMAT_INSTRUCTIONS,
+            instructions=with_guidance("source-scout-format", _FORMAT_INSTRUCTIONS),
             output_schema=ScoutReport,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),

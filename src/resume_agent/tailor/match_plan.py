@@ -15,6 +15,7 @@ from resume_agent.models.job import JobCriteria
 from resume_agent.models.match_plan import MatchPlan
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import SkillMatchContext
+from resume_agent.prompts.guidance import with_guidance
 from resume_agent.tailor.agents import model_for_tier
 from resume_agent.tailor.craft import CRAFT_MATCH_PLAN
 from resume_agent.tailor.provenance import index_facts
@@ -95,7 +96,10 @@ def build_match_plan_agent(
         Agent(
             model=model,
             description="Plan which profile facts to emphasize for a job, by fact id only.",
-            instructions=compose_instructions(_plan_instructions(), style_guide),
+            instructions=with_guidance(
+                "match-plan",
+                compose_instructions(_plan_instructions(), style_guide),
+            ),
             output_schema=MatchPlan,
             use_json_mode=use_json_mode_for(model),
             **retry_kwargs(),
