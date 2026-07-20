@@ -84,3 +84,27 @@ def test_pdf_download_streams_file(tmp_path):
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content == b"%PDF-1.4 test"
+
+
+def test_pdf_download_filename_is_friendly(tmp_path):
+    client = _client()
+    pdf = tmp_path / "ok.pdf"
+    pdf.write_bytes(b"%PDF-1.4 test")
+    with client:
+        with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
+            job = Job(source="manual", jd_text="x", company="Acme Corp", title="Senior Engineer")
+            s.add(job)
+            s.commit()
+            s.refresh(job)
+            assert job.id is not None
+            v = ResumeVersion(job_id=job.id, round=0, pdf_path=str(pdf))
+            s.add(v)
+            s.commit()
+            s.refresh(v)
+            vid = v.id
+        resp = client.get(f"/api/resume-versions/{vid}/pdf")
+    assert resp.status_code == 200
+    assert (
+        f'filename="Acme_Corp-Senior_Engineer-Resume-v{vid}.pdf"'
+        in resp.headers["content-disposition"]
+    )

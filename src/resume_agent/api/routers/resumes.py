@@ -14,9 +14,10 @@ from resume_agent.api.schemas.jobs import (
     ApplicationOut,
     ResumeVersionOut,
 )
+from resume_agent.render.export import resume_download_name
 from resume_agent.services.board import select_resume_version
 from resume_agent.services.rendering import render_resume_version
-from resume_agent.tracking.repository import get_resume_version
+from resume_agent.tracking.repository import get_job, get_resume_version
 
 router = APIRouter()
 link_router = APIRouter()
@@ -31,10 +32,14 @@ def download_pdf(
         raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
     if not version.pdf_path or not Path(version.pdf_path).exists():
         raise ApiException(404, "NOT_FOUND", "No rendered PDF for this version")
+    job = get_job(session, version.job_id)
+    filename = (
+        resume_download_name(job, version) if job is not None else Path(version.pdf_path).name
+    )
     return FileResponse(
         version.pdf_path,
         media_type="application/pdf",
-        filename=Path(version.pdf_path).name,
+        filename=filename,
     )
 
 
