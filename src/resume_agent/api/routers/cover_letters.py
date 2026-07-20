@@ -9,8 +9,9 @@ from sqlmodel import Session
 from resume_agent.api.deps import get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.jobs import ApplicationOut
+from resume_agent.render.export import cover_letter_download_name
 from resume_agent.services.board import select_cover_letter
-from resume_agent.tracking.repository import get_cover_letter
+from resume_agent.tracking.repository import get_cover_letter, get_job
 
 router = APIRouter()
 link_router = APIRouter()
@@ -40,8 +41,14 @@ def download_cover_letter_pdf(
         )
     if not cover_letter.pdf_path or not Path(cover_letter.pdf_path).exists():
         raise ApiException(404, "NOT_FOUND", "No rendered PDF for this cover letter")
+    job = get_job(session, cover_letter.job_id)
+    filename = (
+        cover_letter_download_name(job, cover_letter)
+        if job is not None
+        else Path(cover_letter.pdf_path).name
+    )
     return FileResponse(
         cover_letter.pdf_path,
         media_type="application/pdf",
-        filename=Path(cover_letter.pdf_path).name,
+        filename=filename,
     )
