@@ -225,12 +225,12 @@ aggressiveness determines how many detail fetches are issued.
 | `src/resume_agent/taxonomy/groups.py`                | Skill-group vocabulary + durable token-to-group taxonomy + delta classifier                                               |
 | `src/resume_agent/profile/synthesis.py`              | Verified synthesis: deck → excerpt-backed facts (synthesize → verify → one repair round)                                  |
 | `src/resume_agent/profile/fragments.py`              | Fragment cache walk: one cache/staleness policy, per-mode producers (literal, synthesis, project), concurrent production  |
-| `src/resume_agent/profile/github_harvest.py`          | Deterministic GitHub project-source selection, materialization, supersession, and cleanup                                  |
-| `src/resume_agent/profile/project_extractor.py`       | Project-only structured extraction that cannot emit employment or education facts                                        |
-| `src/resume_agent/profile/coach.py`                   | Coach turn validation, topic-aware context, and structured-output agents                                                  |
-| `src/resume_agent/interview/agent.py`                 | Mock interviewer persona, turn/debrief validation, transcript elision                                                     |
-| `src/resume_agent/services/profile_coach.py`          | Coach session turns, draft approval, recap, rebuild, and impact orchestration                                             |
-| `src/resume_agent/sessions/store.py`                  | Session substrate: file custody every turn-per-run session kind rides (ADR 0006)                                          |
+| `src/resume_agent/profile/github_harvest.py`         | Deterministic GitHub project-source selection, materialization, supersession, and cleanup                                 |
+| `src/resume_agent/profile/project_extractor.py`      | Project-only structured extraction that cannot emit employment or education facts                                         |
+| `src/resume_agent/profile/coach.py`                  | Coach turn validation, topic-aware context, and structured-output agents                                                  |
+| `src/resume_agent/interview/agent.py`                | Mock interviewer persona, turn/debrief validation, transcript elision                                                     |
+| `src/resume_agent/services/profile_coach.py`         | Coach session turns, draft approval, recap, rebuild, and impact orchestration                                             |
+| `src/resume_agent/sessions/store.py`                 | Session substrate: file custody every turn-per-run session kind rides (ADR 0006)                                          |
 | `src/resume_agent/discovery/connectors/detect.py`    | ATS detection (singleton → L1 → L2)                                                                                       |
 | `src/resume_agent/discovery/connectors/companies.py` | Dispatch table + per-URL fail isolation                                                                                   |
 | `src/resume_agent/discovery/scraper/dashboard.py`    | Opt-in learned-recipe browser replay; cache in `data/scraper_recipes/`                                                    |
@@ -259,6 +259,22 @@ aggressiveness determines how many detail fetches are issued.
   `config/review_deep.yaml` through CLI `tailor --deep` or API `deep: true`.
   Advisory critiques are split back into their configured named rows, and each
   `TailorRound` records draft/panel/revise wall-clock seconds.
+- **Agent prompts are registry-projected; guidance is layered.**
+  `prompts/registry.py` imports the complete invariant instruction composition
+  from each production agent builder. Per-agent guidance lives in
+  `config/agent_guidance.yaml`, is capped at 4,000 characters, and is appended
+  beneath immutable rules by `prompts/guidance.py:with_guidance`; it may steer
+  tone, emphasis, or process, never facts. `reviewer-fact-check` is the only
+  non-editable integrity gate. API: `GET /api/agents/prompts` and
+  `PUT /api/agents/prompts/{key}`.
+- **Rendering is template-id based.** The web contract is `{template,
+fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
+  fields. Bundled templates are anchored in `render/templates.py`; validated
+  custom `.typ` uploads live under the tenant `config/templates/` directory.
+  Custom stems are path-safe, Typst compilation is root-pinned, and uploads
+  replace live templates only after a successful validation compile. Deleting
+  an active custom template falls back to `classic`; missing templates never
+  silently fall back during rendering.
 - **Railway is a single-volume, single-owner deployment.** Session cookies and
   bearer tokens share the API guard; `/app/data` owns DB/config/output/secrets;
   browser-only sources return explicit degradation failures in cloud. Admin

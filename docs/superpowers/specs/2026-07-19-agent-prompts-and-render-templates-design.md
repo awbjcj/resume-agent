@@ -17,10 +17,23 @@ Two features, one spec:
 
 ## Feature 1: Agent prompt registry + guidance layer
 
+### Correctness amendments
+
+- Registry completeness includes the dynamic merged-advisory runner (its invariant core
+  is projected; reviewer-specific rubrics remain visible in their reviewer entries) and
+  the Gmail fallback classifier, whose classification contract becomes system
+  instructions. Generic model-construction helpers with no application prompt are the
+  only explicit exemptions.
+- Registry entries project the complete invariant composition passed to each builder,
+  including common reviewer and craft layers, rather than a shorter raw constant.
+- Guidance persistence serializes each process-local read-modify-write and uses unique
+  sibling temporary files with atomic replacement. The 4,000-character cap is enforced
+  at both the HTTP boundary and storage boundary.
+
 ### Decision summary
 
 - **Layered model, not replacement.** Users view full base prompts (transparency)
-  and edit a per-agent *guidance* layer appended beneath immutable rules —
+  and edit a per-agent _guidance_ layer appended beneath immutable rules —
   generalizing the existing `style_guide.md` seam (`compose_instructions`).
 - **Scope:** prompts + the structural knobs that already exist (review roster,
   weights, tiers, rounds — mostly already in the Review settings page). No new
@@ -98,7 +111,7 @@ settings nav.
 - Each agent row: title + description; expanded view shows the **base prompt**
   as a numbered read-only list, then a **"Your guidance"** textarea with
   per-agent save state (PUT one key at a time).
-- Non-editable agents show a badge — *"Integrity gate — read-only"* — and no
+- Non-editable agents show a badge — _"Integrity gate — read-only"_ — and no
   textarea.
 - Page-level note: guidance is appended beneath built-in rules; it can steer
   tone/emphasis/process, never facts.
@@ -163,6 +176,14 @@ fit_one_page: bool = True        # maps to render_pdf fit_pages=1 vs None
   templates compile with `root` = their own directory; bundled templates with
   `root` = the repo `templates/` dir), the validation compile at upload time,
   the size cap, and Typst having no network access.
+- Custom stems use the single safe grammar `[A-Za-z0-9][A-Za-z0-9_-]*` at every
+  boundary. Resolution verifies the resulting file remains inside the tenant template
+  directory, preventing traversal through config, preview, or delete paths.
+- Uploads compile a unique candidate file before atomically replacing the live template;
+  a failed replacement cannot delete or corrupt the previously valid upload.
+- Bundled manifest paths are anchored to the repository/package location rather than the
+  process CWD. Every upload/preview compiler failure is normalized to the standard 422
+  `template_invalid` envelope.
 
 ### Back-compat
 
@@ -182,6 +203,9 @@ fit_one_page: bool = True        # maps to render_pdf fit_pages=1 vs None
 - **Options:** a single "Fit resume to one page" switch.
 - No path fields; a caption notes PDFs are stored in your workspace and
   downloaded from each job's page (unchanged behavior).
+- Multipart upload and preview requests reuse the API client's bearer authentication.
+  Preview reserves its window synchronously before awaiting the PDF so browsers do not
+  block it, and generated object URLs are revoked after use.
 
 ---
 
@@ -189,13 +213,13 @@ fit_one_page: bool = True        # maps to render_pdf fit_pages=1 vs None
 
 All on the existing `ApiException` envelope:
 
-| Code | Status | When |
-| --- | --- | --- |
-| `unknown_agent` | 404 | PUT guidance for an unregistered key |
-| `agent_not_editable` | 409 | PUT guidance for an integrity gate |
-| `template_not_found` | 422 | Config or render references a missing/unknown template |
-| `template_invalid` | 422 | Upload fails the validation compile (compiler output in `details`) |
-| (schema validation) | 422 | Guidance over 4,000 chars; upload size/extension violations |
+| Code                 | Status | When                                                               |
+| -------------------- | ------ | ------------------------------------------------------------------ |
+| `unknown_agent`      | 404    | PUT guidance for an unregistered key                               |
+| `agent_not_editable` | 409    | PUT guidance for an integrity gate                                 |
+| `template_not_found` | 422    | Config or render references a missing/unknown template             |
+| `template_invalid`   | 422    | Upload fails the validation compile (compiler output in `details`) |
+| (schema validation)  | 422    | Guidance over 4,000 chars; upload size/extension violations        |
 
 ## Testing (offline, suite conventions)
 

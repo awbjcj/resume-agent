@@ -23,17 +23,69 @@
 - Backend test command: `.venv/Scripts/python.exe -m pytest <file> -q`. Lint: `ruff check`. Web tests: `cd web && npx vitest run <file>`.
 - Import-cycle rule: `prompts/guidance.py` must NOT import `prompts/registry.py` (registry imports every agent module; those modules import guidance). Editability lives in `guidance.NON_EDITABLE_KEYS`; registry derives `editable` from it.
 
+## Correctness Amendments (binding)
+
+These amendments supersede conflicting snippets later in the plan.
+
+1. **Registry completeness includes dynamic and system-prompt-free agents.** Register the
+   merged advisory runner as `reviewer-merged-advisory`, projecting an invariant
+   module-level base instruction list; its configured reviewer rubrics remain visible in
+   the individual reviewer entries. Move the Gmail fallback classifier's classification
+   contract into module-level instructions, register it as `email-classifier`, and layer
+   guidance into its builder. Completeness tests must enumerate every production
+   `Agent(...)` site or document a generic infrastructure-only exemption.
+   Registry entries must project the full invariant instruction composition used by
+   builders (including common/craft layers), not only the raw role-specific constant;
+   dynamic session/config additions are represented by their invariant core and adjacent
+   registry entries.
+2. **Guidance writes are serialized and collision-safe.** Guard the read-modify-write
+   sequence with a process lock and use a unique sibling temp file followed by
+   `os.replace`; enforce the 4,000-character cap in the storage function as well as the
+   API schema. This prevents concurrent per-agent saves from losing each other or
+   colliding on one fixed `.tmp` path.
+3. **Custom template identifiers are validated once, everywhere.** A bare custom stem
+   must match `[A-Za-z0-9][A-Za-z0-9_-]*`; dots, separators, empty stems, `.` and `..`
+   are rejected. Upload, resolution, preview, delete, and config PUT all use the same
+   validator before constructing a path, and the resolved path must remain beneath the
+   tenant custom-template directory.
+4. **Uploads validate before replacing live data.** Write candidate bytes to a unique
+   temporary `.typ` sibling inside the custom-template directory, compile that candidate
+   with its root pinned to the directory, then atomically replace the final file only on
+   success. On failure remove only the candidate, preserving any existing valid template.
+5. **Bundled paths are independent of CWD.** Manifest paths are absolute paths derived
+   from the repository/package location. Tenant tests and API workers may change CWD;
+   bundled resolution and previews must still work.
+6. **All compile failures use the API envelope.** Both upload validation and preview
+   compilation translate Typst/runtime failures to `TemplateValidationError`, returned
+   as 422 `template_invalid`; they must never leak as an unhandled 500.
+7. **Authenticated web requests reuse the client auth contract.** Multipart upload and
+   preview fetches add the same bearer header as `api` (via a shared exported helper),
+   not cookie-only authentication. Preview opens a blank window synchronously from the
+   click before awaiting bytes, then navigates it to the object URL and revokes that URL
+   later, avoiding popup blocking and leaks.
+8. **Legacy config projection is explicit.** `GET /api/config/render` maps a legacy YAML
+   document with no `template` key to `{template: "classic", fitOnePage: true}` without
+   exposing or rewriting `template_path`/`output_dir`. Runtime `RenderConfig` continues
+   to honor legacy fields; web PUT writes only new fields.
+9. **Final verification checks generated drift against a regenerated baseline.** After
+   regeneration, run the OpenAPI drift test and `git diff --check`; do not use
+   `git diff --exit-code contracts ...` against the feature branch's intentional contract
+   changes. The final sweep also includes full Python tests, Ruff, full web tests, web
+   lint, web build, and a browser user-story check for both settings pages.
+
 ---
 
 ### Task 1: Prompt registry (`prompts/registry.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/prompts/__init__.py` (empty)
 - Create: `src/resume_agent/prompts/registry.py`
 - Modify: `src/resume_agent/interview/agent.py` (extract `_PERSONA_CORE` from `persona_instructions`)
 - Test: `tests/test_prompt_registry.py`
 
 **Interfaces:**
+
 - Consumes: instruction constants from existing agent modules (see table in Step 3).
 - Produces: `PromptSpec` (frozen dataclass: `key: str`, `title: str`, `stage: str`, `description: str`, `instructions: tuple[str, ...]`, `editable: bool`), `PROMPT_SPECS: tuple[PromptSpec, ...]`, `SPECS_BY_KEY: dict[str, PromptSpec]`, `spec_for(key: str) -> PromptSpec | None`. Also `interview.agent._PERSONA_CORE: list[str]`.
 
@@ -332,11 +384,13 @@ git commit -m "feat(prompts): declarative PromptSpec registry projecting all age
 ### Task 2: Guidance store + `with_guidance` (`prompts/guidance.py`)
 
 **Files:**
+
 - Modify: `src/resume_agent/prompts/guidance.py` (extend the Task-1 stub)
 - Modify: `src/resume_agent/tenancy/paths.py` (add `AGENT_GUIDANCE_PATH`)
 - Test: `tests/test_prompt_guidance.py`
 
 **Interfaces:**
+
 - Consumes: `resolve_tenant_path` from `tenancy/paths.py`.
 - Produces: `AGENT_GUIDANCE_PATH = "config/agent_guidance.yaml"` (in `tenancy/paths.py`); in `guidance.py`: `NON_EDITABLE_KEYS: frozenset[str]`, `MAX_GUIDANCE_CHARS = 4000`, `GUIDANCE_HEADER: str`, `load_guidance() -> dict[str, str]`, `guidance_for(key: str) -> str | None`, `save_guidance(key: str, text: str) -> dict[str, str]`, `with_guidance(key: str, base: Sequence[str]) -> list[str]`.
 
@@ -507,11 +561,13 @@ git commit -m "feat(prompts): per-workspace agent guidance layered via with_guid
 ### Task 3: Wire `with_guidance` into every agent builder
 
 **Files:**
+
 - Modify: every builder listed in the table below
 - Modify: `src/resume_agent/tailor/agents.py` (`_merged_advisory_instructions` per-reviewer guidance)
 - Test: `tests/test_prompt_injection.py`
 
 **Interfaces:**
+
 - Consumes: `with_guidance(key, base)`, `guidance_for(key)` from Task 2; registry keys from Task 1.
 - Produces: no new names — every built agent's `instructions` end with `[GUIDANCE_HEADER, text]` when guidance exists.
 
@@ -585,32 +641,32 @@ Expected: FAIL — guidance text absent from instructions.
 
 The transformation is identical everywhere: wrap the final composed instruction list in `with_guidance("<key>", ...)`, importing `from resume_agent.prompts.guidance import with_guidance` at each module top. Exact key ↔ site map:
 
-| File | Site | Wrap |
-| --- | --- | --- |
-| `tailor/agents.py` | `build_tailor_agent` | `with_guidance("tailor-writer", compose_instructions(_writer_instructions(_TAILOR_INSTRUCTIONS), style_guide))` |
-| `tailor/agents.py` | `build_reviser_agent` | `with_guidance("tailor-reviser", compose_instructions(...))` |
-| `tailor/agents.py` | `build_revision_agent` | `with_guidance("tailor-revision", compose_instructions(...))` |
-| `tailor/agents.py` | `build_reviewer_agent` | `with_guidance(f"reviewer-{name}", compose_instructions(...))` |
-| `tailor/match_plan.py` | `build_match_plan_agent` | `with_guidance("match-plan", compose_instructions(...))` |
-| `cover_letter/agents.py` | draft / revise / revision builders | `"cover-letter-draft"` / `"cover-letter-revise"` / `"cover-letter-revision"` |
-| `discovery/extract.py:60` | criteria builder | `"extract-criteria"` |
-| `discovery/fit.py:68` | fit builder | `"fit-score"` |
-| `discovery/relevance.py:49` | relevance builder | `"relevance-judge"` |
-| `discovery/industry.py:158` | industry builder | `"industry-classifier"` |
-| `discovery/url_ingest/llm.py:35` | URL parser builder | `"url-ingest"` |
-| `discovery/scraper/learn.py:53` | recipe learner | `"scraper-learn"` |
-| `discovery/source_scout.py:104,118` | research / format | `"source-scout-research"` / `"source-scout-format"` |
-| `suggestions/agents.py:94,107` | research / format | `"suggestions-research"` / `"suggestions-format"` |
-| `profile/extractor.py:43` | extractor | `"profile-extractor"` |
-| `profile/synthesis.py:126,152` | synthesis / entailment | `"profile-synthesis"` / `"profile-entailment"` |
-| `profile/project_extractor.py:47` | project extractor | `"project-extractor"` |
-| `profile/inference.py:56` | inferrer | `"skill-inference"` |
-| `profile/merge.py:140` | dedup | `"profile-dedup"` |
-| `profile/coach.py:406,420` | coach / formatter | `"coach"` / `with_guidance("coach-formatter", _formatter_instructions(schema))` |
-| `taxonomy/groups.py:117` | group classifier | `"skill-groups"` |
-| `tracking/canonicalize.py:180,194,236,252` | four builders | `"taxonomy-clusters"` / `"taxonomy-themes"` / `"taxonomy-clusters-incremental"` / `"taxonomy-domains-incremental"` |
-| `interview/agent.py:297,309,322` | persona / debrief / format | `with_guidance("interviewer", persona_instructions(style))` / `"interview-debrief"` / `"interview-format"` |
-| `services/email_writer.py:88` | email writer | `with_guidance("email-writer", list(_WRITER_INSTRUCTIONS))` |
+| File                                       | Site                               | Wrap                                                                                                               |
+| ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `tailor/agents.py`                         | `build_tailor_agent`               | `with_guidance("tailor-writer", compose_instructions(_writer_instructions(_TAILOR_INSTRUCTIONS), style_guide))`    |
+| `tailor/agents.py`                         | `build_reviser_agent`              | `with_guidance("tailor-reviser", compose_instructions(...))`                                                       |
+| `tailor/agents.py`                         | `build_revision_agent`             | `with_guidance("tailor-revision", compose_instructions(...))`                                                      |
+| `tailor/agents.py`                         | `build_reviewer_agent`             | `with_guidance(f"reviewer-{name}", compose_instructions(...))`                                                     |
+| `tailor/match_plan.py`                     | `build_match_plan_agent`           | `with_guidance("match-plan", compose_instructions(...))`                                                           |
+| `cover_letter/agents.py`                   | draft / revise / revision builders | `"cover-letter-draft"` / `"cover-letter-revise"` / `"cover-letter-revision"`                                       |
+| `discovery/extract.py:60`                  | criteria builder                   | `"extract-criteria"`                                                                                               |
+| `discovery/fit.py:68`                      | fit builder                        | `"fit-score"`                                                                                                      |
+| `discovery/relevance.py:49`                | relevance builder                  | `"relevance-judge"`                                                                                                |
+| `discovery/industry.py:158`                | industry builder                   | `"industry-classifier"`                                                                                            |
+| `discovery/url_ingest/llm.py:35`           | URL parser builder                 | `"url-ingest"`                                                                                                     |
+| `discovery/scraper/learn.py:53`            | recipe learner                     | `"scraper-learn"`                                                                                                  |
+| `discovery/source_scout.py:104,118`        | research / format                  | `"source-scout-research"` / `"source-scout-format"`                                                                |
+| `suggestions/agents.py:94,107`             | research / format                  | `"suggestions-research"` / `"suggestions-format"`                                                                  |
+| `profile/extractor.py:43`                  | extractor                          | `"profile-extractor"`                                                                                              |
+| `profile/synthesis.py:126,152`             | synthesis / entailment             | `"profile-synthesis"` / `"profile-entailment"`                                                                     |
+| `profile/project_extractor.py:47`          | project extractor                  | `"project-extractor"`                                                                                              |
+| `profile/inference.py:56`                  | inferrer                           | `"skill-inference"`                                                                                                |
+| `profile/merge.py:140`                     | dedup                              | `"profile-dedup"`                                                                                                  |
+| `profile/coach.py:406,420`                 | coach / formatter                  | `"coach"` / `with_guidance("coach-formatter", _formatter_instructions(schema))`                                    |
+| `taxonomy/groups.py:117`                   | group classifier                   | `"skill-groups"`                                                                                                   |
+| `tracking/canonicalize.py:180,194,236,252` | four builders                      | `"taxonomy-clusters"` / `"taxonomy-themes"` / `"taxonomy-clusters-incremental"` / `"taxonomy-domains-incremental"` |
+| `interview/agent.py:297,309,322`           | persona / debrief / format         | `with_guidance("interviewer", persona_instructions(style))` / `"interview-debrief"` / `"interview-format"`         |
+| `services/email_writer.py:88`              | email writer                       | `with_guidance("email-writer", list(_WRITER_INSTRUCTIONS))`                                                        |
 
 For the merged advisory panel, edit `_merged_advisory_instructions` in `tailor/agents.py` — after building `rubric` for each name, append that reviewer's guidance into its rubric line:
 
@@ -650,6 +706,7 @@ git commit -m "feat(prompts): layer user guidance into every agent builder"
 ### Task 4: Prompts API (`GET /api/agents/prompts`, `PUT /api/agents/prompts/{key}`)
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/prompts.py`
 - Create: `src/resume_agent/api/routers/prompts.py`
 - Modify: `src/resume_agent/api/app.py` (include router, guarded)
@@ -657,6 +714,7 @@ git commit -m "feat(prompts): layer user guidance into every agent builder"
 - Test: `tests/api/test_prompts_api.py`
 
 **Interfaces:**
+
 - Consumes: `PROMPT_SPECS`, `spec_for` (Task 1); `guidance_for` raw map via `load_guidance`, `save_guidance`, `MAX_GUIDANCE_CHARS` (Task 2); `ApiException` (`api/errors.py`).
 - Produces: wire schemas `AgentPromptItem` (`key, title, stage, description, instructions: list[str], guidance: str | null, editable: bool`) and `GuidanceUpdate` (`guidance: str`, max length 4000); routes above.
 
@@ -822,12 +880,14 @@ git commit -m "feat(api): agent prompt transparency + guidance endpoints"
 ### Task 5: Review structural knobs (`merged_advisory`, writer tiers) in contract + web
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/config.py` (`ReviewConfigDoc`)
 - Modify: `web/src/features/settings/pages/ReviewSettingsPage.tsx`
 - Modify: `contracts/*`, `web/src/lib/api/schema.ts` (regenerated)
 - Test: `tests/api/test_config_router.py` (extend), `web/src/features/settings/pages/ReviewSettingsPage.test.tsx` (create if absent)
 
 **Interfaces:**
+
 - Consumes: existing `ReviewConfigDoc`, `useConfig`/`useSaveConfig`.
 - Produces: `ReviewConfigDoc.merged_advisory: bool = False`, `tailor_tier: Literal["cheap","mid","premium"] = "premium"`, `reviser_tier: Literal["cheap","mid","premium"] = "premium"` (wire: `mergedAdvisory`, `tailorTier`, `reviserTier`). These names mirror `tailor/review_config.py:31-33`, which already reads them from `review.yaml` — the Doc addition makes the web PUT stop silently dropping them.
 
@@ -866,6 +926,7 @@ Run the test → PASS. Regenerate contracts: `bash scripts/gen_ts_client.sh`; ru
 - [ ] **Step 4: Web — extend `ReviewSettingsPage.tsx`**
 
 Below the Max rounds / threshold fields, add a "Pipeline" `FieldGroup` with:
+
 - a `Switch` bound to `draft.mergedAdvisory` labeled "Merge advisory reviews into one call" with description "Faster and cheaper; turn off to run each advisory reviewer separately."
 - two `ToggleGroup`s (same component pattern the page already uses for `modelTier`, line ~94) bound to `draft.tailorTier` and `draft.reviserTier`, labeled "Writer model tier" and "Reviser model tier", options cheap/mid/premium.
 
@@ -885,12 +946,14 @@ git commit -m "feat(review): expose merged-advisory + writer tiers in contract a
 ### Task 6: Web — Agent Prompts settings page
 
 **Files:**
+
 - Create: `web/src/features/settings/use-prompts.ts`
 - Create: `web/src/features/settings/pages/AgentPromptsPage.tsx`
 - Create: `web/src/features/settings/pages/AgentPromptsPage.test.tsx`
 - Modify: `web/src/app/router.tsx` (lazy route `agent-prompts`), `web/src/features/settings/SettingsLayout.tsx` (`SETTINGS_NAV` entry)
 
 **Interfaces:**
+
 - Consumes: `/api/agents/prompts` GET/PUT from the regenerated `schema.ts`; `api`, `unwrap` from `@/lib/api/client`.
 - Produces: `usePrompts(): UseQueryResult<AgentPromptItem[]>`, `useSaveGuidance(): UseMutationResult` (mutate `{key, guidance}`); route `/settings/agent-prompts`.
 
@@ -906,14 +969,22 @@ import { AgentPromptsPage } from "./AgentPromptsPage";
 
 const items = [
   {
-    key: "tailor-writer", title: "Resume writer", stage: "tailoring",
-    description: "Writes the targeted resume.", instructions: ["Rule one.", "Rule two."],
-    guidance: null, editable: true,
+    key: "tailor-writer",
+    title: "Resume writer",
+    stage: "tailoring",
+    description: "Writes the targeted resume.",
+    instructions: ["Rule one.", "Rule two."],
+    guidance: null,
+    editable: true,
   },
   {
-    key: "reviewer-fact-check", title: "Fact-check gate", stage: "review",
-    description: "Hard gate.", instructions: ["Verify claims."],
-    guidance: null, editable: false,
+    key: "reviewer-fact-check",
+    title: "Fact-check gate",
+    stage: "review",
+    description: "Hard gate.",
+    instructions: ["Verify claims."],
+    guidance: null,
+    editable: false,
   },
 ];
 const save = vi.fn();
@@ -941,9 +1012,17 @@ describe("AgentPromptsPage", () => {
   it("saves guidance for editable agents", async () => {
     render(<AgentPromptsPage />);
     await userEvent.click(screen.getByText("Resume writer"));
-    await userEvent.type(screen.getByLabelText(/your guidance/i), "Punchy verbs.");
-    await userEvent.click(screen.getByRole("button", { name: /save guidance/i }));
-    expect(save).toHaveBeenCalledWith({ key: "tailor-writer", guidance: "Punchy verbs." });
+    await userEvent.type(
+      screen.getByLabelText(/your guidance/i),
+      "Punchy verbs.",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /save guidance/i }),
+    );
+    expect(save).toHaveBeenCalledWith({
+      key: "tailor-writer",
+      guidance: "Punchy verbs.",
+    });
   });
 });
 ```
@@ -966,7 +1045,8 @@ export type AgentPromptItem =
 export function usePrompts() {
   return useQuery({
     queryKey: ["agent-prompts"],
-    queryFn: () => unwrap(api.GET("/api/agents/prompts")) as Promise<AgentPromptItem[]>,
+    queryFn: () =>
+      unwrap(api.GET("/api/agents/prompts")) as Promise<AgentPromptItem[]>,
   });
 }
 
@@ -1017,11 +1097,13 @@ git commit -m "feat(web): Agent Prompts settings page — view prompts, edit gui
 ### Task 7: Render template manifest + sample content (`render/templates.py`)
 
 **Files:**
+
 - Create: `src/resume_agent/render/templates.py`
 - Create: `src/resume_agent/render/sample_content.py`
 - Test: `tests/test_render_templates.py`
 
 **Interfaces:**
+
 - Consumes: `resolve_tenant_path`; `RenderConfig` (current shape; Task 8 extends it).
 - Produces:
   - `TemplateInfo` frozen dataclass: `id: str`, `title: str`, `description: str`, `kind: str` (`"bundled" | "custom"`), `path: Path`
@@ -1242,6 +1324,7 @@ git commit -m "feat(render): template manifest, id resolution, sample content"
 ### Task 8: `RenderConfig` new keys + root-pinned `render_pdf` + service wiring
 
 **Files:**
+
 - Modify: `src/resume_agent/render/render_config.py`
 - Modify: `src/resume_agent/render/renderer.py` (`render_pdf` gains `root`)
 - Modify: `src/resume_agent/render/service.py` (`render_version` resolves template + fit)
@@ -1249,6 +1332,7 @@ git commit -m "feat(render): template manifest, id resolution, sample content"
 - Test: `tests/test_render_config.py` (create; move/extend any existing render-config assertions), existing render service tests (update fakes)
 
 **Interfaces:**
+
 - Consumes: `resolve_template`, `TemplateNotFoundError` (Task 7).
 - Produces:
   - `RenderConfig`: `template: str | None = None`, `fit_one_page: bool = True`, `template_path: str | None = None` (legacy), `output_dir: str = "output"` (legacy/CLI, unchanged semantics)
@@ -1392,6 +1476,7 @@ git commit -m "feat(render): template-id config keys, root-pinned compile, fit t
 ### Task 9: `RenderConfigDoc` contract swap + PUT validation + example file
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/config.py` (`RenderConfigDoc`)
 - Modify: `src/resume_agent/api/routers/config.py` (`put_render` validates the template id)
 - Modify: `config/render.yaml.example` (create if absent — check first)
@@ -1399,6 +1484,7 @@ git commit -m "feat(render): template-id config keys, root-pinned compile, fit t
 - Test: `tests/api/test_config_router.py` (extend)
 
 **Interfaces:**
+
 - Consumes: `resolve_template`, `TemplateNotFoundError` (Task 7).
 - Produces: `RenderConfigDoc(template: str = "classic", fit_one_page: bool = True)` — wire `{template, fitOnePage}`; `template_path`/`output_dir` leave the wire contract. PUT with a nonexistent template → 422 `template_not_found`.
 
@@ -1479,6 +1565,7 @@ git commit -m "feat(api)!: render config contract is template id + fitOnePage"
 ### Task 10: Template management endpoints (list / upload / delete / preview)
 
 **Files:**
+
 - Create: `src/resume_agent/services/render_templates.py`
 - Create: `src/resume_agent/api/routers/render_templates.py`
 - Create: `src/resume_agent/api/schemas/render_templates.py`
@@ -1487,6 +1574,7 @@ git commit -m "feat(api)!: render config contract is template id + fitOnePage"
 - Test: `tests/api/test_render_templates_api.py`
 
 **Interfaces:**
+
 - Consumes: `list_templates`, `resolve_template`, `TemplateNotFoundError`, `CUSTOM_TEMPLATES_DIR` (Task 7); `render_pdf` (Task 8); `sample_resume_content`; `read_upload`/`UploadTooLargeError` (`api/uploads.py`); `ConfigStore` via `get_config_store` (`api/deps.py`).
 - Produces:
   - `services/render_templates.py`: `class TemplateValidationError(Exception)` (message = Typst error text), `validate_template(path: Path) -> None`, `save_custom_template(filename: str, data: bytes) -> TemplateInfo`, `delete_custom_template(stem: str, store) -> bool`, `render_preview(template_id: str) -> bytes`
@@ -1772,11 +1860,13 @@ git commit -m "feat(api): render template list/upload/delete/preview with valida
 ### Task 11: Web — Rendering settings rewrite (picker + upload + fit switch)
 
 **Files:**
+
 - Rewrite: `web/src/features/settings/pages/RenderingSettingsPage.tsx`
 - Create: `web/src/features/settings/use-render-templates.ts`
 - Create: `web/src/features/settings/pages/RenderingSettingsPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `/api/config/render` (new shape) via `useConfig`/`useSaveConfig`; `/api/config/render/templates` GET/POST/DELETE from `schema.ts`.
 - Produces: `useRenderTemplates()`, `useUploadTemplate()` (mutate `File`), `useDeleteTemplate()` (mutate `stem: string`).
 
@@ -1800,11 +1890,25 @@ vi.mock("../use-config", () => ({
 vi.mock("../use-render-templates", () => ({
   useRenderTemplates: () => ({
     data: [
-      { id: "classic", title: "Classic", description: "Single column.", kind: "bundled" },
-      { id: "custom:mine", title: "mine", description: "Uploaded template", kind: "custom" },
+      {
+        id: "classic",
+        title: "Classic",
+        description: "Single column.",
+        kind: "bundled",
+      },
+      {
+        id: "custom:mine",
+        title: "mine",
+        description: "Uploaded template",
+        kind: "custom",
+      },
     ],
   }),
-  useUploadTemplate: () => ({ mutate: uploadMutate, isPending: false, error: null }),
+  useUploadTemplate: () => ({
+    mutate: uploadMutate,
+    isPending: false,
+    error: null,
+  }),
   useDeleteTemplate: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -1819,15 +1923,25 @@ describe("RenderingSettingsPage", () => {
   it("selecting a template marks the draft dirty and saves", async () => {
     render(<RenderingSettingsPage />);
     await userEvent.click(screen.getByRole("radio", { name: /mine/i }));
-    await userEvent.click(screen.getByRole("button", { name: /save changes/i }));
-    expect(saveMutate).toHaveBeenCalledWith({ template: "custom:mine", fitOnePage: true });
+    await userEvent.click(
+      screen.getByRole("button", { name: /save changes/i }),
+    );
+    expect(saveMutate).toHaveBeenCalledWith({
+      template: "custom:mine",
+      fitOnePage: true,
+    });
   });
 
   it("toggling one-page fit updates the draft", async () => {
     render(<RenderingSettingsPage />);
     await userEvent.click(screen.getByRole("switch", { name: /one page/i }));
-    await userEvent.click(screen.getByRole("button", { name: /save changes/i }));
-    expect(saveMutate).toHaveBeenCalledWith({ template: "classic", fitOnePage: false });
+    await userEvent.click(
+      screen.getByRole("button", { name: /save changes/i }),
+    );
+    expect(saveMutate).toHaveBeenCalledWith({
+      template: "classic",
+      fitOnePage: false,
+    });
   });
 });
 ```
@@ -1853,7 +1967,9 @@ export function useRenderTemplates() {
   return useQuery({
     queryKey: KEY,
     queryFn: () =>
-      unwrap(api.GET("/api/config/render/templates")) as Promise<TemplateListItem[]>,
+      unwrap(api.GET("/api/config/render/templates")) as Promise<
+        TemplateListItem[]
+      >,
   });
 }
 
@@ -1870,7 +1986,8 @@ export function useUploadTemplate() {
       });
       const json = await resp.json();
       if (!resp.ok) {
-        const detail = json?.error?.details || json?.error?.message || "Upload failed";
+        const detail =
+          json?.error?.details || json?.error?.message || "Upload failed";
         throw new Error(String(detail));
       }
       return json as TemplateListItem;
@@ -1927,6 +2044,7 @@ git commit -m "feat(web): rendering settings — template picker, validated uplo
 ### Task 12: Docs + full verification sweep
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 - Test: full suites
 
