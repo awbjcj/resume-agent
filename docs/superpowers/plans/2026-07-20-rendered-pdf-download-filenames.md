@@ -48,7 +48,7 @@ On-disk storage paths, `manifest.json`, and bulk export are untouched.
   `Job` (has `.company: str | None`, `.title: str | None`) and the matching
   `ResumeVersion`/`CoverLetter` (has `.id: int | None`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/test_render_export.py` (near `test_job_slug_and_version_filenames`,
 using the same imports already in that file — add `cover_letter_download_name`
@@ -95,13 +95,13 @@ def test_download_name_strips_special_characters_and_collapses_whitespace():
     )
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_render_export.py -v`
 Expected: FAIL — `ImportError: cannot import name 'resume_download_name'`
 (or `cover_letter_download_name`) from the new test's import line.
 
-- [ ] **Step 3: Implement the helpers**
+- [x] **Step 3: Implement the helpers**
 
 In `src/resume_agent/render/export.py`, add after the existing `_origin` helper
 (the module already `import re`s indirectly via `render/renderer.py`'s `_slug`,
@@ -131,12 +131,12 @@ def cover_letter_download_name(job: Job, cover_letter: CoverLetter) -> str:
 Add `import re` near the top of `src/resume_agent/render/export.py` (alongside
 the existing `import json`) if it isn't already imported at module level.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_render_export.py -v`
 Expected: PASS (all tests in the file, including the pre-existing ones).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/resume_agent/render/export.py tests/test_render_export.py
@@ -157,7 +157,7 @@ git commit -m "feat(render): add friendly resume/cover-letter download filename 
   `resume_agent.tracking.repository` (already imported project-wide, not yet in
   this file).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `tests/api/test_job_detail.py`:
 
@@ -186,13 +186,13 @@ def test_pdf_download_filename_is_friendly(tmp_path):
     )
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_job_detail.py::test_pdf_download_filename_is_friendly -v`
 Expected: FAIL — assertion error, `content-disposition` still names
 `ok.pdf` (the old `Path(pdf_path).name` behavior).
 
-- [ ] **Step 3: Implement the route change**
+- [x] **Step 3: Implement the route change**
 
 In `src/resume_agent/api/routers/resumes.py`, add the import and change
 `download_pdf`:
@@ -228,13 +228,13 @@ def download_pdf(
     )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_job_detail.py -v`
 Expected: PASS (including the two pre-existing download tests, which don't
 assert on filename and remain unaffected).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/resume_agent/api/routers/resumes.py tests/api/test_job_detail.py
@@ -254,7 +254,7 @@ git commit -m "feat(api): friendly filename for resume PDF single-file download"
   (`resume_agent.render.export`); `get_job(session, job_id) -> Job | None` from
   `resume_agent.tracking.repository`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/api/test_cover_letters_download.py`:
 
@@ -314,13 +314,13 @@ def test_cover_letter_pdf_download_uses_friendly_filename(tmp_path):
     )
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_cover_letters_download.py -v`
 Expected: the 404 test passes already (unrelated to this change); the friendly-filename
 test FAILS on the `content-disposition` assertion (still names `ok.pdf`).
 
-- [ ] **Step 3: Implement the route change**
+- [x] **Step 3: Implement the route change**
 
 In `src/resume_agent/api/routers/cover_letters.py`, add the import and change
 `download_cover_letter_pdf`:
@@ -358,17 +358,17 @@ def download_cover_letter_pdf(
     )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_cover_letters_download.py -v`
 Expected: PASS (both tests).
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `.venv/Scripts/python.exe -m pytest`
 Expected: PASS (no regressions elsewhere).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/resume_agent/api/routers/cover_letters.py tests/api/test_cover_letters_download.py
