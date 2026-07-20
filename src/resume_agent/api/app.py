@@ -40,6 +40,7 @@ from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
 from resume_agent.api.routers import notifications as notifications_router
 from resume_agent.api.routers import profile as profile_router
+from resume_agent.api.routers import prompts as prompts_router
 from resume_agent.api.routers import prune as prune_router
 from resume_agent.api.routers import resumes
 from resume_agent.api.routers import runs as runs_router
@@ -288,6 +289,7 @@ def create_app(
     app.include_router(gmail_router.callback_router, prefix="/api")
     app.include_router(email_drafts_router.router, prefix="/api", dependencies=guarded)
     app.include_router(config_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(prompts_router.router, prefix="/api", dependencies=guarded)
     app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)
     app.include_router(profile_router.router, prefix="/api", dependencies=guarded)
     app.include_router(coach_router.router, prefix="/api", dependencies=guarded)
