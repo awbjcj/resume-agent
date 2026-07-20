@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import {
+  Bot,
   FileKey2,
   FileText,
   Paintbrush,
@@ -26,6 +27,7 @@ export const SETTINGS_NAV = [
   { to: "/settings/sources", label: "Sources", icon: PanelsTopLeft },
   { to: "/settings/keys", label: "API keys", icon: FileKey2 },
   { to: "/settings/review", label: "Review panel", icon: Sparkles },
+  { to: "/settings/agent-prompts", label: "Agent prompts", icon: Bot },
   { to: "/settings/rendering", label: "Rendering", icon: FileText },
   { to: "/settings/pruning", label: "Pruning", icon: SlidersHorizontal },
   { to: "/settings/style-guide", label: "Style guide", icon: Paintbrush },

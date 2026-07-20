@@ -53,6 +53,11 @@ const ReviewSettingsPage = lazy(() =>
     default: m.ReviewSettingsPage,
   })),
 );
+const AgentPromptsPage = lazy(() =>
+  import("@/features/settings/pages/AgentPromptsPage").then((m) => ({
+    default: m.AgentPromptsPage,
+  })),
+);
 const RenderingSettingsPage = lazy(() =>
   import("@/features/settings/pages/RenderingSettingsPage").then((m) => ({
     default: m.RenderingSettingsPage,
@@ -137,6 +142,7 @@ export const router = createBrowserRouter([
           { path: "sources", element: page(<SourcesPage />) },
           { path: "keys", element: page(<KeysSettingsPage />) },
           { path: "review", element: page(<ReviewSettingsPage />) },
+          { path: "agent-prompts", element: page(<AgentPromptsPage />) },
           { path: "rendering", element: page(<RenderingSettingsPage />) },
           { path: "pruning", element: page(<PruningSettingsPage />) },
           { path: "style-guide", element: page(<StyleGuideSettingsPage />) },
