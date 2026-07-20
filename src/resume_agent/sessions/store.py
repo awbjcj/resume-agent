@@ -18,14 +18,24 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.progress import atomic_write_text
 
 _SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
 
-M = TypeVar("M", bound=ExtensibleModel)
+
+class SessionModel(ExtensibleModel):
+    """Fields every session-store model must define: id, start time, lifecycle, archival."""
+
+    session_id: str = ""
+    started_at: str = ""
+    status: Literal["active", "ended"] = "active"
+    archived_at: str | None = None
+
+
+M = TypeVar("M", bound=SessionModel)
 
 
 def valid_session_id(session_id: str) -> bool:

@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
-from resume_agent.sessions.store import SessionStore, now_iso, valid_session_id
+from resume_agent.sessions.store import SessionModel, SessionStore, now_iso, valid_session_id
 
 STYLE_EXTRA_CAP = 2_000
 
@@ -67,15 +67,11 @@ class InterviewDebrief(ExtensibleModel):
     star_notes: str = ""
 
 
-class InterviewSession(ExtensibleModel):
-    session_id: str = ""
+class InterviewSession(SessionModel):
     job_id: int = 0
     resume_version_id: int = 0
-    started_at: str = ""
     ended_at: str | None = None
-    status: Literal["active", "ended"] = "active"
     concluded: bool = False
-    archived_at: str | None = None
     style: InterviewStyle = Field(default_factory=InterviewStyle)
     context: InterviewContext = Field(default_factory=InterviewContext)
     plan: list[PlanItem] = Field(default_factory=list)

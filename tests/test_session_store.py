@@ -1,17 +1,14 @@
 """The Session substrate: file custody shared by every turn-per-run session kind."""
 
+from typing import Literal
+
 import pytest
 
-from resume_agent.models.base import ExtensibleModel
-from resume_agent.sessions.store import SessionStore, now_iso, valid_session_id
+from resume_agent.sessions.store import SessionModel, SessionStore, now_iso, valid_session_id
 
 
-class _Session(ExtensibleModel):
-    session_id: str = ""
-    started_at: str = ""
+class _Session(SessionModel):
     ended_at: str | None = None
-    status: str = "active"
-    archived_at: str | None = None
     payload: str = ""
 
 
@@ -20,7 +17,14 @@ def store() -> SessionStore[_Session]:
     return SessionStore(_Session, label="probe")
 
 
-def _seed(store, root, session_id, *, status="active", started_at="2026-07-19T00:00:00+00:00"):
+def _seed(
+    store,
+    root,
+    session_id,
+    *,
+    status: Literal["active", "ended"] = "active",
+    started_at="2026-07-19T00:00:00+00:00",
+):
     root.mkdir(parents=True, exist_ok=True)
     store.write(
         root,

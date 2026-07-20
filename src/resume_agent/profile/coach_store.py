@@ -11,7 +11,7 @@ from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.profile.interview import ResearchAction
-from resume_agent.sessions.store import SessionStore, now_iso, valid_session_id
+from resume_agent.sessions.store import SessionModel, SessionStore, now_iso, valid_session_id
 
 
 class CoachTopic(ExtensibleModel):
@@ -40,12 +40,8 @@ class CoachTurnRecord(ExtensibleModel):
     research_actions: list[ResearchAction] = Field(default_factory=list)
 
 
-class CoachSession(ExtensibleModel):
-    session_id: str = ""
-    started_at: str = ""
+class CoachSession(SessionModel):
     ended_at: str | None = None
-    status: Literal["active", "ended"] = "active"
-    archived_at: str | None = None
     turns: list[CoachTurnRecord] = Field(default_factory=list)
     topics: list[CoachTopic] = Field(default_factory=list)
     draft_notes: list[CoachDraftNote] = Field(default_factory=list)
