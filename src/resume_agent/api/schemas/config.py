@@ -7,6 +7,8 @@ serves these values, and the TUI/CLI keep reading the same YAML.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 
 from resume_agent.api.schemas.base import CamelModel
@@ -48,7 +50,9 @@ def _default_reviewers() -> list[ReviewerEntry]:
         ReviewerEntry(name="fact-check", gate=True, weight=0, model_tier="premium"),
         ReviewerEntry(name="ats-keyword", gate=False, weight=1, model_tier="mid"),
         ReviewerEntry(name="recruiter", gate=False, weight=1, model_tier="mid"),
-        ReviewerEntry(name="hiring-manager", gate=False, weight=1, model_tier="premium"),
+        ReviewerEntry(
+            name="hiring-manager", gate=False, weight=1, model_tier="premium"
+        ),
         ReviewerEntry(name="concision", gate=False, weight=1, model_tier="mid"),
     ]
 
@@ -56,6 +60,9 @@ def _default_reviewers() -> list[ReviewerEntry]:
 class ReviewConfigDoc(CamelModel):
     max_rounds: int = 3
     score_threshold: int = 85
+    merged_advisory: bool = False
+    tailor_tier: Literal["cheap", "mid", "premium"] = "premium"
+    reviser_tier: Literal["cheap", "mid", "premium"] = "premium"
     reviewers: list[ReviewerEntry] = Field(default_factory=_default_reviewers)
     length_budget: LengthBudget | None = None
 

@@ -56,6 +56,27 @@ def test_review_reviewers_default_roster(client):
     assert body["reviewers"][0]["gate"] is True
 
 
+def test_review_structural_knobs_round_trip(client):
+    body = client.get("/api/config/review").json()
+    assert body["mergedAdvisory"] is False
+    assert body["tailorTier"] == "premium"
+    assert body["reviserTier"] == "premium"
+    response = client.put(
+        "/api/config/review",
+        json={
+            **body,
+            "mergedAdvisory": True,
+            "tailorTier": "mid",
+            "reviserTier": "cheap",
+        },
+    )
+    assert response.status_code == 200
+    saved = client.get("/api/config/review").json()
+    assert saved["mergedAdvisory"] is True
+    assert saved["tailorTier"] == "mid"
+    assert saved["reviserTier"] == "cheap"
+
+
 def test_profile_repo_filters_round_trip_and_limit_is_bounded(client):
     response = client.put(
         "/api/config/profile",
