@@ -412,6 +412,58 @@
         "title": "AdminUserPatch",
         "type": "object"
       },
+      "AgentPromptItem": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "guidance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guidance"
+          },
+          "instructions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instructions",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "stage",
+          "description",
+          "instructions",
+          "editable"
+        ],
+        "title": "AgentPromptItem",
+        "type": "object"
+      },
       "AliasIn": {
         "properties": {
           "canonical": {
@@ -799,6 +851,20 @@
           "file"
         ],
         "title": "Body_upload_source_api_profile_sources_post",
+        "type": "object"
+      },
+      "Body_upload_template_api_config_render_templates_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_template_api_config_render_templates_post",
         "type": "object"
       },
       "BulkRequest": {
@@ -2153,6 +2219,20 @@
           "connected"
         ],
         "title": "GmailStatusOut",
+        "type": "object"
+      },
+      "GuidanceUpdate": {
+        "properties": {
+          "guidance": {
+            "maxLength": 4000,
+            "title": "Guidance",
+            "type": "string"
+          }
+        },
+        "required": [
+          "guidance"
+        ],
+        "title": "GuidanceUpdate",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -4289,14 +4369,14 @@
       },
       "RenderConfigDoc": {
         "properties": {
-          "outputDir": {
-            "default": "output",
-            "title": "Outputdir",
-            "type": "string"
+          "fitOnePage": {
+            "default": true,
+            "title": "Fitonepage",
+            "type": "boolean"
           },
-          "templatePath": {
-            "default": "templates/resume.typ",
-            "title": "Templatepath",
+          "template": {
+            "default": "classic",
+            "title": "Template",
             "type": "string"
           }
         },
@@ -4586,6 +4666,11 @@
             "title": "Maxrounds",
             "type": "integer"
           },
+          "mergedAdvisory": {
+            "default": false,
+            "title": "Mergedadvisory",
+            "type": "boolean"
+          },
           "reviewers": {
             "items": {
               "$ref": "#/components/schemas/ReviewerEntry"
@@ -4593,10 +4678,30 @@
             "title": "Reviewers",
             "type": "array"
           },
+          "reviserTier": {
+            "default": "premium",
+            "enum": [
+              "cheap",
+              "mid",
+              "premium"
+            ],
+            "title": "Revisertier",
+            "type": "string"
+          },
           "scoreThreshold": {
             "default": 85,
             "title": "Scorethreshold",
             "type": "integer"
+          },
+          "tailorTier": {
+            "default": "premium",
+            "enum": [
+              "cheap",
+              "mid",
+              "premium"
+            ],
+            "title": "Tailortier",
+            "type": "string"
           }
         },
         "title": "ReviewConfigDoc",
@@ -6144,6 +6249,38 @@
           }
         },
         "title": "TailorParams",
+        "type": "object"
+      },
+      "TemplateListItem": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "bundled",
+              "custom"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "kind"
+        ],
+        "title": "TemplateListItem",
         "type": "object"
       },
       "TokenCreateRequest": {
@@ -7858,6 +7995,121 @@
         ]
       }
     },
+    "/api/agents/prompts": {
+      "get": {
+        "operationId": "list_prompts_api_agents_prompts_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentPromptItem"
+                  },
+                  "title": "Response List Prompts Api Agents Prompts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Prompts"
+      }
+    },
+    "/api/agents/prompts/{key}": {
+      "put": {
+        "operationId": "put_guidance_api_agents_prompts__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuidanceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPromptItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Guidance"
+      }
+    },
     "/api/analytics": {
       "get": {
         "operationId": "get_analytics_api_analytics_get",
@@ -8489,6 +8741,211 @@
           }
         },
         "summary": "Put Render"
+      }
+    },
+    "/api/config/render/templates": {
+      "get": {
+        "operationId": "get_templates_api_config_render_templates_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateListItem"
+                  },
+                  "title": "Response Get Templates Api Config Render Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Templates"
+      },
+      "post": {
+        "operationId": "upload_template_api_config_render_templates_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_template_api_config_render_templates_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateListItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Template"
+      }
+    },
+    "/api/config/render/templates/{stem}": {
+      "delete": {
+        "operationId": "delete_template_api_config_render_templates__stem__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "stem",
+            "required": true,
+            "schema": {
+              "title": "Stem",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Template"
+      }
+    },
+    "/api/config/render/templates/{template_id}/preview": {
+      "get": {
+        "operationId": "preview_template_api_config_render_templates__template_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Template"
       }
     },
     "/api/config/review": {

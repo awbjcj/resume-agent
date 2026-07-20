@@ -280,6 +280,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Prompts */
+        get: operations["list_prompts_api_agents_prompts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/prompts/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Guidance */
+        put: operations["put_guidance_api_agents_prompts__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/analytics": {
         parameters: {
             query?: never;
@@ -447,6 +481,58 @@ export interface paths {
         get: operations["get_render_api_config_render_get"];
         /** Put Render */
         put: operations["put_render_api_config_render_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/render/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Templates */
+        get: operations["get_templates_api_config_render_templates_get"];
+        put?: never;
+        /** Upload Template */
+        post: operations["upload_template_api_config_render_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/render/templates/{stem}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Template */
+        delete: operations["delete_template_api_config_render_templates__stem__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/render/templates/{template_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Template */
+        get: operations["preview_template_api_config_render_templates__template_id__preview_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2218,6 +2304,23 @@ export interface components {
             /** Weeklytokenbudget */
             weeklyTokenBudget?: number | null;
         };
+        /** AgentPromptItem */
+        AgentPromptItem: {
+            /** Description */
+            description: string;
+            /** Editable */
+            editable: boolean;
+            /** Guidance */
+            guidance?: string | null;
+            /** Instructions */
+            instructions: string[];
+            /** Key */
+            key: string;
+            /** Stage */
+            stage: string;
+            /** Title */
+            title: string;
+        };
         /** AliasIn */
         AliasIn: {
             /** Canonical */
@@ -2348,6 +2451,11 @@ export interface components {
              * @default false
              */
             primary: boolean;
+        };
+        /** Body_upload_template_api_config_render_templates_post */
+        Body_upload_template_api_config_render_templates_post: {
+            /** File */
+            file: string;
         };
         /** BulkRequest */
         BulkRequest: {
@@ -2901,6 +3009,11 @@ export interface components {
              * @default []
              */
             scopes: string[];
+        };
+        /** GuidanceUpdate */
+        GuidanceUpdate: {
+            /** Guidance */
+            guidance: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3689,15 +3802,15 @@ export interface components {
         /** RenderConfigDoc */
         RenderConfigDoc: {
             /**
-             * Outputdir
-             * @default output
+             * Fitonepage
+             * @default true
              */
-            outputDir: string;
+            fitOnePage: boolean;
             /**
-             * Templatepath
-             * @default templates/resume.typ
+             * Template
+             * @default classic
              */
-            templatePath: string;
+            template: string;
         };
         /** RepoOut */
         RepoOut: {
@@ -3807,13 +3920,30 @@ export interface components {
              * @default 3
              */
             maxRounds: number;
+            /**
+             * Mergedadvisory
+             * @default false
+             */
+            mergedAdvisory: boolean;
             /** Reviewers */
             reviewers?: components["schemas"]["ReviewerEntry"][];
+            /**
+             * Revisertier
+             * @default premium
+             * @enum {string}
+             */
+            reviserTier: "cheap" | "mid" | "premium";
             /**
              * Scorethreshold
              * @default 85
              */
             scoreThreshold: number;
+            /**
+             * Tailortier
+             * @default premium
+             * @enum {string}
+             */
+            tailorTier: "cheap" | "mid" | "premium";
         };
         /** ReviewerEntry */
         ReviewerEntry: {
@@ -4291,6 +4421,20 @@ export interface components {
             deep: boolean;
             /** Jobids */
             jobIds?: number[] | null;
+        };
+        /** TemplateListItem */
+        TemplateListItem: {
+            /** Description */
+            description: string;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bundled" | "custom";
+            /** Title */
+            title: string;
         };
         /** TokenCreateRequest */
         TokenCreateRequest: {
@@ -5158,6 +5302,74 @@ export interface operations {
             };
         };
     };
+    list_prompts_api_agents_prompts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPromptItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_guidance_api_agents_prompts__key__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuidanceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPromptItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_analytics_api_analytics_get: {
         parameters: {
             query?: never;
@@ -5583,6 +5795,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RenderConfigDoc"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_templates_api_config_render_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_template_api_config_render_templates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_template_api_config_render_templates_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateListItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_api_config_render_templates__stem__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                stem: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_template_api_config_render_templates__template_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
