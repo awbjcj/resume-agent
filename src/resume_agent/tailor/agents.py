@@ -18,7 +18,9 @@ from resume_agent.tailor.style_guide import compose_instructions
 
 def model_for_tier(tier: str) -> str:
     s = get_settings()
-    return {"cheap": s.cheap_model, "mid": s.mid_model, "premium": s.premium_model}.get(tier, s.mid_model)
+    return {"cheap": s.cheap_model, "mid": s.mid_model, "premium": s.premium_model}.get(
+        tier, s.mid_model
+    )
 
 
 def _prompt_cache() -> bool:
@@ -150,6 +152,12 @@ _SCORE_BAND_INSTRUCTION = (
     "configured aggregate score threshold."
 )
 
+_MERGED_ADVISORY_BASE_INSTRUCTIONS = [
+    "Return one MergedPanelReview with exactly one ReviewCritique per configured reviewer, in the configured order. Set every reviewer field exactly.",
+    "Judge each dimension independently against its own rubric; do not let one dimension's score bleed into another.",
+    *_COMMON_REVIEWER_INSTRUCTIONS,
+]
+
 
 def _reviewer_instructions(name: str, *, score_bands: bool = False) -> list[str]:
     return [
@@ -161,7 +169,9 @@ def _reviewer_instructions(name: str, *, score_bands: bool = False) -> list[str]
     ]
 
 
-def build_tailor_agent(model_id: str | None = None, style_guide: str | None = None) -> Runner:
+def build_tailor_agent(
+    model_id: str | None = None, style_guide: str | None = None
+) -> Runner:
     model = build_model(
         model_id or model_for_tier("premium"),
         cache_system_prompt=_prompt_cache(),
@@ -180,7 +190,9 @@ def build_tailor_agent(model_id: str | None = None, style_guide: str | None = No
     )
 
 
-def build_reviser_agent(model_id: str | None = None, style_guide: str | None = None) -> Runner:
+def build_reviser_agent(
+    model_id: str | None = None, style_guide: str | None = None
+) -> Runner:
     model = build_model(
         model_id or model_for_tier("premium"),
         cache_system_prompt=_prompt_cache(),
@@ -199,7 +211,9 @@ def build_reviser_agent(model_id: str | None = None, style_guide: str | None = N
     )
 
 
-def build_revision_agent(model_id: str | None = None, style_guide: str | None = None) -> Runner:
+def build_revision_agent(
+    model_id: str | None = None, style_guide: str | None = None
+) -> Runner:
     model = build_model(
         model_id or model_for_tier("premium"),
         cache_system_prompt=_prompt_cache(),
