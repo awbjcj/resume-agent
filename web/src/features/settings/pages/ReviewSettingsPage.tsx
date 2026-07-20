@@ -1,11 +1,19 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -61,6 +69,67 @@ export function ReviewSettingsPage() {
           </Field>
         </div>
       </FieldGroup>
+      <FieldSet>
+        <FieldLegend>Pipeline</FieldLegend>
+        <Field orientation="horizontal">
+          <Switch
+            id="merged-advisory"
+            checked={draft.mergedAdvisory}
+            onCheckedChange={(checked: boolean) =>
+              setDraft({ ...draft, mergedAdvisory: checked })}
+          />
+          <div className="flex flex-col gap-0.5">
+            <FieldLabel htmlFor="merged-advisory">
+              Merge advisory reviews into one call
+            </FieldLabel>
+            <FieldDescription>
+              Faster and cheaper; turn off to run each advisory reviewer separately.
+            </FieldDescription>
+          </div>
+        </Field>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel>Writer model tier</FieldLabel>
+            <ToggleGroup
+              value={[draft.tailorTier]}
+              onValueChange={(values) => {
+                const tier = values.at(-1) as ReviewDoc["tailorTier"] | undefined;
+                if (tier) setDraft({ ...draft, tailorTier: tier });
+              }}
+            >
+              {MODEL_TIERS.map((tier) => (
+                <ToggleGroupItem
+                  key={tier}
+                  value={tier}
+                  aria-label={`${tier} writer tier`}
+                >
+                  {tier}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </Field>
+          <Field>
+            <FieldLabel>Reviser model tier</FieldLabel>
+            <ToggleGroup
+              value={[draft.reviserTier]}
+              onValueChange={(values) => {
+                const tier = values.at(-1) as ReviewDoc["reviserTier"] | undefined;
+                if (tier) setDraft({ ...draft, reviserTier: tier });
+              }}
+            >
+              {MODEL_TIERS.map((tier) => (
+                <ToggleGroupItem
+                  key={tier}
+                  value={tier}
+                  aria-label={`${tier} reviser tier`}
+                >
+                  {tier}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </Field>
+        </div>
+      </FieldSet>
       <Table>
         <TableHeader>
           <TableRow>
