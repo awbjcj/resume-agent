@@ -22,10 +22,16 @@ def test_get_search_defaults(client):
 
 
 def test_put_search_round_trip(client):
-    resp = client.put("/api/config/search", json={
-        "keywords": ["python"], "titles": ["ML Engineer"], "locations": ["Remote"],
-        "remotePolicy": "remote_only", "sponsorshipRequired": True,
-    })
+    resp = client.put(
+        "/api/config/search",
+        json={
+            "keywords": ["python"],
+            "titles": ["ML Engineer"],
+            "locations": ["Remote"],
+            "remotePolicy": "remote_only",
+            "sponsorshipRequired": True,
+        },
+    )
     assert resp.status_code == 200
     assert client.get("/api/config/search").json()["keywords"] == ["python"]
 
@@ -67,6 +73,33 @@ def test_profile_repo_filters_round_trip_and_limit_is_bounded(client):
         "githubRepoDeny": ["noise"],
         "githubRepoLimit": 5,
     }
-    assert client.put(
-        "/api/config/profile", json={"githubRepoLimit": 0}
-    ).status_code == 422
+    assert (
+        client.put("/api/config/profile", json={"githubRepoLimit": 0}).status_code
+        == 422
+    )
+
+
+def test_render_contract_uses_template_id_only(client):
+    assert client.get("/api/config/render").json() == {
+        "template": "classic",
+        "fitOnePage": True,
+    }
+
+
+def test_render_config_rejects_missing_and_path_like_templates(client):
+    for template in ("custom:ghost", "custom:../secret"):
+        response = client.put(
+            "/api/config/render",
+            json={"template": template, "fitOnePage": True},
+        )
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "template_not_found"
+
+
+def test_render_config_round_trip(client):
+    response = client.put(
+        "/api/config/render",
+        json={"template": "classic", "fitOnePage": False},
+    )
+    assert response.status_code == 200
+    assert client.get("/api/config/render").json()["fitOnePage"] is False

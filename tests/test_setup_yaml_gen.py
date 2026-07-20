@@ -35,7 +35,9 @@ def test_parses_token_and_company():
 
 
 def test_token_only_defaults_company_to_titlecased_token():
-    assert parse_greenhouse_boards("datadog") == [{"token": "datadog", "company": "Datadog"}]
+    assert parse_greenhouse_boards("datadog") == [
+        {"token": "datadog", "company": "Datadog"}
+    ]
 
 
 def test_skips_blank_lines_and_trims():
@@ -63,8 +65,13 @@ def test_build_profile_sources_round_trips(tmp_path):
 # ── Task 5 ──────────────────────────────────────────────────────────────────
 def test_build_search_round_trips(tmp_path):
     state = WizardState(
-        keywords=["python"], titles=["Backend Engineer"], locations=["Remote"],
-        remote_policy="remote", min_salary=120000, yoe_min=0, yoe_max=5,
+        keywords=["python"],
+        titles=["Backend Engineer"],
+        locations=["Remote"],
+        remote_policy="remote",
+        min_salary=120000,
+        yoe_min=0,
+        yoe_max=5,
         sponsorship_required=True,
     )
     p = tmp_path / "search.yaml"
@@ -81,8 +88,10 @@ def test_build_connectors_round_trips(tmp_path):
     state = WizardState(
         greenhouse_enabled=True,
         greenhouse_boards=[{"token": "stripe", "company": "Stripe"}],
-        adzuna_enabled=True, adzuna_country="gb",
-        remoteok_enabled=True, linkedin_enabled=False,
+        adzuna_enabled=True,
+        adzuna_country="gb",
+        remoteok_enabled=True,
+        linkedin_enabled=False,
     )
     p = tmp_path / "connectors.yaml"
     p.write_text(build_connectors(state), encoding="utf-8")
@@ -103,7 +112,11 @@ def test_render_from_example_review_round_trips(tmp_path):
     p.write_text(text, encoding="utf-8")
     cfg = load_review_config(p)
     assert [r.name for r in cfg.reviewers] == [
-        "fact-check", "ats-keyword", "recruiter", "hiring-manager", "concision"
+        "fact-check",
+        "ats-keyword",
+        "recruiter",
+        "hiring-manager",
+        "concision",
     ]
     assert cfg.max_rounds == 2
     assert cfg.merged_advisory is True
@@ -113,5 +126,5 @@ def test_render_from_example_render_round_trips(tmp_path):
     p = tmp_path / "render.yaml"
     p.write_text(render_from_example("config/render.yaml.example"), encoding="utf-8")
     cfg = load_render_config(p)
-    assert cfg.template_path == "templates/resume.typ"
-    assert cfg.output_dir == "output"
+    assert cfg.template == "classic"
+    assert cfg.fit_one_page is True

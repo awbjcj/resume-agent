@@ -70,8 +70,8 @@ class PruneConfigDoc(CamelModel):
 
 
 class RenderConfigDoc(CamelModel):
-    template_path: str = "templates/resume.typ"
-    output_dir: str = "output"
+    template: str = "classic"
+    fit_one_page: bool = True
 
 
 class StyleGuideDoc(CamelModel):

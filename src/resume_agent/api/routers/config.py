@@ -12,8 +12,10 @@ from resume_agent.api.schemas.config import (
     SearchConfigDoc,
     StyleGuideDoc,
 )
-from resume_agent.services.config_store import ConfigStore
 from resume_agent.api.deps import get_config_store
+from resume_agent.api.errors import ApiException
+from resume_agent.render.templates import TemplateNotFoundError, resolve_template
+from resume_agent.services.config_store import ConfigStore
 
 router = APIRouter()
 
@@ -59,6 +61,10 @@ def get_render(request: Request):
 
 @router.put("/config/render", response_model=RenderConfigDoc)
 def put_render(body: RenderConfigDoc, request: Request):
+    try:
+        resolve_template(body.template)
+    except TemplateNotFoundError as exc:
+        raise ApiException(422, "template_not_found", str(exc)) from exc
     return _store(request).put("render", body)
 
 

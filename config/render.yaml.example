@@ -1,3 +1,5 @@
-# Render settings (see design spec §5.4).
-template_path: templates/resume.typ
-output_dir: output
+# Rendering: choose a template id and whether to shrink toward one page.
+# Bundled template: classic. Uploaded templates use custom:<name>.
+# Legacy template_path/output_dir keys remain supported for existing CLI files.
+template: classic
+fit_one_page: true
