@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Layers3, Pin, Undo2 } from "lucide-react";
+import { Check, CircleAlert, Layers3, Pin, Trash2, Undo2 } from "lucide-react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,7 +17,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 import type { ProfileMatrix } from "./use-matrix";
-import { useClearSkillGroup, useMatrix, useSetSkillGroup } from "./use-matrix";
+import {
+  useClearSkillGroup,
+  useDeleteSkill,
+  useMatrix,
+  useRestoreSkill,
+  useSetSkillGroup,
+  useSuppressedSkills,
+} from "./use-matrix";
 
 type MatrixRow = NonNullable<ProfileMatrix["rows"]>[number];
 
@@ -25,6 +32,9 @@ export function SkillGroupsPanel() {
   const matrix = useMatrix();
   const setGroup = useSetSkillGroup();
   const clearGroup = useClearSkillGroup();
+  const deleteSkill = useDeleteSkill();
+  const restoreSkill = useRestoreSkill();
+  const suppressed = useSuppressedSkills();
 
   if (matrix.isPending) {
     return <Skeleton className="h-48 w-full" aria-label="Loading skill matrix" />;
@@ -143,6 +153,17 @@ export function SkillGroupsPanel() {
                               </DropdownMenuGroup>
                             </>
                           ) : null}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={deleteSkill.isPending}
+                              onClick={() => deleteSkill.mutate(row.key)}
+                            >
+                              <Trash2 aria-hidden />
+                              Delete skill
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     );
@@ -155,6 +176,32 @@ export function SkillGroupsPanel() {
           );
         })}
       </Accordion>
+      {suppressed.data && suppressed.data.length > 0 ? (
+        <section aria-labelledby="suppressed-heading" className="mt-6">
+          <h3 id="suppressed-heading" className="text-sm font-semibold">
+            Deleted skills
+          </h3>
+          <p className="mb-2 text-sm text-muted-foreground">
+            These stay removed across profile rebuilds until you restore them.
+          </p>
+          <ul className="flex flex-wrap gap-2">
+            {suppressed.data.map((skill) => (
+              <li key={skill.token}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={restoreSkill.isPending}
+                  aria-label={`Restore ${skill.display}`}
+                  onClick={() => restoreSkill.mutate(skill.token)}
+                >
+                  <Undo2 aria-hidden data-icon="inline-start" />
+                  {skill.display}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </section>
   );
 }

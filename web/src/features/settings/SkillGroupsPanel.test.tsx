@@ -4,15 +4,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   value: {} as Record<string, unknown>,
+  suppressed: [] as Array<Record<string, unknown>>,
   refetch: vi.fn(),
   setGroup: vi.fn(),
   clearGroup: vi.fn(),
+  deleteSkill: vi.fn(),
+  restoreSkill: vi.fn(),
 }));
 
 vi.mock("./use-matrix", () => ({
   useMatrix: () => ({ ...state.value, refetch: state.refetch }),
   useSetSkillGroup: () => ({ mutate: state.setGroup, isPending: false }),
   useClearSkillGroup: () => ({ mutate: state.clearGroup, isPending: false }),
+  useDeleteSkill: () => ({ mutate: state.deleteSkill, isPending: false }),
+  useRestoreSkill: () => ({ mutate: state.restoreSkill, isPending: false }),
+  useSuppressedSkills: () => ({ data: state.suppressed }),
 }));
 
 import { SkillGroupsPanel } from "./SkillGroupsPanel";
@@ -27,6 +33,9 @@ describe("SkillGroupsPanel", () => {
     state.refetch.mockReset();
     state.setGroup.mockReset();
     state.clearGroup.mockReset();
+    state.deleteSkill.mockReset();
+    state.restoreSkill.mockReset();
+    state.suppressed = [];
   });
 
   it("renders explicit loading, error/retry, and empty states", async () => {
@@ -155,5 +164,54 @@ describe("SkillGroupsPanel", () => {
 
     expect(await screen.findByRole("menuitem", { name: /^other$/i })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /reset to automatic/i })).toBeNull();
+  });
+
+  it("deletes a skill via the row menu", async () => {
+    state.value = {
+      isPending: false,
+      isError: false,
+      data: {
+        generatedAt: "2026-07-20T00:00:00Z",
+        groups,
+        rows: [
+          {
+            key: "kubernetes",
+            display: "Kubernetes",
+            category: "hard",
+            group: "languages",
+            groupSource: "taxonomy",
+            inferred: false,
+            strength: 2,
+            lastUsed: null,
+          },
+        ],
+      },
+    };
+    render(<SkillGroupsPanel />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /change group for kubernetes/i }),
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: /delete skill/i }));
+    expect(state.deleteSkill).toHaveBeenCalledWith("kubernetes");
+  });
+
+  it("restores a suppressed skill", async () => {
+    state.value = {
+      isPending: false,
+      isError: false,
+      data: { generatedAt: "", groups, rows: [
+        { key: "python", display: "Python", category: "hard", group: "languages",
+          groupSource: "taxonomy", inferred: false, strength: 3, lastUsed: null },
+      ] },
+    };
+    state.suppressed = [
+      { token: "kubernetes", display: "Kubernetes", addedAt: "" },
+    ];
+    render(<SkillGroupsPanel />);
+
+    expect(screen.getByText(/deleted skills/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /restore kubernetes/i }));
+    expect(state.restoreSkill).toHaveBeenCalledWith("kubernetes");
   });
 });
