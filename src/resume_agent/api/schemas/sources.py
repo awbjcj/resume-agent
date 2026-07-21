@@ -73,3 +73,7 @@ class SourcePatchIn(CamelModel):
 
 class DiscoverSourcesIn(CamelModel):
     prompt: str = Field(min_length=3, max_length=2_000)
+
+
+class DiscoverSearchIn(CamelModel):
+    prompt: str = Field(min_length=3, max_length=2_000)

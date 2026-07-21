@@ -1868,6 +1868,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover Search Route */
+        post: operations["discover_search_route_api_search_discover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/secrets": {
         parameters: {
             query?: never;
@@ -2898,6 +2915,11 @@ export interface components {
         };
         /** DiscoverParams */
         DiscoverParams: Record<string, never>;
+        /** DiscoverSearchIn */
+        DiscoverSearchIn: {
+            /** Prompt */
+            prompt: string;
+        };
         /** DiscoverSourcesIn */
         DiscoverSourcesIn: {
             /** Prompt */
@@ -9066,6 +9088,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_search_route_api_search_discover_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoverSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

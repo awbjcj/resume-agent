@@ -65,3 +65,21 @@ def test_scout_command_preflights_all_models(monkeypatch):
     assert result.exit_code == 1
     assert "Missing API key" in result.output
     assert len(set(seen)) == 2
+
+
+def test_scout_search_cmd_prints_suggestions(monkeypatch):
+    from resume_agent import cli
+
+    monkeypatch.setattr(cli, "resolve_api_key", lambda model_id: "key")
+    monkeypatch.setattr(
+        "resume_agent.services.search_discovery.run_search_discovery",
+        lambda *a, **k: {
+            "prompt": "x",
+            "suggestions": [
+                {"value": "Rust", "kind": "keyword", "reason": "fits", "status": "new"}
+            ],
+        },
+    )
+    result = CliRunner().invoke(cli.app, ["scout-search", "platform roles"])
+    assert result.exit_code == 0
+    assert "Rust" in result.stdout

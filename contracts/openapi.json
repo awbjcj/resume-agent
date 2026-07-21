@@ -1846,6 +1846,21 @@
         "title": "DiscoverParams",
         "type": "object"
       },
+      "DiscoverSearchIn": {
+        "properties": {
+          "prompt": {
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "DiscoverSearchIn",
+        "type": "object"
+      },
       "DiscoverSourcesIn": {
         "properties": {
           "prompt": {
@@ -14329,6 +14344,62 @@
           }
         },
         "summary": "Stream Run"
+      }
+    },
+    "/api/search/discover": {
+      "post": {
+        "operationId": "discover_search_route_api_search_discover_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoverSearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discover Search Route"
       }
     },
     "/api/secrets": {

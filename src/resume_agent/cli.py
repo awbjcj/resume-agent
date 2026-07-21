@@ -532,6 +532,45 @@ def scout_cmd(
             typer.echo(f"skipped {row['company']}: {exc}")
 
 
+@app.command("scout-search")
+def scout_search_cmd(
+    prompt: str = typer.Argument(
+        ..., help="What kinds of roles you want to search for."
+    ),
+    search_path: str = typer.Option(DEFAULT_SEARCH, "--search", help="Path to search.yaml."),
+) -> None:
+    """Recommend search conditions (keywords/titles/anchors/excludes) from a prompt."""
+    from resume_agent.services.search_discovery import run_search_discovery
+
+    settings = get_settings()
+    required_models = tuple(dict.fromkeys((settings.mid_model, settings.cheap_model)))
+    missing = [model for model in required_models if not resolve_api_key(model)]
+    if missing:
+        typer.echo(f"Missing API key for configured model(s): {', '.join(missing)}")
+        raise typer.Exit(code=1)
+
+    class EchoReporter:
+        def begin(self, total, label, **extra):
+            typer.echo(f"{label}…")
+
+        def step(self, current, *, label=None, **extra):
+            pass
+
+        def checkpoint(self):
+            pass
+
+    search = str(_tenant_cli_path(search_path))
+    result = run_search_discovery(
+        EchoReporter(),
+        prompt=prompt,
+        search_path=search,
+        profile_dir=_tenant_cli_path(DEFAULT_PROFILE_DIR),
+    )
+    for row in result["suggestions"]:
+        mark = "=" if row["status"] == "duplicate" else "+"
+        typer.echo(f"  {mark} [{row['kind']}] {row['value']} — {row['reason']}")
+
+
 def _read_piped_stdin() -> str | None:
     stream = typer.get_text_stream("stdin")
     if stream.isatty():

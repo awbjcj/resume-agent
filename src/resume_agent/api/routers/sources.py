@@ -13,6 +13,7 @@ from resume_agent.api.deps import (
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.sources import (
     AddSourceIn,
+    DiscoverSearchIn,
     DiscoverSourcesIn,
     SourcePatchIn,
     SourceOut,
@@ -24,6 +25,7 @@ from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.config import Settings
 from resume_agent.llm_runner import plan_search, resolve_api_key
+from resume_agent.services.search_discovery import run_search_discovery
 from resume_agent.services.source_discovery import run_source_discovery
 from resume_agent.services.sources import (
     SourceError,
@@ -122,6 +124,46 @@ def discover_sources_route(
         )
 
     return launch(mgr, "source-discovery", work, singleton_key="source-discovery")
+
+
+@router.post("/search/discover", response_model=RunOut, status_code=202)
+def discover_search_route(
+    body: DiscoverSearchIn,
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+    settings: Settings = Depends(get_settings_dep),
+):
+    required_models = tuple(dict.fromkeys((settings.mid_model, settings.cheap_model)))
+    missing = [model for model in required_models if not resolve_api_key(model)]
+    if missing:
+        raise ApiException(
+            400,
+            "SETUP_INCOMPLETE",
+            f"Missing API key for configured model(s): {', '.join(missing)}",
+        )
+    try:
+        search_plan = plan_search(settings.mid_model, settings.search_mode)
+    except ValueError as exc:
+        raise ApiException(400, "SEARCH_DISABLED", str(exc)) from exc
+    if search_plan.strategy == "none":
+        raise ApiException(
+            400,
+            "SEARCH_DISABLED",
+            "Search Scout needs web search; change search_mode from off.",
+        )
+
+    _, search_path = _config_paths(request)
+    profile_dir = get_profile_dir(request)
+
+    def work(reporter):
+        return run_search_discovery(
+            reporter,
+            prompt=body.prompt,
+            search_path=search_path,
+            profile_dir=profile_dir,
+        )
+
+    return launch(mgr, "search-discovery", work, singleton_key="search-discovery")
 
 
 @router.patch("/sources/{source_id}", response_model=SourceOut)
