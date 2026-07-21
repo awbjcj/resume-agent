@@ -4,6 +4,17 @@
     {
       "title": "Senior ML Engineer",
       "location": "Remote - US",
+      "secondaryLocations": [
+        {"location": "New York City"},
+        {"location": "Seattle"}
+      ],
+      "employmentType": "FullTime",
+      "department": "Engineering",
+      "team": "ML Platform",
+      "workplaceType": "Remote",
+      "compensation": {
+        "compensationTierSummary": "$150K – $200K • Offers Equity"
+      },
       "descriptionPlain": "Build LLM systems. 5+ years of Python.",
       "descriptionHtml": "<p>Build LLM systems. 5+ years of Python.</p>",
       "jobUrl": "https://jobs.ashbyhq.com/acme/abc-123",
@@ -12,6 +23,7 @@
     {
       "title": "Class A CDL Driver",
       "location": "Detroit, MI",
+      "employmentType": "PartTime",
       "descriptionPlain": "Drive a truck.",
       "descriptionHtml": "<p>Drive a truck.</p>",
       "jobUrl": "https://jobs.ashbyhq.com/acme/def-456",
