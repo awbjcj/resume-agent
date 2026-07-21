@@ -93,8 +93,9 @@ def test_fit_prompt_does_not_duplicate_industry_classification():
     assert "industry" not in _text(FIT_INSTRUCTIONS)
 
 
-def test_fit_prompt_guides_us_location_segmentation():
+def test_fit_prompt_guides_location_segmentation():
     rendered = _text(FIT_INSTRUCTIONS)
+    assert "administrative region" in rendered
     assert "us state" in rendered
     assert 'country to "us"' in rendered
     assert "remote" in rendered

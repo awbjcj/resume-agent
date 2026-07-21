@@ -48,9 +48,9 @@ _INSTRUCTIONS = [
     "Parse the job's work location, not the candidate's location. Prefer the JOB LOCATION section, "
     "using the description only to clarify it. Return location=null when no meaningful work location "
     "is supported; otherwise leave unsupported city, region, or country members null.",
-    "Split a combined location into its parts: put the city in city, the US state (full name or "
-    '2-letter code) in region, and the nation in country. Set country to "US" whenever the location '
-    "names a US state or a clearly US city, even when the country is not written.",
+    "Split a combined location into its parts: put the city in city, the state, province, or "
+    'administrative region in region, and the nation in country. Set country to "US" whenever the '
+    "location names a US state or a clearly US city, even when the country is not written.",
     'For remote roles, capture any country qualifier (for example "Remote (US)" means country US) '
     "and leave city and region null unless the posting names a specific hub.",
     "When a SKILL MATCH CONTEXT section is present, use its deterministic tiers. Award full "
