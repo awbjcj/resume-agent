@@ -6,7 +6,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from resume_agent.cover_letter import agents as cover_letter_agents
-from resume_agent.discovery import extract, fit, industry, relevance, source_scout
+from resume_agent.discovery import (
+    extract,
+    fit,
+    industry,
+    relevance,
+    search_scout,
+    source_scout,
+)
 from resume_agent.discovery.scraper import learn
 from resume_agent.discovery.url_ingest import llm as url_ingest_llm
 from resume_agent.gmail import classify
@@ -216,6 +223,20 @@ PROMPT_SPECS = (
         "discovery",
         "Formats grounded source proposals.",
         source_scout._FORMAT_INSTRUCTIONS,
+    ),
+    _spec(
+        "search-scout-research",
+        "Search scout (research)",
+        "discovery",
+        "Researches new search conditions.",
+        search_scout._RESEARCH_INSTRUCTIONS,
+    ),
+    _spec(
+        "search-scout-format",
+        "Search scout (formatter)",
+        "discovery",
+        "Formats grounded search-term proposals.",
+        search_scout._FORMAT_INSTRUCTIONS,
     ),
     _spec(
         "profile-extractor",
