@@ -29,7 +29,11 @@ function Chip({
         {tag.covered ? "●" : "○"}
       </span>
       {tag.name}
-      {!tag.covered && <AddSkillPopover skillName={tag.name} />}
+      {!tag.covered && (
+        <span className="-mr-1 inline-flex size-4 items-center justify-center">
+          <AddSkillPopover skillName={tag.name} />
+        </span>
+      )}
     </span>
   );
 }

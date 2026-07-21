@@ -65,6 +65,7 @@ export function AddSkillPopover({ skillName }: { skillName: string }) {
           <Button
             variant="ghost"
             size="icon-xs"
+            className="size-4 [&_svg]:size-3"
             aria-label={`Add "${skillName}" to your profile`}
             onClick={(event: React.MouseEvent) => event.stopPropagation()}
           />

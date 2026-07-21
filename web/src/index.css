@@ -235,11 +235,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.36rem;
+  min-height: 1.75rem; /* covered == gap height regardless of the embedded + */
   border-radius: 9999px;
-  padding: 0.3rem 0.72rem;
-  font-size: 0.84rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.82rem;
   font-weight: 550;
-  line-height: 1.2;
+  line-height: 1.1;
   border: 1px solid transparent;
 }
 .skill-chip[data-covered="true"] {
