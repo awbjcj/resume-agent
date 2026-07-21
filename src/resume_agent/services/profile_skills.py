@@ -156,14 +156,26 @@ def add_alias(profile_dir: str | Path, skill_id: str, alias: str) -> ManualAlias
 def list_manual_entries(
     profile_dir: str | Path,
 ) -> list[ManualSkillEntry | ManualAliasEntry]:
-    return load_manual_skills(_ledger_path(profile_dir)).entries
+    return [
+        e
+        for e in load_manual_skills(_ledger_path(profile_dir)).entries
+        if isinstance(e, (ManualSkillEntry, ManualAliasEntry))
+    ]
 
 
 def remove_manual_entry(profile_dir: str | Path, entry_id: str) -> None:
     with manual_skills_lock(profile_dir):
         facts = _load_facts_or_raise(profile_dir)
         ledger = load_manual_skills(_ledger_path(profile_dir))
-        entry = next((e for e in ledger.entries if e.id == entry_id), None)
+        entry = next(
+            (
+                e
+                for e in ledger.entries
+                if e.id == entry_id
+                and isinstance(e, (ManualSkillEntry, ManualAliasEntry))
+            ),
+            None,
+        )
         if entry is None:
             raise ManualEntryNotFoundError(f"No manual entry '{entry_id}'")
 
