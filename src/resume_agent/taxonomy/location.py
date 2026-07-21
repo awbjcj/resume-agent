@@ -78,6 +78,20 @@ def _key(raw: str | None) -> str:
     return " ".join(raw.lower().split()) if raw else ""
 
 
+def _clean_region(raw: str | None) -> str | None:
+    """Light pass-through cleanup for a non-US region: no canonical table exists.
+
+    Strips a trailing ZIP-like suffix and collapses whitespace, but preserves
+    the original casing — forcing title-case would corrupt an acronym-like
+    region (e.g. a 2-letter code) if one ever shows up.
+    """
+    if raw is None:
+        return None
+    candidate = _ZIP_RE.sub("", raw.strip()).strip()
+    candidate = " ".join(candidate.split())
+    return candidate or None
+
+
 def normalize_country(raw: str | None) -> str | None:
     if raw is None:
         return None
@@ -120,10 +134,12 @@ def _region_to_usps(raw: str | None) -> str | None:
 
 
 def normalize_region(raw: str | None, country_iso2: str | None) -> str | None:
-    """US states -> USPS code. Non-US gets no region (foreign = city + country)."""
-    if not is_us(country_iso2):
+    """US states -> USPS code. Other resolved countries -> cleaned pass-through."""
+    if is_us(country_iso2):
+        return _region_to_usps(raw)
+    if country_iso2 is None:
         return None
-    return _region_to_usps(raw)
+    return _clean_region(raw)
 
 
 def _split_city_region(city: str) -> tuple[str | None, str | None]:

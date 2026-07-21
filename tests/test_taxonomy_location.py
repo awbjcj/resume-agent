@@ -18,11 +18,20 @@ def test_normalize_country_variants_to_iso2():
     assert location.normalize_country(None) is None
 
 
-def test_normalize_region_us_only():
+def test_normalize_region_us_and_pass_through():
     assert location.normalize_region("California", "US") == "CA"
     assert location.normalize_region("CA", "US") == "CA"
-    assert location.normalize_region("Ontario", "CA") is None  # non-US -> None
     assert location.normalize_region(None, "US") is None
+    assert location.normalize_region("Ontario", "CA") == "Ontario"  # non-US -> pass-through
+    assert location.normalize_region("New Taipei City", "TW") == "New Taipei City"
+    assert location.normalize_region("Some Province", None) is None  # country unresolved
+
+
+def test_clean_region_collapses_whitespace_and_strips_zip():
+    assert location._clean_region("  New   Taipei  City ") == "New Taipei City"
+    assert location._clean_region("Ontario 12345") == "Ontario"
+    assert location._clean_region("   ") is None
+    assert location._clean_region(None) is None
 
 
 def test_build_location_us():
