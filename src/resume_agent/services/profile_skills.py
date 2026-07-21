@@ -181,33 +181,34 @@ def list_suppressed(profile_dir: str | Path) -> list[ManualSuppressEntry]:
 
 
 def delete_skill(profile_dir: str | Path, key: str) -> None:
-    """Durably delete any live skill by matrix key / normalized token.
+    """Durably delete any live skill by matrix key / normalized token or alias.
 
-    Records a suppress entry so the skill stays gone across rebuilds, drops any
-    additive ``new_skill`` add of the same token (it would fight the suppress),
-    removes it from live facts, and rebuilds the saved matrix.
+    Appends a suppress entry keyed on the matched skill's canonical name token
+    (so it can be listed and restored), removes the skill from live facts, and
+    rebuilds the saved matrix. Any additive ``new_skill`` entry for the same
+    token is intentionally left in place: ``apply_manual_skills`` always replays
+    suppressions last, so the pair yields the deleted state now while keeping the
+    add entry so ``restore_skill`` can bring a manually-added skill back.
     """
     with manual_skills_lock(profile_dir):
         facts = _load_facts_or_raise(profile_dir)
-        token = normalize_skill(key)
+        key_token = normalize_skill(key)
         match = next(
             (
                 skill
                 for skills in facts.skills.values()
                 for skill in skills
-                if normalize_skill(skill.name) == token
-                or token in {normalize_skill(a) for a in skill.aliases}
+                if normalize_skill(skill.name) == key_token
+                or key_token in {normalize_skill(a) for a in skill.aliases}
             ),
             None,
         )
         if match is None:
             raise SkillNotFoundError(f"No skill '{key}'")
+        # Key the suppression on the skill's own name, not the (possibly alias)
+        # lookup token — replay matches skills by name, and restore uses this token.
+        token = normalize_skill(match.name)
         ledger = load_manual_skills(_ledger_path(profile_dir))
-        ledger.entries = [
-            e
-            for e in ledger.entries
-            if not (e.kind == "new_skill" and normalize_skill(e.name) == token)
-        ]
         if not any(
             e.kind == "suppress" and normalize_skill(e.token) == token
             for e in ledger.entries

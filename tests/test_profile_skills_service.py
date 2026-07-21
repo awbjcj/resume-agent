@@ -90,6 +90,44 @@ def test_add_skill_restores_when_suppressed(built_profile_dir):
     assert profile_skills.list_suppressed(built_profile_dir) == []
 
 
+def test_restore_brings_back_a_deleted_manual_skill(built_profile_dir):
+    """A manually-added skill must return immediately on restore, not vanish."""
+    from resume_agent.services import profile_skills
+
+    profile_skills.add_skill(built_profile_dir, "Rust", "hard")
+    profile_skills.delete_skill(built_profile_dir, "rust")
+    gone = load_facts(built_profile_dir / "facts.json")
+    assert all(
+        s.name != "Rust" for skills in gone.skills.values() for s in skills
+    )
+
+    profile_skills.restore_skill(built_profile_dir, "rust")
+    facts = load_facts(built_profile_dir / "facts.json")
+    assert any(s.name == "Rust" for s in facts.skills.get("hard", []))
+    assert profile_skills.list_suppressed(built_profile_dir) == []
+
+
+def test_delete_by_alias_removes_the_skill(tmp_path):
+    """Deleting via an alias token must actually remove the skill, not just log."""
+    from resume_agent.models.profile import Contact, ProfileFacts, Skill
+    from resume_agent.profile.store import save_facts
+    from resume_agent.services import profile_skills
+
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"hard": [Skill(name="Kubernetes", category="hard", aliases=["k8s"])]},
+    )
+    save_facts(facts, tmp_path / "facts.json")
+
+    profile_skills.delete_skill(tmp_path, "k8s")
+    remaining = load_facts(tmp_path / "facts.json")
+    assert all(
+        s.name != "Kubernetes" for skills in remaining.skills.values() for s in skills
+    )
+    # The suppress entry is keyed on the skill's canonical token so it can be restored.
+    assert [e.token for e in profile_skills.list_suppressed(tmp_path)] == ["kubernetes"]
+
+
 def test_list_skills_returns_flat_entries(profile_dir):
     rows = list_skills(profile_dir)
     assert rows == [{"id": rows[0]["id"], "name": "Python", "category": None}]
