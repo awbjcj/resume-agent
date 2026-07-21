@@ -1,17 +1,23 @@
+from dataclasses import dataclass
+from typing import Any
+
 import yaml
+
+
+@dataclass
+class _FakeResponse:
+    content: Any
 
 
 class _FakeRunner:
     def __init__(self, content):
         self._content = content
 
-    def run(self, _prompt):
-        class R:
-            pass
+    def run(self, prompt):
+        return _FakeResponse(self._content)
 
-        r = R()
-        r.content = self._content
-        return r
+    async def arun(self, prompt):
+        return _FakeResponse(self._content)
 
 
 class _Reporter:
