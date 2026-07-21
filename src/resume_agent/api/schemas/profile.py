@@ -105,3 +105,9 @@ class ManualEntryOut(CamelModel):
     category: Literal["hard", "soft", "domain"] | None = None
     alias_text: str | None = None
     target_skill_display: str | None = None
+
+
+class SuppressedSkillOut(CamelModel):
+    token: str
+    display: str
+    added_at: str

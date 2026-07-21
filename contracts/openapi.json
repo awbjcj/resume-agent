@@ -6195,6 +6195,29 @@
         "title": "SuggestionTarget",
         "type": "object"
       },
+      "SuppressedSkillOut": {
+        "properties": {
+          "addedAt": {
+            "title": "Addedat",
+            "type": "string"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "display",
+          "addedAt"
+        ],
+        "title": "SuppressedSkillOut",
+        "type": "object"
+      },
       "SystemDefaults": {
         "properties": {
           "maxActiveJobs": {
@@ -12959,6 +12982,54 @@
         "summary": "Post Profile Skill"
       }
     },
+    "/api/profile/skills/{key}": {
+      "delete": {
+        "operationId": "delete_profile_skill_api_profile_skills__key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Profile Skill"
+      }
+    },
     "/api/profile/skills/{key}/group": {
       "delete": {
         "operationId": "delete_skill_group_api_profile_skills__key__group_delete",
@@ -13470,6 +13541,104 @@
           }
         },
         "summary": "Patch Source"
+      }
+    },
+    "/api/profile/suppressed-skills": {
+      "get": {
+        "operationId": "get_suppressed_skills_api_profile_suppressed_skills_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SuppressedSkillOut"
+                  },
+                  "title": "Response Get Suppressed Skills Api Profile Suppressed Skills Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Suppressed Skills"
+      }
+    },
+    "/api/profile/suppressed-skills/{token}/restore": {
+      "post": {
+        "operationId": "restore_suppressed_skill_api_profile_suppressed_skills__token__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Suppressed Skill"
       }
     },
     "/api/profile/sync-github": {

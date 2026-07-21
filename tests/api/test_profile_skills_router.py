@@ -135,3 +135,50 @@ def test_remove_unknown_manual_entry_404s(client):
     _seed_facts(data_dir)
     resp = test_client.delete("/api/profile/manual-skills/nope")
     assert resp.status_code == 404
+
+
+def _seed_kubernetes(data_dir):
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"hard": [Skill(name="Kubernetes", category="hard")]},
+    )
+    save_facts(facts, data_dir / "profile" / "facts.json")
+
+
+def test_delete_skill_then_lists_suppressed(client):
+    test_client, data_dir = client
+    _seed_kubernetes(data_dir)
+
+    resp = test_client.delete("/api/profile/skills/kubernetes")
+    assert resp.status_code == 204
+
+    listed = test_client.get("/api/profile/suppressed-skills").json()
+    assert [row["token"] for row in listed] == ["kubernetes"]
+    assert listed[0]["display"] == "Kubernetes"
+    assert not any(
+        row["name"] == "Kubernetes"
+        for row in test_client.get("/api/profile/skills").json()
+    )
+
+
+def test_restore_suppressed_skill(client):
+    test_client, data_dir = client
+    _seed_kubernetes(data_dir)
+    test_client.delete("/api/profile/skills/kubernetes")
+
+    resp = test_client.post("/api/profile/suppressed-skills/kubernetes/restore")
+    assert resp.status_code == 204
+    assert test_client.get("/api/profile/suppressed-skills").json() == []
+
+
+def test_delete_unknown_skill_404(client):
+    test_client, data_dir = client
+    _seed_kubernetes(data_dir)
+    resp = test_client.delete("/api/profile/skills/nope")
+    assert resp.status_code == 404
+
+
+def test_delete_skill_before_build_400(client):
+    test_client, _ = client
+    resp = test_client.delete("/api/profile/skills/kubernetes")
+    assert resp.status_code == 400

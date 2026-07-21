@@ -36,6 +36,7 @@ from resume_agent.api.schemas.profile import (
     SourceOut,
     SourcePatch,
     SkillGroupOut,
+    SuppressedSkillOut,
     UrlIn,
 )
 from resume_agent.api.schemas.runs import RunOut
@@ -369,6 +370,34 @@ def post_profile_skill_alias(skill_id: str, payload: AddAliasIn, request: Reques
     except profile_skills.SkillAlreadyExistsError as exc:
         raise ApiException(422, "VALIDATION_ERROR", str(exc)) from exc
     return _manual_entry_out(entry)
+
+
+@router.delete("/profile/skills/{key}", status_code=204)
+def delete_profile_skill(key: str, request: Request):
+    try:
+        profile_skills.delete_skill(_profile_dir(request), key)
+    except profile_skills.ProfileNotBuiltError as exc:
+        raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
+    except profile_skills.SkillNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", str(exc)) from exc
+
+
+@router.get("/profile/suppressed-skills", response_model=list[SuppressedSkillOut])
+def get_suppressed_skills(request: Request):
+    return [
+        SuppressedSkillOut(token=e.token, display=e.display, added_at=e.added_at)
+        for e in profile_skills.list_suppressed(_profile_dir(request))
+    ]
+
+
+@router.post("/profile/suppressed-skills/{token}/restore", status_code=204)
+def restore_suppressed_skill(token: str, request: Request):
+    try:
+        profile_skills.restore_skill(_profile_dir(request), token)
+    except profile_skills.ProfileNotBuiltError as exc:
+        raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
+    except profile_skills.ManualEntryNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", str(exc)) from exc
 
 
 @router.get("/profile/manual-skills", response_model=list[ManualEntryOut])
