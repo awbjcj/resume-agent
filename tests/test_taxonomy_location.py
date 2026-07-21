@@ -7,6 +7,13 @@ def test_normalize_country_variants_to_iso2():
     assert location.normalize_country("us") == "US"
     assert location.normalize_country("United Kingdom") == "GB"
     assert location.normalize_country("UK") == "GB"
+    assert location.normalize_country("Taiwan") == "TW"
+    assert location.normalize_country("South Korea") == "KR"
+    assert location.normalize_country("Republic of Korea") == "KR"
+    assert location.normalize_country("UAE") == "AE"
+    assert location.normalize_country("United Arab Emirates") == "AE"
+    assert location.normalize_country("Czechia") == "CZ"
+    assert location.normalize_country("Czech Republic") == "CZ"
     assert location.normalize_country("Atlantis") is None
     assert location.normalize_country(None) is None
 

@@ -18,6 +18,15 @@ _COUNTRY_TO_ISO2 = {
     "canada": "CA", "germany": "DE", "france": "FR", "india": "IN",
     "ireland": "IE", "netherlands": "NL", "australia": "AU", "singapore": "SG",
     "spain": "ES", "poland": "PL", "brazil": "BR", "japan": "JP", "israel": "IL",
+    "taiwan": "TW", "china": "CN", "hong kong": "HK",
+    "south korea": "KR", "korea, republic of": "KR", "republic of korea": "KR",
+    "mexico": "MX", "italy": "IT", "switzerland": "CH", "sweden": "SE",
+    "portugal": "PT", "new zealand": "NZ", "austria": "AT", "belgium": "BE",
+    "denmark": "DK", "norway": "NO", "finland": "FI",
+    "czechia": "CZ", "czech republic": "CZ", "romania": "RO",
+    "uae": "AE", "united arab emirates": "AE", "south africa": "ZA",
+    "argentina": "AR", "colombia": "CO", "chile": "CL", "philippines": "PH",
+    "vietnam": "VN", "indonesia": "ID", "malaysia": "MY", "thailand": "TH",
 }
 
 _US_STATE_TO_USPS = {
