@@ -43,9 +43,28 @@ def test_build_location_us():
     assert loc.raw == "Mountain View, CA, USA"
 
 
-def test_build_location_foreign_has_no_region():
+def test_build_location_foreign_region_pass_through():
     loc = location.build_location("London", "Greater London", "United Kingdom")
     assert loc.country == "GB"
+    assert loc.region == "Greater London"
+    assert loc.is_us is False
+
+
+def test_build_location_taiwan_end_to_end():
+    loc = location.build_location(
+        "Banqiao District", "New Taipei City", "Taiwan",
+        raw="New Taipei, Banqiao District, New Taipei City, Taiwan",
+    )
+    assert loc.city == "Banqiao District"
+    assert loc.region == "New Taipei City"
+    assert loc.country == "TW"
+    assert loc.is_us is False
+    assert loc.raw == "New Taipei, Banqiao District, New Taipei City, Taiwan"
+
+
+def test_build_location_bare_region_without_country_stays_unresolved():
+    loc = location.build_location("Somewhere", "Some Province", None)
+    assert loc.country is None
     assert loc.region is None
     assert loc.is_us is False
 
@@ -130,9 +149,10 @@ def test_la_is_louisiana_never_los_angeles():
     assert bare.country is None
 
 
-def test_foreign_country_keeps_region_null_even_with_state_like_field():
-    # A resolved non-US country must not trigger US inference from a stray token.
+def test_foreign_country_region_not_reinterpreted_as_us_state():
+    # A resolved non-US country must not trigger US inference from a stray token,
+    # and the region is passed through verbatim rather than expanded via the US table.
     loc = location.build_location("Ontario", "CA", "Canada")
     assert loc.country == "CA"
-    assert loc.region is None
+    assert loc.region == "CA"
     assert loc.is_us is False

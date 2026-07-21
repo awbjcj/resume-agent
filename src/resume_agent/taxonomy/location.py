@@ -194,9 +194,16 @@ def build_location(
         iso2 = "US"
 
     us = is_us(iso2)
+    if us:
+        region_value = region_usps
+    elif iso2 is not None:
+        region_value = _clean_region(region)
+    else:
+        region_value = None
+
     return StructuredLocation(
         city=city_value,
-        region=region_usps if us else None,
+        region=region_value,
         country=iso2,
         is_us=us,
         raw=raw,
