@@ -159,4 +159,32 @@ describe("JobModal", () => {
     );
     expect(screen.queryByRole("button", { name: /next job/i })).not.toBeInTheDocument();
   });
+
+  it("uses the wide modal size and a tight version count", async () => {
+    server.use(
+      http.get("/api/jobs/42", () =>
+        HttpResponse.json(
+          jobPayload({
+            resumeVersions: [
+              { id: 1, createdAt: "2026-06-02T00:00:00Z" },
+              { id: 2, createdAt: "2026-06-03T00:00:00Z" },
+              { id: 3, createdAt: "2026-06-04T00:00:00Z" },
+            ],
+          }),
+        ),
+      ),
+    );
+    wrap(<JobModal jobId={42} onClose={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.className).toContain("sm:max-w-7xl");
+
+    const versionsTab = screen.getByRole("tab", { name: /versions/i });
+    expect(versionsTab).toHaveTextContent("Versions3");
+    const count = versionsTab.querySelector("span");
+    expect(count?.className).not.toContain("ml-1.5");
+    expect(count?.className).toContain("leading-none");
+  });
 });
