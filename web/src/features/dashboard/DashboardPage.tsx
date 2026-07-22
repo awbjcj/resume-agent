@@ -1,18 +1,10 @@
-import { Link } from "react-router-dom";
-
 import { PageHeader } from "@/components/PageHeader";
 import { BoardSkeleton } from "@/components/skeletons";
-import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { AddUrlDialog } from "@/features/runs/AddUrlDialog";
 import { ImportJobsButton } from "@/features/runs/ImportJobsDialog";
 import { DiscoverDialog, PullDialog } from "@/features/runs/RunLaunchDialogs";
+import { GettingStartedChecklist } from "@/features/journey/GettingStartedChecklist";
+import { JourneyRail } from "@/features/journey/JourneyRail";
 
 import { ActionQueue } from "./ActionQueue";
 import { AttentionCard } from "./AttentionCard";
@@ -50,6 +42,7 @@ export function DashboardPage() {
         title={heroTitle(waiting)}
         sub="Pull fresh listings, triage the queue, and ship tailored resumes."
       />
+      <GettingStartedChecklist />
       <div className="flex flex-wrap items-center gap-2">
         <PullDialog />
         <DiscoverDialog />
@@ -58,24 +51,11 @@ export function DashboardPage() {
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
-          {totalJobs === 0 ? (
-            <Empty>
-              <EmptyHeader>
-                <EmptyTitle>Add sources and run your first pull</EmptyTitle>
-                <EmptyDescription>
-                  The funnel fills up once discovery has somewhere to look.
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button
-                    render={<Link to="/settings/sources">Add sources</Link>}
-                  />
-                  <PullDialog />
-                </div>
-              </EmptyContent>
-            </Empty>
-          ) : (
+          <JourneyRail />
+          {/* When the funnel has no active jobs the JourneyRail already carries
+              the right next step (add sources, or pull), so no separate empty
+              card is needed — it would only duplicate that guidance. */}
+          {totalJobs > 0 && (
             <>
               <ActionQueue summary={summary} />
               <StageRail summary={summary} />

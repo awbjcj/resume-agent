@@ -27,13 +27,13 @@ export const HEALTH_ITEMS: HealthItem[] = [
   {
     key: "resume",
     label: "Resume document",
-    to: "/settings/profile",
+    to: "/profile",
     ok: (s) => s.profile.hasResume,
   },
   {
     key: "facts",
     label: "Profile facts built",
-    to: "/settings/profile",
+    to: "/profile",
     ok: (s) => s.profile.factsBuiltAt != null,
   },
   {

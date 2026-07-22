@@ -2,10 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import { SettingsLayout, SETTINGS_NAV } from "./SettingsLayout";
+import { SETTINGS_GROUPS, SETTINGS_NAV, SettingsLayout } from "./SettingsLayout";
 
 describe("SettingsLayout", () => {
-  it("renders one nav link per settings area", () => {
+  it("renders one nav link per settings area, bucketed into labelled groups", () => {
     render(
       <MemoryRouter initialEntries={["/settings/search"]}>
         <Routes>
@@ -18,6 +18,13 @@ describe("SettingsLayout", () => {
     for (const item of SETTINGS_NAV) {
       expect(screen.getByRole("link", { name: item.label })).toBeInTheDocument();
     }
+    for (const group of SETTINGS_GROUPS) {
+      expect(screen.getByText(group.label)).toBeInTheDocument();
+    }
     expect(screen.getByText("search page")).toBeInTheDocument();
+  });
+
+  it("no longer surfaces the relocated profile tab", () => {
+    expect(SETTINGS_NAV.some((i) => i.to === "/settings/profile")).toBe(false);
   });
 });

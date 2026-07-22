@@ -58,7 +58,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText(/recent runs/i)).toBeInTheDocument();
   });
 
-  it("degrades to the onboarding empty state on a fresh install", async () => {
+  it("guides a fresh install with the getting-started checklist, not the drained-funnel card", async () => {
     const zero = Object.fromEntries(
       Object.keys(SUMMARY.statusCounts).map((k) => [k, 0]),
     );
@@ -79,21 +79,23 @@ describe("DashboardPage", () => {
       ),
     );
     renderPage();
+    // The onboarding checklist owns first-run guidance...
     await waitFor(() =>
-      expect(
-        screen.getByText("Add sources and run your first pull"),
-      ).toBeInTheDocument(),
+      expect(screen.getByText("Getting started")).toBeInTheDocument(),
     );
+    // ...the "next step" (sources not enabled) is surfaced as a real CTA...
+    const sourceLinks = screen.getAllByRole("link", { name: /add sources/i });
+    expect(sourceLinks.length).toBeGreaterThan(0);
+    expect(sourceLinks[0]).toHaveAttribute("href", "/settings/sources");
+    // ...and the populated funnel does not show.
     expect(screen.queryByLabelText("Pipeline stages")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /add sources/i })).toHaveAttribute(
-      "href",
-      "/settings/sources",
-    );
   });
 
-  it("still shows the empty state when every job has been rejected", async () => {
+  it("does not treat an only-rejected funnel as populated", async () => {
     // rejected doesn't appear on the rail/queues, so a naive "sum every
-    // statusCount" emptiness check would wrongly treat this as populated.
+    // statusCount" emptiness check would wrongly treat this as populated. Even
+    // for a set-up user, an all-rejected funnel has no active jobs, so the
+    // funnel view stays hidden and guidance points forward instead.
     server.use(
       http.get("/api/dashboard/summary", () =>
         HttpResponse.json({
@@ -105,15 +107,12 @@ describe("DashboardPage", () => {
           applied: 0,
         }),
       ),
-      http.get("/api/setup/status", () =>
-        HttpResponse.json({ ...READY_STATUS, complete: false, sources: { enabledCount: 0 } }),
-      ),
+      http.get("/api/setup/status", () => HttpResponse.json(READY_STATUS)),
     );
     renderPage();
     await waitFor(() =>
-      expect(
-        screen.getByText("Add sources and run your first pull"),
-      ).toBeInTheDocument(),
+      expect(screen.getByLabelText("Job-search journey")).toBeInTheDocument(),
     );
+    expect(screen.queryByLabelText("Pipeline stages")).not.toBeInTheDocument();
   });
 });

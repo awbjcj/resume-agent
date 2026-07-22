@@ -73,9 +73,9 @@ const StyleGuideSettingsPage = lazy(() =>
     default: m.StyleGuideSettingsPage,
   })),
 );
-const ProfileSettingsPage = lazy(() =>
-  import("@/features/settings/pages/ProfileSettingsPage").then((m) => ({
-    default: m.ProfileSettingsPage,
+const ProfileWorkspace = lazy(() =>
+  import("@/features/profile/ProfileWorkspace").then((m) => ({
+    default: m.ProfileWorkspace,
   })),
 );
 const SetupWizard = lazy(() =>
@@ -127,6 +127,7 @@ export const router = createBrowserRouter([
       { path: "triage", element: <SetupGate>{page(<TriagePage />)}</SetupGate> },
       { path: "analytics", element: <SetupGate>{page(<AnalyticsPage />)}</SetupGate> },
       { path: "match-gap", element: <SetupGate>{page(<MatchGapPage />)}</SetupGate> },
+      { path: "profile", element: <SetupGate>{page(<ProfileWorkspace />)}</SetupGate> },
       { path: "coach", element: <SetupGate>{page(<CoachPage />)}</SetupGate> },
       { path: "interview", element: <SetupGate>{page(<InterviewPage />)}</SetupGate> },
       { path: "account", element: page(<AccountPage />) },
@@ -136,8 +137,9 @@ export const router = createBrowserRouter([
         path: "settings",
         element: <SetupGate>{page(<SettingsLayout />)}</SetupGate>,
         children: [
-          { index: true, element: <Navigate to="/settings/profile" replace /> },
-          { path: "profile", element: page(<ProfileSettingsPage />) },
+          { index: true, element: <Navigate to="/settings/search" replace /> },
+          // Profile moved to a top-level workspace; keep old links working.
+          { path: "profile", element: <Navigate to="/profile" replace /> },
           { path: "search", element: page(<SearchSettingsPage />) },
           { path: "sources", element: page(<SourcesPage />) },
           { path: "keys", element: page(<KeysSettingsPage />) },

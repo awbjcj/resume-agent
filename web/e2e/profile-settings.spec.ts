@@ -138,8 +138,9 @@ test("profile depth controls and grouped skills form one working story", async (
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto("/settings/profile");
-  await expect(page.getByRole("heading", { name: "Profile & documents" })).toBeVisible();
+  await page.goto("/profile");
+  await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
+  // Documents is the default tab — sources + repo controls live here.
   await expect(page.getByRole("row", { name: /github--portfolio\.md/i })).toContainText("GitHub");
   await expect(page.getByLabel("mode for github--portfolio.md")).toHaveCount(0);
 
@@ -166,6 +167,8 @@ test("profile depth controls and grouped skills form one working story", async (
     githubRepoLimit: 5,
   });
 
+  // Skills are behind their own tab now, no longer stacked under Documents.
+  await page.getByRole("tab", { name: "Skills" }).click();
   await expect(page.getByRole("heading", { name: "Skill groups" })).toBeVisible();
   await expect(page.getByText("Python", { exact: true })).toBeVisible();
   await expect(page.getByText("vFlash", { exact: true })).toBeVisible();
@@ -199,7 +202,8 @@ test("profile depth controls and grouped skills form one working story", async (
 
 test("profile settings stay contained at a narrow viewport", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
-  await page.goto("/settings/profile");
+  await page.goto("/profile");
+  await page.getByRole("tab", { name: "Skills" }).click();
   await expect(page.getByRole("heading", { name: "Skill groups" })).toBeVisible();
 
   const layout = await page.evaluate(() => ({

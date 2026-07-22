@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,15 +39,56 @@ import { NotificationsBell } from "@/features/notifications/NotificationsBell";
 import { LogoutButton } from "@/features/auth/LogoutButton";
 import { useMe } from "@/features/auth/AuthGate";
 
-const NAV: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
-  { to: "/", label: "Dashboard", end: true, icon: LayoutDashboard },
-  { to: "/shortlist", label: "Shortlist", icon: Briefcase },
-  { to: "/pipeline", label: "Pipeline", icon: Kanban },
-  { to: "/triage", label: "Triage", icon: Inbox },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/match-gap", label: "Match-gap", icon: Target },
-  { to: "/coach", label: "Profile coach", icon: MessageCircleMore },
+type NavItem = { to: string; label: string; end?: boolean; icon: LucideIcon };
+
+// The main nav mirrors the job-hunting arc: prepare your profile, work the
+// funnel in its true order (new jobs → picks → tailoring), then analyse.
+// Dashboard stands alone as the home/overview.
+const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
+  {
+    items: [{ to: "/", label: "Dashboard", end: true, icon: LayoutDashboard }],
+  },
+  {
+    label: "Prepare",
+    items: [
+      { to: "/profile", label: "Profile", icon: UserRound },
+      { to: "/coach", label: "Profile coach", icon: MessageCircleMore },
+    ],
+  },
+  {
+    label: "Find & tailor",
+    items: [
+      { to: "/triage", label: "Triage", icon: Inbox },
+      { to: "/shortlist", label: "Shortlist", icon: Briefcase },
+      { to: "/pipeline", label: "Pipeline", icon: Kanban },
+    ],
+  },
+  {
+    label: "Insight",
+    items: [
+      { to: "/match-gap", label: "Match-gap", icon: Target },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
 ];
+
+function NavMenuItem({ item }: { item: NavItem }) {
+  // base-ui render prop keeps a single interactive element (the NavLink);
+  // NavLink sets aria-current="page" when active.
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        className="h-10 rounded-lg px-3 text-[0.95rem]"
+        render={
+          <NavLink to={item.to} end={item.end}>
+            <item.icon className="size-4" aria-hidden="true" />
+            <span>{item.label}</span>
+          </NavLink>
+        }
+      />
+    </SidebarMenuItem>
+  );
+}
 
 export function AppLayout() {
   useRehydrateRuns();
@@ -71,57 +113,32 @@ export function AppLayout() {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <SidebarGroup className="px-3">
+          {NAV_GROUPS.map((group, i) => (
+            <SidebarGroup key={group.label ?? `group-${i}`} className="px-3">
+              {group.label && (
+                <SidebarGroupLabel className="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
+                  {group.label}
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  {group.items.map((item) => (
+                    <NavMenuItem key={item.to} item={item} />
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+          <SidebarGroup className="mt-auto px-3">
             <SidebarGroupLabel className="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
-              Workflows
+              Workspace
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="gap-1">
-                {NAV.map((n) => (
-                  <SidebarMenuItem key={n.to}>
-                    {/* base-ui render prop keeps a single interactive element (the
-                        NavLink); NavLink sets aria-current="page" when active. */}
-                    <SidebarMenuButton
-                      className="h-10 rounded-lg px-3 text-[0.95rem]"
-                      render={
-                        <NavLink to={n.to} end={n.end}>
-                          <n.icon className="size-4" aria-hidden="true" />
-                          <span>{n.label}</span>
-                        </NavLink>
-                      }
-                    />
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup className="px-3">
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    className="h-10 rounded-lg px-3 text-[0.95rem]"
-                    render={
-                      <NavLink to="/settings">
-                        <Settings className="size-4" aria-hidden="true" />
-                        <span>Settings</span>
-                      </NavLink>
-                    }
-                  />
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    className="h-10 rounded-lg px-3 text-[0.95rem]"
-                    render={<NavLink to="/account"><CircleUserRound className="size-4" aria-hidden="true" /><span>Account</span></NavLink>}
-                  />
-                </SidebarMenuItem>
+                <NavMenuItem item={{ to: "/settings", label: "Settings", icon: Settings }} />
+                <NavMenuItem item={{ to: "/account", label: "Account", icon: CircleUserRound }} />
                 {me.data?.role === "admin" && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      className="h-10 rounded-lg px-3 text-[0.95rem]"
-                      render={<NavLink to="/admin"><ShieldCheck className="size-4" aria-hidden="true" /><span>Admin</span></NavLink>}
-                    />
-                  </SidebarMenuItem>
+                  <NavMenuItem item={{ to: "/admin", label: "Admin", icon: ShieldCheck }} />
                 )}
               </SidebarMenu>
             </SidebarGroupContent>

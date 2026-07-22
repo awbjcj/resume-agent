@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { withQueryClient } from "@/test/utils";
-import { ProfileSettingsPage } from "./ProfileSettingsPage";
+import { ProfileWorkspace } from "./ProfileWorkspace";
 
 const mocks = vi.hoisted(() => ({
   launch: vi.fn(),
@@ -22,12 +22,11 @@ vi.mock("@/features/coach/use-coach", () => ({
   useCoachSessions: () => ({ data: { sessions: [] } }),
 }));
 
-
-vi.mock("../SkillGroupsPanel", () => ({
+vi.mock("@/features/settings/SkillGroupsPanel", () => ({
   SkillGroupsPanel: () => <div data-testid="skill-groups" />,
 }));
 
-vi.mock("../ManualSkillsPanel", () => ({
+vi.mock("@/features/settings/ManualSkillsPanel", () => ({
   ManualSkillsPanel: () => <div data-testid="manual-skills" />,
 }));
 
@@ -36,13 +35,11 @@ vi.mock("@/features/runs/use-active-run", () => ({
 }));
 
 vi.mock("@/features/runs/use-launch-run", () => ({
-  launchers: {
-    profileBuild: vi.fn(),
-  },
+  launchers: { profileBuild: vi.fn() },
   useLaunchRun: () => ({ launch: mocks.launch }),
 }));
 
-vi.mock("../use-config", () => ({
+vi.mock("@/features/settings/use-config", () => ({
   useConfig: () => ({
     data: {
       githubUsername: null,
@@ -51,22 +48,20 @@ vi.mock("../use-config", () => ({
       githubRepoLimit: 20,
     },
   }),
-  useSaveConfig: () => ({
-    isPending: false,
-    mutate: mocks.save,
-  }),
+  useSaveConfig: () => ({ isPending: false, mutate: mocks.save }),
 }));
 
-vi.mock("../use-setup-status", () => ({
-  useSetupStatus: () => ({
-    data: { profile: { factsBuiltAt: null } },
-  }),
+vi.mock("@/features/settings/use-setup-status", () => ({
+  useSetupStatus: () => ({ data: { profile: { factsBuiltAt: null } } }),
 }));
 
-describe("ProfileSettingsPage", () => {
-  it("refreshes source and skeleton queries after a profile rebuild", async () => {
+describe("ProfileWorkspace", () => {
+  it("keeps the coach hero visible and refreshes queries after a profile rebuild", async () => {
     const user = userEvent.setup();
-    render(<ProfileSettingsPage />, { wrapper: withQueryClient });
+    render(<ProfileWorkspace />, { wrapper: withQueryClient });
+
+    // coach is a persistent hero action, not tucked in a tab
+    expect(screen.getByRole("link", { name: /open coach/i })).toHaveAttribute("href", "/coach");
 
     await user.click(screen.getByRole("button", { name: /rebuild profile/i }));
 
@@ -79,12 +74,11 @@ describe("ProfileSettingsPage", () => {
     );
   });
 
-  it("edits all repo harvest controls and mounts grouped skills", async () => {
+  it("edits repo harvest controls on Documents and mounts grouped skills on Skills", async () => {
     const user = userEvent.setup();
-    render(<ProfileSettingsPage />, { wrapper: withQueryClient });
-    expect(screen.getByTestId("skill-groups")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open coach/i })).toHaveAttribute("href", "/coach");
+    render(<ProfileWorkspace />, { wrapper: withQueryClient });
 
+    // Documents tab is active by default
     await user.type(screen.getByLabelText(/always include repositories/i), "important, fork");
     await user.type(screen.getByLabelText(/exclude repositories/i), "noise");
     await user.clear(screen.getByLabelText(/repository limit/i));
@@ -98,5 +92,11 @@ describe("ProfileSettingsPage", () => {
         githubRepoLimit: 5,
       }),
     );
+
+    // Skills live behind their own tab — no longer stacked on one page
+    expect(screen.queryByTestId("skill-groups")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: /skills/i }));
+    expect(await screen.findByTestId("skill-groups")).toBeInTheDocument();
+    expect(screen.getByTestId("manual-skills")).toBeInTheDocument();
   });
 });
