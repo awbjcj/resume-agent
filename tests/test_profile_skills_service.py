@@ -8,15 +8,12 @@ from resume_agent.profile.manual_skills import load_manual_skills
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts, save_facts
 from resume_agent.services.profile_skills import (
-    ManualEntryNotFoundError,
     ProfileNotBuiltError,
     SkillAlreadyExistsError,
     SkillNotFoundError,
     add_alias,
     add_skill,
-    list_manual_entries,
     list_skills,
-    remove_manual_entry,
 )
 
 
@@ -76,7 +73,7 @@ def test_restore_removes_suppression(built_profile_dir):
 def test_restore_unknown_raises(built_profile_dir):
     from resume_agent.services import profile_skills
 
-    with pytest.raises(profile_skills.ManualEntryNotFoundError):
+    with pytest.raises(profile_skills.SuppressedSkillNotFoundError):
         profile_skills.restore_skill(built_profile_dir, "kubernetes")
 
 
@@ -213,30 +210,3 @@ def test_add_alias_rejects_a_duplicate_alias(profile_dir):
 
     with pytest.raises(SkillAlreadyExistsError):
         add_alias(profile_dir, skill_id, "py")
-
-
-def test_remove_manual_entry_reverses_a_new_skill(profile_dir):
-    entry = add_skill(profile_dir, "Rust", None)
-
-    remove_manual_entry(profile_dir, entry.id)
-
-    facts = load_facts(profile_dir / "facts.json")
-    assert "hard" not in facts.skills
-    assert list_manual_entries(profile_dir) == []
-
-
-def test_remove_manual_entry_reverses_an_alias(profile_dir):
-    skill_id = list_skills(profile_dir)[0]["id"]
-    assert skill_id is not None
-
-    entry = add_alias(profile_dir, skill_id, "Python3")
-
-    remove_manual_entry(profile_dir, entry.id)
-
-    facts = load_facts(profile_dir / "facts.json")
-    assert facts.skills["Languages"][0].aliases == ["py"]
-
-
-def test_remove_manual_entry_raises_for_unknown_id(profile_dir):
-    with pytest.raises(ManualEntryNotFoundError):
-        remove_manual_entry(profile_dir, "nope")

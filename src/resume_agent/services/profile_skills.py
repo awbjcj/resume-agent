@@ -21,7 +21,6 @@ from resume_agent.profile.manual_skills import (
     apply_manual_skills,
     load_manual_skills,
     manual_skills_lock,
-    remove_manual_skill_entry,
     save_manual_skills,
 )
 from resume_agent.profile.matrix import rebuild_saved_matrix
@@ -41,8 +40,8 @@ class SkillNotFoundError(ValueError):
     """Raised when a skill id passed to ``add_alias`` doesn't resolve."""
 
 
-class ManualEntryNotFoundError(ValueError):
-    """Raised when a ledger entry id passed to ``remove_manual_entry`` doesn't resolve."""
+class SuppressedSkillNotFoundError(ValueError):
+    """Raised when a requested skill is not suppressed."""
 
 
 def _utcnow() -> str:
@@ -153,39 +152,6 @@ def add_alias(profile_dir: str | Path, skill_id: str, alias: str) -> ManualAlias
         return entry
 
 
-def list_manual_entries(
-    profile_dir: str | Path,
-) -> list[ManualSkillEntry | ManualAliasEntry]:
-    return [
-        e
-        for e in load_manual_skills(_ledger_path(profile_dir)).entries
-        if isinstance(e, (ManualSkillEntry, ManualAliasEntry))
-    ]
-
-
-def remove_manual_entry(profile_dir: str | Path, entry_id: str) -> None:
-    with manual_skills_lock(profile_dir):
-        facts = _load_facts_or_raise(profile_dir)
-        ledger = load_manual_skills(_ledger_path(profile_dir))
-        entry = next(
-            (
-                e
-                for e in ledger.entries
-                if e.id == entry_id
-                and isinstance(e, (ManualSkillEntry, ManualAliasEntry))
-            ),
-            None,
-        )
-        if entry is None:
-            raise ManualEntryNotFoundError(f"No manual entry '{entry_id}'")
-
-        updated_facts = remove_manual_skill_entry(facts, entry)
-        ledger.entries = [e for e in ledger.entries if e.id != entry_id]
-        save_facts(updated_facts, _facts_path(profile_dir))
-        save_manual_skills(ledger, _ledger_path(profile_dir))
-        rebuild_saved_matrix(profile_dir, updated_facts)
-
-
 def list_suppressed(profile_dir: str | Path) -> list[ManualSuppressEntry]:
     """Return the durable suppress entries (deleted skills awaiting restore)."""
     ledger = load_manual_skills(_ledger_path(profile_dir))
@@ -246,7 +212,7 @@ def restore_skill(profile_dir: str | Path, token: str) -> None:
             e.kind == "suppress" and normalize_skill(e.token) == norm
             for e in ledger.entries
         ):
-            raise ManualEntryNotFoundError(f"'{token}' is not suppressed")
+            raise SuppressedSkillNotFoundError(f"'{token}' is not suppressed")
         ledger.entries = [
             e
             for e in ledger.entries

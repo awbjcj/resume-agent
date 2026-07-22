@@ -5,11 +5,9 @@ import { api, unwrap } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
 export type SkillEntry = components["schemas"]["SkillEntryOut"];
-export type ManualEntry = components["schemas"]["ManualEntryOut"];
 
 function invalidateSkillSurfaces(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["profile-skills"] });
-  qc.invalidateQueries({ queryKey: ["manual-skills"] });
   qc.invalidateQueries({ queryKey: ["profile-matrix"] });
   qc.invalidateQueries({ queryKey: ["job"] });
   for (const k of ["shortlist", "pipeline", "triage"]) {
@@ -23,16 +21,6 @@ export function useProfileSkills(enabled = true) {
     enabled,
     queryFn: () =>
       unwrap(api.GET("/api/profile/skills", {} as never)) as Promise<SkillEntry[]>,
-  });
-}
-
-export function useManualSkills() {
-  return useQuery({
-    queryKey: ["manual-skills"],
-    queryFn: () =>
-      unwrap(api.GET("/api/profile/manual-skills", {} as never)) as Promise<
-        ManualEntry[]
-      >,
   });
 }
 
@@ -62,23 +50,6 @@ export function useAddSkillAlias() {
     onSuccess: () => {
       invalidateSkillSurfaces(qc);
       toast.success("Added to your skills");
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
-}
-
-export function useRemoveManualSkill() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (entryId: string) =>
-      unwrap(
-        api.DELETE("/api/profile/manual-skills/{entry_id}", {
-          params: { path: { entry_id: entryId } },
-        }),
-      ),
-    onSuccess: () => {
-      invalidateSkillSurfaces(qc);
-      toast.success("Removed");
     },
     onError: (error: Error) => toast.error(error.message),
   });

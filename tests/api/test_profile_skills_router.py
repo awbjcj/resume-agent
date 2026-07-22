@@ -114,29 +114,6 @@ def test_add_alias_rejects_whitespace_only_text(client):
     assert resp.status_code == 422
 
 
-def test_manual_skills_list_and_remove_round_trip(client):
-    test_client, data_dir = client
-    _seed_facts(data_dir)
-    created = test_client.post("/api/profile/skills", json={"name": "Rust"}).json()
-
-    listed = test_client.get("/api/profile/manual-skills").json()
-    assert [row["id"] for row in listed] == [created["id"]]
-
-    resp = test_client.delete(f"/api/profile/manual-skills/{created['id']}")
-    assert resp.status_code == 204
-    assert test_client.get("/api/profile/manual-skills").json() == []
-    assert not any(
-        row["name"] == "Rust" for row in test_client.get("/api/profile/skills").json()
-    )
-
-
-def test_remove_unknown_manual_entry_404s(client):
-    test_client, data_dir = client
-    _seed_facts(data_dir)
-    resp = test_client.delete("/api/profile/manual-skills/nope")
-    assert resp.status_code == 404
-
-
 def _seed_kubernetes(data_dir):
     facts = ProfileFacts(
         contact=Contact(name="Ada"),

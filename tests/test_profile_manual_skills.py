@@ -7,7 +7,6 @@ from resume_agent.profile.manual_skills import (
     apply_manual_skill_entry,
     apply_manual_skills,
     load_manual_skills,
-    remove_manual_skill_entry,
     save_manual_skills,
 )
 from resume_agent.tracking.match_gap import normalize_skill
@@ -122,31 +121,6 @@ def test_apply_manual_skills_replays_every_entry_and_is_idempotent():
     assert len(once.skills["hard"]) == 1
     assert len(twice.skills["hard"]) == 1
     assert twice.skills["Languages"][0].aliases == ["py", "Python3"]
-
-
-def test_remove_new_skill_entry_deletes_it_from_its_category_bucket():
-    facts = _facts()
-    entry = ManualSkillEntry(name="Rust", category="hard", added_at="2026-07-16T00:00:00+00:00")
-    with_skill, _ = apply_manual_skill_entry(facts, entry)
-
-    reverted = remove_manual_skill_entry(with_skill, entry)
-
-    assert reverted.skills.get("hard", []) == []
-
-
-def test_remove_alias_entry_strips_the_alias_but_keeps_the_skill():
-    facts = _facts()
-    entry = ManualAliasEntry(
-        target_skill_token=normalize_skill("Python"),
-        target_skill_display="Python",
-        alias_text="Python3",
-        added_at="2026-07-16T00:00:00+00:00",
-    )
-    with_alias, _ = apply_manual_skill_entry(facts, entry)
-
-    reverted = remove_manual_skill_entry(with_alias, entry)
-
-    assert reverted.skills["Languages"][0].aliases == ["py"]
 
 
 def test_suppress_removes_matching_skill_after_adds():

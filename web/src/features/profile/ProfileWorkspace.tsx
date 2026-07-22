@@ -15,7 +15,6 @@ import { SourceManager } from "@/features/profile-sources/SourceManager";
 import { useCoachSessions } from "@/features/coach/use-coach";
 import { useActiveRun } from "@/features/runs/use-active-run";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
-import { ManualSkillsPanel } from "@/features/settings/ManualSkillsPanel";
 import { SaveBar } from "@/features/settings/SaveBar";
 import { SkillGroupsPanel } from "@/features/settings/SkillGroupsPanel";
 import { useConfig, useSaveConfig } from "@/features/settings/use-config";
@@ -205,8 +204,6 @@ export function ProfileWorkspace() {
 
         <TabsContent value="skills" className="flex flex-col gap-6 pt-2">
           <SkillGroupsPanel />
-          <Separator />
-          <ManualSkillsPanel />
         </TabsContent>
       </Tabs>
     </div>

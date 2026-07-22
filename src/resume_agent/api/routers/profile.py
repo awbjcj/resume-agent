@@ -396,23 +396,7 @@ def restore_suppressed_skill(token: str, request: Request):
         profile_skills.restore_skill(_profile_dir(request), token)
     except profile_skills.ProfileNotBuiltError as exc:
         raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
-    except profile_skills.ManualEntryNotFoundError as exc:
-        raise ApiException(404, "NOT_FOUND", str(exc)) from exc
-
-
-@router.get("/profile/manual-skills", response_model=list[ManualEntryOut])
-def get_manual_skills(request: Request):
-    entries = profile_skills.list_manual_entries(_profile_dir(request))
-    return [_manual_entry_out(entry) for entry in entries]
-
-
-@router.delete("/profile/manual-skills/{entry_id}", status_code=204)
-def delete_manual_skill(entry_id: str, request: Request):
-    try:
-        profile_skills.remove_manual_entry(_profile_dir(request), entry_id)
-    except profile_skills.ProfileNotBuiltError as exc:
-        raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
-    except profile_skills.ManualEntryNotFoundError as exc:
+    except profile_skills.SuppressedSkillNotFoundError as exc:
         raise ApiException(404, "NOT_FOUND", str(exc)) from exc
 
 

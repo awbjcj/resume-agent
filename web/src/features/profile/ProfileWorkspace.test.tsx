@@ -26,10 +26,6 @@ vi.mock("@/features/settings/SkillGroupsPanel", () => ({
   SkillGroupsPanel: () => <div data-testid="skill-groups" />,
 }));
 
-vi.mock("@/features/settings/ManualSkillsPanel", () => ({
-  ManualSkillsPanel: () => <div data-testid="manual-skills" />,
-}));
-
 vi.mock("@/features/runs/use-active-run", () => ({
   useActiveRun: () => null,
 }));
@@ -97,6 +93,5 @@ describe("ProfileWorkspace", () => {
     expect(screen.queryByTestId("skill-groups")).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: /skills/i }));
     expect(await screen.findByTestId("skill-groups")).toBeInTheDocument();
-    expect(screen.getByTestId("manual-skills")).toBeInTheDocument();
   });
 });

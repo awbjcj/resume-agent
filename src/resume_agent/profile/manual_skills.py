@@ -156,24 +156,6 @@ def apply_manual_skills(
     return facts, warnings
 
 
-def remove_manual_skill_entry(
-    facts: ProfileFacts, entry: ManualSkillEntry | ManualAliasEntry
-) -> ProfileFacts:
-    """Best-effort reversal of one entry's effect on ``facts``."""
-    updated = facts.model_copy(deep=True)
-    if isinstance(entry, ManualSkillEntry):
-        _drop_token(updated, normalize_skill(entry.name))
-        return updated
-
-    found = _find_skill(updated, entry.target_skill_token)
-    if found is None:
-        return updated
-    _bucket, skill = found
-    alias_token = normalize_skill(entry.alias_text)
-    skill.aliases = [a for a in skill.aliases if normalize_skill(a) != alias_token]
-    return updated
-
-
 def save_manual_skills(ledger: ManualSkillsLedger, path: str | Path) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)

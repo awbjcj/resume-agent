@@ -12,7 +12,6 @@ function invalidateMatrixSurfaces(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["profile-matrix"] });
   qc.invalidateQueries({ queryKey: ["suppressed-skills"] });
   qc.invalidateQueries({ queryKey: ["profile-skills"] });
-  qc.invalidateQueries({ queryKey: ["manual-skills"] });
   qc.invalidateQueries({ queryKey: ["job"] });
   for (const k of ["shortlist", "pipeline", "triage"]) {
     qc.invalidateQueries({ queryKey: [k] });

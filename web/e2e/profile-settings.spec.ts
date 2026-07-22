@@ -22,7 +22,6 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/setup/status", (route) => route.fulfill({ json: setupStatus }));
   await mockEmptyRuns(page);
   await page.route("**/api/profile/skeleton", (route) => route.fulfill({ json: [] }));
-  await page.route("**/api/profile/manual-skills", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/profile/coach/sessions", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/profile/sources", (route) =>
     route.fulfill({
