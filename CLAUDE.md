@@ -1,5 +1,13 @@
 # Resume Agent — Developer Reference
 
+## Branching
+
+`dev` is the integration branch — all feature work branches off `dev` and PRs back
+into it; CI (`.github/workflows/ci.yml`) runs on both `main` and `dev`. `main` is
+protected (PR + passing checks required, no direct pushes/force-pushes) and is the
+only branch Railway deploys from. Promote `dev` → `main` via PR when a batch of
+work is ready to ship.
+
 ## Commands
 
 ```bash
