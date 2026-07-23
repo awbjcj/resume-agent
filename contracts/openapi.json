@@ -3570,6 +3570,34 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "ModelOption": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "supportsNativeSearch": {
+            "title": "Supportsnativesearch",
+            "type": "boolean"
+          },
+          "supportsReasoning": {
+            "title": "Supportsreasoning",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "supportsReasoning",
+          "supportsNativeSearch"
+        ],
+        "title": "ModelOption",
+        "type": "object"
+      },
       "ModelsConfigDoc": {
         "properties": {
           "cheapModel": {
@@ -4133,6 +4161,37 @@
           "skillsDemonstrated"
         ],
         "title": "ProjectOut",
+        "type": "object"
+      },
+      "ProviderModelCatalog": {
+        "properties": {
+          "hasKey": {
+            "title": "Haskey",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelOption"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "label",
+          "hasKey",
+          "models"
+        ],
+        "title": "ProviderModelCatalog",
         "type": "object"
       },
       "PruneConfigDoc": {
@@ -8479,6 +8538,56 @@
           }
         },
         "summary": "Put Models"
+      }
+    },
+    "/api/config/models/catalog": {
+      "get": {
+        "operationId": "get_model_catalog_api_config_models_catalog_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderModelCatalog"
+                  },
+                  "title": "Response Get Model Catalog Api Config Models Catalog Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Model Catalog"
       }
     },
     "/api/config/profile": {

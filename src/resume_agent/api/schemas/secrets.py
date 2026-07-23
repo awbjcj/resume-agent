@@ -54,3 +54,17 @@ class ModelsConfigDoc(CamelModel):
     cheap_model: str = "claude-haiku-4-5-20251001"
     mid_model: str = "claude-sonnet-5"
     premium_model: str = "claude-opus-4-8"
+
+
+class ModelOption(CamelModel):
+    id: str
+    label: str
+    supports_reasoning: bool
+    supports_native_search: bool
+
+
+class ProviderModelCatalog(CamelModel):
+    provider: str
+    label: str
+    has_key: bool
+    models: list[ModelOption]

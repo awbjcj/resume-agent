@@ -434,6 +434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/models/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model Catalog */
+        get: operations["get_model_catalog_api_config_models_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config/profile": {
         parameters: {
             query?: never;
@@ -3533,6 +3550,17 @@ export interface components {
             /** Username */
             username?: string | null;
         };
+        /** ModelOption */
+        ModelOption: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Supportsnativesearch */
+            supportsNativeSearch: boolean;
+            /** Supportsreasoning */
+            supportsReasoning: boolean;
+        };
         /** ModelsConfigDoc */
         ModelsConfigDoc: {
             /**
@@ -3728,6 +3756,17 @@ export interface components {
             summary: string;
             /** Title */
             title: string;
+        };
+        /** ProviderModelCatalog */
+        ProviderModelCatalog: {
+            /** Haskey */
+            hasKey: boolean;
+            /** Label */
+            label: string;
+            /** Models */
+            models: components["schemas"]["ModelOption"][];
+            /** Provider */
+            provider: string;
         };
         /** PruneConfigDoc */
         PruneConfigDoc: {
@@ -5645,6 +5684,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelsConfigDoc"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_model_catalog_api_config_models_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderModelCatalog"][];
                 };
             };
             /** @description Validation Error */

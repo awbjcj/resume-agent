@@ -8,9 +8,17 @@ from pydantic.alias_generators import to_camel
 from resume_agent.api.deps import get_env_path, refresh_app_settings
 from resume_agent.api.schemas.secrets import (
     SECRET_FIELDS,
+    ModelOption,
     ModelsConfigDoc,
+    ProviderModelCatalog,
     SecretStatus,
     SecretsUpdate,
+)
+from resume_agent.llm_runner import (
+    MODEL_CATALOG,
+    PROVIDER_LABELS,
+    provider_capabilities,
+    supports_native_search,
 )
 from resume_agent.services.env_config import read_env, write_env_updates
 
@@ -20,6 +28,13 @@ _MODEL_ENV = {
     "cheap_model": "CHEAP_MODEL",
     "mid_model": "MID_MODEL",
     "premium_model": "PREMIUM_MODEL",
+}
+
+_PROVIDER_KEY_ENV = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
 }
 
 
@@ -55,6 +70,31 @@ def get_models(request: Request):
     return ModelsConfigDoc(
         **{f: env.get(var) or getattr(defaults, f) for f, var in _MODEL_ENV.items()}
     )
+
+
+@router.get("/config/models/catalog", response_model=list[ProviderModelCatalog])
+def get_model_catalog(request: Request):
+    env = read_env(get_env_path(request))
+    catalogs = []
+    for provider, entries in MODEL_CATALOG.items():
+        models = [
+            ModelOption(
+                id=entry.id,
+                label=entry.label,
+                supports_reasoning=provider_capabilities(entry.id).supports_reasoning,
+                supports_native_search=supports_native_search(entry.id),
+            )
+            for entry in entries
+        ]
+        catalogs.append(
+            ProviderModelCatalog(
+                provider=provider,
+                label=PROVIDER_LABELS[provider],
+                has_key=bool(env.get(_PROVIDER_KEY_ENV[provider])),
+                models=models,
+            )
+        )
+    return catalogs
 
 
 @router.put("/config/models", response_model=ModelsConfigDoc)

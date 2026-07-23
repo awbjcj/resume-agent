@@ -83,6 +83,27 @@ def test_put_models_partial_update_preserves_other_fields(client):
     assert body["premiumModel"] == "custom-premium-non-default"  # untouched by the partial PUT
 
 
+def test_model_catalog_flags_keyed_providers(client):
+    body = client.get("/api/config/models/catalog").json()
+    by_provider = {row["provider"]: row for row in body}
+    assert by_provider["anthropic"]["hasKey"] is True  # env_file sets this key
+    assert by_provider["openai"]["hasKey"] is False
+    assert {"anthropic", "openai", "gemini", "deepseek"} == set(by_provider)
+
+
+def test_model_catalog_entries_carry_id_label_and_capability_flags(client):
+    body = client.get("/api/config/models/catalog").json()
+    anthropic = next(row for row in body if row["provider"] == "anthropic")
+    haiku = next(m for m in anthropic["models"] if "haiku" in m["id"])
+    opus = next(m for m in anthropic["models"] if "opus" in m["id"])
+    assert haiku["label"] and haiku["supportsReasoning"] is False
+    assert opus["supportsReasoning"] is True
+    assert haiku["supportsNativeSearch"] is True  # anthropic has native search
+
+    deepseek = next(row for row in body if row["provider"] == "deepseek")
+    assert deepseek["models"][0]["supportsNativeSearch"] is False
+
+
 def test_put_secret_refreshes_app_settings(client):
     client.put("/api/secrets", json={"anthropicApiKey": "sk-ant-new-key-5678"})
     # settings served to routes must see the new value without an app restart

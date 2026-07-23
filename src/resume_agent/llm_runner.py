@@ -1,8 +1,8 @@
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from inspect import isawaitable
 from typing import Any, Literal, Protocol, TypeVar, cast
 
@@ -146,6 +146,53 @@ async def run_with_cleanup(operation: Awaitable[_T], *runners: Any) -> _T:
 # (no recognised prefix) stays Anthropic, so existing config keeps working.
 PROVIDERS = ("anthropic", "openai", "gemini", "deepseek")
 
+PROVIDER_LABELS: dict[str, str] = {
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "gemini": "Gemini",
+    "deepseek": "DeepSeek",
+}
+
+
+@dataclass(frozen=True)
+class ModelCatalogEntry:
+    """One selectable model id in the cheap/mid/premium tier pickers."""
+
+    id: str
+    label: str
+
+
+# Curated model choices per provider for the tier pickers, so a UI can offer a
+# closed dropdown instead of free text a user could mistype. Ids follow the
+# same ``provider:model`` convention as everywhere else in this module — bare
+# ids are Anthropic. Update this list as providers ship new models.
+MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
+    "anthropic": [
+        ModelCatalogEntry("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
+        ModelCatalogEntry("claude-sonnet-5", "Claude Sonnet 5"),
+        ModelCatalogEntry("claude-opus-4-8", "Claude Opus 4.8"),
+    ],
+    "openai": [
+        ModelCatalogEntry("openai:gpt-5.6-luna", "GPT-5.6 Luna"),
+        ModelCatalogEntry("openai:gpt-5.6-terra", "GPT-5.6 Terra"),
+        ModelCatalogEntry("openai:gpt-5.6-sol", "GPT-5.6 Sol"),
+        ModelCatalogEntry("openai:gpt-5.5-pro", "GPT-5.5 Pro"),
+        ModelCatalogEntry("openai:gpt-5.5", "GPT-5.5"),
+        ModelCatalogEntry("openai:gpt-5.4-mini", "GPT-5.4 Mini"),
+    ],
+    "gemini": [
+        ModelCatalogEntry("gemini:gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite"),
+        ModelCatalogEntry("gemini:gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
+        ModelCatalogEntry("gemini:gemini-3.6-flash", "Gemini 3.6 Flash"),
+        ModelCatalogEntry("gemini:gemini-3.5-flash", "Gemini 3.5 Flash"),
+        ModelCatalogEntry("gemini:gemini-3.1-pro-preview", "Gemini 3.1 Pro (Preview)"),
+    ],
+    "deepseek": [
+        ModelCatalogEntry("deepseek:deepseek-v4-flash", "DeepSeek V4 Flash"),
+        ModelCatalogEntry("deepseek:deepseek-v4-pro", "DeepSeek V4 Pro"),
+    ],
+}
+
 ANTHROPIC_WEB_SEARCH_TOOL = {
     "type": "web_search_20250305",
     "name": "web_search",
@@ -239,6 +286,18 @@ def provider_capabilities(model_id: str) -> ProviderCapabilities:
         reasoning = "reasoner" in folded or folded.startswith("deepseek-v4")
         return ProviderCapabilities(reasoning, False, True)
     return _NO_PROVIDER_CAPABILITIES
+
+
+def supports_native_search(model_id: str) -> bool:
+    """Whether ``model_id``'s provider gets provider-native web search.
+
+    Providers outside this set (DeepSeek) still get search under
+    ``search_mode=auto`` — ``plan_search`` falls back to the DuckDuckGo tool —
+    just not the higher-quality native variant.
+    """
+    provider, _model = split_provider(model_id)
+    return provider in _NATIVE_SEARCH_STRATEGIES
+
 
 def resolve_api_key(model_id: str) -> str:
     """Return the configured key for ``model_id``'s provider, or ``""`` if unset."""
@@ -463,7 +522,9 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
         raise ValueError(f"provider {provider!r} does not support audio transcription")
     key = resolve_api_key(resolved)
     if not key:
-        raise ValueError(f"no API key configured for transcription provider {provider!r}")
+        raise ValueError(
+            f"no API key configured for transcription provider {provider!r}"
+        )
     if provider == "gemini":
         from google import genai
         from google.genai import types

@@ -1,13 +1,14 @@
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GmailCard } from "../GmailCard";
+import { ModelPicker } from "../ModelPicker";
 import { SecretsForm } from "../forms/SecretsForm";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import { useDraft } from "../use-draft";
 import { useGmailConnectOutcome } from "../use-gmail";
+import { useModelCatalog } from "../use-model-catalog";
 import { useSaveSecrets, useSecrets } from "../use-secrets";
 
 type ModelsDoc = { cheapModel: string; midModel: string; premiumModel: string };
@@ -23,6 +24,7 @@ export function KeysSettingsPage() {
   const saveSecrets = useSaveSecrets();
   const models = useConfig("/api/config/models");
   const saveModels = useSaveConfig("/api/config/models");
+  const catalog = useModelCatalog();
   const { draft, setDraft, dirty, reset } = useDraft(models.data as ModelsDoc | undefined);
   useGmailConnectOutcome();
 
@@ -45,8 +47,8 @@ export function KeysSettingsPage() {
           {MODEL_FIELDS.map((f) => (
             <Field key={f.key}>
               <FieldLabel htmlFor={f.key}>{f.label}</FieldLabel>
-              <Input id={f.key} value={draft[f.key]}
-                onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} />
+              <ModelPicker id={f.key} value={draft[f.key]} catalog={catalog.data}
+                onChange={(value) => setDraft({ ...draft, [f.key]: value })} />
             </Field>
           ))}
         </FieldGroup>
