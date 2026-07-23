@@ -1,11 +1,14 @@
+import uuid
 from pathlib import Path
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.config import get_settings
+
+# Import tables so their metadata is registered before create_all().
+from resume_agent.tracking import tables  # noqa: F401
 from resume_agent.tracking.migrate import (
     ensure_application_cover_letter_id_column,
     ensure_archived_at_column,
@@ -17,9 +20,6 @@ from resume_agent.tracking.migrate import (
     ensure_resume_version_revision_columns,
     ensure_url_index,
 )
-
-# Import tables so their metadata is registered before create_all().
-from resume_agent.tracking import tables  # noqa: F401
 
 
 def _ensure_sqlite_dir(url: str) -> None:
@@ -52,15 +52,22 @@ def make_engine(url: str | None = None) -> Engine:
     resolved = url or get_settings().db_url
     _ensure_sqlite_dir(resolved)
     if _is_memory_sqlite(resolved):
-        # A single shared connection so every thread (e.g. FastAPI's request
-        # threadpool vs. the lifespan that ran init_db) sees the same in-memory
-        # database. The default SingletonThreadPool would give each thread its
-        # own empty DB. Only in-memory URLs hit this; file/prod is unaffected.
+        # SQLite's shared-cache URI mode gives every thread (FastAPI's request
+        # threadpool, RunManager workers, the lifespan that ran init_db) its own
+        # DBAPI connection with an independent transaction state, while all of
+        # them still see the same in-memory schema/data. A plain StaticPool
+        # (one physical connection reused by every thread) makes concurrent
+        # sessions share one transaction state, so interleaved BEGIN/COMMIT
+        # calls from two threads intermittently raised "Could not refresh
+        # instance" ORM errors under real concurrency (e.g. RunManager's
+        # background worker racing a request thread's poll). The cache is
+        # keyed by name, so each engine gets a unique one -- otherwise every
+        # `make_engine("sqlite://")` call (one per test) would share a single
+        # process-wide database and collide on `CREATE TABLE`.
+        name = uuid.uuid4().hex
         return create_engine(
-            resolved,
+            f"sqlite:///file:{name}?mode=memory&cache=shared&uri=true",
             echo=False,
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
         )
     engine = create_engine(resolved, echo=False)
     if resolved.startswith("sqlite"):
