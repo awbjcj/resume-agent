@@ -1,4 +1,6 @@
 import json
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +19,48 @@ _MAX_OFFSET = (
     1000  # safety ceiling: <=51 pages (~1020 rows) even if a tenant ignores searchText
 )
 _FACETS_DIR = Path("data/workday_facets")
+
+# Large Workday boards (thousands of postings) fire many list + detail requests;
+# an intermittent throttle (429) or transient 5xx must not abort the whole pull.
+_RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+_RETRY_ATTEMPTS = 4  # one initial call + three retries
+_RETRY_BACKOFF_S = 2.0  # exponential base when the server sends no Retry-After
+_MAX_RETRY_SLEEP_S = 30.0
+
+
+def _retry_after_seconds(response: httpx.Response) -> float | None:
+    """Seconds from a numeric Retry-After header; None for absent/date/garbage."""
+    raw = response.headers.get("retry-after")
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return None  # HTTP-date form is rare here; fall back to backoff
+
+
+def _request_with_retry(send: Callable[[], httpx.Response]) -> httpx.Response:
+    """Issue a Workday request, retrying transient throttles/5xx with backoff.
+
+    Honors a numeric ``Retry-After`` when present, else exponential backoff.
+    After ``_RETRY_ATTEMPTS`` the last error is re-raised so a persistently
+    failing endpoint still surfaces as a per-URL failure upstream (the
+    companies connector isolates it rather than aborting sibling URLs).
+    """
+    for attempt in range(_RETRY_ATTEMPTS):
+        try:
+            response = send()
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError as error:
+            status = error.response.status_code
+            if status not in _RETRY_STATUSES or attempt + 1 >= _RETRY_ATTEMPTS:
+                raise
+            delay = _retry_after_seconds(error.response)
+            if delay is None:
+                delay = _RETRY_BACKOFF_S * (2**attempt)
+            time.sleep(min(delay, _MAX_RETRY_SLEEP_S))
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def default_facets_dir() -> Path:
@@ -212,12 +256,13 @@ def _list_page(
     offset: int,
     applied_facets: dict[str, list[str]],
 ) -> dict:
-    response = httpx.post(
-        cxs_jobs_url(target),
-        json=list_request_body(search, offset, applied_facets),
-        timeout=30,
+    response = _request_with_retry(
+        lambda: httpx.post(
+            cxs_jobs_url(target),
+            json=list_request_body(search, offset, applied_facets),
+            timeout=30,
+        )
     )
-    response.raise_for_status()
     return response.json()
 
 
@@ -285,8 +330,9 @@ def _fetch_detail(target: AtsTarget, row: WorkdayRow) -> dict | None:
     # No detail path -> cannot fetch a description; skip rather than GET a bad URL.
     if not row.external_path:
         return None
-    resp = httpx.get(cxs_detail_url(target, row.external_path), timeout=30)
-    resp.raise_for_status()
+    resp = _request_with_retry(
+        lambda: httpx.get(cxs_detail_url(target, row.external_path), timeout=30)
+    )
     return resp.json()
 
 

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+import pytest
 
 import resume_agent.discovery.connectors.workday as workday
 from resume_agent.discovery.connectors.detect import AtsTarget
@@ -210,6 +211,87 @@ def test_fetch_workday_isolates_failed_detail_fetch(monkeypatch):
     monkeypatch.setattr(workday.httpx, "get", fake_get)
     jobs = workday.fetch_workday(TARGET, SearchConfig())
     assert [j.title for j in jobs] == ["Data Scientist"]
+
+
+@pytest.fixture(autouse=True)
+def _no_backoff_sleep(monkeypatch):
+    """Neutralize retry backoff so throttle-retry paths don't slow the suite."""
+    monkeypatch.setattr(workday.time, "sleep", lambda _seconds: None)
+
+
+def _response(status: int, *, headers=None, payload=None) -> httpx.Response:
+    return httpx.Response(
+        status,
+        headers=headers or {},
+        json=payload if payload is not None else {},
+        request=httpx.Request("POST", "https://acme.wd5.myworkdayjobs.com/x"),
+    )
+
+
+def test_request_with_retry_recovers_from_throttle(monkeypatch):
+    """A 429 followed by a 200 succeeds, honoring the Retry-After header."""
+    slept: list[float] = []
+    monkeypatch.setattr(workday.time, "sleep", lambda seconds: slept.append(seconds))
+    responses = [
+        _response(429, headers={"Retry-After": "7"}),
+        _response(200, payload={"ok": True}),
+    ]
+    calls: list[int] = []
+
+    def send() -> httpx.Response:
+        calls.append(1)
+        return responses[len(calls) - 1]
+
+    result = workday._request_with_retry(send)
+
+    assert result.json() == {"ok": True}
+    assert len(calls) == 2
+    assert slept == [7.0]  # Retry-After honored over exponential backoff
+
+
+def test_request_with_retry_gives_up_after_persistent_throttle(monkeypatch):
+    monkeypatch.setattr(workday.time, "sleep", lambda _seconds: None)
+    calls: list[int] = []
+
+    def send() -> httpx.Response:
+        calls.append(1)
+        return _response(429)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        workday._request_with_retry(send)
+
+    assert len(calls) == workday._RETRY_ATTEMPTS  # bounded, then re-raises
+
+
+def test_request_with_retry_does_not_retry_non_transient():
+    calls: list[int] = []
+
+    def send() -> httpx.Response:
+        calls.append(1)
+        return _response(404)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        workday._request_with_retry(send)
+
+    assert len(calls) == 1  # a 404 fails fast, never retried
+
+
+def test_fetch_workday_recovers_when_list_page_throttled(monkeypatch):
+    """A transient 429 on the list POST is retried, not fatal to the pull."""
+    attempts: list[int] = []
+
+    def fake_post(url, json, timeout):
+        attempts.append(1)
+        if len(attempts) == 1:
+            return _response(429)
+        return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+
+    monkeypatch.setattr(workday.httpx, "post", fake_post)
+    monkeypatch.setattr(workday.httpx, "get", lambda url, timeout: _Resp(DETAIL))
+    jobs = workday.fetch_workday(TARGET, SearchConfig())
+
+    assert [j.title for j in jobs] == ["Software Engineer", "Data Scientist"]
+    assert len(attempts) >= 2  # first POST throttled, retried to success
 
 
 def test_apply_detail_updates_company_name(monkeypatch):
