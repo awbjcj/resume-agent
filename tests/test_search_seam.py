@@ -1,8 +1,8 @@
 import pytest
 
 from resume_agent.llm_runner import (
-    ANTHROPIC_WEB_SEARCH_TOOL,
     OPENAI_WEB_SEARCH_TOOL,
+    anthropic_web_search_tool,
     build_search_equipped,
     plan_search,
 )
@@ -39,13 +39,22 @@ def test_build_off_mode_disables_advisor():
         build_search_equipped("claude-opus-4-8", "off")
 
 
-def test_build_search_equipped_anthropic_returns_server_tool(monkeypatch):
+def test_build_search_equipped_anthropic_returns_dynamic_server_tool(monkeypatch):
     monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda _model_id: "")
 
     _model, tools = build_search_equipped("claude-opus-4-8", "auto")
 
-    assert ANTHROPIC_WEB_SEARCH_TOOL in tools
+    assert tools == [anthropic_web_search_tool("claude-opus-4-8")]
+    assert tools[0]["type"] == "web_search_20260209"
+
+
+def test_build_search_equipped_anthropic_haiku_uses_basic_server_tool(monkeypatch):
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda _model_id: "")
+
+    _model, tools = build_search_equipped("claude-haiku-4-5", "auto")
+
+    assert tools[0]["type"] == "web_search_20250305"
 
 
 def test_openai_server_tool_shape_is_current():
-    assert OPENAI_WEB_SEARCH_TOOL == {"type": "web_search_preview"}
+    assert OPENAI_WEB_SEARCH_TOOL == {"type": "web_search"}

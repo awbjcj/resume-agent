@@ -193,12 +193,20 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
     ],
 }
 
-ANTHROPIC_WEB_SEARCH_TOOL = {
-    "type": "web_search_20250305",
-    "name": "web_search",
-    "max_uses": 5,
-}
-OPENAI_WEB_SEARCH_TOOL = {"type": "web_search_preview"}
+OPENAI_WEB_SEARCH_TOOL = {"type": "web_search"}
+
+
+def anthropic_web_search_tool(model_id: str) -> dict[str, Any]:
+    """Pick the Anthropic web-search tool variant for a (possibly bare) Claude model id.
+
+    ``web_search_20260209`` (dynamic filtering) requires Opus 4.6+ or Sonnet 4.6+;
+    Haiku models need the basic ``web_search_20250305`` type. Mirrors the
+    "haiku" check `provider_capabilities` already uses for reasoning support.
+    """
+    _provider, model = split_provider(model_id)
+    tool_type = "web_search_20250305" if "haiku" in model.casefold() else "web_search_20260209"
+    return {"type": tool_type, "name": "web_search", "max_uses": 5}
+
 
 SearchMode = Literal["auto", "native", "tool", "off"]
 SearchStrategy = Literal[
@@ -439,7 +447,7 @@ def build_search_equipped(
         reasoning=reasoning,
     )
     if plan.strategy == "native_anthropic":
-        return model, [ANTHROPIC_WEB_SEARCH_TOOL]
+        return model, [anthropic_web_search_tool(model_id)]
     if plan.strategy == "tool":
         from agno.tools.duckduckgo import DuckDuckGoTools
 
