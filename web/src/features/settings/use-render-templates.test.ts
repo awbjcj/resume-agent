@@ -18,12 +18,10 @@ describe("openTemplatePreview", () => {
     const open = vi.spyOn(window, "open").mockReturnValue(previewWindow as never);
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(new Blob(["%PDF"]), {
-          status: 200,
-          headers: { "content-type": "application/pdf" },
-        }),
-      ),
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: vi.fn().mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" })),
+      } as unknown as Response),
     );
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
