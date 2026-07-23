@@ -1,3 +1,4 @@
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -50,6 +51,15 @@ def test_generate_run_and_list(client, monkeypatch):
         f"/api/jobs/{job_id}/email-draft", json={"draftType": "follow_up"}
     )
     assert launched.status_code == 202
+    run_id = launched.json()["runId"]
+    run = None
+    for _ in range(50):
+        run = client.get(f"/api/runs/{run_id}").json()
+        if run["state"] in {"done", "error"}:
+            break
+        time.sleep(0.05)
+    assert run is not None
+    assert run["state"] == "done"
 
     listed = client.get(f"/api/jobs/{job_id}/email-drafts")
     assert listed.status_code == 200
