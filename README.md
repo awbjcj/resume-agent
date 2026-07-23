@@ -1,11 +1,16 @@
 # Resume Agent
 
-A personal, command-line job-hunt pipeline. It pulls job posts from multiple
-sources (job-board connectors, LinkedIn, or hand-pasted), scores them against a
-**fact-locked** profile of _your_ real experience, helps you tailor a resume
-through a panel of reviewer agents, drafts a matching cover letter, renders both
-to PDF, and tracks every application — auto-syncing statuses from your Gmail —
-all on your own machine, in one SQLite database.
+[![CI](https://github.com/awbjcj/resume-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/awbjcj/resume-agent/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
+
+A local-first, command-line and web job-hunt pipeline. Point it at your own
+resume and API keys, and it pulls job posts from multiple sources (job-board
+connectors, LinkedIn, or hand-pasted), scores them against a **fact-locked**
+profile of your real experience, helps you tailor a resume through a panel of
+reviewer agents, drafts a matching cover letter, renders both to PDF, and tracks
+every application — auto-syncing statuses from your Gmail — all on your own
+machine, in one SQLite database.
 
 The guiding rule is **fact-lock**: every bullet on a tailored resume must trace
 back to a fact you actually provided. The agents rewrite and reframe; they never
@@ -519,3 +524,19 @@ payloads captured from real responses.
 
 v1.5 keeps the tailor loop synchronous. Parallel reviewer panels and job-level
 concurrency are deferred while this pass reduces cost through leaner prompts.
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING](.github/CONTRIBUTING.md) for local
+setup and the checks your change must pass (`make verify`). Please branch from
+`main` and open a PR.
+
+## Security
+
+Found a vulnerability? Please report it privately — see the
+[security policy](.github/SECURITY.md). Do not open a public issue for security
+reports.
+
+## License
+
+[MIT](LICENSE) © awbjcj
