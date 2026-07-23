@@ -203,6 +203,43 @@ def plan_search(model_id: str, mode: SearchMode) -> SearchPlan:
     return SearchPlan(provider, native_strategy or "tool")
 
 
+@dataclass(frozen=True)
+class ProviderCapabilities:
+    """Provider-native features safe to request for a resolved model."""
+
+    supports_reasoning: bool
+    supports_native_citations: bool
+    supports_prompt_cache: bool
+
+
+_NO_PROVIDER_CAPABILITIES = ProviderCapabilities(False, False, False)
+
+
+def provider_capabilities(model_id: str) -> ProviderCapabilities:
+    """Return conservative capabilities without importing a provider SDK."""
+    if not model_id:
+        return _NO_PROVIDER_CAPABILITIES
+    prefix, separator, _rest = model_id.partition(":")
+    if separator and prefix not in PROVIDERS:
+        return _NO_PROVIDER_CAPABILITIES
+
+    provider, model = split_provider(model_id)
+    folded = model.casefold()
+    if provider == "anthropic" and folded.startswith("claude-"):
+        return ProviderCapabilities("haiku" not in folded, True, True)
+    if provider == "openai" and folded.startswith(("gpt-", "o1", "o3", "o4")):
+        return ProviderCapabilities(
+            folded.startswith(("gpt-5", "o1", "o3", "o4")), True, True
+        )
+    if provider == "gemini" and folded.startswith("gemini-"):
+        return ProviderCapabilities(
+            folded.startswith(("gemini-3", "gemini-2.5")), True, True
+        )
+    if provider == "deepseek" and folded.startswith("deepseek-"):
+        reasoning = "reasoner" in folded or folded.startswith("deepseek-v4")
+        return ProviderCapabilities(reasoning, False, True)
+    return _NO_PROVIDER_CAPABILITIES
+
 def resolve_api_key(model_id: str) -> str:
     """Return the configured key for ``model_id``'s provider, or ``""`` if unset."""
     provider, _ = split_provider(model_id)
@@ -246,6 +283,7 @@ def build_model(
     api_key: str | None = None,
     *,
     cache_system_prompt: bool = False,
+    reasoning: bool = False,
 ) -> Any:
     """Construct the agno model for a (possibly provider-prefixed) ``model_id``.
 
@@ -255,31 +293,50 @@ def build_model(
     only to Anthropic; other providers ignore it.
     """
     provider, model = split_provider(model_id)
+    reasoning = reasoning and provider_capabilities(model_id).supports_reasoning
     key = api_key or resolve_api_key(model_id) or None
     if provider == "openai":
         from agno.models.openai import OpenAIChat
 
-        return OpenAIChat(id=model, api_key=key)
+        return OpenAIChat(
+            id=model,
+            api_key=key,
+            reasoning_effort="high" if reasoning else None,
+        )
     if provider == "gemini":
         from agno.models.google import Gemini
 
-        return Gemini(id=model, api_key=key)
+        return Gemini(
+            id=model,
+            api_key=key,
+            thinking_level="high" if reasoning else None,
+        )
     if provider == "deepseek":
         from agno.models.deepseek import DeepSeek
 
-        return DeepSeek(id=model, api_key=key)
+        return DeepSeek(
+            id=model,
+            api_key=key,
+            use_thinking=True if reasoning else None,
+            reasoning_effort="max" if reasoning else None,
+        )
     from agno.models.anthropic import Claude
 
     return Claude(
         id=model,
         api_key=key,
         cache_system_prompt=cache_system_prompt,
+        thinking={"type": "adaptive"} if reasoning else None,
+        output_config={"effort": "high"} if reasoning else None,
     )
 
 
 def build_search_equipped(
     model_id: str,
     mode: SearchMode | None = None,
+    *,
+    reasoning: bool = False,
+    cache_system_prompt: bool = False,
 ) -> tuple[Any, list[Any]]:
     """Build a model and its search tools for advisor research."""
     settings = get_settings()
@@ -288,17 +345,40 @@ def build_search_equipped(
         raise ValueError("advisor web search is disabled by search_mode=off")
     _provider, model_name = split_provider(model_id)
     api_key = resolve_api_key(model_id) or None
+    reasoning = reasoning and provider_capabilities(model_id).supports_reasoning
 
     if plan.strategy == "native_openai":
         from agno.models.openai.responses import OpenAIResponses
 
-        return OpenAIResponses(id=model_name, api_key=api_key), [OPENAI_WEB_SEARCH_TOOL]
+        return (
+            OpenAIResponses(
+                id=model_name,
+                api_key=api_key,
+                reasoning_effort="high" if reasoning else None,
+                store=False,
+            ),
+            [OPENAI_WEB_SEARCH_TOOL],
+        )
     if plan.strategy == "native_gemini":
-        from agno.models.google import Gemini
+        from agno.models.google.gemini_interactions import GeminiInteractions
 
-        return Gemini(id=model_name, api_key=api_key, search=True), []
+        return (
+            GeminiInteractions(
+                id=model_name,
+                api_key=api_key,
+                search=True,
+                thinking_level="high" if reasoning else None,
+                store=False,
+            ),
+            [],
+        )
 
-    model = build_model(model_id, api_key=api_key)
+    model = build_model(
+        model_id,
+        api_key=api_key,
+        cache_system_prompt=cache_system_prompt,
+        reasoning=reasoning,
+    )
     if plan.strategy == "native_anthropic":
         return model, [ANTHROPIC_WEB_SEARCH_TOOL]
     if plan.strategy == "tool":

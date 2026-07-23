@@ -86,7 +86,7 @@ def test_worker_classifies_structured_validation_results(monkeypatch, tmp_path):
     assert result["scrapeAvailable"] is True
 
 
-def test_worker_dedupes_config_and_same_report_without_reordering(monkeypatch, tmp_path):
+def test_worker_dedupes_config_and_preserves_order_within_status(monkeypatch, tmp_path):
     (tmp_path / "connectors.yaml").write_text(
         "greenhouse: {enabled: true, boards: [{token: existing}]}\n",
         encoding="utf-8",
@@ -108,13 +108,13 @@ def test_worker_dedupes_config_and_same_report_without_reordering(monkeypatch, t
     result = run_worker(monkeypatch, tmp_path, candidates, previews)
 
     assert [row["company"] for row in result["candidates"]] == [
-        "Existing",
         "Acme",
+        "Existing",
         "Acme again",
     ]
     assert [row["status"] for row in result["candidates"]] == [
-        "duplicate",
         "validated",
+        "duplicate",
         "duplicate",
     ]
 

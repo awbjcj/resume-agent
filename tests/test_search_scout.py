@@ -31,7 +31,9 @@ def test_builders_wire_models_and_schema(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        search_scout, "build_search_equipped", lambda model_id: (model_id, ["tool"])
+        search_scout,
+        "build_search_equipped",
+        lambda model_id, **_kwargs: (model_id, ["tool"]),
     )
     monkeypatch.setattr(search_scout, "build_model", lambda model_id: model_id)
     monkeypatch.setattr(search_scout, "use_json_mode_for", lambda model: True)

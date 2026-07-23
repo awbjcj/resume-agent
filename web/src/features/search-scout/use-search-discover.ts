@@ -6,9 +6,18 @@ import { trackRun } from "@/lib/runs/tracker";
 
 export type SearchSuggestionRow = {
   value: string;
-  kind: "keyword" | "title" | "role_anchor" | "exclude_term";
+  kind:
+    | "keyword"
+    | "title"
+    | "role_anchor"
+    | "exclude_term"
+    | "location"
+    | "seniority"
+    | "adjacent_role";
   reason: string;
   status: "new" | "duplicate";
+  fitScore: number | null;
+  citations: { url: string; title: string }[];
 };
 
 type SearchScoutResult = { prompt: string; suggestions: SearchSuggestionRow[] };

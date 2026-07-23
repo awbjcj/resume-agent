@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { ExternalLink, Search } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ function statusText(row: ScoutCandidate): string {
   }
   if (row.status === "unverified") return "Scrape target";
   if (row.status === "duplicate") return "Already added";
+  if (row.status === "avoid") return "Avoid";
   return "Failed";
 }
 
@@ -159,11 +160,12 @@ export function DiscoverCompaniesDialog() {
               </TableHeader>
               <TableBody>
                 {result.candidates.map((row) => {
+                  const citations = row.citations ?? [];
                   const scrapeBlocked = row.status === "unverified" && !result.scrapeAvailable;
-                  const disabled = scrapeBlocked || row.status === "failed" || row.status === "duplicate" || added.has(row.url);
+                  const disabled = scrapeBlocked || row.status === "avoid" || row.status === "failed" || row.status === "duplicate" || added.has(row.url);
                   const explanation = scrapeBlocked ? result.scrapeUnavailableReason : rowErrors[row.url] ?? row.error ?? row.reason;
                   return (
-                    <TableRow key={`${row.company}:${row.url}`}>
+                    <TableRow key={`${row.signal}:${row.company}:${row.url}`}>
                       <TableCell title={scrapeBlocked ? result.scrapeUnavailableReason ?? undefined : undefined}>
                         <Checkbox
                           aria-label={`Select ${row.company}`}
@@ -173,16 +175,41 @@ export function DiscoverCompaniesDialog() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{row.company}</div>
-                        <div className="max-w-60 truncate text-xs text-muted-foreground">{row.url}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{row.company}</span>
+                          {row.fitScore == null ? null : (
+                            <Badge variant="secondary">{row.fitScore} fit</Badge>
+                          )}
+                        </div>
+                        {row.url ? (
+                          <div className="max-w-60 truncate text-xs text-muted-foreground">{row.url}</div>
+                        ) : null}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={row.status === "failed" ? "destructive" : "outline"}>
+                        <Badge variant={row.status === "failed" || row.status === "avoid" ? "destructive" : "outline"}>
                           {added.has(row.url) ? "Added" : statusText(row)}
                         </Badge>
                       </TableCell>
                       <TableCell className={rowErrors[row.url] ? "text-destructive" : "text-muted-foreground"}>
-                        {explanation}
+                        <div className="flex flex-col gap-1.5">
+                          <span>{explanation}</span>
+                          {citations.length ? (
+                            <div className="flex flex-wrap gap-x-3 gap-y-1">
+                              {citations.map((citation) => (
+                                <a
+                                  key={citation.url}
+                                  className="inline-flex items-center gap-1 text-xs text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+                                  href={citation.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {citation.title || citation.url}
+                                  <ExternalLink data-icon="inline-end" aria-hidden="true" />
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

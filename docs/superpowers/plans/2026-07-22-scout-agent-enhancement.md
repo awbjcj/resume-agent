@@ -19,6 +19,64 @@
 - Scout results are **untyped run-result dicts** (hand-built camelCase keys), NOT governed by `api/schemas/suggestions.py`. New fields are added as camelCase keys to the service row dicts — no OpenAPI/TS contract regeneration for the scout payload.
 - New Pydantic fields must be default-safe so the cheap formatter degrades cleanly.
 
+## Correctness Amendments (binding)
+
+These amendments were verified against the current repository contracts and the
+installed Agno 2.6.12 adapters before implementation. They supersede conflicting
+task snippets below.
+
+1. **Keep the existing feature branch and protect unrelated edits.** This plan is
+   already committed on `feat/scout-agent-enhancement`, which is the isolated branch
+   for this work. The pre-existing uncommitted Lever connector changes are unrelated,
+   remain untouched, and are excluded from task commits and verification conclusions.
+2. **Capability resolution is conservative at both boundaries.** An empty model id,
+   an unrecognised `provider:` prefix, or an unrecognised model family returns the
+   all-`False` capability shape. `build_model(..., reasoning=True)` and
+   `build_search_equipped(..., reasoning=True)` must also intersect the request with
+   `provider_capabilities`; callers cannot accidentally attach unsupported kwargs.
+   The Task 1 unknown-prefix test must assert all `False`, not Anthropic citations.
+3. **Use verified Agno 2.6.12 kwargs.** Claude uses adaptive `thinking` plus
+   `output_config.effort`; OpenAI Responses uses `reasoning_effort`; Gemini uses
+   `thinking_level`; DeepSeek uses `use_thinking=True` with
+   `reasoning_effort="max"`. Gemini native scout search uses Agno's
+   `GeminiInteractions` wrapper with `search=True`, `thinking_level` when enabled,
+   and `store=False` so profile/search context is not retained as a stored
+   Interaction. OpenAI Responses native search likewise sets `store=False`.
+4. **Runtime failure is not a silent no-reasoning retry.** Unsupported features are
+   removed before construction. A real provider timeout/error follows the existing
+   bounded `AgentRunner` retry policy and then surfaces; this change does not add a
+   second, potentially costly fallback LLM call.
+5. **The shared citation type lives in a shared module.** Add
+   `discovery/scout_models.py` with `Citation`; neither scout imports domain models
+   from the other scout. Only non-empty HTTP(S) citations cross the service boundary.
+6. **Scores are validated, not merely documented.** Both schema fields use
+   `Field(default=None, ge=0, le=100)`. Service ranking sorts descending by score
+   with `None` last, while retaining deterministic input order for ties.
+7. **URL-less avoid rows must survive.** Positive Source Scout rows still require an
+   HTTP(S) careers URL. An explicit `avoid` row may omit it, skips dedupe and URL
+   validation, and is returned with status/signal `avoid`; the UI renders it as
+   non-selectable advisory evidence.
+8. **Search kinds map to real config destinations.** `location -> locations`,
+   `adjacent_role -> titles`, and `seniority -> experience_levels`. Seniority values
+   are restricted to the existing LinkedIn vocabulary (`internship`, `entry`,
+   `associate`, `mid-senior`, `director`, `executive`). Dedupe keys use the destination
+   field, so `title` and `adjacent_role` cannot emit the same value twice in one run.
+9. **Scout completion payloads are generic run results.** Do not edit the unrelated
+   match-gap schemas in `api/schemas/suggestions.py`. `RunOut.result` is intentionally
+   `Any`, so regenerating OpenAPI would not type these nested payloads. The effective
+   consumer contract is the service row dict plus the local types in
+   `web/src/features/{sources,search-scout}`; update those types, UI components, and
+   focused component tests together. No OpenAPI/TypeScript regeneration is required
+   unless a separate typed-run-result refactor is undertaken.
+10. **UI work is in scope.** Render fit scores, evidence links, and avoid state using
+    the existing shadcn/base-nova primitives and semantic tokens. Wire all actionable
+    Search Scout kinds into the Search settings draft. Avoid rows and duplicates are
+    never selectable. Evidence links open safely with `rel="noreferrer"`.
+11. **Final verification covers the full story.** In addition to the backend suite,
+    run scoped frontend tests, frontend lint/build, the OpenAPI drift gate (expected
+    unchanged for this generic payload), provider-import seam grep, and a browser
+    walkthrough of both dialogs when the local runtime can be started.
+
 ---
 
 ### Task 1: Provider capability seam
@@ -1112,7 +1170,8 @@ git commit -m "feat(scout): gate research-agent reasoning/caching via provider_c
 ### Task 9: Full-suite verification + lint
 
 **Files:**
-- No source changes (verification task). If the web UI (`D:\Fun\ui`) hand-types scout results, note the new keys as a follow-up — it is a separate working directory and out of scope for this backend plan.
+- Verification task after the backend and in-repository `web/` scout UI changes from
+  Correctness Amendment 10 are complete.
 
 - [ ] **Step 1: Run the full offline suite**
 
@@ -1141,7 +1200,8 @@ git commit -m "chore(scout): lint cleanup after enrichment"
 ## Notes for the executor
 
 - **Ranking `None` scores sort last** within a status group — this is deliberate (a scored recommendation outranks an unscored one).
-- **`avoid` rows never hit the URL probe** — they carry evidence only. The web layer renders them as "skip" cards; that rendering is out of scope here.
+- **`avoid` rows never hit the URL probe** — they carry evidence only. The in-repository
+  web layer renders them as non-selectable advisory rows in this implementation.
 - **Caching is cost-only.** Do not add a test that asserts a cache hit — the offline suite fakes the model, so there is no real cache to read. Task 3 asserts the *kwarg is attached*, which is the correct offline boundary.
 - **DeepSeek path is exercised only at the capability/build layer** (Tasks 1-3). No live DeepSeek call is made anywhere in the suite.
 - If `settings.mid_model` is ever configured to a Haiku or `deepseek-chat` id, Task 8's wiring correctly passes `reasoning=False` — the research agent still runs, just without a deliberation budget.

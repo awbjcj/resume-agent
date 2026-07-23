@@ -18,6 +18,9 @@ const mocks = vi.hoisted(() => ({
           reason: "Matches the prompt",
           confidence: "high" as const,
           status: "validated" as const,
+          signal: "positive" as const,
+          fitScore: 92,
+          citations: [{ url: "https://example.test/acme", title: "Acme evidence" }],
           ats: "greenhouse",
           token: "acme",
           roleCount: 4,
@@ -30,11 +33,29 @@ const mocks = vi.hoisted(() => ({
           reason: "No supported ATS",
           confidence: "low" as const,
           status: "unverified" as const,
+          signal: "positive" as const,
+          fitScore: 65,
+          citations: [],
           ats: null,
           token: null,
           roleCount: null,
           error: null,
           errorCode: "ATS_NOT_DETECTED",
+        },
+        {
+          company: "RiskCo",
+          url: "",
+          reason: "Documented hiring freeze",
+          confidence: "medium" as const,
+          status: "avoid" as const,
+          signal: "avoid" as const,
+          fitScore: 12,
+          citations: [{ url: "https://example.test/risk", title: "Hiring freeze" }],
+          ats: null,
+          token: null,
+          roleCount: null,
+          error: null,
+          errorCode: null,
         },
       ],
     },
@@ -97,5 +118,22 @@ describe("DiscoverCompaniesDialog", () => {
       "true",
     );
     expect(screen.getByText(/local browser/i)).toBeInTheDocument();
+  });
+
+  it("renders fit and evidence while keeping avoid rows non-selectable", async () => {
+    const user = userEvent.setup();
+    render(<DiscoverCompaniesDialog />);
+    await user.click(screen.getByRole("button", { name: /discover companies/i }));
+
+    expect(screen.getByText("92 fit")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Acme evidence" })).toHaveAttribute(
+      "href",
+      "https://example.test/acme",
+    );
+    expect(screen.getByText("Avoid")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /select riskco/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 });

@@ -9,7 +9,10 @@ export type ScoutCandidate = {
   url: string;
   reason: string;
   confidence: "high" | "medium" | "low";
-  status: "validated" | "unverified" | "failed" | "duplicate";
+  status: "validated" | "unverified" | "avoid" | "failed" | "duplicate";
+  signal: "positive" | "avoid";
+  fitScore: number | null;
+  citations: { url: string; title: string }[];
   ats: string | null;
   token: string | null;
   roleCount: number | null;

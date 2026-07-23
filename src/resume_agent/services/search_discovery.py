@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from resume_agent.discovery.search_config import load_search_config
+from resume_agent.discovery.scout_models import citation_rows
 from resume_agent.discovery.search_scout import (
     MAX_SUGGESTIONS,
     SearchSuggestions,
@@ -27,6 +28,9 @@ _EXISTING_FIELD = {
     "title": "titles",
     "role_anchor": "role_anchors",
     "exclude_term": "exclude_terms",
+    "location": "locations",
+    "seniority": "experience_levels",
+    "adjacent_role": "titles",
 }
 
 
@@ -72,13 +76,14 @@ def scout_search_context(search_path: str, profile_dir: Path) -> str:
 
 
 def _existing_terms(search_path: str) -> dict[str, set[str]]:
+    fields = set(_EXISTING_FIELD.values())
     try:
         search = load_search_config(search_path)
     except (OSError, ValueError):
-        return {kind: set() for kind in _EXISTING_FIELD}
+        return {field: set() for field in fields}
     return {
-        kind: {term.casefold() for term in getattr(search, field, [])}
-        for kind, field in _EXISTING_FIELD.items()
+        field: {term.casefold() for term in getattr(search, field, [])}
+        for field in fields
     }
 
 
@@ -109,13 +114,27 @@ def run_search_discovery(
             continue
         kind = suggestion.kind
         fold = value.casefold()
-        dedupe_key = (kind, fold)
+        destination = _EXISTING_FIELD[kind]
+        dedupe_key = (destination, fold)
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
-        status = "duplicate" if fold in existing.get(kind, set()) else "new"
+        status = "duplicate" if fold in existing[destination] else "new"
         rows.append(
-            {"value": value, "kind": kind, "reason": suggestion.reason, "status": status}
+            {
+                "value": value,
+                "kind": kind,
+                "reason": suggestion.reason,
+                "status": status,
+                "fitScore": suggestion.fit_score,
+                "citations": citation_rows(suggestion.citations),
+            }
         )
+    rows.sort(
+        key=lambda row: (
+            0 if row["status"] == "new" else 1,
+            -row["fitScore"] if row["fitScore"] is not None else 1,
+        )
+    )
     reporter.step(1)
     return {"prompt": prompt, "suggestions": rows}

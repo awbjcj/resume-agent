@@ -30,6 +30,11 @@ export function SearchSettingsPage() {
               ...draft,
               keywords: dedupe(draft.keywords, added.keywords),
               titles: dedupe(draft.titles, added.titles),
+              locations: dedupe(draft.locations, added.locations),
+              experienceLevels: dedupe(
+                draft.experienceLevels,
+                added.experienceLevels,
+              ),
               roleAnchors: dedupe(draft.roleAnchors, added.roleAnchors),
               excludeTerms: dedupe(draft.excludeTerms, added.excludeTerms),
             })

@@ -17,11 +17,13 @@ from resume_agent.llm_runner import (
     Runner,
     build_model,
     build_search_equipped,
+    provider_capabilities,
     retry_kwargs,
     tool_kwargs,
     use_json_mode_for,
 )
 from resume_agent.models.base import ExtensibleModel
+from resume_agent.discovery.scout_models import Citation
 from resume_agent.services.sources import preview_source
 
 MAX_CANDIDATES = 12
@@ -33,6 +35,9 @@ class ScoutCandidate(ExtensibleModel):
     careers_url: str = ""
     reason: str = ""
     confidence: Literal["high", "medium", "low"] = "medium"
+    fit_score: int | None = Field(default=None, ge=0, le=100)
+    signal: Literal["positive", "avoid"] = "positive"
+    citations: list[Citation] = Field(default_factory=list)
 
 
 class ScoutReport(ExtensibleModel):
@@ -84,6 +89,10 @@ _RESEARCH_INSTRUCTIONS = [
     "as a scrape candidate.",
     f"Return at most {MAX_CANDIDATES} compact lines with company, exact HTTP(S) URL, probe result, "
     "and one evidence-based fit reason.",
+    "For each recommendation, give a 0-100 fit score grounded in the supplied profile and include "
+    "the title and exact HTTP(S) URL of the web evidence used. Mark a company as avoid only when "
+    "the evidence shows a concrete negative signal such as a hiring freeze, material layoffs, or "
+    "a clear mismatch. An avoid recommendation may omit a careers URL but must include evidence.",
 ]
 
 _FORMAT_INSTRUCTIONS = [
@@ -91,13 +100,21 @@ _FORMAT_INSTRUCTIONS = [
     "Convert only entries with an explicit HTTP(S) careers URL into ScoutCandidate rows. Copy URLs exactly; "
     "never invent, repair, shorten, or substitute them.",
     "Set confidence high only when the notes explicitly report a successful check_source result.",
+    "Copy fit_score, signal, and citations verbatim from the notes. Never invent a score, URL, "
+    "citation title, or avoid signal. Positive rows require an HTTP(S) careers URL; explicit avoid "
+    "rows may omit it when their evidence URL is present.",
     f"Return at most {MAX_CANDIDATES} candidates and prefer verified boards.",
 ]
 
 
 def build_scout_research_agent(check_source: Callable[[str], str]) -> Runner:
     settings = get_settings()
-    model, search_tools = build_search_equipped(settings.mid_model)
+    capabilities = provider_capabilities(settings.mid_model)
+    model, search_tools = build_search_equipped(
+        settings.mid_model,
+        reasoning=capabilities.supports_reasoning,
+        cache_system_prompt=capabilities.supports_prompt_cache,
+    )
     return AgentRunner(
         Agent(
             model=model,

@@ -30,6 +30,9 @@ describe("SuggestSearchTermsDialog", () => {
           { value: "Rust", kind: "keyword", reason: "profile uses Rust", status: "new" },
           { value: "python", kind: "keyword", reason: "dup", status: "duplicate" },
           { value: "Staff Engineer", kind: "title", reason: "seniority", status: "new" },
+          { value: "Berlin", kind: "location", reason: "hiring hub", status: "new", fitScore: 88, citations: [{ url: "https://example.test/berlin", title: "Berlin hub" }] },
+          { value: "mid-senior", kind: "seniority", reason: "profile depth", status: "new" },
+          { value: "Platform Architect", kind: "adjacent_role", reason: "adjacent fit", status: "new" },
         ],
       },
     };
@@ -42,11 +45,20 @@ describe("SuggestSearchTermsDialog", () => {
 
     await userEvent.click(await screen.findByRole("checkbox", { name: /select rust/i }));
     await userEvent.click(screen.getByRole("checkbox", { name: /select staff engineer/i }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /select berlin/i }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /select mid-senior/i }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /select platform architect/i }));
+    expect(screen.getByRole("link", { name: "Berlin hub" })).toHaveAttribute(
+      "href",
+      "https://example.test/berlin",
+    );
     await userEvent.click(screen.getByRole("button", { name: /add selected/i }));
 
     expect(onApply).toHaveBeenCalledWith({
       keywords: ["Rust"],
-      titles: ["Staff Engineer"],
+      titles: ["Staff Engineer", "Platform Architect"],
+      locations: ["Berlin"],
+      experienceLevels: ["mid-senior"],
       roleAnchors: [],
       excludeTerms: [],
     });

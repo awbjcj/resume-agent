@@ -1,7 +1,7 @@
 # Scout Agent Enhancement — Design
 
 **Date:** 2026-07-22
-**Status:** Approved (design); implementation plan pending
+**Status:** Approved with correctness amendments; implementation in progress
 **Scope:** Enhance the two agno-backed advisor agents — **Source Scout** (recommends
 companies / careers-board URLs) and **Search Scout** (recommends keywords / titles /
 role-anchors / exclude-terms) — to produce ranked, web-cited, multi-axis
@@ -21,6 +21,33 @@ Make the scouts genuinely good advisors along three axes the user selected:
 
 Explicitly **out of scope**: coordinated source+term bundles (the two scouts stay
 independent), and any third LLM stage (fast-by-default posture preserved).
+
+## Correctness amendments
+
+The implementation audit found contract mismatches between the initial design, the
+plan, and the running application. These rules are binding:
+
+- Capability probing is conservative for unknown prefixes and unknown model families,
+  and model builders re-check capabilities before attaching requested reasoning kwargs.
+- Gemini native search uses Agno's Interactions wrapper with `store=False`; OpenAI
+  Responses search also sets `store=False`. The scouts are single-turn and must not
+  opt profile context into provider-side conversation retention merely to gain search.
+- Provider runtime failures retain the existing bounded retry/error semantics. Only
+  unsupported capabilities degrade pre-call; there is no hidden second LLM call.
+- `Citation` is a shared scout model, HTTP(S)-only at the service boundary, and both
+  fit-score fields are validated in the inclusive range 0-100.
+- URL-less explicit `avoid` recommendations are retained and never probed. Positive
+  source recommendations still require a careers URL.
+- Search kinds map to persisted config fields: `location -> locations`,
+  `adjacent_role -> titles`, `seniority -> experience_levels`; seniority uses the
+  existing LinkedIn value vocabulary. Dedupe follows the destination field.
+- Scout results are nested inside generic `RunOut.result: Any`; the unrelated
+  match-gap suggestion schemas are not their contract. Update the service row shapes
+  and the web client's local types/components/tests. A typed run-result/OpenAPI
+  redesign remains out of scope.
+- The existing web dialogs are part of this feature: they render rank/evidence/avoid
+  state and can apply every actionable suggestion kind with accessible, base-nova
+  shadcn composition.
 
 ## Structural decision
 
@@ -118,10 +145,11 @@ supplies nothing.
 - **Fit-scoring + avoid-judgment run inside the reasoning-enabled research agent** — no
   third LLM call. When reasoning is unavailable (Haiku formatter, `deepseek-chat`,
   unknown provider) the research agent still scores, just without a deliberation budget.
-- **Prompt caching**: the large, stable grounding block (profile facts, top skills,
-  existing sources / current search terms) is marked cacheable so repeated runs in a
-  session are cheaper. Caching is **cost-only** — correctness never depends on a cache
-  hit, and a `cache_read == 0` outcome is not a failure.
+- **Prompt caching**: Anthropic's stable system/tool prefix is marked cacheable;
+  OpenAI/Gemini/DeepSeek may use their provider-managed implicit caches. Per-run profile
+  grounding stays in the user message because it changes by workspace/run and must not
+  be mistaken for a reusable system prefix. Caching is **cost-only** — correctness never
+  depends on a cache hit, and a `cache_read == 0` outcome is not a failure.
 - All four features are **best-effort**; a provider lacking one produces valid,
   un-enriched output.
 - All model-feature kwargs are attached through **agno** model params via the
@@ -131,39 +159,44 @@ supplies nothing.
 
 Changes in `services/source_discovery.py` and `services/search_discovery.py`:
 
-- `scout_context` / `scout_search_context` remain the context producers; their stable
-  prefix is marked cacheable (via the research builder's caching directive).
+- `scout_context` / `scout_search_context` remain the context producers and stay in the
+  per-run user message. The stable research instructions and tool definitions form the
+  only explicitly cacheable Anthropic prefix.
 - **Ranking**: sort by `fit_score` descending within each status group. Source Scout
-  status precedence: `validated` > `unverified` > `failed` > `duplicate`; Search Scout:
-  `new` > `duplicate`. `None` scores sort last within their group.
+  status precedence: `validated` > `unverified` > `avoid` > `failed` > `duplicate`;
+  Search Scout: `new` > `duplicate`. `None` scores sort last within their group.
 - **Validation fan-out runs only on `positive` candidates.** `avoid` rows skip the URL
   probe entirely and are returned with their citations + rationale, no ATS/reachability
   fields.
-- **Dedupe for new kinds** (extends `_EXISTING_FIELD`):
+- **Dedupe and apply targets for new kinds** (extends `_EXISTING_FIELD`):
   - `location → search.locations`
   - `adjacent_role → search.titles`
-  - `seniority` has no `search.yaml` field → **always surfaced as `new` (advisory-only)**.
+  - `seniority → search.experience_levels` using the existing LinkedIn vocabulary.
+  In-run dedupe is by destination field plus folded value, not by presentation kind.
 - **Citations flow** research → formatter as untrusted data; the formatter copies them
   verbatim and never invents — the existing fact-lock / untrusted-notes discipline is
   preserved. Set `fit_score` high-confidence only when the notes explicitly support it,
   mirroring the current "confidence high only on explicit check_source success" rule.
 
-## 5. API contract
+## 5. API and web contract
 
-- Extend the camelCase response schemas (`api/schemas/suggestions.py`) with `fitScore`,
-  `signal`, `citations`, and the new `SuggestionKind` values.
-- Regenerate `contracts/openapi.json` + `contracts/ts/api.ts` via
-  `bash scripts/gen_ts_client.sh`.
-- `tests/api/test_openapi_contract.py` (drift gate) must pass.
-- Purely **additive** — no field removed or renamed, no breaking change to existing
-  clients.
+- Scout completion data remains an additive camelCase dict nested in generic
+  `RunOut.result: Any`. Do not modify `api/schemas/suggestions.py`; it belongs to the
+  separate match-gap advisor.
+- Update the local web consumer types and both scout dialogs in the same change as the
+  service rows. Those types are the concrete checked consumer contract for this
+  intentionally generic run-result payload.
+- `tests/api/test_openapi_contract.py` must remain green and the generated contract must
+  remain unchanged. A separately designed typed-run-result union would be required
+  before OpenAPI could describe result shapes by run kind.
+- The response additions are backward-compatible: no existing key is removed or renamed.
 
 ## 6. Error handling
 
 - **Capability probe**: never raises; unknown/unresolvable → conservative all-`False`.
-- **Reasoning failure/timeout**: handled by the existing agno retry (`retry_kwargs` /
-  `AgentRunner` `is_transient`); the run still produces recommendations, just without a
-  deliberation budget on the failed call.
+- **Reasoning failure/timeout**: handled by the existing bounded `AgentRunner`
+  `is_transient` retry policy. If retries are exhausted the run fails normally; there is
+  no hidden fallback request without reasoning.
 - **Citations absent** (DeepSeek/DuckDuckGo, or provider returned none): `citations=[]`,
   the rationale stands alone. No hard failure.
 - **Caching**: cost-only; `cache_read == 0` is never treated as an error.
@@ -183,7 +216,7 @@ key, no network.
   `avoid` signals, and new-kind suggestions; assert:
   - ranking by `fit_score` within status groups,
   - `avoid` rows skip the validation fan-out,
-  - dedupe of the new kinds (`location`, `adjacent_role`) and advisory-only `seniority`,
+  - dedupe/apply mapping of `location`, `adjacent_role`, and canonical `seniority`,
   - citation passthrough (formatter copies verbatim).
 - **Capability-mapping assertions**: verify *which* agno model kwargs get attached per
   provider+model (reasoning on research-with-capable-model, never on formatter, cache
@@ -196,12 +229,13 @@ key, no network.
 | Path | Change |
 |---|---|
 | `src/resume_agent/llm_runner.py` | New `provider_capabilities` seam + `ProviderCapabilities`; builders attach gated kwargs |
+| `src/resume_agent/discovery/scout_models.py` | Shared citation value model |
 | `src/resume_agent/discovery/source_scout.py` | `Citation`, `ScoutCandidate` fields (`fit_score`, `signal`, `citations`); research instructions for scoring/avoid/citations |
 | `src/resume_agent/discovery/search_scout.py` | New `SuggestionKind`s, `fit_score`, `citations`; research instructions |
 | `src/resume_agent/services/source_discovery.py` | Ranking, avoid-skips-validation, citation rows |
 | `src/resume_agent/services/search_discovery.py` | Ranking, new-kind dedupe, citation rows |
-| `src/resume_agent/api/schemas/suggestions.py` | camelCase `fitScore`, `signal`, `citations`, new kinds |
-| `contracts/openapi.json`, `contracts/ts/api.ts` | Regenerated |
+| `web/src/features/sources/*` | Typed enriched Source Scout rows and accessible evidence/avoid UI |
+| `web/src/features/search-scout/*` | Typed enriched Search Scout rows, grouping, evidence, and apply mapping |
 | `tests/` | Capability probe unit tests; enriched scout service tests |
 
 ## Non-goals / preserved invariants

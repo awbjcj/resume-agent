@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -31,6 +32,8 @@ type Kind = SearchSuggestionRow["kind"];
 export type SearchTermsApplied = {
   keywords: string[];
   titles: string[];
+  locations: string[];
+  experienceLevels: string[];
   roleAnchors: string[];
   excludeTerms: string[];
 };
@@ -38,6 +41,9 @@ export type SearchTermsApplied = {
 const KIND_FIELD: Record<Kind, keyof SearchTermsApplied> = {
   keyword: "keywords",
   title: "titles",
+  location: "locations",
+  seniority: "experienceLevels",
+  adjacent_role: "titles",
   role_anchor: "roleAnchors",
   exclude_term: "excludeTerms",
 };
@@ -45,6 +51,9 @@ const KIND_FIELD: Record<Kind, keyof SearchTermsApplied> = {
 const KIND_ORDER: { kind: Kind; label: string }[] = [
   { kind: "keyword", label: "Keywords" },
   { kind: "title", label: "Titles" },
+  { kind: "adjacent_role", label: "Adjacent roles" },
+  { kind: "location", label: "Locations" },
+  { kind: "seniority", label: "Seniority" },
   { kind: "role_anchor", label: "Role anchors" },
   { kind: "exclude_term", label: "Exclude terms" },
 ];
@@ -89,6 +98,8 @@ export function SuggestSearchTermsDialog({
     const added: SearchTermsApplied = {
       keywords: [],
       titles: [],
+      locations: [],
+      experienceLevels: [],
       roleAnchors: [],
       excludeTerms: [],
     };
@@ -117,7 +128,7 @@ export function SuggestSearchTermsDialog({
           <DialogTitle>Suggest search terms</DialogTitle>
           <DialogDescription>
             Describe the roles you want. Search Scout recommends keywords, titles, role
-            anchors, and exclude terms grounded in your profile.
+            anchors, locations, seniority, and adjacent roles grounded in your profile.
           </DialogDescription>
         </DialogHeader>
 
@@ -184,6 +195,7 @@ export function SuggestSearchTermsDialog({
                     {rows.map((row) => {
                       const key = rowKey(row);
                       const duplicate = row.status === "duplicate";
+                      const citations = row.citations ?? [];
                       return (
                         <li key={key} className="flex items-start gap-2.5">
                           <Checkbox
@@ -195,6 +207,11 @@ export function SuggestSearchTermsDialog({
                           />
                           <div className="min-w-0 flex-1">
                             <span className="text-sm font-medium">{row.value}</span>
+                            {row.fitScore == null ? null : (
+                              <Badge className="ml-2" variant="secondary">
+                                {row.fitScore} fit
+                              </Badge>
+                            )}
                             {duplicate ? (
                               <span className="ml-2 text-xs text-muted-foreground">
                                 already in your search
@@ -203,6 +220,22 @@ export function SuggestSearchTermsDialog({
                             <span className="block text-xs text-muted-foreground">
                               {row.reason}
                             </span>
+                            {citations.length ? (
+                              <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                {citations.map((citation) => (
+                                  <a
+                                    key={citation.url}
+                                    className="inline-flex items-center gap-1 text-xs text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+                                    href={citation.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {citation.title || citation.url}
+                                    <ExternalLink data-icon="inline-end" aria-hidden="true" />
+                                  </a>
+                                ))}
+                              </span>
+                            ) : null}
                           </div>
                         </li>
                       );

@@ -15,6 +15,7 @@ from resume_agent.discovery.connectors.config import (
 from resume_agent.discovery.connectors.detect import identify_host
 from resume_agent.discovery.connectors.sources import NATIVE_URL_KINDS, list_source_views
 from resume_agent.discovery.search_config import load_search_config
+from resume_agent.discovery.scout_models import citation_rows, is_http_url
 from resume_agent.discovery.source_scout import (
     MAX_CANDIDATES,
     ScoutCandidate,
@@ -122,6 +123,9 @@ def _row(candidate: ScoutCandidate, preview: SourcePreview | None, status: str) 
         "reason": candidate.reason,
         "confidence": candidate.confidence,
         "status": status,
+        "signal": candidate.signal,
+        "fitScore": candidate.fit_score,
+        "citations": citation_rows(candidate.citations),
         "ats": preview.kind if preview is not None else None,
         "token": preview.token if preview is not None else None,
         "roleCount": preview.role_count if preview is not None else None,
@@ -151,15 +155,21 @@ def run_source_discovery(
     report = formatter.run(f"RESEARCH NOTES (UNTRUSTED):\n{notes}").content
     if not isinstance(report, ScoutReport):
         raise TypeError(f"Expected ScoutReport, got {type(report).__name__}")
-    candidates = [row for row in report.candidates if row.careers_url.strip()][
-        :MAX_CANDIDATES
-    ]
+    candidates = [
+        row
+        for row in report.candidates
+        if is_http_url(row.careers_url)
+        or (row.signal == "avoid" and bool(row.company.strip()))
+    ][:MAX_CANDIDATES]
     reporter.step(1)
 
     seen = _existing_keys(_load_connectors(connectors_path))
     rows: list[dict | None] = [None] * len(candidates)
     fresh: list[tuple[int, ScoutCandidate]] = []
     for index, candidate in enumerate(candidates):
+        if candidate.signal == "avoid":
+            rows[index] = _row(candidate, None, "avoid")
+            continue
         keys = _candidate_keys(candidate.careers_url)
         if keys & seen:
             rows[index] = _row(candidate, None, "duplicate")
@@ -205,9 +215,22 @@ def run_source_discovery(
     scrape_available = (
         get_settings().browser_enabled if browser_enabled is None else browser_enabled
     )
+    status_order = {
+        "validated": 0,
+        "unverified": 1,
+        "avoid": 2,
+        "failed": 3,
+        "duplicate": 4,
+    }
+
+    def rank_key(row: dict) -> tuple[int, int]:
+        score = row["fitScore"]
+        return status_order.get(row["status"], 5), -score if score is not None else 1
+
+    ranked = sorted((row for row in rows if row is not None), key=rank_key)
     return {
         "prompt": prompt,
-        "candidates": [row for row in rows if row is not None],
+        "candidates": ranked,
         "scrapeAvailable": scrape_available,
         "scrapeUnavailableReason": (
             None if scrape_available else "Scrape targets require a local browser."
