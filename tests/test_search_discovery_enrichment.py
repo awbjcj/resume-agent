@@ -17,7 +17,10 @@ class _Runner:
     def __init__(self, content):
         self.content = content
 
-    def run(self, _prompt):
+    def run(self, prompt: str) -> Any:
+        return _Response(self.content)
+
+    async def arun(self, prompt: str) -> Any:
         return _Response(self.content)
 
 
