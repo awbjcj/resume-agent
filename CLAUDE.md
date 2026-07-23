@@ -202,6 +202,14 @@ Safety ceiling: `_MAX_OFFSET = 1000` (≤51 pages) even if the tenant ignores
 `searchText`. Keep `search.yaml` role anchors tight — the title-gate's
 aggressiveness determines how many detail fetches are issued.
 
+**Throttle-resilient.** A big board fires many list + detail requests, so both
+HTTP calls go through `_request_with_retry`: transient statuses (`429`, `500`,
+`502`, `503`, `504`) are retried with backoff — a numeric `Retry-After` is
+honored, else exponential (`_RETRY_BACKOFF_S · 2ⁿ`, capped at
+`_MAX_RETRY_SLEEP_S`) — for `_RETRY_ATTEMPTS` tries before the last error is
+re-raised, so a persistently-throttled board still surfaces as a per-URL failure
+(the companies connector isolates it) rather than aborting sibling URLs.
+
 ---
 
 ## Relevance gates (`text.py`)
