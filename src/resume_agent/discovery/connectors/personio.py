@@ -1,43 +1,40 @@
+import json
+
 import httpx
-from bs4 import BeautifulSoup
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
-from resume_agent.discovery.connectors.dates import parse_iso_datetime
 from resume_agent.discovery.connectors.detect import AtsTarget
 from resume_agent.discovery.connectors.text import html_to_markdown
 from resume_agent.discovery.search_config import SearchConfig
 
 
-def feed_url(token: str, country: str = "com") -> str:
-    return f"https://{token}.jobs.personio.{country}/xml"
+def search_url(token: str, country: str = "com") -> str:
+    # Personio's legacy /xml feed is gone for companies on the new careers
+    # platform (bare 404); /search.json is the universal JSON endpoint and
+    # serves the full job description inline, so no per-job detail fetch.
+    return f"https://{token}.jobs.personio.{country}/search.json?language=en"
 
 
-def _text(node) -> str:
-    return node.get_text(strip=True) if node is not None else ""
+def job_url(token: str, country: str, position_id: str) -> str:
+    return f"https://{token}.jobs.personio.{country}/job/{position_id}"
 
 
-def parse_personio(xml_text: str, token: str, country: str = "com") -> list[RawJob]:
-    soup = BeautifulSoup(xml_text, "xml")
+def parse_personio(payload: str, token: str, country: str = "com") -> list[RawJob]:
+    positions = json.loads(payload)
     rows = []
-    for position in soup.find_all("position"):
-        position_id = _text(position.find("id"))
-        parts = []
-        for section in position.find_all("jobDescription"):
-            if heading := _text(section.find("name")):
-                parts.append(f"<h2>{heading}</h2>")
-            if value := section.find("value"):
-                parts.append(value.get_text())
+    for position in positions:
+        position_id = position.get("id")
         rows.append(
             RawJob(
                 source="personio",
-                url=f"https://{token}.jobs.personio.{country}/job/{position_id}"
-                if position_id
+                url=job_url(token, country, str(position_id))
+                if position_id is not None
                 else None,
-                company=_text(position.find("subcompany")) or token,
-                title=_text(position.find("name")),
-                location=_text(position.find("office")) or None,
-                jd_text=html_to_markdown("\n".join(parts)),
-                posted_at=parse_iso_datetime(_text(position.find("createdAt"))),
+                company=position.get("subcompany") or token,
+                title=position.get("name"),
+                location=position.get("office") or None,
+                jd_text=html_to_markdown(position.get("description") or ""),
+                posted_at=None,
             )
         )
     return rows
@@ -49,6 +46,8 @@ def fetch_personio(
     limit: int | None = None,
     skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
-    response = httpx.get(feed_url(target.token, target.country), timeout=30)
+    response = httpx.get(
+        search_url(target.token, target.country), timeout=30, follow_redirects=True
+    )
     response.raise_for_status()
     return parse_personio(response.text, target.token, target.country)
