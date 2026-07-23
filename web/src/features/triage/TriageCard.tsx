@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FitMeter } from "@/components/FitMeter";
 import { StatusBadge } from "@/components/StatusBadge";
+import { locationLabel } from "@/lib/format";
 import type { TriageItem } from "./use-triage";
 
 export function TriageCard({
@@ -33,7 +34,7 @@ export function TriageCard({
           {row.title ?? "—"}
         </div>
         <div className="mt-1 text-sm text-muted-foreground">
-          {row.company ?? "—"} · {row.location ?? "location n/a"}
+          {row.company ?? "—"} · {locationLabel(row) ?? "location n/a"}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <StatusBadge status={row.status} />

@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { locationLabel } from "@/lib/format";
 
 type Row = {
   jobId: number;
@@ -19,6 +20,9 @@ type Row = {
   fitScore: number | null;
   source?: string;
   location?: string | null;
+  locationCountry?: string | null;
+  locationRegion?: string | null;
+  locationCity?: string | null;
   status?: string;
   postedAt?: string | null;
   url?: string | null;
@@ -133,10 +137,10 @@ export function JobTable({
             </TableCell>
             <TableCell
               className="min-w-0 truncate text-muted-foreground"
-              title={row.location ?? undefined}
+              title={locationLabel(row) ?? undefined}
               onClick={() => onOpen(row.jobId)}
             >
-              {row.location ?? "—"}
+              {locationLabel(row) ?? "—"}
             </TableCell>
             <TableCell onClick={() => onOpen(row.jobId)}>
               {row.status ? <StatusBadge status={row.status} /> : "—"}

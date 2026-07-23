@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -109,15 +110,28 @@ class JobCriteriaExtract(BaseModel):
         """
         return [] if value is None else value
 
-    def to_criteria(self) -> JobCriteria:
+    def to_criteria(
+        self, *, usd_rate_lookup: Callable[[str], float | None] | None = None
+    ) -> JobCriteria:
         """Map the lean extraction result onto the persisted domain model."""
         salary = None
         if self.salary_range is not None:
             sr = self.salary_range
+            from resume_agent.discovery.currency import convert_salary_to_usd
+
+            conversion_kwargs = (
+                {"rate_lookup": usd_rate_lookup} if usd_rate_lookup is not None else {}
+            )
+            minimum, maximum, currency = convert_salary_to_usd(
+                sr.minimum,
+                sr.maximum,
+                sr.currency or "USD",
+                **conversion_kwargs,
+            )
             salary = SalaryRange(
-                minimum=sr.minimum,
-                maximum=sr.maximum,
-                currency=sr.currency or "USD",
+                minimum=minimum,
+                maximum=maximum,
+                currency=currency,
                 period=sr.period or "year",
             )
         return JobCriteria(

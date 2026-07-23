@@ -1,7 +1,7 @@
 // Structured meta panel for the modal rail. Labeled rows, null-omitting,
 // surfacing the full per-job facet set.
 
-import { salaryLabel, recency } from "@/lib/format";
+import { locationLabel, salaryLabel, recency } from "@/lib/format";
 import { industryLabel } from "@/lib/filters/industry-label";
 import type { JobDetail } from "@/features/job/use-job-detail";
 
@@ -25,9 +25,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function JobMeta({ job }: { job: JobDetail }) {
   const salary = salaryLabel(job.salaryMin, job.salaryMax, job.salaryCurrency);
   const posted = recency(job.postedAt);
-  const locationParts = [job.locationCity, job.locationRegion, job.locationCountry]
-    .filter(Boolean)
-    .join(", ");
+  const location = locationLabel(job);
 
   const rows: Array<[string, React.ReactNode]> = [];
   if (salary) rows.push(["Salary", salary]);
@@ -43,8 +41,7 @@ export function JobMeta({ job }: { job: JobDetail }) {
     ]);
   if (job.industry) rows.push(["Industry", industryLabel(job.industry)]);
   if (job.companySize) rows.push(["Company size", job.companySize]);
-  if (locationParts || job.location)
-    rows.push(["Location", locationParts || job.location]);
+  if (location) rows.push(["Location", location]);
   if (posted) rows.push(["Posted", posted]);
   rows.push(["Source", job.source]);
 

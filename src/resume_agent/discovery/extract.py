@@ -28,8 +28,9 @@ _INSTRUCTIONS = [
     "otherwise null.",
     "Extract the minimum required years of experience as yoe_min. Do not turn a preferred or "
     "maximum value into a minimum.",
-    "Extract salary minimum, maximum, currency, and period only when stated. Preserve the stated "
-    "pay period rather than converting it.",
+    "Extract salary minimum, maximum, source currency, and period only when stated. Preserve the "
+    "stated pay period rather than converting it; the application converts non-USD amounts to USD "
+    "after extraction.",
     "Set remote_policy to remote, hybrid, or onsite only when supported, and capture the stated "
     "job location separately.",
     "List the concrete tech stack (tech_stack): named languages, frameworks, platforms, databases, "

@@ -123,6 +123,35 @@ def test_extract_preserves_fractional_hourly_salary():
     assert out.salary_range.period == "hour"
 
 
+def test_extract_converts_non_usd_salary_to_usd():
+    extracted = _extract(
+        salary_range={
+            "minimum": 100_000,
+            "maximum": 120_000,
+            "currency": "eur",
+            "period": "year",
+        }
+    )
+
+    out = extracted.to_criteria(usd_rate_lookup=lambda currency: 1.08)
+
+    assert out.salary_range is not None
+    assert (out.salary_range.minimum, out.salary_range.maximum) == (108_000, 129_600)
+    assert out.salary_range.currency == "USD"
+
+
+def test_extract_keeps_source_currency_when_rate_is_unavailable():
+    extracted = _extract(
+        salary_range={"minimum": 10, "maximum": 20, "currency": "INR", "period": "hour"}
+    )
+
+    out = extracted.to_criteria(usd_rate_lookup=lambda currency: None)
+
+    assert out.salary_range is not None
+    assert (out.salary_range.minimum, out.salary_range.maximum) == (10, 20)
+    assert out.salary_range.currency == "INR"
+
+
 def test_extract_rejects_wrong_type():
     with pytest.raises(TypeError):
         extract_job_criteria("x", _FakeAgent("nope"))

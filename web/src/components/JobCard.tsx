@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FitMeter } from "./FitMeter";
-import { metaLine } from "@/lib/format";
+import { locationLabel, metaLine } from "@/lib/format";
 import type { ShortlistItem } from "@/lib/filters/types";
 
 const SPONSORSHIP_PILL: Record<string, string> = {
@@ -37,6 +37,7 @@ export function JobCard({
   const shown = sorted.slice(0, SKILL_CAP);
   const overflow = sorted.length - shown.length;
   const meta = metaLine(row);
+  const location = locationLabel(row);
   const sponsorPill =
     row.sponsorshipSignal && SPONSORSHIP_PILL[row.sponsorshipSignal];
 
@@ -63,7 +64,7 @@ export function JobCard({
               {row.title ?? "—"}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
-              {row.company ?? "—"} · {row.location ?? "location n/a"}
+              {row.company ?? "—"} · {location ?? "location n/a"}
             </div>
 
             {(meta.length > 0 || sponsorPill) && (

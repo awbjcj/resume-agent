@@ -40,6 +40,76 @@ export function recency(postedAt: string | null | undefined): string | null {
   return months === 1 ? "1mo ago" : `${months}mo ago`;
 }
 
+// Words that stay lowercase mid-phrase when title-casing a raw location string
+// (e.g. "United States of America" -> "of" stays lowercase, not "Of").
+const LOWERCASE_LOCATION_WORDS = new Set(["of", "the", "and", "de", "la", "van", "von"]);
+
+function titleCaseWord(word: string): string {
+  return word
+    .split(/([-'])/)
+    .map((part) => (part === "-" || part === "'" || !part ? part : part[0].toUpperCase() + part.slice(1).toLowerCase()))
+    .join("");
+}
+
+function titleCase(text: string): string {
+  return text
+    .trim()
+    .split(/\s+/)
+    .map((word, i) => {
+      const lower = word.toLowerCase();
+      if (i > 0 && LOWERCASE_LOCATION_WORDS.has(lower)) return lower;
+      return titleCaseWord(word);
+    })
+    .join(" ");
+}
+
+/** A bare 2-3 letter alpha token reads as a code (country/state abbreviation, e.g.
+ * "US", "IE", "NY") and is uppercased; anything longer is title-cased so a
+ * source that shouts "CALIFORNIA" renders as "California". */
+function formatLocationSegment(segment: string): string {
+  const trimmed = segment.trim();
+  if (!trimmed) return "";
+  if (/^[a-z]{2,3}$/i.test(trimmed)) return trimmed.toUpperCase();
+  // Sources commonly write remote locations as "Remote - us". Keep the
+  // descriptive part readable while treating the trailing token as a code.
+  const trailingCode = /^(.*?)(\s[-–]\s)([a-z]{2,3})$/i.exec(trimmed);
+  if (trailingCode) {
+    return `${titleCase(trailingCode[1])}${trailingCode[2]}${trailingCode[3].toUpperCase()}`;
+  }
+  return titleCase(trimmed);
+}
+
+/** Normalizes a raw, un-structured location string ("san francisco, CALIFORNIA,
+ * us") into consistent casing ("San Francisco, CALIFORNIA" -> "San Francisco,
+ * California, US"). */
+export function formatLocationText(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const formatted = raw
+    .split(",")
+    .map(formatLocationSegment)
+    .filter(Boolean)
+    .join(", ");
+  return formatted || null;
+}
+
+/** The single source of truth for how a job's location renders anywhere in the
+ * UI: prefers the backend-normalized city/region/country facets (already
+ * correctly cased — ISO2 country, USPS state) and only falls back to
+ * formatting the raw scraped string when those facets are absent. */
+export function locationLabel(job: {
+  location?: string | null;
+  locationCity?: string | null;
+  locationRegion?: string | null;
+  locationCountry?: string | null;
+}): string | null {
+  const structured = [job.locationCity, job.locationRegion, job.locationCountry]
+    .filter(Boolean)
+    .map((part) => formatLocationSegment(part!))
+    .join(", ");
+  if (structured) return structured;
+  return formatLocationText(job.location);
+}
+
 /** One compact line: salary · seniority · type · industry · recency. */
 export function metaLine(row: {
   salaryMin?: number | null;

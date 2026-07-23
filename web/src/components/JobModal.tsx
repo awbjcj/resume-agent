@@ -20,6 +20,7 @@ import { VersionRow } from "@/features/job/VersionRow";
 import { RevisionRunPlaceholders } from "@/features/job/RevisionRunPlaceholders";
 import { useJobDetail } from "@/features/job/use-job-detail";
 import { JdBody } from "./JdBody";
+import { locationLabel } from "@/lib/format";
 
 type ClosedLoopApplication = {
   resumeVersionId?: number | null;
@@ -141,7 +142,7 @@ export function JobModal({
                     {job.company ?? "—"}
                   </span>
                   <span aria-hidden>·</span>
-                  <span>{job.location ?? "location n/a"}</span>
+                  <span>{locationLabel(job) ?? "location n/a"}</span>
                   <StatusBadge status={job.status} />
                   <div className="ml-auto flex items-center gap-2">
                     <Button
