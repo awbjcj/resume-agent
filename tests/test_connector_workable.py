@@ -16,7 +16,10 @@ def test_workable_maps_public_account_payload():
     )
     jobs = parse_workable(payload, "careers")
 
-    assert account_url("careers") == "https://www.workable.com/api/accounts/careers"
+    assert (
+        account_url("careers")
+        == "https://apply.workable.com/api/v1/widget/accounts/careers"
+    )
     assert jobs[0].company == "Workable"
     assert jobs[0].location == "Athens, Attica, Greece"
     assert "Ship tested APIs" in jobs[0].jd_text
@@ -35,7 +38,7 @@ def test_workable_fetch_uses_details_endpoint(monkeypatch):
         def json(self):
             return payload
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, timeout=None, follow_redirects=None):
         captured.update(url=url, params=params)
         return Response()
 

@@ -8,7 +8,9 @@ from resume_agent.discovery.search_config import SearchConfig
 
 
 def account_url(account: str) -> str:
-    return f"https://www.workable.com/api/accounts/{account}"
+    # Workable relocated the public account feed off www.workable.com/api/accounts
+    # (which now 302-redirects) to the apply.workable.com widget API.
+    return f"https://apply.workable.com/api/v1/widget/accounts/{account}"
 
 
 def _location(item: dict) -> str | None:
@@ -43,7 +45,10 @@ def fetch_workable(
     skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
     response = httpx.get(
-        account_url(target.token), params={"details": "true"}, timeout=30
+        account_url(target.token),
+        params={"details": "true"},
+        timeout=30,
+        follow_redirects=True,
     )
     response.raise_for_status()
     return parse_workable(response.json(), target.token)
