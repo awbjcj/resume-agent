@@ -9,19 +9,22 @@ from resume_agent.discovery.connectors.base import (
 from resume_agent.discovery.connectors.config import LeverBoard
 from resume_agent.discovery.connectors.dates import parse_epoch_millis
 from resume_agent.discovery.connectors.harvest import harvest
-from resume_agent.discovery.connectors.text import html_to_markdown, primary_location
+from resume_agent.discovery.connectors.text import html_to_markdown
 from resume_agent.discovery.search_config import SearchConfig
 
 _BASE = "https://api.lever.co/v0/postings"
 
 
-def fetch_lever_board(token: str, search: SearchConfig | None = None) -> list:
-    """GET a Lever board's postings array in JSON mode."""
-    params = {"mode": "json"}
-    location = primary_location(search) if search is not None else ""
-    if location:
-        params["location"] = location
-    resp = httpx.get(f"{_BASE}/{token}", params=params, timeout=30)
+def fetch_lever_board(token: str) -> list:
+    """GET a Lever board's full postings array in JSON mode.
+
+    No server-side ``location`` filter: Lever's ``?location=`` param is an exact,
+    case-sensitive match against a posting's ``categories.location``, so any
+    near-miss (or a posting with no location) silently drops the whole board.
+    Like Greenhouse and Ashby, we fetch every posting in one GET and let the
+    local relevance gate decide.
+    """
+    resp = httpx.get(f"{_BASE}/{token}", params={"mode": "json"}, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
@@ -84,9 +87,7 @@ class LeverConnector:
     ) -> FetchResult:
         return harvest(
             self.boards,
-            lambda board: parse_lever(
-                self._get_board(board.token, search), board.display()
-            ),
+            lambda board: parse_lever(self._get_board(board.token), board.display()),
             search=search,
             limit=limit,
             key=lambda board: board.token,
@@ -95,5 +96,5 @@ class LeverConnector:
             unit_limit=lambda board: board.limit,
         )
 
-    def _get_board(self, token: str, search: SearchConfig) -> list:
-        return fetch_lever_board(token, search)
+    def _get_board(self, token: str) -> list:
+        return fetch_lever_board(token)

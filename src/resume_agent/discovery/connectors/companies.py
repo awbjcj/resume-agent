@@ -64,7 +64,7 @@ def _greenhouse(
 def _lever(
     target: AtsTarget, search: SearchConfig, limit=None, skip_seen=None
 ) -> list[RawJob]:
-    return parse_lever(fetch_lever_board(target.token, search), target.token)
+    return parse_lever(fetch_lever_board(target.token), target.token)
 
 
 def _ashby(

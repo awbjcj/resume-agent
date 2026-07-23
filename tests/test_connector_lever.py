@@ -7,7 +7,6 @@ import httpx
 from resume_agent.discovery.connectors.config import LeverBoard
 from resume_agent.discovery.connectors.lever import (
     LeverConnector,
-    fetch_lever_board,
     parse_lever,
 )
 from resume_agent.discovery.search_config import SearchConfig
@@ -45,7 +44,7 @@ def test_parse_lever_posted_at_none_when_absent():
 
 
 class _FakeLever(LeverConnector):
-    def _get_board(self, token, search):
+    def _get_board(self, token):
         return FIXTURE
 
 
@@ -59,7 +58,7 @@ def test_connector_fetches_boards_and_filters_by_search():
 class _PartlyBrokenLever(LeverConnector):
     """First board 404s; the rest return the fixture payload."""
 
-    def _get_board(self, token, search):
+    def _get_board(self, token):
         if token == "dead":
             raise httpx.HTTPStatusError(
                 "404",
@@ -88,17 +87,22 @@ def test_get_board_delegates_to_module_fetcher(monkeypatch):
 
     called = {}
 
-    def fake_fetch(token, search=None):
+    def fake_fetch(token):
         called["token"] = token
         return []
 
     monkeypatch.setattr(lever, "fetch_lever_board", fake_fetch)
     conn = lever.LeverConnector([LeverBoard(token="acme")])
-    assert conn._get_board("acme", SearchConfig()) == []
+    assert conn._get_board("acme") == []
     assert called["token"] == "acme"
 
 
-def test_fetch_lever_board_pushes_location(monkeypatch):
+def test_lever_never_pushes_location_even_when_configured(monkeypatch):
+    # Lever's ?location= filter is an exact, case-sensitive string match, so any
+    # near-miss (e.g. "Remote" vs a posting's "Remote - US") silently zeroes the
+    # whole board. Like Greenhouse/Ashby, Lever must fetch every posting and let
+    # the local relevance gate decide — never pre-filter server-side by location,
+    # even when the search config carries one.
     captured = {}
 
     class Response:
@@ -115,9 +119,11 @@ def test_fetch_lever_board_pushes_location(monkeypatch):
     import resume_agent.discovery.connectors.lever as lever
 
     monkeypatch.setattr(lever.httpx, "get", fake_get)
-    fetch_lever_board("acme", SearchConfig(locations=["Remote"]))
+    LeverConnector([LeverBoard(token="acme")]).fetch(
+        SearchConfig(locations=["Remote"])
+    )
 
-    assert captured["params"] == {"mode": "json", "location": "Remote"}
+    assert captured["params"] == {"mode": "json"}
 
 
 def test_lever_per_board_limit_overrides_global(monkeypatch):
@@ -131,7 +137,7 @@ def test_lever_per_board_limit_overrides_global(monkeypatch):
         }
         for index in range(3)
     ]
-    monkeypatch.setattr(connector, "_get_board", lambda token, search: payload)
+    monkeypatch.setattr(connector, "_get_board", lambda token: payload)
     result = connector.fetch(SearchConfig(role_anchors=["Engineer"]), limit=2)
     assert len(result.jobs) == 3
     assert [job.company for job in result.jobs] == ["alpha", "beta", "beta"]
