@@ -26,6 +26,18 @@ type Row = {
   status?: string;
   postedAt?: string | null;
   url?: string | null;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  salaryCurrency?: string | null;
+  seniority?: string | null;
+  employmentType?: string | null;
+  industry?: string | null;
+  rejectReason?: string | null;
+};
+
+type ExtraColumn = {
+  header: string;
+  render: (row: Row) => ReactNode;
 };
 
 function sourceLabel(source: string | undefined): string {
@@ -43,6 +55,8 @@ export function JobTable({
   onToggleAll,
   allChecked,
   actions,
+  statusColumn = true,
+  extraColumn,
 }: {
   rows: Row[];
   selection: { isSelected: (id: number) => boolean };
@@ -51,6 +65,12 @@ export function JobTable({
   onToggleAll?: (checked: boolean) => void;
   allChecked?: boolean;
   actions?: (row: Row) => ReactNode;
+  /** Set false when the caller's rows all share one implicit status (e.g. the
+   * shortlist and triage boards) — the column would otherwise be redundant. */
+  statusColumn?: boolean;
+  /** Replaces the space freed by hiding the status column with board-specific
+   * detail (salary/seniority for the shortlist, reject reason for triage). */
+  extraColumn?: ExtraColumn;
 }) {
   const ordered = rows.map((row) => row.jobId);
   return (
@@ -61,7 +81,8 @@ export function JobTable({
         <col className="w-20" />
         <col className="w-32" />
         <col className="w-52" />
-        <col className="w-36" />
+        {statusColumn && <col className="w-36" />}
+        {extraColumn && <col className="w-64" />}
         {actions && <col className="w-40" />}
       </colgroup>
       <TableHeader>
@@ -77,7 +98,8 @@ export function JobTable({
           <TableHead className="text-center">Fit</TableHead>
           <TableHead>Source</TableHead>
           <TableHead>Location</TableHead>
-          <TableHead>Status</TableHead>
+          {statusColumn && <TableHead>Status</TableHead>}
+          {extraColumn && <TableHead>{extraColumn.header}</TableHead>}
           {actions && <TableHead className="text-right">Actions</TableHead>}
         </TableRow>
       </TableHeader>
@@ -142,9 +164,19 @@ export function JobTable({
             >
               {locationLabel(row) ?? "—"}
             </TableCell>
-            <TableCell onClick={() => onOpen(row.jobId)}>
-              {row.status ? <StatusBadge status={row.status} /> : "—"}
-            </TableCell>
+            {statusColumn && (
+              <TableCell onClick={() => onOpen(row.jobId)}>
+                {row.status ? <StatusBadge status={row.status} /> : "—"}
+              </TableCell>
+            )}
+            {extraColumn && (
+              <TableCell
+                className="min-w-0 truncate text-muted-foreground"
+                onClick={() => onOpen(row.jobId)}
+              >
+                {extraColumn.render(row) ?? "—"}
+              </TableCell>
+            )}
             {actions && (
               <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                 <div className="flex justify-end gap-1">{actions(row)}</div>

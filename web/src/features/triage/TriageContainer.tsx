@@ -13,18 +13,25 @@ import { BoardSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  type TriageItem,
-  useBoardQuery,
-} from "@/features/board/use-board-query";
+import { useBoardQuery, type TriageItem } from "@/features/board/use-board-query";
 import { useBulkAction } from "@/features/board/use-bulk-action";
 import { useJobNavigation } from "@/features/board/use-job-navigation";
 import { useSelection } from "@/features/board/use-selection";
 import { JobQuickActions } from "@/features/board/JobQuickActions";
 import { useBoardFilters } from "@/features/shortlist/use-board-filters";
+import { recency } from "@/lib/format";
 
 import { QuickFilters } from "./QuickFilters";
 import { ImportJobsButton } from "@/features/runs/ImportJobsDialog";
+
+function triageNote(row: {
+  rejectReason?: string | null;
+  postedAt?: string | null;
+}): string | null {
+  if (row.rejectReason) return row.rejectReason;
+  const posted = recency(row.postedAt);
+  return posted ? `Posted ${posted}` : null;
+}
 
 export function TriageContainer() {
   const [archived, setArchived] = useState(false);
@@ -155,6 +162,8 @@ export function TriageContainer() {
                 allowDelete
               />
             )}
+            statusColumn={false}
+            extraColumn={{ header: "Notes", render: triageNote }}
           />
           {hasNextPage && (
             <div className="mt-5 flex justify-center">

@@ -22,6 +22,7 @@ import { BoardViewToggle } from "@/features/board/BoardViewToggle";
 import { JobQuickActions } from "@/features/board/JobQuickActions";
 import { useJobNavigation } from "@/features/board/use-job-navigation";
 import { useViewMode } from "@/features/board/use-view-mode";
+import { metaLine } from "@/lib/format";
 
 import { useApprove } from "./use-approve";
 import { useBoardFilters } from "./use-board-filters";
@@ -162,6 +163,11 @@ export function ShortlistContainer() {
               onToggleAll={(checked) => checked ? selection.selectPage(loadedIds) : selection.clear()}
               allChecked={rows.every((row) => selection.isSelected(row.jobId))}
               actions={(row) => <><Button size="sm" onClick={() => approve.mutate(row.jobId)}>Approve</Button><JobQuickActions jobId={row.jobId} url={row.url} /></>}
+              statusColumn={false}
+              extraColumn={{
+                header: "Details",
+                render: (row) => metaLine(row).join(" · ") || null,
+              }}
             />
           )}
           {hasNextPage && (

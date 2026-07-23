@@ -26,6 +26,22 @@ describe("JobTable", () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
+  it("hides the status column and renders an extra column in its place", () => {
+    render(
+      <JobTable
+        rows={rows}
+        selection={{ isSelected: () => false }}
+        onToggle={vi.fn()}
+        onOpen={vi.fn()}
+        statusColumn={false}
+        extraColumn={{ header: "Notes", render: (row) => `note-${row.jobId}` }}
+      />,
+    );
+    expect(screen.queryByText("Status")).not.toBeInTheDocument();
+    expect(screen.getByText("Notes")).toBeInTheDocument();
+    expect(screen.getByText("note-1")).toBeInTheDocument();
+  });
+
   it("renders an optional actions column without opening the row", () => {
     const onOpen = vi.fn();
     render(
