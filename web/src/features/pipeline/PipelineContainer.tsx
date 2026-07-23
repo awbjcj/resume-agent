@@ -189,6 +189,10 @@ export function PipelineContainer() {
             onClear={selection.clear}
           >
             <Select
+              items={PIPELINE_STAGE_ORDER.map((stage) => ({
+                value: stage,
+                label: pipelineStageLabel(stage),
+              }))}
               value={targetStatus}
               onValueChange={(value) => {
                 if (value) setTargetStatus(value);

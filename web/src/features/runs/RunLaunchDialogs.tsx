@@ -112,7 +112,7 @@ export function ReprocessDialog() {
         </DialogHeader>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="reprocess-scope">Scope</Label>
-          <Select value={scope} onValueChange={(v) => setScope(v as ReprocessScope)}>
+          <Select items={REPROCESS_SCOPES} value={scope} onValueChange={(v) => setScope(v as ReprocessScope)}>
             <SelectTrigger id="reprocess-scope" className="w-full">
               <SelectValue />
             </SelectTrigger>

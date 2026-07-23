@@ -112,6 +112,10 @@ export function AddSkillPopover({ skillName }: { skillName: string }) {
         {mode === "new" ? (
           <div className="mt-3 space-y-3">
             <Select
+              items={(Object.keys(CATEGORY_LABEL) as Category[]).map((value) => ({
+                value,
+                label: CATEGORY_LABEL[value],
+              }))}
               value={category}
               onValueChange={(value) => setCategory((value as Category) ?? "unspecified")}
             >

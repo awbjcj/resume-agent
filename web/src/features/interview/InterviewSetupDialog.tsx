@@ -98,7 +98,7 @@ export function InterviewSetupDialog({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="interview-stage">Stage</FieldLabel>
-            <Select value={stage} onValueChange={(v) => setStage(v ?? "hiring_manager")}>
+            <Select items={STAGES} value={stage} onValueChange={(v) => setStage(v ?? "hiring_manager")}>
               <SelectTrigger id="interview-stage" className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
@@ -107,7 +107,7 @@ export function InterviewSetupDialog({
           </Field>
           <Field>
             <FieldLabel htmlFor="interview-demeanor">Demeanor</FieldLabel>
-            <Select value={demeanor} onValueChange={(v) => setDemeanor(v ?? "neutral")}>
+            <Select items={DEMEANORS} value={demeanor} onValueChange={(v) => setDemeanor(v ?? "neutral")}>
               <SelectTrigger id="interview-demeanor" className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {DEMEANORS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
@@ -116,7 +116,7 @@ export function InterviewSetupDialog({
           </Field>
           <Field>
             <FieldLabel htmlFor="interview-difficulty">Difficulty</FieldLabel>
-            <Select value={difficulty} onValueChange={(v) => setDifficulty(v ?? "standard")}>
+            <Select items={DIFFICULTIES} value={difficulty} onValueChange={(v) => setDifficulty(v ?? "standard")}>
               <SelectTrigger id="interview-difficulty" className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {DIFFICULTIES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
@@ -139,6 +139,10 @@ export function InterviewSetupDialog({
           <Field className="sm:col-span-2">
             <FieldLabel htmlFor="interview-version">Resume version</FieldLabel>
             <Select
+              items={versions.map((version) => ({
+                value: String(version.id),
+                label: `${new Date(version.createdAt).toLocaleDateString()} · ${version.origin}`,
+              }))}
               value={String(resumeVersionId || newestVersionId)}
               onValueChange={(v) => setResumeVersionId(Number(v))}
             >

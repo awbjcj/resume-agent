@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomTransform } from "d3-zoom";
 import { ArrowLeftIcon, Maximize2Icon, MinusIcon, PlusIcon } from "lucide-react";
@@ -61,13 +61,26 @@ export function SkillMap({
   const editRows = editCategoryRows ?? categoryRows;
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const gRef = useRef<SVGGElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
   const zoomBehaviorRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(
     null,
   );
   const [containerWidth, setContainerWidth] = useState(DEFAULT_WIDTH);
   const [view, setView] = useState<MapView>({ level: "galaxy" });
-  const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
   const [menuAction, setMenuAction] = useState<TaxonomyMenuAction | null>(null);
+
+  // The d3-zoom transform is a transient, high-frequency value: writing it to
+  // React state would re-render the entire node tree on every pan/zoom frame.
+  // Instead we push it straight to the two DOM nodes that consume it. React
+  // never owns the `transform` attribute/style, so imperative writes survive
+  // unrelated re-renders (view drill, resize, menu open).
+  const applyTransform = useCallback((t: ZoomTransform) => {
+    gRef.current?.setAttribute("transform", t.toString());
+    if (layerRef.current) {
+      layerRef.current.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`;
+    }
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === "undefined") return;
@@ -83,7 +96,7 @@ export function SkillMap({
     if (!svgRef.current) return;
     const behavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 2.5])
-      .on("zoom", (event) => setTransform(event.transform));
+      .on("zoom", (event) => applyTransform(event.transform));
     const svg = select(svgRef.current);
     svg.call(behavior);
     zoomBehaviorRef.current = behavior;
@@ -91,7 +104,7 @@ export function SkillMap({
       svg.on(".zoom", null);
       zoomBehaviorRef.current = null;
     };
-  }, []);
+  }, [applyTransform]);
 
   const viewExists = view.level === "galaxy" || categoryRows.some((category) =>
     category.slug === (view.level === "category" ? view.slug : view.categorySlug) &&
@@ -118,17 +131,23 @@ export function SkillMap({
     () => runLayout(graph.nodes, graph.links, dimensions.width, dimensions.height, graph.rootId),
     [dimensions, graph.links, graph.nodes, graph.rootId],
   );
-  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  // Memoized: rebuilt only when the laid-out nodes change, not on every d3-zoom
+  // transform tick (which re-renders this component but leaves `nodes` intact).
+  const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const focusedCategory = activeView.level === "galaxy" ? null : categoryRows.find((category) => category.slug === (activeView.level === "category" ? activeView.slug : activeView.categorySlug)) ?? null;
   const focusedDomain = activeView.level === "domain" ? focusedCategory?.domains.find((domain) => domain.id === activeView.domainId) ?? null : null;
-  const transformStyle = `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`;
-  const allSkills = editRows.flatMap((category) => category.domains.flatMap((domain) => domain.skills));
+  // Only consumed by the merge-skill dialog; keep the full taxonomy flat-map out
+  // of the per-zoom-tick render path.
+  const allSkills = useMemo(
+    () => editRows.flatMap((category) => category.domains.flatMap((domain) => domain.skills)),
+    [editRows],
+  );
 
   const applyZoom = (action: "in" | "out" | "reset") => {
     if (!svgRef.current || !zoomBehaviorRef.current) return;
-    if (action === "reset") setTransform(zoomIdentity);
-    // jsdom does not implement SVGAnimatedLength; the state update above still
-    // makes focus transitions deterministic in component tests.
+    if (action === "reset") applyTransform(zoomIdentity);
+    // jsdom does not implement SVGAnimatedLength; the imperative reset above
+    // still runs, so focus transitions stay deterministic in component tests.
     if (!svgRef.current.width?.baseVal) return;
     const svg = select(svgRef.current);
     if (action === "reset") zoomBehaviorRef.current.transform(svg, zoomIdentity);
@@ -193,7 +212,7 @@ export function SkillMap({
           role="img"
           aria-label="Domain hubs connected to expanded generalized skills"
         >
-          <g transform={transform.toString()}>
+          <g ref={gRef}>
             {graph.links.map((link) => {
               const source = nodeById.get(link.source);
               const target = nodeById.get(link.target);
@@ -210,10 +229,7 @@ export function SkillMap({
           </g>
         </svg>
 
-        <div
-          className="pointer-events-none absolute inset-0 origin-top-left"
-          style={{ transform: transformStyle }}
-        >
+        <div ref={layerRef} className="pointer-events-none absolute inset-0 origin-top-left">
           {nodes.map((node) => {
             const ready = node.kind !== "category" && stateOf(node.kind, node.entityKey) === "ready";
             const target: SuggestionTarget | null = node.kind === "category" ? null : {

@@ -36,6 +36,7 @@ export function SourceConnectionFields({ draft, onChange }: Props) {
       <Field>
         <FieldLabel htmlFor="source-provider">Connection type</FieldLabel>
         <Select
+          items={SOURCE_PROVIDERS}
           value={draft.provider}
           onValueChange={(value) => onChange({ provider: value as SourceProvider })}
         >
@@ -86,7 +87,14 @@ export function SourceConnectionFields({ draft, onChange }: Props) {
       {draft.provider === "personio" ? (
         <Field>
           <FieldLabel htmlFor="personio-country">Region</FieldLabel>
-          <Select value={draft.country} onValueChange={(value) => onChange({ country: value as "com" | "de" })}>
+          <Select
+            items={[
+              { value: "com", label: "Global (.com)" },
+              { value: "de", label: "Germany (.de)" },
+            ]}
+            value={draft.country}
+            onValueChange={(value) => onChange({ country: value as "com" | "de" })}
+          >
             <SelectTrigger id="personio-country" className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent><SelectGroup><SelectItem value="com">Global (.com)</SelectItem><SelectItem value="de">Germany (.de)</SelectItem></SelectGroup></SelectContent>
           </Select>
