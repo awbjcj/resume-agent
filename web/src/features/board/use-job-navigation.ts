@@ -48,6 +48,10 @@ export function useJobNavigation(
   useEffect(() => {
     if (!pendingAdvance) return;
     if (index < 0) {
+      // Intentional: this effect exists to synchronize with the external
+      // fetch landing (orderedIds growing); clearing the flag here, not in
+      // render, is the correct place once that external event resolves.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPendingAdvance(false);
     } else if (index < orderedIds.length - 1) {
       setPendingAdvance(false);
