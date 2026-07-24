@@ -980,6 +980,25 @@ def test_validate_member_accepts_valid_documents(tmp_path):
     staged = tmp_path / "staged.yaml"
     staged.write_text("titles: [engineer]\n", encoding="utf-8")
     validate_member("config/search.yaml", staged)
+
+
+@pytest.mark.parametrize(
+    ("arcname", "body"),
+    [
+        # match_plan_enabled exists on the real ReviewConfig domain model but
+        # not on the API's wire-only ReviewConfigDoc. Pydantic's default
+        # extra="ignore" means validating against the wrong model would let
+        # this typo through silently -- it must fail here, at import, not on
+        # the next tailor run.
+        ("config/review.yaml", "match_plan_enabled: not-a-bool\n"),
+        ("config/review_deep.yaml", "match_plan_enabled: not-a-bool\n"),
+    ],
+)
+def test_validate_member_checks_fields_the_wire_schema_omits(tmp_path, arcname, body):
+    staged = tmp_path / "staged.yaml"
+    staged.write_text(body, encoding="utf-8")
+    with pytest.raises(InvalidBundleError):
+        validate_member(arcname, staged)
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -998,22 +1017,41 @@ from dataclasses import dataclass
 
 import yaml
 
-from resume_agent.api.schemas.config import (
-    ProfileConfigDoc,
-    PruneConfigDoc,
-    RenderConfigDoc,
-    ReviewConfigDoc,
-    SearchConfigDoc,
-)
+from resume_agent.api.schemas.config import ProfileConfigDoc
 from resume_agent.discovery.connectors.config import ConnectorsConfig
+from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.profile.group_corrections import GroupCorrections
 from resume_agent.profile.matrix import load_overrides
 from resume_agent.prompts.guidance import MAX_GUIDANCE_CHARS
+from resume_agent.render.render_config import RenderConfig
 from resume_agent.render.templates import validate_custom_stem
 from resume_agent.services.backup import UnsafeArchiveError, _extract_validated
 from resume_agent.settings_sections import SECTIONS_BY_ID
+from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.taxonomy.corrections import TaxonomyCorrections
+from resume_agent.tracking.prune_config import PruneConfig
 ```
+
+**Why not the `*ConfigDoc` schemas used by `_store(request).get(domain)`:** those
+(`SearchConfigDoc`, `ReviewConfigDoc`, `RenderConfigDoc`, `PruneConfigDoc`) are
+wire-only DTOs in `api/schemas/config.py`, kept deliberately separate from the
+domain models every runtime consumer actually loads through
+(`load_search_config` → `services/search_discovery.py` and the connectors;
+`load_review_config` → `services/tailoring.py`; `load_render_config` →
+`services/rendering.py`; `load_prune_config` → `services/prune.py`). The two
+schema families are not field-identical — `ReviewConfigDoc`, for instance, has
+no `match_plan_enabled`, `early_stop_on_regression`, or `style_guide_path`,
+all present on the real `ReviewConfig`. Pydantic's default `extra="ignore"`
+means validating against the wire DTO would not reject a bundle with a bad
+value in one of those missing fields — it would import cleanly and only break
+on the next tailor run. `config/review_deep.yaml` is not a ConfigStore domain
+at all; `services/tailoring.py` loads it through the identical
+`load_review_config`, so it validates against the same `ReviewConfig`.
+`config/profile_sources.yaml` is the one exception: `ProfileConfigDoc` **is**
+the real model there — `api/routers/coach.py`, `api/routers/profile.py`, and
+`api/routers/setup.py` all read `github_username` / `github_repo_allow` /
+`github_repo_deny` / `github_repo_limit` straight off it, with no separate
+domain class underneath.
 
 Then append:
 
@@ -1063,11 +1101,11 @@ def _check_taxonomy_corrections(path: Path) -> None:
 
 _VALIDATORS: dict[str, Callable[[Path], None]] = {
     "config/connectors.yaml": _yaml_doc(ConnectorsConfig),
-    "config/search.yaml": _yaml_doc(SearchConfigDoc),
-    "config/review.yaml": _yaml_doc(ReviewConfigDoc),
-    "config/review_deep.yaml": _yaml_doc(ReviewConfigDoc),
-    "config/render.yaml": _yaml_doc(RenderConfigDoc),
-    "config/prune.yaml": _yaml_doc(PruneConfigDoc),
+    "config/search.yaml": _yaml_doc(SearchConfig),
+    "config/review.yaml": _yaml_doc(ReviewConfig),
+    "config/review_deep.yaml": _yaml_doc(ReviewConfig),
+    "config/render.yaml": _yaml_doc(RenderConfig),
+    "config/prune.yaml": _yaml_doc(PruneConfig),
     "config/profile_sources.yaml": _yaml_doc(ProfileConfigDoc),
     "config/agent_guidance.yaml": _check_guidance,
     "config/style_guide.md": _check_text,
@@ -2530,6 +2568,17 @@ git commit -m "docs: record the settings registry as the single enumeration"
 
 1. The spec lists `UNSUPPORTED_VERSION` and `UNSAFE_ARCHIVE` as separate codes; `UnsupportedBundleVersionError` subclasses `InvalidBundleError`, so `_bundle_error` must check it **first**. It does.
 2. `is_customized` treats an absent file with a shipped default as *not* customized. The spec says "differs from the shipped `.example`", which would literally mark a fresh workspace as customized. The badge answers "do you have changes worth exporting", so absent means nothing to lose.
+
+**Caught in pre-flight review (before dispatch):** Task 5's first draft validated
+`search.yaml`, `review.yaml`, `review_deep.yaml`, `render.yaml`, and
+`prune.yaml` against the API's wire-only `*ConfigDoc` schemas. Those are not
+field-identical to the domain models every runtime consumer actually loads
+through (`SearchConfig`, `ReviewConfig`, `RenderConfig`, `PruneConfig`), and
+Pydantic's default `extra="ignore"` means the wrong model would not even
+error on a bad value in a field it doesn't declare — the bundle would import
+clean and break on the next tailor run instead. Fixed to validate against the
+real domain models; `profile_sources.yaml` was checked and confirmed to be the
+one section where the `*ConfigDoc` genuinely is the only schema.
 
 **Caught during self-review:** the first draft built `UserContext(user_id=..., username=..., is_admin=..., paths=...)` in every test. `UserContext` actually has **eight** required fields (`user_id`, `username`, `role`, `paths`, `settings`, `engine`, `system_engine`, `own_key_providers`) and `is_admin` is a read-only property derived from `role`. Every test would have died with `TypeError` on the first line. The plan now mirrors the existing helper at `tests/tenancy/test_workspace.py:13`.
 
