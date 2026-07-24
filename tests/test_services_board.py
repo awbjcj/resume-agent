@@ -187,6 +187,23 @@ def test_set_stage_out_of_rejection_overrides_discovery_gates():
     assert updated.gate_override is True
 
 
+def test_set_stage_out_of_rejection_clears_the_stale_reject_reason():
+    with _session() as session:
+        job = _job(session, status=JobStatus.rejected.value)
+        job.reject_reason = "salary below minimum"
+        job.reject_category = "filtered"
+        session.add(job)
+        session.commit()
+        assert job.id is not None
+
+        updated = board.set_stage(session, job.id, JobStatus.shortlisted.value)
+
+    assert updated is not None
+    assert updated.gate_override is True
+    assert updated.reject_reason is None
+    assert updated.reject_category is None
+
+
 def test_set_stage_out_of_filtered_does_not_override_discovery_gates():
     with _session() as session:
         job = _job(session, status=JobStatus.filtered.value)

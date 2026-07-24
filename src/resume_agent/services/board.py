@@ -508,6 +508,11 @@ def bulk_apply(
                 and status not in _DISCOVERY_STAGE_STATUSES
             ):
                 job.gate_override = True
+                # The prior rejection no longer applies once the job is
+                # promoted; a stale reason would otherwise linger and be matched
+                # by the triage reject-reason filter. Mirrors reprocess().
+                job.reject_reason = None
+                job.reject_category = None
             elif status in _DISCOVERY_STAGE_STATUSES:
                 job.gate_override = False
             job.status = status
@@ -533,6 +538,11 @@ def set_stage(session: Session, job_id: int, status: str) -> Job | None:
         and status not in _DISCOVERY_STAGE_STATUSES
     ):
         job.gate_override = True
+        # The prior rejection no longer applies once the job is promoted; a
+        # stale reason would otherwise linger and be matched by the triage
+        # reject-reason filter. Mirrors reprocess().
+        job.reject_reason = None
+        job.reject_category = None
     elif status in _DISCOVERY_STAGE_STATUSES:
         job.gate_override = False
     job.status = status
