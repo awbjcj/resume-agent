@@ -12,6 +12,7 @@ from resume_agent.services.settings_bundle import (
     InvalidBundleError,
     UnsupportedBundleVersionError,
     export_settings_bundle,
+    import_settings_bundle,
     read_bundle_manifest,
     validate_member,
 )
@@ -226,3 +227,141 @@ def test_validate_member_checks_fields_the_wire_schema_omits(tmp_path, arcname, 
     staged.write_text(body, encoding="utf-8")
     with pytest.raises(InvalidBundleError):
         validate_member(arcname, staged)
+
+
+def test_import_replaces_named_sections_and_leaves_the_rest(tmp_path):
+    paths, context = workspace(tmp_path)
+    (paths.config_dir / "connectors.yaml").write_text("companies: [old]\n", "utf-8")
+    (paths.config_dir / "search.yaml").write_text("titles: [mine]\n", "utf-8")
+    archive = write_bundle(
+        tmp_path,
+        {"version": 1, "exportedAt": "", "sections": ["sources"]},
+        {"config/connectors.yaml": "companies:\n  urls: []\n"},
+    )
+
+    with use_context(context):
+        applied = import_settings_bundle(archive)
+
+    assert applied == ("sources",)
+    assert (
+        paths.config_dir / "connectors.yaml"
+    ).read_text("utf-8") == "companies:\n  urls: []\n"
+    assert (paths.config_dir / "search.yaml").read_text("utf-8") == "titles: [mine]\n"
+
+
+def test_import_round_trips_an_export(tmp_path):
+    paths, context = workspace(tmp_path)
+    (paths.root / "profile").mkdir(parents=True)
+    (paths.config_dir / "connectors.yaml").write_text(
+        "companies:\n  urls: []\n", "utf-8"
+    )
+    (paths.root / "profile" / "overrides.yaml").write_text("ban: [x]\n", "utf-8")
+    with use_context(context):
+        archive = export_settings_bundle(tmp_path / "out")
+
+    (paths.config_dir / "connectors.yaml").write_text("companies: [drift]\n", "utf-8")
+    (paths.root / "profile" / "overrides.yaml").write_text("ban: [y]\n", "utf-8")
+
+    with use_context(context):
+        import_settings_bundle(archive)
+
+    assert (
+        paths.config_dir / "connectors.yaml"
+    ).read_text("utf-8") == "companies:\n  urls: []\n"
+    assert (paths.root / "profile" / "overrides.yaml").read_text("utf-8") == "ban: [x]\n"
+
+
+def test_import_ignores_a_credential_hidden_in_the_bundle(tmp_path):
+    paths, context = workspace(tmp_path)
+    archive = write_bundle(
+        tmp_path,
+        {"version": 1, "exportedAt": "", "sections": ["sources"]},
+        {
+            "config/connectors.yaml": "companies:\n  urls: []\n",
+            "config/gmail_credentials.json": '{"web": {"client_secret": "stolen"}}',
+            "secrets.env": "ANTHROPIC_API_KEY=sk-evil\n",
+        },
+    )
+
+    with use_context(context):
+        import_settings_bundle(archive)
+
+    assert not (paths.config_dir / "gmail_credentials.json").exists()
+    assert not paths.secrets_env.exists()
+
+
+def test_import_ignores_files_a_section_does_not_claim(tmp_path):
+    paths, context = workspace(tmp_path)
+    archive = write_bundle(
+        tmp_path,
+        {"version": 1, "exportedAt": "", "sections": ["sources"]},
+        {
+            "config/connectors.yaml": "companies:\n  urls: []\n",
+            "config/search.yaml": "titles: [smuggled]\n",
+        },
+    )
+
+    with use_context(context):
+        import_settings_bundle(archive)
+
+    assert not (paths.config_dir / "search.yaml").exists()
+
+
+def test_a_corrupt_ledger_leaves_every_live_file_byte_identical(tmp_path):
+    paths, context = workspace(tmp_path)
+    (paths.root / "profile").mkdir(parents=True)
+    original_groups = '{"corrections": {"python": {"group": "languages"}}}'
+    (paths.root / "profile" / "group_corrections.json").write_text(
+        original_groups, "utf-8"
+    )
+    (paths.config_dir / "connectors.yaml").write_text("companies: [keep]\n", "utf-8")
+    archive = write_bundle(
+        tmp_path,
+        {"version": 1, "exportedAt": "", "sections": ["sources", "skill_groups"]},
+        {
+            "config/connectors.yaml": "companies:\n  urls: []\n",
+            "data/profile/group_corrections.json": "{truncated",
+        },
+    )
+
+    with use_context(context), pytest.raises(InvalidBundleError):
+        import_settings_bundle(archive)
+
+    assert (
+        paths.root / "profile" / "group_corrections.json"
+    ).read_text("utf-8") == original_groups
+    assert (paths.config_dir / "connectors.yaml").read_text("utf-8") == "companies: [keep]\n"
+
+
+def test_import_replaces_the_whole_templates_set(tmp_path):
+    paths, context = workspace(tmp_path)
+    directory = paths.config_dir / "templates"
+    directory.mkdir()
+    (directory / "old.typ").write_text("#old", encoding="utf-8")
+    archive = write_bundle(
+        tmp_path,
+        {"version": 1, "exportedAt": "", "sections": ["templates"]},
+        {"config/templates/new.typ": "#new"},
+    )
+
+    with use_context(context):
+        import_settings_bundle(archive)
+
+    assert not (directory / "old.typ").exists()
+    assert (directory / "new.typ").read_text("utf-8") == "#new"
+
+
+def test_a_section_claiming_no_files_is_skipped_not_cleared(tmp_path):
+    paths, context = workspace(tmp_path)
+    (paths.config_dir / "connectors.yaml").write_text("companies: [keep]\n", "utf-8")
+    archive = write_bundle(
+        tmp_path,
+        {"version": 1, "exportedAt": "", "sections": ["sources"]},
+        {"config/unrelated.yaml": "nothing: true\n"},
+    )
+
+    with use_context(context):
+        applied = import_settings_bundle(archive)
+
+    assert applied == ()
+    assert (paths.config_dir / "connectors.yaml").read_text("utf-8") == "companies: [keep]\n"

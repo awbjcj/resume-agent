@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 import tarfile
 import tempfile
 from collections.abc import Callable
@@ -37,6 +38,7 @@ from resume_agent.settings_sections import (
 )
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.taxonomy.corrections import TaxonomyCorrections
+from resume_agent.tenancy.paths import resolve_tenant_path
 from resume_agent.tracking.prune_config import PruneConfig
 
 BUNDLE_VERSION = 1
@@ -212,3 +214,85 @@ def _manifest_from_stage(stage: Path) -> BundleManifest:
         sections=known,
         unknown_sections=unknown,
     )
+
+
+def _claim(
+    stage: Path, section_ids: tuple[str, ...]
+) -> dict[str, list[tuple[str, Path]]]:
+    """Map each section to the staged files it actually owns.
+
+    Anything the allowlist does not claim is dropped here -- a crafted bundle
+    cannot plant a credential, and a bundle from a newer build stays importable.
+    """
+    claimed: dict[str, list[tuple[str, Path]]] = {}
+    for section_id in section_ids:
+        section = SECTIONS_BY_ID[section_id]
+        found: list[tuple[str, Path]] = []
+        for entry in section.files:
+            if "*" in entry:
+                parent = stage / PurePosixPath(entry).parent
+                pattern = PurePosixPath(entry).name
+                if parent.is_dir():
+                    for path in sorted(parent.glob(pattern)):
+                        if path.is_file():
+                            found.append(
+                                (f"{PurePosixPath(entry).parent}/{path.name}", path)
+                            )
+                continue
+            staged = stage / entry
+            if staged.is_file():
+                found.append((entry, staged))
+        if found:
+            claimed[section_id] = found
+    return claimed
+
+
+def import_settings_bundle(archive: Path) -> tuple[str, ...]:
+    """Replace the sections a bundle names; leave every other section alone."""
+    with tempfile.TemporaryDirectory(prefix="ra-settings-import-") as temporary:
+        stage = Path(temporary) / "stage"
+        try:
+            _extract_validated(archive, stage)
+        except UnsafeArchiveError:
+            raise
+        except Exception as error:
+            raise InvalidBundleError("upload is not a readable bundle") from error
+
+        manifest = _manifest_from_stage(stage)
+        claimed = _claim(stage, manifest.sections)
+
+        for members in claimed.values():
+            for arcname, path in members:
+                validate_member(arcname, path)
+
+        return _apply(claimed)
+
+
+def _apply(claimed: dict[str, list[tuple[str, Path]]]) -> tuple[str, ...]:
+    """Stash, write, and roll back on any failure."""
+    rollback = Path(tempfile.mkdtemp(prefix="ra-settings-rollback-"))
+    stashed: list[tuple[Path, Path]] = []
+    written: list[Path] = []
+    try:
+        for section_id in claimed:
+            for entry in SECTIONS_BY_ID[section_id].files:
+                for live in live_paths(entry):
+                    stash = rollback / f"{len(stashed)}-{live.name}"
+                    shutil.move(live, stash)
+                    stashed.append((live, stash))
+        for members in claimed.values():
+            for arcname, staged in members:
+                target = resolve_tenant_path(arcname)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(staged, target)
+                written.append(target)
+    except BaseException:
+        for target in written:
+            target.unlink(missing_ok=True)
+        for live, stash in stashed:
+            live.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(stash, live)
+        raise
+    finally:
+        shutil.rmtree(rollback, ignore_errors=True)
+    return tuple(claimed)
