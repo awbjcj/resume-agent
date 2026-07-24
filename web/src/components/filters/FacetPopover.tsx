@@ -45,16 +45,18 @@ export function FacetPopover({
 }: FacetPopoverProps) {
   const [query, setQuery] = useState("");
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
-  const [sessionCounts, setSessionCounts] = useState(counts);
   const isControlled = open !== undefined;
   const resolvedOpen = isControlled ? open : uncontrolledOpen;
-  const visibleCounts = resolvedOpen ? sessionCounts : counts;
+  // Counts refresh live while the popover is open. The server computes each
+  // facet leave-one-out (its own selection excluded), so an open facet's
+  // options never vanish or reorder as you toggle them — only their numbers
+  // move to track the rest of the filter state.
   const options = useMemo(
     () =>
-      Object.entries(visibleCounts)
+      Object.entries(counts)
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
         .map(([value]) => value),
-    [visibleCounts],
+    [counts],
   );
   const shown = options.filter((option) =>
     (getLabel ? getLabel(option) : option).toLowerCase().includes(query.toLowerCase()),
@@ -69,7 +71,6 @@ export function FacetPopover({
   }, [resolvedOpen]);
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) setSessionCounts(counts);
     if (!nextOpen) setQuery("");
     if (!isControlled) setUncontrolledOpen(nextOpen);
     onOpenChange?.(nextOpen);
@@ -144,7 +145,7 @@ export function FacetPopover({
                     <Checkbox checked={checked} readOnly aria-hidden tabIndex={-1} />
                     <span className="flex-1 truncate">{optionLabel}</span>
                     <span className="text-xs tabular-nums text-muted-foreground">
-                      {visibleCounts[option]}
+                      {counts[option]}
                     </span>
                   </CommandItem>
                 );

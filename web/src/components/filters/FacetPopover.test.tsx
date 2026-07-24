@@ -104,6 +104,25 @@ describe("FacetPopover", () => {
     expect(onChange).toHaveBeenLastCalledWith(new Set());
   });
 
+  it("refreshes its counts live while open (leave-one-out)", () => {
+    const props = {
+      label: "Skills",
+      selected: new Set<string>(),
+      onChange: vi.fn<(selected: Set<string>) => void>(),
+      onOpenChange: vi.fn<(open: boolean) => void>(),
+    };
+    const { rerender } = render(
+      <FacetPopover {...props} counts={{ python: 52, react: 38 }} open />,
+    );
+    expect(screen.getByText("52")).toBeInTheDocument();
+
+    // The parent re-queried after another filter changed — the open popover
+    // must reflect the new counts rather than a snapshot taken on open.
+    rerender(<FacetPopover {...props} counts={{ python: 20, react: 9 }} open />);
+    expect(screen.getByText("20")).toBeInTheDocument();
+    expect(screen.queryByText("52")).not.toBeInTheDocument();
+  });
+
   it("opens and closes from Done without controlled props", () => {
     render(
       <FacetPopover

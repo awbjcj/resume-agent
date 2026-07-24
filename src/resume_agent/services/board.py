@@ -163,7 +163,10 @@ def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 
-def _passes_filter(row: Any, f: BoardFilter) -> bool:
+def _passes_filter(row: Any, f: BoardFilter, *, exclude: str | None = None) -> bool:
+    """Whether ``row`` survives ``f``. ``exclude`` drops one facet key's own
+    selection (and ``"skills"``) from the check — the leave-one-out pass that
+    lets ``board_facets`` count a facet without hiding its sibling options."""
     if f.q and f.q.strip().lower() not in _row_text(row):
         return False
     if f.reject_reason:
@@ -200,6 +203,8 @@ def _passes_filter(row: Any, f: BoardFilter) -> bool:
             return False
 
     for spec in FACET_SPECS:
+        if spec.key == exclude:
+            continue
         selected = _selected(getattr(f, spec.filter_attr))
         value = getattr(row, spec.row_attr, None)
         if spec.skip_unset_rows and value is None:
@@ -207,15 +212,18 @@ def _passes_filter(row: Any, f: BoardFilter) -> bool:
         if selected and value not in selected:
             return False
 
-    selected_skills = {_normalize_token(v) for v in f.skills if v}
-    if selected_skills and not (_row_skill_tokens(row) & selected_skills):
-        return False
+    if exclude != "skills":
+        selected_skills = {_normalize_token(v) for v in f.skills if v}
+        if selected_skills and not (_row_skill_tokens(row) & selected_skills):
+            return False
 
     return True
 
 
-def _apply_board_filter(rows: list[Any], f: BoardFilter) -> list[Any]:
-    return [row for row in rows if _passes_filter(row, f)]
+def _apply_board_filter(
+    rows: list[Any], f: BoardFilter, *, exclude: str | None = None
+) -> list[Any]:
+    return [row for row in rows if _passes_filter(row, f, exclude=exclude)]
 
 
 def _posted_sort_value(row: Any) -> datetime:
@@ -267,13 +275,21 @@ def _count_skills(rows: list[Any]) -> dict[str, int]:
     return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
 
 
-def board_facets(rows: list[Any]) -> Facets:
+def board_facets(rows: list[Any], f: BoardFilter) -> Facets:
+    """Leave-one-out facet counts over the raw ``rows``.
+
+    Each facet is counted after applying every filter EXCEPT its own selection,
+    so choosing one value never zeroes out that facet's sibling options — they
+    stay listed and selectable — while their numbers still reflect all the other
+    active filters. That is what lets an open facet popover refresh live as the
+    rest of the filter state changes.
+    """
     facets: Facets = {}
     for spec in FACET_SPECS:
-        counts = _count_values(rows, spec.key)
+        counts = _count_values(_apply_board_filter(rows, f, exclude=spec.key), spec.key)
         if counts:
             facets[spec.key] = counts
-    skills = _count_skills(rows)
+    skills = _count_skills(_apply_board_filter(rows, f, exclude="skills"))
     if skills:
         facets["skills"] = skills
     return facets
@@ -285,6 +301,26 @@ def _by_fit_desc(rows):
     )
 
 
+def _raw_board_rows(
+    session: Session,
+    board: BoardName,
+    f: BoardFilter,
+    *,
+    facts_path: str = DEFAULT_FACTS,
+) -> list[Any]:
+    """Source rows for ``board`` before any filter/sort. Faceting needs these
+    unfiltered so it can re-apply the filter leave-one-out per facet."""
+    if board == "shortlist":
+        resolved_facts = resolve_tenant_path(facts_path)
+        facts = load_facts(resolved_facts) if resolved_facts.exists() else None
+        return shortlist_rows(session, facts=facts)
+    if board == "pipeline":
+        return pipeline_rows(session)
+    if board == "triage":
+        return archived_rows(session) if f.archived else triage_rows(session)
+    raise ValueError(f"Unknown board {board!r}")
+
+
 def _board_rows(
     session: Session,
     board: BoardName,
@@ -292,16 +328,7 @@ def _board_rows(
     *,
     facts_path: str = DEFAULT_FACTS,
 ) -> list[Any]:
-    if board == "shortlist":
-        resolved_facts = resolve_tenant_path(facts_path)
-        facts = load_facts(resolved_facts) if resolved_facts.exists() else None
-        rows = shortlist_rows(session, facts=facts)
-    elif board == "pipeline":
-        rows = pipeline_rows(session)
-    elif board == "triage":
-        rows = archived_rows(session) if f.archived else triage_rows(session)
-    else:
-        raise ValueError(f"Unknown board {board!r}")
+    rows = _raw_board_rows(session, board, f, facts_path=facts_path)
     return _sort_rows(_apply_board_filter(rows, f), f.sort)
 
 
@@ -315,10 +342,11 @@ def list_board(
     facts_path: str = DEFAULT_FACTS,
 ) -> BoardListResult:
     f = board_filter or BoardFilter(sort="stage" if board == "pipeline" else "fit")
-    rows = _board_rows(session, board, f, facts_path=facts_path)
+    raw = _raw_board_rows(session, board, f, facts_path=facts_path)
+    rows = _sort_rows(_apply_board_filter(raw, f), f.sort)
     return BoardListResult(
         page=paginate(rows, page=page, page_size=page_size),
-        facets=board_facets(rows),
+        facets=board_facets(raw, f),
     )
 
 

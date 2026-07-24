@@ -124,6 +124,42 @@ def test_board_industry_filter_uses_exact_canonical_name():
         "Unknown industry role",
         "Fintech role",
     ]
+    # Leave-one-out: the industry facet ignores its own selection, so the
+    # unselected "Autonomous Driving" stays counted and selectable.
+    assert result.facets["industry"] == {"Autonomous Driving": 1, "Fintech": 1}
+
+
+def test_facets_are_leave_one_out_so_siblings_stay_selectable():
+    """Selecting one source keeps the other sources counted in the source facet
+    (own selection excluded), while a different facet still narrows to the
+    selected-source subset."""
+    with _session() as session:
+        gh = _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=70,
+            criteria_json={"industry": "Fintech"},
+        )
+        lv = _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            fit_score=80,
+            criteria_json={"industry": "Healthcare"},
+        )
+        gh.source, lv.source = "greenhouse", "lever"
+        session.add_all([gh, lv])
+        session.commit()
+        result = board.list_board(
+            session,
+            "shortlist",
+            board_filter=board.BoardFilter(source=("greenhouse",)),
+        )
+
+    # Only greenhouse rows are in the page...
+    assert {row.source for row in result.page.data} == {"greenhouse"}
+    # ...but the source facet still offers lever (its own selection excluded)...
+    assert result.facets["source"] == {"greenhouse": 1, "lever": 1}
+    # ...while the industry facet reflects the greenhouse-only subset.
     assert result.facets["industry"] == {"Fintech": 1}
 
 
