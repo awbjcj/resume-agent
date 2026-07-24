@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import resume_agent.services.settings_bundle as settings_bundle
 from resume_agent.config import Settings
 from resume_agent.services.settings_bundle import (
     BUNDLE_VERSION,
@@ -169,6 +170,21 @@ def test_read_manifest_rejects_a_non_tar_upload(tmp_path):
     archive.write_bytes(b"this is not gzip")
     with pytest.raises(InvalidBundleError):
         read_bundle_manifest(archive)
+
+
+@pytest.mark.parametrize("operation", [read_bundle_manifest, import_settings_bundle])
+def test_bundle_operations_reject_excessive_expanded_size(
+    tmp_path, monkeypatch, operation
+):
+    archive = write_bundle(
+        tmp_path,
+        {"version": 1, "exportedAt": "", "sections": ["sources"]},
+        {"config/connectors.yaml": "companies: []\n"},
+    )
+    monkeypatch.setattr(settings_bundle, "_MAX_BUNDLE_EXTRACTED_BYTES", 8)
+
+    with pytest.raises(InvalidBundleError, match="expands beyond"):
+        operation(archive)
 
 
 @pytest.mark.parametrize(

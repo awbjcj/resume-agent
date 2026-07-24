@@ -62,8 +62,25 @@ export function TriageFilters({
   onArchivedChange: (archived: boolean) => void;
   onChange: (filter: FilterState) => void;
 }) {
-  const [search, setSearch] = useState(filter.q);
-  const [rejectReason, setRejectReason] = useState(filter.rejectReason);
+  const [searchDraft, setSearchDraft] = useState(() => ({
+    value: filter.q,
+    committed: filter.q,
+  }));
+  const [reasonDraft, setReasonDraft] = useState(() => ({
+    value: filter.rejectReason,
+    committed: filter.rejectReason,
+  }));
+  const search =
+    searchDraft.committed === filter.q ? searchDraft.value : filter.q;
+  const rejectReason =
+    reasonDraft.committed === filter.rejectReason
+      ? reasonDraft.value
+      : filter.rejectReason;
+  const setSearch = (value: string) =>
+    setSearchDraft({ value, committed: filter.q });
+  const setRejectReason = (value: string) =>
+    setReasonDraft({ value, committed: filter.rejectReason });
+
   const sourceCounts = countsWithSelected(facets.source, filter.source);
   const statusCounts = countsWithSelected(facets.status, filter.status);
   statusCounts.raw ??= 0;

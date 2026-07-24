@@ -32,6 +32,11 @@ describe("ResetSectionButton", () => {
 
     await user.click(screen.getByRole("button", { name: /^reset$/i }));
     await waitFor(() => expect(reset).toHaveBeenCalledWith("sources"));
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/reset company sources to defaults/i),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it("names the section it will reset", async () => {

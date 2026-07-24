@@ -151,6 +151,18 @@ def test_set_stage_out_of_rejection_overrides_discovery_gates():
     assert updated.gate_override is True
 
 
+def test_set_stage_out_of_filtered_does_not_override_discovery_gates():
+    with _session() as session:
+        job = _job(session, status=JobStatus.filtered.value)
+        assert job.id is not None
+
+        updated = board.set_stage(session, job.id, JobStatus.shortlisted.value)
+
+    assert updated is not None
+    assert updated.status == JobStatus.shortlisted.value
+    assert updated.gate_override is False
+
+
 def test_set_stage_back_to_rejection_clears_discovery_gate_override():
     with _session() as session:
         job = _job(session, status=JobStatus.shortlisted.value)

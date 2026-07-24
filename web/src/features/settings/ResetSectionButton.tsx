@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { RotateCcw } from "lucide-react";
 
 import {
@@ -30,8 +31,9 @@ export function ResetSectionButton({
   note?: string;
 }) {
   const reset = useResetSection();
+  const [open, setOpen] = useState(false);
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button variant="outline" size="sm" />}>
         <RotateCcw data-icon="inline-start" />
         Reset to defaults
@@ -55,7 +57,10 @@ export function ResetSectionButton({
             disabled={reset.isPending}
             onClick={(event) => {
               event.preventDefault();
-              reset.mutate({ sectionId });
+              reset.mutate(
+                { sectionId },
+                { onSuccess: () => setOpen(false) },
+              );
             }}
           >
             {reset.isPending ? <Spinner data-icon="inline-start" /> : null}

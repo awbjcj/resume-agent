@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Archive, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -54,20 +54,23 @@ export function BackupSettingsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
+  const previewRequest = useRef(0);
 
   async function choose(chosen: File | null) {
+    const request = ++previewRequest.current;
     setFile(chosen);
     setPreview(null);
     if (!chosen) return;
     setBusy(true);
     try {
-      setPreview(
-        (await post("/api/settings/bundle/preview", chosen)) as Preview,
-      );
+      const next = (await post("/api/settings/bundle/preview", chosen)) as Preview;
+      if (request === previewRequest.current) setPreview(next);
     } catch (error) {
-      toast.error((error as Error).message);
+      if (request === previewRequest.current) {
+        toast.error((error as Error).message);
+      }
     } finally {
-      setBusy(false);
+      if (request === previewRequest.current) setBusy(false);
     }
   }
 

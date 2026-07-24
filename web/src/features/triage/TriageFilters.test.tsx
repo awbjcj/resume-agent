@@ -54,4 +54,46 @@ describe("TriageFilters", () => {
     expect(searchField).toHaveClass("sm:flex-1");
     expect(reasonField).toHaveClass("sm:flex-1");
   });
+
+  it("resyncs text drafts when committed URL filters change", () => {
+    const filter = emptyFilterState();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <TriageFilters
+          filter={filter}
+          facets={{}}
+          total={0}
+          archived={false}
+          onArchivedChange={vi.fn()}
+          onChange={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), {
+      target: { value: "uncommitted" },
+    });
+
+    view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <TriageFilters
+          filter={{ ...filter, q: "from-history", rejectReason: "salary" }}
+          facets={{}}
+          total={0}
+          archived={false}
+          onArchivedChange={vi.fn()}
+          onChange={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("searchbox", { name: "Search" })).toHaveValue(
+      "from-history",
+    );
+    expect(
+      screen.getByRole("searchbox", { name: "Rejection reason" }),
+    ).toHaveValue("salary");
+  });
 });

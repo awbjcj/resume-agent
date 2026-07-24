@@ -75,4 +75,58 @@ describe("BackupSettingsPage", () => {
     await user.click(screen.getByRole("button", { name: /apply bundle/i }));
     await waitFor(() => expect(applied).toHaveBeenCalled());
   });
+
+  it("keeps the newest preview when requests resolve out of order", async () => {
+    let releaseFirst!: () => void;
+    const firstPending = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let previewRequests = 0;
+    let firstReturned = false;
+    server.use(
+      http.get("*/api/settings/sections", () =>
+        HttpResponse.json({ sections: [] }),
+      ),
+      http.post("*/api/settings/bundle/preview", async () => {
+        previewRequests += 1;
+        const requestNumber = previewRequests;
+        if (requestNumber === 1) {
+          await firstPending;
+          firstReturned = true;
+        }
+        return HttpResponse.json({
+          version: 1,
+          exportedAt: "2026-07-23T00:00:00+00:00",
+          sections: [{
+            id: String(requestNumber),
+            label: requestNumber === 1 ? "Preview A" : "Preview B",
+            customized: true,
+          }],
+          unknownSections: [],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<BackupSettingsPage />, { wrapper: withQueryClient });
+    const input = screen.getByLabelText(/bundle file/i);
+
+    await user.upload(
+      input,
+      new File(["a"], "first.tar.gz", { type: "application/gzip" }),
+    );
+    await waitFor(() => expect(previewRequests).toBe(1));
+    await user.upload(
+      input,
+      new File(["b"], "second.tar.gz", { type: "application/gzip" }),
+    );
+
+    const summary = (await screen.findByText(/this bundle will replace/i)).closest(
+      "p",
+    );
+    expect(summary).not.toBeNull();
+    expect(summary).toHaveTextContent("Preview B");
+    releaseFirst();
+    await waitFor(() => expect(firstReturned).toBe(true));
+    expect(summary).toHaveTextContent("Preview B");
+  });
 });

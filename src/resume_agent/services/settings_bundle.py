@@ -43,6 +43,8 @@ from resume_agent.tracking.prune_config import PruneConfig
 
 BUNDLE_VERSION = 1
 MANIFEST_NAME = "manifest.json"
+_MAX_BUNDLE_MEMBERS = 256
+_MAX_BUNDLE_EXTRACTED_BYTES = 64 * 1024 * 1024
 
 
 class InvalidBundleError(ValueError):
@@ -179,13 +181,32 @@ def validate_member(arcname: str, path: Path) -> None:
         raise InvalidBundleError(f"{arcname} is not valid: {error}") from error
 
 
+def _extract_bundle_validated(archive: Path, destination: Path) -> None:
+    """Reject archive bombs before delegating to the shared safe extractor."""
+    with tarfile.open(archive, "r:gz") as tar:
+        members = tar.getmembers()
+        if len(members) > _MAX_BUNDLE_MEMBERS:
+            raise InvalidBundleError(
+                f"bundle contains more than {_MAX_BUNDLE_MEMBERS} members"
+            )
+        extracted_bytes = sum(
+            member.size for member in members if member.isfile()
+        )
+        if extracted_bytes > _MAX_BUNDLE_EXTRACTED_BYTES:
+            raise InvalidBundleError(
+                "bundle expands beyond the "
+                f"{_MAX_BUNDLE_EXTRACTED_BYTES // (1024 * 1024)} MB limit"
+            )
+    _extract_validated(archive, destination)
+
+
 def read_bundle_manifest(archive: Path) -> BundleManifest:
     """Extract only the manifest, so a preview never touches live files."""
     with tempfile.TemporaryDirectory(prefix="ra-settings-preview-") as temporary:
         stage = Path(temporary)
         try:
-            _extract_validated(archive, stage)
-        except UnsafeArchiveError:
+            _extract_bundle_validated(archive, stage)
+        except (InvalidBundleError, UnsafeArchiveError):
             raise
         except Exception as error:
             raise InvalidBundleError("upload is not a readable bundle") from error
@@ -256,8 +277,8 @@ def import_settings_bundle(archive: Path) -> tuple[str, ...]:
     with tempfile.TemporaryDirectory(prefix="ra-settings-import-") as temporary:
         stage = Path(temporary) / "stage"
         try:
-            _extract_validated(archive, stage)
-        except UnsafeArchiveError:
+            _extract_bundle_validated(archive, stage)
+        except (InvalidBundleError, UnsafeArchiveError):
             raise
         except Exception as error:
             raise InvalidBundleError("upload is not a readable bundle") from error

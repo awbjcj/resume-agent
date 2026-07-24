@@ -46,7 +46,7 @@ from resume_agent.tracking.repository import (
 from resume_agent.tracking.tables import Application, Job, JobStatus, utcnow
 
 BoardName = Literal["shortlist", "triage", "pipeline"]
-_DISCOVERY_GATE_STATUSES = {
+_DISCOVERY_STAGE_STATUSES = {
     JobStatus.filtered.value,
     JobStatus.rejected.value,
 }
@@ -476,11 +476,11 @@ def bulk_apply(
             if status is None:
                 raise ValueError("status is required for setStatus")
             if (
-                job.status in _DISCOVERY_GATE_STATUSES
-                and status not in _DISCOVERY_GATE_STATUSES
+                job.status == JobStatus.rejected.value
+                and status not in _DISCOVERY_STAGE_STATUSES
             ):
                 job.gate_override = True
-            elif status in _DISCOVERY_GATE_STATUSES:
+            elif status in _DISCOVERY_STAGE_STATUSES:
                 job.gate_override = False
             job.status = status
             session.add(job)
@@ -501,11 +501,11 @@ def set_stage(session: Session, job_id: int, status: str) -> Job | None:
     if job is None:
         return None
     if (
-        job.status in _DISCOVERY_GATE_STATUSES
-        and status not in _DISCOVERY_GATE_STATUSES
+        job.status == JobStatus.rejected.value
+        and status not in _DISCOVERY_STAGE_STATUSES
     ):
         job.gate_override = True
-    elif status in _DISCOVERY_GATE_STATUSES:
+    elif status in _DISCOVERY_STAGE_STATUSES:
         job.gate_override = False
     job.status = status
     return save_job(session, job)
