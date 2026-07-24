@@ -21,7 +21,7 @@ guidance" to another machine.
 time. After the first edit, the original is unrecoverable through the product.
 
 The root cause is that *the set of customizable settings* is not named anywhere.
-It is scattered across five enumerations that no single caller can see:
+It is scattered across six enumerations that no single caller can see:
 
 | Location | What it enumerates |
 | --- | --- |
@@ -30,27 +30,28 @@ It is scattered across five enumerations that no single caller can see:
 | `render/templates.py::CUSTOM_TEMPLATES_DIR` | `config/templates` |
 | `prompts/guidance.py` | its own locked write path for `agent_guidance.yaml` |
 | `tenancy/workspace.py::provision_workspace` | the `config/*.example` glob |
+| `profile/group_corrections.py`, `taxonomy/corrections.py`, `profile/matrix.py` | three correction-ledger paths, each known only to its own module |
 
 "What goes in a settings bundle" and "what can be reset" are the same list read
 from two directions. Declaring it once is the spine of this design.
 
 ## Goals
 
-- A settings-only bundle that exports and imports **just** customizations —
-  no jobs, no database, no profile corpus, no credentials.
+- A settings-only bundle that exports and imports **just** hand-authored
+  customizations — no jobs, no database, no derived profile corpus, no
+  credentials.
 - Section-level replace on import, bundle-level merge: sections absent from a
   bundle are left untouched.
 - A reset-to-default control for every customizable section.
 
 ## Non-goals
 
-- **Skill and taxonomy correction ledgers stay out of scope.**
-  `data/profile/overrides.yaml`, `data/profile/group_corrections.json`, and
-  `data/taxonomy/taxonomy_corrections.json` are hand-authored user intent, but
-  they live under `data/`, not `config/`, and were explicitly excluded. Keeping
-  the bundle boundary exactly "the workspace `config/` directory" is what makes
-  the allowlist auditable at a glance. They remain covered by the existing
-  whole-workspace archive.
+- **Derived artifacts.** Only hand-authored intent travels. `facts.json`,
+  `matrix.json`, `cluster_map.json`, and `data/skill_aliases.json` are all
+  regenerated from sources by `profile build` or the discovery pipeline
+  (`_refresh_skill_aliases`), so bundling them would ship stale output that the
+  next rebuild overwrites. The correction ledgers *are* included precisely
+  because they are the inputs a rebuild replays, not its output.
 - Deep-merging within a section (unioning two company lists, reconciling two
   reviewer rosters). Section-level replace only.
 - Any change to the existing whole-workspace archive. It stays the full
@@ -70,28 +71,43 @@ New module `src/resume_agent/settings_sections.py` — the single enumeration.
 class SettingsSection:
     id: str                   # stable wire id
     label: str                # UI label
-    files: tuple[str, ...]    # workspace-config-relative; may glob
+    files: tuple[str, ...]    # canonical relative paths; may glob
 
 SETTINGS_SECTIONS: tuple[SettingsSection, ...] = (...)
 ```
 
-| id | label | files (relative to workspace `config/`) | default when reset |
+`files` holds paths in the **canonical relative form already spoken by
+`tenancy/paths.py`** — `config/connectors.yaml`, `data/profile/overrides.yaml`.
+Running each through `resolve_tenant_path` yields the live file in either tenant
+or legacy mode, and the same string is both the archive arcname and the key for
+locating a shipped default. No second path vocabulary is introduced.
+
+| id | label | files | default when reset |
 | --- | --- | --- | --- |
-| `sources` | Company sources | `connectors.yaml` | shipped `.example` |
-| `search` | Search | `search.yaml` | shipped `.example` |
-| `review` | Review panel | `review.yaml`, `review_deep.yaml` | shipped `.example`s |
-| `agent_guidance` | Agent prompts | `agent_guidance.yaml` | *deleted* → no guidance |
-| `style_guide` | Style guide | `style_guide.md` | shipped `.example` |
-| `render` | Rendering | `render.yaml` | shipped `.example` |
-| `templates` | Custom resume templates | `templates/*.typ` | *cleared* → bundled only |
-| `prune` | Pruning | `prune.yaml` | shipped `.example` |
-| `profile_sources` | Profile sources | `profile_sources.yaml` | shipped `.example` |
+| `sources` | Company sources | `config/connectors.yaml` | shipped `.example` |
+| `search` | Search | `config/search.yaml` | shipped `.example` |
+| `review` | Review panel | `config/review.yaml`, `config/review_deep.yaml` | shipped `.example`s |
+| `agent_guidance` | Agent prompts | `config/agent_guidance.yaml` | *deleted* → no guidance |
+| `style_guide` | Style guide | `config/style_guide.md` | shipped `.example` |
+| `render` | Rendering | `config/render.yaml` | shipped `.example` |
+| `templates` | Custom resume templates | `config/templates/*.typ` | *cleared* → bundled only |
+| `prune` | Pruning | `config/prune.yaml` | shipped `.example` |
+| `profile_sources` | Profile sources | `config/profile_sources.yaml` | shipped `.example` |
+| `skill_overrides` | Skill overrides | `data/profile/overrides.yaml` | *deleted* → no overrides |
+| `skill_groups` | Skill group corrections | `data/profile/group_corrections.json` | *deleted* → taxonomy wins |
+| `taxonomy` | Taxonomy corrections | `data/taxonomy/taxonomy_corrections.json` | *deleted* → LLM output wins |
+
+Twelve sections. The last three are the correction ledgers: hand-authored intent
+that every rebuild replays, and the most painful customizations to lose because
+they represent accumulated judgement rather than a one-time configuration.
 
 This table is an **allowlist**, not a denylist, and that distinction is
-load-bearing: `gmail/auth.py` puts `CREDENTIALS_PATH =
-"config/gmail_credentials.json"` — an OAuth client secret — in the very
-directory being bundled. A denylist over `config/` would ship it the moment
-someone adds a file nobody remembered to exclude. Allowlists fail closed.
+load-bearing. It now spans the workspace root, whose immediate neighbours
+include `secrets.env`, `gmail_token.json`, `resume_agent.db`, and — per
+`gmail/auth.py` — `config/gmail_credentials.json`, an OAuth client secret. A
+denylist would ship any of those the moment someone adds a file nobody
+remembered to exclude. Allowlists fail closed, and the twelve rows above are the
+complete, auditable statement of what can leave or enter a workspace this way.
 
 `provision_workspace`'s `*.example` glob becomes a reader of this table, which
 is what makes "reset a section" and "provision that section fresh" literally the
@@ -105,26 +121,37 @@ earns nothing. The `tenancy/paths.py` constants likewise stay: they are named
 strings consumed by leaf code, not a competing list.
 
 A section is **customized** when any file it owns differs from that file's
-shipped `.example`, or — for sections with no `.example` (`agent_guidance`,
-`templates`) — when the file exists at all, or the directory is non-empty.
+shipped `.example`, or — for sections that ship no `.example` — when the file
+exists at all, or the glob matches anything.
 
 ### Reset is policy-free
 
-`provision_workspace` already defines "fresh" as *copy every `config/*.example`*.
-Reset re-runs that definition for one section:
+`provision_workspace` already defines "fresh" as *copy every shipped
+`.example`*. Reset re-runs that definition for one section:
 
 > For each file the section owns, copy the shipped `.example` if the repository
 > ships one; otherwise delete the file.
 
-No policy enum, no per-section special cases. `agent_guidance.yaml` has no
-`.example`, so it is deleted, and `load_guidance()` then returns `{}` — exactly
-its documented default. `templates/*.typ` has no `.example`, so the directory is
-cleared and rendering falls back to bundled templates, which is what
-`render/templates.py` already does for a missing custom template.
+No policy enum, no per-section special cases, and the five sections that reset
+by deletion all land on their real defaults for free:
 
-Defaults resolve against `_REPOSITORY_ROOT / "config"`, reusing the anchor
-idiom in `render/templates.py:14` rather than the process working directory, so
-reset behaves identically under Railway and locally.
+| Section | After deletion |
+| --- | --- |
+| `agent_guidance` | `load_guidance()` returns `{}` — its documented default |
+| `templates` | `render/templates.py` falls back to bundled templates, as it already does for a missing custom template |
+| `skill_overrides` | the next `profile build` re-derives without overrides |
+| `skill_groups` | `decorate_matrix_groups` falls through to overrides, then taxonomy |
+| `taxonomy` | `apply_taxonomy_corrections` replays an empty ledger, leaving LLM clustering intact |
+
+The default for a file is `_REPOSITORY_ROOT / <canonical path> + ".example"`,
+reusing the anchor idiom in `render/templates.py:14` rather than the process
+working directory, so reset behaves identically under Railway and locally. The
+three `data/` ledgers ship no `.example`, which is why they reset by deletion —
+the rule needs no knowledge of *which* directory a section lives in.
+
+Resetting `skill_overrides` is the one case whose effect is not immediate: the
+ban/alias/forbid/category rules are consumed at build time, so the matrix keeps
+showing the old shape until the next `profile build`. The confirm dialog says so.
 
 ### The bundle
 
@@ -132,11 +159,13 @@ New service `src/resume_agent/services/settings_bundle.py`. Archive layout —
 arcnames are config-relative, plus a manifest at the root:
 
 ```
-manifest.json      {"version": 1, "exportedAt": "...", "sections": ["sources", "review"]}
-connectors.yaml
-review.yaml
-review_deep.yaml
-templates/mine.typ
+manifest.json      {"version": 1, "exportedAt": "...", "sections": ["sources", "review", "taxonomy"]}
+config/connectors.yaml
+config/review.yaml
+config/review_deep.yaml
+config/templates/mine.typ
+data/profile/overrides.yaml
+data/taxonomy/taxonomy_corrections.json
 ```
 
 The manifest makes section membership explicit rather than inferred from
@@ -161,9 +190,17 @@ discipline of `import_data_root`:
    that section's declared patterns. **Unclaimed members are ignored, not
    rejected** — so a crafted bundle cannot plant a credential, and a bundle from
    a newer build stays importable by an older one.
-4. Validate in the stage: every YAML parses through its existing Pydantic schema
-   (`DOMAIN_SCHEMAS`), every `.typ` stem passes `validate_custom_stem`. A bad
-   bundle fails with no live file modified.
+4. Validate in the stage, reusing each artifact's existing loader rather than
+   writing bundle-specific parsers — config YAML through `DOMAIN_SCHEMAS`,
+   `.typ` stems through `validate_custom_stem`, `overrides.yaml` through
+   `load_overrides`, and the two JSON ledgers through `load_group_corrections`
+   and `sanitize_taxonomy_corrections`. A bad bundle fails with no live file
+   modified.
+
+   `sanitize_taxonomy_corrections` matters here: the taxonomy ledger tolerates
+   dangling references by design (they are inert), so validation must accept a
+   ledger that points at clusters the recipient does not have. Importing
+   somebody else's corrections is expected to be partially inert, not an error.
 5. Apply section by section: stash current files to a rollback directory,
    `os.replace` the new ones in, discard the stash on success, restore it on
    failure.
@@ -189,7 +226,7 @@ workspace archive — these are kilobytes of text.
 
 **Import refuses while the caller has active runs** (`409 RUNS_ACTIVE`, via
 `run_manager.list_active(user_id=...)`), consistent with the existing archive
-endpoints: it can rewrite nine sections at once while a tailor run is reading
+endpoints: it can rewrite twelve sections at once while a tailor run is reading
 `review.yaml`.
 
 **Single-section reset does not** carry that guard. Its blast radius is the same
@@ -244,7 +281,7 @@ the Backup table and on individual pages. It opens the confirm dialog:
 > first if you want them back.
 
 The dialog names the section and its files, not a semantic count ("your 12
-URLs"). Semantic summaries would require per-section introspection — nine
+URLs"). Semantic summaries would require per-section introspection — twelve
 special cases for one line of text. The `Customized` badge carries the "you have
 changes here" signal instead.
 
@@ -260,7 +297,13 @@ the form is dirty and is scoped to edit-in-progress actions.
 | Style guide | `style_guide` |
 | Rendering | `render`, `templates` |
 | Pruning | `prune` |
-| *(no page)* | `profile_sources` — Backup table only |
+| *(no Settings page)* | `profile_sources`, `skill_overrides`, `skill_groups`, `taxonomy` — Backup table only |
+
+Four of the twelve sections have no Settings page: `profile_sources` is edited
+from `ProfileWorkspace.tsx` and the setup wizard, and the three correction
+ledgers are written from the profile skills panel and the Match/Gap
+constellation. Per-page buttons could therefore never be the complete surface —
+which is why the Backup table is canonical rather than a convenience.
 
 ## Testing
 
@@ -268,21 +311,29 @@ Backend tests run offline: no API key, no network, agent calls and the browser
 faked.
 
 **`tests/test_settings_sections.py`** — reset copies the `.example`; reset
-deletes when no `.example` ships (`agent_guidance`); `templates/` is cleared;
-`customized` detection is correct in both directions.
+deletes for each of the five sections that ship none; `templates/` is cleared;
+`customized` detection is correct in both directions; every declared path
+resolves under the active workspace through `resolve_tenant_path` in both tenant
+and legacy mode.
 
 **`tests/test_settings_bundle.py`**
 
-- Export → import round-trip is the identity.
-- `gmail_credentials.json` and `secrets.env` never appear in an export.
-- A bundle *containing* them is ignored on import, not obeyed.
+- Export → import round-trip is the identity, including the three `data/`
+  ledgers.
+- `gmail_credentials.json`, `secrets.env`, `gmail_token.json`, and
+  `resume_agent.db` never appear in an export.
+- A bundle *containing* any of them is ignored on import, not obeyed.
 - Path traversal is rejected.
-- Unparseable YAML is rejected with every live file byte-identical afterwards.
-- A two-section bundle leaves the other seven untouched.
+- Unparseable YAML or JSON is rejected with every live file byte-identical
+  afterwards.
+- A taxonomy ledger referencing clusters the recipient lacks imports cleanly and
+  stays inert.
+- A two-section bundle leaves the other ten untouched.
 - Unknown future section names are ignored.
 
-The two credential tests are load-bearing, not incidental: they are what make
-the allowlist a guarantee rather than an intention.
+The credential tests are load-bearing, not incidental: now that the allowlist
+spans the workspace root rather than `config/` alone, they are what make it a
+guarantee rather than an intention.
 
 **`tests/api/test_settings_api.py`** — each endpoint, the `confirm` guard, `409`
 while runs are active, and that the routes sit behind the normal auth guard.
@@ -301,4 +352,7 @@ refresh), and an addition to `AgentPromptsPage.test.tsx` for per-agent reset.
 - `provision_workspace` stops carrying its own idea of what a fresh workspace
   contains, so provisioning and resetting can no longer drift apart.
 - A settings bundle is safe to hand to another person: by construction it can
-  carry only the nine declared sections.
+  carry only the twelve declared sections.
+- The correction ledgers become transferable and resettable for the first time.
+  They were previously recoverable only by restoring an entire workspace, which
+  meant losing every job in the process.
