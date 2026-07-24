@@ -92,6 +92,19 @@ def delete_custom_template(stem: str, store) -> bool:
     return True
 
 
+def clear_custom_render_template(store) -> None:
+    """Fall back to classic when the active template is a custom upload.
+
+    The templates-section reset removes every custom ``.typ`` at once, so
+    ``render.yaml`` must not keep naming one -- the same reconciliation
+    ``delete_custom_template`` performs for a single stem. Bundled ids and the
+    empty default are left untouched.
+    """
+    render_doc = store.get("render")
+    if render_doc.template and render_doc.template.startswith("custom:"):
+        store.put("render", render_doc.model_copy(update={"template": "classic"}))
+
+
 def render_preview(template_id: str) -> bytes:
     info = resolve_template(template_id)
     try:

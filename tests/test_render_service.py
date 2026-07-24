@@ -170,3 +170,35 @@ def test_render_version_can_disable_one_page_fit(tmp_path):
         )
         render_version(session, _require_id(version.id), config, render_fn=fake_render)
     assert calls["fit_pages"] is None
+
+
+class _FakeConfigStore:
+    """Minimal store honoring the get/put contract clear_custom_render_template needs."""
+
+    def __init__(self, doc: RenderConfig) -> None:
+        self.doc = doc
+
+    def get(self, key: str) -> RenderConfig:
+        assert key == "render"
+        return self.doc
+
+    def put(self, key: str, doc: RenderConfig) -> None:
+        assert key == "render"
+        self.doc = doc
+
+
+def test_clear_custom_render_template_falls_back_to_classic():
+    from resume_agent.services.render_templates import clear_custom_render_template
+
+    store = _FakeConfigStore(RenderConfig(template="custom:mine"))
+    clear_custom_render_template(store)
+    assert store.doc.template == "classic"
+
+
+def test_clear_custom_render_template_leaves_bundled_and_empty_alone():
+    from resume_agent.services.render_templates import clear_custom_render_template
+
+    for template in ("classic", None):
+        store = _FakeConfigStore(RenderConfig(template=template))
+        clear_custom_render_template(store)
+        assert store.doc.template == template

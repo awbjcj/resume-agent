@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request, UploadFile
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
+from resume_agent.api.deps import get_config_store
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.settings import (
     BundleApplied,
@@ -20,6 +21,7 @@ from resume_agent.api.schemas.settings import (
 )
 from resume_agent.api.uploads import UploadTooLargeError, copy_upload
 from resume_agent.services.backup import UnsafeArchiveError
+from resume_agent.services.render_templates import clear_custom_render_template
 from resume_agent.services.settings_bundle import (
     InvalidBundleError,
     UnsupportedBundleVersionError,
@@ -127,9 +129,17 @@ def apply_bundle(
 
 
 @router.post("/sections/{section_id}/reset", response_model=SettingsSectionOut)
-def reset(section_id: str) -> SettingsSectionOut:
+def reset(section_id: str, request: Request) -> SettingsSectionOut:
     section = section_for(section_id)
     if section is None:
         raise ApiException(404, "NOT_FOUND", f"No settings section {section_id!r}")
+    context = current_context()
+    user_id = context.user_id if context is not None else None
+    if request.app.state.run_manager.list_active(user_id=user_id):
+        raise ApiException(409, "RUNS_ACTIVE", "Refusing while your runs are active")
     reset_section(section)
+    # Removing every custom template would leave render.yaml naming one that no
+    # longer exists; rendering never silently falls back, so reconcile here.
+    if section.id == "templates":
+        clear_custom_render_template(get_config_store(request))
     return _out(section)

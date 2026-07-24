@@ -103,6 +103,16 @@ def test_reset_of_an_unknown_section_is_404(mu_client):
     assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
+def test_reset_is_refused_while_runs_are_active(mu_client, mu_app, monkeypatch):
+    _login(mu_client)
+    monkeypatch.setattr(
+        mu_app.state.run_manager, "list_active", lambda user_id=None: ["run-1"]
+    )
+    response = mu_client.post("/api/settings/sections/sources/reset")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "RUNS_ACTIVE"
+
+
 def test_reset_returns_the_section_uncustomized(mu_client):
     _login(mu_client)
     mu_client.post(
