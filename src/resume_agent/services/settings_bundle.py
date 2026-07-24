@@ -120,6 +120,10 @@ def _check_text(path: Path) -> None:
     path.read_text(encoding="utf-8")
 
 
+def _check_overrides(path: Path) -> None:
+    load_overrides(path)
+
+
 def _check_group_corrections(path: Path) -> None:
     # NOT load_group_corrections: it swallows ValueError and returns an empty
     # ledger, which would let a truncated file import as "no corrections".
@@ -143,7 +147,7 @@ _VALIDATORS: dict[str, Callable[[Path], None]] = {
     "config/profile_sources.yaml": _yaml_doc(ProfileConfigDoc),
     "config/agent_guidance.yaml": _check_guidance,
     "config/style_guide.md": _check_text,
-    "data/profile/overrides.yaml": lambda path: load_overrides(path),
+    "data/profile/overrides.yaml": _check_overrides,
     "data/profile/group_corrections.json": _check_group_corrections,
     "data/taxonomy/taxonomy_corrections.json": _check_taxonomy_corrections,
 }
