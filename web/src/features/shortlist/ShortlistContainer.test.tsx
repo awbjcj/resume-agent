@@ -67,12 +67,33 @@ describe("ShortlistContainer", () => {
   it("switches to a list while retaining row actions", async () => {
     localStorage.setItem("shortlist-view", "list");
     server.use(http.get("/api/shortlist", () => HttpResponse.json({
-      data: [{ jobId: 8, company: "Acme", title: "Designer", fitScore: 70, skills: [], url: "https://example.test/8" }],
+      data: [{
+        jobId: 8,
+        company: "Acme",
+        title: "Designer",
+        fitScore: 70,
+        skills: [],
+        url: "https://example.test/8",
+        salaryMin: 120000,
+        salaryMax: 150000,
+        salaryCurrency: "USD",
+        seniority: "Senior",
+        employmentType: "Full-time",
+        industry: "Design software",
+      }],
       pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 }, facets: {}, total: 1,
     })));
     wrap(<ShortlistContainer />);
     expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open posting" })).toBeInTheDocument();
+    expect(screen.getByText("Compensation")).toBeInTheDocument();
+    expect(screen.getByText("$120k–150k")).toBeInTheDocument();
+    expect(screen.getByText("Level")).toBeInTheDocument();
+    expect(screen.getByText("Senior")).toBeInTheDocument();
+    expect(screen.getByText("Work type")).toBeInTheDocument();
+    expect(screen.getByText("Full-time")).toBeInTheDocument();
+    expect(screen.getByText("Industry")).toBeInTheDocument();
+    expect(screen.getByText("Design software")).toBeInTheDocument();
   });
 
   it("keeps the open facet scope stable after filtered results finish loading", async () => {

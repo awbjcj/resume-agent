@@ -38,6 +38,7 @@ type Row = {
 type ExtraColumn = {
   header: string;
   render: (row: Row) => ReactNode;
+  width?: "default" | "wide";
 };
 
 function sourceLabel(source: string | undefined): string {
@@ -74,7 +75,13 @@ export function JobTable({
 }) {
   const ordered = rows.map((row) => row.jobId);
   return (
-    <Table className="min-w-[64rem] table-fixed">
+    <Table
+      className={
+        extraColumn?.width === "wide"
+          ? "min-w-[74rem] table-fixed"
+          : "min-w-[64rem] table-fixed"
+      }
+    >
       <colgroup>
         <col className="w-11" />
         <col className="w-72" />
@@ -82,7 +89,9 @@ export function JobTable({
         <col className="w-32" />
         <col className="w-52" />
         {statusColumn && <col className="w-36" />}
-        {extraColumn && <col className="w-64" />}
+        {extraColumn && (
+          <col className={extraColumn.width === "wide" ? "w-96" : "w-64"} />
+        )}
         {actions && <col className="w-40" />}
       </colgroup>
       <TableHeader>
@@ -171,7 +180,7 @@ export function JobTable({
             )}
             {extraColumn && (
               <TableCell
-                className="min-w-0 truncate text-muted-foreground"
+                className="min-w-0 whitespace-normal py-3 text-muted-foreground"
                 onClick={() => onOpen(row.jobId)}
               >
                 {extraColumn.render(row) ?? "—"}

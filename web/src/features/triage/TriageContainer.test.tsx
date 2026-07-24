@@ -57,4 +57,41 @@ describe("TriageContainer", () => {
     expect(screen.getByRole("button", { name: "Archive job" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete job" })).toBeInTheDocument();
   });
+
+  it("gives a rejected job's reason a labeled, readable detail block", async () => {
+    server.use(
+      http.get("/api/triage", () =>
+        HttpResponse.json({
+          data: [
+            {
+              jobId: 4,
+              company: "Acme",
+              title: "Principal Engineer",
+              location: "Remote",
+              source: "adzuna",
+              status: "rejected",
+              fitScore: 31,
+              postedAt: null,
+              archivedAt: null,
+              hasProgress: false,
+              rejectReason:
+                "The role requires on-site work and does not offer the required sponsorship.",
+            },
+          ],
+          pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
+          facets: { source: { adzuna: 1 }, status: { rejected: 1 } },
+          total: 1,
+        }),
+      ),
+    );
+
+    wrap(<TriageContainer />);
+
+    expect(await screen.findByText("Rejection reason")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The role requires on-site work and does not offer the required sponsorship.",
+      ),
+    ).toBeInTheDocument();
+  });
 });
