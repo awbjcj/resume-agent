@@ -1,12 +1,19 @@
+import io
 import json
 import tarfile
 from pathlib import Path
+
+import pytest
 
 from resume_agent.config import Settings
 from resume_agent.services.settings_bundle import (
     BUNDLE_VERSION,
     MANIFEST_NAME,
+    InvalidBundleError,
+    UnsupportedBundleVersionError,
     export_settings_bundle,
+    read_bundle_manifest,
+    validate_member,
 )
 from resume_agent.tenancy.context import UserContext, use_context
 from resume_agent.tenancy.workspace import WorkspacePaths
@@ -109,3 +116,113 @@ def test_export_names_glob_members_by_their_real_filename(tmp_path):
     with use_context(context):
         archive = export_settings_bundle(tmp_path / "out")
     assert "config/templates/mine.typ" in members(archive)
+
+
+def write_bundle(tmp_path: Path, manifest_body: object, files: dict[str, str]) -> Path:
+    archive = tmp_path / "bundle.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        if manifest_body is not None:
+            blob = json.dumps(manifest_body).encode("utf-8")
+            info = tarfile.TarInfo(MANIFEST_NAME)
+            info.size = len(blob)
+            tar.addfile(info, io.BytesIO(blob))
+        for name, text in files.items():
+            blob = text.encode("utf-8")
+            info = tarfile.TarInfo(name)
+            info.size = len(blob)
+            tar.addfile(info, io.BytesIO(blob))
+    return archive
+
+
+def test_read_manifest_separates_known_from_unknown_sections(tmp_path):
+    archive = write_bundle(
+        tmp_path,
+        {
+            "version": 1,
+            "exportedAt": "2026-07-23T00:00:00+00:00",
+            "sections": ["sources", "from_the_future"],
+        },
+        {"config/connectors.yaml": "companies: []\n"},
+    )
+    parsed = read_bundle_manifest(archive)
+    assert parsed.sections == ("sources",)
+    assert parsed.unknown_sections == ("from_the_future",)
+
+
+def test_read_manifest_rejects_a_missing_manifest(tmp_path):
+    archive = write_bundle(tmp_path, None, {"config/connectors.yaml": "x: 1\n"})
+    with pytest.raises(InvalidBundleError):
+        read_bundle_manifest(archive)
+
+
+def test_read_manifest_rejects_an_unknown_version(tmp_path):
+    archive = write_bundle(
+        tmp_path, {"version": 99, "exportedAt": "", "sections": []}, {}
+    )
+    with pytest.raises(UnsupportedBundleVersionError):
+        read_bundle_manifest(archive)
+
+
+def test_read_manifest_rejects_a_non_tar_upload(tmp_path):
+    archive = tmp_path / "not-a-bundle.tar.gz"
+    archive.write_bytes(b"this is not gzip")
+    with pytest.raises(InvalidBundleError):
+        read_bundle_manifest(archive)
+
+
+@pytest.mark.parametrize(
+    ("arcname", "body"),
+    [
+        ("config/connectors.yaml", "companies: [\n"),
+        ("config/search.yaml", ": : :\n"),
+        ("data/profile/overrides.yaml", "ban: {oops\n"),
+        ("data/profile/group_corrections.json", "{not json"),
+        ("data/taxonomy/taxonomy_corrections.json", "{not json"),
+    ],
+)
+def test_validate_member_rejects_corruption(tmp_path, arcname, body):
+    staged = tmp_path / "staged"
+    staged.write_text(body, encoding="utf-8")
+    with pytest.raises(InvalidBundleError):
+        validate_member(arcname, staged)
+
+
+def test_validate_member_rejects_a_traversing_template_stem(tmp_path):
+    staged = tmp_path / "staged.typ"
+    staged.write_text("#let x = 1", encoding="utf-8")
+    with pytest.raises(InvalidBundleError):
+        validate_member("config/templates/../evil.typ", staged)
+
+
+def test_validate_member_accepts_a_ledger_naming_unknown_clusters(tmp_path):
+    staged = tmp_path / "staged.json"
+    staged.write_text(
+        json.dumps({"domain_renames": {"cluster-i-do-not-have": "whatever"}}),
+        encoding="utf-8",
+    )
+    validate_member("data/taxonomy/taxonomy_corrections.json", staged)
+
+
+def test_validate_member_accepts_valid_documents(tmp_path):
+    staged = tmp_path / "staged.yaml"
+    staged.write_text("titles: [engineer]\n", encoding="utf-8")
+    validate_member("config/search.yaml", staged)
+
+
+@pytest.mark.parametrize(
+    ("arcname", "body"),
+    [
+        # match_plan_enabled exists on the real ReviewConfig domain model but
+        # not on the API's wire-only ReviewConfigDoc. Pydantic's default
+        # extra="ignore" means validating against the wrong model would let
+        # this typo through silently -- it must fail here, at import, not on
+        # the next tailor run.
+        ("config/review.yaml", "match_plan_enabled: not-a-bool\n"),
+        ("config/review_deep.yaml", "match_plan_enabled: not-a-bool\n"),
+    ],
+)
+def test_validate_member_checks_fields_the_wire_schema_omits(tmp_path, arcname, body):
+    staged = tmp_path / "staged.yaml"
+    staged.write_text(body, encoding="utf-8")
+    with pytest.raises(InvalidBundleError):
+        validate_member(arcname, staged)
