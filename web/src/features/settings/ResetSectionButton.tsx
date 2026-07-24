@@ -20,15 +20,20 @@ import { useResetSection } from "./use-settings-sections";
 
 /** Restores one settings section to the value a fresh workspace would have.
  *  Used both in the Backup page's section table and on individual settings
- *  pages, so the confirm copy stays identical wherever a reset is offered. */
+ *  pages, so the confirm copy stays identical wherever a reset is offered.
+ *  `buttonLabel` overrides the face text for pages that show more than one
+ *  reset side-by-side (Rendering), where the generic "Reset to defaults" would
+ *  be ambiguous; the confirm dialog always names the section via `label`. */
 export function ResetSectionButton({
   sectionId,
   label,
   note,
+  buttonLabel = "Reset to defaults",
 }: {
   sectionId: string;
   label: string;
   note?: string;
+  buttonLabel?: string;
 }) {
   const reset = useResetSection();
   const [open, setOpen] = useState(false);
@@ -36,7 +41,7 @@ export function ResetSectionButton({
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button variant="outline" size="sm" />}>
         <RotateCcw data-icon="inline-start" />
-        Reset to defaults
+        {buttonLabel}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

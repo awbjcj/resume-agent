@@ -61,13 +61,12 @@ export function RenderingSettingsPage() {
             sample data.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ResetSectionButton sectionId="render" label="Rendering" />
-          <ResetSectionButton
-            sectionId="templates"
-            label="Custom resume templates"
-          />
-        </div>
+        <ResetSectionButton
+          sectionId="render"
+          label="Rendering options"
+          buttonLabel="Reset options"
+          note="Custom uploaded templates are kept — reset those separately below."
+        />
       </header>
 
       <FieldSet>
@@ -145,10 +144,18 @@ export function RenderingSettingsPage() {
 
       <FieldGroup>
         <Field data-invalid={Boolean(upload.error)}>
-          <FieldLabel htmlFor="template-upload">
-            <Upload aria-hidden="true" />
-            Upload Typst template
-          </FieldLabel>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <FieldLabel htmlFor="template-upload">
+              <Upload aria-hidden="true" />
+              Upload Typst template
+            </FieldLabel>
+            <ResetSectionButton
+              sectionId="templates"
+              label="Custom resume templates"
+              buttonLabel="Reset custom templates"
+              note="This deletes every custom template you uploaded; the bundled templates remain."
+            />
+          </div>
           <Input
             id="template-upload"
             type="file"

@@ -34,6 +34,19 @@ describe("RenderingSettingsPage", () => {
     remove.mockClear();
   });
 
+  it("names each reset so the two are not confusable", () => {
+    render(<RenderingSettingsPage />, { wrapper: withQueryClient });
+    expect(
+      screen.getByRole("button", { name: /reset options/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /reset custom templates/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^reset to defaults$/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("selects templates and saves the new path-free contract", async () => {
     render(<RenderingSettingsPage />, { wrapper: withQueryClient });
     expect(screen.queryByLabelText(/path|directory/i)).not.toBeInTheDocument();
