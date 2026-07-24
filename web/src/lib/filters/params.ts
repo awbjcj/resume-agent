@@ -21,6 +21,7 @@ export function boardFilterToParams(
 ): Record<string, string> {
   const p: Record<string, string> = { sortBy: s.sort, preset: s.preset };
   if (s.q.trim()) p.q = s.q.trim();
+  if (s.rejectReason.trim()) p.rejectReason = s.rejectReason.trim();
   if (s.fitMin != null) p.minFit = String(s.fitMin);
   if (s.maxFit != null) p.maxFit = String(s.maxFit);
   if (s.salaryMin != null) p.minSalary = String(s.salaryMin);

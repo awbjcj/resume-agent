@@ -104,6 +104,7 @@ def delete_job_endpoint(
 def _bulk_filter(body: BulkRequest) -> board.BoardFilter:
     return board.BoardFilter(
         q=body.q,
+        reject_reason=body.reject_reason,
         source=tuple(body.source),
         status=tuple(body.status_in),
         remote=tuple(body.remote),

@@ -8,6 +8,7 @@ export type Preset = "balanced" | "pay_first" | "freshest";
 
 export interface FilterState {
   q: string;
+  rejectReason: string;
   salaryMin: number | null;
   source: Set<string>;
   status: Set<string>;
@@ -32,6 +33,7 @@ export interface FilterState {
 export function emptyFilterState(): FilterState {
   return {
     q: "",
+    rejectReason: "",
     salaryMin: null,
     source: new Set(),
     status: new Set(),

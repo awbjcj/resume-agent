@@ -26,11 +26,13 @@ def board_filter_query(default_sort: str):
     """The boards' shared filter surface, declared once.
 
     A factory because the wire default for ``sortBy`` is per-board (shortlist
-    and triage rank by fit, pipeline by stage) while the parameter set is not.
+    ranks by fit, triage by recency, and pipeline by stage) while the parameter
+    set is not.
     """
 
     def dependency(
         q: str | None = None,
+        reject_reason: str | None = Query(None, alias="rejectReason"),
         source: str | None = None,
         status: str | None = None,
         remote: str | None = None,
@@ -52,6 +54,7 @@ def board_filter_query(default_sort: str):
     ) -> board.BoardFilter:
         return board.BoardFilter(
             q=q,
+            reject_reason=reject_reason,
             source=_csv(source),
             status=_csv(status),
             remote=_csv(remote),
@@ -104,7 +107,7 @@ def get_pipeline(
 @router.get("/triage", response_model=BoardPage[TriageItem])
 def get_triage(
     archived: bool = False,
-    board_filter: board.BoardFilter = Depends(board_filter_query("fit")),
+    board_filter: board.BoardFilter = Depends(board_filter_query("recency")),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, alias="pageSize", ge=1, le=200),
     session: Session = Depends(get_session),

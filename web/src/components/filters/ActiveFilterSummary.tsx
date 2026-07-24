@@ -43,6 +43,8 @@ export function ActiveFilterSummary({
   const scalar = (key: keyof FilterState, value: string) =>
     scalars.push({ key, value, label: value });
   if (filter.q.trim()) scalar("q", `Search: ${filter.q.trim()}`);
+  if (filter.rejectReason.trim())
+    scalar("rejectReason", `Reason: ${filter.rejectReason.trim()}`);
   if (filter.fitMin != null) scalar("fitMin", `Fit >= ${filter.fitMin}`);
   if (filter.maxFit != null) scalar("maxFit", `Fit <= ${filter.maxFit}`);
   if (filter.salaryMin != null) scalar("salaryMin", `Salary >= ${filter.salaryMin}`);

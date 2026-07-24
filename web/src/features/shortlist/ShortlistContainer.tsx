@@ -166,7 +166,6 @@ export function ShortlistContainer() {
               extraColumn={{
                 header: "Details",
                 render: (row) => <ShortlistDetails row={row} />,
-                width: "wide",
               }}
             />
           )}

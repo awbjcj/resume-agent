@@ -25,6 +25,7 @@ describe("useBulkAction", () => {
     );
     const filter = emptyFilterState();
     filter.source = new Set(["adzuna"]);
+    filter.rejectReason = "sponsorship";
     const { result } = renderHook(() => useBulkAction("triage"), { wrapper });
     const res = await result.current.preview({
       action: "delete",
@@ -34,6 +35,7 @@ describe("useBulkAction", () => {
     expect(received).toMatchObject({
       scope: "query",
       source: ["adzuna"],
+      rejectReason: "sponsorship",
       dryRun: true,
     });
     expect(res.affected).toBe(10);

@@ -4,15 +4,12 @@ import { useSearchParams } from "react-router-dom";
 import { BulkActionBar } from "@/components/BulkActionBar";
 import { BulkPreviewButton } from "@/components/BulkPreviewButton";
 import { EmptyState } from "@/components/EmptyState";
-import { FilterDesk } from "@/components/FilterDesk";
 import { JobModal } from "@/components/JobModal";
 import { JobTable } from "@/components/JobTable";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
 import { BoardSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useBoardQuery, type TriageItem } from "@/features/board/use-board-query";
 import { useBulkAction } from "@/features/board/use-bulk-action";
 import { useJobNavigation } from "@/features/board/use-job-navigation";
@@ -20,9 +17,9 @@ import { useSelection } from "@/features/board/use-selection";
 import { JobQuickActions } from "@/features/board/JobQuickActions";
 import { useBoardFilters } from "@/features/shortlist/use-board-filters";
 import { recency } from "@/lib/format";
+import type { FilterState } from "@/lib/filters/types";
 
-import { QuickFilters } from "./QuickFilters";
-import { ImportJobsButton } from "@/features/runs/ImportJobsDialog";
+import { TriageFilters } from "./TriageFilters";
 
 type TriageNoteRow = {
   rejectReason?: string | null;
@@ -32,30 +29,35 @@ type TriageNoteRow = {
 function TriageNote({ row }: { row: TriageNoteRow }) {
   if (row.rejectReason) {
     return (
-      <div className="border-l-2 border-destructive/45 pl-3">
-        <div className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-destructive">
-          Rejection reason
-        </div>
-        <p className="mt-1 whitespace-normal break-words text-sm leading-5 text-foreground">
+      <div
+        className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap"
+        title={row.rejectReason}
+      >
+        <span
+          aria-hidden
+          className="size-1.5 shrink-0 rounded-full bg-destructive"
+        />
+        <span
+          className="min-w-0 truncate text-sm text-destructive"
+          aria-label={`Rejection reason: ${row.rejectReason}`}
+        >
           {row.rejectReason}
-        </p>
+        </span>
       </div>
     );
   }
   const posted = recency(row.postedAt);
   return posted ? (
-    <dl>
-      <dt className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75">
-        Posted
-      </dt>
-      <dd className="mt-0.5 text-sm leading-5 text-foreground">{posted}</dd>
-    </dl>
+    <span className="whitespace-nowrap text-sm text-foreground">Posted {posted}</span>
   ) : null;
 }
 
 export function TriageContainer() {
   const [archived, setArchived] = useState(false);
-  const [filter, setFilter] = useBoardFilters();
+  const [rawFilter, setRawFilter] = useBoardFilters("recency");
+  const filter: FilterState = { ...rawFilter, fitMin: null, maxFit: null };
+  const setFilter = (next: FilterState) =>
+    setRawFilter({ ...next, fitMin: null, maxFit: null });
   const { rows, facets, total, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useBoardQuery<TriageItem>("triage", filter, { archived });
   const selection = useSelection();
@@ -115,18 +117,14 @@ export function TriageContainer() {
           ["Matching", total.toLocaleString()],
         ]}
       />
-      <FilterDesk filter={filter} facets={facets} total={total} onChange={setFilter} />
-      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <Switch id="show-archived" checked={archived} onCheckedChange={setArchived} />
-          <Label htmlFor="show-archived" className="text-sm font-medium">
-            Show archived
-          </Label>
-        </div>
-        <span aria-hidden className="h-4 w-px bg-border" />
-        <QuickFilters onApply={(patch) => setFilter({ ...filter, ...patch })} />
-        <ImportJobsButton />
-      </div>
+      <TriageFilters
+        filter={filter}
+        facets={facets}
+        total={total}
+        archived={archived}
+        onArchivedChange={setArchived}
+        onChange={setFilter}
+      />
       {!rows.length ? (
         <EmptyState
           title="Nothing to triage"
@@ -183,10 +181,10 @@ export function TriageContainer() {
               />
             )}
             statusColumn={false}
+            fitColumn={false}
             extraColumn={{
               header: "Notes",
               render: (row) => <TriageNote row={row} />,
-              width: "wide",
             }}
           />
           {hasNextPage && (

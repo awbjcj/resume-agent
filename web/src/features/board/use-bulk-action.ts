@@ -45,6 +45,7 @@ function buildBody(board: Board, args: Args, dryRun: boolean): BulkRequest {
     status: args.status ?? null,
     archived: args.archived ?? false,
     q: filter.q.trim() || null,
+    rejectReason: filter.rejectReason.trim() || null,
     minFit: filter.fitMin,
     maxFit: filter.maxFit,
     minSalary: filter.salaryMin,

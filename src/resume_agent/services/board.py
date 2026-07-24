@@ -54,6 +54,7 @@ Facets = dict[str, dict[str, int]]
 @dataclass(frozen=True)
 class BoardFilter:
     q: str | None = None
+    reject_reason: str | None = None
     source: tuple[str, ...] = ()
     status: tuple[str, ...] = ()
     remote: tuple[str, ...] = ()
@@ -161,6 +162,10 @@ def _aware(dt: datetime) -> datetime:
 def _passes_filter(row: Any, f: BoardFilter) -> bool:
     if f.q and f.q.strip().lower() not in _row_text(row):
         return False
+    if f.reject_reason:
+        reason = getattr(row, "reject_reason", None)
+        if reason is None or f.reject_reason.strip().lower() not in reason.lower():
+            return False
 
     score = getattr(row, "fit_score", None)
     if f.min_fit is not None and score is not None and score < f.min_fit:

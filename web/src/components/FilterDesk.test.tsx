@@ -25,6 +25,14 @@ describe("FilterDesk", () => {
     render(<FilterDesk filter={emptyFilterState()} facets={facets} total={1} onChange={() => {}} />);
     expect(screen.getByText("Min fit")).toBeInTheDocument();
     expect(screen.getByText("Sort")).toBeInTheDocument();
+
+    const searchField = screen.getByRole("searchbox", { name: "Search" })
+      .closest('[data-slot="field"]');
+    const fitField = screen.getByRole("spinbutton", { name: "Min fit" })
+      .closest('[data-slot="field"]');
+    expect(searchField?.parentElement).toBe(fitField?.parentElement);
+    expect(searchField).toHaveClass("sm:flex-1");
+    expect(fitField).toHaveClass("sm:flex-1");
   });
 
   it("shows the Preset control only for composite sort", () => {

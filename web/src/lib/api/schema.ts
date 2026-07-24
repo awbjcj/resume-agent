@@ -2557,6 +2557,8 @@ export interface components {
             q?: string | null;
             /** Region */
             region?: string[];
+            /** Rejectreason */
+            rejectReason?: string | null;
             /** Remote */
             remote?: string[];
             /**
@@ -7620,6 +7622,7 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
                 q?: string | null;
+                rejectReason?: string | null;
                 source?: string | null;
                 status?: string | null;
                 remote?: string | null;
@@ -9213,6 +9216,7 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
                 q?: string | null;
+                rejectReason?: string | null;
                 source?: string | null;
                 status?: string | null;
                 remote?: string | null;
@@ -9921,6 +9925,7 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
                 q?: string | null;
+                rejectReason?: string | null;
                 source?: string | null;
                 status?: string | null;
                 remote?: string | null;

@@ -201,6 +201,7 @@ export function FilterDesk({
       return;
     }
     if (key === "q") set({ q: "" });
+    else if (key === "rejectReason") set({ rejectReason: "" });
     else if (key === "fitMin") set({ fitMin: null });
     else if (key === "maxFit") set({ maxFit: null });
     else if (key === "salaryMin") set({ salaryMin: null });
@@ -314,27 +315,35 @@ export function FilterDesk({
             </Field>
           )}
 
-          <Field className="w-full gap-1.5 sm:w-auto sm:min-w-56 sm:flex-1">
-            <FieldLabel htmlFor="f-q" className={CONTROL_LABEL_CLASS}>
-              Search
-            </FieldLabel>
-            <Input
-              id="f-q"
-              type="search"
-              placeholder="Title, company, skill…"
-              className="h-9 bg-background"
-              value={draft.q}
-              onChange={(event) =>
-                setPrimaryDraft({ ...draft, q: event.target.value })
-              }
-            />
-          </Field>
+          <div className="flex w-full flex-col gap-2 sm:flex-row lg:min-w-[28rem] lg:flex-1">
+            <Field className="w-full gap-1.5 sm:basis-0 sm:flex-1">
+              <FieldLabel htmlFor="f-q" className={CONTROL_LABEL_CLASS}>
+                Search
+              </FieldLabel>
+              <div className="relative">
+                <SearchIcon
+                  aria-hidden
+                  className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  id="f-q"
+                  type="search"
+                  placeholder="Title, company, skill…"
+                  className="h-9 bg-background pl-8"
+                  value={draft.q}
+                  onChange={(event) =>
+                    setPrimaryDraft({ ...draft, q: event.target.value })
+                  }
+                />
+              </div>
+            </Field>
 
-          <MinFitInput
-            id="f-fit"
-            value={draft.fitMin}
-            onChange={(fitMin) => setPrimaryDraft({ ...draft, fitMin })}
-          />
+            <MinFitInput
+              id="f-fit"
+              value={draft.fitMin}
+              onChange={(fitMin) => setPrimaryDraft({ ...draft, fitMin })}
+            />
+          </div>
 
           <SalaryThresholdInput
             id="f-salary"

@@ -283,6 +283,34 @@ def test_stale_min_days_filter_keeps_only_older_jobs():
     assert [row.company for row in result.page.data] == ["Stale"]
 
 
+def test_reject_reason_filter_is_case_insensitive_and_excludes_missing_reasons():
+    with _session() as session:
+        _job(
+            session,
+            status=JobStatus.rejected.value,
+            company="Sponsorship rejection",
+            reject_reason="Sponsorship not available",
+        )
+        _job(
+            session,
+            status=JobStatus.rejected.value,
+            company="Salary rejection",
+            reject_reason="salary below minimum",
+        )
+        _job(
+            session,
+            status=JobStatus.raw.value,
+            company="No rejection reason",
+        )
+        result = board.list_board(
+            session,
+            "triage",
+            board_filter=board.BoardFilter(reject_reason="SPONSORSHIP"),
+        )
+
+    assert [row.company for row in result.page.data] == ["Sponsorship rejection"]
+
+
 def test_facet_specs_match_board_filter_fields():
     import dataclasses
 

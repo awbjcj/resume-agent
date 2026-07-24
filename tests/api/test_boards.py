@@ -107,6 +107,25 @@ def test_triage_item_exposes_reject_reason():
     assert item["rejectReason"] == "salary below minimum"
 
 
+def test_triage_filters_by_reject_reason():
+    client = _client()
+    with client:
+        _seed(
+            client.app,
+            status=JobStatus.rejected.value,
+            company="Keep",
+            reject_reason="sponsorship not available",
+        )
+        _seed(
+            client.app,
+            status=JobStatus.rejected.value,
+            company="Drop",
+            reject_reason="salary below minimum",
+        )
+        body = client.get("/api/triage?rejectReason=sponsor").json()
+    assert [item["company"] for item in body["data"]] == ["Keep"]
+
+
 def test_job_detail_exposes_reject_reason():
     client = _client()
     with client:

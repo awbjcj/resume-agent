@@ -38,7 +38,6 @@ type Row = {
 type ExtraColumn = {
   header: string;
   render: (row: Row) => ReactNode;
-  width?: "default" | "wide";
 };
 
 function sourceLabel(source: string | undefined): string {
@@ -57,6 +56,7 @@ export function JobTable({
   allChecked,
   actions,
   statusColumn = true,
+  fitColumn = true,
   extraColumn,
 }: {
   rows: Row[];
@@ -69,29 +69,23 @@ export function JobTable({
   /** Set false when the caller's rows all share one implicit status (e.g. the
    * shortlist and triage boards) — the column would otherwise be redundant. */
   statusColumn?: boolean;
+  /** Triage decisions do not depend on displaying the numeric fit score. */
+  fitColumn?: boolean;
   /** Replaces the space freed by hiding the status column with board-specific
    * detail (salary/seniority for the shortlist, reject reason for triage). */
   extraColumn?: ExtraColumn;
 }) {
   const ordered = rows.map((row) => row.jobId);
   return (
-    <Table
-      className={
-        extraColumn?.width === "wide"
-          ? "min-w-[74rem] table-fixed"
-          : "min-w-[64rem] table-fixed"
-      }
-    >
+    <Table className="min-w-[64rem] table-fixed">
       <colgroup>
         <col className="w-11" />
         <col className="w-72" />
-        <col className="w-20" />
+        {fitColumn && <col className="w-20" />}
         <col className="w-32" />
         <col className="w-52" />
         {statusColumn && <col className="w-36" />}
-        {extraColumn && (
-          <col className={extraColumn.width === "wide" ? "w-96" : "w-64"} />
-        )}
+        {extraColumn && <col className={fitColumn ? "w-80" : "w-96"} />}
         {actions && <col className="w-40" />}
       </colgroup>
       <TableHeader>
@@ -104,7 +98,7 @@ export function JobTable({
             />
           </TableHead>
           <TableHead>Role</TableHead>
-          <TableHead className="text-center">Fit</TableHead>
+          {fitColumn && <TableHead className="text-center">Fit</TableHead>}
           <TableHead>Source</TableHead>
           <TableHead>Location</TableHead>
           {statusColumn && <TableHead>Status</TableHead>}
@@ -141,22 +135,33 @@ export function JobTable({
                 className="block w-full min-w-0 rounded-sm text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
                 onClick={() => onOpen(row.jobId)}
               >
-                <div className="truncate font-medium" title={row.title ?? undefined}>
-                  {row.title ?? "Untitled role"}
-                </div>
-                <div
-                  className="truncate text-xs text-muted-foreground"
-                  title={row.company ?? undefined}
-                >
-                  {row.company ?? "Unknown company"}
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span
+                    className="min-w-0 truncate font-medium"
+                    title={row.title ?? undefined}
+                  >
+                    {row.title ?? "Untitled role"}
+                  </span>
+                  <span aria-hidden className="shrink-0 text-muted-foreground/50">
+                    ·
+                  </span>
+                  <span className="sr-only">at</span>
+                  <span
+                    className="min-w-0 truncate text-xs text-muted-foreground"
+                    title={row.company ?? undefined}
+                  >
+                    {row.company ?? "Unknown company"}
+                  </span>
                 </div>
               </button>
             </TableCell>
-            <TableCell className="text-center" onClick={() => onOpen(row.jobId)}>
-              <Badge variant="secondary" className="min-w-9 justify-center tabular-nums">
-                {row.fitScore ?? "—"}
-              </Badge>
-            </TableCell>
+            {fitColumn && (
+              <TableCell className="text-center" onClick={() => onOpen(row.jobId)}>
+                <Badge variant="secondary" className="min-w-9 justify-center tabular-nums">
+                  {row.fitScore ?? "—"}
+                </Badge>
+              </TableCell>
+            )}
             <TableCell className="min-w-0" onClick={() => onOpen(row.jobId)}>
               <Badge
                 variant="outline"
@@ -180,7 +185,7 @@ export function JobTable({
             )}
             {extraColumn && (
               <TableCell
-                className="min-w-0 whitespace-normal py-3 text-muted-foreground"
+                className="min-w-0 truncate text-muted-foreground"
                 onClick={() => onOpen(row.jobId)}
               >
                 {extraColumn.render(row) ?? "—"}

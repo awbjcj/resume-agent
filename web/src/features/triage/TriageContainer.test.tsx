@@ -56,9 +56,14 @@ describe("TriageContainer", () => {
     expect(screen.getByRole("link", { name: "Open posting" })).toHaveAttribute("href", "https://example.test/job/3");
     expect(screen.getByRole("button", { name: "Archive job" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete job" })).toBeInTheDocument();
+    expect(screen.queryByText("Fit")).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Rejection reason" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Minimum fit")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Minimum salary")).not.toBeInTheDocument();
   });
 
-  it("gives a rejected job's reason a labeled, readable detail block", async () => {
+  it("shows a rejected job's reason in a compact labeled note", async () => {
     server.use(
       http.get("/api/triage", () =>
         HttpResponse.json({
@@ -87,7 +92,11 @@ describe("TriageContainer", () => {
 
     wrap(<TriageContainer />);
 
-    expect(await screen.findByText("Rejection reason")).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText(
+        "Rejection reason: The role requires on-site work and does not offer the required sponsorship.",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
         "The role requires on-site work and does not offer the required sponsorship.",

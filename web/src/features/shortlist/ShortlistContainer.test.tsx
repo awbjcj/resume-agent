@@ -86,14 +86,11 @@ describe("ShortlistContainer", () => {
     wrap(<ShortlistContainer />);
     expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open posting" })).toBeInTheDocument();
-    expect(screen.getByText("Compensation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Job details")).toBeInTheDocument();
     expect(screen.getByText("$120k–150k")).toBeInTheDocument();
-    expect(screen.getByText("Level")).toBeInTheDocument();
-    expect(screen.getByText("Senior")).toBeInTheDocument();
-    expect(screen.getByText("Work type")).toBeInTheDocument();
-    expect(screen.getByText("Full-time")).toBeInTheDocument();
-    expect(screen.getByText("Industry")).toBeInTheDocument();
     expect(screen.getByText("Design software")).toBeInTheDocument();
+    expect(screen.queryByText("Level")).not.toBeInTheDocument();
+    expect(screen.queryByText("Work type")).not.toBeInTheDocument();
   });
 
   it("keeps the open facet scope stable after filtered results finish loading", async () => {

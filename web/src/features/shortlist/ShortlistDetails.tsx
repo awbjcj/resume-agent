@@ -1,41 +1,57 @@
+import { Fragment } from "react";
+
 import { recency, salaryLabel } from "@/lib/format";
 
 type ShortlistDetailsRow = {
   salaryMin?: number | null;
   salaryMax?: number | null;
   salaryCurrency?: string | null;
-  seniority?: string | null;
-  employmentType?: string | null;
   industry?: string | null;
   postedAt?: string | null;
 };
 
 export function ShortlistDetails({ row }: { row: ShortlistDetailsRow }) {
-  const fields = [
+  const details = [
     {
       label: "Compensation",
       value: salaryLabel(row.salaryMin, row.salaryMax, row.salaryCurrency),
+      className: "font-medium text-emerald-700 dark:text-emerald-300",
     },
-    { label: "Level", value: row.seniority },
-    { label: "Work type", value: row.employmentType },
-    { label: "Industry", value: row.industry },
-    { label: "Posted", value: recency(row.postedAt) },
-  ].filter((field) => Boolean(field.value));
+    {
+      label: "Industry",
+      value: row.industry,
+      className: "text-primary",
+    },
+    {
+      label: "Posted",
+      value: recency(row.postedAt),
+      className: "text-muted-foreground",
+    },
+  ].filter((detail) => Boolean(detail.value));
 
-  if (!fields.length) return null;
+  if (!details.length) return null;
 
   return (
-    <dl className="grid grid-cols-2 gap-x-5 gap-y-2.5 whitespace-normal">
-      {fields.map((field) => (
-        <div key={field.label} className="min-w-0">
-          <dt className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75">
-            {field.label}
-          </dt>
-          <dd className="mt-0.5 break-words text-sm leading-5 text-foreground">
-            {field.value}
-          </dd>
-        </div>
+    <div
+      className="flex min-w-0 items-baseline gap-2 overflow-hidden whitespace-nowrap"
+      aria-label="Job details"
+    >
+      {details.map((detail, index) => (
+        <Fragment key={detail.label}>
+          {index > 0 && (
+            <span aria-hidden className="shrink-0 text-border">
+              •
+            </span>
+          )}
+          <span
+            className={`min-w-0 truncate text-sm ${detail.className}`}
+            title={`${detail.label}: ${detail.value}`}
+          >
+            <span className="sr-only">{detail.label}: </span>
+            {detail.value}
+          </span>
+        </Fragment>
       ))}
-    </dl>
+    </div>
   );
 }

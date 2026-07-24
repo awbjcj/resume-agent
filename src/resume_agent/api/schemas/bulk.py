@@ -18,6 +18,7 @@ class BulkRequest(CamelModel):
     dry_run: bool = True
     archived: bool = False
     q: str | None = None
+    reject_reason: str | None = None
     source: list[str] = Field(default_factory=list)
     status_in: list[str] = Field(default_factory=list)
     remote: list[str] = Field(default_factory=list)

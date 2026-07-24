@@ -997,6 +997,17 @@
             "title": "Region",
             "type": "array"
           },
+          "rejectReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejectreason"
+          },
           "remote": {
             "items": {
               "type": "string"
@@ -11691,6 +11702,22 @@
           },
           {
             "in": "query",
+            "name": "rejectReason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rejectreason"
+            }
+          },
+          {
+            "in": "query",
             "name": "source",
             "required": false,
             "schema": {
@@ -14612,6 +14639,22 @@
           },
           {
             "in": "query",
+            "name": "rejectReason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rejectreason"
+            }
+          },
+          {
+            "in": "query",
             "name": "source",
             "required": false,
             "schema": {
@@ -16065,6 +16108,22 @@
           },
           {
             "in": "query",
+            "name": "rejectReason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rejectreason"
+            }
+          },
+          {
+            "in": "query",
             "name": "source",
             "required": false,
             "schema": {
@@ -16340,7 +16399,7 @@
             "name": "sortBy",
             "required": false,
             "schema": {
-              "default": "fit",
+              "default": "recency",
               "title": "Sortby",
               "type": "string"
             }
