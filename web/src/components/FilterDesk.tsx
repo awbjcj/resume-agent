@@ -102,6 +102,13 @@ function hasOptions(counts: Record<string, number>, selected: Set<string>) {
   return Object.keys(counts).length > 0 || selected.size > 0;
 }
 
+function mergeCounts(
+  stableCounts: Record<string, number>,
+  liveCounts: Record<string, number>,
+) {
+  return { ...stableCounts, ...liveCounts };
+}
+
 function pretty(value: string) {
   return value.replace(/_/g, " ");
 }
@@ -179,6 +186,10 @@ export function FilterDesk({
   const [openFacet, setOpenFacet] = useState<(typeof SET_KEYS)[number] | null>(
     null,
   );
+  const [openFacetScope, setOpenFacetScope] = useState<{
+    key: (typeof SET_KEYS)[number];
+    counts: Record<string, number>;
+  } | null>(null);
   const draft = isPrimaryDraftCurrent(primaryDraft, filter)
     ? primaryDraft
     : primaryDraftFromFilter(filter);
@@ -186,13 +197,6 @@ export function FilterDesk({
     onChange({ ...filter, ...patch });
   const setFacet = (key: (typeof SET_KEYS)[number], value: Set<string>) =>
     onChange({ ...filter, [key]: value });
-  const handleFacetOpenChange = (
-    key: (typeof SET_KEYS)[number],
-    nextOpen: boolean,
-  ) =>
-    setOpenFacet((current) =>
-      nextOpen ? key : current === key ? null : current,
-    );
   const removeFilter = (key: keyof FilterState, value: string) => {
     if ((SET_KEYS as readonly string[]).includes(key)) {
       const next = new Set(filter[key as (typeof SET_KEYS)[number]]);
@@ -256,6 +260,30 @@ export function FilterDesk({
     { key: "companySize", label: "Company size" },
     { key: "skills", label: "Skills" },
   ];
+  const facetSpecMap = Object.fromEntries(
+    facetSpecs.map((facetSpec) => [facetSpec.key, facetSpec]),
+  ) as Record<(typeof SET_KEYS)[number], FacetSpec>;
+  const facetCounts = (key: (typeof SET_KEYS)[number]) => {
+    const counts = countsWithSelected(facets[key], filter[key]);
+    for (const option of facetSpecMap[key]?.options ?? []) counts[option] ??= 0;
+    return counts;
+  };
+  const canStabilizeFacet = (key: (typeof SET_KEYS)[number]) =>
+    facets[key] !== undefined;
+  const handleFacetOpenChange = (
+    key: (typeof SET_KEYS)[number],
+    nextOpen: boolean,
+  ) => {
+    setOpenFacet((current) =>
+      nextOpen ? key : current === key ? null : current,
+    );
+    if (nextOpen && key !== "status") {
+      setOpenFacetScope({ key, counts: facetCounts(key) });
+      return;
+    }
+    setOpenFacetScope((current) => (current?.key === key ? null : current));
+  };
+
   const statusCounts = countsWithSelected(facets.status, filter.status);
   for (const option of statusOptions ?? []) statusCounts[option] ??= 0;
   const showStatus = hasOptions(statusCounts, filter.status);
@@ -263,12 +291,12 @@ export function FilterDesk({
     openFacet === null ||
     (openFacet === "status"
       ? showStatus
-      : facetSpecs.some(({ key, options }) => {
-          if (key !== openFacet) return false;
-          const counts = countsWithSelected(facets[key], filter[key]);
-          for (const option of options ?? []) counts[option] ??= 0;
-          return hasOptions(counts, filter[key]);
-        }));
+      : hasOptions(
+          openFacetScope?.key === openFacet && canStabilizeFacet(openFacet)
+            ? mergeCounts(openFacetScope.counts, facetCounts(openFacet))
+            : facetCounts(openFacet),
+          filter[openFacet],
+        ));
 
   useEffect(() => {
     if (!isOpenFacetRenderable) {
@@ -467,9 +495,12 @@ export function FilterDesk({
       </form>
 
       <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-        {facetSpecs.map(({ key, label, options, getLabel }) => {
-          const counts = countsWithSelected(facets[key], filter[key]);
-          for (const option of options ?? []) counts[option] ??= 0;
+        {facetSpecs.map(({ key, label, getLabel }) => {
+          const liveCounts = facetCounts(key);
+          const counts =
+            openFacetScope?.key === key && canStabilizeFacet(key)
+              ? mergeCounts(openFacetScope.counts, liveCounts)
+              : liveCounts;
           if (!hasOptions(counts, filter[key])) return null;
           return (
             <FacetPopover

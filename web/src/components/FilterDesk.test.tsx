@@ -127,6 +127,33 @@ describe("FilterDesk", () => {
     expect(screen.queryByText("Filter by Source")).not.toBeInTheDocument();
   });
 
+  it("keeps an open facet option list stable during refreshes", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <FilterDesk
+        filter={emptyFilterState()}
+        facets={{ source: { greenhouse: 1, lever: 1 } }}
+        total={2}
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Source" }));
+    expect(screen.getByRole("checkbox", { name: /lever/i })).toBeInTheDocument();
+
+    rerender(
+      <FilterDesk
+        filter={{ ...emptyFilterState(), source: new Set(["greenhouse"]) }}
+        facets={{ source: { greenhouse: 1 } }}
+        total={1}
+        onChange={onChange}
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: /lever/i })).toBeInTheDocument();
+  });
+
   it("renders the readable canonical in active chips and the popover", async () => {
     render(
       <FilterDesk
