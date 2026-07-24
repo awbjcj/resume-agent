@@ -19,47 +19,47 @@ from resume_agent.api.deps import (
     require_token,
 )
 from resume_agent.api.errors import ApiException, install_error_handlers
-from resume_agent.api.routers import analytics as analytics_router
+from resume_agent.api.rate_limit import FailedAttemptLimiter
 from resume_agent.api.routers import account as account_router
 from resume_agent.api.routers import admin as admin_router
 from resume_agent.api.routers import admin_invites as admin_invites_router
 from resume_agent.api.routers import admin_system as admin_system_router
 from resume_agent.api.routers import admin_users as admin_users_router
+from resume_agent.api.routers import analytics as analytics_router
 from resume_agent.api.routers import auth as auth_router
-from resume_agent.api.routers import boards, health
+from resume_agent.api.routers import boards, health, resumes
+from resume_agent.api.routers import coach as coach_router
 from resume_agent.api.routers import config as config_router
 from resume_agent.api.routers import cover_letters as cover_letters_router
-from resume_agent.api.routers import coach as coach_router
-from resume_agent.api.routers import interview as interview_router
-from resume_agent.api.routers import transcribe as transcribe_router
 from resume_agent.api.routers import dashboard as dashboard_router
 from resume_agent.api.routers import email_drafts as email_drafts_router
 from resume_agent.api.routers import errors as errors_router
 from resume_agent.api.routers import gmail as gmail_router
+from resume_agent.api.routers import interview as interview_router
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.api.routers import match_gap as match_gap_router
 from resume_agent.api.routers import notifications as notifications_router
 from resume_agent.api.routers import profile as profile_router
 from resume_agent.api.routers import prompts as prompts_router
-from resume_agent.api.routers import render_templates as render_templates_router
 from resume_agent.api.routers import prune as prune_router
-from resume_agent.api.routers import resumes
+from resume_agent.api.routers import render_templates as render_templates_router
 from resume_agent.api.routers import runs as runs_router
 from resume_agent.api.routers import secrets as secrets_router
+from resume_agent.api.routers import settings as settings_router
 from resume_agent.api.routers import setup as setup_router
 from resume_agent.api.routers import sources as sources_router
 from resume_agent.api.routers import suggestions as suggestions_router
 from resume_agent.api.routers import taxonomy as taxonomy_router
+from resume_agent.api.routers import transcribe as transcribe_router
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.rate_limit import FailedAttemptLimiter
 from resume_agent.config import Settings, get_settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.services.config_store import YamlConfigStore
 from resume_agent.services.profile_documents import DocumentStore
 from resume_agent.tenancy.bootstrap import build_context, ensure_bootstrapped
+from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.engines import EngineRegistry
 from resume_agent.tenancy.system_db import init_system_db, make_system_engine
-from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.workspace import workspace_paths
 
 
@@ -268,6 +268,9 @@ def create_app(
         prefix="/api",
         dependencies=download_guarded,
     )
+    app.include_router(
+        settings_router.link_router, prefix="/api", dependencies=download_guarded
+    )
     app.include_router(account_router.router, prefix="/api", dependencies=guarded)
     app.include_router(boards.router, prefix="/api", dependencies=guarded)
     app.include_router(jobs_router.router, prefix="/api", dependencies=guarded)
@@ -290,6 +293,7 @@ def create_app(
     app.include_router(gmail_router.callback_router, prefix="/api")
     app.include_router(email_drafts_router.router, prefix="/api", dependencies=guarded)
     app.include_router(config_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(settings_router.router, prefix="/api", dependencies=guarded)
     app.include_router(
         render_templates_router.router, prefix="/api", dependencies=guarded
     )

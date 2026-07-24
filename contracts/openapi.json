@@ -718,6 +718,20 @@
         "title": "BoardPage[TriageItem]",
         "type": "object"
       },
+      "Body_apply_bundle_api_settings_bundle_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_apply_bundle_api_settings_bundle_post",
+        "type": "object"
+      },
       "Body_import_jobs_endpoint_api_jobs_import_post": {
         "properties": {
           "file": {
@@ -772,6 +786,20 @@
           "file"
         ],
         "title": "Body_launch_import_urls_api_jobs_import_urls_post",
+        "type": "object"
+      },
+      "Body_preview_bundle_api_settings_bundle_preview_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_preview_bundle_api_settings_bundle_preview_post",
         "type": "object"
       },
       "Body_transcribe_audio_api_transcribe_post": {
@@ -1129,6 +1157,56 @@
           "reasons"
         ],
         "title": "BulkResultOut",
+        "type": "object"
+      },
+      "BundleApplied": {
+        "properties": {
+          "applied": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Applied",
+            "type": "array"
+          }
+        },
+        "required": [
+          "applied"
+        ],
+        "title": "BundleApplied",
+        "type": "object"
+      },
+      "BundlePreview": {
+        "properties": {
+          "exportedAt": {
+            "title": "Exportedat",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SettingsSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "unknownSections": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknownsections",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "exportedAt",
+          "sections",
+          "unknownSections"
+        ],
+        "title": "BundlePreview",
         "type": "object"
       },
       "CategoryOut": {
@@ -2954,6 +3032,17 @@
             "default": false,
             "title": "Regressed",
             "type": "boolean"
+          },
+          "rejectCategory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejectcategory"
           },
           "rejectReason": {
             "anyOf": [
@@ -5286,6 +5375,45 @@
         "title": "SetGroupIn",
         "type": "object"
       },
+      "SettingsSectionList": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SettingsSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sections"
+        ],
+        "title": "SettingsSectionList",
+        "type": "object"
+      },
+      "SettingsSectionOut": {
+        "properties": {
+          "customized": {
+            "title": "Customized",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "customized"
+        ],
+        "title": "SettingsSectionOut",
+        "type": "object"
+      },
       "SetupStatusOut": {
         "properties": {
           "complete": {
@@ -6573,6 +6701,17 @@
               }
             ],
             "title": "Postedat"
+          },
+          "rejectCategory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejectcategory"
           },
           "rejectReason": {
             "anyOf": [
@@ -14546,6 +14685,286 @@
           }
         },
         "summary": "Put Secrets"
+      }
+    },
+    "/api/settings/bundle": {
+      "get": {
+        "operationId": "export_bundle_api_settings_bundle_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Bundle",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "operationId": "apply_bundle_api_settings_bundle_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "confirm",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Confirm",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_apply_bundle_api_settings_bundle_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleApplied"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Bundle",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/bundle/preview": {
+      "post": {
+        "operationId": "preview_bundle_api_settings_bundle_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_bundle_api_settings_bundle_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundlePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Bundle",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/sections": {
+      "get": {
+        "operationId": "list_sections_api_settings_sections_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsSectionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sections",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/sections/{section_id}/reset": {
+      "post": {
+        "operationId": "reset_api_settings_sections__section_id__reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsSectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset",
+        "tags": [
+          "settings"
+        ]
       }
     },
     "/api/setup/status": {

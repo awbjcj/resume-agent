@@ -1886,6 +1886,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Bundle */
+        get: operations["export_bundle_api_settings_bundle_get"];
+        put?: never;
+        /** Apply Bundle */
+        post: operations["apply_bundle_api_settings_bundle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/bundle/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Bundle */
+        post: operations["preview_bundle_api_settings_bundle_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sections */
+        get: operations["list_sections_api_settings_sections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/sections/{section_id}/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset */
+        post: operations["reset_api_settings_sections__section_id__reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/setup/status": {
         parameters: {
             query?: never;
@@ -2457,6 +2526,11 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Body_apply_bundle_api_settings_bundle_post */
+        Body_apply_bundle_api_settings_bundle_post: {
+            /** File */
+            file: string;
+        };
         /** Body_import_jobs_endpoint_api_jobs_import_post */
         Body_import_jobs_endpoint_api_jobs_import_post: {
             /** File */
@@ -2474,6 +2548,11 @@ export interface components {
         };
         /** Body_launch_import_urls_api_jobs_import_urls_post */
         Body_launch_import_urls_api_jobs_import_urls_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_preview_bundle_api_settings_bundle_preview_post */
+        Body_preview_bundle_api_settings_bundle_preview_post: {
             /** File */
             file: string;
         };
@@ -2598,6 +2677,22 @@ export interface components {
             };
             /** Skipped */
             skipped: number;
+        };
+        /** BundleApplied */
+        BundleApplied: {
+            /** Applied */
+            applied: string[];
+        };
+        /** BundlePreview */
+        BundlePreview: {
+            /** Exportedat */
+            exportedAt: string;
+            /** Sections */
+            sections: components["schemas"]["SettingsSectionOut"][];
+            /** Unknownsections */
+            unknownSections: string[];
+            /** Version */
+            version: number;
         };
         /** CategoryOut */
         CategoryOut: {
@@ -3361,6 +3456,8 @@ export interface components {
              * @default false
              */
             regressed: boolean;
+            /** Rejectcategory */
+            rejectCategory?: string | null;
             /** Rejectreason */
             rejectReason?: string | null;
             /** Remotepolicy */
@@ -4179,6 +4276,20 @@ export interface components {
             /** Group */
             group: string;
         };
+        /** SettingsSectionList */
+        SettingsSectionList: {
+            /** Sections */
+            sections: components["schemas"]["SettingsSectionOut"][];
+        };
+        /** SettingsSectionOut */
+        SettingsSectionOut: {
+            /** Customized */
+            customized: boolean;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
         /** SetupStatusOut */
         SetupStatusOut: {
             /** Complete */
@@ -4584,6 +4695,8 @@ export interface components {
             location: string | null;
             /** Postedat */
             postedAt: string | null;
+            /** Rejectcategory */
+            rejectCategory?: string | null;
             /** Rejectreason */
             rejectReason?: string | null;
             /** Source */
@@ -9166,6 +9279,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SecretStatus"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_bundle_api_settings_bundle_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_bundle_api_settings_bundle_post: {
+        parameters: {
+            query?: {
+                confirm?: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_apply_bundle_api_settings_bundle_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleApplied"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_bundle_api_settings_bundle_preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_bundle_api_settings_bundle_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundlePreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sections_api_settings_sections_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsSectionList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_api_settings_sections__section_id__reset_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsSectionOut"];
                 };
             };
             /** @description Validation Error */
