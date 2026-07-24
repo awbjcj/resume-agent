@@ -275,6 +275,7 @@ async def classify_incrementally(
     batch_size: int,
     concurrency: int,
     category_cap: int,
+    reconcile_batch_size: int,
     reporter: ProgressReporter | None = None,
 ) -> ClassificationOutcome:
     if batch_size < 1:
@@ -283,6 +284,8 @@ async def classify_incrementally(
         raise ValueError("concurrency must be at least 1")
     if category_cap < 1:
         raise ValueError("category_cap must be at least 1")
+    if reconcile_batch_size < 1:
+        raise ValueError("reconcile_batch_size must be at least 1")
 
     started = time.monotonic()
     semaphore = asyncio.Semaphore(concurrency)
@@ -347,21 +350,52 @@ async def classify_incrementally(
 
     new_heads = set(aliases.values()) - stable_canonicals
     if new_heads:
+        # Reconcile merges synonyms that separate alias batches minted
+        # independently (batch A made 'k8s' canonical, batch B made 'kube'
+        # canonical). Two properties matter:
+        #
+        #   * Partial coverage is NOT fatal. Every head here is already a valid
+        #     canonical from its own batch; reconcile is only a cross-batch
+        #     merge refinement. A head the merge pass leaves untouched simply
+        #     stays its own canonical (identity alias) — the same state any
+        #     canonical stable across runs is already in. A backlog of hundreds
+        #     of noisy tokens (many not real skills) will always leave some
+        #     heads unmerged, so aborting the whole run on that is wrong; we
+        #     keep them and record the gap for observability. Only a failed
+        #     model CALL aborts (transactional: the last-good file is kept).
+        #   * Chunked, not one call. Sending hundreds of heads in a single
+        #     structured-output call is what degrades coverage in the first
+        #     place. Chunks run sequentially and each chunk's heads fold into
+        #     the next chunk's existing-canonical context, so cross-chunk
+        #     synonyms are still caught via the same reuse path.
+        reconcile_shards = _shard(new_heads, reconcile_batch_size)
         if reporter is not None:
-            reporter.begin(1, "Reconciling skill synonyms")
-        try:
-            reconciled = await canonicalize(sorted(new_heads), sorted(stable_canonicals))
-        except Exception as exc:
-            raise ReconcileError(f"reconcile failed: {exc}") from exc
-        if reconciled.failed_tokens:
-            raise ReconcileError(
-                f"reconcile returned invalid output for {sorted(reconciled.failed_tokens)!r}"
-            )
+            reporter.begin(len(reconcile_shards), "Reconciling skill synonyms")
+        reconciled_aliases: dict[str, str] = {}
+        running_stable = set(stable_canonicals)
+        for shard_index, shard in enumerate(reconcile_shards, start=1):
+            try:
+                reconciled = await canonicalize(sorted(shard), sorted(running_stable))
+            except Exception as exc:
+                raise ReconcileError(f"reconcile failed: {exc}") from exc
+            reconciled_aliases.update(reconciled.aliases)
+            # Every head in this shard is now a canonical the next chunk may
+            # reuse — whether the model merged it or it stayed itself.
+            running_stable |= set(shard)
+            if reconciled.failed_tokens:
+                failures.append(
+                    ClassificationFailure(
+                        "canonicalize",
+                        tuple(sorted(reconciled.failed_tokens)),
+                        "reconcile left new canonicals unmerged; kept as-is",
+                    )
+                )
+            if reporter is not None:
+                reporter.step(shard_index, label="Reconciled skill synonyms")
+        # Uncovered heads fall through .get(head, head) unchanged.
         aliases = {
-            token: reconciled.aliases.get(head, head) for token, head in aliases.items()
+            token: reconciled_aliases.get(head, head) for token, head in aliases.items()
         }
-        if reporter is not None:
-            reporter.step(1, label="Reconciled skill synonyms")
 
     alias_additions = ClusterMap(aliases=aliases)
     merged_aliases = merge_cluster_map(existing, alias_additions).aliases

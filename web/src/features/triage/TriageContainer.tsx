@@ -24,13 +24,33 @@ import { recency } from "@/lib/format";
 import { QuickFilters } from "./QuickFilters";
 import { ImportJobsButton } from "@/features/runs/ImportJobsDialog";
 
-function triageNote(row: {
+type TriageNoteRow = {
   rejectReason?: string | null;
   postedAt?: string | null;
-}): string | null {
-  if (row.rejectReason) return row.rejectReason;
+};
+
+function TriageNote({ row }: { row: TriageNoteRow }) {
+  if (row.rejectReason) {
+    return (
+      <div className="border-l-2 border-destructive/45 pl-3">
+        <div className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-destructive">
+          Rejection reason
+        </div>
+        <p className="mt-1 whitespace-normal break-words text-sm leading-5 text-foreground">
+          {row.rejectReason}
+        </p>
+      </div>
+    );
+  }
   const posted = recency(row.postedAt);
-  return posted ? `Posted ${posted}` : null;
+  return posted ? (
+    <dl>
+      <dt className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75">
+        Posted
+      </dt>
+      <dd className="mt-0.5 text-sm leading-5 text-foreground">{posted}</dd>
+    </dl>
+  ) : null;
 }
 
 export function TriageContainer() {
@@ -163,7 +183,11 @@ export function TriageContainer() {
               />
             )}
             statusColumn={false}
-            extraColumn={{ header: "Notes", render: triageNote }}
+            extraColumn={{
+              header: "Notes",
+              render: (row) => <TriageNote row={row} />,
+              width: "wide",
+            }}
           />
           {hasNextPage && (
             <div className="mt-5 flex justify-center">

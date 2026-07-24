@@ -37,6 +37,7 @@ def refresh_clusters(
     reporter: ProgressReporter | None = None,
     batch_size: int | None = None,
     concurrency: int | None = None,
+    reconcile_batch_size: int | None = None,
     extra_tokens: frozenset[str] | set[str] = frozenset(),
     corrections_path: str | Path | None = None,
 ) -> dict[str, object]:
@@ -44,10 +45,17 @@ def refresh_clusters(
     settings = get_settings()
     size = settings.cluster_batch_size if batch_size is None else batch_size
     width = settings.llm_concurrency if concurrency is None else concurrency
+    reconcile_size = (
+        settings.cluster_reconcile_batch_size
+        if reconcile_batch_size is None
+        else reconcile_batch_size
+    )
     if size < 1:
         raise ValueError("batch_size must be at least 1")
     if width < 1:
         raise ValueError("concurrency must be at least 1")
+    if reconcile_size < 1:
+        raise ValueError("reconcile_batch_size must be at least 1")
 
     with _REFRESH_LOCK:
         demanded = collect_target_skill_tokens(session) | set(extra_tokens)
@@ -62,6 +70,7 @@ def refresh_clusters(
                     batch_size=size,
                     concurrency=width,
                     category_cap=settings.domains_per_category_cap,
+                    reconcile_batch_size=reconcile_size,
                     reporter=reporter,
                 ),
                 canonicalizer,

@@ -22,10 +22,9 @@ import { BoardViewToggle } from "@/features/board/BoardViewToggle";
 import { JobQuickActions } from "@/features/board/JobQuickActions";
 import { useJobNavigation } from "@/features/board/use-job-navigation";
 import { useViewMode } from "@/features/board/use-view-mode";
-import { metaLine } from "@/lib/format";
-
 import { useApprove } from "./use-approve";
 import { useBoardFilters } from "./use-board-filters";
+import { ShortlistDetails } from "./ShortlistDetails";
 
 export function ShortlistContainer() {
   const [filters, setFilters] = useBoardFilters();
@@ -166,7 +165,8 @@ export function ShortlistContainer() {
               statusColumn={false}
               extraColumn={{
                 header: "Details",
-                render: (row) => metaLine(row).join(" · ") || null,
+                render: (row) => <ShortlistDetails row={row} />,
+                width: "wide",
               }}
             />
           )}

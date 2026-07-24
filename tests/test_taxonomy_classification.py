@@ -95,6 +95,7 @@ def _classify(*, demanded, existing=None, canonicalizer=None, themer=None, **kwa
             batch_size=kwargs.pop("batch_size", 60),
             concurrency=kwargs.pop("concurrency", 4),
             category_cap=kwargs.pop("category_cap", 12),
+            reconcile_batch_size=kwargs.pop("reconcile_batch_size", 150),
             **kwargs,
         )
     )
@@ -192,7 +193,9 @@ def test_ambiguous_existing_canonicals_reject_the_new_token():
     assert "k8s" not in outcome.additions.aliases
 
 
-def test_reconcile_failure_is_fatal():
+def test_reconcile_call_failure_is_fatal():
+    # A genuine model CALL failure is transactional: abort so the caller keeps
+    # the last-good file rather than saving a half-reconciled map.
     def respond(new, existing):
         if len(new) > 1:
             return RuntimeError("reconcile down")
@@ -204,6 +207,53 @@ def test_reconcile_failure_is_fatal():
             canonicalizer=_Canonicalizer(respond),
             batch_size=1,
         )
+
+
+def test_reconcile_partial_coverage_keeps_heads_and_is_not_fatal():
+    # Reproduces the reported failure: the reconcile call SUCCEEDS and returns
+    # well-formed clusters, but silently omits a head (what a real model does
+    # with a large, noisy backlog). The omitted head is already a valid
+    # canonical from its batch, so it must keep itself instead of aborting the
+    # whole run.
+    def respond(new, existing):
+        if len(new) > 1:  # the reconcile call over both new heads
+            return [[token] for token in new if token != "rust"]
+        return [[new[0]]]
+
+    outcome = _classify(
+        demanded={"python", "rust"},
+        canonicalizer=_Canonicalizer(respond),
+        batch_size=1,
+    )
+
+    assert outcome.additions.aliases == {"python": "python", "rust": "rust"}
+    assert any(
+        f.phase == "canonicalize" and "rust" in f.tokens for f in outcome.failures
+    )
+
+
+def test_reconcile_shards_large_new_head_sets_instead_of_one_call():
+    # Simulates a large fresh-corpus backlog: every alias batch mints its own
+    # singleton head, so `new_heads` ends up far bigger than any one call
+    # should reasonably receive. A well-behaved reconcile phase must chunk
+    # this instead of sending every head in a single unsharded call.
+    tokens = {f"skill{index}" for index in range(12)}
+    canonicalizer = _Canonicalizer()
+
+    outcome = _classify(
+        demanded=tokens,
+        canonicalizer=canonicalizer,
+        batch_size=60,
+        reconcile_batch_size=4,
+    )
+
+    assert outcome.additions.aliases == {token: token for token in tokens}
+    # First call is the single alias batch (batch_size=60 covers all 12 at
+    # once); every subsequent call is a reconcile chunk and must respect
+    # reconcile_batch_size regardless of how large batch_size is.
+    reconcile_calls = canonicalizer.calls[1:]
+    assert len(reconcile_calls) == 3
+    assert all(len(call["new"]) <= 4 for call in reconcile_calls)
 
 
 def test_existing_unthemed_canonical_is_themed_without_canonical_call():
