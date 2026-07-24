@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import {
+  Archive,
   Bot,
   FileKey2,
   FileText,
@@ -50,7 +51,10 @@ export const SETTINGS_GROUPS = [
   },
   {
     label: "System",
-    items: [{ to: "/settings/keys", label: "API keys", icon: FileKey2 }],
+    items: [
+      { to: "/settings/keys", label: "API keys", icon: FileKey2 },
+      { to: "/settings/backup", label: "Backup", icon: Archive },
+    ],
   },
 ] satisfies ReadonlyArray<{ label: string; items: ReadonlyArray<SettingsNavItem> }>;
 

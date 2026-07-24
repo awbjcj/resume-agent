@@ -73,6 +73,11 @@ const StyleGuideSettingsPage = lazy(() =>
     default: m.StyleGuideSettingsPage,
   })),
 );
+const BackupSettingsPage = lazy(() =>
+  import("@/features/settings/pages/BackupSettingsPage").then((m) => ({
+    default: m.BackupSettingsPage,
+  })),
+);
 const ProfileWorkspace = lazy(() =>
   import("@/features/profile/ProfileWorkspace").then((m) => ({
     default: m.ProfileWorkspace,
@@ -148,6 +153,7 @@ export const router = createBrowserRouter([
           { path: "rendering", element: page(<RenderingSettingsPage />) },
           { path: "pruning", element: page(<PruningSettingsPage />) },
           { path: "style-guide", element: page(<StyleGuideSettingsPage />) },
+          { path: "backup", element: page(<BackupSettingsPage />) },
         ],
       },
     ],
