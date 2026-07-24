@@ -54,6 +54,40 @@ def test_pipeline_status_filter():
     assert [r["company"] for r in body["data"]] == ["Keep"]
 
 
+def test_pipeline_sponsorship_and_type_filters_expose_matching_details():
+    client = _client()
+    with client:
+        _seed(
+            client.app,
+            status=JobStatus.filtered.value,
+            company="Keep",
+            criteria_json={
+                "sponsorship_signal": "offered",
+                "employment_type": "full_time",
+            },
+            reject_reason="below salary threshold",
+            reject_category="filtered",
+        )
+        _seed(
+            client.app,
+            status=JobStatus.filtered.value,
+            company="Drop",
+            criteria_json={
+                "sponsorship_signal": "denied",
+                "employment_type": "contract",
+            },
+        )
+        body = client.get(
+            "/api/pipeline?sponsorship=offered&employmentType=full_time"
+        ).json()
+
+    assert [row["company"] for row in body["data"]] == ["Keep"]
+    assert body["data"][0]["sponsorshipSignal"] == "offered"
+    assert body["data"][0]["employmentType"] == "full_time"
+    assert body["data"][0]["rejectReason"] == "below salary threshold"
+    assert body["data"][0]["rejectCategory"] == "filtered"
+
+
 def test_pipeline_response_cleans_legacy_jd_tokens():
     client = _client()
     with client:

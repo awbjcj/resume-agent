@@ -124,8 +124,20 @@ class PipelineRow:
     application_status: str | None
     salary_min: float | None
     salary_max: float | None
+    salary_currency: str | None
     remote_policy: str | None
     seniority: str | None
+    sponsorship_signal: str | None
+    employment_type: str | None
+    industry: str | None
+    company_size: str | None
+    posted_at: datetime | None
+    skills: list[SkillTag]
+    location_country: str | None
+    location_region: str | None
+    location_city: str | None
+    reject_reason: str | None
+    reject_category: str | None
     has_progress: bool = False
     needs_attention: bool = False
     regressed: bool = False
@@ -286,11 +298,13 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
     versions = versions_by_job(session)
     applications = applications_by_job(session)
     progressed = progressed_job_ids(session)
+    aliases = load_aliases(SKILL_ALIASES_PATH)
     rows = []
     for job in jobs:
         job_id = _require_job_id(job)
         criteria = job.criteria_json or {}
         salary = criteria.get("salary_range") or {}
+        location = criteria.get("location_parts") or {}
         best = pick_best(versions.get(job_id, []))
         version = best.version
         application = applications.get(job_id)
@@ -314,8 +328,20 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
                 application_status=application.status if application else None,
                 salary_min=salary.get("minimum"),
                 salary_max=salary.get("maximum"),
+                salary_currency=salary.get("currency"),
                 remote_policy=criteria.get("remote_policy"),
                 seniority=criteria.get("seniority"),
+                sponsorship_signal=criteria.get("sponsorship_signal"),
+                employment_type=criteria.get("employment_type"),
+                industry=criteria.get("industry"),
+                company_size=snap_size(criteria.get("company_size")),
+                posted_at=job.posted_at,
+                skills=_skill_tags(criteria, set(), aliases),
+                location_country=location.get("country"),
+                location_region=location.get("region"),
+                location_city=location.get("city"),
+                reject_reason=job.reject_reason,
+                reject_category=job.reject_category,
                 has_progress=job_has_progress(job, progressed),
                 needs_attention=best.no_clean_round,
                 regressed=best.regressed,

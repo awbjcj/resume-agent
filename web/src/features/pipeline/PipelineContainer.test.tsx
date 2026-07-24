@@ -137,6 +137,28 @@ describe("PipelineContainer", () => {
     expect(screen.getByRole("link", { name: "Open posting" })).toBeInTheDocument();
   });
 
+  it("shows a compact details column with filtered reasons in list view", async () => {
+    localStorage.setItem("pipeline-view", "list");
+    const user = userEvent.setup();
+    server.use(
+      statusAware([
+        {
+          ...pipelineItem(11, "filtered", "Platform Engineer"),
+          rejectReason: "sponsorship not available",
+          rejectCategory: "filtered",
+          sponsorshipSignal: "denied",
+          employmentType: "full_time",
+        },
+      ]),
+    );
+
+    wrap(<PipelineContainer />);
+
+    await user.click(await screen.findByRole("button", { name: /filtered.*1 job/i }));
+    expect(await screen.findByText("Details")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filtered: sponsorship not available")).toBeInTheDocument();
+  });
+
   it("selects every job in a stage from the list header checkbox", async () => {
     localStorage.setItem("pipeline-view", "list");
     server.use(
@@ -282,5 +304,43 @@ describe("PipelineContainer", () => {
     await user.click(screen.getByRole("button", { name: /^apply$/i }));
 
     await waitFor(() => expect(requestedMinFits.at(-1)).toBe("65"));
+  });
+
+  it("applies sponsorship and type facets through the pipeline server query", async () => {
+    const requestedFilters: Array<{
+      sponsorship: string | null;
+      employmentType: string | null;
+    }> = [];
+    server.use(
+      http.get("/api/pipeline", ({ request }) => {
+        const search = new URL(request.url).searchParams;
+        requestedFilters.push({
+          sponsorship: search.get("sponsorship"),
+          employmentType: search.get("employmentType"),
+        });
+        return HttpResponse.json({
+          data: [],
+          pagination: { page: 1, pageSize: 200, totalItems: 0, totalPages: 1 },
+          facets: { status: {} },
+          total: 0,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+
+    wrap(<PipelineContainer />);
+    await screen.findByText("No jobs in the pipeline");
+
+    await user.click(screen.getByRole("button", { name: "Sponsorship" }));
+    await user.click(screen.getByRole("checkbox", { name: /offered/i }));
+    await user.click(screen.getByRole("button", { name: "Type" }));
+    await user.click(screen.getByRole("checkbox", { name: /full time/i }));
+
+    await waitFor(() =>
+      expect(requestedFilters.at(-1)).toEqual({
+        sponsorship: "offered",
+        employmentType: "full_time",
+      }),
+    );
   });
 });

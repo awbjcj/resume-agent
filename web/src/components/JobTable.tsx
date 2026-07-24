@@ -31,7 +31,10 @@ type Row = {
   salaryCurrency?: string | null;
   seniority?: string | null;
   employmentType?: string | null;
+  remotePolicy?: string | null;
+  sponsorshipSignal?: string | null;
   industry?: string | null;
+  rejectCategory?: string | null;
   rejectReason?: string | null;
 };
 
@@ -77,16 +80,16 @@ export function JobTable({
 }) {
   const ordered = rows.map((row) => row.jobId);
   return (
-    <Table className="min-w-[64rem] table-fixed">
+    <Table className="min-w-[64rem] table-fixed [&_[data-slot=table-cell]]:px-1.5 [&_[data-slot=table-head]]:px-1.5">
       <colgroup>
-        <col className="w-11" />
-        <col className="w-72" />
-        {fitColumn && <col className="w-20" />}
-        <col className="w-32" />
-        <col className="w-52" />
-        {statusColumn && <col className="w-36" />}
-        {extraColumn && <col className={fitColumn ? "w-80" : "w-96"} />}
-        {actions && <col className="w-40" />}
+        <col className="w-9" />
+        <col className="w-96" />
+        {fitColumn && <col className="w-16" />}
+        <col className="w-28" />
+        <col className="w-44" />
+        {statusColumn && <col className="w-32" />}
+        {extraColumn && <col className={fitColumn ? "w-72" : "w-80"} />}
+        {actions && <col className="w-32" />}
       </colgroup>
       <TableHeader>
         <TableRow>
@@ -135,19 +138,16 @@ export function JobTable({
                 className="block w-full min-w-0 rounded-sm text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
                 onClick={() => onOpen(row.jobId)}
               >
-                <div className="flex min-w-0 items-baseline gap-2">
+                <div className="flex min-w-0 flex-col gap-0.5 whitespace-normal">
                   <span
-                    className="min-w-0 truncate font-medium"
+                    className="break-words font-medium leading-snug"
                     title={row.title ?? undefined}
                   >
                     {row.title ?? "Untitled role"}
                   </span>
-                  <span aria-hidden className="shrink-0 text-muted-foreground/50">
-                    ·
-                  </span>
                   <span className="sr-only">at</span>
                   <span
-                    className="min-w-0 truncate text-xs text-muted-foreground"
+                    className="break-words text-xs leading-snug text-muted-foreground"
                     title={row.company ?? undefined}
                   >
                     {row.company ?? "Unknown company"}

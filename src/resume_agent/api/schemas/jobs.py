@@ -53,8 +53,19 @@ class PipelineItem(CamelModel):
     application_status: str | None
     salary_min: float | None
     salary_max: float | None
+    salary_currency: str | None = None
     remote_policy: str | None
     seniority: str | None
+    sponsorship_signal: str | None = None
+    employment_type: str | None = None
+    industry: str | None = None
+    company_size: str | None = None
+    posted_at: datetime | None = None
+    location_country: str | None = None
+    location_region: str | None = None
+    location_city: str | None = None
+    reject_reason: str | None = None
+    reject_category: str | None = None
     has_progress: bool
     needs_attention: bool = False
     regressed: bool = False

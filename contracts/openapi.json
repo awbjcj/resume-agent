@@ -3965,6 +3965,17 @@
             ],
             "title": "Company"
           },
+          "companySize": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Companysize"
+          },
           "critiqueJson": {
             "anyOf": [
               {
@@ -3980,6 +3991,17 @@
             ],
             "title": "Critiquejson"
           },
+          "employmentType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employmenttype"
+          },
           "fitScore": {
             "anyOf": [
               {
@@ -3994,6 +4016,17 @@
           "hasProgress": {
             "title": "Hasprogress",
             "type": "boolean"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
           },
           "jdText": {
             "title": "Jdtext",
@@ -4014,6 +4047,39 @@
             ],
             "title": "Location"
           },
+          "locationCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationcity"
+          },
+          "locationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationcountry"
+          },
+          "locationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locationregion"
+          },
           "needsAttention": {
             "default": false,
             "title": "Needsattention",
@@ -4030,10 +4096,44 @@
             ],
             "title": "Pdfpath"
           },
+          "postedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postedat"
+          },
           "regressed": {
             "default": false,
             "title": "Regressed",
             "type": "boolean"
+          },
+          "rejectCategory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejectcategory"
+          },
+          "rejectReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejectreason"
           },
           "remotePolicy": {
             "anyOf": [
@@ -4045,6 +4145,17 @@
               }
             ],
             "title": "Remotepolicy"
+          },
+          "salaryCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salarycurrency"
           },
           "salaryMax": {
             "anyOf": [
@@ -4082,6 +4193,17 @@
           "source": {
             "title": "Source",
             "type": "string"
+          },
+          "sponsorshipSignal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sponsorshipsignal"
           },
           "status": {
             "title": "Status",

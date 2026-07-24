@@ -112,7 +112,7 @@ describe("ShortlistContainer", () => {
             },
           ],
           pagination: { page: 1, pageSize: 50, totalItems: source ? 1 : 2, totalPages: 1 },
-          facets: { source: source ? { greenhouse: 1 } : { greenhouse: 1, lever: 1 } },
+          facets: { source: { greenhouse: 1, lever: 1 } },
           total: source ? 1 : 2,
         });
       }),

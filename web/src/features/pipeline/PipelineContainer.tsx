@@ -27,11 +27,10 @@ import { BoardViewToggle } from "@/features/board/BoardViewToggle";
 import { JobQuickActions } from "@/features/board/JobQuickActions";
 import { useJobNavigation } from "@/features/board/use-job-navigation";
 import { useViewMode } from "@/features/board/use-view-mode";
+import { useBoardFilters } from "@/features/shortlist/use-board-filters";
 import { useBulkRun } from "@/features/runs/use-bulk-run";
 import { LaunchDialog } from "@/features/runs/LaunchDialog";
 import { useApprovedLaunchJobs } from "@/features/runs/use-approved-launch-jobs";
-import { emptyFilterState } from "@/lib/filters/types";
-
 import { PipelineStageSection } from "./PipelineStageSection";
 import {
   openStagesFromParam,
@@ -40,14 +39,8 @@ import {
   pipelineStageLabel,
 } from "./pipeline-stages";
 
-function pipelineFilter() {
-  const filter = emptyFilterState();
-  filter.sort = "stage";
-  return filter;
-}
-
 export function PipelineContainer() {
-  const [filter, setFilter] = useState(pipelineFilter);
+  const [filter, setFilter] = useBoardFilters("stage");
   const [targetStatus, setTargetStatus] = useState("approved");
   const [launchMode, setLaunchMode] = useState<"tailor" | "coverLetter" | null>(null);
   const [params, setParams] = useSearchParams();

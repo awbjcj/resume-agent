@@ -26,6 +26,25 @@ describe("JobTable", () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
+  it("stacks the full company below a wrapping role title", () => {
+    render(
+      <JobTable
+        rows={rows}
+        selection={{ isSelected: () => false }}
+        onToggle={vi.fn()}
+        onOpen={vi.fn()}
+      />,
+    );
+
+    const role = screen.getByText("Eng");
+    const company = screen.getByText("Acme");
+    expect(role.parentElement).toBe(company.parentElement);
+    expect(role.parentElement).toHaveClass("flex-col", "whitespace-normal");
+    expect(role).toHaveClass("break-words");
+    expect(company).toHaveClass("break-words");
+    expect(company).not.toHaveClass("truncate");
+  });
+
   it("hides the status column and renders an extra column in its place", () => {
     render(
       <JobTable

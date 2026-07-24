@@ -14,6 +14,7 @@ import type { ViewMode } from "@/features/board/use-view-mode";
 import type { FilterState } from "@/lib/filters/types";
 
 import { PipelineCard } from "./PipelineCard";
+import { PipelineDetails } from "./PipelineDetails";
 import { pipelineStageLabel } from "./pipeline-stages";
 import type { PipelineItem } from "./use-pipeline";
 
@@ -114,6 +115,10 @@ export function PipelineStageSection({
                   if (row) onOpen(row);
                 }}
                 actions={(row) => actions(row as PipelineItem)}
+                extraColumn={{
+                  header: "Details",
+                  render: (row) => <PipelineDetails row={row} />,
+                }}
               />
             </div>
           ) : (

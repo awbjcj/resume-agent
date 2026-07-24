@@ -378,18 +378,45 @@ def test_pipeline_rows_include_lean_metadata_fields():
                 title="Eng",
                 status=JobStatus.filtered.value,
                 criteria_json={
-                    "salary_range": {"minimum": 140000, "maximum": 180000},
+                    "salary_range": {
+                        "minimum": 140000,
+                        "maximum": 180000,
+                        "currency": "USD",
+                    },
                     "remote_policy": "hybrid",
                     "seniority": "staff",
+                    "sponsorship_signal": "offered",
+                    "employment_type": "full_time",
+                    "industry": "Fintech",
+                    "company_size": "enterprise",
+                    "location_parts": {
+                        "country": "US",
+                        "region": "NY",
+                        "city": "New York",
+                    },
+                    "must_have_skills": ["Python"],
                 },
+                reject_reason="outside salary band",
+                reject_category="filtered",
             ),
         )
 
         row = pipeline_rows(s)[0]
         assert row.salary_min == 140000
         assert row.salary_max == 180000
+        assert row.salary_currency == "USD"
         assert row.remote_policy == "hybrid"
         assert row.seniority == "staff"
+        assert row.sponsorship_signal == "offered"
+        assert row.employment_type == "full_time"
+        assert row.industry == "Fintech"
+        assert row.company_size == "enterprise"
+        assert row.location_country == "US"
+        assert row.location_region == "NY"
+        assert row.location_city == "New York"
+        assert [skill.name for skill in row.skills] == ["python"]
+        assert row.reject_reason == "outside salary band"
+        assert row.reject_category == "filtered"
 
 
 def test_triage_rows_are_pre_shortlist_and_unarchived():

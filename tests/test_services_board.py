@@ -41,6 +41,49 @@ def test_list_pipeline_filters_by_status_and_min_fit():
     assert page.data[0].company == "Acme"
 
 
+def test_pipeline_sponsorship_and_type_filters_match_shortlist_facets():
+    with _session() as session:
+        _job(
+            session,
+            status=JobStatus.approved.value,
+            company="Keep",
+            criteria_json={
+                "sponsorship_signal": "offered",
+                "employment_type": "full_time",
+            },
+        )
+        _job(
+            session,
+            status=JobStatus.approved.value,
+            company="Wrong type",
+            criteria_json={
+                "sponsorship_signal": "offered",
+                "employment_type": "contract",
+            },
+        )
+        _job(
+            session,
+            status=JobStatus.approved.value,
+            company="No sponsor",
+            criteria_json={
+                "sponsorship_signal": "denied",
+                "employment_type": "full_time",
+            },
+        )
+        result = board.list_board(
+            session,
+            "pipeline",
+            board_filter=board.BoardFilter(
+                sponsorship=("offered",),
+                employment_type=("full_time",),
+            ),
+        )
+
+    assert [row.company for row in result.page.data] == ["Keep"]
+    assert result.facets["sponsorship"] == {"denied": 1, "offered": 1}
+    assert result.facets["employmentType"] == {"contract": 1, "full_time": 1}
+
+
 def test_board_min_filters_only_drop_known_failing_values():
     with _session() as session:
         _job(
