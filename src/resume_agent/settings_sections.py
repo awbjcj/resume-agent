@@ -19,6 +19,7 @@ the lookup for a shipped default.
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -107,3 +108,43 @@ def default_path(entry: str) -> Path | None:
 def arcname_for(entry: str, path: Path) -> str:
     """Archive member name for a live file matched by `entry`."""
     return str(PurePosixPath(entry).parent / path.name)
+
+
+def is_customized(section: SettingsSection) -> bool:
+    """True when the user has content here they would not want silently lost.
+
+    An absent file that has a shipped default counts as NOT customized: there
+    is nothing to lose, and reset would only put the default back. The badge
+    answers "do you have changes worth exporting", not "does this byte-match a
+    pristine install".
+    """
+    for entry in section.files:
+        default = default_path(entry)
+        paths = live_paths(entry)
+        if default is None:
+            if paths:
+                return True
+            continue
+        if paths and paths[0].read_bytes() != default.read_bytes():
+            return True
+    return False
+
+
+def reset_section(section: SettingsSection) -> None:
+    """Restore one section to defaults.
+
+    The rule is policy-free and identical to fresh provisioning: copy the
+    shipped `.example` when the repository ships one, otherwise delete the
+    file. The five sections that ship no example -- agent guidance, custom
+    templates, and the three correction ledgers -- all land on their true
+    defaults by being removed.
+    """
+    for entry in section.files:
+        for path in live_paths(entry):
+            path.unlink(missing_ok=True)
+        default = default_path(entry)
+        if default is None:
+            continue
+        target = resolve_tenant_path(entry)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(default, target)

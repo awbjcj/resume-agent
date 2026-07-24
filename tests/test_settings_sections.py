@@ -8,7 +8,9 @@ from resume_agent.settings_sections import (
     SETTINGS_SECTIONS,
     arcname_for,
     default_path,
+    is_customized,
     live_paths,
+    reset_section,
     section_for,
 )
 from resume_agent.tenancy.context import UserContext, use_context
@@ -117,3 +119,86 @@ def test_default_path_is_none_for_sections_that_ship_no_example():
 )
 def test_arcname_for_is_posix_and_glob_aware(entry, filename, expected):
     assert arcname_for(entry, Path("/anywhere") / filename) == expected
+
+
+def _workspace(tmp_path):
+    paths = WorkspacePaths(tmp_path / "users" / "u1")
+    paths.config_dir.mkdir(parents=True)
+    return paths, _context(paths)
+
+
+def test_absent_defaulted_file_is_not_customized(tmp_path):
+    _, context = _workspace(tmp_path)
+    with use_context(context):
+        assert is_customized(SECTIONS_BY_ID["sources"]) is False
+
+
+def test_file_matching_the_example_is_not_customized(tmp_path):
+    paths, context = _workspace(tmp_path)
+    example = default_path("config/connectors.yaml")
+    assert example is not None
+    (paths.config_dir / "connectors.yaml").write_bytes(example.read_bytes())
+    with use_context(context):
+        assert is_customized(SECTIONS_BY_ID["sources"]) is False
+
+
+def test_file_differing_from_the_example_is_customized(tmp_path):
+    paths, context = _workspace(tmp_path)
+    (paths.config_dir / "connectors.yaml").write_text("companies: []\n", "utf-8")
+    with use_context(context):
+        assert is_customized(SECTIONS_BY_ID["sources"]) is True
+
+
+def test_section_with_no_example_is_customized_when_the_file_exists(tmp_path):
+    paths, context = _workspace(tmp_path)
+    with use_context(context):
+        assert is_customized(SECTIONS_BY_ID["agent_guidance"]) is False
+    (paths.config_dir / "agent_guidance.yaml").write_text("writer: hi\n", "utf-8")
+    with use_context(context):
+        assert is_customized(SECTIONS_BY_ID["agent_guidance"]) is True
+
+
+def test_reset_restores_the_shipped_example(tmp_path):
+    paths, context = _workspace(tmp_path)
+    target = paths.config_dir / "connectors.yaml"
+    target.write_text("companies: []\n", encoding="utf-8")
+    example = default_path("config/connectors.yaml")
+    assert example is not None
+    with use_context(context):
+        reset_section(SECTIONS_BY_ID["sources"])
+    assert target.read_bytes() == example.read_bytes()
+
+
+def test_reset_deletes_when_no_example_ships(tmp_path):
+    paths, context = _workspace(tmp_path)
+    target = paths.config_dir / "agent_guidance.yaml"
+    target.write_text("writer: hi\n", encoding="utf-8")
+    with use_context(context):
+        reset_section(SECTIONS_BY_ID["agent_guidance"])
+    assert not target.exists()
+
+
+def test_reset_clears_the_templates_directory(tmp_path):
+    paths, context = _workspace(tmp_path)
+    directory = paths.config_dir / "templates"
+    directory.mkdir()
+    (directory / "mine.typ").write_text("#mine", encoding="utf-8")
+    (directory / "keep.txt").write_text("not a template", encoding="utf-8")
+    with use_context(context):
+        reset_section(SECTIONS_BY_ID["templates"])
+    assert not (directory / "mine.typ").exists()
+    assert (directory / "keep.txt").exists()
+
+
+def test_reset_of_an_absent_section_is_a_noop(tmp_path):
+    _, context = _workspace(tmp_path)
+    with use_context(context):
+        reset_section(SECTIONS_BY_ID["taxonomy"])  # must not raise
+
+
+def test_every_section_resets_without_error(tmp_path):
+    _, context = _workspace(tmp_path)
+    with use_context(context):
+        for section in SETTINGS_SECTIONS:
+            reset_section(section)
+            assert is_customized(section) is False
