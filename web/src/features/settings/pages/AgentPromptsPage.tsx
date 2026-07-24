@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
+import { ResetSectionButton } from "../ResetSectionButton";
 import {
   type AgentPromptItem,
   usePrompts,
@@ -67,14 +68,24 @@ function PromptRow({ item }: { item: AgentPromptItem }) {
             />
             <div className="flex items-center justify-between gap-3">
               <FieldDescription>{guidance.length.toLocaleString()} / 4,000</FieldDescription>
-              <Button
-                size="sm"
-                disabled={save.isPending || guidance === (item.guidance ?? "")}
-                onClick={() => save.mutate({ key: item.key, guidance })}
-              >
-                {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-                Save guidance
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={!item.guidance || save.isPending}
+                  onClick={() => save.mutate({ key: item.key, guidance: "" })}
+                >
+                  Reset this agent
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={save.isPending || guidance === (item.guidance ?? "")}
+                  onClick={() => save.mutate({ key: item.key, guidance })}
+                >
+                  {save.isPending ? <Spinner data-icon="inline-start" /> : null}
+                  Save guidance
+                </Button>
+              </div>
             </div>
           </Field>
         ) : (
@@ -106,12 +117,15 @@ export function AgentPromptsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-lg font-semibold">Agent prompts</h1>
-        <p className="text-sm text-muted-foreground">
-          Read every built-in prompt and add subordinate guidance. Guidance can steer
-          tone, emphasis, and process, never facts or integrity rules.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">Agent prompts</h1>
+          <p className="text-sm text-muted-foreground">
+            Read every built-in prompt and add subordinate guidance. Guidance can
+            steer tone, emphasis, and process, never facts or integrity rules.
+          </p>
+        </div>
+        <ResetSectionButton sectionId="agent_guidance" label="Agent prompts" />
       </header>
       {STAGES.map(([stage, label]) => {
         const items = prompts.data.filter((item) => item.stage === stage);

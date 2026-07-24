@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
+import { ResetSectionButton } from "@/features/settings/ResetSectionButton";
 import { useRunStore, type PullRunResult } from "@/lib/runs/store";
 import { AddSourceDialog } from "./AddSourceDialog";
 import { DiscoverCompaniesDialog } from "./DiscoverCompaniesDialog";
@@ -293,11 +294,14 @@ export function SourcesManager() {
 export function SourcesPage() {
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-lg font-semibold">Sources</h1>
-        <p className="text-sm text-muted-foreground">
-          The boards, careers pages, and feeds that supply the pull pipeline.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">Sources</h1>
+          <p className="text-sm text-muted-foreground">
+            The boards, careers pages, and feeds that supply the pull pipeline.
+          </p>
+        </div>
+        <ResetSectionButton sectionId="sources" label="Company sources" />
       </header>
       <SourcesManager />
     </div>

@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { withQueryClient } from "@/test/utils";
 import { RenderingSettingsPage } from "./RenderingSettingsPage";
 
 const save = vi.fn();
@@ -34,7 +35,7 @@ describe("RenderingSettingsPage", () => {
   });
 
   it("selects templates and saves the new path-free contract", async () => {
-    render(<RenderingSettingsPage />);
+    render(<RenderingSettingsPage />, { wrapper: withQueryClient });
     expect(screen.queryByLabelText(/path|directory/i)).not.toBeInTheDocument();
     await userEvent.click(screen.getByText("mine"));
     await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -42,7 +43,7 @@ describe("RenderingSettingsPage", () => {
   });
 
   it("toggles one-page fit, uploads, and deletes custom templates", async () => {
-    render(<RenderingSettingsPage />);
+    render(<RenderingSettingsPage />, { wrapper: withQueryClient });
     await userEvent.click(screen.getByRole("switch", { name: /fit resume to one page/i }));
     await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
     expect(save).toHaveBeenCalledWith({ template: "classic", fitOnePage: false });

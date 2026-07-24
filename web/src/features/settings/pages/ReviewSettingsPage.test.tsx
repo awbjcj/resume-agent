@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { withQueryClient } from "@/test/utils";
 import { ReviewSettingsPage } from "./ReviewSettingsPage";
 
 const save = vi.fn();
@@ -23,7 +24,7 @@ vi.mock("../use-config", () => ({
 
 describe("ReviewSettingsPage pipeline controls", () => {
   it("saves merged advisory and writer tier changes", async () => {
-    render(<ReviewSettingsPage />);
+    render(<ReviewSettingsPage />, { wrapper: withQueryClient });
     await userEvent.click(screen.getByRole("switch", { name: /merge advisory/i }));
     await userEvent.click(screen.getByRole("button", { name: "mid writer tier" }));
     await userEvent.click(screen.getByRole("button", { name: "cheap reviser tier" }));

@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import type { paths } from "@/lib/api/schema";
 
+import { ResetSectionButton } from "../ResetSectionButton";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import { useDraft } from "../use-draft";
@@ -52,11 +53,21 @@ export function RenderingSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-lg font-semibold">Rendering</h1>
-        <p className="text-sm text-muted-foreground">
-          Choose the layout used for generated resumes and preview it with sample data.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">Rendering</h1>
+          <p className="text-sm text-muted-foreground">
+            Choose the layout used for generated resumes and preview it with
+            sample data.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <ResetSectionButton sectionId="render" label="Rendering" />
+          <ResetSectionButton
+            sectionId="templates"
+            label="Custom resume templates"
+          />
+        </div>
       </header>
 
       <FieldSet>

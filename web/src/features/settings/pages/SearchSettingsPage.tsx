@@ -1,6 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { SuggestSearchTermsDialog } from "@/features/search-scout/SuggestSearchTermsDialog";
 import { SearchConfigForm } from "../forms/SearchConfigForm";
+import { ResetSectionButton } from "../ResetSectionButton";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import { useDraft } from "../use-draft";
@@ -24,22 +25,25 @@ export function SearchSettingsPage() {
             What discovery looks for. Tighter role anchors mean fewer wasted fetches.
           </p>
         </div>
-        <SuggestSearchTermsDialog
-          onApply={(added) =>
-            setDraft({
-              ...draft,
-              keywords: dedupe(draft.keywords, added.keywords),
-              titles: dedupe(draft.titles, added.titles),
-              locations: dedupe(draft.locations, added.locations),
-              experienceLevels: dedupe(
-                draft.experienceLevels,
-                added.experienceLevels,
-              ),
-              roleAnchors: dedupe(draft.roleAnchors, added.roleAnchors),
-              excludeTerms: dedupe(draft.excludeTerms, added.excludeTerms),
-            })
-          }
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <SuggestSearchTermsDialog
+            onApply={(added) =>
+              setDraft({
+                ...draft,
+                keywords: dedupe(draft.keywords, added.keywords),
+                titles: dedupe(draft.titles, added.titles),
+                locations: dedupe(draft.locations, added.locations),
+                experienceLevels: dedupe(
+                  draft.experienceLevels,
+                  added.experienceLevels,
+                ),
+                roleAnchors: dedupe(draft.roleAnchors, added.roleAnchors),
+                excludeTerms: dedupe(draft.excludeTerms, added.excludeTerms),
+              })
+            }
+          />
+          <ResetSectionButton sectionId="search" label="Search" />
+        </div>
       </header>
       <SearchConfigForm value={draft} onChange={setDraft} />
       <SaveBar

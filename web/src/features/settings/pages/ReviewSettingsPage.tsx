@@ -18,6 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import type { paths } from "@/lib/api/schema";
+import { ResetSectionButton } from "../ResetSectionButton";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import { useDraft } from "../use-draft";
@@ -44,11 +45,14 @@ export function ReviewSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-lg font-semibold">Review panel</h1>
-        <p className="text-sm text-muted-foreground">
-          How tailored resumes get scored before they're offered up for approval.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">Review panel</h1>
+          <p className="text-sm text-muted-foreground">
+            How tailored resumes get scored before they're offered up for approval.
+          </p>
+        </div>
+        <ResetSectionButton sectionId="review" label="Review panel" />
       </header>
       <Alert>
         <AlertDescription>

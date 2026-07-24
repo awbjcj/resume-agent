@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { withQueryClient } from "@/test/utils";
 import { AgentPromptsPage } from "./AgentPromptsPage";
 
 const save = vi.fn();
@@ -24,6 +25,15 @@ const items = [
     guidance: null,
     editable: false,
   },
+  {
+    key: "tailor-reviser",
+    title: "Resume reviser",
+    stage: "tailoring",
+    description: "Revises drafts against reviewer feedback.",
+    instructions: ["Revise carefully."],
+    guidance: "Existing guidance text.",
+    editable: true,
+  },
 ];
 
 vi.mock("../use-prompts", () => ({
@@ -35,14 +45,14 @@ describe("AgentPromptsPage", () => {
   beforeEach(() => save.mockClear());
 
   it("groups agents and reveals immutable base instructions", async () => {
-    render(<AgentPromptsPage />);
+    render(<AgentPromptsPage />, { wrapper: withQueryClient });
     expect(screen.getByRole("heading", { name: "Tailoring" })).toBeInTheDocument();
     await userEvent.click(screen.getByText("Resume writer"));
     expect(screen.getByText("Rule one.")).toBeInTheDocument();
   });
 
   it("saves editable guidance and keeps integrity gates read-only", async () => {
-    render(<AgentPromptsPage />);
+    render(<AgentPromptsPage />, { wrapper: withQueryClient });
     await userEvent.click(screen.getByText("Resume writer"));
     await userEvent.type(screen.getByLabelText("Your guidance for Resume writer"), "Punchy verbs.");
     await userEvent.click(screen.getByRole("button", { name: "Save guidance" }));
@@ -54,5 +64,27 @@ describe("AgentPromptsPage", () => {
     await userEvent.click(screen.getByText("Fact-check gate"));
     expect(screen.getByText("Integrity gate — read-only")).toBeInTheDocument();
     expect(screen.queryByLabelText(/guidance for Fact-check/i)).not.toBeInTheDocument();
+  });
+
+  it("resetting one agent clears just its guidance", async () => {
+    const user = userEvent.setup();
+    render(<AgentPromptsPage />, { wrapper: withQueryClient });
+
+    await user.click(screen.getByText("Resume reviser"));
+    await user.click(screen.getByRole("button", { name: /reset this agent/i }));
+
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith({ key: "tailor-reviser", guidance: "" }),
+    );
+  });
+
+  it("does not offer a reset control on an integrity gate", async () => {
+    const user = userEvent.setup();
+    render(<AgentPromptsPage />, { wrapper: withQueryClient });
+
+    await user.click(screen.getByText("Fact-check gate"));
+    expect(
+      screen.queryByRole("button", { name: /reset this agent/i }),
+    ).not.toBeInTheDocument();
   });
 });

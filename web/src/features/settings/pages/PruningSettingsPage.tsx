@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import type { paths } from "@/lib/api/schema";
+import { ResetSectionButton } from "../ResetSectionButton";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import { useDraft } from "../use-draft";
@@ -29,11 +30,14 @@ export function PruningSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-lg font-semibold">Pruning</h1>
-        <p className="text-sm text-muted-foreground">
-          Archiving is reversible and never touches jobs you have progressed.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">Pruning</h1>
+          <p className="text-sm text-muted-foreground">
+            Archiving is reversible and never touches jobs you have progressed.
+          </p>
+        </div>
+        <ResetSectionButton sectionId="prune" label="Pruning" />
       </header>
       <FieldGroup>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
