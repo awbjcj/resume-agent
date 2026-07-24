@@ -108,16 +108,24 @@ def provision_workspace(
         directory.mkdir(parents=True, exist_ok=True)
     # Local import: settings_sections -> tenancy.paths -> tenancy.context ->
     # tenancy.workspace would otherwise be a module-load cycle.
-    from resume_agent.settings_sections import seedable_entries
+    from resume_agent.settings_sections import SETTINGS_SECTIONS
 
     templates = Path(template_dir)
     if templates.is_dir():
-        for entry in seedable_entries():
-            name = PurePosixPath(entry).name
-            example = templates / f"{name}.example"
-            target = paths.config_dir / name
-            if example.is_file() and not target.exists():
-                shutil.copyfile(example, target)
+        # Registry-driven, but seeded from the caller's template_dir -- never
+        # from the repository root -- so provisioning does not silently no-op
+        # when the shipped examples are not colocated with the package.
+        for section in SETTINGS_SECTIONS:
+            for entry in section.files:
+                if "*" in entry or PurePosixPath(entry).parent != PurePosixPath(
+                    "config"
+                ):
+                    continue
+                name = PurePosixPath(entry).name
+                example = templates / f"{name}.example"
+                target = paths.config_dir / name
+                if example.is_file() and not target.exists():
+                    shutil.copyfile(example, target)
     return paths
 
 
