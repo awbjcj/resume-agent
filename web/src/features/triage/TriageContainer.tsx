@@ -22,12 +22,18 @@ import type { FilterState } from "@/lib/filters/types";
 import { TriageFilters } from "./TriageFilters";
 
 type TriageNoteRow = {
+  status?: string;
   rejectReason?: string | null;
+  rejectCategory?: string | null;
   postedAt?: string | null;
 };
 
 function TriageNote({ row }: { row: TriageNoteRow }) {
   if (row.rejectReason) {
+    const label =
+      row.status === "filtered" || row.rejectCategory === "filtered"
+        ? "Filtered out"
+        : "Rejected";
     return (
       <div
         className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap"
@@ -39,9 +45,9 @@ function TriageNote({ row }: { row: TriageNoteRow }) {
         />
         <span
           className="min-w-0 truncate text-sm text-destructive"
-          aria-label={`Rejection reason: ${row.rejectReason}`}
+          aria-label={`${label}: ${row.rejectReason}`}
         >
-          {row.rejectReason}
+          <span className="font-medium">{label}:</span> {row.rejectReason}
         </span>
       </div>
     );

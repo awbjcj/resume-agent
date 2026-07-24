@@ -70,6 +70,21 @@ def ensure_reject_category_column(engine: Engine) -> None:
             )
 
 
+def ensure_gate_override_column(engine: Engine) -> None:
+    """Idempotently add the manual discovery-gate override flag."""
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+        if not cols:
+            return
+        if "gate_override" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE jobs ADD COLUMN gate_override BOOLEAN "
+                    "NOT NULL DEFAULT 0"
+                )
+            )
+
+
 def ensure_content_fingerprint_column(engine: Engine) -> None:
     """Idempotently add ``jobs.content_fingerprint`` and backfill it for every row."""
     with engine.begin() as conn:

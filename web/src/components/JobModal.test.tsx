@@ -67,6 +67,26 @@ describe("JobModal", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the hard-filter reason banner for a filtered rejection", async () => {
+    server.use(
+      http.get("/api/jobs/42", () =>
+        HttpResponse.json(
+          jobPayload({
+            status: "rejected",
+            fitRationale: null,
+            rejectReason: "salary below minimum",
+            rejectCategory: "filtered",
+          }),
+        ),
+      ),
+    );
+    wrap(<JobModal jobId={42} onClose={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByText(/filtered out during discovery/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByText("salary below minimum")).toBeInTheDocument();
+  });
+
   it("groups skills into must-have / best-have with a coverage tally", async () => {
     server.use(
       http.get("/api/jobs/42", () =>

@@ -222,7 +222,7 @@ def run_filter(
     for job in jobs:
         criteria = JobCriteria.model_validate(job.criteria_json or {})
         decision = apply_filters(criteria, config)
-        if decision.keep:
+        if decision.keep or job.gate_override:
             job.status = JobStatus.filtered.value
         else:
             job.status = JobStatus.rejected.value
@@ -346,7 +346,11 @@ def run_relevance(
     if target is None or agent is None:
         return 0
 
-    jobs = _stage_jobs(session, JobStatus.raw.value, job_ids)
+    jobs = [
+        job
+        for job in _stage_jobs(session, JobStatus.raw.value, job_ids)
+        if not job.gate_override
+    ]
     judged = [job for job in jobs if (job.jd_text or "").strip()]
     skipped = len(jobs) - len(judged)
     if reporter:

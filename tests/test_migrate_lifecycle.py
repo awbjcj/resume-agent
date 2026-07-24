@@ -3,6 +3,7 @@ from sqlalchemy import text
 from resume_agent.db import make_engine
 from resume_agent.tracking.migrate import (
     ensure_content_fingerprint_column,
+    ensure_gate_override_column,
     ensure_reject_category_column,
 )
 
@@ -45,3 +46,15 @@ def test_content_fingerprint_backfills_all_rows():
         result = conn.execute(text("SELECT id, content_fingerprint FROM jobs")).mappings().all()
         rows = {int(row["id"]): row["content_fingerprint"] for row in result}
     assert all(rows[i] for i in (1, 2, 3))  # every non-blank jd_text got a fingerprint
+
+
+def test_gate_override_defaults_existing_rows_to_false():
+    engine = _legacy_engine()
+    ensure_gate_override_column(engine)
+    ensure_gate_override_column(engine)
+    with engine.connect() as conn:
+        result = (
+            conn.execute(text("SELECT id, gate_override FROM jobs")).mappings().all()
+        )
+        rows = {int(row["id"]): bool(row["gate_override"]) for row in result}
+    assert rows == {1: False, 2: False, 3: False}

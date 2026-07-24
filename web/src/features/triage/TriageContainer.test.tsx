@@ -63,7 +63,7 @@ describe("TriageContainer", () => {
     expect(screen.queryByLabelText("Minimum salary")).not.toBeInTheDocument();
   });
 
-  it("shows a rejected job's reason in a compact labeled note", async () => {
+  it("labels a hard-filter reason separately from a relevance rejection", async () => {
     server.use(
       http.get("/api/triage", () =>
         HttpResponse.json({
@@ -81,6 +81,7 @@ describe("TriageContainer", () => {
               hasProgress: false,
               rejectReason:
                 "The role requires on-site work and does not offer the required sponsorship.",
+              rejectCategory: "filtered",
             },
           ],
           pagination: { page: 1, pageSize: 200, totalItems: 1, totalPages: 1 },
@@ -94,7 +95,7 @@ describe("TriageContainer", () => {
 
     expect(
       await screen.findByLabelText(
-        "Rejection reason: The role requires on-site work and does not offer the required sponsorship.",
+        "Filtered out: The role requires on-site work and does not offer the required sponsorship.",
       ),
     ).toBeInTheDocument();
     expect(

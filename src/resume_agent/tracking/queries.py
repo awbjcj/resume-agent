@@ -89,6 +89,7 @@ class JobDetailRow(ShortlistRow):
     needs_attention: bool = False
     regressed: bool = False
     reject_reason: str | None = None
+    reject_category: str | None = None
 
 
 @dataclass
@@ -104,6 +105,7 @@ class TriageRow:
     archived_at: datetime | None
     has_progress: bool
     reject_reason: str | None = None
+    reject_category: str | None = None
     url: str | None = None
 
 
@@ -267,6 +269,7 @@ def job_detail_row(
         needs_attention=best.no_clean_round,
         regressed=best.regressed,
         reject_reason=job.reject_reason,
+        reject_category=job.reject_category,
     )
 
 
@@ -355,6 +358,7 @@ def _triage_row(job: Job, progressed: set[int]) -> TriageRow:
         archived_at=job.archived_at,
         has_progress=job_has_progress(job, progressed),
         reject_reason=job.reject_reason,
+        reject_category=job.reject_category,
         url=job.url,
     )
 

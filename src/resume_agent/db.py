@@ -15,6 +15,7 @@ from resume_agent.tracking.migrate import (
     ensure_content_fingerprint_column,
     ensure_cover_letter_revision_columns,
     ensure_dedup_key_column,
+    ensure_gate_override_column,
     ensure_posted_at_column,
     ensure_reject_category_column,
     ensure_resume_version_revision_columns,
@@ -81,6 +82,7 @@ def init_db(engine: Engine) -> None:
     ensure_posted_at_column(engine)
     ensure_archived_at_column(engine)
     ensure_reject_category_column(engine)
+    ensure_gate_override_column(engine)
     ensure_content_fingerprint_column(engine)
     ensure_resume_version_revision_columns(engine)
     ensure_cover_letter_revision_columns(engine)

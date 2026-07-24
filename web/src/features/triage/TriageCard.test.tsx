@@ -33,6 +33,23 @@ describe("TriageCard", () => {
     expect(screen.getByText("salary below minimum")).toBeInTheDocument();
   });
 
+  it("shows the filter reason for a filtered job", () => {
+    render(
+      <TriageCard
+        row={row({
+          status: "filtered",
+          rejectReason: "sponsorship not available",
+          rejectCategory: "filtered",
+        })}
+        checked={false}
+        onCheck={noop}
+        onOpen={noop}
+      />,
+    );
+    expect(screen.getByText("Filtered out:")).toBeInTheDocument();
+    expect(screen.getByText("sponsorship not available")).toBeInTheDocument();
+  });
+
   it("does not show a reason for a non-rejected job", () => {
     render(
       <TriageCard

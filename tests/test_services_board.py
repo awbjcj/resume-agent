@@ -136,6 +136,35 @@ def test_set_stage_changes_status():
     assert updated.status == JobStatus.approved.value
 
 
+def test_set_stage_out_of_rejection_overrides_discovery_gates():
+    with _session() as session:
+        job = _job(session, status=JobStatus.rejected.value)
+        job.reject_category = "filtered"
+        session.add(job)
+        session.commit()
+        assert job.id is not None
+
+        updated = board.set_stage(session, job.id, JobStatus.shortlisted.value)
+
+    assert updated is not None
+    assert updated.status == JobStatus.shortlisted.value
+    assert updated.gate_override is True
+
+
+def test_set_stage_back_to_rejection_clears_discovery_gate_override():
+    with _session() as session:
+        job = _job(session, status=JobStatus.shortlisted.value)
+        job.gate_override = True
+        session.add(job)
+        session.commit()
+        assert job.id is not None
+
+        updated = board.set_stage(session, job.id, JobStatus.rejected.value)
+
+    assert updated is not None
+    assert updated.gate_override is False
+
+
 def test_delete_refuses_job_with_progress():
     with _session() as session:
         job = _job(session, status=JobStatus.rendered.value)  # rendered == has_progress
@@ -179,6 +208,28 @@ def test_bulk_apply_commits_once():
 
         assert result.affected == 3
         assert len(commits) == 1
+
+
+def test_bulk_stage_change_out_of_rejection_overrides_discovery_gates():
+    with _session() as session:
+        job = _job(session, status=JobStatus.rejected.value)
+        assert job.id is not None
+
+        result = board.bulk_apply(
+            session,
+            board="triage",
+            action="setStatus",
+            scope="ids",
+            board_filter=board.BoardFilter(),
+            ids=[job.id],
+            status=JobStatus.shortlisted.value,
+            dry_run=False,
+        )
+        session.refresh(job)
+
+        assert result.affected == 1
+        assert job.status == JobStatus.shortlisted.value
+        assert job.gate_override is True
 
 
 def test_bulk_apply_query_count_is_constant():

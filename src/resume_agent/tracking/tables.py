@@ -51,6 +51,7 @@ class Job(SQLModel, table=True):
     status: str = Field(default=JobStatus.raw.value, index=True)
     reject_reason: str | None = None
     reject_category: str | None = None
+    gate_override: bool = Field(default=False)
     content_fingerprint: str | None = Field(default=None, index=True)
     posted_at: datetime | None = None
     archived_at: datetime | None = Field(default=None, index=True)

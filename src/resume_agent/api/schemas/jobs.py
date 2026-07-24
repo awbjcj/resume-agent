@@ -73,6 +73,7 @@ class TriageItem(CamelModel):
     archived_at: datetime | None
     has_progress: bool
     reject_reason: str | None = None
+    reject_category: str | None = None
     url: str | None = None
 
 
@@ -151,6 +152,7 @@ class JobDetail(CamelModel):
     needs_attention: bool = False
     regressed: bool = False
     reject_reason: str | None = None
+    reject_category: str | None = None
 
 
 class JobPatch(CamelModel):

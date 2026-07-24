@@ -105,6 +105,7 @@ def test_triage_item_exposes_reject_reason():
         body = client.get("/api/triage").json()
     item = next(r for r in body["data"] if r["company"] == "Rej")
     assert item["rejectReason"] == "salary below minimum"
+    assert item["rejectCategory"] == "filtered"
 
 
 def test_triage_filters_by_reject_reason():

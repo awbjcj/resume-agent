@@ -259,6 +259,7 @@ re-raised, so a persistently-throttled board still surfaces as a per-URL failure
 | `src/resume_agent/discovery/ingest.py`               | `save_or_upgrade`, source-priority logic                                                                                  |
 | `src/resume_agent/tracking/dedup.py`                 | `compute_dedup_key` — `company                                                                                            | normalized_title` |
 | `tests/test_discovery_ingest.py`                     | Ingest + dedup + priority tests                                                                                           |
+| `src/resume_agent/settings_sections.py`              | Single enumeration of customizable settings: bundle scope + reset targets                                                 |
 
 ---
 

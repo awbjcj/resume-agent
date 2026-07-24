@@ -984,3 +984,37 @@ def test_reprocess_clears_stale_fit_when_now_rejected():
         assert rejected[0].fit_score is None
         assert rejected[0].fit_rationale is None
         assert rejected[0].reject_category == "filtered"
+
+
+def test_reprocess_scores_manually_overridden_hard_filtered_job():
+    cfg = SearchConfig(sponsorship_required=True, target_role="AI engineering roles")
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        save_job(
+            s,
+            Job(
+                source="x",
+                jd_text="bad role, nosponsor here",
+                title="CDL Driver",
+                status=JobStatus.shortlisted.value,
+                reject_reason="sponsorship not available",
+                reject_category="filtered",
+                gate_override=True,
+            ),
+        )
+
+        reprocess(
+            s,
+            cfg,
+            facts,
+            _ExtractAgent(),
+            _FitAgent(),
+            ["shortlisted"],
+            relevance_agent=_Judge(),
+        )
+
+        shortlisted = jobs_by_status(s, JobStatus.shortlisted.value)
+        assert len(shortlisted) == 1
+        assert shortlisted[0].fit_score == 90
+        assert shortlisted[0].gate_override is True
+        assert not jobs_by_status(s, JobStatus.rejected.value)

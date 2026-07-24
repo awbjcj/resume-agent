@@ -58,6 +58,14 @@ export function StageManager({ job, onDeleted }: { job: JobDetail; onDeleted: ()
       {job.hasProgress && (
         <p className="text-xs text-muted-foreground">Has progress — delete disabled.</p>
       )}
+      {(job.status === "filtered" || job.status === "rejected") &&
+        stage !== "filtered" &&
+        stage !== "rejected" && (
+          <p className="text-xs text-muted-foreground">
+            Moving this job forward overrides its discovery filter or rejection so it can be
+            scored on the next discovery or shortlist re-score run.
+          </p>
+        )}
     </div>
   );
 }
