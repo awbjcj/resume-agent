@@ -190,17 +190,35 @@ discipline of `import_data_root`:
    that section's declared patterns. **Unclaimed members are ignored, not
    rejected** — so a crafted bundle cannot plant a credential, and a bundle from
    a newer build stays importable by an older one.
-4. Validate in the stage, reusing each artifact's existing loader rather than
-   writing bundle-specific parsers — config YAML through `DOMAIN_SCHEMAS`,
-   `.typ` stems through `validate_custom_stem`, `overrides.yaml` through
-   `load_overrides`, and the two JSON ledgers through `load_group_corrections`
-   and `sanitize_taxonomy_corrections`. A bad bundle fails with no live file
-   modified.
+4. Validate in the stage against each artifact's existing **model**, but under a
+   **strict error policy that the read-time loaders deliberately do not have**.
+   A bad bundle fails with no live file modified.
 
-   `sanitize_taxonomy_corrections` matters here: the taxonomy ledger tolerates
-   dangling references by design (they are inert), so validation must accept a
-   ledger that points at clusters the recipient does not have. Importing
-   somebody else's corrections is expected to be partially inert, not an error.
+   This distinction is the subtle part. `load_group_corrections` catches
+   `(OSError, ValueError)` and `load_taxonomy_corrections` catches
+   `(OSError, UnicodeError, json.JSONDecodeError)`, both returning an *empty*
+   ledger. That tolerance is correct at read time — a corrupt ledger must not
+   brick the profile page — but catastrophic at import time, where a truncated
+   file would validate clean and then silently replace real corrections with
+   nothing. `load_overrides` catches only `OSError`, so it already rejects.
+
+   Validation therefore reuses the models and rejects on parse failure:
+
+   | Artifact | Validator |
+   | --- | --- |
+   | `config/*.yaml`, `style_guide.md` | `DOMAIN_SCHEMAS[domain].model_validate` |
+   | `config/templates/*.typ` | `validate_custom_stem` on the stem |
+   | `data/profile/overrides.yaml` | `load_overrides` (already strict) |
+   | `data/profile/group_corrections.json` | `GroupCorrections.model_validate_json` |
+   | `data/taxonomy/taxonomy_corrections.json` | `json.loads` + `TaxonomyCorrections.model_validate` |
+
+   What validation must *not* reject is **semantic** unfamiliarity. The taxonomy
+   ledger tolerates dangling references by design — they are inert — so a ledger
+   naming clusters the recipient does not have imports cleanly. Importing
+   somebody else's corrections is expected to be partially inert. The normal
+   read path then applies `sanitize_taxonomy_corrections` and
+   `load_group_corrections` as it always has, so unfamiliar entries are dropped
+   at use, not at import.
 5. Apply section by section: stash current files to a rollback directory,
    `os.replace` the new ones in, discard the stash on success, restore it on
    failure.
@@ -325,7 +343,9 @@ and legacy mode.
 - A bundle *containing* any of them is ignored on import, not obeyed.
 - Path traversal is rejected.
 - Unparseable YAML or JSON is rejected with every live file byte-identical
-  afterwards.
+  afterwards — asserted **specifically for `group_corrections.json` and
+  `taxonomy_corrections.json`**, whose read-time loaders would otherwise absorb
+  the corruption and silently import an empty ledger over real corrections.
 - A taxonomy ledger referencing clusters the recipient lacks imports cleanly and
   stays inert.
 - A two-section bundle leaves the other ten untouched.
