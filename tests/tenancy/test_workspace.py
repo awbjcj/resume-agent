@@ -1,5 +1,6 @@
 from resume_agent.config import Settings
 from resume_agent.discovery.connectors.telemetry import read_runs, record_run
+from resume_agent.settings_sections import seedable_entries
 from resume_agent.taxonomy.skills import load_aliases
 from resume_agent.tenancy.context import UserContext, use_context
 from resume_agent.tenancy.workspace import (
@@ -91,3 +92,39 @@ def test_effective_settings_tracks_user_owned_provider_keys(tmp_path):
     assert overlay.settings.session_secret == "platform-secret"
     assert overlay.settings.db_url == paths.db_url
     assert overlay.own_key_providers == frozenset({"anthropic"})
+
+
+def test_seedable_entries_are_config_files_that_ship_an_example():
+    entries = seedable_entries()
+    assert "config/connectors.yaml" in entries
+    assert "config/search.yaml" in entries
+    assert "config/agent_guidance.yaml" not in entries
+    assert "data/profile/overrides.yaml" not in entries
+    assert "config/templates/*.typ" not in entries
+
+
+def test_provisioning_seeds_every_registry_default(tmp_path):
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "connectors.yaml.example").write_text("companies: []\n", "utf-8")
+    (templates / "search.yaml.example").write_text("titles: []\n", "utf-8")
+    (templates / "unlisted.yaml.example").write_text("nope: true\n", "utf-8")
+
+    paths = provision_workspace(tmp_path / "data", "u1", template_dir=templates)
+
+    assert (paths.config_dir / "connectors.yaml").read_text("utf-8") == "companies: []\n"
+    assert (paths.config_dir / "search.yaml").read_text("utf-8") == "titles: []\n"
+    # Not in the registry, so provisioning no longer copies it.
+    assert not (paths.config_dir / "unlisted.yaml").exists()
+
+
+def test_provisioning_never_overwrites_an_existing_file(tmp_path):
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "search.yaml.example").write_text("titles: []\n", "utf-8")
+    paths = provision_workspace(tmp_path / "data", "u1", template_dir=templates)
+    (paths.config_dir / "search.yaml").write_text("titles: [dev]\n", "utf-8")
+
+    provision_workspace(tmp_path / "data", "u1", template_dir=templates)
+
+    assert (paths.config_dir / "search.yaml").read_text("utf-8") == "titles: [dev]\n"

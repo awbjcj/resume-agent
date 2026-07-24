@@ -27,42 +27,44 @@
 
 **Create:**
 
-| Path | Responsibility |
-| --- | --- |
-| `src/resume_agent/settings_sections.py` | The twelve-row table, path resolution, `is_customized`, `reset_section` |
-| `src/resume_agent/services/settings_bundle.py` | Export, manifest read, strict validation, section-level apply with rollback |
-| `src/resume_agent/api/schemas/settings.py` | `CamelModel` DTOs for the five routes |
-| `src/resume_agent/api/routers/settings.py` | `router` + `link_router` |
-| `tests/test_settings_sections.py` | Registry, customized detection, reset |
-| `tests/test_settings_bundle.py` | Round-trip, credential exclusion, strict validation, rollback |
-| `tests/api/test_settings_api.py` | Routes, guards, confirm, 409 |
-| `web/src/features/settings/use-settings-sections.ts` | Query + mutations |
-| `web/src/features/settings/ResetSectionButton.tsx` | Shared confirm-dialog reset control |
-| `web/src/features/settings/ResetSectionButton.test.tsx` | Its test |
-| `web/src/features/settings/pages/BackupSettingsPage.tsx` | Export, import, section table |
-| `web/src/features/settings/pages/BackupSettingsPage.test.tsx` | Its test |
+| Path                                                          | Responsibility                                                              |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `src/resume_agent/settings_sections.py`                       | The twelve-row table, path resolution, `is_customized`, `reset_section`     |
+| `src/resume_agent/services/settings_bundle.py`                | Export, manifest read, strict validation, section-level apply with rollback |
+| `src/resume_agent/api/schemas/settings.py`                    | `CamelModel` DTOs for the five routes                                       |
+| `src/resume_agent/api/routers/settings.py`                    | `router` + `link_router`                                                    |
+| `tests/test_settings_sections.py`                             | Registry, customized detection, reset                                       |
+| `tests/test_settings_bundle.py`                               | Round-trip, credential exclusion, strict validation, rollback               |
+| `tests/api/test_settings_api.py`                              | Routes, guards, confirm, 409                                                |
+| `web/src/features/settings/use-settings-sections.ts`          | Query + mutations                                                           |
+| `web/src/features/settings/ResetSectionButton.tsx`            | Shared confirm-dialog reset control                                         |
+| `web/src/features/settings/ResetSectionButton.test.tsx`       | Its test                                                                    |
+| `web/src/features/settings/pages/BackupSettingsPage.tsx`      | Export, import, section table                                               |
+| `web/src/features/settings/pages/BackupSettingsPage.test.tsx` | Its test                                                                    |
 
 **Modify:**
 
-| Path | Change |
-| --- | --- |
-| `src/resume_agent/tenancy/workspace.py` | `provision_workspace` seeds from the registry |
-| `src/resume_agent/api/app.py` | Register `settings.router` (guarded) and `settings.link_router` (download-guarded) |
-| `web/src/features/settings/SettingsLayout.tsx` | Add `Backup` to the `System` nav group |
-| `web/src/app/router.tsx` | Add the `backup` route |
-| `web/src/features/settings/pages/*.tsx` | Add `ResetSectionButton` to six pages |
-| `web/src/features/settings/pages/AgentPromptsPage.tsx` | Per-agent reset |
-| `CLAUDE.md` | Document the registry as the single enumeration |
+| Path                                                   | Change                                                                             |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `src/resume_agent/tenancy/workspace.py`                | `provision_workspace` seeds from the registry                                      |
+| `src/resume_agent/api/app.py`                          | Register `settings.router` (guarded) and `settings.link_router` (download-guarded) |
+| `web/src/features/settings/SettingsLayout.tsx`         | Add `Backup` to the `System` nav group                                             |
+| `web/src/app/router.tsx`                               | Add the `backup` route                                                             |
+| `web/src/features/settings/pages/*.tsx`                | Add `ResetSectionButton` to six pages                                              |
+| `web/src/features/settings/pages/AgentPromptsPage.tsx` | Per-agent reset                                                                    |
+| `CLAUDE.md`                                            | Document the registry as the single enumeration                                    |
 
 ---
 
 ### Task 1: The section registry
 
 **Files:**
+
 - Create: `src/resume_agent/settings_sections.py`
 - Test: `tests/test_settings_sections.py`
 
 **Interfaces:**
+
 - Consumes: `resume_agent.tenancy.paths.resolve_tenant_path`
 - Produces:
   - `SettingsSection` frozen dataclass with `id: str`, `label: str`, `files: tuple[str, ...]`
@@ -341,10 +343,12 @@ git commit -m "feat: declare the customizable settings surface once"
 ### Task 2: Customized detection and reset
 
 **Files:**
+
 - Modify: `src/resume_agent/settings_sections.py` (append)
 - Test: `tests/test_settings_sections.py` (append)
 
 **Interfaces:**
+
 - Consumes: `live_paths`, `default_path`, `SettingsSection` from Task 1
 - Produces:
   - `is_customized(section: SettingsSection) -> bool`
@@ -509,14 +513,16 @@ git commit -m "feat: reset one settings section to its shipped default"
 ### Task 3: Provisioning seeds from the registry
 
 **Files:**
+
 - Modify: `src/resume_agent/tenancy/workspace.py:92-115`
 - Test: `tests/tenancy/test_workspace.py` (append — the file exists and already defines a `_context(tmp_path)` helper at line 13; reuse it)
 
 **Interfaces:**
+
 - Consumes: `SETTINGS_SECTIONS`, `default_path` from Task 1
 - Produces: `seedable_entries() -> tuple[str, ...]` in `settings_sections.py`
 
-**Why this is delicate:** `provision_workspace(template_dir=...)` is threaded from `app.state.template_config_dir` through six call sites (`api/app.py:126`, `api/deps.py:168`, `api/routers/admin.py:127`, `api/routers/auth.py:186`, `api/routers/gmail.py:148`, `gmail/scheduler.py:88`), and `tests/api/conftest.py` points it at a temp dir. **The `template_dir` parameter and its semantics must not change.** Only the *list* of files to seed moves into the registry; the *anchor* stays `template_dir`.
+**Why this is delicate:** `provision_workspace(template_dir=...)` is threaded from `app.state.template_config_dir` through six call sites (`api/app.py:126`, `api/deps.py:168`, `api/routers/admin.py:127`, `api/routers/auth.py:186`, `api/routers/gmail.py:148`, `gmail/scheduler.py:88`), and `tests/api/conftest.py` points it at a temp dir. **The `template_dir` parameter and its semantics must not change.** Only the _list_ of files to seed moves into the registry; the _anchor_ stays `template_dir`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -633,10 +639,12 @@ git commit -m "refactor: provision workspaces from the settings registry"
 ### Task 4: Bundle export
 
 **Files:**
+
 - Create: `src/resume_agent/services/settings_bundle.py`
 - Test: `tests/test_settings_bundle.py`
 
 **Interfaces:**
+
 - Consumes: `SETTINGS_SECTIONS`, `live_paths`, `arcname_for` from Task 1
 - Produces:
   - `BUNDLE_VERSION: int = 1`
@@ -864,17 +872,19 @@ git commit -m "feat: export a settings-only bundle"
 ### Task 5: Manifest reading and strict validation
 
 **Files:**
+
 - Modify: `src/resume_agent/services/settings_bundle.py` (append)
 - Test: `tests/test_settings_bundle.py` (append)
 
 **Interfaces:**
+
 - Consumes: `_extract_validated`, `UnsafeArchiveError` from `resume_agent.services.backup`; `SECTIONS_BY_ID`, `live_paths` from Task 1
 - Produces:
   - `BundleManifest` frozen dataclass: `version: int`, `exported_at: str`, `sections: tuple[str, ...]`, `unknown_sections: tuple[str, ...]`
   - `read_bundle_manifest(archive: Path) -> BundleManifest`
   - `validate_member(arcname: str, path: Path) -> None`
 
-**Critical context:** the read-time ledger loaders are deliberately tolerant and **must not** be used for validation. `load_group_corrections` catches `(OSError, ValueError)` and `load_taxonomy_corrections` catches `(OSError, UnicodeError, json.JSONDecodeError)`, both returning an *empty* ledger. Using them here would let a truncated bundle validate clean and then silently replace real corrections with nothing. Validate against the **models** with errors propagating.
+**Critical context:** the read-time ledger loaders are deliberately tolerant and **must not** be used for validation. `load_group_corrections` catches `(OSError, ValueError)` and `load_taxonomy_corrections` catches `(OSError, UnicodeError, json.JSONDecodeError)`, both returning an _empty_ ledger. Using them here would let a truncated bundle validate clean and then silently replace real corrections with nothing. Validate against the **models** with errors propagating.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1193,10 +1203,12 @@ git commit -m "feat: read and strictly validate a settings bundle"
 ### Task 6: Bundle import with rollback
 
 **Files:**
+
 - Modify: `src/resume_agent/services/settings_bundle.py` (append)
 - Test: `tests/test_settings_bundle.py` (append)
 
 **Interfaces:**
+
 - Consumes: `read_bundle_manifest`, `validate_member`, `_manifest_from_stage` from Task 5
 - Produces: `import_settings_bundle(archive: Path) -> tuple[str, ...]` returning applied section ids
 
@@ -1460,12 +1472,14 @@ git commit -m "feat: apply a settings bundle section by section with rollback"
 ### Task 7: API schemas, routes, and contract
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/settings.py`
 - Create: `src/resume_agent/api/routers/settings.py`
 - Modify: `src/resume_agent/api/app.py`
 - Test: `tests/api/test_settings_api.py`
 
 **Interfaces:**
+
 - Consumes: everything from Tasks 1-6
 - Produces: five routes; `SettingsSectionOut`, `SettingsSectionList`, `BundlePreview`, `BundleApplied`
 
@@ -1827,11 +1841,13 @@ git commit -m "feat: expose settings bundle and reset over the API"
 ### Task 8: Web data layer and reset button
 
 **Files:**
+
 - Create: `web/src/features/settings/use-settings-sections.ts`
 - Create: `web/src/features/settings/ResetSectionButton.tsx`
 - Test: `web/src/features/settings/ResetSectionButton.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `/api/settings/sections`, `/api/settings/sections/{sectionId}/reset` from Task 7
 - Produces:
   - `useSettingsSections()` — TanStack query returning `SettingsSection[]`
@@ -2024,7 +2040,9 @@ export function ResetSectionButton({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={reset.isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={reset.isPending}>
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             disabled={reset.isPending}
             onClick={(event) => {
@@ -2060,12 +2078,14 @@ git commit -m "feat(web): shared reset-to-defaults control"
 ### Task 9: The Backup page
 
 **Files:**
+
 - Create: `web/src/features/settings/pages/BackupSettingsPage.tsx`
 - Create: `web/src/features/settings/pages/BackupSettingsPage.test.tsx`
 - Modify: `web/src/features/settings/SettingsLayout.tsx:51-54`
 - Modify: `web/src/app/router.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSettingsSections`, `ResetSectionButton` from Task 8; `openDownload`, `getToken` from `@/lib/api/client`
 - Produces: `<BackupSettingsPage />` at route `/settings/backup`
 
@@ -2228,7 +2248,9 @@ export function BackupSettingsPage() {
     if (!chosen) return;
     setBusy(true);
     try {
-      setPreview((await post("/api/settings/bundle/preview", chosen)) as Preview);
+      setPreview(
+        (await post("/api/settings/bundle/preview", chosen)) as Preview,
+      );
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
@@ -2280,9 +2302,7 @@ export function BackupSettingsPage() {
               id={fileId}
               type="file"
               accept=".tar.gz,.tgz,application/gzip"
-              onChange={(event) =>
-                void choose(event.target.files?.[0] ?? null)
-              }
+              onChange={(event) => void choose(event.target.files?.[0] ?? null)}
             />
           </Field>
           {preview ? (
@@ -2411,6 +2431,7 @@ git commit -m "feat(web): settings backup page with bundle transfer and reset ta
 ### Task 10: Per-page and per-agent reset controls
 
 **Files:**
+
 - Modify: `web/src/features/settings/pages/SearchSettingsPage.tsx`
 - Modify: `web/src/features/settings/pages/ReviewSettingsPage.tsx`
 - Modify: `web/src/features/settings/pages/RenderingSettingsPage.tsx`
@@ -2421,6 +2442,7 @@ git commit -m "feat(web): settings backup page with bundle transfer and reset ta
 - Test: `web/src/features/settings/pages/AgentPromptsPage.test.tsx` (append)
 
 **Interfaces:**
+
 - Consumes: `ResetSectionButton` from Task 8, `useSaveGuidance` from `use-prompts.ts`
 - Produces: no new exports
 
@@ -2477,20 +2499,20 @@ On each page, place the control in the heading row. Example for `SearchSettingsP
 import { ResetSectionButton } from "../ResetSectionButton";
 
 // inside the header row, after the title:
-<ResetSectionButton sectionId="search" label="Search" />
+<ResetSectionButton sectionId="search" label="Search" />;
 ```
 
 Section ids per page:
 
-| File | `sectionId` / `label` |
-| --- | --- |
-| `SearchSettingsPage.tsx` | `search` / "Search" |
-| `ReviewSettingsPage.tsx` | `review` / "Review panel" |
-| `RenderingSettingsPage.tsx` | `render` / "Rendering" **and** `templates` / "Custom resume templates" |
-| `PruningSettingsPage.tsx` | `prune` / "Pruning" |
-| `StyleGuideSettingsPage.tsx` | `style_guide` / "Style guide" |
-| sources page | `sources` / "Company sources" |
-| `AgentPromptsPage.tsx` | `agent_guidance` / "Agent prompts" (page level, alongside the per-agent buttons) |
+| File                         | `sectionId` / `label`                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `SearchSettingsPage.tsx`     | `search` / "Search"                                                              |
+| `ReviewSettingsPage.tsx`     | `review` / "Review panel"                                                        |
+| `RenderingSettingsPage.tsx`  | `render` / "Rendering" **and** `templates` / "Custom resume templates"           |
+| `PruningSettingsPage.tsx`    | `prune` / "Pruning"                                                              |
+| `StyleGuideSettingsPage.tsx` | `style_guide` / "Style guide"                                                    |
+| sources page                 | `sources` / "Company sources"                                                    |
+| `AgentPromptsPage.tsx`       | `agent_guidance` / "Agent prompts" (page level, alongside the per-agent buttons) |
 
 - [ ] **Step 5: Run the whole web suite**
 
@@ -2510,6 +2532,7 @@ git commit -m "feat(web): reset controls on settings pages and agent prompts"
 ### Task 11: Documentation
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 
 - [ ] **Step 1: Add the registry to the design notes**
@@ -2528,7 +2551,7 @@ In `CLAUDE.md`, under **Known design notes**, add:
   set as a tar.gz (`GET/POST /api/settings/bundle`), replacing the sections a
   bundle names and leaving the rest untouched — a bundle can add or replace
   settings but never clear them. Reset (`POST
-  /api/settings/sections/{id}/reset`) copies the shipped `.example` when one
+/api/settings/sections/{id}/reset`) copies the shipped `.example` when one
   exists and deletes the file otherwise, which is the same rule
   `provision_workspace` uses to seed a fresh workspace. Import validation uses
   the artifacts' **models** but not their read-time loaders:
@@ -2542,7 +2565,7 @@ In `CLAUDE.md`, under **Known design notes**, add:
 In the **Hot paths** table, add:
 
 ```markdown
-| `src/resume_agent/settings_sections.py`              | Single enumeration of customizable settings: bundle scope + reset targets                                                 |
+| `src/resume_agent/settings_sections.py` | Single enumeration of customizable settings: bundle scope + reset targets |
 ```
 
 - [ ] **Step 3: Full verification**
@@ -2562,6 +2585,27 @@ git commit -m "docs: record the settings registry as the single enumeration"
 
 ## Self-Review Notes
 
+**Spec coverage:** section registry (T1), reset semantics incl. the five delete-defaults (T1-2), provisioning as reader (T3), export + manifest + credential exclusion (T4), strict validation incl. the tolerant-loader trap (T5), section-level replace + rollback + zero-claim guard (T6), five endpoints + error codes + runs-active guard + contract (T7), shared reset control (T8), Backup page as canonical surface (T9), per-page and per-agent resets (T10), docs (T11).
+
+**Known deviations from the spec, both deliberate:**
+
+1. The spec lists `UNSUPPORTED_VERSION` and `UNSAFE_ARCHIVE` as separate codes; `UnsupportedBundleVersionError` subclasses `InvalidBundleError`, so `_bundle_error` must check it **first**. It does.
+2. `is_customized` treats an absent file with a shipped default as _not_ customized. The spec says "differs from the shipped `.example`", which would literally mark a fresh workspace as customized. The badge answers "do you have changes worth exporting", so absent means nothing to lose.
+
+**Caught in pre-flight review (before dispatch):** Task 5's first draft validated
+`search.yaml`, `review.yaml`, `review_deep.yaml`, `render.yaml`, and
+`prune.yaml` against the API's wire-only `*ConfigDoc` schemas. Those are not
+field-identical to the domain models every runtime consumer actually loads
+through (`SearchConfig`, `ReviewConfig`, `RenderConfig`, `PruneConfig`), and
+Pydantic's default `extra="ignore"` means the wrong model would not even
+error on a bad value in a field it doesn't declare — the bundle would import
+clean and break on the next tailor run instead. Fixed to validate against the
+real domain models; `profile_sources.yaml` was checked and confirmed to be the
+one section where the `*ConfigDoc` genuinely is the only schema.
+
+**Caught during self-review:** the first draft built `UserContext(user_id=..., username=..., is_admin=..., paths=...)` in every test. `UserContext` actually has **eight** required fields (`user_id`, `username`, `role`, `paths`, `settings`, `engine`, `system_engine`, `own_key_providers`) and `is_admin` is a read-only property derived from `role`. Every test would have died with `TypeError` on the first line. The plan now mirrors the existing helper at `tests/tenancy/test_workspace.py:13`.
+
+**Open risk:** Task 3 changes `provision_workspace`, whose `template_dir` is threaded through six call sites and pinned by `tests/api/conftest.py`. The task preserves the parameter and only moves the _file list_ into the registry. If `tests/api` fails after Task 3, the cause is an `.example` that ships but is not in the registry — add a section for it rather than restoring the glob.
 **Spec coverage:** section registry (T1), reset semantics incl. the five delete-defaults (T1-2), provisioning as reader (T3), export + manifest + credential exclusion (T4), strict validation incl. the tolerant-loader trap (T5), section-level replace + rollback + zero-claim guard (T6), five endpoints + error codes + runs-active guard + contract (T7), shared reset control (T8), Backup page as canonical surface (T9), per-page and per-agent resets (T10), docs (T11).
 
 **Known deviations from the spec, both deliberate:**

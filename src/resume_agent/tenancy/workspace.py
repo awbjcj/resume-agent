@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shutil
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from resume_agent.config import Settings
 from resume_agent.setup.env_writer import parse_env
@@ -106,11 +106,17 @@ def provision_workspace(
         paths.root / "taxonomy",
     ):
         directory.mkdir(parents=True, exist_ok=True)
+    # Local import: settings_sections -> tenancy.paths -> tenancy.context ->
+    # tenancy.workspace would otherwise be a module-load cycle.
+    from resume_agent.settings_sections import seedable_entries
+
     templates = Path(template_dir)
     if templates.is_dir():
-        for example in sorted(templates.glob("*.example")):
-            target = paths.config_dir / example.name.removesuffix(".example")
-            if not target.exists():
+        for entry in seedable_entries():
+            name = PurePosixPath(entry).name
+            example = templates / f"{name}.example"
+            target = paths.config_dir / name
+            if example.is_file() and not target.exists():
                 shutil.copyfile(example, target)
     return paths
 

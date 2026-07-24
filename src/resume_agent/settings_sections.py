@@ -130,6 +130,20 @@ def is_customized(section: SettingsSection) -> bool:
     return False
 
 
+def seedable_entries() -> tuple[str, ...]:
+    """Entries a fresh workspace is provisioned with.
+
+    Exactly the entries that ship a `.example`. Provisioning and resetting
+    therefore cannot drift: both mean "put the shipped default here".
+    """
+    return tuple(
+        entry
+        for section in SETTINGS_SECTIONS
+        for entry in section.files
+        if default_path(entry) is not None
+    )
+
+
 def reset_section(section: SettingsSection) -> None:
     """Restore one section to defaults.
 
