@@ -1,10 +1,16 @@
-name: CI
+name: Reusable CI
 
 on:
-  pull_request:
-    branches: [main, dev]
-  push:
-    branches: [main, dev]
+  workflow_call:
+    inputs:
+      full:
+        description: >
+          Run the full suite (web production build + dependency audit) in
+          addition to lint/test. Quick (dev) runs pass false; full (main)
+          runs pass true.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,10 +53,12 @@ jobs:
       - name: Test (vitest)
         run: npm run test:run
       - name: Build
+        if: inputs.full
         run: npm run build
 
   security-audit:
     name: security-audit
+    if: inputs.full
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

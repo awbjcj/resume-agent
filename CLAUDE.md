@@ -3,10 +3,19 @@
 ## Branching
 
 `dev` is the integration branch — all feature work branches off `dev` and PRs back
-into it; CI (`.github/workflows/ci.yml`) runs on both `main` and `dev`. `main` is
-protected (PR + passing checks required, no direct pushes/force-pushes) and is the
-only branch Railway deploys from. Promote `dev` → `main` via PR when a batch of
-work is ready to ship.
+into it; `main` is protected (PR + passing checks required, no direct
+pushes/force-pushes) and is the only branch Railway deploys from. Promote `dev`
+→ `main` via PR when a batch of work is ready to ship.
+
+CI is split by branch so `dev` gets fast feedback and `main` gets the full
+gate before a deploy-triggering merge: `.github/workflows/_reusable-ci.yml`
+holds the actual jobs (`python-quality`, `web-quality`, `security-audit`)
+behind a `full` input; `.github/workflows/ci-dev.yml` calls it with
+`full: false` (lint + test only) on pushes/PRs to `dev`, and
+`.github/workflows/ci-main.yml` calls it with `full: true` (adds the web
+production build and the pip-audit/npm-audit dependency scan) on
+pushes/PRs to `main`. `.github/workflows/codeql.yml` is a fully-commented
+placeholder — uncomment it once the repo goes public.
 
 ## Commands
 
