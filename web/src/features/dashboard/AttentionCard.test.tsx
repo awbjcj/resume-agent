@@ -146,4 +146,19 @@ describe("AttentionCard", () => {
 
     expect(screen.getAllByRole("button", { name: /retry/i })).toHaveLength(12);
   });
+
+  it("never hides a whole kind's heading just because another kind is more numerous", async () => {
+    // 9 job records + 1 source record = 10 total, over VISIBLE_LIMIT (8). A
+    // naive slice-then-group would put all 8 visible rows in "job" and drop
+    // the "Sources" heading entirely, even though only 2 rows are hidden.
+    const manyJobs = Array.from({ length: 9 }, (_, index) => ({
+      ...jobRecord,
+      id: index + 1,
+      jobDetails: { ...jobRecord.jobDetails, jobId: index + 1 },
+    }));
+    renderAttentionCard([...manyJobs, sourceRecord]);
+
+    expect(await screen.findByRole("heading", { name: /jobs/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /sources/i })).toBeInTheDocument();
+  });
 });

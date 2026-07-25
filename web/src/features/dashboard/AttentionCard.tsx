@@ -30,6 +30,26 @@ interface RetryTarget {
   stage: RedoStage;
 }
 
+/**
+ * Every non-empty group keeps its heading visible, even when collapsed: slicing
+ * the flat row list to VISIBLE_LIMIT before grouping could zero out an entire
+ * kind's section just because another kind is more numerous. Each group gets
+ * at least one row (if it has any), then the remaining budget fills groups in
+ * priority order, so the total shown still respects the limit.
+ */
+function distributeVisibleBudget<T extends { items: unknown[] }>(
+  groups: T[],
+  limit: number,
+): T[] {
+  const reserved = groups.map((group) => Math.min(1, group.items.length));
+  let budget = limit - reserved.reduce((total, count) => total + count, 0);
+  return groups.map((group, index) => {
+    const extra = Math.max(0, Math.min(budget, group.items.length - reserved[index]));
+    budget -= extra;
+    return { ...group, items: group.items.slice(0, reserved[index] + extra) };
+  });
+}
+
 export function AttentionCard() {
   const records = useErrorRecords("open");
   const dismiss = useDismissError();
@@ -40,13 +60,15 @@ export function AttentionCard() {
   const [retry, setRetry] = useState<RetryTarget | null>(null);
 
   const rows = records.data?.records ?? [];
-  const visible = showAll ? rows : rows.slice(0, VISIBLE_LIMIT);
   const isBusy = dismiss.isPending || resolve.isPending;
 
-  const grouped = GROUPS.map((group) => ({
+  const activeGroups = GROUPS.map((group) => ({
     ...group,
-    items: visible.filter((row) => row.kind === group.kind),
+    items: rows.filter((row) => row.kind === group.kind),
   })).filter((group) => group.items.length > 0);
+  const grouped = showAll
+    ? activeGroups
+    : distributeVisibleBudget(activeGroups, VISIBLE_LIMIT);
 
   return (
     <Card>
