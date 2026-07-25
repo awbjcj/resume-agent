@@ -92,6 +92,9 @@ def list_board(
     """
     f = board_filter or BoardFilter(sort="recency" if board == "pipeline" else "fit")
     query_time = datetime.now(timezone.utc)
+    # Resolving a companySize/skills filter costs a table scan, so the page read
+    # and the facet counts below share one derivation instead of each doing it.
+    derived = board_query.derive_filter_values(session, f)
     jobs, total = board_query.board_page(
         session,
         board,
@@ -99,6 +102,7 @@ def list_board(
         page=page,
         page_size=page_size,
         now=query_time,
+        derived=derived,
     )
     if board == "shortlist":
         resolved_facts = resolve_tenant_path(facts_path)
@@ -121,6 +125,7 @@ def list_board(
                 board,
                 f,
                 now=query_time,
+                derived=derived,
             )
             if with_facets and page == 1
             else None

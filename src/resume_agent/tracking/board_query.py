@@ -156,7 +156,15 @@ _VISIBLE_FACETS: dict[BoardName, frozenset[str]] = {
 
 
 @dataclass(frozen=True)
-class _DerivedFilterValues:
+class DerivedFilterValues:
+    """Raw column values behind a canonical filter token.
+
+    ``companySize`` and ``skills`` are selected as canonical tokens but stored
+    as free text, so resolving either one costs a table scan. Deriving them is
+    a pure function of the filter, so one request's page read and facet counts
+    can share a single instance -- see :func:`derive_filter_values`.
+    """
+
     company_sizes: tuple[str, ...] | None = None
     skills: tuple[str, ...] | None = None
 
@@ -197,11 +205,19 @@ def _raw_skill_values(session: Session) -> set[str]:
     return values
 
 
-def _derive_filter_values(
+def derive_filter_values(
     session: Session,
     board_filter: BoardFilter,
-    aliases_path: str | Path,
-) -> _DerivedFilterValues:
+    aliases_path: str | Path = SKILL_ALIASES_PATH,
+) -> DerivedFilterValues:
+    """Resolve the canonical ``companySize``/``skills`` tokens to raw values.
+
+    Callers that make more than one query for a single request (a page read
+    plus its facet counts) should derive once and pass the result to both, so
+    the scans this costs are paid once. Pass the same ``aliases_path`` to the
+    derivation and to its consumers -- the result is only valid for the filter
+    and alias table it was derived from.
+    """
     company_sizes: tuple[str, ...] | None = None
     selected_sizes = set(_selected(board_filter.company_size))
     if selected_sizes:
@@ -230,7 +246,7 @@ def _derive_filter_values(
             )
         )
 
-    return _DerivedFilterValues(company_sizes=company_sizes, skills=skill_values)
+    return DerivedFilterValues(company_sizes=company_sizes, skills=skill_values)
 
 
 def _skill_exists(raw_values: tuple[str, ...]) -> ColumnElement[bool]:
@@ -285,7 +301,7 @@ def _filter_clauses(
     exclude: str | None,
     now: datetime,
     aliases_path: str | Path,
-    derived: _DerivedFilterValues | None = None,
+    derived: DerivedFilterValues | None = None,
 ) -> list[ColumnElement[bool]]:
     clauses = _base_clauses(board, board_filter)
 
@@ -343,7 +359,7 @@ def _filter_clauses(
         cutoff = now - timedelta(days=board_filter.stale_min_days)
         clauses.extend((posted_at.is_not(None), posted_at < cutoff))
 
-    derived = derived or _derive_filter_values(session, board_filter, aliases_path)
+    derived = derived or derive_filter_values(session, board_filter, aliases_path)
     visible_facets = _VISIBLE_FACETS[board]
     for spec in FACET_SPECS:
         if spec.key == exclude:
@@ -434,10 +450,14 @@ def board_statement(
     *,
     now: datetime | None = None,
     aliases_path: str | Path = SKILL_ALIASES_PATH,
+    derived: DerivedFilterValues | None = None,
 ):
-    """Return the filtered and stably ordered statement, before paging."""
+    """Return the filtered and stably ordered statement, before paging.
+
+    ``derived`` reuses an already-resolved :class:`DerivedFilterValues`; when
+    omitted the values are derived here.
+    """
     query_time = now or datetime.now(timezone.utc)
-    derived = _derive_filter_values(session, board_filter, aliases_path)
     return select(Job).where(
         *_filter_clauses(
             session,
@@ -460,6 +480,7 @@ def board_page(
     page_size: int,
     now: datetime | None = None,
     aliases_path: str | Path = SKILL_ALIASES_PATH,
+    derived: DerivedFilterValues | None = None,
 ) -> tuple[list[Job], int]:
     """Return one stable page of jobs plus the full filtered count."""
     page = max(1, page)
@@ -470,6 +491,7 @@ def board_page(
         board_filter,
         now=now,
         aliases_path=aliases_path,
+        derived=derived,
     )
     id_statement = cast(Any, statement.with_only_columns(cast(Any, Job.id)))
     count_statement = select(func.count()).select_from(
@@ -506,7 +528,7 @@ def _skill_facet_counts(
     *,
     now: datetime,
     aliases_path: str | Path,
-    derived: _DerivedFilterValues,
+    derived: DerivedFilterValues,
 ) -> dict[str, int]:
     if board == "triage":
         return {}
@@ -565,7 +587,7 @@ def _shared_facet_counts(
     *,
     now: datetime,
     aliases_path: str | Path,
-    derived: _DerivedFilterValues,
+    derived: DerivedFilterValues,
 ) -> Facets:
     """Count facets from one narrow projection when leave-one-out sets coincide."""
     visible_specs = [
@@ -656,10 +678,12 @@ def board_facet_counts(
     *,
     now: datetime | None = None,
     aliases_path: str | Path = SKILL_ALIASES_PATH,
+    derived: DerivedFilterValues | None = None,
 ) -> Facets:
     """Return leave-one-out counts without hydrating board row DTOs."""
     query_time = now or datetime.now(timezone.utc)
-    derived = _derive_filter_values(session, board_filter, aliases_path)
+    # Derived once here rather than per leave-one-out clause set below.
+    derived = derived or derive_filter_values(session, board_filter, aliases_path)
     if _shared_facet_projection_allowed(board_filter):
         return _shared_facet_counts(
             session,
