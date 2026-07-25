@@ -2630,8 +2630,9 @@ export interface components {
             /**
              * Preset
              * @default balanced
+             * @enum {string}
              */
-            preset: string;
+            preset: "balanced" | "pay_first" | "freshest";
             /** Q */
             q?: string | null;
             /** Region */
@@ -2652,8 +2653,9 @@ export interface components {
             /**
              * Sortby
              * @default fit
+             * @enum {string}
              */
-            sortBy: string;
+            sortBy: "fit" | "salary" | "recency" | "composite" | "company" | "stage";
             /** Source */
             source?: string[];
             /** Sponsorship */

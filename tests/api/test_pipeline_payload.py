@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
@@ -10,7 +12,7 @@ def test_pipeline_uses_bounded_previews_but_detail_keeps_full_description():
     client = TestClient(create_app(db_url="sqlite://"))
     description = "Build reliable distributed systems with Python. " * 130
     with client:
-        with get_session(client.app.state.engine) as session:
+        with get_session(client.app.state.engine) as session:  # type: ignore[union-attr]
             for index in range(50):
                 session.add(
                     Job(
@@ -27,7 +29,9 @@ def test_pipeline_uses_bounded_previews_but_detail_keeps_full_description():
                     )
                 )
             session.commit()
-            first_id = session.exec(select(Job.id).order_by(Job.id)).first()
+            first_id = session.exec(
+                select(Job.id).order_by(cast(Any, Job.id))
+            ).first()
 
         response = client.get("/api/pipeline?pageSize=50")
         detail = client.get(f"/api/jobs/{first_id}")

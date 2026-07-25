@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -224,7 +225,7 @@ def shortlist_rows(
 
 
 def project_shortlist_jobs(
-    jobs: list[Job],
+    jobs: Sequence[Job],
     *,
     facts: ProfileFacts | None = None,
     aliases_path: str | Path = SKILL_ALIASES_PATH,
@@ -310,7 +311,7 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
 
 def project_pipeline_jobs(
     session: Session,
-    jobs: list[Job],
+    jobs: Sequence[Job],
     *,
     aliases_path: str | Path = SKILL_ALIASES_PATH,
 ) -> list[PipelineRow]:
@@ -435,7 +436,7 @@ def archived_rows(session: Session) -> list[TriageRow]:
 
 def project_triage_jobs(
     session: Session,
-    jobs: list[Job],
+    jobs: Sequence[Job],
 ) -> list[TriageRow]:
     """Project an already-selected job page with page-scoped progress lookups."""
     job_ids = [_require_job_id(job) for job in jobs]

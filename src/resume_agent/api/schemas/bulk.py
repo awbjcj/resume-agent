@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import Field
 
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.tracking.board_query import Preset, SortKey
 
 
 class BulkRequest(CamelModel):
@@ -36,8 +37,8 @@ class BulkRequest(CamelModel):
     min_salary: int | None = None
     stale_days: int | None = None
     stale_min_days: int | None = None
-    sort_by: str = "fit"
-    preset: str = "balanced"
+    sort_by: SortKey = "fit"
+    preset: Preset = "balanced"
 
 
 class BulkResultOut(CamelModel):

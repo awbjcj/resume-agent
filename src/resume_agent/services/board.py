@@ -125,7 +125,7 @@ def list_shortlist(
     *,
     board_filter: BoardFilter | None = None,
     min_fit: int | None = None,
-    sort: str = "fit",
+    sort: SortKey = "fit",
     page: int = 1,
     page_size: int = 50,
     facts_path: str = DEFAULT_FACTS,
@@ -154,7 +154,7 @@ def list_pipeline(
     status: str | None = None,
     min_fit: int | None = None,
     q: str | None = None,
-    sort: str = "recency",
+    sort: SortKey = "recency",
     page: int = 1,
     page_size: int = 50,
     board_filter: BoardFilter | None = None,
@@ -180,7 +180,7 @@ def list_triage(
     archived: bool = False,
     status: str | None = None,
     min_fit: int | None = None,
-    sort: str = "fit",
+    sort: SortKey = "fit",
     page: int = 1,
     page_size: int = 50,
     board_filter: BoardFilter | None = None,
@@ -212,9 +212,8 @@ def _target_ids(
         return list(dict.fromkeys(ids))
     if scope == "query":
         statement = board_query.board_statement(session, board, board_filter)
-        return list(
-            session.exec(statement.with_only_columns(cast(Any, Job.id))).all()
-        )
+        id_statement = cast(Any, statement.with_only_columns(cast(Any, Job.id)))
+        return list(session.exec(id_statement).all())
     raise ValueError(f"Unknown bulk scope {scope!r}")
 
 

@@ -468,7 +468,7 @@ def board_page(
         now=now,
         aliases_path=aliases_path,
     )
-    id_statement = statement.with_only_columns(cast(Any, Job.id))
+    id_statement = cast(Any, statement.with_only_columns(cast(Any, Job.id)))
     count_statement = select(func.count()).select_from(
         id_statement.order_by(None).subquery()
     )

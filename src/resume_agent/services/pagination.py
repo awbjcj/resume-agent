@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
@@ -31,7 +32,7 @@ def paginate(items: list[T], *, page: int = 1, page_size: int = 50) -> Page[T]:
 
 
 def page_from_slice(
-    items: list[T],
+    items: Sequence[T],
     *,
     total: int,
     page: int,
@@ -42,7 +43,7 @@ def page_from_slice(
     page_size = max(1, page_size)
     total = max(0, total)
     return Page(
-        data=items,
+        data=list(items),
         page=page,
         page_size=page_size,
         total_items=total,

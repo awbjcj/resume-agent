@@ -1025,6 +1025,11 @@
           },
           "preset": {
             "default": "balanced",
+            "enum": [
+              "balanced",
+              "pay_first",
+              "freshest"
+            ],
             "title": "Preset",
             "type": "string"
           },
@@ -1088,6 +1093,14 @@
           },
           "sortBy": {
             "default": "fit",
+            "enum": [
+              "fit",
+              "salary",
+              "recency",
+              "composite",
+              "company",
+              "stage"
+            ],
             "title": "Sortby",
             "type": "string"
           },
