@@ -28,3 +28,21 @@ composition reproduce the same failure mode.
 
 The post-implementation table belongs below this section so before/after
 measurements retain the exact fixture and command.
+
+## After
+
+| Board | Page | p50 | p95 | Payload | `jdText` | Facets |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| shortlist | 1 | 15.2 | 18.5 | 37,326 | 0 | 330 |
+| shortlist | 7 (last) | 7.6 | 9.4 | 25,153 | 0 | 4 |
+| triage | 1 | 46.5 | 52.5 | 14,129 | 0 | 65 |
+| triage | 14 (last) | 28.3 | 30.3 | 4,836 | 0 | 4 |
+| pipeline | 1 | 88.3 | 108.7 | 53,248 | 0 | 444 |
+| pipeline | 40 (last) | 39.6 | 45.5 | 53,086 | 0 | 4 |
+
+Pipeline page 1 is about 13.8 times faster and its payload is 84% smaller.
+Later pages no longer calculate or return facets, so pipeline page 40 is faster
+than page 1 rather than paying a whole-board projection cost. The repeatable
+Windows measurement does not meet the plan's aspirational 50 ms page-1 target;
+profiling attributes most of the remaining page-1 time to exact 12-facet
+aggregation rather than page selection.
