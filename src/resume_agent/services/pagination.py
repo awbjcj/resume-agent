@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
@@ -27,4 +28,24 @@ def paginate(items: list[T], *, page: int = 1, page_size: int = 50) -> Page[T]:
         data=items[start : start + page_size],
         page=page, page_size=page_size,
         total_items=total, total_pages=total_pages,
+    )
+
+
+def page_from_slice(
+    items: Sequence[T],
+    *,
+    total: int,
+    page: int,
+    page_size: int,
+) -> Page[T]:
+    """Build a Page from rows already sliced by the persistence query."""
+    page = max(1, page)
+    page_size = max(1, page_size)
+    total = max(0, total)
+    return Page(
+        data=list(items),
+        page=page,
+        page_size=page_size,
+        total_items=total,
+        total_pages=(total + page_size - 1) // page_size if total else 0,
     )

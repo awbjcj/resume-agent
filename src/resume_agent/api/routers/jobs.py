@@ -123,6 +123,7 @@ def _bulk_filter(body: BulkRequest) -> board.BoardFilter:
         stale_days=body.stale_days,
         stale_min_days=body.stale_min_days,
         sort=body.sort_by,
+        preset=body.preset,
         archived=body.archived,
     )
 

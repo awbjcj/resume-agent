@@ -15,17 +15,3 @@ The Python Pydantic models are the single source of truth. `tests/api/test_opena
 fails if `openapi.json` drifts from the live app — regenerate and commit.
 
 The frontend imports these types directly; no API client is hand-written.
-
-## shortlist_filter.contract.json
-
-The cross-language behavioral contract for shortlist filter-and-rank. Rows use the
-camelCase `ShortlistItem` wire shape; `filterState` uses camelCase `FilterState`
-keys (sets as arrays); `expected` is the ordered `jobId` list after
-`applyFilters -> sortRows`.
-
-Two conformance harnesses assert it:
-- `tests/test_shortlist_filter_contract.py` (Python - `services/shortlist_filtering.py`)
-- `web/src/lib/filters/contract.test.ts` (TypeScript - `lib/filters/*`)
-
-**Rule:** any change to filter, sort, or composite-rank behavior MUST add or update a
-case here. A case that only one runtime needs does not belong in the contract.

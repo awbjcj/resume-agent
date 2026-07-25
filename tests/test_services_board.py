@@ -80,6 +80,7 @@ def test_pipeline_sponsorship_and_type_filters_match_shortlist_facets():
         )
 
     assert [row.company for row in result.page.data] == ["Keep"]
+    assert result.facets is not None
     assert result.facets["sponsorship"] == {"denied": 1, "offered": 1}
     assert result.facets["employmentType"] == {"contract": 1, "full_time": 1}
 
@@ -169,6 +170,7 @@ def test_board_industry_filter_uses_exact_canonical_name():
     ]
     # Leave-one-out: the industry facet ignores its own selection, so the
     # unselected "Autonomous Driving" stays counted and selectable.
+    assert result.facets is not None
     assert result.facets["industry"] == {"Autonomous Driving": 1, "Fintech": 1}
 
 
@@ -200,6 +202,7 @@ def test_facets_are_leave_one_out_so_siblings_stay_selectable():
 
     # Only greenhouse rows are in the page...
     assert {row.source for row in result.page.data} == {"greenhouse"}
+    assert result.facets is not None
     # ...but the source facet still offers lever (its own selection excluded)...
     assert result.facets["source"] == {"greenhouse": 1, "lever": 1}
     # ...while the industry facet reflects the greenhouse-only subset.
@@ -384,6 +387,59 @@ def test_bulk_apply_query_count_is_constant():
         small = _selects(_seed(2))
         large = _selects(_seed(10))
         assert small == large
+
+
+def test_list_board_derives_filter_values_once_per_request():
+    """The page read and the facet counts share one derivation pass.
+
+    Resolving a ``skills`` or ``companySize`` filter means scanning the whole
+    table for the raw values behind the canonical token, so a request that did
+    it separately for the page and for the facets paid twice for one answer.
+    """
+    from sqlalchemy import event
+
+    with _session() as session:
+        _job(
+            session,
+            status=JobStatus.shortlisted.value,
+            company="Acme",
+            criteria_json={
+                "must_have_skills": ["Python"],
+                "company_size": "seed stage",
+            },
+        )
+
+        scans: list[str] = []
+
+        def _tally(conn, cursor, statement, parameters, context, executemany):
+            if "DISTINCT" in statement.upper():
+                scans.append(statement.upper())
+
+        engine = session.get_bind()
+        event.listen(engine, "before_cursor_execute", _tally)
+        try:
+            result = board.list_board(
+                session,
+                "shortlist",
+                board_filter=board.BoardFilter(
+                    skills=("python",),
+                    company_size=("startup",),  # what "seed stage" snaps to
+                ),
+                page=1,
+            )
+        finally:
+            event.remove(engine, "before_cursor_execute", _tally)
+
+    # The JSON path is a bound parameter, so match on the extraction function:
+    # skills fan out over json_each, company_size is a plain json_extract.
+    skill_scans = [s for s in scans if "JSON_EACH" in s]
+    size_scans = [s for s in scans if "JSON_EXTRACT" in s and "JSON_EACH" not in s]
+    # One pass over the three skill keys, one over company_size -- not two of each.
+    assert len(skill_scans) == 3, skill_scans
+    assert len(size_scans) == 1, size_scans
+    # The shared derivation must not change what the request returns.
+    assert [row.company for row in result.page.data] == ["Acme"]
+    assert result.facets is not None
 
 
 def test_stale_days_filter_keeps_only_recently_posted_jobs():

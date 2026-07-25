@@ -26,8 +26,7 @@ def board_filter_query(default_sort: str):
     """The boards' shared filter surface, declared once.
 
     A factory because the wire default for ``sortBy`` is per-board (shortlist
-    ranks by fit, triage by recency, and pipeline by stage) while the parameter
-    set is not.
+    ranks by fit; pipeline and triage by recency) while the parameter set is not.
     """
 
     def dependency(
@@ -50,7 +49,8 @@ def board_filter_query(default_sort: str):
         min_salary: int | None = Query(None, alias="minSalary"),
         stale_days: int | None = Query(None, alias="staleDays"),
         stale_min_days: int | None = Query(None, alias="staleMinDays"),
-        sort: str = Query(default_sort, alias="sortBy"),
+        sort: board.SortKey = Query(default_sort, alias="sortBy"),
+        preset: board.Preset = Query("balanced"),
     ) -> board.BoardFilter:
         return board.BoardFilter(
             q=q,
@@ -73,6 +73,7 @@ def board_filter_query(default_sort: str):
             stale_days=stale_days,
             stale_min_days=stale_min_days,
             sort=sort,
+            preset=preset,
         )
 
     return dependency
@@ -93,7 +94,7 @@ def get_shortlist(
 
 @router.get("/pipeline", response_model=BoardPage[PipelineItem])
 def get_pipeline(
-    board_filter: board.BoardFilter = Depends(board_filter_query("stage")),
+    board_filter: board.BoardFilter = Depends(board_filter_query("recency")),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, alias="pageSize", ge=1, le=200),
     session: Session = Depends(get_session),

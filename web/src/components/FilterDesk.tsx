@@ -37,7 +37,6 @@ const SORTS: [SortKey, string][] = [
   ["recency", "Recency"],
   ["composite", "Composite"],
   ["company", "Company"],
-  ["stage", "Stage"],
 ];
 const PRESETS: [Preset, string][] = [
   ["balanced", "Balanced"],

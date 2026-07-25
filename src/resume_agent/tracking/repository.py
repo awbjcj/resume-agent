@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, TypeVar, cast
@@ -434,31 +434,59 @@ def has_progress(session: Session, job_id: int) -> bool:
     return False
 
 
-def progressed_job_ids(session: Session) -> set[int]:
+def progressed_job_ids(
+    session: Session,
+    job_ids: Collection[int] | None = None,
+) -> set[int]:
     """Job ids owning any child row, resolved in one query per child table.
 
     Mirrors has_progress()'s child-existence check, but batched so a whole-table
     prune scan costs three queries instead of ~4 per job (an N+1 over every job).
     """
+    if job_ids is not None and not job_ids:
+        return set()
     progressed: set[int] = set()
     for model in (Application, ResumeVersion, CoverLetter):
-        progressed.update(session.exec(select(cast(Any, model.job_id))).all())
+        job_id = cast(Any, model.job_id)
+        statement = select(job_id)
+        if job_ids is not None:
+            statement = statement.where(job_id.in_(job_ids))
+        progressed.update(session.exec(statement).all())
     return progressed
 
 
-def versions_by_job(session: Session) -> dict[int, list[ResumeVersion]]:
+def versions_by_job(
+    session: Session,
+    job_ids: Collection[int] | None = None,
+) -> dict[int, list[ResumeVersion]]:
     """Every resume version grouped by job_id — one query for whole-board reads."""
+    if job_ids is not None and not job_ids:
+        return {}
+    job_id = cast(Any, ResumeVersion.job_id)
+    statement = select(ResumeVersion)
+    if job_ids is not None:
+        statement = statement.where(job_id.in_(job_ids))
     grouped: dict[int, list[ResumeVersion]] = {}
-    for version in session.exec(select(ResumeVersion)).all():
+    for version in session.exec(statement).all():
         grouped.setdefault(version.job_id, []).append(version)
     return grouped
 
 
-def applications_by_job(session: Session) -> dict[int, Application]:
+def applications_by_job(
+    session: Session,
+    job_ids: Collection[int] | None = None,
+) -> dict[int, Application]:
     """Lowest-id application per job — the batched mirror of application_for_job()."""
+    if job_ids is not None and not job_ids:
+        return {}
     id_col = cast(Any, Application.id)
+    job_id = cast(Any, Application.job_id)
+    statement = select(Application)
+    if job_ids is not None:
+        statement = statement.where(job_id.in_(job_ids))
+    statement = statement.order_by(id_col)
     grouped: dict[int, Application] = {}
-    for application in session.exec(select(Application).order_by(id_col)).all():
+    for application in session.exec(statement).all():
         grouped.setdefault(application.job_id, application)
     return grouped
 
@@ -470,18 +498,29 @@ def job_has_progress(job: Job, progressed: set[int]) -> bool:
 
 def _prune_rows(session: Session) -> list[PruneRow]:
     progressed = progressed_job_ids(session)
+    columns = [
+        cast(Any, Job.id),
+        cast(Any, Job.status),
+        cast(Any, Job.fit_score),
+        cast(Any, Job.posted_at),
+        cast(Any, Job.created_at),
+        cast(Any, Job.archived_at),
+    ]
+    statement = select(*columns)
     return [
         PruneRow(
-            job_id=job.id,
-            status=job.status,
-            fit_score=job.fit_score,
-            posted_at=job.posted_at,
-            created_at=job.created_at,
-            archived_at=job.archived_at,
-            has_progress=job.status in _PROGRESS_STATUSES or job.id in progressed,
+            job_id=job_id,
+            status=status,
+            fit_score=fit_score,
+            posted_at=posted_at,
+            created_at=created_at,
+            archived_at=archived_at,
+            has_progress=status in _PROGRESS_STATUSES or job_id in progressed,
         )
-        for job in session.exec(select(Job)).all()
-        if job.id is not None
+        for job_id, status, fit_score, posted_at, created_at, archived_at in session.exec(
+            statement
+        ).all()
+        if job_id is not None
     ]
 
 

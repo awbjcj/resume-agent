@@ -2493,7 +2493,7 @@ export interface components {
                 [key: string]: {
                     [key: string]: number;
                 };
-            };
+            } | null;
             pagination: components["schemas"]["Pagination"];
             /** Total */
             total: number;
@@ -2507,7 +2507,7 @@ export interface components {
                 [key: string]: {
                     [key: string]: number;
                 };
-            };
+            } | null;
             pagination: components["schemas"]["Pagination"];
             /** Total */
             total: number;
@@ -2521,7 +2521,7 @@ export interface components {
                 [key: string]: {
                     [key: string]: number;
                 };
-            };
+            } | null;
             pagination: components["schemas"]["Pagination"];
             /** Total */
             total: number;
@@ -2630,8 +2630,9 @@ export interface components {
             /**
              * Preset
              * @default balanced
+             * @enum {string}
              */
-            preset: string;
+            preset: "balanced" | "pay_first" | "freshest";
             /** Q */
             q?: string | null;
             /** Region */
@@ -2652,8 +2653,9 @@ export interface components {
             /**
              * Sortby
              * @default fit
+             * @enum {string}
              */
-            sortBy: string;
+            sortBy: "fit" | "salary" | "recency" | "composite" | "company" | "stage";
             /** Source */
             source?: string[];
             /** Sponsorship */
@@ -3773,8 +3775,8 @@ export interface components {
             hasProgress: boolean;
             /** Industry */
             industry?: string | null;
-            /** Jdtext */
-            jdText: string;
+            /** Jdpreview */
+            jdPreview: string;
             /** Jobid */
             jobId: number;
             /** Location */
@@ -7775,7 +7777,8 @@ export interface operations {
                 minSalary?: number | null;
                 staleDays?: number | null;
                 staleMinDays?: number | null;
-                sortBy?: string;
+                sortBy?: "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+                preset?: "balanced" | "pay_first" | "freshest";
             };
             header?: {
                 authorization?: string | null;
@@ -9536,7 +9539,8 @@ export interface operations {
                 minSalary?: number | null;
                 staleDays?: number | null;
                 staleMinDays?: number | null;
-                sortBy?: string;
+                sortBy?: "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+                preset?: "balanced" | "pay_first" | "freshest";
             };
             header?: {
                 authorization?: string | null;
@@ -10245,7 +10249,8 @@ export interface operations {
                 minSalary?: number | null;
                 staleDays?: number | null;
                 staleMinDays?: number | null;
-                sortBy?: string;
+                sortBy?: "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+                preset?: "balanced" | "pay_first" | "freshest";
             };
             header?: {
                 authorization?: string | null;

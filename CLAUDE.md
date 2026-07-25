@@ -65,10 +65,11 @@ logic lives in routers. Start it with `resume-agent serve`; `create_app(...)` in
 - **In-memory sqlite tests** need a shared connection: `make_engine` gives
   `sqlite://` a `StaticPool` + `check_same_thread=False` so the request threadpool
   sees the schema the lifespan thread created.
-- **Board filters are declared once.** `board_filter_query(default_sort)` in
-  `api/routers/boards.py` owns the shared query surface for
-  shortlist/pipeline/triage; a new board filter is added in exactly one place.
-  Triage's extra `archived` flag stays endpoint-local via `dataclasses.replace`.
+- **Board filters are declared once.** `tracking/board_query.py` owns the shared
+  shortlist/pipeline/triage selection, sorting, paging, and facet expressions;
+  `board_filter_query(default_sort)` only maps the shared HTTP query surface
+  into that contract. Triage's extra `archived` flag stays endpoint-local via
+  `dataclasses.replace`.
 
 ---
 
@@ -274,6 +275,15 @@ re-raised, so a persistently-throttled board still surfaces as a per-URL failure
 
 ## Known design notes
 
+- **Boards page in SQL.** `tracking.board_query` selects only the returned page,
+  and row projection happens afterward. `PipelineItem` ships a bounded
+  `jdPreview`; the full `jd_text` is available only from `JobDetail`. Two costs
+  the page read must not re-incur: `jd_text` stays `defer()`-ed on shortlist and
+  triage (only `PipelineRow` reads it — pinned by
+  `test_shortlist_and_triage_rows_never_touch_jd_text`), and the `companySize`/
+  `skills` token-to-raw-value scans are derived once per request via
+  `derive_filter_values` and passed to both `board_page` and
+  `board_facet_counts`.
 - **Profile coaching is turn-per-run and evidence-locked.** Durable sessions follow
   ADR 0006, while the ADR 0005 amendment requires every draft note to retain
   verbatim quotes from the current user turn. The former batch interview API,

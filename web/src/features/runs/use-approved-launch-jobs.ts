@@ -17,7 +17,7 @@ export function useApprovedLaunchJobs(enabled: boolean) {
           params: {
             query: {
               status: "approved",
-              sortBy: "stage",
+              sortBy: "recency",
               page,
               pageSize: 200,
             },

@@ -92,3 +92,25 @@ def test_bulk_delete_query_dry_run_uses_board_filter():
         )
     assert resp.status_code == 200
     assert resp.json() == {"affected": 1, "skipped": 0, "reasons": {}}
+
+
+def test_bulk_query_rejects_unknown_sort_and_preset_values():
+    client = _client()
+    with client:
+        base = {
+            "board": "pipeline",
+            "action": "archive",
+            "scope": "query",
+            "dryRun": True,
+        }
+        bad_sort = client.post(
+            "/api/jobs/bulk",
+            json={**base, "sortBy": "not-a-sort"},
+        )
+        bad_preset = client.post(
+            "/api/jobs/bulk",
+            json={**base, "preset": "not-a-preset"},
+        )
+
+    assert bad_sort.status_code == 422
+    assert bad_preset.status_code == 422

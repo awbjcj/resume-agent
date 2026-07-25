@@ -3,7 +3,7 @@ import type { components } from "@/lib/api/schema";
 export type ShortlistItem = components["schemas"]["ShortlistItem"];
 export type SkillTag = components["schemas"]["SkillTagOut"];
 
-export type SortKey = "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+export type SortKey = "fit" | "salary" | "recency" | "composite" | "company";
 export type Preset = "balanced" | "pay_first" | "freshest";
 
 export interface FilterState {

@@ -21,7 +21,7 @@ def to_page(service_page: ServicePage, item_model) -> Page:
 def to_board_page(
     service_page: ServicePage,
     item_model,
-    facets: dict[str, dict[str, int]],
+    facets: dict[str, dict[str, int]] | None,
 ) -> BoardPage:
     return BoardPage(
         data=[item_model.model_validate(row) for row in service_page.data],

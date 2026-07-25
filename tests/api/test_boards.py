@@ -108,7 +108,7 @@ def test_pipeline_response_cleans_legacy_jd_tokens():
             session.commit()
         body = client.get("/api/pipeline?status=approved").json()
 
-    assert body["data"][0]["jdText"] == "Google Google San Francisco, CA Remote eligible Mid"
+    assert body["data"][0]["jdPreview"] == "Google Google San Francisco, CA Remote eligible Mid"
 
 
 def test_triage_archived_query():

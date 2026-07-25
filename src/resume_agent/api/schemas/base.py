@@ -36,5 +36,5 @@ class Page(CamelModel, Generic[T]):
 
 
 class BoardPage(Page[T], Generic[T]):
-    facets: dict[str, dict[str, int]]
+    facets: dict[str, dict[str, int]] | None
     total: int
