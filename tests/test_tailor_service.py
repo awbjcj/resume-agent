@@ -282,3 +282,68 @@ def test_tailor_jobs_rejects_unpersisted_job_before_llm_work():
                 reviewer_agents={"fact-check": _NoCall()},
                 reviser_agent=_NoCall(),
             )
+
+
+def test_retailoring_a_rendered_job_keeps_it_rendered():
+    config = ReviewConfig(
+        max_rounds=1,
+        score_threshold=50,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+    with _session() as s:
+        job = save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="jd",
+                status=JobStatus.rendered.value,
+                criteria_json=JobCriteria().model_dump(mode="json"),
+            ),
+        )
+        tailor_job(
+            s,
+            job,
+            ProfileFacts(contact=Contact(name="Ada")),
+            config,  # type: ignore[call-arg]
+            tailor_agent=_ContentAgent(),
+            reviewer_agents={"fact-check": _FactCheck()},
+            reviser_agent=_ContentAgent(),
+        )
+
+        assert job.status == JobStatus.rendered.value
+
+
+def test_retailoring_appends_a_new_attempt_and_keeps_old_versions():
+    config = ReviewConfig(
+        max_rounds=1,
+        score_threshold=50,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+    facts = ProfileFacts(contact=Contact(name="Ada"))
+    with _session() as s:
+        job = save_job(
+            s,
+            Job(
+                source="manual",
+                jd_text="jd",
+                status=JobStatus.approved.value,
+                criteria_json=JobCriteria().model_dump(mode="json"),
+            ),
+        )
+        first = tailor_job(
+            s, job, facts, config,  # type: ignore[call-arg]
+            tailor_agent=_ContentAgent(),
+            reviewer_agents={"fact-check": _FactCheck()},
+            reviser_agent=_ContentAgent(),
+        )
+        second = tailor_job(
+            s, job, facts, config,  # type: ignore[call-arg]
+            tailor_agent=_ContentAgent(),
+            reviewer_agents={"fact-check": _FactCheck()},
+            reviser_agent=_ContentAgent(),
+        )
+
+        assert first[0].attempt == 1
+        assert second[0].attempt == 2
+        stored = resume_versions_for_job(s, _require_id(job.id))
+        assert len(stored) == 2  # nothing was replaced

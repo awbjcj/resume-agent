@@ -17,35 +17,57 @@ from resume_agent.profile.matrix import (
 from resume_agent.progress import ProgressReporter
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.workflow import TailorRound, arun_tailor_review
-from resume_agent.tracking.repository import save_job, save_resume_version
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.tracking.repository import (
+    resume_versions_for_job,
+    save_job,
+    save_resume_version,
+)
+from resume_agent.tracking.stages import advance
+from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 
 logger = logging.getLogger(__name__)
 
 
+def _next_attempt(session: Session, job_id: int) -> int:
+    existing = resume_versions_for_job(session, job_id)
+    return max((version.attempt for version in existing), default=0) + 1
+
+
 def _persist_rounds(
-    session: Session, job: Job, rounds: list[TailorRound]
+    session: Session,
+    job: Job,
+    rounds: list[TailorRound],
+    *,
+    model: str | None = None,
 ) -> list[ResumeVersion]:
-    """Persist each review round as a ResumeVersion and mark the job tailored."""
+    """Persist each review round as a ResumeVersion and mark the job tailored.
+
+    Status moves forward only: re-tailoring a rendered job leaves it rendered.
+    Versions are appended under a fresh attempt number; nothing is replaced.
+    """
     if job.id is None:
         raise ValueError("Cannot tailor a job that has not been persisted")
+    attempt = _next_attempt(session, job.id)
     versions: list[ResumeVersion] = []
     for r in rounds:
         version = ResumeVersion(
             job_id=job.id,
             round=r.round_num,
+            attempt=attempt,
+            tailor_model=model,
             content_json=r.content.model_dump(mode="json"),
             review_score=r.verdict.aggregate_score,
             fact_check_passed=r.verdict.gate_passed,
             critique_json=[c.model_dump(mode="json") for c in r.verdict.critiques],
         )
         versions.append(save_resume_version(session, version))
-    job.status = JobStatus.tailored.value
+    advance(job, JobStatus.tailored.value, never_regress=True)
     save_job(session, job)
     logger.info(
-        "tailor job=%s rounds=%s total_llm_seconds=%.1f stages=%s",
+        "tailor job=%s attempt=%s rounds=%s total_llm_seconds=%.1f stages=%s",
         job.id,
+        attempt,
         len(rounds),
         sum(sum(round_.stage_seconds.values()) for round_ in rounds),
         [round_.stage_seconds for round_ in rounds],
