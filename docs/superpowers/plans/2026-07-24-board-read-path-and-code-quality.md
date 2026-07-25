@@ -152,11 +152,13 @@ requests ≈ **17 MB transferred and ≈ 12 s of server CPU**.
    the database, snaps those values in Python, then uses the matching raw set in
    SQL. It must not try to enumerate all theoretically possible raw strings.
 6. **Leave-one-out faceting is a deliberate feature**, not an accident — choosing one value must not zero out its siblings (commit `b0a1c965`). `GROUP BY` preserves this naturally: build the facet's count query with every filter _except_ its own. Do not regress it; `tests/api/test_board_facets.py` guards it.
-7. **The `q` filter searches `jd_text`** (`_row_text` includes it). Moving `q`
-   to SQL must preserve literal substring semantics: escape SQL wildcard
-   characters (`%` and `_`) rather than interpreting user input as a pattern.
-   SQLite `LIKE` is case-insensitive for ASCII by default; Task 5 pins ASCII
-   case-folding and wildcard literals with tests.
+7. **The `q` filter searches the fields present on each current row DTO.**
+   Pipeline rows include `status` and `jd_text`; triage rows include `status`
+   but not `jd_text`; shortlist rows include neither. Moving `q` to SQL must
+   preserve that board-specific surface and literal substring semantics:
+   escape SQL wildcard characters (`%` and `_`) rather than interpreting user
+   input as a pattern. SQLite `LIKE` is case-insensitive for ASCII by default;
+   Task 5 pins ASCII case-folding and wildcard literals with tests.
 8. **Row DTOs are the API projection surface.** `ShortlistItem.model_validate(row)` whitelists fields off the richer DTO. Column projections must therefore keep every attribute the schema names, or validation fails at runtime rather than at type-check time.
 
 ---
@@ -402,6 +404,8 @@ each facet alone; two facets combined; `q`; `min_fit`/`max_fit`; `min_salary`;
 `stale_days`; `stale_min_days`; each `sort` value; `composite` × each preset.
 Include literal `%` and `_` search terms, missing values, compound/aliased
 skills, snapped free-text company sizes, and ties spanning a page boundary.
+Pin the board-specific search surface: only pipeline searches `jd_text`;
+shortlist does not search `status`; triage searches `status` but not `jd_text`.
 
 This table **is** the safety net for the whole phase. Write it before any
 builder code, and keep the old Python path importable until Task 6 deletes it,
