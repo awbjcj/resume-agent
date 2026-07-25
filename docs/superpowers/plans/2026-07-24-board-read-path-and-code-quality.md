@@ -183,7 +183,11 @@ contains total / `jdText` / facet byte counts.
 
 - [ ] **Step 2: Seed realistic pipeline rows**
 
-The current `seed()` writes `status="shortlisted" if i % 2 == 0 else "raw"` — no row ever lands in a pipeline status, so `--board pipeline` would measure an empty table. Widen it to cycle `("shortlisted", "raw", "approved", "tailored", "rendered", "rejected")` and grow `jd_text` to ~5.6 KB to match the measured production average.
+The current `seed()` writes only `shortlisted` / `raw`. The pipeline board reads
+all active statuses, so those rows are visible, but the seed does not exercise
+real pipeline status diversity or legacy stage ordering. Widen it to cycle
+`("shortlisted", "raw", "approved", "tailored", "rendered", "rejected")` and
+grow `jd_text` to ~5.6 KB to match the measured production average.
 Use the real JSON keys: `salary_range.minimum` / `maximum`,
 `must_have_skills`, `nice_to_have_skills`, `tech_stack`, and the ordinary
 facet keys. The existing benchmark's `salary_range.min` / `max` and
