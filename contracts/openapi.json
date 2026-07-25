@@ -4028,8 +4028,8 @@
             ],
             "title": "Industry"
           },
-          "jdText": {
-            "title": "Jdtext",
+          "jdPreview": {
+            "title": "Jdpreview",
             "type": "string"
           },
           "jobId": {
@@ -4240,7 +4240,7 @@
           "location",
           "status",
           "fitScore",
-          "jdText",
+          "jdPreview",
           "critiqueJson",
           "pdfPath",
           "applicationStatus",

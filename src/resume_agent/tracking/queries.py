@@ -118,7 +118,7 @@ class PipelineRow:
     location: str | None
     status: str
     fit_score: int | None
-    jd_text: str
+    jd_preview: str
     critique_json: list[dict] | None
     pdf_path: str | None
     application_status: str | None
@@ -338,7 +338,7 @@ def project_pipeline_jobs(
                 location=job.location,
                 status=job.status,
                 fit_score=job.fit_score,
-                jd_text=clean_job_description_text(job.jd_text),
+                jd_preview=clean_job_description_text(job.jd_text)[:400],
                 # None means "never tailored" (no version); [] means a version
                 # exists but reviewers raised nothing. The board reads them apart.
                 critique_json=(version.critique_json or []) if version else None,

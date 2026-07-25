@@ -3773,8 +3773,8 @@ export interface components {
             hasProgress: boolean;
             /** Industry */
             industry?: string | null;
-            /** Jdtext */
-            jdText: string;
+            /** Jdpreview */
+            jdPreview: string;
             /** Jobid */
             jobId: number;
             /** Location */

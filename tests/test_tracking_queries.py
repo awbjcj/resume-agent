@@ -178,7 +178,7 @@ def test_pipeline_rows_include_pdf_and_application_status():
         row = rows[0]
         assert row.status == JobStatus.rendered.value
         assert row.pdf_path == "output/acme.pdf"
-        assert row.jd_text == "a"
+        assert row.jd_preview == "a"
         assert row.critique_json == [{"reviewer": "fact-check", "passed": True}]
         assert row.application_status == ApplicationStatus.submitted.value
         assert row.fit_score == 90
@@ -308,11 +308,11 @@ def test_pipeline_rows_clean_legacy_source_chrome_tokens():
 
         row = pipeline_rows(s)[0]
 
-        assert "\\_corporate" not in row.jd_text
-        assert "\\_place" not in row.jd_text
-        assert "\\_laptop" not in row.jd_text
-        assert "\\*\\*" not in row.jd_text
-        assert row.jd_text == "Google Google San Francisco, CA Remote eligible Mid"
+        assert "\\_corporate" not in row.jd_preview
+        assert "\\_place" not in row.jd_preview
+        assert "\\_laptop" not in row.jd_preview
+        assert "\\*\\*" not in row.jd_preview
+        assert row.jd_preview == "Google Google San Francisco, CA Remote eligible Mid"
 
 
 def test_pipeline_rows_distinguish_no_version_from_empty_critiques():

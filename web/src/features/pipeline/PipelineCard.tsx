@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
-import { cleanJobDescriptionText } from "@/lib/format/prettify";
 import type { PipelineItem } from "./use-pipeline";
 
 export function PipelineCard({
@@ -51,7 +50,7 @@ export function PipelineCard({
           </div>
         </div>
         <p className="mt-4 line-clamp-3 break-words whitespace-pre-line text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
-          {cleanJobDescriptionText(row.jdText)}
+          {row.jdPreview}
         </p>
       </button>
       </div>

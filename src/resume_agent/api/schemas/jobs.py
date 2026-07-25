@@ -47,7 +47,7 @@ class PipelineItem(CamelModel):
     location: str | None
     status: str
     fit_score: int | None
-    jd_text: str
+    jd_preview: str
     critique_json: list[dict] | None
     pdf_path: str | None
     application_status: str | None
