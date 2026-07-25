@@ -81,6 +81,35 @@ def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
     }
 
 
+def test_discover_jobs_with_empty_job_ids_scopes_to_nothing_not_everything(
+    monkeypatch, tmp_path
+):
+    """An explicit empty set means 'no jobs' -- refresh_jobs relies on this when
+    a pull finds zero new/changed raw jobs. Falling back to the unscoped
+    default here would silently re-run the funnel over the whole backlog."""
+    seen = {}
+
+    def fake_discover(session, config, facts, extract, fit, relevance, **kwargs):
+        seen["scope"] = kwargs["scope"]
+        return {}
+
+    monkeypatch.setattr(discovery, "discover", fake_discover)
+    monkeypatch.setattr(discovery, "load_search_config", lambda p: object())
+    monkeypatch.setattr(discovery, "load_facts", lambda p: object())
+    monkeypatch.setattr(
+        discovery,
+        "build_discovery_bundle",
+        lambda: DiscoveryBundle(
+            extract=None, fit=None, relevance=None,
+            canonicalizer=None, industry_classifier=None,
+        ),
+    )
+    with _session() as session:
+        discovery.discover_jobs(session, job_ids=set())
+
+    assert seen["scope"].job_ids == frozenset()
+
+
 def test_add_job_from_url_extracts_and_overrides(monkeypatch):
     monkeypatch.setattr(discovery, "build_url_extract_agent", lambda: object())
     monkeypatch.setattr(

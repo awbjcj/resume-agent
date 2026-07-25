@@ -198,7 +198,7 @@ def discover_jobs(
         canonicalizer=bundle.canonicalizer,
         industry_classifier=bundle.industry_classifier,
         reporter=reporter,
-        scope=StageScope(job_ids=frozenset(job_ids)) if job_ids else StageScope(),
+        scope=StageScope(job_ids=frozenset(job_ids)) if job_ids is not None else StageScope(),
         matrix=matrix,
         cluster_map=cluster_map,
     )
