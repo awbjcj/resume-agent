@@ -63,7 +63,7 @@ SelectionScope = Literal["ids", "query"]
 @dataclass(frozen=True)
 class BoardListResult:
     page: Page
-    facets: Facets
+    facets: Facets | None
 
 
 @dataclass(frozen=True)
@@ -107,11 +107,15 @@ def list_board(
             page=page,
             page_size=page_size,
         ),
-        facets=board_query.board_facet_counts(
-            session,
-            board,
-            f,
-            now=query_time,
+        facets=(
+            board_query.board_facet_counts(
+                session,
+                board,
+                f,
+                now=query_time,
+            )
+            if page == 1
+            else None
         ),
     )
 

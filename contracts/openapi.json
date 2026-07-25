@@ -620,14 +620,21 @@
             "type": "array"
           },
           "facets": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "type": "integer"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
               },
-              "type": "object"
-            },
-            "title": "Facets",
-            "type": "object"
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facets"
           },
           "pagination": {
             "$ref": "#/components/schemas/Pagination"
@@ -656,14 +663,21 @@
             "type": "array"
           },
           "facets": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "type": "integer"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
               },
-              "type": "object"
-            },
-            "title": "Facets",
-            "type": "object"
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facets"
           },
           "pagination": {
             "$ref": "#/components/schemas/Pagination"
@@ -692,14 +706,21 @@
             "type": "array"
           },
           "facets": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "type": "integer"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
               },
-              "type": "object"
-            },
-            "title": "Facets",
-            "type": "object"
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facets"
           },
           "pagination": {
             "$ref": "#/components/schemas/Pagination"

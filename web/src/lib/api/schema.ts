@@ -2493,7 +2493,7 @@ export interface components {
                 [key: string]: {
                     [key: string]: number;
                 };
-            };
+            } | null;
             pagination: components["schemas"]["Pagination"];
             /** Total */
             total: number;
@@ -2507,7 +2507,7 @@ export interface components {
                 [key: string]: {
                     [key: string]: number;
                 };
-            };
+            } | null;
             pagination: components["schemas"]["Pagination"];
             /** Total */
             total: number;
@@ -2521,7 +2521,7 @@ export interface components {
                 [key: string]: {
                     [key: string]: number;
                 };
-            };
+            } | null;
             pagination: components["schemas"]["Pagination"];
             /** Total */
             total: number;
