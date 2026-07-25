@@ -68,7 +68,7 @@ def build_fit_agent(model_id: str | None = None) -> Runner:
             description="Score evidence-based candidate fit and parse the job location.",
             instructions=with_guidance("fit-score", _INSTRUCTIONS),
             output_schema=FitScore,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, FitScore),
             **retry_kwargs(),
         )
     )

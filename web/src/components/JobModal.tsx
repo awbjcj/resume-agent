@@ -6,6 +6,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmailDraftDialog } from "@/features/job/EmailDraftDialog";
+import { RedoDialog } from "@/features/runs/RedoDialog";
+import { useRedoRun } from "@/features/runs/use-redo-run";
 import type { CoverLetterItem } from "@/features/job/CoverLetterRow";
 import { StatusBadge } from "./StatusBadge";
 import { FitDial } from "./FitDial";
@@ -59,6 +61,8 @@ export function JobModal({
   const closedLoopJob = job as (NonNullable<typeof job> & ClosedLoopJob) | undefined;
   const coverLetters = closedLoopJob?.coverLetters ?? [];
   const [emailDraftOpen, setEmailDraftOpen] = useState(false);
+  const [redoOpen, setRedoOpen] = useState(false);
+  const redoRun = useRedoRun();
   const navEnabled = Boolean(onPrev || onNext);
 
   // Arrow keys step through the list, but never while the user is typing in a
@@ -145,6 +149,14 @@ export function JobModal({
                   <span>{locationLabel(job) ?? "location n/a"}</span>
                   <StatusBadge status={job.status} />
                   <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full bg-background/60 backdrop-blur-sm"
+                      onClick={() => setRedoOpen(true)}
+                    >
+                      Redo…
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -301,6 +313,13 @@ export function JobModal({
       jobId={jobId}
       open={emailDraftOpen}
       onOpenChange={setEmailDraftOpen}
+    />
+    <RedoDialog
+      open={redoOpen}
+      jobIds={[jobId]}
+      initialStages={["tailor"]}
+      onOpenChange={setRedoOpen}
+      onLaunch={(jobIds, stages, deep) => redoRun.redo(jobIds, stages, deep)}
     />
     </>
   );

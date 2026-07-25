@@ -1694,6 +1694,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Redo */
+        post: operations["launch_redo_api_redo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/refresh": {
         parameters: {
             query?: never;
@@ -3111,6 +3128,7 @@ export interface components {
             firstSeenAt: string;
             /** Id */
             id: number;
+            jobDetails?: components["schemas"]["JobFailureDetails"] | null;
             /** Kind */
             kind: string;
             /**
@@ -3137,6 +3155,7 @@ export interface components {
         };
         /** ErrorRecordsOut */
         ErrorRecordsOut: {
+            pagination?: components["schemas"]["Pagination"] | null;
             /** Records */
             records?: components["schemas"]["ErrorRecordOut"][];
         };
@@ -3486,6 +3505,38 @@ export interface components {
             title: string | null;
             /** Url */
             url: string | null;
+        };
+        /**
+         * JobFailureDetails
+         * @description The formatted diagnostic for one job's stage failure.
+         *
+         *     Typed rather than a free-form map: an exposed dict's keys become a de facto
+         *     contract with nothing holding them stable, and a schema flows into the
+         *     generated TS client so the web side needs no hand-written shape.
+         */
+        JobFailureDetails: {
+            /** Company */
+            company?: string | null;
+            /** Errortype */
+            errorType: string;
+            /** Jobid */
+            jobId: number;
+            /** Message */
+            message: string;
+            /** Model */
+            model?: string | null;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "pull" | "extract" | "tailor" | "render";
+            /** Title */
+            title?: string | null;
+            /**
+             * Tracebacktail
+             * @default
+             */
+            tracebackTail: string;
         };
         /** JobLiteOut */
         JobLiteOut: {
@@ -3985,6 +4036,24 @@ export interface components {
              * @default
              */
             suggestedAnswer: string;
+        };
+        /**
+         * RedoParams
+         * @description Which jobs to redo and which stages to run.
+         *
+         *     Validated here and nowhere deeper: redo_jobs trusts its inputs. Deduping
+         *     stages matters because ["tailor", "tailor"] would otherwise bill twice.
+         */
+        RedoParams: {
+            /**
+             * Deep
+             * @default false
+             */
+            deep: boolean;
+            /** Jobids */
+            jobIds: number[];
+            /** Stages */
+            stages: ("pull" | "extract" | "tailor" | "render")[];
         };
         /** RefreshParams */
         RefreshParams: {
@@ -6601,6 +6670,8 @@ export interface operations {
         parameters: {
             query?: {
                 status?: "open" | "dismissed" | "resolved";
+                page?: number;
+                pageSize?: number;
             };
             header?: {
                 authorization?: string | null;
@@ -8887,6 +8958,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PullParams"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_redo_api_redo_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedoParams"];
             };
         };
         responses: {

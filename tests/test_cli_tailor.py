@@ -1,9 +1,11 @@
+from typing import cast
+
 from typer.testing import CliRunner
 
 from resume_agent import cli
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.tracking.repository import get_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 
 runner = CliRunner()
 
@@ -48,7 +50,15 @@ def test_tailor_processes_a_job(tmp_path, monkeypatch):
         fact_check_passed = True
 
     def fake_tailor(session, *, job_ids=None, approved=False, review_path=None, facts_path=None, reporter=None):
-        return {jid: [_Version()] for jid in (job_ids or [])}
+        from resume_agent.tailor.service import TailorOutcome
+
+        return TailorOutcome(
+            versions=cast(
+                dict[int, list[ResumeVersion]],
+                {jid: [_Version()] for jid in (job_ids or [])},
+            ),
+            failures={},
+        )
 
     monkeypatch.setattr(cli, "tailor", fake_tailor)
 

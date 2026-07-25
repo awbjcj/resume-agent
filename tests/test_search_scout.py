@@ -36,7 +36,9 @@ def test_builders_wire_models_and_schema(monkeypatch):
         lambda model_id, **_kwargs: (model_id, ["tool"]),
     )
     monkeypatch.setattr(search_scout, "build_model", lambda model_id: model_id)
-    monkeypatch.setattr(search_scout, "use_json_mode_for", lambda model: True)
+    monkeypatch.setattr(
+        search_scout, "use_json_mode_for", lambda model, schema=None: True
+    )
 
     assert search_scout.build_search_scout_research_agent() is not None
     assert captured["model"] == "anthropic:mid"

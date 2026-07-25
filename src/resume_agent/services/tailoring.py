@@ -15,11 +15,12 @@ from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.agents import TailorBundle, build_tailor_bundle  # noqa: F401  (TailorBundle re-exported for callers/tests)
+from resume_agent.tailor.agents import model_for_tier
 from resume_agent.tailor.review_config import load_review_config
-from resume_agent.tailor.service import tailor_jobs
+from resume_agent.tailor.service import TailorOutcome, tailor_jobs
 from resume_agent.tailor.style_guide import load_style_guide
 from resume_agent.tracking.repository import get_job, jobs_by_status
-from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+from resume_agent.tracking.tables import Job, JobStatus
 from resume_agent.taxonomy.clusters import load_cluster_map
 from resume_agent.tenancy.limits import enforce_active_budget
 from resume_agent.tenancy.paths import (
@@ -50,10 +51,10 @@ def tailor(
     facts_path: str = DEFAULT_FACTS,
     reporter: ProgressReporter | None = None,
     fail_on_partial: bool = False,
-) -> dict[int, list[ResumeVersion]]:
+) -> TailorOutcome:
     targets = resolve_targets(session, job_ids=job_ids, approved=approved)
     if not targets:
-        return {}
+        return TailorOutcome()
     config = load_review_config(review_path)
     enforce_active_budget()
     facts = load_facts(facts_path)
@@ -68,7 +69,10 @@ def tailor(
     )
     style_guide = load_style_guide(config.style_guide_path)
     bundle = build_tailor_bundle(config, style_guide=style_guide)
-    results = tailor_jobs(
+    # Mirrors build_tailor_bundle's own tier lookup, so `model` records the
+    # model that actually ran.
+    model = model_for_tier(getattr(config, "tailor_tier", "premium"))
+    outcome = tailor_jobs(
         session,
         targets,
         facts,
@@ -80,13 +84,14 @@ def tailor(
         match_plan_agent=bundle.match_plan,
         skill_matrix=skill_matrix,
         cluster_map=cluster_map,
+        model=model,
     )
-    for job_id in results:
+    for job_id in outcome.versions:
         export_job_artifacts(session, job_id)
-    if fail_on_partial and len(results) != len(targets):
-        failed_ids = [str(job.id) for job in targets if job.id not in results]
+    if fail_on_partial and outcome.failures and not outcome.versions:
+        job_id, failure = next(iter(outcome.failures.items()))
         raise RuntimeError(
-            f"Tailoring failed for {len(failed_ids)} of {len(targets)} jobs "
-            f"(job IDs: {', '.join(failed_ids)})"
+            f"Tailoring failed for all {len(outcome.failures)} job(s). "
+            f"First cause (job {job_id}): {failure.error_type}: {failure.message}"
         )
-    return results
+    return outcome

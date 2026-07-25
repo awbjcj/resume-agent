@@ -163,3 +163,23 @@ def ensure_application_cover_letter_id_column(engine: Engine) -> None:
     if "cover_letter_id" not in cols:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE applications ADD COLUMN cover_letter_id INTEGER"))
+
+
+def ensure_resume_version_attempt_columns(engine: Engine) -> None:
+    """Idempotently add ``resume_versions.attempt``/``tailor_model``.
+
+    Existing rows predate the attempt concept but are, by definition, a job's
+    first tailoring; backfilling to 1 (not the column default of 0) keeps
+    _next_attempt()'s "max + 1" logic from colliding with them on redo.
+    """
+    cols = _table_columns(engine, "resume_versions")
+    if not cols:
+        return
+    with engine.begin() as conn:
+        if "attempt" not in cols:
+            conn.execute(
+                text("ALTER TABLE resume_versions ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0")
+            )
+            conn.execute(text("UPDATE resume_versions SET attempt = 1 WHERE attempt = 0"))
+        if "tailor_model" not in cols:
+            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN tailor_model VARCHAR"))

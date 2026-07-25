@@ -3,12 +3,13 @@ from typing import Any
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from resume_agent.discovery.ingest import add_job
+from resume_agent.discovery.fit import FitLocation, FitScore
 from resume_agent.discovery.industry import (
     IndustryCandidate,
     IndustryClassification,
     IndustryGroup,
 )
+from resume_agent.discovery.ingest import add_job
 from resume_agent.discovery.pipeline import (
     discover,
     reprocess,
@@ -24,15 +25,14 @@ from resume_agent.models.job import (
 )
 from resume_agent.models.profile import Contact, ProfileFacts
 from resume_agent.profile.matrix import MatrixRow, SkillMatrix
-from resume_agent.discovery.fit import FitLocation, FitScore
-from resume_agent.tracking.repository import jobs_by_status, save_job
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.industries import (
     IndustryTaxonomy,
     load_industry_taxonomy,
     save_industry_taxonomy,
 )
-from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.tracking.repository import jobs_by_status, save_job
+from resume_agent.tracking.tables import Job, JobStatus
 
 
 def _session() -> Session:
@@ -743,17 +743,20 @@ def test_run_extract_skips_failed_job_and_persists_the_rest():
             s,
             Job(source="x", jd_text="good role", title="A", status=JobStatus.raw.value),
         )
-        save_job(
+        bad = save_job(
             s,
             Job(source="x", jd_text="boom role", title="B", status=JobStatus.raw.value),
         )
 
-        run_extract(s, _OneBadExtractAgent())  # must not raise
+        failures = run_extract(s, _OneBadExtractAgent())  # must not raise
 
         extracted = jobs_by_status(s, JobStatus.extracted.value)
         raw = jobs_by_status(s, JobStatus.raw.value)
         assert [j.title for j in extracted] == ["A"]  # good job saved
         assert [j.title for j in raw] == ["B"]  # failed job left raw to retry
+        # The caller (redo's per-job outcome reporting) needs to know which
+        # job failed, not just that "something" was skipped.
+        assert list(failures) == [bad.id]
 
 
 def test_run_extract_skips_job_when_agent_returns_wrong_type():
@@ -787,7 +790,7 @@ def test_run_score_skips_failed_job_and_persists_the_rest(tmp_path):
                 criteria_json={},
             ),
         )
-        save_job(
+        bad = save_job(
             s,
             Job(
                 source="x",
@@ -798,7 +801,7 @@ def test_run_score_skips_failed_job_and_persists_the_rest(tmp_path):
             ),
         )
 
-        run_score(
+        failures = run_score(
             s, facts, _OneBadFitAgent(), aliases_path=tmp_path / "a.json"
         )  # must not raise
 
@@ -806,6 +809,7 @@ def test_run_score_skips_failed_job_and_persists_the_rest(tmp_path):
         filtered = jobs_by_status(s, JobStatus.filtered.value)
         assert [j.title for j in shortlisted] == ["A"]  # good job scored + saved
         assert [j.title for j in filtered] == ["B"]  # failed job left filtered to retry
+        assert list(failures) == [bad.id]
 
 
 def test_discover_isolates_a_single_unparseable_job():
@@ -908,16 +912,15 @@ def test_reprocess_rejected_relevance_only():
 def test_reprocess_unknown_scope_raises():
     import pytest
 
-    with _session() as s:
-        with pytest.raises(ValueError):
-            reprocess(
-                s,
-                SearchConfig(),
-                ProfileFacts(contact=Contact(name="Ada")),
-                _ExtractAgent(),
-                _FitAgent(),
-                ["bogus"],
-            )
+    with _session() as s, pytest.raises(ValueError):
+        reprocess(
+            s,
+            SearchConfig(),
+            ProfileFacts(contact=Contact(name="Ada")),
+            _ExtractAgent(),
+            _FitAgent(),
+            ["bogus"],
+        )
 
 
 def test_reprocess_only_touches_scoped_jobs():

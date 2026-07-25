@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import traceback
+from dataclasses import dataclass
 from datetime import timedelta
 from threading import RLock
 from typing import Any
@@ -9,12 +11,45 @@ from typing import Any
 from sqlalchemy import func
 from sqlmodel import Session, col, select
 
-from resume_agent.tracking.tables import ErrorRecord, utcnow
+from resume_agent.tracking.tables import ErrorRecord, Job, utcnow
 
 RETENTION_DAYS = 30
-_KINDS = {"run", "source"}
+_KINDS = {"run", "source", "job"}
 _TERMINAL = {"dismissed", "resolved"}
 _WRITE_LOCK = RLock()
+
+MAX_MESSAGE_CHARS = 300
+MAX_TRACEBACK_CHARS = 4000
+TRACEBACK_FRAMES = 5
+
+
+@dataclass(frozen=True)
+class StageFailure:
+    """One job's stage failure, formatted for storage and display.
+
+    Built where the exception is still in hand. The full traceback goes to the
+    log via exc_info; only the tail is persisted, so a 400-job failed run does
+    not write megabytes into a user-facing table.
+    """
+
+    error_type: str
+    message: str
+    traceback_tail: str
+
+    @classmethod
+    def from_exception(cls, exc: BaseException) -> StageFailure:
+        frames = traceback.format_exception(type(exc), exc, exc.__traceback__)
+        tail = "".join(frames[-TRACEBACK_FRAMES:])[-MAX_TRACEBACK_CHARS:]
+        return cls(
+            error_type=type(exc).__name__,
+            message=str(exc)[:MAX_MESSAGE_CHARS],
+            traceback_tail=tail,
+        )
+
+
+def job_failure_label(job_id: int, stage: str) -> str:
+    """The dedupe key for a job+stage failure."""
+    return f"job:{job_id}:{stage}"
 
 
 def record_error(
@@ -147,3 +182,61 @@ def count_open(session: Session) -> int:
             )
         ).one()
     )
+
+
+def record_job_failure(
+    session: Session,
+    *,
+    job: Job,
+    stage: str,
+    failure: StageFailure,
+    run_id: str | None = None,
+    model: str | None = None,
+) -> ErrorRecord:
+    """Persist one job's stage failure, deduped on job+stage."""
+    if job.id is None:
+        raise ValueError("cannot record a failure for an unsaved job")
+    return record_error(
+        session,
+        kind="job",
+        source_label=job_failure_label(job.id, stage),
+        message=f"{failure.error_type}: {failure.message}",
+        run_id=run_id,
+        # camelCase so JobFailureDetails (a CamelModel, which validates by
+        # alias) reads this straight back.
+        details={
+            "jobId": job.id,
+            "company": job.company,
+            "title": job.title,
+            "stage": stage,
+            "errorType": failure.error_type,
+            "message": failure.message,
+            "model": model,
+            "tracebackTail": failure.traceback_tail,
+        },
+    )
+
+
+def resolve_job_failures(session: Session, job_id: int, stage: str) -> int:
+    """Close any open failure for this job+stage. Returns how many closed.
+
+    Called on every stage success. Without it a failure outlives the run that
+    fixed it and the dashboard fills with already-resolved noise.
+    """
+    with _WRITE_LOCK:
+        records = session.exec(
+            select(ErrorRecord).where(
+                ErrorRecord.kind == "job",
+                ErrorRecord.source_label == job_failure_label(job_id, stage),
+                ErrorRecord.status == "open",
+            )
+        ).all()
+        if not records:
+            return 0
+        now = utcnow()
+        for record in records:
+            record.status = "resolved"
+            record.updated_at = now
+            session.add(record)
+        session.commit()
+        return len(records)

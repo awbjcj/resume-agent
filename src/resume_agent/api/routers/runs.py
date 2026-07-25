@@ -12,32 +12,34 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request, UploadFile
+from sse_starlette.sse import EventSourceResponse
 
 from resume_agent.api.deps import get_engine, get_run_manager, get_sse_user_context
 from resume_agent.api.errors import ApiException
-from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.api.mappers import to_page
-from sse_starlette.sse import EventSourceResponse
-
 from resume_agent.api.runs.launch import launch, session_work
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.schemas.jobs import ReviseRequest
 from resume_agent.api.runs.sse import record_to_run, run_events
+from resume_agent.api.schemas.base import Page
+from resume_agent.api.schemas.jobs import ReviseRequest
 from resume_agent.api.schemas.runs import (
     AddJobUrlParams,
     CoverLetterParams,
     DiscoverParams,
     PullParams,
+    RedoParams,
+    RedoResultOut,
     RefreshParams,
     ReprocessParams,
     RunOut,
+    StageOutcomeOut,
     TailorParams,
 )
-from resume_agent.api.schemas.base import Page
+from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.config import get_settings
 from resume_agent.db import get_session
-from resume_agent.services.cover_letters import write_cover_letters
 from resume_agent.services.cover_letter_revision import revise_cover_letter_version
+from resume_agent.services.cover_letters import write_cover_letters
 from resume_agent.services.discovery import (
     add_job_from_url,
     discover_jobs,
@@ -47,11 +49,12 @@ from resume_agent.services.discovery import (
     scrape_linkedin_jobs,
 )
 from resume_agent.services.errors import record_source_failures
-from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP, tailor
 from resume_agent.services.pagination import paginate
+from resume_agent.services.redo import redo_jobs
 from resume_agent.services.revision import revise_resume_version
-from resume_agent.tracking.repository import get_cover_letter, get_resume_version
+from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP, tailor
 from resume_agent.tenancy.context import current_context
+from resume_agent.tracking.repository import get_cover_letter, get_resume_version
 
 router = APIRouter()
 link_router = APIRouter()
@@ -273,7 +276,7 @@ def launch_tailor(
     engine = _engine(request)
 
     def do_tailor(session, reporter):
-        results = tailor(
+        outcome = tailor(
             session,
             job_ids=params.job_ids,
             approved=params.approved,
@@ -288,11 +291,49 @@ def launch_tailor(
                     "versionCount": len(v),
                     "factCheckPassed": v[-1].fact_check_passed if v else False,
                 }
-                for jid, v in results.items()
-            ]
+                for jid, v in outcome.versions.items()
+            ],
+            "failures": [
+                {
+                    "jobId": jid,
+                    "errorType": failure.error_type,
+                    "message": failure.message,
+                }
+                for jid, failure in outcome.failures.items()
+            ],
         }
 
     return launch(mgr, "tailor", session_work(engine, do_tailor))
+
+
+@router.post("/redo", response_model=RunOut, status_code=202)
+def launch_redo(
+    params: RedoParams, request: Request, mgr: RunManager = Depends(get_run_manager)
+):
+    engine = _engine(request)
+
+    def do_redo(session, reporter):
+        outcomes = redo_jobs(
+            session,
+            job_ids=params.job_ids,
+            stages=params.stages,
+            deep=params.deep,
+            reporter=reporter,
+            run_id=reporter.run_id,
+        )
+        return RedoResultOut(
+            outcomes=[
+                StageOutcomeOut(
+                    job_id=outcome.job_id,
+                    stage=outcome.stage,
+                    status=outcome.status,
+                    detail=outcome.detail,
+                )
+                for outcome in outcomes
+            ]
+        ).model_dump(by_alias=True)
+
+    return launch(mgr, "redo", session_work(engine, do_redo))
 
 
 @router.post("/cover-letters", response_model=RunOut, status_code=202)

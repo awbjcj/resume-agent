@@ -3,6 +3,7 @@ from typer.testing import CliRunner
 from resume_agent import cli
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.ingest import add_job
+from resume_agent.tailor.service import TailorOutcome
 from resume_agent.tracking.repository import save_job
 from resume_agent.tracking.tables import JobStatus
 
@@ -35,7 +36,7 @@ def test_tailor_deep_flag_selects_deep_config(tmp_path, monkeypatch):
         lambda session, *, review_path, **kwargs: captured.update(
             review_path=review_path
         )
-        or {},
+        or TailorOutcome(),
     )
 
     result = runner.invoke(
@@ -55,7 +56,7 @@ def test_tailor_explicit_review_wins_over_deep(tmp_path, monkeypatch):
         lambda session, *, review_path, **kwargs: captured.update(
             review_path=review_path
         )
-        or {},
+        or TailorOutcome(),
     )
 
     result = runner.invoke(

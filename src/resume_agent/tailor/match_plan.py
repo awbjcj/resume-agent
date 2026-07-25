@@ -101,7 +101,7 @@ def build_match_plan_agent(
                 compose_instructions(_plan_instructions(), style_guide),
             ),
             output_schema=MatchPlan,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, MatchPlan),
             **retry_kwargs(),
         )
     )

@@ -34,7 +34,10 @@ describe("error hooks", () => {
     mocks.unwrap.mockResolvedValue({ errors: [] });
   });
 
-  it("lists open errors by default", async () => {
+  it("lists open errors by default, requesting the backend's max page size", async () => {
+    // AttentionCard has no pagination UI of its own -- it shows "everything
+    // open" behind a local Show all toggle, so it must ask for as many rows
+    // as the server will return in one call, not the 50-row default page.
     const { wrapper } = wrap();
     const { result } = renderHook(() => useErrorRecords(), { wrapper });
 
@@ -43,7 +46,7 @@ describe("error hooks", () => {
     });
 
     expect(mocks.get).toHaveBeenCalledWith("/api/errors", {
-      params: { query: { status: "open" } },
+      params: { query: { status: "open", pageSize: 200 } },
     });
   });
 

@@ -30,7 +30,10 @@ import { useViewMode } from "@/features/board/use-view-mode";
 import { useBoardFilters } from "@/features/shortlist/use-board-filters";
 import { useBulkRun } from "@/features/runs/use-bulk-run";
 import { LaunchDialog } from "@/features/runs/LaunchDialog";
+import { RedoDialog } from "@/features/runs/RedoDialog";
 import { useApprovedLaunchJobs } from "@/features/runs/use-approved-launch-jobs";
+import { useRedoRun } from "@/features/runs/use-redo-run";
+import { useSelectedJobIds } from "@/features/board/use-selected-job-ids";
 import { PipelineStageSection } from "./PipelineStageSection";
 import {
   openStagesFromParam,
@@ -43,6 +46,7 @@ export function PipelineContainer() {
   const [filter, setFilter] = useBoardFilters("recency");
   const [targetStatus, setTargetStatus] = useState("approved");
   const [launchMode, setLaunchMode] = useState<"tailor" | "coverLetter" | null>(null);
+  const [redoOpen, setRedoOpen] = useState(false);
   const [params, setParams] = useSearchParams();
   const [openStages, setOpenStages] = useState(() =>
     openStagesFromParam(params.get("stage")),
@@ -57,6 +61,8 @@ export function PipelineContainer() {
   const { reconcile } = selection;
   const bulk = useBulkAction("pipeline");
   const runs = useBulkRun();
+  const redoRun = useRedoRun();
+  const redoJobIds = useSelectedJobIds("pipeline", selection, filter, redoOpen);
   const launchJobs = useApprovedLaunchJobs(launchMode !== null);
   const [view, setView] = useViewMode("pipeline-view");
   // Rows loaded by each open stage section, mirrored here so bulk selection and
@@ -228,6 +234,14 @@ export function PipelineContainer() {
                 })
               }
             />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!selection.count}
+              onClick={() => setRedoOpen(true)}
+            >
+              Redo…
+            </Button>
           </BulkActionBar>
           {stages.map((stage) => (
             <PipelineStageSection
@@ -277,6 +291,13 @@ export function PipelineContainer() {
             ? runs.coverLettersSelected(jobIds)
             : runs.tailorSelected(jobIds, deep)
         }
+      />
+      <RedoDialog
+        open={redoOpen}
+        jobIds={redoJobIds}
+        initialStages={["tailor"]}
+        onOpenChange={setRedoOpen}
+        onLaunch={(jobIds, stages, deep) => redoRun.redo(jobIds, stages, deep)}
       />
     </>
   );

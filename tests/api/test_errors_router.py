@@ -52,6 +52,11 @@ def test_error_list_defaults_to_open_records(tmp_path):
         "firstSeenAt": "ignored",
         "lastSeenAt": "ignored",
         "updatedAt": "ignored",
+        "jobDetails": None,
+    }
+    pagination = response.json()["pagination"]
+    assert pagination == {
+        "page": 1, "pageSize": 50, "totalItems": 1, "totalPages": 1
     }
 
 
@@ -76,5 +81,5 @@ def test_dismiss_all_and_invalid_status(tmp_path):
         invalid = client.get("/api/errors", params={"status": "weird"})
 
     assert cleared.json() == {"dismissed": 2}
-    assert empty.json() == {"records": []}
+    assert empty.json()["records"] == []
     assert invalid.status_code == 422

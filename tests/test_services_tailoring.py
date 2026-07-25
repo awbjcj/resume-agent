@@ -1,14 +1,26 @@
 from pathlib import Path
+from typing import cast
 
 import pytest
+from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.profile.matrix import Overrides, build_matrix, save_matrix
 from resume_agent.profile.store import save_facts
 from resume_agent.services import rendering, tailoring
+from resume_agent.services.errors import StageFailure
+from resume_agent.tailor.service import TailorOutcome
 from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
+
+
+@pytest.fixture
+def session():
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as database:
+        yield database
 
 
 def _session():
@@ -37,11 +49,17 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
         match_plan_agent=None,
         skill_matrix=None,
         cluster_map=None,
+        model=None,
     ):
         captured["targets"] = [j.id for j in targets]
         captured["match_plan"] = match_plan_agent
         captured["skill_matrix"] = skill_matrix
-        return {targets[0].id: ["v1"]}
+        return TailorOutcome(
+            versions=cast(
+                dict[int, list[ResumeVersion]], {targets[0].id: ["v1"]}
+            ),
+            failures={},
+        )
 
     monkeypatch.setattr(tailoring, "tailor_jobs", fake_tailor_jobs)
     monkeypatch.setattr(
@@ -78,7 +96,8 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
     assert exports == [job.id]
 
 
-def test_tailor_can_fail_loudly_when_a_target_produces_no_resume(monkeypatch):
+def test_tailor_does_not_raise_when_only_some_targets_fail(monkeypatch):
+    """fail_on_partial raises only on TOTAL failure -- a partial result is kept."""
     monkeypatch.setattr(
         tailoring, "load_review_config",
         lambda p: type("C", (), {"style_guide_path": None, "reviewers": []})(),
@@ -103,19 +122,25 @@ def test_tailor_can_fail_loudly_when_a_target_produces_no_resume(monkeypatch):
         session.commit()
         for job in jobs:
             session.refresh(job)
+        failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
         monkeypatch.setattr(
             tailoring,
             "tailor_jobs",
-            lambda *args, **kwargs: {jobs[0].id: ["v1"]},
+            lambda *args, **kwargs: TailorOutcome(
+                versions=cast(dict[int, list[ResumeVersion]], {jobs[0].id: ["v1"]}),
+                failures=cast(dict[int, StageFailure], {jobs[1].id: failure}),
+            ),
         )
         monkeypatch.setattr(tailoring, "export_job_artifacts", lambda *args, **kwargs: None)
 
-        with pytest.raises(RuntimeError, match="failed for 1 of 2 jobs"):
-            tailoring.tailor(
-                session,
-                job_ids=[job.id for job in jobs if job.id is not None],
-                fail_on_partial=True,
-            )
+        outcome = tailoring.tailor(
+            session,
+            job_ids=[job.id for job in jobs if job.id is not None],
+            fail_on_partial=True,
+        )
+
+        assert list(outcome.versions) == [jobs[0].id]
+        assert list(outcome.failures) == [jobs[1].id]
 
 
 def test_tailor_loads_bound_skill_artifacts_once(tmp_path, monkeypatch):
@@ -135,7 +160,12 @@ def test_tailor_loads_bound_skill_artifacts_once(tmp_path, monkeypatch):
 
     def fake_tailor_jobs(*args, **kwargs):
         captured.update(kwargs)
-        return {args[1][0].id: ["v1"]}
+        return TailorOutcome(
+            versions=cast(
+                dict[int, list[ResumeVersion]], {args[1][0].id: ["v1"]}
+            ),
+            failures={},
+        )
 
     monkeypatch.setattr(tailoring, "tailor_jobs", fake_tailor_jobs)
     monkeypatch.setattr(
@@ -189,3 +219,84 @@ def test_render_resume_version_returns_path(monkeypatch, tmp_path):
         path = rendering.render_resume_version(session, v.id)
     assert path is not None
     assert Path(path).name == "out.pdf"
+
+
+def test_fail_on_partial_raises_only_when_everything_failed(monkeypatch, session):
+    job = Job(source="manual", jd_text="jd", status=JobStatus.approved.value)
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    assert job.id is not None
+    job_id = job.id
+    failure = StageFailure(
+        error_type="ValueError",
+        message="match_plan_enabled requires a match-plan agent",
+        traceback_tail="",
+    )
+    monkeypatch.setattr(
+        tailoring,
+        "tailor_jobs",
+        lambda *a, **k: TailorOutcome(versions={}, failures={job_id: failure}),
+    )
+    monkeypatch.setattr(tailoring, "enforce_active_budget", lambda: None)
+    monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
+    monkeypatch.setattr(
+        tailoring, "load_review_config",
+        lambda p: type("C", (), {"style_guide_path": None, "reviewers": []})(),
+    )
+    monkeypatch.setattr(tailoring, "load_style_guide", lambda p: None)
+    monkeypatch.setattr(
+        tailoring, "build_tailor_bundle",
+        lambda config, style_guide=None: tailoring.TailorBundle(
+            tailor=_RunnerStub("t"), reviser=_RunnerStub("r"), reviewers={},
+            revision=_RunnerStub("revise"),
+        ),
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        tailoring.tailor(session, job_ids=[job_id], fail_on_partial=True)
+
+    # The whole point: the cause is named, not just counted.
+    assert "match_plan_enabled requires a match-plan agent" in str(excinfo.value)
+    assert "ValueError" in str(excinfo.value)
+
+
+def test_partial_failure_does_not_raise(monkeypatch, session):
+    ok = Job(source="manual", jd_text="a", status=JobStatus.approved.value)
+    bad = Job(source="manual", jd_text="b", status=JobStatus.approved.value)
+    session.add(ok)
+    session.add(bad)
+    session.commit()
+    session.refresh(ok)
+    session.refresh(bad)
+    assert ok.id is not None
+    assert bad.id is not None
+    ok_id, bad_id = ok.id, bad.id
+    failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
+    monkeypatch.setattr(
+        tailoring,
+        "tailor_jobs",
+        lambda *a, **k: TailorOutcome(versions={ok_id: []}, failures={bad_id: failure}),
+    )
+    monkeypatch.setattr(tailoring, "enforce_active_budget", lambda: None)
+    monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
+    monkeypatch.setattr(
+        tailoring, "load_review_config",
+        lambda p: type("C", (), {"style_guide_path": None, "reviewers": []})(),
+    )
+    monkeypatch.setattr(tailoring, "load_style_guide", lambda p: None)
+    monkeypatch.setattr(
+        tailoring, "build_tailor_bundle",
+        lambda config, style_guide=None: tailoring.TailorBundle(
+            tailor=_RunnerStub("t"), reviser=_RunnerStub("r"), reviewers={},
+            revision=_RunnerStub("revise"),
+        ),
+    )
+    monkeypatch.setattr(tailoring, "export_job_artifacts", lambda *a, **k: None)
+
+    outcome = tailoring.tailor(
+        session, job_ids=[ok_id, bad_id], fail_on_partial=True
+    )
+
+    assert list(outcome.versions) == [ok.id]
+    assert list(outcome.failures) == [bad.id]

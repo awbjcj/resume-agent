@@ -124,7 +124,7 @@ def build_search_scout_formatter_agent() -> Runner:
             description="Convert grounded Search Scout notes into SearchSuggestions.",
             instructions=with_guidance("search-scout-format", _FORMAT_INSTRUCTIONS),
             output_schema=SearchSuggestions,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, SearchSuggestions),
             **retry_kwargs(),
         )
     )

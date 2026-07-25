@@ -183,7 +183,7 @@ def _default_agent() -> Runner:
             description="Partition technical-skill tokens into conservative synonym clusters.",
             instructions=with_guidance("taxonomy-clusters", _INSTRUCTIONS),
             output_schema=SkillClusters,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, SkillClusters),
         )
     )
 
@@ -197,7 +197,7 @@ def _default_themer_agent() -> Runner:
             description="Partition canonical technical skills into dashboard-ready themes.",
             instructions=with_guidance("taxonomy-themes", _THEME_INSTRUCTIONS),
             output_schema=SkillThemes,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, SkillThemes),
         )
     )
 
@@ -243,7 +243,7 @@ def build_incremental_canonicalizer_agent() -> Runner:
                 "taxonomy-clusters-incremental", _INCREMENTAL_INSTRUCTIONS
             ),
             output_schema=SkillClusters,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, SkillClusters),
             **retry_kwargs(),
         )
     )
@@ -261,7 +261,7 @@ def build_incremental_themer_agent() -> Runner:
                 "taxonomy-domains-incremental", _INCREMENTAL_DOMAIN_INSTRUCTIONS
             ),
             output_schema=IncrementalSkillDomains,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, IncrementalSkillDomains),
             **retry_kwargs(),
         )
     )

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from resume_agent.api.runs.models import RunState
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.services.redo import RedoStage
 
 
 class AddJobTextRequest(CamelModel):
@@ -69,3 +70,36 @@ class AddJobUrlParams(CamelModel):
     title: str | None = None
     location: str | None = None
     allow_browser: bool = True
+
+
+def _dedupe(values: list) -> list:
+    """Order-preserving dedupe."""
+    return list(dict.fromkeys(values))
+
+
+class RedoParams(CamelModel):
+    """Which jobs to redo and which stages to run.
+
+    Validated here and nowhere deeper: redo_jobs trusts its inputs. Deduping
+    stages matters because ["tailor", "tailor"] would otherwise bill twice.
+    """
+
+    job_ids: list[int] = Field(min_length=1)
+    stages: list[RedoStage] = Field(min_length=1)
+    deep: bool = False
+
+    @field_validator("job_ids", "stages")
+    @classmethod
+    def _drop_duplicates(cls, value: list) -> list:
+        return _dedupe(value)
+
+
+class StageOutcomeOut(CamelModel):
+    job_id: int
+    stage: RedoStage
+    status: Literal["ok", "skipped", "failed"]
+    detail: str | None = None
+
+
+class RedoResultOut(CamelModel):
+    outcomes: list[StageOutcomeOut] = Field(default_factory=list)

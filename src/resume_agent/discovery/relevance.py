@@ -50,7 +50,7 @@ def build_relevance_agent(model_id: str | None = None) -> Runner | None:
             description="Apply a high-recall role-family relevance gate to a job title and snippet.",
             instructions=with_guidance("relevance-judge", _INSTRUCTIONS),
             output_schema=RelevanceVerdict,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, RelevanceVerdict),
             **retry_kwargs(),
         )
     )

@@ -62,7 +62,7 @@ def build_extract_agent(model_id: str | None = None) -> AgentRunner:
             description="Extract a job posting into the application's hiring-criteria schema.",
             instructions=with_guidance("extract-criteria", _INSTRUCTIONS),
             output_schema=JobCriteriaExtract,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, JobCriteriaExtract),
             **retry_kwargs(),
         )
     )

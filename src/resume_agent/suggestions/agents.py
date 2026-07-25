@@ -108,7 +108,7 @@ def build_formatter_agent() -> Runner:
             description="Transform grounded research into the application's suggestion schema.",
             instructions=with_guidance("suggestions-format", _FORMAT_INSTRUCTIONS),
             output_schema=SuggestionDraft,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, SuggestionDraft),
             **retry_kwargs(),
         )
     )

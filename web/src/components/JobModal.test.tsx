@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
@@ -206,5 +207,18 @@ describe("JobModal", () => {
     const count = versionsTab.querySelector("span");
     expect(count?.className).not.toContain("ml-1.5");
     expect(count?.className).toContain("leading-none");
+  });
+
+  it("opens redo for the single job it is showing", async () => {
+    server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
+    const user = userEvent.setup();
+    wrap(<JobModal jobId={42} onClose={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+    );
+
+    await user.click(await screen.findByRole("button", { name: /^redo/i }));
+
+    expect(screen.getByRole("button", { name: /re-tailor 1 job/i })).toBeEnabled();
   });
 });

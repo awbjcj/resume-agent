@@ -6,6 +6,12 @@ import type { components } from "@/lib/api/schema";
 
 export type ErrorRecord = components["schemas"]["ErrorRecordOut"];
 
+// AttentionCard has no pagination UI -- it presents "every open error" behind
+// a local Show all toggle, so this requests the backend's own page-size
+// ceiling (api/routers/errors.py::MAX_PAGE_SIZE) rather than its 50-row
+// default page.
+const MAX_PAGE_SIZE = 200;
+
 export function useErrorRecords(
   status: "open" | "dismissed" | "resolved" = "open",
 ) {
@@ -13,7 +19,9 @@ export function useErrorRecords(
     queryKey: ["error-records", status],
     queryFn: () =>
       unwrap(
-        api.GET("/api/errors", { params: { query: { status } } }),
+        api.GET("/api/errors", {
+          params: { query: { status, pageSize: MAX_PAGE_SIZE } },
+        }),
       ) as Promise<components["schemas"]["ErrorRecordsOut"]>,
   });
 }

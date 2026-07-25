@@ -1,6 +1,10 @@
+import warnings
+
 import pytest
+from pydantic import BaseModel
 
 from resume_agent.llm_runner import build_model, resolve_api_key, split_provider
+from resume_agent.models.resume import ResumeContent
 
 
 def test_split_provider_bare_id_defaults_anthropic():
@@ -75,6 +79,54 @@ def test_build_model_gemini_branch():
     model = build_model("gemini:gemini-2.0-flash", api_key="sk-test")
     assert isinstance(model, Gemini)
     assert model.id == "gemini-2.0-flash"
+
+
+def test_openai_response_schema_has_no_keywords_beside_refs():
+    model = build_model("openai:gpt-5.6-terra", api_key="sk-test")
+
+    params = model.get_request_params(response_format=ResumeContent)
+    schema = params["response_format"]["json_schema"]["schema"]
+
+    assert schema["$defs"]["Education"]["properties"]["source"] == {
+        "$ref": "#/$defs/Source"
+    }
+    assert schema["$defs"]["Language"]["properties"]["source"] == {
+        "$ref": "#/$defs/Source"
+    }
+
+
+def test_gemini_uses_json_schema_without_lossy_dictionary_placeholder():
+    model = build_model("gemini:gemini-3.6-flash", api_key="sk-test")
+
+    params = model.get_request_params(response_format=ResumeContent)
+    config = params["config"]
+    skills_schema = config.response_json_schema["properties"]["skills"]
+
+    assert config.response_schema is None
+    assert "example_key" not in skills_schema.get("properties", {})
+    assert skills_schema["additionalProperties"]["items"] == {
+        "$ref": "#/$defs/TailoredSkill"
+    }
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        config.model_dump()
+    assert not [
+        warning
+        for warning in caught
+        if "PydanticSerializationUnexpectedValue" in str(warning.message)
+    ]
+
+
+def test_claude_falls_back_to_json_mode_only_for_oversized_schema():
+    from resume_agent.llm_runner import use_json_mode_for
+
+    class SmallOutput(BaseModel):
+        answer: str
+
+    model = build_model("claude-sonnet-5", api_key="sk-test")
+
+    assert use_json_mode_for(model, SmallOutput) is False
+    assert use_json_mode_for(model, ResumeContent) is True
 
 
 def test_build_model_deepseek_branch():

@@ -2251,6 +2251,16 @@
             "title": "Id",
             "type": "integer"
           },
+          "jobDetails": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobFailureDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -2304,6 +2314,16 @@
       },
       "ErrorRecordsOut": {
         "properties": {
+          "pagination": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pagination"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "records": {
             "items": {
               "$ref": "#/components/schemas/ErrorRecordOut"
@@ -3221,6 +3241,79 @@
           "skills"
         ],
         "title": "JobDetail",
+        "type": "object"
+      },
+      "JobFailureDetails": {
+        "description": "The formatted diagnostic for one job's stage failure.\n\nTyped rather than a free-form map: an exposed dict's keys become a de facto\ncontract with nothing holding them stable, and a schema flows into the\ngenerated TS client so the web side needs no hand-written shape.",
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "errorType": {
+            "title": "Errortype",
+            "type": "string"
+          },
+          "jobId": {
+            "title": "Jobid",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "stage": {
+            "enum": [
+              "pull",
+              "extract",
+              "tailor",
+              "render"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "tracebackTail": {
+            "default": "",
+            "title": "Tracebacktail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "stage",
+          "errorType",
+          "message"
+        ],
+        "title": "JobFailureDetails",
         "type": "object"
       },
       "JobLiteOut": {
@@ -4650,6 +4743,44 @@
           "questionId"
         ],
         "title": "QuestionReviewOut",
+        "type": "object"
+      },
+      "RedoParams": {
+        "description": "Which jobs to redo and which stages to run.\n\nValidated here and nowhere deeper: redo_jobs trusts its inputs. Deduping\nstages matters because [\"tailor\", \"tailor\"] would otherwise bill twice.",
+        "properties": {
+          "deep": {
+            "default": false,
+            "title": "Deep",
+            "type": "boolean"
+          },
+          "jobIds": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Jobids",
+            "type": "array"
+          },
+          "stages": {
+            "items": {
+              "enum": [
+                "pull",
+                "extract",
+                "tailor",
+                "render"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Stages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "jobIds",
+          "stages"
+        ],
+        "title": "RedoParams",
         "type": "object"
       },
       "RefreshParams": {
@@ -10059,6 +10190,29 @@
             }
           },
           {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Pagesize",
+              "type": "integer"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -14168,6 +14322,62 @@
           }
         },
         "summary": "Launch Pull"
+      }
+    },
+    "/api/redo": {
+      "post": {
+        "operationId": "launch_redo_api_redo_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedoParams"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Redo"
       }
     },
     "/api/refresh": {

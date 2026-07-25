@@ -134,7 +134,7 @@ def build_synthesis_agent(model_id: str | None = None) -> Runner:
             "excerpt-backed resume facts.",
             instructions=with_guidance("profile-synthesis", _SYNTHESIS_INSTRUCTIONS),
             output_schema=SynthesizedFragment,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, SynthesizedFragment),
             **retry_kwargs(),
         )
     )
@@ -160,7 +160,7 @@ def build_entailment_agent(model_id: str | None = None) -> Runner:
             description="Judge whether source excerpts fully support synthesized claims.",
             instructions=with_guidance("profile-entailment", _ENTAILMENT_INSTRUCTIONS),
             output_schema=ClaimVerdicts,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ClaimVerdicts),
             **retry_kwargs(),
         )
     )

@@ -52,7 +52,7 @@ def build_learn_agent(model_id: str | None = None) -> Runner:
             description="Infer a reusable CSS-selector recipe for one job board.",
             instructions=with_guidance("scraper-learn", _INSTRUCTIONS),
             output_schema=ScrapeRecipe,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ScrapeRecipe),
             **retry_kwargs(),
         )
     )

@@ -141,7 +141,7 @@ def build_bullet_dedup_agent(model_id: str | None = None) -> Runner:
             description="Group near-duplicate resume bullets by index.",
             instructions=with_guidance("profile-dedup", _DEDUP_INSTRUCTIONS),
             output_schema=BulletDupGroups,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, BulletDupGroups),
             **retry_kwargs(),
         )
     )
