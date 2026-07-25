@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -93,5 +93,38 @@ describe("RedoDialog", () => {
     await user.click(screen.getByRole("checkbox", { name: /re-tailor resume/i }));
 
     expect(screen.getByRole("switch", { name: /deep review/i })).toBeInTheDocument();
+  });
+
+  it("does not strand a stray '0 jobs' popup when the caller clears open and jobIds together (AttentionCard retry pattern)", async () => {
+    const user = userEvent.setup();
+    const onLaunch = vi.fn().mockResolvedValue(true);
+
+    function Harness() {
+      const [retry, setRetry] = useState<{ jobId: number } | null>({ jobId: 42 });
+      return (
+        <RedoDialog
+          open={retry !== null}
+          jobIds={retry ? [retry.jobId] : []}
+          initialStages={["tailor"]}
+          onOpenChange={(open) => {
+            if (!open) setRetry(null);
+          }}
+          onLaunch={onLaunch}
+        />
+      );
+    }
+    render(<Harness />, { wrapper });
+
+    expect(document.body.querySelector('[data-slot="dialog-content"]')).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    // The caller clears its target (jobIds -> []) in the same update that
+    // closes the dialog. That must not remount the popup body mid-close: a
+    // fresh "0 jobs" instance would mount already-closed, Base UI would
+    // never animate it, and it would never disappear -- and its own
+    // Cancel/Close would call back into an already-null target and do
+    // nothing. The popup must simply close.
+    expect(document.body.querySelector('[data-slot="dialog-content"]')).toBeNull();
   });
 });

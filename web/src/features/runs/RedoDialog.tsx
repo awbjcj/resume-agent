@@ -66,7 +66,13 @@ export interface RedoDialogProps {
 export function RedoDialog(props: RedoDialogProps) {
   // Same closed->open remount guard as LaunchDialog: Base UI's Dialog stays
   // mounted through its exit animation, so remounting mid-close strands an
-  // already-open popup that never hides.
+  // already-open popup that never hides. Unlike LaunchDialog, jobIds isn't
+  // seeded into any RedoDialogBody state (count/label read the prop live),
+  // so it must NOT factor into resetKey -- callers like AttentionCard clear
+  // their target (jobIds -> []) in the same update that closes the dialog,
+  // and keying on jobIds.length would remount a fresh, already-closed body
+  // right at that moment, stranding a stuck-open "0 jobs" popup whose
+  // Cancel/Close call back into an already-cleared target and do nothing.
   const [openState, setOpenState] = useState(() => ({
     isOpen: props.open,
     sequence: 0,
@@ -77,7 +83,7 @@ export function RedoDialog(props: RedoDialogProps) {
       sequence: props.open ? openState.sequence + 1 : openState.sequence,
     });
   }
-  const resetKey = [openState.sequence, props.jobIds.length].join(":");
+  const resetKey = String(openState.sequence);
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <RedoDialogBody key={resetKey} {...props} />

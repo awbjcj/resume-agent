@@ -523,10 +523,17 @@ def build_model(
     if provider == "gemini":
         Gemini = _compatible_gemini_class()
 
+        # Unlike Claude/DeepSeek, Gemini treats an unset thinking config as
+        # "provider decides" (an automatic, unbounded thinking budget) rather
+        # than off. Left unset, schema-heavy structured-output calls (e.g. the
+        # tailor agents) can spend the entire output-token budget on internal
+        # reasoning and get cut off mid-JSON. Disable it explicitly to match
+        # the other providers' non-reasoning default.
         return Gemini(
             id=model,
             api_key=key,
             thinking_level="high" if reasoning else None,
+            thinking_budget=None if reasoning else 0,
         )
     if provider == "deepseek":
         from agno.models.deepseek import DeepSeek
