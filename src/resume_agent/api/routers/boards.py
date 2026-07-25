@@ -93,7 +93,7 @@ def get_shortlist(
 
 @router.get("/pipeline", response_model=BoardPage[PipelineItem])
 def get_pipeline(
-    board_filter: board.BoardFilter = Depends(board_filter_query("stage")),
+    board_filter: board.BoardFilter = Depends(board_filter_query("recency")),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, alias="pageSize", ge=1, le=200),
     session: Session = Depends(get_session),

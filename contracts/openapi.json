@@ -12254,7 +12254,7 @@
             "name": "sortBy",
             "required": false,
             "schema": {
-              "default": "stage",
+              "default": "recency",
               "title": "Sortby",
               "type": "string"
             }

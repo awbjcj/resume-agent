@@ -19,7 +19,7 @@ type JobDetail = components["schemas"]["JobDetail"];
 function useInterviewableJobs(enabled: boolean) {
   return useQuery({
     queryKey: ["interviewable-jobs"], enabled,
-    queryFn: async () => (await Promise.all((["tailored", "rendered"] as const).map((status) => fetchAllPages<PipelineItem>((page) => api.GET("/api/pipeline", { params: { query: { status, sortBy: "stage", page, pageSize: 200 } } }))))).flat(),
+    queryFn: async () => (await Promise.all((["tailored", "rendered"] as const).map((status) => fetchAllPages<PipelineItem>((page) => api.GET("/api/pipeline", { params: { query: { status, sortBy: "recency", page, pageSize: 200 } } }))))).flat(),
   });
 }
 

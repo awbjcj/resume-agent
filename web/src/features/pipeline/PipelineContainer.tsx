@@ -40,7 +40,7 @@ import {
 } from "./pipeline-stages";
 
 export function PipelineContainer() {
-  const [filter, setFilter] = useBoardFilters("stage");
+  const [filter, setFilter] = useBoardFilters("recency");
   const [targetStatus, setTargetStatus] = useState("approved");
   const [launchMode, setLaunchMode] = useState<"tailor" | "coverLetter" | null>(null);
   const [params, setParams] = useSearchParams();

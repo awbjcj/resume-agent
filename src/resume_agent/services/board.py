@@ -250,10 +250,6 @@ def _sort_rows(rows: list[Any], sort: str) -> list[Any]:
         return sorted(
             rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower())
         )
-    if sort == "stage":
-        return sorted(
-            rows, key=lambda r: (getattr(r, "status", ""), (r.company or "").lower())
-        )
     return rows
 
 
@@ -341,7 +337,7 @@ def list_board(
     page_size: int = 50,
     facts_path: str = DEFAULT_FACTS,
 ) -> BoardListResult:
-    f = board_filter or BoardFilter(sort="stage" if board == "pipeline" else "fit")
+    f = board_filter or BoardFilter(sort="recency" if board == "pipeline" else "fit")
     raw = _raw_board_rows(session, board, f, facts_path=facts_path)
     rows = _sort_rows(_apply_board_filter(raw, f), f.sort)
     return BoardListResult(
@@ -384,7 +380,7 @@ def list_pipeline(
     status: str | None = None,
     min_fit: int | None = None,
     q: str | None = None,
-    sort: str = "stage",
+    sort: str = "recency",
     page: int = 1,
     page_size: int = 50,
     board_filter: BoardFilter | None = None,
