@@ -293,7 +293,7 @@ def redo_jobs(
     deduped. This function trusts them.
     """
     enforce_active_budget()
-    ordered = [stage for stage in REDO_STAGES if stage in set(stages)]
+    ordered: list[RedoStage] = [stage for stage in REDO_STAGES if stage in set(stages)]
     found = {job_id: get_job(session, job_id) for job_id in job_ids}
     jobs = [job for job in found.values() if job is not None]
 

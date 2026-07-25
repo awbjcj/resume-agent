@@ -10,6 +10,7 @@ from sqlmodel import Session
 
 from resume_agent.api.deps import get_session
 from resume_agent.api.errors import ApiException
+from resume_agent.api.schemas.base import Pagination
 from resume_agent.api.schemas.errors import (
     DismissAllOut,
     ErrorRecordOut,
@@ -72,12 +73,12 @@ def list_errors(
     window = paginate(records, page=page, page_size=page_size)
     return ErrorRecordsOut(
         records=[_row(record) for record in window.data],
-        pagination={
-            "page": window.page,
-            "page_size": window.page_size,
-            "total_items": window.total_items,
-            "total_pages": window.total_pages,
-        },
+        pagination=Pagination(
+            page=window.page,
+            page_size=window.page_size,
+            total_items=window.total_items,
+            total_pages=window.total_pages,
+        ),
     )
 
 

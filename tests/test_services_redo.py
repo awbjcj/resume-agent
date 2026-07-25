@@ -31,6 +31,7 @@ def _rendered_job(session) -> Job:
 
 def test_stages_run_in_pipeline_order_whatever_order_was_asked(session, monkeypatch):
     job = _rendered_job(session)
+    assert job.id is not None
     seen: list[str] = []
     monkeypatch.setattr(
         redo, "_run_pull",
@@ -54,13 +55,15 @@ def test_stages_run_in_pipeline_order_whatever_order_was_asked(session, monkeypa
 
 def test_tailor_failure_is_recorded_as_a_job_error(session, monkeypatch):
     job = _rendered_job(session)
+    assert job.id is not None
+    job_id = job.id
     failure = StageFailure(
         error_type="ValueError", message="no match-plan agent", traceback_tail="tb"
     )
     monkeypatch.setattr(
         redo,
         "tailor",
-        lambda *a, **k: TailorOutcome(versions={}, failures={job.id: failure}),
+        lambda *a, **k: TailorOutcome(versions={}, failures={job_id: failure}),
     )
 
     outcomes = redo.redo_jobs(session, job_ids=[job.id], stages=["tailor"])
@@ -77,12 +80,14 @@ def test_tailor_failure_records_the_model_that_produced_it(session, monkeypatch)
     model produced it (see spec: 'model' is the resolved model id for extract
     and tailor)."""
     job = _rendered_job(session)
+    assert job.id is not None
+    job_id = job.id
     failure = StageFailure(error_type="ValueError", message="boom", traceback_tail="")
     monkeypatch.setattr(
         redo,
         "tailor",
         lambda *a, **k: TailorOutcome(
-            versions={}, failures={job.id: failure}, model="openai:gpt-5"
+            versions={}, failures={job_id: failure}, model="openai:gpt-5"
         ),
     )
 
@@ -95,19 +100,21 @@ def test_tailor_failure_records_the_model_that_produced_it(session, monkeypatch)
 
 def test_tailor_success_resolves_an_earlier_failure(session, monkeypatch):
     job = _rendered_job(session)
+    assert job.id is not None
+    job_id = job.id
     failure = StageFailure(error_type="ValueError", message="boom", traceback_tail="")
     monkeypatch.setattr(
         redo, "tailor",
-        lambda *a, **k: TailorOutcome(versions={}, failures={job.id: failure}),
+        lambda *a, **k: TailorOutcome(versions={}, failures={job_id: failure}),
     )
-    redo.redo_jobs(session, job_ids=[job.id], stages=["tailor"])
+    redo.redo_jobs(session, job_ids=[job_id], stages=["tailor"])
     assert len(list_error_records(session, "open")) == 1
 
     monkeypatch.setattr(
         redo, "tailor",
-        lambda *a, **k: TailorOutcome(versions={job.id: []}, failures={}),
+        lambda *a, **k: TailorOutcome(versions={job_id: []}, failures={}),
     )
-    outcomes = redo.redo_jobs(session, job_ids=[job.id], stages=["tailor"])
+    outcomes = redo.redo_jobs(session, job_ids=[job_id], stages=["tailor"])
 
     assert [o.status for o in outcomes] == ["ok"]
     assert list_error_records(session, "open") == []
@@ -115,20 +122,23 @@ def test_tailor_success_resolves_an_earlier_failure(session, monkeypatch):
 
 def test_missing_job_is_skipped_not_fatal(session, monkeypatch):
     job = _rendered_job(session)
+    assert job.id is not None
+    job_id = job.id
     monkeypatch.setattr(
         redo, "tailor",
-        lambda *a, **k: TailorOutcome(versions={job.id: []}, failures={}),
+        lambda *a, **k: TailorOutcome(versions={job_id: []}, failures={}),
     )
 
-    outcomes = redo.redo_jobs(session, job_ids=[job.id, 9999], stages=["tailor"])
+    outcomes = redo.redo_jobs(session, job_ids=[job_id, 9999], stages=["tailor"])
 
     statuses = {o.job_id: o.status for o in outcomes}
-    assert statuses[job.id] == "ok"
+    assert statuses[job_id] == "ok"
     assert statuses[9999] == "skipped"
 
 
 def test_render_skips_a_job_with_no_versions(session):
     job = _rendered_job(session)
+    assert job.id is not None
 
     outcomes = redo.redo_jobs(session, job_ids=[job.id], stages=["render"])
 
@@ -142,6 +152,8 @@ def test_extract_stage_reports_the_real_per_job_outcome(session, monkeypatch):
     the same way pull and tailor already do."""
     good = _rendered_job(session)
     bad = _rendered_job(session)
+    assert good.id is not None
+    assert bad.id is not None
     failure = StageFailure(error_type="ValueError", message="boom", traceback_tail="")
     monkeypatch.setattr(redo, "load_search_config", lambda p: object())
     monkeypatch.setattr(redo, "load_facts", lambda p: object())
@@ -169,13 +181,15 @@ def test_extract_stage_reports_the_real_per_job_outcome(session, monkeypatch):
 
 def test_redo_never_regresses_a_rendered_job(session, monkeypatch):
     job = _rendered_job(session)
+    assert job.id is not None
+    job_id = job.id
     monkeypatch.setattr(
         redo, "tailor",
-        lambda *a, **k: TailorOutcome(versions={job.id: []}, failures={}),
+        lambda *a, **k: TailorOutcome(versions={job_id: []}, failures={}),
     )
     monkeypatch.setattr(redo, "_run_extract", lambda *a, **k: [])
 
-    redo.redo_jobs(session, job_ids=[job.id], stages=["extract", "tailor"])
+    redo.redo_jobs(session, job_ids=[job_id], stages=["extract", "tailor"])
 
     session.refresh(job)
     assert job.status == JobStatus.rendered.value

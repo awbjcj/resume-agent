@@ -46,6 +46,8 @@ def test_default_scope_selects_by_status_only(session):
 def test_id_scope_still_filters_by_status(session):
     extracted = _job(session, JobStatus.extracted.value)
     rendered = _job(session, JobStatus.rendered.value)
+    assert extracted.id is not None
+    assert rendered.id is not None
 
     scope = StageScope(job_ids=frozenset({extracted.id, rendered.id}))
     rows = _stage_jobs(session, JobStatus.extracted.value, scope)
@@ -55,6 +57,7 @@ def test_id_scope_still_filters_by_status(session):
 
 def test_any_status_scope_selects_the_ids_whatever_their_status(session):
     rendered = _job(session, JobStatus.rendered.value)
+    assert rendered.id is not None
 
     scope = StageScope(job_ids=frozenset({rendered.id}), any_status=True)
     rows = _stage_jobs(session, JobStatus.extracted.value, scope)
@@ -64,6 +67,7 @@ def test_any_status_scope_selects_the_ids_whatever_their_status(session):
 
 def test_never_regress_scope_suppresses_rejection(session):
     rendered = _job(session, JobStatus.rendered.value, **REJECTED_CRITERIA)
+    assert rendered.id is not None
 
     run_filter(
         session,

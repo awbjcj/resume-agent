@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import cast
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -53,7 +54,12 @@ def test_tailor_loads_config_and_calls_tailor_jobs(monkeypatch):
         captured["targets"] = [j.id for j in targets]
         captured["match_plan"] = match_plan_agent
         captured["skill_matrix"] = skill_matrix
-        return TailorOutcome(versions={targets[0].id: ["v1"]}, failures={})
+        return TailorOutcome(
+            versions=cast(
+                dict[int, list[ResumeVersion]], {targets[0].id: ["v1"]}
+            ),
+            failures={},
+        )
 
     monkeypatch.setattr(tailoring, "tailor_jobs", fake_tailor_jobs)
     monkeypatch.setattr(
@@ -121,7 +127,8 @@ def test_tailor_does_not_raise_when_only_some_targets_fail(monkeypatch):
             tailoring,
             "tailor_jobs",
             lambda *args, **kwargs: TailorOutcome(
-                versions={jobs[0].id: ["v1"]}, failures={jobs[1].id: failure}
+                versions=cast(dict[int, list[ResumeVersion]], {jobs[0].id: ["v1"]}),
+                failures=cast(dict[int, StageFailure], {jobs[1].id: failure}),
             ),
         )
         monkeypatch.setattr(tailoring, "export_job_artifacts", lambda *args, **kwargs: None)
@@ -153,7 +160,12 @@ def test_tailor_loads_bound_skill_artifacts_once(tmp_path, monkeypatch):
 
     def fake_tailor_jobs(*args, **kwargs):
         captured.update(kwargs)
-        return TailorOutcome(versions={args[1][0].id: ["v1"]}, failures={})
+        return TailorOutcome(
+            versions=cast(
+                dict[int, list[ResumeVersion]], {args[1][0].id: ["v1"]}
+            ),
+            failures={},
+        )
 
     monkeypatch.setattr(tailoring, "tailor_jobs", fake_tailor_jobs)
     monkeypatch.setattr(
@@ -214,6 +226,8 @@ def test_fail_on_partial_raises_only_when_everything_failed(monkeypatch, session
     session.add(job)
     session.commit()
     session.refresh(job)
+    assert job.id is not None
+    job_id = job.id
     failure = StageFailure(
         error_type="ValueError",
         message="match_plan_enabled requires a match-plan agent",
@@ -222,7 +236,7 @@ def test_fail_on_partial_raises_only_when_everything_failed(monkeypatch, session
     monkeypatch.setattr(
         tailoring,
         "tailor_jobs",
-        lambda *a, **k: TailorOutcome(versions={}, failures={job.id: failure}),
+        lambda *a, **k: TailorOutcome(versions={}, failures={job_id: failure}),
     )
     monkeypatch.setattr(tailoring, "enforce_active_budget", lambda: None)
     monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
@@ -240,7 +254,7 @@ def test_fail_on_partial_raises_only_when_everything_failed(monkeypatch, session
     )
 
     with pytest.raises(RuntimeError) as excinfo:
-        tailoring.tailor(session, job_ids=[job.id], fail_on_partial=True)
+        tailoring.tailor(session, job_ids=[job_id], fail_on_partial=True)
 
     # The whole point: the cause is named, not just counted.
     assert "match_plan_enabled requires a match-plan agent" in str(excinfo.value)
@@ -255,11 +269,14 @@ def test_partial_failure_does_not_raise(monkeypatch, session):
     session.commit()
     session.refresh(ok)
     session.refresh(bad)
+    assert ok.id is not None
+    assert bad.id is not None
+    ok_id, bad_id = ok.id, bad.id
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
     monkeypatch.setattr(
         tailoring,
         "tailor_jobs",
-        lambda *a, **k: TailorOutcome(versions={ok.id: []}, failures={bad.id: failure}),
+        lambda *a, **k: TailorOutcome(versions={ok_id: []}, failures={bad_id: failure}),
     )
     monkeypatch.setattr(tailoring, "enforce_active_budget", lambda: None)
     monkeypatch.setattr(tailoring, "load_facts", lambda p: object())
@@ -278,7 +295,7 @@ def test_partial_failure_does_not_raise(monkeypatch, session):
     monkeypatch.setattr(tailoring, "export_job_artifacts", lambda *a, **k: None)
 
     outcome = tailoring.tailor(
-        session, job_ids=[ok.id, bad.id], fail_on_partial=True
+        session, job_ids=[ok_id, bad_id], fail_on_partial=True
     )
 
     assert list(outcome.versions) == [ok.id]

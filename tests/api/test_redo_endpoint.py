@@ -34,7 +34,7 @@ def test_redo_rejects_an_unknown_stage():
 def test_redo_dedupes_repeated_ids_and_stages():
     from resume_agent.api.schemas.runs import RedoParams
 
-    params = RedoParams(jobIds=[3, 3, 1], stages=["tailor", "tailor"])
+    params = RedoParams(job_ids=[3, 3, 1], stages=["tailor", "tailor"])
 
     assert params.job_ids == [3, 1]     # order preserved, duplicates dropped
     assert params.stages == ["tailor"]

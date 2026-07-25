@@ -1,21 +1,23 @@
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.services.errors import StageFailure, record_error, record_job_failure
 
 
-def _client() -> TestClient:
-    return TestClient(create_app(db_url="sqlite://"))
+def _app() -> FastAPI:
+    return create_app(db_url="sqlite://")
 
 
 def test_job_record_exposes_typed_details():
-    with _client() as client:
+    app = _app()
+    with TestClient(app) as client:
         from sqlmodel import Session
 
         from resume_agent.tracking.repository import save_job
         from resume_agent.tracking.tables import Job
 
-        engine = client.app.state.engine
+        engine = app.state.engine
         with Session(engine) as session:
             job = save_job(
                 session,
@@ -46,10 +48,11 @@ def test_job_record_exposes_typed_details():
 
 
 def test_source_record_has_no_job_details():
-    with _client() as client:
+    app = _app()
+    with TestClient(app) as client:
         from sqlmodel import Session
 
-        with Session(client.app.state.engine) as session:
+        with Session(app.state.engine) as session:
             record_error(
                 session, kind="source", source_label="workday:acme", message="HTTP 500"
             )
@@ -60,10 +63,11 @@ def test_source_record_has_no_job_details():
 
 
 def test_unparseable_details_yield_none_not_500():
-    with _client() as client:
+    app = _app()
+    with TestClient(app) as client:
         from sqlmodel import Session
 
-        with Session(client.app.state.engine) as session:
+        with Session(app.state.engine) as session:
             record_error(
                 session,
                 kind="job",
@@ -79,10 +83,11 @@ def test_unparseable_details_yield_none_not_500():
 
 
 def test_errors_list_paginates():
-    with _client() as client:
+    app = _app()
+    with TestClient(app) as client:
         from sqlmodel import Session
 
-        with Session(client.app.state.engine) as session:
+        with Session(app.state.engine) as session:
             for index in range(7):
                 record_error(
                     session, kind="source", source_label=f"workday:acme-{index}",

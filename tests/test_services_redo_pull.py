@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -18,7 +20,7 @@ def session():
 
 
 def _tailored_job(session, **overrides) -> Job:
-    values = {
+    values: dict[str, Any] = {
         "source": "greenhouse",
         "url": "https://boards.greenhouse.io/acme/jobs/1",
         "company": "Acme",

@@ -14,6 +14,19 @@ def _session():
     return get_session(engine)
 
 
+class _RunnerStub:
+    """Minimal Runner protocol stand-in for tests that never invoke it."""
+
+    def __init__(self, value=None):
+        self.value = value
+
+    def run(self, prompt: str):
+        return self.value
+
+    async def arun(self, prompt: str):
+        return self.value
+
+
 def test_add_job_from_text_inserts(tmp_path):
     with _session() as session:
         job = discovery.add_job_from_text(
@@ -26,16 +39,6 @@ def test_add_job_from_text_inserts(tmp_path):
 
 def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
     seen = {}
-
-    class _RunnerStub:
-        def __init__(self, value):
-            self.value = value
-
-        def run(self, prompt: str):
-            return self.value
-
-        async def arun(self, prompt: str):
-            return self.value
 
     def _canonicalizer(skills: set[str]) -> dict[str, str]:
         return {"value": "c"}
@@ -100,8 +103,8 @@ def test_discover_jobs_with_empty_job_ids_scopes_to_nothing_not_everything(
         discovery,
         "build_discovery_bundle",
         lambda: DiscoveryBundle(
-            extract=None, fit=None, relevance=None,
-            canonicalizer=None, industry_classifier=None,
+            extract=_RunnerStub(), fit=_RunnerStub(), relevance=None,
+            canonicalizer=None, industry_classifier=_RunnerStub(),
         ),
     )
     with _session() as session:

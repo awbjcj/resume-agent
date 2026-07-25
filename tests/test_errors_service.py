@@ -187,6 +187,7 @@ def test_success_resolves_open_job_failure(session):
     from resume_agent.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
+    assert job.id is not None
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
     record = record_job_failure(session, job=job, stage="tailor", failure=failure)
 
@@ -207,6 +208,7 @@ def test_resolve_leaves_other_stages_open(session):
     from resume_agent.tracking.tables import Job
 
     job = save_job(session, Job(source="manual", jd_text="jd"))
+    assert job.id is not None
     failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
     pull = record_job_failure(session, job=job, stage="pull", failure=failure)
     record_job_failure(session, job=job, stage="tailor", failure=failure)
