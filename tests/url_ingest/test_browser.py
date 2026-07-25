@@ -1,3 +1,6 @@
+import pytest
+from playwright.sync_api import Error as PlaywrightError
+
 import resume_agent.discovery.url_ingest.browser as browser
 
 
@@ -160,3 +163,82 @@ def test_render_pages_empty_urls_skips_browser(monkeypatch):
         lambda: (_ for _ in ()).throw(AssertionError("no browser")),
     )
     assert browser.render_pages([]) == {}
+
+
+class _FlakyChromium:
+    """Fails the first launch with a PlaywrightError, then succeeds."""
+
+    def __init__(self, context):
+        self._context = context
+        self.calls = 0
+
+    def launch_persistent_context(self, data_dir, headless=False):
+        self.calls += 1
+        if self.calls == 1:
+            raise PlaywrightError(
+                "BrowserType.launch_persistent_context: Target page, "
+                "context or browser has been closed"
+            )
+        return self._context
+
+
+class _AlwaysFailsChromium:
+    def __init__(self, message="boom"):
+        self.calls = 0
+        self._message = message
+
+    def launch_persistent_context(self, data_dir, headless=False):
+        self.calls += 1
+        raise PlaywrightError(self._message)
+
+
+def test_fetch_rendered_retries_after_clearing_stale_profile_cache(monkeypatch, tmp_path):
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "GPUPersistentCache").mkdir()
+    (profile / f"{profile.name}.CHROME_DELETE").mkdir()
+
+    page = _FakePage()
+    context = _FakeContext(page)
+    chromium = _FlakyChromium(context)
+    monkeypatch.setattr(browser, "sync_playwright", lambda: _FakePlaywright(chromium))
+
+    html = browser.fetch_rendered(
+        "https://job.test/x", user_data_dir=str(profile), pace_seconds=0.0
+    )
+
+    assert html == "<html>rendered</html>"
+    assert chromium.calls == 2
+    assert not (profile / "GPUPersistentCache").exists()
+    assert not (profile / f"{profile.name}.CHROME_DELETE").exists()
+
+
+def test_fetch_rendered_reraises_launch_failure_without_migration_artifacts(
+    monkeypatch, tmp_path
+):
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    chromium = _AlwaysFailsChromium()
+    monkeypatch.setattr(browser, "sync_playwright", lambda: _FakePlaywright(chromium))
+
+    with pytest.raises(PlaywrightError):
+        browser.fetch_rendered(
+            "https://job.test/x", user_data_dir=str(profile), pace_seconds=0.0
+        )
+
+    assert chromium.calls == 1
+
+
+def test_fetch_rendered_reraises_when_retry_also_fails(monkeypatch, tmp_path):
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "ShaderCache").mkdir()
+    chromium = _AlwaysFailsChromium("still broken")
+    monkeypatch.setattr(browser, "sync_playwright", lambda: _FakePlaywright(chromium))
+
+    with pytest.raises(PlaywrightError, match="still broken"):
+        browser.fetch_rendered(
+            "https://job.test/x", user_data_dir=str(profile), pace_seconds=0.0
+        )
+
+    assert chromium.calls == 2

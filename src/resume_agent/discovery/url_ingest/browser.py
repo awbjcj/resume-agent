@@ -1,10 +1,62 @@
+import shutil
 import time
+from pathlib import Path
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from resume_agent.config import get_settings
 from resume_agent.discovery.url_ingest.models import PageContent
+
+# Pure disk caches Chrome migrates into a "<profile>.CHROME_DELETE" staging
+# folder when the profile's recorded version differs from the launching
+# binary's (e.g. after a Playwright browser upgrade). Safe to delete --
+# Chrome regenerates them -- but on Windows the migration rename can itself
+# fail with Access Denied, which aborts the whole browser launch.
+_STALE_PROFILE_CACHE_DIRS = (
+    "GPUPersistentCache",
+    "ShaderCache",
+    "GrShaderCache",
+    "GraphiteDawnCache",
+)
+
+
+def _clear_stale_profile_cache(data_dir: str) -> bool:
+    """Remove leftover Chrome version-migration artifacts from a profile dir.
+
+    Returns True when anything was found and removed, so the caller knows a
+    retry is worth attempting rather than surfacing the original error.
+    """
+    root = Path(data_dir)
+    cleared = False
+    delete_staging = root / f"{root.name}.CHROME_DELETE"
+    if delete_staging.exists():
+        shutil.rmtree(delete_staging, ignore_errors=True)
+        cleared = True
+    for name in _STALE_PROFILE_CACHE_DIRS:
+        candidate = root / name
+        if candidate.exists():
+            shutil.rmtree(candidate, ignore_errors=True)
+            cleared = True
+    return cleared
+
+
+def _launch_persistent_context(chromium, data_dir: str, *, headless: bool):
+    """launch_persistent_context, retried once past a stale-cache migration failure.
+
+    See _clear_stale_profile_cache: a Chromium version bump leaves the profile
+    stale, and Chrome's startup migration of its GPU/shader caches can hit a
+    transient Windows Access Denied that aborts the launch entirely. Retrying
+    once after clearing those directories resolves it; any other failure (no
+    migration artifacts present) propagates unchanged.
+    """
+    try:
+        return chromium.launch_persistent_context(data_dir, headless=headless)
+    except PlaywrightError:
+        if not _clear_stale_profile_cache(data_dir):
+            raise
+        return chromium.launch_persistent_context(data_dir, headless=headless)
 
 
 def fetch_rendered(
@@ -24,7 +76,7 @@ def fetch_rendered(
     """
     data_dir = user_data_dir or get_settings().linkedin_user_data_dir
     with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(data_dir, headless=headless)
+        context = _launch_persistent_context(p.chromium, data_dir, headless=headless)
         try:
             page = context.new_page()
             page.goto(url, wait_until="domcontentloaded")
@@ -65,7 +117,7 @@ def render_pages(
         return results
     data_dir = user_data_dir or get_settings().linkedin_user_data_dir
     with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(data_dir, headless=headless)
+        context = _launch_persistent_context(p.chromium, data_dir, headless=headless)
         try:
             for url in dict.fromkeys(urls):  # dedupe, preserve order; re-clicks boomerang
                 page = context.new_page()
