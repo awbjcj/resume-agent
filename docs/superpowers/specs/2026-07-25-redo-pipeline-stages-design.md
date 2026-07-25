@@ -73,6 +73,10 @@ silence becomes user-visible.
 | 9 | Per-job failures persist as `ErrorRecord` rows with structured details plus a truncated traceback tail. | The substrate already exists with dedupe, counts, and retention. Structured fields drive a formatted row; the tail is there when a provider SDK error needs real diagnosis. |
 | 10 | A stage success auto-resolves that job+stage's open failure. | Without it the card becomes a graveyard of already-fixed failures and stops being read, which defeats triage. |
 | 11 | Triage extends `AttentionCard`, grouped by kind, with a Retry action. | Retry is what makes it triage rather than a log. A dedicated route is more surface than the volume justifies. |
+| 12 | `RedoParams` validates at the API boundary; `redo_jobs` trusts its inputs. | Validation belongs at system edges, not scattered through internal calls. |
+| 13 | Job failure details are a typed schema, not a free-form map. | Hyrum's Law — an exposed map's keys become a contract with nothing holding them stable. A typed schema also flows into the generated TS client. |
+| 14 | `GET /api/errors` is paginated. | One failed 400-job redo makes this list unbounded, and each row carries a 4 KB traceback tail. |
+| 15 | `POST /api/redo` keeps the codebase's verb-style run-launch naming. | `/api/tailor`, `/api/pull`, `/api/discover`, `/api/reprocess` are all RPC-style launchers already. Consistency beats REST purity for a surface that starts a job rather than mutating a resource. |
 
 ## Architecture
 
@@ -317,17 +321,78 @@ this one" action.
 
 ```python
 class RedoParams(CamelModel):
-    job_ids: list[int]
-    stages: list[RedoStage]
+    job_ids: list[int] = Field(min_length=1)
+    stages: list[RedoStage] = Field(min_length=1)
     deep: bool = False
+
+    @field_validator("job_ids", "stages")
+    @classmethod
+    def _dedupe(cls, v): ...   # order-preserving dedupe
 ```
 
-Result payload: `{ "outcomes": [{ jobId, stage, status, detail }] }`.
+Validation happens at this boundary and nowhere deeper: an empty `jobIds` or
+`stages` is a `422`, and duplicates are collapsed so `["tailor", "tailor"]`
+cannot bill twice. `redo_jobs` trusts its inputs.
 
-`ErrorRecordOut` gains `details: dict[str, Any] | None`, and `_row()` stops
-dropping `details_json`. That is the entire error-surface API change — the write
-path already stores it. Source and run records get their details exposed too,
-for free.
+Result payload is a declared schema, not an ad-hoc dict:
+
+```python
+class StageOutcomeOut(CamelModel):
+    job_id: int
+    stage: RedoStage
+    status: Literal["ok", "skipped", "failed"]
+    detail: str | None = None
+
+class RedoResultOut(CamelModel):
+    outcomes: list[StageOutcomeOut] = Field(default_factory=list)
+```
+
+#### Error records
+
+`ErrorRecordOut` gains one **typed** field:
+
+```python
+class JobFailureDetails(CamelModel):
+    job_id: int
+    stage: RedoStage
+    error_type: str
+    message: str
+    company: str | None = None
+    title: str | None = None
+    model: str | None = None
+    attempt: int | None = None
+    traceback_tail: str = ""
+
+class ErrorRecordOut(CamelModel):
+    ...
+    job_details: JobFailureDetails | None = None   # set when kind == "job"
+```
+
+`_row()` projects `details_json` through `JobFailureDetails` when
+`kind == "job"`. A row whose stored JSON fails validation yields `None` rather
+than a `500` — persisted JSON from an older schema is untrusted input at a read
+boundary, exactly like a third-party response.
+
+A typed field rather than a raw `details: dict[str, Any]` for two reasons.
+Hyrum's Law: an exposed free-form map becomes a de facto contract on whatever
+keys happen to be in it, with nothing to hold it stable. And a typed schema
+flows through `openapi-typescript` into `contracts/ts/api.ts`, so the web client
+gets real types instead of the hand-written shape this spec previously called
+for — that hand-typing was a symptom of an untyped contract, not a solution.
+
+Source and run records get **no** details field. Neither writes `details` today
+(`record_source_failures` passes none), so exposing one would be speculative.
+
+#### Pagination
+
+`GET /api/errors` gains `page` (default 1) and `pageSize` (default 50, max 200),
+and `ErrorRecordsOut` gains a `pagination` block built by the existing
+`services/pagination.py::page_from_slice`. Both additions are additive and
+backward compatible.
+
+This is not optional polish: a single failed 400-job redo writes 400 open
+records, and every job record carries a traceback tail capped at 4 KB. Unpaged,
+that is a multi-megabyte response on a dashboard that loads on every visit.
 
 Schemas are `CamelModel`, so the wire format is camelCase. OpenAPI →
 `contracts/openapi.json` → `contracts/ts/api.ts` regenerated via
@@ -384,9 +449,8 @@ openai:gpt-5 · 4 minutes ago
   around — and render `details` as a plain key/value list when present.
 
 The card is currently a single dense JSX expression; it gets broken into
-`AttentionCard` + a `JobFailureRow` component. `details` is typed by hand in
-`features/errors/use-errors.ts`, since a free-form `dict[str, Any]` surfaces in
-OpenAPI as a generic object.
+`AttentionCard` + a `JobFailureRow` component. `jobDetails` arrives fully typed
+from `contracts/ts/api.ts`, so no hand-written shape is needed.
 
 ## Data flow
 
@@ -455,8 +519,14 @@ Offline; agents and the browser faked, per the existing suite.
 - `test_repeated_failure_dedupes_and_counts` — same job+stage twice → one row,
   `count = 2`.
 - `test_success_resolves_open_failure` — the auto-resolve invariant.
-- `test_error_row_exposes_details` — regression guard on the `_row()` omission.
+- `test_error_row_exposes_job_details` — regression guard on the `_row()`
+  omission.
+- `test_error_row_tolerates_unparseable_details` — legacy JSON → `jobDetails`
+  is `None`, not a `500`.
 - `test_traceback_tail_is_truncated` — frame and character caps hold.
+- `test_errors_list_paginates`.
+- `test_redo_rejects_empty_job_ids` / `test_redo_rejects_empty_stages` — `422`.
+- `test_redo_dedupes_repeated_stages` — `["tailor","tailor"]` runs once.
 - Web: `RedoDialog.test.tsx`, `use-redo-run.test.tsx`, a
   `PipelineContainer.test.tsx` case for Redo over a selection, and
   `AttentionCard.test.tsx` for kind grouping, formatted job rows, and Retry
@@ -477,8 +547,8 @@ Offline; agents and the browser faked, per the existing suite.
 | `src/resume_agent/api/schemas/runs.py` | `RedoParams`. |
 | `src/resume_agent/api/routers/runs.py` | `POST /api/redo`. |
 | `src/resume_agent/services/errors.py` | `"job"` kind, `StageFailure`, `record_job_failure`, `resolve_job_failures`. |
-| `src/resume_agent/api/schemas/errors.py` | `ErrorRecordOut.details`. |
-| `src/resume_agent/api/routers/errors.py` | `_row()` stops dropping `details_json`. |
+| `src/resume_agent/api/schemas/errors.py` | `JobFailureDetails`, `ErrorRecordOut.job_details`, `ErrorRecordsOut.pagination`. |
+| `src/resume_agent/api/routers/errors.py` | `_row()` projects typed job details; `page`/`pageSize` on the list. |
 | `web/src/features/runs/RedoDialog.tsx` | New. |
 | `web/src/features/runs/use-redo-run.ts` | New. |
 | `web/src/features/pipeline/PipelineContainer.tsx` | `Redo…` bulk action. |
