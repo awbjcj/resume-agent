@@ -1,8 +1,9 @@
-"""Board read-models (filter/sort/paginate over the query DTOs) and mutations.
+"""Board read orchestration and mutations.
 
-Read side wraps tracking.queries with the core server-side filters the API
-exposes; rich faceting stays client-side for now. Mutation side wraps
-tracking.repository, preserving the existing job/application semantics.
+Read side asks tracking.board_query for one filtered, sorted, paged set of jobs
+(plus its leave-one-out facet counts) and then projects only those jobs through
+tracking.queries. Mutation side wraps tracking.repository, preserving the
+existing job/application semantics.
 """
 
 from __future__ import annotations
@@ -81,7 +82,14 @@ def list_board(
     page: int = 1,
     page_size: int = 50,
     facts_path: str = DEFAULT_FACTS,
+    with_facets: bool = True,
 ) -> BoardListResult:
+    """One board page, plus leave-one-out facet counts on page 1.
+
+    Facet counts cost their own aggregation queries, so ``with_facets=False``
+    skips them for callers that only need the page (``facets`` is then ``None``,
+    exactly as it already is on pages after the first).
+    """
     f = board_filter or BoardFilter(sort="recency" if board == "pipeline" else "fit")
     query_time = datetime.now(timezone.utc)
     jobs, total = board_query.board_page(
@@ -114,7 +122,7 @@ def list_board(
                 f,
                 now=query_time,
             )
-            if page == 1
+            if with_facets and page == 1
             else None
         ),
     )
@@ -138,6 +146,7 @@ def list_shortlist(
         page=page,
         page_size=page_size,
         facts_path=facts_path,
+        with_facets=False,
     ).page
 
 
@@ -171,6 +180,7 @@ def list_pipeline(
         board_filter=f,
         page=page,
         page_size=page_size,
+        with_facets=False,
     ).page
 
 
@@ -197,6 +207,7 @@ def list_triage(
         board_filter=f,
         page=page,
         page_size=page_size,
+        with_facets=False,
     ).page
 
 

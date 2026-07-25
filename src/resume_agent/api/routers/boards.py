@@ -26,8 +26,7 @@ def board_filter_query(default_sort: str):
     """The boards' shared filter surface, declared once.
 
     A factory because the wire default for ``sortBy`` is per-board (shortlist
-    ranks by fit, triage by recency, and pipeline by stage) while the parameter
-    set is not.
+    ranks by fit; pipeline and triage by recency) while the parameter set is not.
     """
 
     def dependency(

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from sqlalchemy import String, and_, case, cast as sql_cast, false, func, or_, true
+from sqlalchemy.orm import defer
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import Session, select
 
@@ -323,7 +324,9 @@ def _filter_clauses(
 
     if board_filter.min_salary is not None and board != "triage":
         salary = _salary_value(board)
-        currency = _json_text("salary_range", "currency")
+        # NULLIF mirrors the Python predicate's ``currency or "USD"``: a blank
+        # currency defaults to USD instead of silently escaping the gate.
+        currency = func.nullif(_json_text("salary_range", "currency"), "")
         clauses.append(
             or_(
                 func.upper(func.coalesce(currency, "USD")) != "USD",
@@ -481,10 +484,13 @@ def board_page(
     if not page_ids:
         return [], total
     job_id = cast(Any, Job.id)
-    jobs_by_id = {
-        job.id: job
-        for job in session.exec(select(Job).where(job_id.in_(page_ids))).all()
-    }
+    page_statement = select(Job).where(job_id.in_(page_ids))
+    if board != "pipeline":
+        # Only PipelineRow reads jd_text (for its bounded preview); ShortlistRow
+        # and TriageRow never do, so keep the largest column out of the page read.
+        # tests/test_tracking_queries.py pins that invariant.
+        page_statement = page_statement.options(defer(cast(Any, Job.jd_text)))
+    jobs_by_id = {job.id: job for job in session.exec(page_statement).all()}
     jobs = [jobs_by_id[value] for value in page_ids]
     return jobs, total
 
@@ -588,13 +594,13 @@ def _shared_facet_counts(
     aliases = load_aliases(aliases_path)
     tokens_by_raw: dict[str, tuple[str, ...]] = {}
     for row in session.exec(statement).all():
-        source = row[1]
-        status = row[2]
-        criteria = row[3] or {} if board != "triage" else {}
+        # Attribute access, not row[n]: `columns` is built conditionally, so
+        # positional reads would silently shift if a column were ever added.
+        criteria = getattr(row, "criteria_json", None) or {}
         location = criteria.get("location_parts") or {}
         values = {
-            "source": source,
-            "status": status,
+            "source": row.source,
+            "status": row.status,
             "remote": criteria.get("remote_policy"),
             "sponsorship": criteria.get("sponsorship_signal"),
             "seniority": criteria.get("seniority"),
