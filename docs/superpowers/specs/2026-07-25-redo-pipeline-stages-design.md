@@ -43,6 +43,8 @@ silence becomes user-visible.
 - Redoing never destroys prior work and never moves a job backwards.
 - Tailor a board selection regardless of status ("Tailor selected").
 - A failing run names its actual cause.
+- Per-job failures are durable, formatted, and triageable from the dashboard —
+  with a retry that closes the loop.
 
 ## Non-goals
 
@@ -51,6 +53,8 @@ silence becomes user-visible.
   explicitly-targeted act.
 - Marking versions stale when the JD text changes.
 - Redo surfaces on the shortlist and triage boards.
+- A dedicated `/errors` route. Failure triage extends the existing dashboard
+  `AttentionCard`.
 - Replacing `reprocess()`'s destructive raw-reset. `StageScope` makes that
   possible later; it is out of scope here.
 
@@ -66,6 +70,9 @@ silence becomes user-visible.
 | 6 | Per-job outcomes in the run result; every cause logged. | A partial run should finish green and say which jobs failed; a total failure should name the exception. |
 | 7 | One `Redo…` bulk action, tailor pre-ticked. | "Tailor selected" *is* redo with one stage ticked. One dialog, one launch path. |
 | 8 | Confirm with an explicit count; no hard cap. | `enforce_active_budget()` is the real ceiling. An arbitrary cap blocks legitimate large redos. |
+| 9 | Per-job failures persist as `ErrorRecord` rows with structured details plus a truncated traceback tail. | The substrate already exists with dedupe, counts, and retention. Structured fields drive a formatted row; the tail is there when a provider SDK error needs real diagnosis. |
+| 10 | A stage success auto-resolves that job+stage's open failure. | Without it the card becomes a graveyard of already-fixed failures and stops being read, which defeats triage. |
+| 11 | Triage extends `AttentionCard`, grouped by kind, with a Retry action. | Retry is what makes it triage rather than a log. A dedicated route is more surface than the volume justifies. |
 
 ## Architecture
 
@@ -218,7 +225,7 @@ by. Deterministic, no new state. A job with no versions →
 @dataclass(frozen=True)
 class TailorOutcome:
     versions: dict[int, list[ResumeVersion]]
-    failures: dict[int, str]
+    failures: dict[int, StageFailure]   # see Failure triage below
 ```
 
 and logs each captured `Result.error` with `exc_info` and the job id.
@@ -229,6 +236,79 @@ outcomes in the run result.
 
 The same one-line logging fix lands in `run_extract`, `run_score`, and
 `run_relevance`, which are silent today for the same reason.
+
+### Failure triage
+
+The `ErrorRecord` substrate already provides what triage needs — dedupe on
+`(kind, source_label, status="open")`, a `count`, first/last-seen timestamps,
+`open`/`dismissed`/`resolved` states, 30-day retention — and is already wired to
+the dashboard's `AttentionCard`. Two gaps block per-job failures from using it:
+
+1. `services/errors.py:15` — `_KINDS = {"run", "source"}` has no job kind.
+2. `api/routers/errors.py:28` — `_row()` builds `ErrorRecordOut` from ten fields
+   and omits `details_json`. Structured detail is persisted on write and then
+   dropped at the API boundary, so the UI has nothing to format.
+
+#### `StageFailure` — the shared failure value object
+
+Built once, where the exception is still in hand:
+
+```python
+@dataclass(frozen=True)
+class StageFailure:
+    error_type: str        # "ValueError"
+    message: str           # truncated to 300 chars
+    traceback_tail: str    # last 5 frames, capped at 4000 chars
+
+    @classmethod
+    def from_exception(cls, exc: BaseException) -> StageFailure: ...
+```
+
+This is why `TailorOutcome.failures` is `dict[int, StageFailure]` rather than
+`dict[int, str]` — a bare string cannot carry the traceback. The full traceback
+still goes to the log via `exc_info`; only the tail is persisted.
+
+#### Recording
+
+Add `"job"` to `_KINDS`, plus one writer delegating to the existing
+`record_error`:
+
+```python
+record_job_failure(
+    session, *, job, stage, failure, run_id, model: str | None = None
+) -> ErrorRecord
+```
+
+`model` is `None` for stages with no LLM model in play (a `pull` HTTP failure);
+it is the resolved model id for `extract` and `tailor`.
+
+- `source_label = f"job:{job_id}:{stage}"` — the dedupe key, so a redo that
+  fails the same way twice increments `count` instead of doubling rows.
+- `message = f"{error_type}: {message}"`, truncated.
+- `details_json` = `jobId`, `company`, `title`, `stage`, `errorType`, `message`,
+  `model`, `runId`, `attempt`, `tracebackTail`. `model` is present because the
+  motivating case is model-switching: when a re-tailor fails, the first question
+  is which model produced it.
+
+Both `redo_jobs` and a plain `tailor` run record through this writer, so per-job
+failures land in one place regardless of which run produced them.
+
+`StageOutcome` and `StageFailure` are not the same thing and should not be
+merged: `StageOutcome` is the transient per-job row in a run's result payload
+(covering `ok`/`skipped`/`failed`), while `StageFailure` is the durable
+diagnostic written to `ErrorRecord`. A failed `StageOutcome.detail` carries the
+same one-line message the record's `message` does.
+
+#### Auto-resolve on success
+
+```python
+resolve_job_failures(session, job_id, stage) -> int
+```
+
+Flips matching `open` records to `resolved`; called on every stage success.
+Without it a failure survives the fix that cured it, the card fills with stale
+rows, and it stops being read. Manual `dismiss` remains the "I don't care about
+this one" action.
 
 ### API
 
@@ -243,6 +323,11 @@ class RedoParams(CamelModel):
 ```
 
 Result payload: `{ "outcomes": [{ jobId, stage, status, detail }] }`.
+
+`ErrorRecordOut` gains `details: dict[str, Any] | None`, and `_row()` stops
+dropping `details_json`. That is the entire error-surface API change — the write
+path already stores it. Source and run records get their details exposed too,
+for free.
 
 Schemas are `CamelModel`, so the wire format is camelCase. OpenAPI →
 `contracts/openapi.json` → `contracts/ts/api.ts` regenerated via
@@ -279,6 +364,30 @@ The existing `Tailor approved…` button and `LaunchDialog` are kept as-is. They
 serve a different purpose — a roster of approved work — and folding them into
 Redo would conflate "start the pipeline" with "run it again."
 
+**`features/dashboard/AttentionCard.tsx`** — rows group under **Sources / Jobs /
+Runs** headings. A job row renders:
+
+```
+Acme — Staff Engineer                    [tailor] ×3
+ValueError: match_plan_enabled requires a match-plan agent
+openai:gpt-5 · 4 minutes ago
+  ▸ Technical details                    [Retry] [Dismiss] [Resolve]
+```
+
+- **Retry** opens `RedoDialog` pre-filled with that job and that stage, closing
+  the loop without leaving the dashboard.
+- Company/title links into the job.
+- **Technical details** is a collapsed expander holding `tracebackTail`.
+- Top 8 shown; **Show all N** expands inline, so no new route. The existing
+  **Clear all** is unchanged.
+- Source and run rows keep today's rendering — they have no `jobId` to format
+  around — and render `details` as a plain key/value list when present.
+
+The card is currently a single dense JSX expression; it gets broken into
+`AttentionCard` + a `JobFailureRow` component. `details` is typed by hand in
+`features/errors/use-errors.ts`, since a free-form `dict[str, Any]` surfaces in
+OpenAPI as a generic object.
+
 ## Data flow
 
 ```
@@ -292,6 +401,14 @@ RedoDialog (stages, jobIds, deep)
                  └─ render   → render_version(selected|newest)
        └─ GET /api/runs/{id}/events (SSE) → per-stage progress
        └─ run result: [{ jobId, stage, status, detail }]
+
+per stage, per job:
+  failed  → record_job_failure  → ErrorRecord(kind="job",
+                                    source_label="job:{id}:{stage}")
+  ok      → resolve_job_failures → that row flips to "resolved"
+
+AttentionCard ← GET /api/errors?status=open
+  └─ Retry → RedoDialog(jobIds=[jobId], stages=[stage]) → POST /api/redo
 ```
 
 ## Error handling
@@ -302,7 +419,10 @@ RedoDialog (stages, jobIds, deep)
 | No `url` on re-pull | `skipped("no source URL")`. |
 | Fetch/parse failure | `failed(reason)`; `jd_text` preserved. |
 | Browser needed, `browser_enabled=false` | `failed` with the standard cloud degradation message. |
-| Per-job LLM failure | Isolated by `gather_isolated`, logged with the job id, reported as `failed` with the exception message. |
+| Per-job LLM failure | Isolated by `gather_isolated`, logged with the job id, reported as `failed`, and written to an `ErrorRecord` with structured details. |
+| Same job+stage fails twice | One `ErrorRecord`, `count` incremented, `last_seen_at` bumped. |
+| A previously-failed job+stage succeeds | Its open `ErrorRecord` flips to `resolved`. |
+| `record_job_failure` itself raises | Logged and swallowed. Recording a failure must never turn a partial run into a total one. |
 | Every job failed in a stage | Stage reports all failures; the run still reports other stages. |
 | Over active-job budget | `enforce_active_budget()` raises; mapped to `429` by `launch()`. |
 | Concurrent run conflict | Existing launch-seam mapping (`409`). |
@@ -330,8 +450,17 @@ Offline; agents and the browser faked, per the existing suite.
 - `test_all_failed_raises_with_cause` — `RuntimeError` names the first
   exception, not just a count.
 - `test_render_targets_selected_version_else_newest`.
-- Web: `RedoDialog.test.tsx`, `use-redo-run.test.tsx`, and a
-  `PipelineContainer.test.tsx` case for Redo over a selection.
+- `test_job_failure_recorded_with_details` — payload carries jobId, company,
+  stage, errorType, and model.
+- `test_repeated_failure_dedupes_and_counts` — same job+stage twice → one row,
+  `count = 2`.
+- `test_success_resolves_open_failure` — the auto-resolve invariant.
+- `test_error_row_exposes_details` — regression guard on the `_row()` omission.
+- `test_traceback_tail_is_truncated` — frame and character caps hold.
+- Web: `RedoDialog.test.tsx`, `use-redo-run.test.tsx`, a
+  `PipelineContainer.test.tsx` case for Redo over a selection, and
+  `AttentionCard.test.tsx` for kind grouping, formatted job rows, and Retry
+  wiring into `RedoDialog`.
 - Contract: `tests/api/test_openapi_contract.py` drift gate after regenerating
   the TS client.
 
@@ -347,8 +476,13 @@ Offline; agents and the browser faked, per the existing suite.
 | `src/resume_agent/tracking/tables.py` | `ResumeVersion.attempt`, `.tailor_model`. |
 | `src/resume_agent/api/schemas/runs.py` | `RedoParams`. |
 | `src/resume_agent/api/routers/runs.py` | `POST /api/redo`. |
+| `src/resume_agent/services/errors.py` | `"job"` kind, `StageFailure`, `record_job_failure`, `resolve_job_failures`. |
+| `src/resume_agent/api/schemas/errors.py` | `ErrorRecordOut.details`. |
+| `src/resume_agent/api/routers/errors.py` | `_row()` stops dropping `details_json`. |
 | `web/src/features/runs/RedoDialog.tsx` | New. |
 | `web/src/features/runs/use-redo-run.ts` | New. |
 | `web/src/features/pipeline/PipelineContainer.tsx` | `Redo…` bulk action. |
 | `web/src/components/JobModal.tsx` | Per-job `Redo…`. |
-| `CLAUDE.md` | Document the redo path and the high-water invariant. |
+| `web/src/features/dashboard/AttentionCard.tsx` | Grouped by kind; split out `JobFailureRow`; Retry action. |
+| `web/src/features/errors/use-errors.ts` | Hand-typed `details` shape. |
+| `CLAUDE.md` | Document the redo path, the high-water invariant, and job-kind error records. |
