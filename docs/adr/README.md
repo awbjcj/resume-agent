@@ -10,3 +10,4 @@ Decisions the architecture reviews must not re-litigate. Newest last.
 | [0004](0004-company-rename-recomputes-dedup-key-skip-on-collision.md) | Company rename recomputes dedup key | Renames recompute `dedup_key`; collisions skip rather than merge. |
 | [0005](0005-read-only-agent-tools-deterministic-writes.md) | Read-only agent tools | Every tool inside an agent loop is read-only; writes happen after the loop through deterministic services behind user approval. |
 | [0006](0006-turn-per-run-conversational-sessions.md) | Turn-per-run conversational sessions | Durable session JSON per conversation; one user message → one run → one typed turn. The Session substrate (`sessions/store.py`) is its custody implementation. |
+| [0007](0007-board-filtering-in-sql.md) | Board filtering in SQL | `tracking.board_query` owns selection, sorting, paging, and facets; projection runs only for returned jobs. |

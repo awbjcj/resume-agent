@@ -399,16 +399,24 @@ kind, not the category)
 **Board seam**:
 `services/board` — the single place board-data _policy_ and _assembled reads_
 live. Owns the mutations (`set_stage`, `set_archived`, `delete`,
-`upsert_application`) and the assembled detail read (`get_job_detail`). Raw list
-projections (`shortlist_rows`, `pipeline_rows`, `triage_rows`) stay in
-`tracking.queries` and are called directly by both adapters — wrapping them in
-board would add shallow pass-throughs and fight the frontend's rich in-process
-filtering. Adapters cross this seam for mutations; they never re-import
-`tracking.repository` mutation functions. Bulk actions are transactional: one
-batched load plus `progressed_job_ids` gate, then one commit; `delete_job_row` is
-the unguarded cascade shared with `delete_job` and prune.
+`upsert_application`), the assembled detail read (`get_job_detail`), and board
+read orchestration (`list_board`). `tracking.board_query` selects and pages job
+ids; `tracking.queries` projects only those returned jobs into API-shaped rows.
+The frontend sends filter state as query parameters and does not filter the
+materialized board in process. Adapters cross this seam for mutations; they
+never re-import `tracking.repository` mutation functions. Bulk actions are
+transactional: one batched load plus `progressed_job_ids` gate, then one commit;
+`delete_job_row` is the unguarded cascade shared with `delete_job` and prune.
 _Avoid_: board service (it is the seam, not a layer), repository (the repository
 is what board guards)
+
+**Board query**:
+`tracking/board_query.py` — the single statement builder that turns a
+`BoardFilter` into filtered, sorted, paged SQL and leave-one-out `GROUP BY`
+facet counts. It is the only place board selection is expressed; row
+projections receive only the returned page. Computed facets invert their stored
+values at this boundary.
+_Avoid_: board repository, filter service
 
 **JobDetailRow**:
 The flat read-model for one job's detail view, assembled by `job_detail_row`
@@ -418,26 +426,14 @@ The flat read-model for one job's detail view, assembled by `job_detail_row`
 `ShortlistRow`.
 _Avoid_: detail DTO, job view (name it for the row it is)
 
-**Filter contract**:
-The cross-language behavioral spec for shortlist filter-and-rank: a checked-in
-fixture of `(rows, filterState) -> ordered [job id]` cases, rows in the camelCase
-`ShortlistItem` wire shape. It is the single interface for a predicate that
-genuinely runs in two runtimes — `services/shortlist_filtering.py` (Python) and
-`web/src/lib/filters` (React, TS). Both implementations stay; the contract is the
-one thing that cannot drift. Lives in `contracts/` beside `openapi.json`.
-_Avoid_: filter test, fixture (it is the interface, not one side's test)
-
-**Conformance harness**:
-The thin per-runtime runner that feeds the Filter contract through one
-implementation and asserts the ordered ids — pytest through `filtering.py`, vitest
-through `apply.ts`/`sort.ts`. Owns no behavior; only proves an adapter satisfies
-the contract. Language-local edge cases (None vs undefined, tz-naive dates) stay in
-ordinary unit tests; shared behavior lives in the contract.
-_Avoid_: unit test (a conformance harness asserts the shared contract, not
-language-local edges)
+**JD preview**:
+The cleaned excerpt of at most 400 characters that board responses ship instead
+of a full job description. Full `jd_text` is exposed only by `JobDetail`.
+_Avoid_: JD text (that means the complete stored description), summary (the
+preview is truncated, not synthesized)
 
 **Composite rank**:
-The weighted fit/salary/recency sort key (`PRESETS`) for the shortlist. Sorted at
-full precision so Python and JS order identically — the `round`/`Math.round` step
-is display-only and never enters the ordering. The Filter contract pins this.
+The server-side weighted fit/salary/recency SQL sort key (`PRESETS`) for the
+shortlist. Presets choose different weight sets; stable job-id ordering breaks
+ties.
 _Avoid_: composite score (the score is the value; the rank is its use as sort key)
