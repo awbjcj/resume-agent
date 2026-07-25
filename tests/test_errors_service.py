@@ -113,6 +113,127 @@ def test_record_source_failures_preserves_run_id(session):
     assert {row.run_id for row in rows} == {"run-123"}
 
 
+def test_record_job_failure_stores_formatted_details(session):
+    from resume_agent.services.errors import StageFailure, record_job_failure
+    from resume_agent.tracking.repository import save_job
+    from resume_agent.tracking.tables import Job
+
+    job = save_job(
+        session, Job(source="manual", jd_text="jd", company="Acme", title="Staff")
+    )
+    try:
+        raise ValueError("match_plan_enabled requires a match-plan agent")
+    except ValueError as exc:
+        failure = StageFailure.from_exception(exc)
+
+    record = record_job_failure(
+        session,
+        job=job,
+        stage="tailor",
+        failure=failure,
+        run_id="r1",
+        model="openai:gpt-5",
+    )
+
+    assert record.kind == "job"
+    assert record.source_label == f"job:{job.id}:tailor"
+    assert record.message.startswith("ValueError: match_plan_enabled")
+    details = record.details_json or {}
+    assert details["jobId"] == job.id
+    assert details["company"] == "Acme"
+    assert details["title"] == "Staff"
+    assert details["stage"] == "tailor"
+    assert details["errorType"] == "ValueError"
+    assert details["model"] == "openai:gpt-5"
+    assert "ValueError" in details["tracebackTail"]
+
+
+def test_repeated_job_failure_dedupes_and_counts(session):
+    from resume_agent.services.errors import StageFailure, record_job_failure
+    from resume_agent.tracking.repository import save_job
+    from resume_agent.tracking.tables import Job
+
+    job = save_job(session, Job(source="manual", jd_text="jd"))
+    failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
+
+    first = record_job_failure(session, job=job, stage="tailor", failure=failure)
+    second = record_job_failure(session, job=job, stage="tailor", failure=failure)
+
+    assert second.id == first.id
+    assert second.count == 2
+
+
+def test_different_stages_are_separate_records(session):
+    from resume_agent.services.errors import StageFailure, record_job_failure
+    from resume_agent.tracking.repository import save_job
+    from resume_agent.tracking.tables import Job
+
+    job = save_job(session, Job(source="manual", jd_text="jd"))
+    failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
+
+    tailor = record_job_failure(session, job=job, stage="tailor", failure=failure)
+    pull = record_job_failure(session, job=job, stage="pull", failure=failure)
+
+    assert tailor.id != pull.id
+
+
+def test_success_resolves_open_job_failure(session):
+    from resume_agent.services.errors import (
+        StageFailure,
+        record_job_failure,
+        resolve_job_failures,
+    )
+    from resume_agent.tracking.repository import save_job
+    from resume_agent.tracking.tables import Job
+
+    job = save_job(session, Job(source="manual", jd_text="jd"))
+    failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
+    record = record_job_failure(session, job=job, stage="tailor", failure=failure)
+
+    resolved = resolve_job_failures(session, job.id, "tailor")
+
+    session.refresh(record)
+    assert resolved == 1
+    assert record.status == "resolved"
+
+
+def test_resolve_leaves_other_stages_open(session):
+    from resume_agent.services.errors import (
+        StageFailure,
+        record_job_failure,
+        resolve_job_failures,
+    )
+    from resume_agent.tracking.repository import save_job
+    from resume_agent.tracking.tables import Job
+
+    job = save_job(session, Job(source="manual", jd_text="jd"))
+    failure = StageFailure(error_type="RuntimeError", message="boom", traceback_tail="")
+    pull = record_job_failure(session, job=job, stage="pull", failure=failure)
+    record_job_failure(session, job=job, stage="tailor", failure=failure)
+
+    resolve_job_failures(session, job.id, "tailor")
+
+    session.refresh(pull)
+    assert pull.status == "open"
+
+
+def test_stage_failure_truncates_message_and_traceback():
+    from resume_agent.services.errors import (
+        MAX_MESSAGE_CHARS,
+        MAX_TRACEBACK_CHARS,
+        StageFailure,
+    )
+
+    try:
+        raise ValueError("x" * 5000)
+    except ValueError as exc:
+        failure = StageFailure.from_exception(exc)
+
+    assert len(failure.message) == MAX_MESSAGE_CHARS
+    assert len(failure.traceback_tail) <= MAX_TRACEBACK_CHARS
+    assert failure.error_type == "ValueError"
+
+
 def test_concurrent_writers_do_not_duplicate_or_lose_counts(tmp_path):
     engine = make_engine(f"sqlite:///{(tmp_path / 'errors.db').as_posix()}")
     init_db(engine)
