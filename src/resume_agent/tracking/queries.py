@@ -220,6 +220,16 @@ def shortlist_rows(
         .where(Job.status == JobStatus.shortlisted.value, archived_col.is_(None))
         .order_by(fit_score_col.desc().nullslast())
     ).all()
+    return project_shortlist_jobs(jobs, facts=facts, aliases_path=aliases_path)
+
+
+def project_shortlist_jobs(
+    jobs: list[Job],
+    *,
+    facts: ProfileFacts | None = None,
+    aliases_path: str | Path = SKILL_ALIASES_PATH,
+) -> list[ShortlistRow]:
+    """Project an already-selected job page into shortlist rows."""
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
     return [_shortlist_row(job, tokens, aliases) for job in jobs]
@@ -295,10 +305,21 @@ def pipeline_rows(session: Session) -> list[PipelineRow]:
         .where(archived_col.is_(None))
         .order_by(status_col, company_col, title_col)
     ).all()
-    versions = versions_by_job(session)
-    applications = applications_by_job(session)
-    progressed = progressed_job_ids(session)
-    aliases = load_aliases(SKILL_ALIASES_PATH)
+    return project_pipeline_jobs(session, jobs, aliases_path=SKILL_ALIASES_PATH)
+
+
+def project_pipeline_jobs(
+    session: Session,
+    jobs: list[Job],
+    *,
+    aliases_path: str | Path = SKILL_ALIASES_PATH,
+) -> list[PipelineRow]:
+    """Project an already-selected job page with page-scoped child lookups."""
+    job_ids = [_require_job_id(job) for job in jobs]
+    versions = versions_by_job(session, job_ids)
+    applications = applications_by_job(session, job_ids)
+    progressed = progressed_job_ids(session, job_ids)
+    aliases = load_aliases(aliases_path)
     rows = []
     for job in jobs:
         job_id = _require_job_id(job)
@@ -398,8 +419,7 @@ def triage_rows(session: Session) -> list[TriageRow]:
         .where(status_col.in_(_TRIAGE_STATUSES), archived_col.is_(None))
         .order_by(cast(Any, Job.fit_score).asc().nullsfirst())
     ).all()
-    progressed = progressed_job_ids(session)
-    return [_triage_row(job, progressed) for job in jobs]
+    return project_triage_jobs(session, jobs)
 
 
 def archived_rows(session: Session) -> list[TriageRow]:
@@ -410,5 +430,14 @@ def archived_rows(session: Session) -> list[TriageRow]:
         .where(archived_col.is_not(None))
         .order_by(archived_col.desc())
     ).all()
-    progressed = progressed_job_ids(session)
+    return project_triage_jobs(session, jobs)
+
+
+def project_triage_jobs(
+    session: Session,
+    jobs: list[Job],
+) -> list[TriageRow]:
+    """Project an already-selected job page with page-scoped progress lookups."""
+    job_ids = [_require_job_id(job) for job in jobs]
+    progressed = progressed_job_ids(session, job_ids)
     return [_triage_row(job, progressed) for job in jobs]

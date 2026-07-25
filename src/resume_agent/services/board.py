@@ -9,36 +9,31 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-import re
+from datetime import datetime, timezone
 from typing import Any, Literal, Sequence, cast
 
 from sqlmodel import Session, select
 
 from resume_agent.profile.store import load_facts
-from resume_agent.services.pagination import Page, paginate
+from resume_agent.services.pagination import Page, page_from_slice
 from resume_agent.tenancy.paths import FACTS_PATH as DEFAULT_FACTS, resolve_tenant_path
+from resume_agent.tracking import board_query
 from resume_agent.tracking.board_query import (
-    FACET_SPECS,
-    NEUTRAL,
-    PRESETS,
-    RECENCY_WINDOW_DAYS,
-    SALARY_CEILING,
     BoardFilter,
     BoardName,
+    FACET_SPECS as FACET_SPECS,
     Facets,
-    Preset,
-    SortKey,
+    Preset as Preset,
+    SortKey as SortKey,
 )
 from resume_agent.tracking.queries import (
     PipelineRow,
     ShortlistRow,
     TriageRow,
-    archived_rows,
     job_detail_row,
-    pipeline_rows,
-    shortlist_rows,
-    triage_rows,
+    project_pipeline_jobs,
+    project_shortlist_jobs,
+    project_triage_jobs,
 )
 from resume_agent.tracking.repository import (
     application_for_job,
@@ -78,261 +73,6 @@ class BulkResult:
     reasons: dict[str, int]
 
 
-_FACETS_BY_KEY = {spec.key: spec for spec in FACET_SPECS}
-
-
-_PUNCT = re.compile(r"[^a-z0-9+#. ]+")
-_WS = re.compile(r"\s+")
-
-
-def _normalize_token(value: str) -> str:
-    return _WS.sub(" ", _PUNCT.sub(" ", value.lower())).strip()
-
-
-def _selected(values: Sequence[str]) -> set[str]:
-    return {v for v in values if v}
-
-
-def _row_value(row: Any, key: str) -> str | None:
-    spec = _FACETS_BY_KEY.get(key)
-    if spec is None:
-        return None
-    return getattr(row, spec.row_attr, None)
-
-
-def _row_text(row: Any) -> str:
-    fields = (
-        getattr(row, "company", None),
-        getattr(row, "title", None),
-        getattr(row, "location", None),
-        getattr(row, "source", None),
-        getattr(row, "status", None),
-        getattr(row, "jd_text", None),
-    )
-    return " ".join(str(v) for v in fields if v).lower()
-
-
-def _row_skill_tokens(row: Any) -> set[str]:
-    return {
-        _normalize_token(tag.name) for tag in getattr(row, "skills", []) if tag.name
-    }
-
-
-def _aware(dt: datetime) -> datetime:
-    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
-
-
-def _passes_filter(row: Any, f: BoardFilter, *, exclude: str | None = None) -> bool:
-    """Whether ``row`` survives ``f``. ``exclude`` drops one facet key's own
-    selection (and ``"skills"``) from the check — the leave-one-out pass that
-    lets ``board_facets`` count a facet without hiding its sibling options."""
-    if f.q and f.q.strip().lower() not in _row_text(row):
-        return False
-    if f.reject_reason:
-        reason = getattr(row, "reject_reason", None)
-        if reason is None or f.reject_reason.strip().lower() not in reason.lower():
-            return False
-
-    score = getattr(row, "fit_score", None)
-    if f.min_fit is not None and score is not None and score < f.min_fit:
-        return False
-    if f.max_fit is not None and score is not None and score > f.max_fit:
-        return False
-
-    if f.min_salary is not None:
-        salary = getattr(row, "salary_max", None) or getattr(row, "salary_min", None)
-        currency = (getattr(row, "salary_currency", None) or "USD").upper()
-        if currency == "USD" and salary is not None and salary < f.min_salary:
-            return False
-
-    if f.stale_days is not None:
-        posted_at = getattr(row, "posted_at", None)
-        if posted_at is None:
-            return False
-        cutoff = datetime.now(timezone.utc) - timedelta(days=f.stale_days)
-        if _aware(posted_at) < cutoff:
-            return False
-
-    if f.stale_min_days is not None:
-        posted_at = getattr(row, "posted_at", None)
-        if posted_at is None:
-            return False
-        cutoff = datetime.now(timezone.utc) - timedelta(days=f.stale_min_days)
-        if _aware(posted_at) >= cutoff:
-            return False
-
-    for spec in FACET_SPECS:
-        if spec.key == exclude:
-            continue
-        selected = _selected(getattr(f, spec.filter_attr))
-        value = getattr(row, spec.row_attr, None)
-        if spec.skip_unset_rows and value is None:
-            continue
-        if selected and value not in selected:
-            return False
-
-    if exclude != "skills":
-        selected_skills = {_normalize_token(v) for v in f.skills if v}
-        if selected_skills and not (_row_skill_tokens(row) & selected_skills):
-            return False
-
-    return True
-
-
-def _apply_board_filter(
-    rows: list[Any], f: BoardFilter, *, exclude: str | None = None
-) -> list[Any]:
-    return [row for row in rows if _passes_filter(row, f, exclude=exclude)]
-
-
-def _posted_sort_value(row: Any) -> datetime:
-    posted_at = getattr(row, "posted_at", None)
-    return (
-        _aware(posted_at)
-        if posted_at is not None
-        else datetime.min.replace(tzinfo=timezone.utc)
-    )
-
-
-def _salary_sort_value(row: Any) -> int:
-    return getattr(row, "salary_max", None) or getattr(row, "salary_min", None) or 0
-
-
-def _composite_raw(
-    row: Any,
-    preset: Preset,
-    now: datetime,
-) -> float:
-    w_fit, w_salary, w_recency = PRESETS[preset]
-    fit_score = getattr(row, "fit_score", None)
-    fit_normalized = float(fit_score) if fit_score is not None else NEUTRAL
-
-    salary = _salary_sort_value(row) or None
-    salary_normalized = (
-        min(salary, SALARY_CEILING) / SALARY_CEILING * 100
-        if salary is not None
-        else NEUTRAL
-    )
-
-    posted_at = getattr(row, "posted_at", None)
-    if posted_at is None:
-        recency_normalized = NEUTRAL
-    else:
-        age_days = (now - _aware(posted_at)).total_seconds() / 86400.0
-        recency_normalized = min(
-            100.0,
-            max(0.0, 100.0 - (age_days / RECENCY_WINDOW_DAYS * 100.0)),
-        )
-
-    return (
-        w_fit * fit_normalized
-        + w_salary * salary_normalized
-        + w_recency * recency_normalized
-    )
-
-
-def _sort_rows(
-    rows: list[Any],
-    sort: SortKey,
-    *,
-    preset: Preset = "balanced",
-    now: datetime | None = None,
-) -> list[Any]:
-    if sort == "fit":
-        return _by_fit_desc(rows)
-    if sort == "composite":
-        rank_time = now or datetime.now(timezone.utc)
-        return sorted(
-            rows,
-            key=lambda row: _composite_raw(row, preset, rank_time),
-            reverse=True,
-        )
-    if sort == "salary":
-        return sorted(rows, key=_salary_sort_value, reverse=True)
-    if sort == "recency":
-        return sorted(rows, key=_posted_sort_value, reverse=True)
-    if sort == "company":
-        return sorted(
-            rows, key=lambda r: ((r.company or "").lower(), (r.title or "").lower())
-        )
-    return rows
-
-
-def _count_values(rows: list[Any], key: str) -> dict[str, int]:
-    counts: Counter[str] = Counter()
-    for row in rows:
-        value = _row_value(row, key)
-        if value:
-            counts[value] += 1
-    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
-
-
-def _count_skills(rows: list[Any]) -> dict[str, int]:
-    counts: Counter[str] = Counter()
-    for row in rows:
-        for token in _row_skill_tokens(row):
-            if token:
-                counts[token] += 1
-    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
-
-
-def board_facets(rows: list[Any], f: BoardFilter) -> Facets:
-    """Leave-one-out facet counts over the raw ``rows``.
-
-    Each facet is counted after applying every filter EXCEPT its own selection,
-    so choosing one value never zeroes out that facet's sibling options — they
-    stay listed and selectable — while their numbers still reflect all the other
-    active filters. That is what lets an open facet popover refresh live as the
-    rest of the filter state changes.
-    """
-    facets: Facets = {}
-    for spec in FACET_SPECS:
-        counts = _count_values(_apply_board_filter(rows, f, exclude=spec.key), spec.key)
-        if counts:
-            facets[spec.key] = counts
-    skills = _count_skills(_apply_board_filter(rows, f, exclude="skills"))
-    if skills:
-        facets["skills"] = skills
-    return facets
-
-
-def _by_fit_desc(rows):
-    return sorted(
-        rows, key=lambda r: (r.fit_score is not None, r.fit_score or -1), reverse=True
-    )
-
-
-def _raw_board_rows(
-    session: Session,
-    board: BoardName,
-    f: BoardFilter,
-    *,
-    facts_path: str = DEFAULT_FACTS,
-) -> list[Any]:
-    """Source rows for ``board`` before any filter/sort. Faceting needs these
-    unfiltered so it can re-apply the filter leave-one-out per facet."""
-    if board == "shortlist":
-        resolved_facts = resolve_tenant_path(facts_path)
-        facts = load_facts(resolved_facts) if resolved_facts.exists() else None
-        return shortlist_rows(session, facts=facts)
-    if board == "pipeline":
-        return pipeline_rows(session)
-    if board == "triage":
-        return archived_rows(session) if f.archived else triage_rows(session)
-    raise ValueError(f"Unknown board {board!r}")
-
-
-def _board_rows(
-    session: Session,
-    board: BoardName,
-    f: BoardFilter,
-    *,
-    facts_path: str = DEFAULT_FACTS,
-) -> list[Any]:
-    rows = _raw_board_rows(session, board, f, facts_path=facts_path)
-    return _sort_rows(_apply_board_filter(rows, f), f.sort, preset=f.preset)
-
-
 def list_board(
     session: Session,
     board: BoardName,
@@ -343,11 +83,36 @@ def list_board(
     facts_path: str = DEFAULT_FACTS,
 ) -> BoardListResult:
     f = board_filter or BoardFilter(sort="recency" if board == "pipeline" else "fit")
-    raw = _raw_board_rows(session, board, f, facts_path=facts_path)
-    rows = _sort_rows(_apply_board_filter(raw, f), f.sort, preset=f.preset)
+    query_time = datetime.now(timezone.utc)
+    jobs, total = board_query.board_page(
+        session,
+        board,
+        f,
+        page=page,
+        page_size=page_size,
+        now=query_time,
+    )
+    if board == "shortlist":
+        resolved_facts = resolve_tenant_path(facts_path)
+        facts = load_facts(resolved_facts) if resolved_facts.exists() else None
+        rows = project_shortlist_jobs(jobs, facts=facts)
+    elif board == "pipeline":
+        rows = project_pipeline_jobs(session, jobs)
+    else:
+        rows = project_triage_jobs(session, jobs)
     return BoardListResult(
-        page=paginate(rows, page=page, page_size=page_size),
-        facets=board_facets(raw, f),
+        page=page_from_slice(
+            rows,
+            total=total,
+            page=page,
+            page_size=page_size,
+        ),
+        facets=board_query.board_facet_counts(
+            session,
+            board,
+            f,
+            now=query_time,
+        ),
     )
 
 
@@ -442,7 +207,10 @@ def _target_ids(
     if scope == "ids":
         return list(dict.fromkeys(ids))
     if scope == "query":
-        return [row.job_id for row in _board_rows(session, board, board_filter)]
+        statement = board_query.board_statement(session, board, board_filter)
+        return list(
+            session.exec(statement.with_only_columns(cast(Any, Job.id))).all()
+        )
     raise ValueError(f"Unknown bulk scope {scope!r}")
 
 

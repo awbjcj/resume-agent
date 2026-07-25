@@ -1,13 +1,20 @@
 import json
+import re
+from collections import Counter
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import pytest
 from sqlmodel import Session, select
 
 from resume_agent.db import init_db, make_engine
-from resume_agent.services import board as legacy_board
 from resume_agent.tracking import queries
 from resume_agent.tracking.board_query import (
+    FACET_SPECS,
+    NEUTRAL,
+    PRESETS,
+    RECENCY_WINDOW_DAYS,
+    SALARY_CEILING,
     BoardFilter,
     board_facet_counts,
     board_page,
@@ -16,6 +23,8 @@ from resume_agent.tracking.tables import Job
 
 
 NOW = datetime.now(timezone.utc)
+_PUNCT = re.compile(r"[^a-z0-9+#. ]+")
+_WS = re.compile(r"\s+")
 
 
 def _seed(session: Session) -> None:
@@ -85,21 +94,170 @@ def board_session(tmp_path, monkeypatch):
     engine.dispose()
 
 
+def _legacy_rows(session, board, board_filter, facts_path):
+    if board == "shortlist":
+        return queries.shortlist_rows(session)
+    if board == "pipeline":
+        return queries.pipeline_rows(session)
+    if board_filter.archived:
+        return queries.archived_rows(session)
+    return queries.triage_rows(session)
+
+
+def _normalize(value: str) -> str:
+    return _WS.sub(" ", _PUNCT.sub(" ", value.lower())).strip()
+
+
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+def _salary(row: Any) -> float:
+    return getattr(row, "salary_max", None) or getattr(row, "salary_min", None) or 0
+
+
+def _passes(row: Any, board_filter: BoardFilter, exclude: str | None = None) -> bool:
+    text = " ".join(
+        str(value)
+        for value in (
+            getattr(row, "company", None),
+            getattr(row, "title", None),
+            getattr(row, "location", None),
+            getattr(row, "source", None),
+            getattr(row, "status", None),
+            getattr(row, "jd_text", None),
+        )
+        if value
+    ).lower()
+    if board_filter.q and board_filter.q.strip().lower() not in text:
+        return False
+    reason = getattr(row, "reject_reason", None)
+    if board_filter.reject_reason and (
+        reason is None or board_filter.reject_reason.strip().lower() not in reason.lower()
+    ):
+        return False
+    score = getattr(row, "fit_score", None)
+    if board_filter.min_fit is not None and score is not None and score < board_filter.min_fit:
+        return False
+    if board_filter.max_fit is not None and score is not None and score > board_filter.max_fit:
+        return False
+    if board_filter.min_salary is not None:
+        salary = _salary(row) or None
+        currency = (getattr(row, "salary_currency", None) or "USD").upper()
+        if currency == "USD" and salary is not None and salary < board_filter.min_salary:
+            return False
+    posted_at = getattr(row, "posted_at", None)
+    if board_filter.stale_days is not None:
+        if posted_at is None or _aware(posted_at) < NOW - timedelta(
+            days=board_filter.stale_days
+        ):
+            return False
+    if board_filter.stale_min_days is not None:
+        if posted_at is None or _aware(posted_at) >= NOW - timedelta(
+            days=board_filter.stale_min_days
+        ):
+            return False
+    for spec in FACET_SPECS:
+        if spec.key == exclude:
+            continue
+        selected = {value for value in getattr(board_filter, spec.filter_attr) if value}
+        value = getattr(row, spec.row_attr, None)
+        if spec.skip_unset_rows and value is None:
+            continue
+        if selected and value not in selected:
+            return False
+    if exclude != "skills":
+        selected = {_normalize(value) for value in board_filter.skills if value}
+        row_skills = {
+            _normalize(tag.name) for tag in getattr(row, "skills", []) if tag.name
+        }
+        if selected and not row_skills & selected:
+            return False
+    return True
+
+
+def _composite(row: Any, preset: str) -> float:
+    w_fit, w_salary, w_recency = PRESETS[preset]
+    fit = float(row.fit_score) if row.fit_score is not None else NEUTRAL
+    salary = _salary(row) or None
+    salary_score = (
+        min(salary, SALARY_CEILING) / SALARY_CEILING * 100
+        if salary is not None
+        else NEUTRAL
+    )
+    if row.posted_at is None:
+        recency = NEUTRAL
+    else:
+        age = (NOW - _aware(row.posted_at)).total_seconds() / 86400
+        recency = min(100.0, max(0.0, 100.0 - age / RECENCY_WINDOW_DAYS * 100))
+    return w_fit * fit + w_salary * salary_score + w_recency * recency
+
+
 def _legacy_ids(session, board, board_filter, facts_path):
-    rows = legacy_board._raw_board_rows(
-        session,
-        board,
-        board_filter,
-        facts_path=str(facts_path),
-    )
-    filtered = legacy_board._apply_board_filter(rows, board_filter)
-    ordered = legacy_board._sort_rows(
-        filtered,
-        board_filter.sort,
-        preset=board_filter.preset,
-        now=NOW,
-    )
+    rows = [
+        row
+        for row in _legacy_rows(session, board, board_filter, facts_path)
+        if _passes(row, board_filter)
+    ]
+    if board_filter.sort == "fit":
+        ordered = sorted(
+            rows,
+            key=lambda row: (row.fit_score is not None, row.fit_score or -1),
+            reverse=True,
+        )
+    elif board_filter.sort == "salary":
+        ordered = sorted(rows, key=_salary, reverse=True)
+    elif board_filter.sort == "recency":
+        floor = datetime.min.replace(tzinfo=timezone.utc)
+        ordered = sorted(
+            rows,
+            key=lambda row: _aware(row.posted_at) if row.posted_at else floor,
+            reverse=True,
+        )
+    elif board_filter.sort == "company":
+        ordered = sorted(
+            rows,
+            key=lambda row: (
+                (row.company or "").lower(),
+                (row.title or "").lower(),
+            ),
+        )
+    elif board_filter.sort == "composite":
+        ordered = sorted(
+            rows,
+            key=lambda row: _composite(row, board_filter.preset),
+            reverse=True,
+        )
+    else:
+        ordered = rows
     return [row.job_id for row in ordered]
+
+
+def _legacy_facets(rows: list[Any], board_filter: BoardFilter):
+    facets = {}
+    for spec in FACET_SPECS:
+        counts = Counter(
+            getattr(row, spec.row_attr)
+            for row in rows
+            if _passes(row, board_filter, exclude=spec.key)
+            and getattr(row, spec.row_attr, None)
+        )
+        if counts:
+            facets[spec.key] = dict(
+                sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+            )
+    skill_counts: Counter[str] = Counter()
+    for row in rows:
+        if not _passes(row, board_filter, exclude="skills"):
+            continue
+        skill_counts.update(
+            {_normalize(tag.name) for tag in getattr(row, "skills", []) if tag.name}
+        )
+    if skill_counts:
+        facets["skills"] = dict(
+            sorted(skill_counts.items(), key=lambda item: (-item[1], item[0]))
+        )
+    return facets
 
 
 @pytest.mark.parametrize(
@@ -215,12 +373,7 @@ def test_legacy_stage_sort_remains_deterministic(board_session):
 )
 def test_facets_match_legacy_leave_one_out_counts(board_session, board_filter):
     session, aliases_path, facts_path = board_session
-    raw = legacy_board._raw_board_rows(
-        session,
-        "pipeline",
-        board_filter,
-        facts_path=str(facts_path),
-    )
+    raw = _legacy_rows(session, "pipeline", board_filter, facts_path)
 
     actual = board_facet_counts(
         session,
@@ -230,7 +383,7 @@ def test_facets_match_legacy_leave_one_out_counts(board_session, board_filter):
         aliases_path=aliases_path,
     )
 
-    assert actual == legacy_board.board_facets(raw, board_filter)
+    assert actual == _legacy_facets(raw, board_filter)
 
 
 def test_page_order_has_no_duplicates_across_ties(board_session):

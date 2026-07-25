@@ -468,15 +468,24 @@ def board_page(
         now=now,
         aliases_path=aliases_path,
     )
+    id_statement = statement.with_only_columns(cast(Any, Job.id))
     count_statement = select(func.count()).select_from(
-        statement.order_by(None).subquery()
+        id_statement.order_by(None).subquery()
     )
     total = session.exec(count_statement).one()
-    jobs = list(
+    page_ids = list(
         session.exec(
-            statement.offset((page - 1) * page_size).limit(page_size)
+            id_statement.offset((page - 1) * page_size).limit(page_size)
         ).all()
     )
+    if not page_ids:
+        return [], total
+    job_id = cast(Any, Job.id)
+    jobs_by_id = {
+        job.id: job
+        for job in session.exec(select(Job).where(job_id.in_(page_ids))).all()
+    }
+    jobs = [jobs_by_id[value] for value in page_ids]
     return jobs, total
 
 
@@ -497,6 +506,7 @@ def _skill_facet_counts(
         return {}
     aliases = load_aliases(aliases_path)
     tokens_by_job: dict[int, set[str]] = defaultdict(set)
+    tokens_by_raw: dict[str, tuple[str, ...]] = {}
     clauses = _filter_clauses(
         session,
         board,
@@ -520,15 +530,117 @@ def _skill_facet_counts(
         for job_id, raw in session.exec(statement).all():
             if not raw:
                 continue
-            tokens_by_job[job_id].update(
-                canonical_skill(atomic, aliases)
-                for atomic in split_skills([str(raw)])
-                if canonical_skill(atomic, aliases)
-            )
+            raw_text = str(raw)
+            tokens = tokens_by_raw.get(raw_text)
+            if tokens is None:
+                tokens = tuple(
+                    token
+                    for atomic in split_skills([raw_text])
+                    if (token := canonical_skill(atomic, aliases))
+                )
+                tokens_by_raw[raw_text] = tokens
+            tokens_by_job[job_id].update(tokens)
     counts: Counter[str] = Counter()
     for tokens in tokens_by_job.values():
         counts.update(tokens)
     return _sorted_counts(counts)
+
+
+def _shared_facet_projection_allowed(board_filter: BoardFilter) -> bool:
+    return not board_filter.skills and not any(
+        _selected(getattr(board_filter, spec.filter_attr)) for spec in FACET_SPECS
+    )
+
+
+def _shared_facet_counts(
+    session: Session,
+    board: BoardName,
+    board_filter: BoardFilter,
+    *,
+    now: datetime,
+    aliases_path: str | Path,
+    derived: _DerivedFilterValues,
+) -> Facets:
+    """Count facets from one narrow projection when leave-one-out sets coincide."""
+    visible_specs = [
+        spec for spec in FACET_SPECS if spec.key in _VISIBLE_FACETS[board]
+    ]
+    clauses = _filter_clauses(
+        session,
+        board,
+        board_filter,
+        exclude=None,
+        now=now,
+        aliases_path=aliases_path,
+        derived=derived,
+    )
+    columns = [
+        cast(Any, Job.id),
+        cast(Any, Job.source),
+        cast(Any, Job.status),
+    ]
+    if board != "triage":
+        columns.append(cast(Any, Job.criteria_json))
+    statement = select(*columns).where(*clauses)
+
+    value_counts = {spec.key: Counter[str]() for spec in visible_specs}
+    skill_counts: Counter[str] = Counter()
+    aliases = load_aliases(aliases_path)
+    tokens_by_raw: dict[str, tuple[str, ...]] = {}
+    for row in session.exec(statement).all():
+        source = row[1]
+        status = row[2]
+        criteria = row[3] or {} if board != "triage" else {}
+        location = criteria.get("location_parts") or {}
+        values = {
+            "source": source,
+            "status": status,
+            "remote": criteria.get("remote_policy"),
+            "sponsorship": criteria.get("sponsorship_signal"),
+            "seniority": criteria.get("seniority"),
+            "employmentType": criteria.get("employment_type"),
+            "industry": criteria.get("industry"),
+            "country": location.get("country"),
+            "region": location.get("region"),
+            "city": location.get("city"),
+            "companySize": criteria.get("company_size"),
+        }
+        for spec in visible_specs:
+            value = values[spec.key]
+            if not value:
+                continue
+            token = str(value)
+            if spec.key == "companySize":
+                snapped = snap_company_size(token)
+                if snapped is None:
+                    continue
+                token = snapped
+            value_counts[spec.key][token] += 1
+
+        if board != "triage":
+            job_skills: set[str] = set()
+            for key in SKILL_KEYS:
+                raw_items = [str(item) for item in (criteria.get(key) or [])]
+                for raw in raw_items:
+                    tokens = tokens_by_raw.get(raw)
+                    if tokens is None:
+                        tokens = tuple(
+                            token
+                            for atomic in split_skills([raw])
+                            if (token := canonical_skill(atomic, aliases))
+                        )
+                        tokens_by_raw[raw] = tokens
+                    job_skills.update(tokens)
+            skill_counts.update(job_skills)
+
+    facets = {
+        key: _sorted_counts(counts)
+        for key, counts in value_counts.items()
+        if counts
+    }
+    if skill_counts:
+        facets["skills"] = _sorted_counts(skill_counts)
+    return facets
 
 
 def board_facet_counts(
@@ -542,6 +654,15 @@ def board_facet_counts(
     """Return leave-one-out counts without hydrating board row DTOs."""
     query_time = now or datetime.now(timezone.utc)
     derived = _derive_filter_values(session, board_filter, aliases_path)
+    if _shared_facet_projection_allowed(board_filter):
+        return _shared_facet_counts(
+            session,
+            board,
+            board_filter,
+            now=query_time,
+            aliases_path=aliases_path,
+            derived=derived,
+        )
     facets: Facets = {}
     for spec in FACET_SPECS:
         if spec.key not in _VISIBLE_FACETS[board]:
