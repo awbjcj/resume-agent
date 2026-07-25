@@ -273,7 +273,7 @@ def launch_tailor(
     engine = _engine(request)
 
     def do_tailor(session, reporter):
-        results = tailor(
+        outcome = tailor(
             session,
             job_ids=params.job_ids,
             approved=params.approved,
@@ -288,8 +288,16 @@ def launch_tailor(
                     "versionCount": len(v),
                     "factCheckPassed": v[-1].fact_check_passed if v else False,
                 }
-                for jid, v in results.items()
-            ]
+                for jid, v in outcome.versions.items()
+            ],
+            "failures": [
+                {
+                    "jobId": jid,
+                    "errorType": failure.error_type,
+                    "message": failure.message,
+                }
+                for jid, failure in outcome.failures.items()
+            ],
         }
 
     return launch(mgr, "tailor", session_work(engine, do_tailor))

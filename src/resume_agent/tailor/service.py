@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 
 from sqlmodel import Session
 
@@ -15,6 +16,7 @@ from resume_agent.profile.matrix import (
     build_skill_match_context,
 )
 from resume_agent.progress import ProgressReporter
+from resume_agent.services.errors import StageFailure
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.workflow import TailorRound, arun_tailor_review
 from resume_agent.taxonomy.clusters import ClusterMap
@@ -27,6 +29,14 @@ from resume_agent.tracking.stages import advance
 from resume_agent.tracking.tables import Job, JobStatus, ResumeVersion
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class TailorOutcome:
+    """What one tailor run produced, per job, including what went wrong."""
+
+    versions: dict[int, list[ResumeVersion]] = field(default_factory=dict)
+    failures: dict[int, StageFailure] = field(default_factory=dict)
 
 
 def _next_attempt(session: Session, job_id: int) -> int:
@@ -126,7 +136,8 @@ def tailor_jobs(
     match_plan_agent: Runner | None = None,
     skill_matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
-) -> dict[int, list[ResumeVersion]]:
+    model: str | None = None,
+) -> TailorOutcome:
     """Tailor targets concurrently, then persist successful jobs serially."""
     for job in targets:
         if job.id is None:
@@ -134,6 +145,7 @@ def tailor_jobs(
     if reporter:
         reporter.begin(len(targets), "Tailoring")
     results: dict[int, list[ResumeVersion]] = {}
+    failures: dict[int, StageFailure] = {}
     if targets:
         sem = asyncio.Semaphore(get_settings().llm_concurrency)
         on_complete = (lambda n: reporter.step(n)) if reporter else None
@@ -176,12 +188,18 @@ def tailor_jobs(
             )
         )
         for job, res in zip(targets, rounds_results):
-            if not res.ok or res.value is None:
-                continue
             job_id = job.id
             if job_id is None:
                 raise ValueError("Cannot tailor a job that has not been persisted")
-            results[job_id] = _persist_rounds(session, job, res.value)
+            if not res.ok or res.value is None:
+                # Previously a bare `continue`: the captured exception was
+                # discarded, so callers could only report a count. Log it and
+                # hand it back so the cause reaches the user.
+                error = res.error or RuntimeError("tailoring produced no rounds")
+                logger.warning("tailor job=%s failed", job_id, exc_info=error)
+                failures[job_id] = StageFailure.from_exception(error)
+                continue
+            results[job_id] = _persist_rounds(session, job, res.value, model=model)
     if reporter:
         reporter.done()
-    return results
+    return TailorOutcome(versions=results, failures=failures)

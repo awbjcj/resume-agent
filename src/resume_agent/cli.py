@@ -4,16 +4,16 @@ from typing import cast
 import typer
 from sqlmodel import select
 
-from resume_agent.config import load_yaml, get_settings
 from resume_agent.admin_cli import admin_app
+from resume_agent.config import get_settings, load_yaml
 from resume_agent.db import get_session, init_db, make_engine
 from resume_agent.discovery.connectors.telemetry import read_runs
 from resume_agent.gmail.classify import classify_email
 from resume_agent.gmail.client import build_gmail_service, fetch_recent_messages
 from resume_agent.gmail.propose import propose_transitions
 from resume_agent.llm_runner import missing_model_keys, plan_search, resolve_api_key
-from resume_agent.progress import ProgressReporter
 from resume_agent.profile.store import load_facts
+from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.cover_letters import write_cover_letters
 from resume_agent.services.discovery import (
@@ -29,21 +29,27 @@ from resume_agent.services.discovery import (
 from resume_agent.services.prune import prune as run_prune
 from resume_agent.services.rendering import render_resume_version
 from resume_agent.services.tailoring import DEFAULT_REVIEW, DEFAULT_REVIEW_DEEP, tailor
+from resume_agent.tenancy.paths import (
+    CONNECTORS_PATH as DEFAULT_CONNECTORS,
+)
+from resume_agent.tenancy.paths import (
+    FACTS_PATH as DEFAULT_FACTS,
+)
+from resume_agent.tenancy.paths import (
+    SEARCH_PATH as DEFAULT_SEARCH,
+)
+from resume_agent.tenancy.paths import (
+    TELEMETRY_PATH as CONNECTOR_RUNS_PATH,
+)
+from resume_agent.tracking.canonicalize import build_skill_canonicalizer
+from resume_agent.tracking.match_gap import match_gap
 from resume_agent.tracking.queries import application_job_pairs
 from resume_agent.tracking.repository import (
     get_job,
     save_job,
     update_application_status,
 )
-from resume_agent.tracking.canonicalize import build_skill_canonicalizer
-from resume_agent.tracking.match_gap import match_gap
 from resume_agent.tracking.tables import Job, JobStatus
-from resume_agent.tenancy.paths import (
-    CONNECTORS_PATH as DEFAULT_CONNECTORS,
-    FACTS_PATH as DEFAULT_FACTS,
-    SEARCH_PATH as DEFAULT_SEARCH,
-    TELEMETRY_PATH as CONNECTOR_RUNS_PATH,
-)
 
 app = typer.Typer(help="Resume Agent — personal job-hunt automation pipeline.")
 profile_app = typer.Typer(help="Build and manage your fact-lock profile.")
@@ -187,7 +193,7 @@ def profile_add_url(
     """Fetch a public URL and save its readable text as a literal source."""
     import httpx
 
-    import resume_agent.profile.intake as intake
+    from resume_agent.profile import intake
 
     try:
         doc = intake.add_url_source(dir, url)
@@ -967,7 +973,7 @@ def tailor_cmd(
         review_path = (
             DEFAULT_REVIEW_DEEP if deep and review == DEFAULT_REVIEW else review
         )
-        results = tailor(
+        outcome = tailor(
             session,
             job_ids=[job_id] if job_id is not None else None,
             approved=approved,
@@ -975,10 +981,12 @@ def tailor_cmd(
             facts_path=facts,
             reporter=ProgressReporter("tailor"),
         )
-        for jid, versions in results.items():
+        for jid, versions in outcome.versions.items():
             typer.echo(
                 f"Job #{jid}: {len(versions)} version(s); final fact_check_passed={versions[-1].fact_check_passed}"
             )
+        for jid, failure in outcome.failures.items():
+            typer.echo(f"Job #{jid}: failed -- {failure.error_type}: {failure.message}")
 
 
 @app.command("cover-letter")
