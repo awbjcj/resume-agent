@@ -498,14 +498,15 @@ def job_has_progress(job: Job, progressed: set[int]) -> bool:
 
 def _prune_rows(session: Session) -> list[PruneRow]:
     progressed = progressed_job_ids(session)
-    statement = select(
+    columns = [
         cast(Any, Job.id),
         cast(Any, Job.status),
         cast(Any, Job.fit_score),
         cast(Any, Job.posted_at),
         cast(Any, Job.created_at),
         cast(Any, Job.archived_at),
-    )
+    ]
+    statement = select(*columns)
     return [
         PruneRow(
             job_id=job_id,
