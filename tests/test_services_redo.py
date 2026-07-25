@@ -72,6 +72,27 @@ def test_tailor_failure_is_recorded_as_a_job_error(session, monkeypatch):
     assert records[0].source_label == f"job:{job.id}:tailor"
 
 
+def test_tailor_failure_records_the_model_that_produced_it(session, monkeypatch):
+    """The motivating case: when a re-tailor fails, the first question is which
+    model produced it (see spec: 'model' is the resolved model id for extract
+    and tailor)."""
+    job = _rendered_job(session)
+    failure = StageFailure(error_type="ValueError", message="boom", traceback_tail="")
+    monkeypatch.setattr(
+        redo,
+        "tailor",
+        lambda *a, **k: TailorOutcome(
+            versions={}, failures={job.id: failure}, model="openai:gpt-5"
+        ),
+    )
+
+    redo.redo_jobs(session, job_ids=[job.id], stages=["tailor"])
+
+    records = list_error_records(session, "open")
+    assert records[0].details_json is not None
+    assert records[0].details_json["model"] == "openai:gpt-5"
+
+
 def test_tailor_success_resolves_an_earlier_failure(session, monkeypatch):
     job = _rendered_job(session)
     failure = StageFailure(error_type="ValueError", message="boom", traceback_tail="")

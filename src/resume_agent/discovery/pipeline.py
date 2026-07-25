@@ -119,6 +119,7 @@ def run_extract(
         for job, res in zip(jobs, results):
             if not res.ok or res.value is None:
                 # Leave failed jobs raw so the next discover retries them.
+                logger.warning("extract job=%s failed", job.id, exc_info=res.error)
                 continue
             criteria = res.value
             job.criteria_json = criteria.model_dump(mode="json")
@@ -307,6 +308,7 @@ def run_score(
         for (job, location_text), res in zip(pairs, results):
             if not res.ok or res.value is None:
                 # Leave failed jobs filtered so the next discover retries them.
+                logger.warning("score job=%s failed", job.id, exc_info=res.error)
                 continue
             fit = res.value
             job.fit_score = fit.score
@@ -402,6 +404,7 @@ def run_relevance(
         )
         for job, res in zip(judged, results):
             if not res.ok or res.value is None:
+                logger.warning("relevance job=%s failed", job.id, exc_info=res.error)
                 continue
             verdict = res.value
             if not verdict.keep and advance(

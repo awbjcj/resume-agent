@@ -142,9 +142,9 @@ def _record(session, job, stage, failure, run_id, model=None) -> None:
         )
 
 
-def _settle(session, job, stage, outcome, failure, run_id) -> StageOutcome:
+def _settle(session, job, stage, outcome, failure, run_id, model=None) -> StageOutcome:
     if outcome.status == "failed" and failure is not None:
-        _record(session, job, stage, failure, run_id)
+        _record(session, job, stage, failure, run_id, model=model)
     elif outcome.status == "ok":
         resolve_job_failures(session, outcome.job_id, stage)
     return outcome
@@ -214,7 +214,7 @@ def _run_tailor(session, jobs, run_id, deep) -> list[StageOutcome]:
             results.append(
                 _settle(session, job, "tailor",
                         StageOutcome(job.id, "tailor", "failed", detail),
-                        failure, run_id)
+                        failure, run_id, model=outcome.model)
             )
         else:
             results.append(

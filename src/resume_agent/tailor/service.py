@@ -37,6 +37,7 @@ class TailorOutcome:
 
     versions: dict[int, list[ResumeVersion]] = field(default_factory=dict)
     failures: dict[int, StageFailure] = field(default_factory=dict)
+    model: str | None = None
 
 
 def _next_attempt(session: Session, job_id: int) -> int:
@@ -202,4 +203,4 @@ def tailor_jobs(
             results[job_id] = _persist_rounds(session, job, res.value, model=model)
     if reporter:
         reporter.done()
-    return TailorOutcome(versions=results, failures=failures)
+    return TailorOutcome(versions=results, failures=failures, model=model)
