@@ -188,7 +188,7 @@ def build_tailor_agent(
                 ),
             ),
             output_schema=ResumeContent,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ResumeContent),
             **retry_kwargs(),
         )
     )
@@ -212,7 +212,7 @@ def build_reviser_agent(
                 ),
             ),
             output_schema=ResumeContent,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ResumeContent),
             **retry_kwargs(),
         )
     )
@@ -234,7 +234,7 @@ def build_revision_agent(
                 compose_instructions(_REVISION_INSTRUCTIONS, style_guide),
             ),
             output_schema=ResumeContent,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ResumeContent),
             **retry_kwargs(),
         )
     )
@@ -262,7 +262,7 @@ def build_reviewer_agent(
                 ),
             ),
             output_schema=ReviewCritique,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ReviewCritique),
             **retry_kwargs(),
         )
     )
@@ -316,7 +316,7 @@ def build_merged_advisory_agent(
                 ),
             ),
             output_schema=MergedPanelReview,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, MergedPanelReview),
             **retry_kwargs(),
         )
     )

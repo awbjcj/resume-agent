@@ -48,7 +48,7 @@ def build_project_extractor_agent(model_id: str | None = None) -> Runner:
             description="Extract one project's facts and evidenced skills from a repository document.",
             instructions=with_guidance("project-extractor", _INSTRUCTIONS),
             output_schema=ProjectDocFacts,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ProjectDocFacts),
             **retry_kwargs(),
         )
     )

@@ -343,7 +343,7 @@ def build_interview_formatter_agent(schema: type[ExtensibleModel]) -> Runner:
             description="Convert interviewer notes into one structured turn.",
             instructions=with_guidance("interview-format", _FORMAT_INSTRUCTIONS),
             output_schema=schema,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, schema),
             **retry_kwargs(),
         )
     )

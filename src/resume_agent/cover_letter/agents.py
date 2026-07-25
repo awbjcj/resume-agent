@@ -66,7 +66,7 @@ def build_cover_letter_agent(model_id: str | None = None) -> Runner:
             description="Write a targeted cover letter under a strict candidate-profile fact-lock.",
             instructions=with_guidance("cover-letter-draft", _DRAFT_INSTRUCTIONS),
             output_schema=CoverLetterContent,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, CoverLetterContent),
             **retry_kwargs(),
         )
     )
@@ -80,7 +80,7 @@ def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
             description="Repair unsupported cover-letter claims and provenance without adding facts.",
             instructions=with_guidance("cover-letter-revise", _REVISE_INSTRUCTIONS),
             output_schema=CoverLetterContent,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, CoverLetterContent),
             **retry_kwargs(),
         )
     )
@@ -94,7 +94,7 @@ def build_cover_letter_revision_agent(model_id: str | None = None) -> Runner:
             description="Apply one user-requested cover-letter edit without weakening its fact-lock.",
             instructions=with_guidance("cover-letter-revision", _REVISION_INSTRUCTIONS),
             output_schema=CoverLetterContent,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, CoverLetterContent),
             **retry_kwargs(),
         )
     )

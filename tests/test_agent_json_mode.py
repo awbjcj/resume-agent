@@ -7,10 +7,10 @@ structured outputs (``supports_native_structured_outputs = False``), so an
 agno cannot parse, falls back to the raw ``str``, and the pipeline raises
 ``TypeError: Expected <Schema> from agent, got str``.
 
-Providers that *do* support native structured outputs (OpenAI, Anthropic) must
-keep them (``use_json_mode=False``) — they are stricter than JSON mode. Builders
-derive the flag from the model via ``use_json_mode_for``; these tests pin both
-the helper's contract and that the builders thread it through.
+Providers that support native structured outputs keep them unless a schema
+exceeds a provider grammar limit. Builders derive the flag from the model and
+the output schema via ``use_json_mode_for``; these tests pin both the helper's
+contract and that the builders thread it through.
 
 Model construction here is offline: no network call is made, and a missing API
 key resolves to ``None`` without error.
@@ -51,32 +51,55 @@ def test_fit_builder_threads_json_mode(model_id, expected):
 
 @pytest.mark.parametrize("model_id, expected", _CASES)
 def test_extract_builder_threads_json_mode(model_id, expected):
-    assert cast(AgentRunner, build_extract_agent(model_id))._agent.use_json_mode is expected
+    assert (
+        cast(AgentRunner, build_extract_agent(model_id))._agent.use_json_mode
+        is expected
+    )
 
 
 @pytest.mark.parametrize("model_id, expected", _CASES)
 def test_url_extract_builder_threads_json_mode(model_id, expected):
-    assert cast(AgentRunner, build_url_extract_agent(model_id))._agent.use_json_mode is expected
+    assert (
+        cast(AgentRunner, build_url_extract_agent(model_id))._agent.use_json_mode
+        is expected
+    )
 
 
 @pytest.mark.parametrize("model_id, expected", _CASES)
 def test_tailor_builder_threads_json_mode(model_id, expected):
-    assert cast(AgentRunner, build_tailor_agent(model_id))._agent.use_json_mode is expected
+    if model_id.startswith("claude-"):
+        expected = True
+    assert (
+        cast(AgentRunner, build_tailor_agent(model_id))._agent.use_json_mode is expected
+    )
 
 
 @pytest.mark.parametrize("model_id, expected", _CASES)
 def test_reviewer_builder_threads_json_mode(model_id, expected):
-    assert cast(AgentRunner, build_reviewer_agent("hiring-manager", model_id))._agent.use_json_mode is expected
+    assert (
+        cast(
+            AgentRunner, build_reviewer_agent("hiring-manager", model_id)
+        )._agent.use_json_mode
+        is expected
+    )
 
 
 @pytest.mark.parametrize("model_id, expected", _CASES)
 def test_cover_letter_builder_threads_json_mode(model_id, expected):
-    assert cast(AgentRunner, build_cover_letter_agent(model_id))._agent.use_json_mode is expected
+    assert (
+        cast(AgentRunner, build_cover_letter_agent(model_id))._agent.use_json_mode
+        is expected
+    )
 
 
 @pytest.mark.parametrize("model_id, expected", _CASES)
 def test_profile_extractor_builder_threads_json_mode(model_id, expected):
-    assert cast(AgentRunner, build_extractor_agent(model_id))._agent.use_json_mode is expected
+    if model_id.startswith("claude-"):
+        expected = True
+    assert (
+        cast(AgentRunner, build_extractor_agent(model_id))._agent.use_json_mode
+        is expected
+    )
 
 
 @pytest.mark.parametrize("model_id, expected", _CASES)

@@ -114,7 +114,9 @@ def _capture_default_model(monkeypatch, factory):
         canonicalize_module, "Agent", lambda **kwargs: SimpleNamespace(**kwargs)
     )
     monkeypatch.setattr(canonicalize_module, "AgentRunner", lambda agent: agent)
-    monkeypatch.setattr(canonicalize_module, "use_json_mode_for", lambda model: False)
+    monkeypatch.setattr(
+        canonicalize_module, "use_json_mode_for", lambda model, schema=None: False
+    )
 
     factory()
     return captured["model_id"]
@@ -155,7 +157,9 @@ def test_incremental_builders_use_expected_models_and_retry_policy(monkeypatch):
     )
     monkeypatch.setattr(canonicalize_module, "get_settings", lambda: settings)
     monkeypatch.setattr(canonicalize_module, "build_model", lambda model_id: model_id)
-    monkeypatch.setattr(canonicalize_module, "use_json_mode_for", lambda model: False)
+    monkeypatch.setattr(
+        canonicalize_module, "use_json_mode_for", lambda model, schema=None: False
+    )
     monkeypatch.setattr(canonicalize_module, "retry_kwargs", lambda: {"retries": 3})
     monkeypatch.setattr(
         canonicalize_module,

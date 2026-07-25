@@ -136,7 +136,7 @@ def build_scout_formatter_agent() -> Runner:
             description="Convert grounded Source Scout notes into a ScoutReport.",
             instructions=with_guidance("source-scout-format", _FORMAT_INSTRUCTIONS),
             output_schema=ScoutReport,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ScoutReport),
             **retry_kwargs(),
         )
     )

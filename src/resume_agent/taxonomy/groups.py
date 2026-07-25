@@ -118,7 +118,7 @@ def build_group_classifier_agent() -> Runner:
             description="Assign skill tokens to fixed profile-dashboard groups.",
             instructions=with_guidance("skill-groups", _GROUP_INSTRUCTIONS),
             output_schema=SkillGroupAssignments,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, SkillGroupAssignments),
             **retry_kwargs(),
         )
     )

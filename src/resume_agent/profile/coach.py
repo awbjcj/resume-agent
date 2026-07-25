@@ -429,7 +429,7 @@ def build_coach_formatter_agent(schema: type[CoachTurn]) -> Runner:
                 "coach-formatter", _formatter_instructions(schema)
             ),
             output_schema=schema,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, schema),
             **retry_kwargs(),
         )
     )

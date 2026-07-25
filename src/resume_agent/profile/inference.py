@@ -57,7 +57,7 @@ def build_inference_agent(model_id: str | None = None) -> Runner:
             description="Derive evidence-linked skills the candidate's facts demonstrate.",
             instructions=with_guidance("skill-inference", _INSTRUCTIONS),
             output_schema=InferredSkills,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, InferredSkills),
             **retry_kwargs(),
         )
     )

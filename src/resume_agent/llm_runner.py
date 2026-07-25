@@ -2,9 +2,13 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from copy import deepcopy
 from dataclasses import dataclass
+from functools import lru_cache
 from inspect import isawaitable
 from typing import Any, Literal, Protocol, TypeVar, cast
+
+from pydantic import BaseModel
 
 from resume_agent.config import get_settings
 
@@ -204,7 +208,9 @@ def anthropic_web_search_tool(model_id: str) -> dict[str, Any]:
     "haiku" check `provider_capabilities` already uses for reasoning support.
     """
     _provider, model = split_provider(model_id)
-    tool_type = "web_search_20250305" if "haiku" in model.casefold() else "web_search_20260209"
+    tool_type = (
+        "web_search_20250305" if "haiku" in model.casefold() else "web_search_20260209"
+    )
     return {"type": tool_type, "name": "web_search", "max_uses": 5}
 
 
@@ -331,18 +337,162 @@ def missing_model_keys(settings) -> list[str]:
     ]
 
 
-def use_json_mode_for(model: Any) -> bool:
+_ANTHROPIC_MAX_OPTIONAL_PROPERTIES = 24
+_ANTHROPIC_MAX_UNION_PROPERTIES = 16
+
+
+def _pydantic_json_schema(output_schema: Any) -> dict[str, Any] | None:
+    """Return a detached JSON schema for a Pydantic output model, when possible."""
+    if isinstance(output_schema, dict):
+        return deepcopy(output_schema)
+    if isinstance(output_schema, type) and issubclass(output_schema, BaseModel):
+        return output_schema.model_json_schema()
+    return None
+
+
+def _walk_json_schema(value: Any):
+    """Yield every mapping node in a JSON-compatible schema."""
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _walk_json_schema(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_json_schema(child)
+
+
+def _anthropic_schema_exceeds_limits(output_schema: Any) -> bool:
+    """Whether Claude's native grammar compiler will reject ``output_schema``."""
+    schema = _pydantic_json_schema(output_schema)
+    if schema is None:
+        return False
+
+    optional_properties = 0
+    union_properties = 0
+    for node in _walk_json_schema(schema):
+        properties = node.get("properties")
+        if isinstance(properties, dict):
+            required = set(node.get("required", ()))
+            optional_properties += len(set(properties) - required)
+        if any(
+            isinstance(node.get(keyword), list) and len(node[keyword]) > 1
+            for keyword in ("anyOf", "oneOf")
+        ):
+            union_properties += 1
+        schema_types = node.get("type")
+        if isinstance(schema_types, list) and len(schema_types) > 1:
+            union_properties += 1
+
+    return (
+        optional_properties > _ANTHROPIC_MAX_OPTIONAL_PROPERTIES
+        or union_properties > _ANTHROPIC_MAX_UNION_PROPERTIES
+    )
+
+
+def _without_ref_siblings(schema: dict[str, Any]) -> dict[str, Any]:
+    """Remove JSON Schema keywords providers reject beside ``$ref``."""
+    normalized = deepcopy(schema)
+    for node in _walk_json_schema(normalized):
+        if "$ref" not in node:
+            continue
+        for key in tuple(node):
+            if key != "$ref" and not key.startswith("$"):
+                del node[key]
+    return normalized
+
+
+@lru_cache(maxsize=1)
+def _compatible_openai_chat_class():
+    from agno.models.openai import OpenAIChat
+
+    class CompatibleOpenAIChat(OpenAIChat):
+        """OpenAI adapter that emits legal reference nodes for response_format."""
+
+        def get_request_params(
+            self,
+            response_format=None,
+            tools=None,
+            tool_choice=None,
+            run_response=None,
+        ):
+            params = super().get_request_params(
+                response_format=response_format,
+                tools=tools,
+                tool_choice=tool_choice,
+                run_response=run_response,
+            )
+            json_schema = params.get("response_format", {}).get("json_schema", {})
+            schema = json_schema.get("schema")
+            if isinstance(schema, dict):
+                json_schema["schema"] = _without_ref_siblings(schema)
+            return params
+
+    return CompatibleOpenAIChat
+
+
+@lru_cache(maxsize=1)
+def _compatible_gemini_class():
+    from agno.models.google import Gemini
+
+    class CompatibleGemini(Gemini):
+        """Gemini adapter that preserves dictionaries and referenced item types."""
+
+        def get_request_params(
+            self,
+            system_message=None,
+            response_format=None,
+            tools=None,
+            tool_choice=None,
+        ):
+            if not (
+                isinstance(response_format, type)
+                and issubclass(response_format, BaseModel)
+            ):
+                return super().get_request_params(
+                    system_message=system_message,
+                    response_format=response_format,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                )
+
+            params = super().get_request_params(
+                system_message=system_message,
+                response_format=None,
+                tools=tools,
+                tool_choice=tool_choice,
+            )
+            config = params.get("config")
+            if config is None:
+                from google.genai.types import GenerateContentConfig
+
+                config = GenerateContentConfig()
+                params["config"] = config
+            config.response_mime_type = "application/json"
+            config.response_schema = None
+            config.response_json_schema = _without_ref_siblings(
+                response_format.model_json_schema()
+            )
+            return params
+
+    return CompatibleGemini
+
+
+def use_json_mode_for(model: Any, output_schema: Any = None) -> bool:
     """Whether an ``output_schema`` agent over ``model`` must use JSON mode.
 
     Providers without native/json_schema structured outputs (e.g. DeepSeek)
     honour an ``output_schema`` only via ``response_format`` JSON mode; without
     it they intermittently return prose that agno cannot parse, falling back to
-    the raw ``str``. Providers that *do* support it — OpenAI, Anthropic — keep
-    their stricter native structured outputs (``use_json_mode=False``). The flag
-    is read off the agno model itself, so this stays correct as providers gain
-    or lose native support.
+    the raw ``str``. Providers with native support keep their stricter
+    structured outputs unless a Claude schema exceeds Anthropic's grammar
+    limits; oversized Claude schemas use JSON mode plus local Pydantic
+    validation instead of failing the request with HTTP 400.
     """
-    return not getattr(model, "supports_native_structured_outputs", False)
+    if not getattr(model, "supports_native_structured_outputs", False):
+        return True
+    return getattr(
+        model, "provider", None
+    ) == "Anthropic" and _anthropic_schema_exceeds_limits(output_schema)
 
 
 def build_model(
@@ -363,7 +513,7 @@ def build_model(
     reasoning = reasoning and provider_capabilities(model_id).supports_reasoning
     key = api_key or resolve_api_key(model_id) or None
     if provider == "openai":
-        from agno.models.openai import OpenAIChat
+        OpenAIChat = _compatible_openai_chat_class()
 
         return OpenAIChat(
             id=model,
@@ -371,7 +521,7 @@ def build_model(
             reasoning_effort="high" if reasoning else None,
         )
     if provider == "gemini":
-        from agno.models.google import Gemini
+        Gemini = _compatible_gemini_class()
 
         return Gemini(
             id=model,

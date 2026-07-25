@@ -50,7 +50,7 @@ def build_extractor_agent(model_id: str | None = None) -> Runner:
             description="Convert raw resume text into the application's immutable candidate fact record.",
             instructions=with_guidance("profile-extractor", _INSTRUCTIONS),
             output_schema=ProfileFacts,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ProfileFacts),
         )
     )
 

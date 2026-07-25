@@ -36,7 +36,7 @@ def build_url_extract_agent(model_id: str | None = None) -> Runner:
             description="Recover one structured job posting from cleaned web-page text.",
             instructions=with_guidance("url-ingest", _INSTRUCTIONS),
             output_schema=ExtractedJob,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, ExtractedJob),
             **retry_kwargs(),
         )
     )

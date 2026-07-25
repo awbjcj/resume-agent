@@ -165,7 +165,7 @@ def build_industry_classifier() -> AgentRunner:
             description="Map new employer-industry candidates to stable readable canonicals.",
             instructions=with_guidance("industry-classifier", _INSTRUCTIONS),
             output_schema=IndustryClassification,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, IndustryClassification),
             **retry_kwargs(),
         )
     )

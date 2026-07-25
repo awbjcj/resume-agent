@@ -88,7 +88,7 @@ def build_writer_agent() -> Runner:
             description="Draft one professional job-search email.",
             instructions=with_guidance("email-writer", _WRITER_INSTRUCTIONS),
             output_schema=EmailDraftContent,
-            use_json_mode=use_json_mode_for(model),
+            use_json_mode=use_json_mode_for(model, EmailDraftContent),
             **retry_kwargs(),
         )
     )
