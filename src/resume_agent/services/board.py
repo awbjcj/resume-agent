@@ -18,6 +18,18 @@ from sqlmodel import Session, select
 from resume_agent.profile.store import load_facts
 from resume_agent.services.pagination import Page, paginate
 from resume_agent.tenancy.paths import FACTS_PATH as DEFAULT_FACTS, resolve_tenant_path
+from resume_agent.tracking.board_query import (
+    FACET_SPECS,
+    NEUTRAL,
+    PRESETS,
+    RECENCY_WINDOW_DAYS,
+    SALARY_CEILING,
+    BoardFilter,
+    BoardName,
+    Facets,
+    Preset,
+    SortKey,
+)
 from resume_agent.tracking.queries import (
     PipelineRow,
     ShortlistRow,
@@ -45,50 +57,12 @@ from resume_agent.tracking.repository import (
 )
 from resume_agent.tracking.tables import Application, Job, JobStatus, utcnow
 
-BoardName = Literal["shortlist", "triage", "pipeline"]
-SortKey = Literal["fit", "salary", "recency", "composite", "company", "stage"]
-Preset = Literal["balanced", "pay_first", "freshest"]
 _DISCOVERY_STAGE_STATUSES = {
     JobStatus.filtered.value,
     JobStatus.rejected.value,
 }
 BulkAction = Literal["archive", "restore", "delete", "approve", "setStatus"]
 SelectionScope = Literal["ids", "query"]
-Facets = dict[str, dict[str, int]]
-SALARY_CEILING = 250_000
-RECENCY_WINDOW_DAYS = 30
-NEUTRAL = 50.0
-PRESETS: dict[Preset, tuple[float, float, float]] = {
-    "balanced": (0.50, 0.30, 0.20),
-    "pay_first": (0.30, 0.55, 0.15),
-    "freshest": (0.35, 0.20, 0.45),
-}
-
-
-@dataclass(frozen=True)
-class BoardFilter:
-    q: str | None = None
-    reject_reason: str | None = None
-    source: tuple[str, ...] = ()
-    status: tuple[str, ...] = ()
-    remote: tuple[str, ...] = ()
-    sponsorship: tuple[str, ...] = ()
-    seniority: tuple[str, ...] = ()
-    employment_type: tuple[str, ...] = ()
-    industry: tuple[str, ...] = ()
-    country: tuple[str, ...] = ()
-    region: tuple[str, ...] = ()
-    city: tuple[str, ...] = ()
-    company_size: tuple[str, ...] = ()
-    skills: tuple[str, ...] = ()
-    min_fit: int | None = None
-    max_fit: int | None = None
-    min_salary: int | None = None
-    stale_days: int | None = None
-    stale_min_days: int | None = None
-    sort: SortKey = "fit"
-    preset: Preset = "balanced"
-    archived: bool = False
 
 
 @dataclass(frozen=True)
@@ -103,32 +77,6 @@ class BulkResult:
     skipped: int
     reasons: dict[str, int]
 
-
-@dataclass(frozen=True)
-class FacetSpec:
-    """One facet: its wire key, the row attribute it reads, and the BoardFilter
-    field that selects on it. The single statement of the facet vocabulary —
-    _row_value, _passes_filter, and board_facets all derive from this table."""
-
-    key: str  # camelCase wire key (facet payload + filter query param)
-    row_attr: str  # attribute on the row DTO
-    filter_attr: str  # field name on BoardFilter
-    skip_unset_rows: bool = False  # rows without the value pass the filter
-
-
-FACET_SPECS: tuple[FacetSpec, ...] = (
-    FacetSpec("source", "source", "source"),
-    FacetSpec("status", "status", "status"),
-    FacetSpec("remote", "remote_policy", "remote"),
-    FacetSpec("sponsorship", "sponsorship_signal", "sponsorship"),
-    FacetSpec("seniority", "seniority", "seniority"),
-    FacetSpec("employmentType", "employment_type", "employment_type"),
-    FacetSpec("industry", "industry", "industry", skip_unset_rows=True),
-    FacetSpec("country", "location_country", "country"),
-    FacetSpec("region", "location_region", "region"),
-    FacetSpec("city", "location_city", "city"),
-    FacetSpec("companySize", "company_size", "company_size"),
-)
 
 _FACETS_BY_KEY = {spec.key: spec for spec in FACET_SPECS}
 
