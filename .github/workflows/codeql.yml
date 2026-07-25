@@ -1,0 +1,42 @@
+# CodeQL static analysis — disabled for now.
+#
+# This repo is currently private, so CodeQL's free scanning tier (and the
+# security-events write it needs) doesn't apply yet. Uncomment this whole
+# file when the repo goes public to get automated security scanning on
+# pushes/PRs to main plus a weekly scheduled scan.
+#
+# name: CodeQL
+#
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+#     branches: [main]
+#   schedule:
+#     - cron: "0 6 * * 1"
+#
+# permissions:
+#   contents: read
+#   security-events: write
+#
+# jobs:
+#   analyze:
+#     name: analyze (${{ matrix.language }})
+#     runs-on: ubuntu-latest
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         language: [python, javascript-typescript]
+#     steps:
+#       - uses: actions/checkout@v7
+#
+#       - name: Initialize CodeQL
+#         uses: github/codeql-action/init@v3
+#         with:
+#           languages: ${{ matrix.language }}
+#
+#       - name: Autobuild
+#         uses: github/codeql-action/autobuild@v3
+#
+#       - name: Perform CodeQL analysis
+#         uses: github/codeql-action/analyze@v3

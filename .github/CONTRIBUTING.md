@@ -51,11 +51,16 @@ live endpoints.
 
 ## CI
 
-Every PR runs `python-quality` and `web-quality` (both must pass to merge) plus a
-non-blocking security audit and CodeQL analysis. Fix failures — don't skip tests
-or disable lint rules to get green.
+CI is split by branch. PRs and pushes into `dev` run the quick gate —
+`python-quality` and `web-quality` lint + test only, for fast feedback. PRs and
+pushes into `main` run the full gate — the same two jobs plus the web
+production build and a non-blocking security audit (`pip-audit` +
+`npm audit`). Fix failures — don't skip tests or disable lint rules to get
+green. CodeQL analysis (`.github/workflows/codeql.yml`) is prepared but
+commented out while the repo is private; it activates once the repo goes
+public.
 
 ## Branch protection
 
-`main` requires passing CI and at least one review. Please branch from `main` and
-open a PR rather than pushing directly.
+`main` requires passing CI and at least one review. Please branch from `dev`
+and open a PR back into `dev` rather than targeting `main` directly.
