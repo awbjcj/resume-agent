@@ -341,4 +341,40 @@ describe("PipelineContainer", () => {
       }),
     );
   });
+
+  it("opens redo for the current selection with re-tailor pre-ticked", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("pipeline-view", "list");
+    server.use(
+      statusAware([
+        pipelineItem(9, "tailored", "Operator"),
+        pipelineItem(10, "rendered", "Architect"),
+      ]),
+    );
+    wrap(<PipelineContainer />);
+
+    await user.click(
+      await screen.findByRole("checkbox", { name: /Select tailored Co Operator/ }),
+    );
+    await user.click(screen.getByRole("button", { name: /^redo/i }));
+
+    expect(
+      await screen.findByRole("checkbox", { name: /re-tailor resume/i }),
+    ).toBeChecked();
+    expect(screen.getByRole("button", { name: /re-tailor 1 job/i })).toBeEnabled();
+  });
+
+  it("allows redo on a rendered job", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("pipeline-view", "list");
+    server.use(statusAware([pipelineItem(10, "rendered", "Architect")]));
+    wrap(<PipelineContainer />);
+
+    await user.click(
+      await screen.findByRole("checkbox", { name: /Select rendered Co Architect/ }),
+    );
+    await user.click(screen.getByRole("button", { name: /^redo/i }));
+
+    expect(screen.getByRole("button", { name: /re-tailor 1 job/i })).toBeEnabled();
+  });
 });
