@@ -5,7 +5,7 @@ bundle refactoring.
 
 | Surface | Budget | Current baseline |
 | --- | ---: | ---: |
-| Initial JavaScript | 200 KB gzip | about 132 KB (`index` 86.03 KB + `lib` 45.72 KB) |
+| Initial JavaScript | 200 KB gzip | 131.72 KB (`index` 86.00 KB + `lib` 45.72 KB) |
 | Largest lazy route chunk | 120 KB gzip | `AnalyticsPage` 99.50 KB |
 | Board page response | 150 KB | enforced by the pipeline payload regression test |
 
