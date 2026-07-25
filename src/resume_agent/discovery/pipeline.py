@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -8,28 +9,29 @@ from sqlmodel import Session, select
 
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
-from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.discovery.extract import (  # noqa: F401
     Runner,
     aextract_job_criteria,
     extract_job_criteria,
 )
 from resume_agent.discovery.filter import apply_filters
-from resume_agent.discovery.industry import IndustryCandidate, classify_industries
 from resume_agent.discovery.fit import (  # noqa: F401
     FitScore,
     ascore_fit,
     compose_fit_input,
     score_fit,
 )
-from resume_agent.discovery.relevance import ajudge_relevance, judge_relevance  # noqa: F401
+from resume_agent.discovery.industry import IndustryCandidate, classify_industries
+from resume_agent.discovery.relevance import (  # noqa: F401
+    ajudge_relevance,
+    judge_relevance,
+)
 from resume_agent.discovery.search_config import SearchConfig
 from resume_agent.llm_runner import run_with_cleanup
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import SkillMatrix, build_skill_match_context
 from resume_agent.progress import ProgressReporter
-from resume_agent.taxonomy.location import build_location
 from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.industries import (
     INDUSTRY_TAXONOMY_PATH,
@@ -41,9 +43,12 @@ from resume_agent.taxonomy.industries import (
     normalize_industry,
     save_industry_taxonomy,
 )
+from resume_agent.taxonomy.location import build_location
 from resume_agent.taxonomy.skills import refresh_aliases, split_skills
+from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.tracking.match_gap import Canonicalizer, normalize_skill
 from resume_agent.tracking.repository import has_progress, jobs_by_status, status_counts
+from resume_agent.tracking.stages import advance
 from resume_agent.tracking.tables import Job, JobStatus
 
 logger = logging.getLogger(__name__)
@@ -55,22 +60,45 @@ logger = logging.getLogger(__name__)
 _DISCOVER_PHASES = 3
 
 
-def _stage_jobs(session: Session, status: str, job_ids: set[int] | None = None) -> list[Job]:
+@dataclass(frozen=True)
+class StageScope:
+    """Which rows a funnel stage runs over, and how it may write status.
+
+    The default reproduces the automatic funnel exactly: select by status,
+    write status freely. Redo passes explicit ids with any_status=True and
+    never_regress=True so a rendered job can be re-extracted without being
+    dragged back down the ladder.
+    """
+
+    job_ids: frozenset[int] | None = None
+    any_status: bool = False
+    never_regress: bool = False
+
+
+# Frozen and immutable, so sharing this instance as a default arg is safe;
+# ruff (B008) forbids a fresh `StageScope()` call in a signature.
+_DEFAULT_SCOPE = StageScope()
+
+
+def _stage_jobs(session: Session, status: str, scope: StageScope) -> list[Job]:
+    if scope.any_status and scope.job_ids is not None:
+        rows = [session.get(Job, job_id) for job_id in sorted(scope.job_ids)]
+        return [job for job in rows if job is not None]
     jobs = jobs_by_status(session, status)
-    if job_ids is None:
+    if scope.job_ids is None:
         return jobs
-    return [job for job in jobs if job.id in job_ids]
+    return [job for job in jobs if job.id in scope.job_ids]
 
 
 def run_extract(
     session: Session,
     agent: Runner,
     reporter: ProgressReporter | None = None,
-    job_ids: set[int] | None = None,
+    scope: StageScope = _DEFAULT_SCOPE,
     industry_classifier: Runner | None = None,
     industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
 ) -> None:
-    jobs = _stage_jobs(session, JobStatus.raw.value, job_ids)
+    jobs = _stage_jobs(session, JobStatus.raw.value, scope)
     if reporter:
         reporter.begin(
             len(jobs), "Extracting criteria", phase_index=2, phase_count=_DISCOVER_PHASES
@@ -94,7 +122,7 @@ def run_extract(
                 continue
             criteria = res.value
             job.criteria_json = criteria.model_dump(mode="json")
-            job.status = JobStatus.extracted.value
+            advance(job, JobStatus.extracted.value, never_regress=scope.never_regress)
             session.add(job)
     _normalize_job_industries(
         session, industry_classifier, industry_taxonomy_path, batch=jobs
@@ -216,16 +244,15 @@ def _normalize_job_industries(
 def run_filter(
     session: Session,
     config: SearchConfig,
-    job_ids: set[int] | None = None,
+    scope: StageScope = _DEFAULT_SCOPE,
 ) -> None:
-    jobs = _stage_jobs(session, JobStatus.extracted.value, job_ids)
+    jobs = _stage_jobs(session, JobStatus.extracted.value, scope)
     for job in jobs:
         criteria = JobCriteria.model_validate(job.criteria_json or {})
         decision = apply_filters(criteria, config)
         if decision.keep or job.gate_override:
-            job.status = JobStatus.filtered.value
-        else:
-            job.status = JobStatus.rejected.value
+            advance(job, JobStatus.filtered.value, never_regress=scope.never_regress)
+        elif advance(job, JobStatus.rejected.value, never_regress=scope.never_regress):
             job.reject_reason = decision.reject_reason
             job.reject_category = "filtered"
         session.add(job)
@@ -239,11 +266,11 @@ def run_score(
     canonicalizer: Canonicalizer | None = None,
     aliases_path: Path | str = SKILL_ALIASES_PATH,
     reporter: ProgressReporter | None = None,
-    job_ids: set[int] | None = None,
+    scope: StageScope = _DEFAULT_SCOPE,
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
 ) -> None:
-    jobs = _stage_jobs(session, JobStatus.filtered.value, job_ids)
+    jobs = _stage_jobs(session, JobStatus.filtered.value, scope)
     if reporter:
         reporter.begin(len(jobs), "Scoring fit", phase_index=3, phase_count=_DISCOVER_PHASES)
     if jobs:
@@ -285,7 +312,7 @@ def run_score(
             job.fit_score = fit.score
             job.fit_rationale = fit.rationale
             _write_taxonomy_fields(job, fit, location_text)
-            job.status = JobStatus.shortlisted.value
+            advance(job, JobStatus.shortlisted.value, never_regress=scope.never_regress)
             session.add(job)
     session.commit()
     if canonicalizer is not None:
@@ -339,7 +366,7 @@ def run_relevance(
     config: SearchConfig,
     agent: Runner | None,
     reporter: ProgressReporter | None = None,
-    job_ids: set[int] | None = None,
+    scope: StageScope = _DEFAULT_SCOPE,
 ) -> int:
     """Reject off-target raw jobs via the cheap relevance gate."""
     target = _relevance_target(config)
@@ -348,7 +375,7 @@ def run_relevance(
 
     jobs = [
         job
-        for job in _stage_jobs(session, JobStatus.raw.value, job_ids)
+        for job in _stage_jobs(session, JobStatus.raw.value, scope)
         if not job.gate_override
     ]
     judged = [job for job in jobs if (job.jd_text or "").strip()]
@@ -377,9 +404,10 @@ def run_relevance(
             if not res.ok or res.value is None:
                 continue
             verdict = res.value
-            if not verdict.keep:
+            if not verdict.keep and advance(
+                job, JobStatus.rejected.value, never_regress=scope.never_regress
+            ):
                 reason = (verdict.reason or "model rejected").strip()
-                job.status = JobStatus.rejected.value
                 job.reject_reason = f"off-target role: {reason}"
                 job.reject_category = "relevance"
                 session.add(job)
@@ -401,24 +429,24 @@ def discover(
     industry_classifier: Runner | None = None,
     industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
     reporter: ProgressReporter | None = None,
-    job_ids: set[int] | None = None,
+    scope: StageScope = _DEFAULT_SCOPE,
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
 ) -> dict[str, int]:
-    """Run the full funnel over current rows (optionally only `job_ids`)."""
-    run_relevance(session, config, relevance_agent, reporter=reporter, job_ids=job_ids)
+    """Run the full funnel over current rows (optionally scoped)."""
+    run_relevance(session, config, relevance_agent, reporter=reporter, scope=scope)
     run_extract(
         session,
         extract_agent,
         reporter=reporter,
-        job_ids=job_ids,
+        scope=scope,
         industry_classifier=industry_classifier,
         industry_taxonomy_path=industry_taxonomy_path,
     )
-    run_filter(session, config, job_ids=job_ids)
+    run_filter(session, config, scope=scope)
     run_score(
         session, profile_facts, fit_agent, canonicalizer=canonicalizer,
-        reporter=reporter, job_ids=job_ids,
+        reporter=reporter, scope=scope,
         matrix=matrix, cluster_map=cluster_map,
     )
     if reporter:
@@ -495,7 +523,7 @@ def reprocess(
         industry_classifier=industry_classifier,
         industry_taxonomy_path=industry_taxonomy_path,
         reporter=reporter,
-        job_ids=set(selected),
+        scope=StageScope(job_ids=frozenset(selected)),
         matrix=matrix,
         cluster_map=cluster_map,
     )

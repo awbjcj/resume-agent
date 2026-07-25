@@ -24,10 +24,10 @@ from resume_agent.discovery.ingest import (
     ingest_jobs,
     save_or_upgrade,
 )
-from resume_agent.discovery.pipeline import discover, reprocess
-from resume_agent.discovery.search_config import load_search_config
+from resume_agent.discovery.pipeline import StageScope, discover, reprocess
 from resume_agent.discovery.scraper.dashboard import DashboardScraper
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
+from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.url_ingest.service import job_from_url
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import (
@@ -44,7 +44,6 @@ from resume_agent.services.agents import (
     build_url_extract_agent,
 )
 from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
-from resume_agent.tracking.tables import Job
 from resume_agent.tenancy.limits import (
     DEFAULT_MAX_ACTIVE_JOBS,
     active_limit,
@@ -52,11 +51,20 @@ from resume_agent.tenancy.limits import (
 )
 from resume_agent.tenancy.paths import (
     CONNECTORS_PATH as DEFAULT_CONNECTORS,
+)
+from resume_agent.tenancy.paths import (
     FACTS_PATH as DEFAULT_FACTS,
+)
+from resume_agent.tenancy.paths import (
     SEARCH_PATH as DEFAULT_SEARCH,
+)
+from resume_agent.tenancy.paths import (
     TELEMETRY_PATH as CONNECTOR_RUNS_PATH,
+)
+from resume_agent.tenancy.paths import (
     resolve_tenant_path,
 )
+from resume_agent.tracking.tables import Job
 
 
 @dataclass(frozen=True)
@@ -190,7 +198,7 @@ def discover_jobs(
         canonicalizer=bundle.canonicalizer,
         industry_classifier=bundle.industry_classifier,
         reporter=reporter,
-        job_ids=job_ids,
+        scope=StageScope(job_ids=frozenset(job_ids)) if job_ids else StageScope(),
         matrix=matrix,
         cluster_map=cluster_map,
     )

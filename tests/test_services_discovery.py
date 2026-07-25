@@ -58,7 +58,7 @@ def test_discover_jobs_delegates_and_forwards_bundle(monkeypatch, tmp_path):
         canonicalizer=None,
         industry_classifier=None,
         reporter=None,
-        job_ids=None,
+        scope=None,
         matrix=None,
         cluster_map=None,
     ):
