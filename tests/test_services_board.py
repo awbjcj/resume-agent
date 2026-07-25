@@ -80,6 +80,7 @@ def test_pipeline_sponsorship_and_type_filters_match_shortlist_facets():
         )
 
     assert [row.company for row in result.page.data] == ["Keep"]
+    assert result.facets is not None
     assert result.facets["sponsorship"] == {"denied": 1, "offered": 1}
     assert result.facets["employmentType"] == {"contract": 1, "full_time": 1}
 
@@ -169,6 +170,7 @@ def test_board_industry_filter_uses_exact_canonical_name():
     ]
     # Leave-one-out: the industry facet ignores its own selection, so the
     # unselected "Autonomous Driving" stays counted and selectable.
+    assert result.facets is not None
     assert result.facets["industry"] == {"Autonomous Driving": 1, "Fintech": 1}
 
 
@@ -200,6 +202,7 @@ def test_facets_are_leave_one_out_so_siblings_stay_selectable():
 
     # Only greenhouse rows are in the page...
     assert {row.source for row in result.page.data} == {"greenhouse"}
+    assert result.facets is not None
     # ...but the source facet still offers lever (its own selection excluded)...
     assert result.facets["source"] == {"greenhouse": 1, "lever": 1}
     # ...while the industry facet reflects the greenhouse-only subset.
