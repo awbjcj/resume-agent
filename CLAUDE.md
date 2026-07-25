@@ -268,7 +268,13 @@ re-raised, so a persistently-throttled board still surfaces as a per-URL failure
 
 - **Boards page in SQL.** `tracking.board_query` selects only the returned page,
   and row projection happens afterward. `PipelineItem` ships a bounded
-  `jdPreview`; the full `jd_text` is available only from `JobDetail`.
+  `jdPreview`; the full `jd_text` is available only from `JobDetail`. Two costs
+  the page read must not re-incur: `jd_text` stays `defer()`-ed on shortlist and
+  triage (only `PipelineRow` reads it — pinned by
+  `test_shortlist_and_triage_rows_never_touch_jd_text`), and the `companySize`/
+  `skills` token-to-raw-value scans are derived once per request via
+  `derive_filter_values` and passed to both `board_page` and
+  `board_facet_counts`.
 - **Profile coaching is turn-per-run and evidence-locked.** Durable sessions follow
   ADR 0006, while the ADR 0005 amendment requires every draft note to retain
   verbatim quotes from the current user turn. The former batch interview API,
