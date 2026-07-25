@@ -4652,6 +4652,44 @@
         "title": "QuestionReviewOut",
         "type": "object"
       },
+      "RedoParams": {
+        "description": "Which jobs to redo and which stages to run.\n\nValidated here and nowhere deeper: redo_jobs trusts its inputs. Deduping\nstages matters because [\"tailor\", \"tailor\"] would otherwise bill twice.",
+        "properties": {
+          "deep": {
+            "default": false,
+            "title": "Deep",
+            "type": "boolean"
+          },
+          "jobIds": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Jobids",
+            "type": "array"
+          },
+          "stages": {
+            "items": {
+              "enum": [
+                "pull",
+                "extract",
+                "tailor",
+                "render"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Stages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "jobIds",
+          "stages"
+        ],
+        "title": "RedoParams",
+        "type": "object"
+      },
       "RefreshParams": {
         "properties": {
           "limit": {
@@ -14168,6 +14206,62 @@
           }
         },
         "summary": "Launch Pull"
+      }
+    },
+    "/api/redo": {
+      "post": {
+        "operationId": "launch_redo_api_redo_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedoParams"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Launch Redo"
       }
     },
     "/api/refresh": {

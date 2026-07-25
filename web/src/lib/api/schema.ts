@@ -1694,6 +1694,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Redo */
+        post: operations["launch_redo_api_redo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/refresh": {
         parameters: {
             query?: never;
@@ -3985,6 +4002,24 @@ export interface components {
              * @default
              */
             suggestedAnswer: string;
+        };
+        /**
+         * RedoParams
+         * @description Which jobs to redo and which stages to run.
+         *
+         *     Validated here and nowhere deeper: redo_jobs trusts its inputs. Deduping
+         *     stages matters because ["tailor", "tailor"] would otherwise bill twice.
+         */
+        RedoParams: {
+            /**
+             * Deep
+             * @default false
+             */
+            deep: boolean;
+            /** Jobids */
+            jobIds: number[];
+            /** Stages */
+            stages: ("pull" | "extract" | "tailor" | "render")[];
         };
         /** RefreshParams */
         RefreshParams: {
@@ -8887,6 +8922,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PullParams"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_redo_api_redo_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedoParams"];
             };
         };
         responses: {
