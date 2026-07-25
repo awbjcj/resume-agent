@@ -46,6 +46,8 @@ from resume_agent.tracking.repository import (
 from resume_agent.tracking.tables import Application, Job, JobStatus, utcnow
 
 BoardName = Literal["shortlist", "triage", "pipeline"]
+SortKey = Literal["fit", "salary", "recency", "composite", "company", "stage"]
+Preset = Literal["balanced", "pay_first", "freshest"]
 _DISCOVERY_STAGE_STATUSES = {
     JobStatus.filtered.value,
     JobStatus.rejected.value,
@@ -53,6 +55,14 @@ _DISCOVERY_STAGE_STATUSES = {
 BulkAction = Literal["archive", "restore", "delete", "approve", "setStatus"]
 SelectionScope = Literal["ids", "query"]
 Facets = dict[str, dict[str, int]]
+SALARY_CEILING = 250_000
+RECENCY_WINDOW_DAYS = 30
+NEUTRAL = 50.0
+PRESETS: dict[Preset, tuple[float, float, float]] = {
+    "balanced": (0.50, 0.30, 0.20),
+    "pay_first": (0.30, 0.55, 0.15),
+    "freshest": (0.35, 0.20, 0.45),
+}
 
 
 @dataclass(frozen=True)
@@ -76,7 +86,8 @@ class BoardFilter:
     min_salary: int | None = None
     stale_days: int | None = None
     stale_min_days: int | None = None
-    sort: str = "fit"
+    sort: SortKey = "fit"
+    preset: Preset = "balanced"
     archived: bool = False
 
 
@@ -239,9 +250,55 @@ def _salary_sort_value(row: Any) -> int:
     return getattr(row, "salary_max", None) or getattr(row, "salary_min", None) or 0
 
 
-def _sort_rows(rows: list[Any], sort: str) -> list[Any]:
-    if sort in {"fit", "composite"}:
+def _composite_raw(
+    row: Any,
+    preset: Preset,
+    now: datetime,
+) -> float:
+    w_fit, w_salary, w_recency = PRESETS[preset]
+    fit_score = getattr(row, "fit_score", None)
+    fit_normalized = float(fit_score) if fit_score is not None else NEUTRAL
+
+    salary = _salary_sort_value(row) or None
+    salary_normalized = (
+        min(salary, SALARY_CEILING) / SALARY_CEILING * 100
+        if salary is not None
+        else NEUTRAL
+    )
+
+    posted_at = getattr(row, "posted_at", None)
+    if posted_at is None:
+        recency_normalized = NEUTRAL
+    else:
+        age_days = (now - _aware(posted_at)).total_seconds() / 86400.0
+        recency_normalized = min(
+            100.0,
+            max(0.0, 100.0 - (age_days / RECENCY_WINDOW_DAYS * 100.0)),
+        )
+
+    return (
+        w_fit * fit_normalized
+        + w_salary * salary_normalized
+        + w_recency * recency_normalized
+    )
+
+
+def _sort_rows(
+    rows: list[Any],
+    sort: SortKey,
+    *,
+    preset: Preset = "balanced",
+    now: datetime | None = None,
+) -> list[Any]:
+    if sort == "fit":
         return _by_fit_desc(rows)
+    if sort == "composite":
+        rank_time = now or datetime.now(timezone.utc)
+        return sorted(
+            rows,
+            key=lambda row: _composite_raw(row, preset, rank_time),
+            reverse=True,
+        )
     if sort == "salary":
         return sorted(rows, key=_salary_sort_value, reverse=True)
     if sort == "recency":
@@ -325,7 +382,7 @@ def _board_rows(
     facts_path: str = DEFAULT_FACTS,
 ) -> list[Any]:
     rows = _raw_board_rows(session, board, f, facts_path=facts_path)
-    return _sort_rows(_apply_board_filter(rows, f), f.sort)
+    return _sort_rows(_apply_board_filter(rows, f), f.sort, preset=f.preset)
 
 
 def list_board(
@@ -339,7 +396,7 @@ def list_board(
 ) -> BoardListResult:
     f = board_filter or BoardFilter(sort="recency" if board == "pipeline" else "fit")
     raw = _raw_board_rows(session, board, f, facts_path=facts_path)
-    rows = _sort_rows(_apply_board_filter(raw, f), f.sort)
+    rows = _sort_rows(_apply_board_filter(raw, f), f.sort, preset=f.preset)
     return BoardListResult(
         page=paginate(rows, page=page, page_size=page_size),
         facets=board_facets(raw, f),

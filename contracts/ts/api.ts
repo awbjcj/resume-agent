@@ -7775,7 +7775,8 @@ export interface operations {
                 minSalary?: number | null;
                 staleDays?: number | null;
                 staleMinDays?: number | null;
-                sortBy?: string;
+                sortBy?: "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+                preset?: "balanced" | "pay_first" | "freshest";
             };
             header?: {
                 authorization?: string | null;
@@ -9536,7 +9537,8 @@ export interface operations {
                 minSalary?: number | null;
                 staleDays?: number | null;
                 staleMinDays?: number | null;
-                sortBy?: string;
+                sortBy?: "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+                preset?: "balanced" | "pay_first" | "freshest";
             };
             header?: {
                 authorization?: string | null;
@@ -10245,7 +10247,8 @@ export interface operations {
                 minSalary?: number | null;
                 staleDays?: number | null;
                 staleMinDays?: number | null;
-                sortBy?: string;
+                sortBy?: "fit" | "salary" | "recency" | "composite" | "company" | "stage";
+                preset?: "balanced" | "pay_first" | "freshest";
             };
             header?: {
                 authorization?: string | null;

@@ -50,7 +50,8 @@ def board_filter_query(default_sort: str):
         min_salary: int | None = Query(None, alias="minSalary"),
         stale_days: int | None = Query(None, alias="staleDays"),
         stale_min_days: int | None = Query(None, alias="staleMinDays"),
-        sort: str = Query(default_sort, alias="sortBy"),
+        sort: board.SortKey = Query(default_sort, alias="sortBy"),
+        preset: board.Preset = Query("balanced"),
     ) -> board.BoardFilter:
         return board.BoardFilter(
             q=q,
@@ -73,6 +74,7 @@ def board_filter_query(default_sort: str):
             stale_days=stale_days,
             stale_min_days=stale_min_days,
             sort=sort,
+            preset=preset,
         )
 
     return dependency

@@ -12255,7 +12255,30 @@
             "required": false,
             "schema": {
               "default": "recency",
+              "enum": [
+                "fit",
+                "salary",
+                "recency",
+                "composite",
+                "company",
+                "stage"
+              ],
               "title": "Sortby",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "preset",
+            "required": false,
+            "schema": {
+              "default": "balanced",
+              "enum": [
+                "balanced",
+                "pay_first",
+                "freshest"
+              ],
+              "title": "Preset",
               "type": "string"
             }
           },
@@ -15472,7 +15495,30 @@
             "required": false,
             "schema": {
               "default": "fit",
+              "enum": [
+                "fit",
+                "salary",
+                "recency",
+                "composite",
+                "company",
+                "stage"
+              ],
               "title": "Sortby",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "preset",
+            "required": false,
+            "schema": {
+              "default": "balanced",
+              "enum": [
+                "balanced",
+                "pay_first",
+                "freshest"
+              ],
+              "title": "Preset",
               "type": "string"
             }
           },
@@ -16941,7 +16987,30 @@
             "required": false,
             "schema": {
               "default": "recency",
+              "enum": [
+                "fit",
+                "salary",
+                "recency",
+                "composite",
+                "company",
+                "stage"
+              ],
               "title": "Sortby",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "preset",
+            "required": false,
+            "schema": {
+              "default": "balanced",
+              "enum": [
+                "balanced",
+                "pay_first",
+                "freshest"
+              ],
+              "title": "Preset",
               "type": "string"
             }
           },
