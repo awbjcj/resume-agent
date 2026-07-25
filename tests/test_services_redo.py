@@ -136,6 +136,37 @@ def test_render_skips_a_job_with_no_versions(session):
     assert outcomes[0].detail == "no resume version"
 
 
+def test_extract_stage_reports_the_real_per_job_outcome(session, monkeypatch):
+    """run_extract/run_score silently skip a failed job internally; redo must
+    not paper over that as a blanket 'ok' -- it should record and surface it,
+    the same way pull and tailor already do."""
+    good = _rendered_job(session)
+    bad = _rendered_job(session)
+    failure = StageFailure(error_type="ValueError", message="boom", traceback_tail="")
+    monkeypatch.setattr(redo, "load_search_config", lambda p: object())
+    monkeypatch.setattr(redo, "load_facts", lambda p: object())
+    monkeypatch.setattr(redo, "_skill_artifacts", lambda p, f: (None, None))
+    monkeypatch.setattr(
+        redo, "build_discovery_bundle",
+        lambda: type("B", (), {
+            "extract": None, "fit": None, "canonicalizer": None,
+            "industry_classifier": None,
+        })(),
+    )
+    monkeypatch.setattr(redo, "run_extract", lambda *a, **k: {bad.id: failure})
+    monkeypatch.setattr(redo, "run_filter", lambda *a, **k: None)
+    monkeypatch.setattr(redo, "run_score", lambda *a, **k: {})
+
+    outcomes = redo.redo_jobs(session, job_ids=[good.id, bad.id], stages=["extract"])
+
+    statuses = {o.job_id: o.status for o in outcomes}
+    assert statuses[good.id] == "ok"
+    assert statuses[bad.id] == "failed"
+    records = list_error_records(session, "open")
+    assert len(records) == 1
+    assert records[0].source_label == f"job:{bad.id}:extract"
+
+
 def test_redo_never_regresses_a_rendered_job(session, monkeypatch):
     job = _rendered_job(session)
     monkeypatch.setattr(

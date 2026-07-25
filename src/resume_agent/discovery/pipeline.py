@@ -32,6 +32,7 @@ from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import SkillMatrix, build_skill_match_context
 from resume_agent.progress import ProgressReporter
+from resume_agent.services.errors import StageFailure
 from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.taxonomy.industries import (
     INDUSTRY_TAXONOMY_PATH,
@@ -97,8 +98,9 @@ def run_extract(
     scope: StageScope = _DEFAULT_SCOPE,
     industry_classifier: Runner | None = None,
     industry_taxonomy_path: Path | str = INDUSTRY_TAXONOMY_PATH,
-) -> None:
+) -> dict[int, StageFailure]:
     jobs = _stage_jobs(session, JobStatus.raw.value, scope)
+    failures: dict[int, StageFailure] = {}
     if reporter:
         reporter.begin(
             len(jobs), "Extracting criteria", phase_index=2, phase_count=_DISCOVER_PHASES
@@ -120,6 +122,9 @@ def run_extract(
             if not res.ok or res.value is None:
                 # Leave failed jobs raw so the next discover retries them.
                 logger.warning("extract job=%s failed", job.id, exc_info=res.error)
+                if job.id is not None:
+                    error = res.error or RuntimeError("extraction produced no criteria")
+                    failures[job.id] = StageFailure.from_exception(error)
                 continue
             criteria = res.value
             job.criteria_json = criteria.model_dump(mode="json")
@@ -129,6 +134,7 @@ def run_extract(
         session, industry_classifier, industry_taxonomy_path, batch=jobs
     )
     session.commit()
+    return failures
 
 
 _INDUSTRY_RETRY_KEY = "_industry_candidate"
@@ -270,8 +276,9 @@ def run_score(
     scope: StageScope = _DEFAULT_SCOPE,
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
-) -> None:
+) -> dict[int, StageFailure]:
     jobs = _stage_jobs(session, JobStatus.filtered.value, scope)
+    failures: dict[int, StageFailure] = {}
     if reporter:
         reporter.begin(len(jobs), "Scoring fit", phase_index=3, phase_count=_DISCOVER_PHASES)
     if jobs:
@@ -309,6 +316,9 @@ def run_score(
             if not res.ok or res.value is None:
                 # Leave failed jobs filtered so the next discover retries them.
                 logger.warning("score job=%s failed", job.id, exc_info=res.error)
+                if job.id is not None:
+                    error = res.error or RuntimeError("scoring produced no fit result")
+                    failures[job.id] = StageFailure.from_exception(error)
                 continue
             fit = res.value
             job.fit_score = fit.score
@@ -321,6 +331,7 @@ def run_score(
         _refresh_skill_aliases(
             jobs_by_status(session, JobStatus.shortlisted.value), canonicalizer, aliases_path
         )
+    return failures
 
 
 def _job_location_text(job: Job) -> str | None:

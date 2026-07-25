@@ -177,22 +177,34 @@ def _run_extract(session, jobs, run_id) -> list[StageOutcome]:
         any_status=True,
         never_regress=True,
     )
-    run_extract(
+    extract_failures = run_extract(
         session, bundle.extract, scope=scope,
         industry_classifier=bundle.industry_classifier,
     )
     run_filter(session, config, scope)
-    run_score(
+    score_failures = run_score(
         session, facts, bundle.fit, canonicalizer=bundle.canonicalizer,
         scope=scope, matrix=matrix, cluster_map=cluster_map,
     )
+    # A job that failed extraction never had valid criteria to score against,
+    # so an extract failure is the root cause and wins over a later score one.
+    failures = {**score_failures, **extract_failures}
     outcomes = []
     for job in jobs:
         assert job.id is not None
-        outcomes.append(
-            _settle(session, job, "extract",
-                    StageOutcome(job.id, "extract", "ok", None), None, run_id)
-        )
+        failure = failures.get(job.id)
+        if failure is not None:
+            detail = f"{failure.error_type}: {failure.message}"
+            outcomes.append(
+                _settle(session, job, "extract",
+                        StageOutcome(job.id, "extract", "failed", detail),
+                        failure, run_id)
+            )
+        else:
+            outcomes.append(
+                _settle(session, job, "extract",
+                        StageOutcome(job.id, "extract", "ok", None), None, run_id)
+            )
     return outcomes
 
 
