@@ -81,6 +81,20 @@ def test_build_model_gemini_branch():
     assert model.id == "gemini-2.0-flash"
 
 
+def test_build_model_gemini_disables_thinking_when_reasoning_not_requested():
+    # Unlike Claude/DeepSeek, Gemini treats an unset thinking config as
+    # "provider decides" (automatic budget), not "off" - so build_model must
+    # explicitly disable it to match the other providers' non-reasoning default.
+    model = build_model("gemini:gemini-3.5-flash", api_key="sk-test")
+    assert model.thinking_budget == 0
+
+
+def test_build_model_gemini_leaves_thinking_budget_unset_when_reasoning_requested():
+    model = build_model("gemini:gemini-3.5-flash", api_key="sk-test", reasoning=True)
+    assert model.thinking_budget is None
+    assert model.thinking_level == "high"
+
+
 def test_openai_response_schema_has_no_keywords_beside_refs():
     model = build_model("openai:gpt-5.6-terra", api_key="sk-test")
 
