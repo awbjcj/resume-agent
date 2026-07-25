@@ -14,8 +14,11 @@ behind a `full` input; `.github/workflows/ci-dev.yml` calls it with
 `full: false` (lint + test only) on pushes/PRs to `dev`, and
 `.github/workflows/ci-main.yml` calls it with `full: true` (adds the web
 production build and the pip-audit/npm-audit dependency scan) on
-pushes/PRs to `main`. `.github/workflows/codeql.yml` is a fully-commented
-placeholder — uncomment it once the repo goes public.
+pushes/PRs to `main`. `.github/workflows/codeql.yml.disabled` is a
+fully-commented placeholder — a fully-commented file with a live `.yml`
+extension still gets parsed (and fails) as an invalid workflow by GitHub
+Actions, so it's kept as `.disabled` until the repo goes public: rename it
+back to `.yml` and uncomment it then.
 
 ## Commands
 
