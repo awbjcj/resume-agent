@@ -290,9 +290,11 @@ it is the resolved model id for `extract` and `tailor`.
   fails the same way twice increments `count` instead of doubling rows.
 - `message = f"{error_type}: {message}"`, truncated.
 - `details_json` = `jobId`, `company`, `title`, `stage`, `errorType`, `message`,
-  `model`, `runId`, `attempt`, `tracebackTail`. `model` is present because the
-  motivating case is model-switching: when a re-tailor fails, the first question
-  is which model produced it.
+  `model`, `tracebackTail`, stored camelCase so `JobFailureDetails`
+  (a `CamelModel`, which validates by alias) reads it directly. `model` is
+  present because the motivating case is model-switching: when a re-tailor
+  fails, the first question is which model produced it. No `attempt` — the
+  failure means no version was created, so there is no attempt to name.
 
 Both `redo_jobs` and a plain `tailor` run record through this writer, so per-job
 failures land in one place regardless of which run produced them.
@@ -360,7 +362,6 @@ class JobFailureDetails(CamelModel):
     company: str | None = None
     title: str | None = None
     model: str | None = None
-    attempt: int | None = None
     traceback_tail: str = ""
 
 class ErrorRecordOut(CamelModel):
