@@ -35,12 +35,21 @@ class KnownJobsIndex:
             index[key] = known
 
     def add(self, job: Job) -> None:
-        known = KnownJob(job.source)
-        url = _normalized_url(job.url)
+        self.add_fields(job.source, job.url, job.dedup_key, job.location)
+
+    def add_fields(
+        self,
+        source: str,
+        url: str | None,
+        dedup_key: str | None,
+        location: str | None,
+    ) -> None:
+        known = KnownJob(source)
+        url = _normalized_url(url)
         if url is not None:
             self._add_best(self.by_url, url, known)
-        if job.dedup_key:
-            key = (job.dedup_key, _normalized_location(job.location))
+        if dedup_key:
+            key = (dedup_key, _normalized_location(location))
             self._add_best(self.by_key_location, key, known)
 
     def match(self, row: RawJob) -> KnownJob | None:
@@ -58,8 +67,11 @@ class KnownJobsIndex:
 def build_known_index(session: Session) -> KnownJobsIndex:
     archived_at = cast(Any, Job.archived_at)
     index = KnownJobsIndex()
-    for job in session.exec(select(Job).where(archived_at.is_(None))).all():
-        index.add(job)
+    statement = select(Job.source, Job.url, Job.dedup_key, Job.location).where(
+        archived_at.is_(None)
+    )
+    for source, url, dedup_key, location in session.exec(statement).all():
+        index.add_fields(source, url, dedup_key, location)
     return index
 
 

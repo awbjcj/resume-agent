@@ -498,18 +498,28 @@ def job_has_progress(job: Job, progressed: set[int]) -> bool:
 
 def _prune_rows(session: Session) -> list[PruneRow]:
     progressed = progressed_job_ids(session)
+    statement = select(
+        Job.id,
+        Job.status,
+        Job.fit_score,
+        Job.posted_at,
+        Job.created_at,
+        Job.archived_at,
+    )
     return [
         PruneRow(
-            job_id=job.id,
-            status=job.status,
-            fit_score=job.fit_score,
-            posted_at=job.posted_at,
-            created_at=job.created_at,
-            archived_at=job.archived_at,
-            has_progress=job.status in _PROGRESS_STATUSES or job.id in progressed,
+            job_id=job_id,
+            status=status,
+            fit_score=fit_score,
+            posted_at=posted_at,
+            created_at=created_at,
+            archived_at=archived_at,
+            has_progress=status in _PROGRESS_STATUSES or job_id in progressed,
         )
-        for job in session.exec(select(Job)).all()
-        if job.id is not None
+        for job_id, status, fit_score, posted_at, created_at, archived_at in session.exec(
+            statement
+        ).all()
+        if job_id is not None
     ]
 
 
