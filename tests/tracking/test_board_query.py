@@ -2,7 +2,7 @@ import json
 import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from sqlmodel import Session, select
@@ -16,6 +16,7 @@ from resume_agent.tracking.board_query import (
     RECENCY_WINDOW_DAYS,
     SALARY_CEILING,
     BoardFilter,
+    Preset,
     board_facet_counts,
     board_page,
 )
@@ -125,7 +126,7 @@ def _passes(row: Any, board_filter: BoardFilter, exclude: str | None = None) -> 
             getattr(row, "location", None),
             getattr(row, "source", None),
             getattr(row, "status", None),
-            getattr(row, "jd_text", None),
+            getattr(row, "jd_preview", None),
         )
         if value
     ).lower()
@@ -176,7 +177,7 @@ def _passes(row: Any, board_filter: BoardFilter, exclude: str | None = None) -> 
     return True
 
 
-def _composite(row: Any, preset: str) -> float:
+def _composite(row: Any, preset: Preset) -> float:
     w_fit, w_salary, w_recency = PRESETS[preset]
     fit = float(row.fit_score) if row.fit_score is not None else NEUTRAL
     salary = _salary(row) or None
@@ -414,7 +415,7 @@ def test_page_order_has_no_duplicates_across_ties(board_session):
 
     first_ids = [job.id for job in first]
     second_ids = [job.id for job in second]
-    assert first_ids == sorted(first_ids)
-    assert second_ids == sorted(second_ids)
+    assert first_ids == sorted(cast(list[int], first_ids))
+    assert second_ids == sorted(cast(list[int], second_ids))
     assert set(first_ids).isdisjoint(second_ids)
     assert total == second_total

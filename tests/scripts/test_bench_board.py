@@ -49,7 +49,8 @@ def test_bench_reports_requested_page_and_payload_bytes(tmp_path):
 
         assert result.board == "pipeline"
         assert result.page == 2
-        assert result.total_bytes > result.jd_text_bytes > 0
+        assert result.total_bytes > 0
+        assert result.jd_text_bytes == 0
         assert result.facets_bytes > 0
     finally:
         engine.dispose()
