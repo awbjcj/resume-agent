@@ -164,6 +164,37 @@ primary reason counts, then hard-deletes archived zero-progress jobs older than
 `retention_days`. Surfaced via the web Triage page and
 `resume-agent prune [--dry-run]`.
 
+### Redo — forward-only, never destructive
+
+`services/redo.py` re-runs any stage (`pull`/`extract`/`tailor`/`render`) over
+explicitly chosen jobs at any status. It exists because the automatic paths are
+deliberately one-way: `merge.decide()` freezes `jd_text` once a job leaves
+`raw`, and `reprocess()` skips anything `has_progress()` covers. Those guards
+stay; redo is the explicit escape hatch, never a mode.
+
+Three invariants, all enforced by `tracking/stages.py::advance`:
+
+- **Never regresses.** Status is a high-water mark. A rendered job stays
+  rendered through a re-pull + re-extract + re-tailor.
+- **Never rejects.** `rejected` ranks below `raw`, so the filter and relevance
+  gates cannot fire under `never_regress`. Fresh fit scores are still written.
+- **Never deletes.** New `ResumeVersion` rows are appended under an incremented
+  `attempt`; `tailor_model` records which model produced them.
+
+`StageScope(job_ids, any_status, never_regress)` is how the funnel stages in
+`discovery/pipeline.py` run over explicit ids. `StageScope()` reproduces the
+automatic funnel exactly — that default is the regression guard.
+
+Re-pull deliberately bypasses `find_existing`/`decide`/`_apply` and refreshes
+the row in place; a `dedup_key` that would collide with a sibling keeps the old
+identity and takes only the text.
+
+Per-job stage failures are durable: `services/errors.py::record_job_failure`
+writes an `ErrorRecord` with `kind="job"` keyed `job:{id}:{stage}` (so repeats
+coalesce into `count`), and `resolve_job_failures` closes it when that stage
+later succeeds. `gather_isolated` no longer discards the exception — the cause
+reaches the run result, the log, and the dashboard.
+
 ---
 
 ## ATS detection flow (`detect.py`)
