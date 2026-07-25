@@ -3128,6 +3128,7 @@ export interface components {
             firstSeenAt: string;
             /** Id */
             id: number;
+            jobDetails?: components["schemas"]["JobFailureDetails"] | null;
             /** Kind */
             kind: string;
             /**
@@ -3154,6 +3155,7 @@ export interface components {
         };
         /** ErrorRecordsOut */
         ErrorRecordsOut: {
+            pagination?: components["schemas"]["Pagination"] | null;
             /** Records */
             records?: components["schemas"]["ErrorRecordOut"][];
         };
@@ -3503,6 +3505,38 @@ export interface components {
             title: string | null;
             /** Url */
             url: string | null;
+        };
+        /**
+         * JobFailureDetails
+         * @description The formatted diagnostic for one job's stage failure.
+         *
+         *     Typed rather than a free-form map: an exposed dict's keys become a de facto
+         *     contract with nothing holding them stable, and a schema flows into the
+         *     generated TS client so the web side needs no hand-written shape.
+         */
+        JobFailureDetails: {
+            /** Company */
+            company?: string | null;
+            /** Errortype */
+            errorType: string;
+            /** Jobid */
+            jobId: number;
+            /** Message */
+            message: string;
+            /** Model */
+            model?: string | null;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "pull" | "extract" | "tailor" | "render";
+            /** Title */
+            title?: string | null;
+            /**
+             * Tracebacktail
+             * @default
+             */
+            tracebackTail: string;
         };
         /** JobLiteOut */
         JobLiteOut: {
@@ -6636,6 +6670,8 @@ export interface operations {
         parameters: {
             query?: {
                 status?: "open" | "dismissed" | "resolved";
+                page?: number;
+                pageSize?: number;
             };
             header?: {
                 authorization?: string | null;
