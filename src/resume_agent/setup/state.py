@@ -1,4 +1,17 @@
 from dataclasses import dataclass, field
+from typing import cast
+
+from resume_agent.config import Settings
+
+
+def _tier_default(name: str) -> str:
+    """Seed a tier from ``Settings`` so the wizard cannot drift behind it.
+
+    These were literals, and ``mid_model`` had already fallen a generation
+    behind (``claude-sonnet-4-6`` vs ``claude-sonnet-5``) -- a new user would
+    have been set up on a stale model with nothing to flag it.
+    """
+    return cast(str, Settings.model_fields[name].default)
 
 
 @dataclass
@@ -13,9 +26,9 @@ class WizardState:
     linkedin_email: str = ""
     linkedin_password: str = ""
     db_url: str = "sqlite:///data/resume_agent.db"
-    cheap_model: str = "claude-haiku-4-5-20251001"
-    mid_model: str = "claude-sonnet-4-6"
-    premium_model: str = "claude-opus-4-8"
+    cheap_model: str = field(default_factory=lambda: _tier_default("cheap_model"))
+    mid_model: str = field(default_factory=lambda: _tier_default("mid_model"))
+    premium_model: str = field(default_factory=lambda: _tier_default("premium_model"))
 
     # profile sources (→ profile_sources.yaml)
     resume_path: str = ""

@@ -2,7 +2,21 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.config import Settings
+
+
+def _tier_default(field: str) -> str:
+    """Read a model-tier default off ``Settings`` instead of restating it.
+
+    These defaults used to be duplicated as literals here and in the setup
+    wizard, which is how the wizard silently drifted a generation behind
+    ``Settings``. Deriving them keeps the API docs, the wizard, and the runtime
+    honest, and makes the OpenAPI contract move whenever a tier default moves.
+    """
+    return cast(str, Settings.model_fields[field].default)
 
 # schema field name -> .env variable. One place; GET, PUT, and setup-status use it.
 SECRET_FIELDS: dict[str, str] = {
@@ -51,9 +65,9 @@ class SecretsUpdate(CamelModel):
 
 
 class ModelsConfigDoc(CamelModel):
-    cheap_model: str = "claude-haiku-4-5-20251001"
-    mid_model: str = "claude-sonnet-5"
-    premium_model: str = "claude-opus-4-8"
+    cheap_model: str = _tier_default("cheap_model")
+    mid_model: str = _tier_default("mid_model")
+    premium_model: str = _tier_default("premium_model")
 
 
 class ModelOption(CamelModel):

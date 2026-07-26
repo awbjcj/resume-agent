@@ -1,10 +1,16 @@
+from resume_agent.config import Settings
 from resume_agent.setup.state import WizardState
 
 
 def test_defaults_match_settings_defaults():
+    # Compare against Settings rather than restating its literals. Restating them
+    # is what let mid_model drift a generation behind (claude-sonnet-4-6 vs
+    # claude-sonnet-5) while this test -- named for the invariant it was meant to
+    # protect -- kept passing.
     s = WizardState()
     assert s.db_url == "sqlite:///data/resume_agent.db"
-    assert s.cheap_model == "claude-haiku-4-5-20251001"
+    for tier in ("cheap_model", "mid_model", "premium_model"):
+        assert getattr(s, tier) == Settings.model_fields[tier].default
     assert s.remote_policy == "any"
     assert s.greenhouse_boards == []
 
