@@ -110,6 +110,34 @@ builder imports a concrete agno model class directly.
   `thinking_budget=0` only for pre-3 ids. Verified live against
   `gemini-3.6-flash`: `thinking_level="low"` reports no thought tokens;
   `thinking_budget=0` is a hard 400.
+- **Anthropic has the same "unset means provider decides" trap, and it is
+  generation-specific.** Omitting `thinking` runs **adaptive** on Sonnet 5 and
+  Opus 5, and runs **without** thinking on Opus 4.8/4.7 and older — so leaving
+  it unset silently bought thinking on every non-reasoning agent using the
+  default `mid_model`. Because `max_tokens` caps thinking **plus** response
+  text, that truncated large structured outputs into the same unparsed-`str`
+  symptom as the Gemini bug. `_anthropic_thinking` therefore sends
+  `{"type": "disabled"}` for non-reasoning 4.6+ ids (omitting it on pre-4.6,
+  where unset already means off, and on Fable/Mythos, which reject a disabled
+  config), and `_anthropic_max_tokens` replaces agno's 8192 default — clamped
+  to the SDK's per-model non-streaming ceiling so a custom Opus 4/4.1 id
+  cannot raise `ValueError`.
+- **Claude capability gates read the model generation, never a substring.**
+  `anthropic_version` parses `claude-<family>-<major>[-<minor>]` into a
+  comparable tuple; pre-4 ids (`claude-3-5-haiku-…`) put the version first and
+  deliberately return `None`, which is correct because every gated capability
+  arrived with 4.6. Both adaptive thinking + `output_config.effort`
+  (`provider_capabilities`) and the `web_search_20260209` tool variant
+  (`anthropic_web_search_tool`) gate on `>= (4, 6)`. The old `"haiku" in
+  model` heuristic was right only for the catalog and 400'd for any pre-4.6 id
+  entered through the tier picker's custom field; agno cannot catch this
+  because its `NON_THINKING_MODELS` covers only Haiku 3 and 3.5.
+- **Model-tier defaults live only on `Settings`.** `ModelsConfigDoc`
+  (`api/schemas/secrets.py`) and `WizardState` (`setup/state.py`) derive theirs
+  via `Settings.model_fields[...].default` instead of restating literals —
+  which is how the wizard silently fell a generation behind (`claude-sonnet-4-6`
+  vs `claude-sonnet-5`) while a test *named* for that invariant kept passing by
+  restating the literals too.
 - **A structured-output call that returns `str` is diagnosed, not guessed.**
   agno leaves `RunOutput.content` as the raw `str` whenever it cannot parse a
   response into `output_schema`, which collapses truncation, refusal and a

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from copy import deepcopy
@@ -283,18 +284,45 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
 
 OPENAI_WEB_SEARCH_TOOL = {"type": "web_search"}
 
+# Claude ids name their family before the version (``claude-opus-4-8``,
+# ``claude-sonnet-5``, ``claude-haiku-4-5-20251001``). Pre-4 ids used the
+# opposite order (``claude-3-5-haiku-20241022``) and deliberately do not match,
+# so they classify as legacy -- which is exactly right, since every capability
+# gated on this parser arrived with the 4.6 generation.
+_ANTHROPIC_VERSION = re.compile(
+    r"^claude-(?:opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?"
+)
+# Adaptive thinking, `output_config.effort`, and the dynamic-filtering
+# web-search tool all require this generation or newer.
+_ANTHROPIC_MODERN = (4, 6)
+# Thinking is always on for these families; an explicit disabled config is a 400.
+_ANTHROPIC_ALWAYS_THINKING = ("claude-fable-", "claude-mythos-")
+
+
+def anthropic_version(model: str) -> tuple[int, int] | None:
+    """Parse a bare Claude id into a comparable ``(major, minor)``, or ``None``.
+
+    ``None`` means "older than the 4.x family, or not a recognizable Claude id" --
+    treat it as supporting none of the 4.6+ request surface.
+    """
+    match = _ANTHROPIC_VERSION.match(model.casefold())
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2) or 0)
+
 
 def anthropic_web_search_tool(model_id: str) -> dict[str, Any]:
     """Pick the Anthropic web-search tool variant for a (possibly bare) Claude model id.
 
-    ``web_search_20260209`` (dynamic filtering) requires Opus 4.6+ or Sonnet 4.6+;
-    Haiku models need the basic ``web_search_20250305`` type. Mirrors the
-    "haiku" check `provider_capabilities` already uses for reasoning support.
+    ``web_search_20260209`` (dynamic filtering) requires Opus 4.6+ / Sonnet 4.6+;
+    anything older -- Haiku 4.5, and any pre-4.6 id reachable through the custom
+    model field -- must get the basic ``web_search_20250305`` or the Messages API
+    rejects the tool definition with a 400 before any search runs.
     """
     _provider, model = split_provider(model_id)
-    tool_type = (
-        "web_search_20250305" if "haiku" in model.casefold() else "web_search_20260209"
-    )
+    version = anthropic_version(model)
+    modern = version is not None and version >= _ANTHROPIC_MODERN
+    tool_type = "web_search_20260209" if modern else "web_search_20250305"
     return {"type": tool_type, "name": "web_search", "max_uses": 5}
 
 
@@ -371,7 +399,15 @@ def provider_capabilities(model_id: str) -> ProviderCapabilities:
     provider, model = split_provider(model_id)
     folded = model.casefold()
     if provider == "anthropic" and folded.startswith("claude-"):
-        return ProviderCapabilities("haiku" not in folded, True, True)
+        # Reasoning means `thinking={"type": "adaptive"}` + `output_config.effort`,
+        # and BOTH arrived with the 4.6 generation: adaptive is rejected on 4.5 and
+        # older (they need `{"type": "enabled", "budget_tokens": N}`), and `effort`
+        # errors outright on Sonnet 4.5 / Haiku 4.5. agno cannot catch this for us --
+        # its NON_THINKING_MODELS guard only covers the Haiku 3 and 3.5 families --
+        # so a pre-4.6 id would reach the API and 400 at runtime.
+        version = anthropic_version(model)
+        reasoning = version is not None and version >= _ANTHROPIC_MODERN
+        return ProviderCapabilities(reasoning, True, True)
     if provider == "openai" and folded.startswith(("gpt-", "o1", "o3", "o4")):
         return ProviderCapabilities(
             folded.startswith(("gpt-5", "o1", "o3", "o4")), True, True
