@@ -255,9 +255,10 @@ class ModelCatalogEntry:
 # ids are Anthropic. Update this list as providers ship new models.
 MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
     "anthropic": [
-        ModelCatalogEntry("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
+        ModelCatalogEntry("claude-haiku-4-5", "Claude Haiku 4.5"),
         ModelCatalogEntry("claude-sonnet-5", "Claude Sonnet 5"),
         ModelCatalogEntry("claude-opus-4-8", "Claude Opus 4.8"),
+        ModelCatalogEntry("claude-opus-5", "Claude Opus 5"),
     ],
     "openai": [
         ModelCatalogEntry("openai:gpt-5.6-luna", "GPT-5.6 Luna"),

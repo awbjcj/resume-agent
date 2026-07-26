@@ -3717,7 +3717,7 @@ export interface components {
         ModelsConfigDoc: {
             /**
              * Cheapmodel
-             * @default claude-haiku-4-5-20251001
+             * @default claude-haiku-4-5
              */
             cheapModel: string;
             /**
@@ -3727,7 +3727,7 @@ export interface components {
             midModel: string;
             /**
              * Premiummodel
-             * @default claude-opus-4-8
+             * @default claude-opus-5
              */
             premiumModel: string;
         };
