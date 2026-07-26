@@ -101,11 +101,22 @@ def test_build_model_gemini_3_uses_high_thinking_level_when_reasoning():
 def test_build_model_pre_gemini_3_still_disables_thinking_with_a_budget():
     # Older Gemini ids have no thinking_level and treat an unset thinking config
     # as "provider decides" (unbounded automatic budget) rather than off, so 0
-    # remains the way to disable it there. Not live-verified: the 2.x models are
-    # retired (404) on the current API.
+    # remains the way to disable it there. Reachable in practice: gemini-2.5-*
+    # is still a current model a user can enter in the custom tier field (only
+    # gemini-2.0 and older are deprecated).
     model = build_model("gemini:gemini-2.0-flash", api_key="sk-test")
     assert model.thinking_budget == 0
     assert model.thinking_level is None
+
+
+def test_build_model_pre_gemini_3_never_sends_thinking_level_when_reasoning():
+    # The mirror image of the thinking_budget-on-Gemini-3 failure: pre-3 ids have
+    # no thinking_level, and agno forwards any non-None value straight into
+    # ThinkingConfig, so sending one would 400 the whole request and come back as
+    # a plain str. Reasoning is left to the provider's own budget instead.
+    model = build_model("gemini:gemini-2.5-flash", api_key="sk-test", reasoning=True)
+    assert model.thinking_level is None
+    assert model.thinking_budget is None
 
 
 def test_openai_response_schema_has_no_keywords_beside_refs():

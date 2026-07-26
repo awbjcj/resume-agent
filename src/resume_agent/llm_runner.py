@@ -712,10 +712,13 @@ def build_model(
                 api_key=key,
                 thinking_level="high" if reasoning else "low",
             )
+        # Pre-3 ids have no thinking_level at all -- sending one is the mirror
+        # image of the thinking_budget-on-Gemini-3 failure, and agno forwards any
+        # non-None value straight into ThinkingConfig -- so 0 is the only way off
+        # here, and reasoning is left to the provider's own budget.
         return Gemini(
             id=model,
             api_key=key,
-            thinking_level="high" if reasoning else None,
             thinking_budget=None if reasoning else 0,
         )
     if provider == "deepseek":
@@ -771,12 +774,15 @@ def build_search_equipped(
     if plan.strategy == "native_gemini":
         from agno.models.google.gemini_interactions import GeminiInteractions
 
+        # Same "unset means provider decides" rule `build_model` guards: leaving
+        # thinking_level unset buys an unbounded automatic budget, so a
+        # non-reasoning research agent bounds it at "low" rather than omitting it.
         return (
             GeminiInteractions(
                 id=model_name,
                 api_key=api_key,
                 search=True,
-                thinking_level="high" if reasoning else None,
+                thinking_level="high" if reasoning else "low",
                 store=False,
             ),
             [],
