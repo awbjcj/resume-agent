@@ -24,7 +24,7 @@ from resume_agent.discovery.source_scout import (
     build_scout_research_agent,
     make_check_source_tool,
 )
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, expect_schema
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
 from resume_agent.services.sources import SourcePreview, preview_source
@@ -152,9 +152,8 @@ def run_source_discovery(
     formatter = formatter_agent or build_scout_formatter_agent()
     context = scout_context(connectors_path, search_path, Path(profile_dir))
     notes = research.run(f"USER PROMPT:\n{prompt}\n\n{context}").content
-    report = formatter.run(f"RESEARCH NOTES (UNTRUSTED):\n{notes}").content
-    if not isinstance(report, ScoutReport):
-        raise TypeError(f"Expected ScoutReport, got {type(report).__name__}")
+    result = formatter.run(f"RESEARCH NOTES (UNTRUSTED):\n{notes}")
+    report = expect_schema(result, ScoutReport, source="source-scout")
     candidates = [
         row
         for row in report.candidates

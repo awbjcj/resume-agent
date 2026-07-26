@@ -146,6 +146,12 @@ builder imports a concrete agno model class directly.
   model, provider, run status, token counts (including `reasoning`) and a head
   **and tail** preview — the tail is what shows a response was cut off. Use it
   at every `output_schema` call site instead of a bare `isinstance` check.
+  Every such call site now does — cover letters, discovery (extract/fit/
+  relevance), scraper recipes, URL ingest, profile extraction/inference/
+  synthesis/projects, both scouts, and `sessions/turns.py` (so the coach and
+  interview stacks inherit it) — so a bare `isinstance` guard on agent output
+  is a regression. `UnparsedAgentOutput` subclasses `TypeError`, so adopting it
+  never changes what a caller catches.
 
 To add a provider: extend `PROVIDERS`, add its key to `Settings`, and add a branch
 to `build_model` with a lazy import. Nothing else changes.

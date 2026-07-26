@@ -1,4 +1,4 @@
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, expect_schema
 from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
@@ -18,10 +18,9 @@ def compose_cover_letter_input(
 
 
 def draft_cover_letter(input_text: str, agent: Runner) -> CoverLetterContent:
-    content = agent.run(input_text).content
-    if not isinstance(content, CoverLetterContent):
-        raise TypeError(f"Expected CoverLetterContent from draft agent, got {type(content).__name__}")
-    return content
+    return expect_schema(
+        agent.run(input_text), CoverLetterContent, source="cover-letter draft"
+    )
 
 
 def compose_revise_input(
@@ -43,7 +42,6 @@ def compose_revise_input(
 
 
 def revise_cover_letter(input_text: str, agent: Runner) -> CoverLetterContent:
-    content = agent.run(input_text).content
-    if not isinstance(content, CoverLetterContent):
-        raise TypeError(f"Expected CoverLetterContent from reviser agent, got {type(content).__name__}")
-    return content
+    return expect_schema(
+        agent.run(input_text), CoverLetterContent, source="cover-letter reviser"
+    )

@@ -9,6 +9,7 @@ from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
+    expect_schema,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -59,12 +60,7 @@ def build_learn_agent(model_id: str | None = None) -> Runner:
 
 
 def learn_recipe(pruned_html: str, agent: Runner) -> ScrapeRecipe:
-    result = agent.run(pruned_html)
-    recipe = result.content
-    if not isinstance(recipe, ScrapeRecipe):
-        raise TypeError(
-            f"Expected ScrapeRecipe from learn agent, got {type(recipe).__name__}"
-        )
+    recipe = expect_schema(agent.run(pruned_html), ScrapeRecipe, source="scrape-learn")
     return recipe.model_copy(
         update={"schema_version": RECIPE_SCHEMA_VERSION, "learned_at": utcnow()}
     )

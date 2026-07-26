@@ -9,6 +9,7 @@ from resume_agent.llm_runner import (
     Runner,
     acall,
     build_model,
+    expect_schema,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -91,18 +92,11 @@ def compose_fit_input(
 
 
 def score_fit(input_text: str, agent: Runner) -> FitScore:
-    result = agent.run(input_text)
-    fit = result.content
-    if not isinstance(fit, FitScore):
-        raise TypeError(f"Expected FitScore from agent, got {type(fit).__name__}")
-    return fit
+    return expect_schema(agent.run(input_text), FitScore, source="fit")
 
 
 async def ascore_fit(
     input_text: str, agent: Runner, *, sem: asyncio.Semaphore
 ) -> FitScore:
     result = await acall(agent, input_text, sem=sem)
-    fit = result.content
-    if not isinstance(fit, FitScore):
-        raise TypeError(f"Expected FitScore from agent, got {type(fit).__name__}")
-    return fit
+    return expect_schema(result, FitScore, source="fit")

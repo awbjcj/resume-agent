@@ -13,6 +13,7 @@ from resume_agent.llm_runner import (
     Runner,
     acall,
     build_model,
+    expect_schema,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -90,9 +91,5 @@ async def aextract_project_facts(
     sem: asyncio.Semaphore,
 ) -> ProfileFacts:
     result = await acall(agent, text, sem=sem)
-    doc_facts = result.content
-    if not isinstance(doc_facts, ProjectDocFacts):
-        raise TypeError(
-            f"Expected ProjectDocFacts from agent, got {type(doc_facts).__name__}"
-        )
+    doc_facts = expect_schema(result, ProjectDocFacts, source="project-extract")
     return project_facts_to_profile(doc_facts, source=source)
