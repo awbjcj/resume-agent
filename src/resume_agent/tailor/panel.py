@@ -3,7 +3,7 @@ import json
 from collections.abc import Coroutine, Mapping
 from typing import Any
 
-from resume_agent.llm_runner import Runner, acall
+from resume_agent.llm_runner import Runner, acall, expect_schema
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import MergedPanelReview, ReviewCritique
@@ -54,11 +54,7 @@ def compose_evidence_review_input(
 
 
 def review_one(input_text: str, agent: Runner) -> ReviewCritique:
-    result = agent.run(input_text)
-    critique = result.content
-    if not isinstance(critique, ReviewCritique):
-        raise TypeError(f"Expected ReviewCritique from reviewer, got {type(critique).__name__}")
-    return critique
+    return expect_schema(agent.run(input_text), ReviewCritique, source="reviewer")
 
 
 def run_panel(
@@ -89,7 +85,7 @@ def run_panel(
         result = reviewer_agents[MERGED_ADVISORY].run(
             compose_lean_review_input(content, jd_text, resume_stats(content))
         )
-        critiques.extend(_merged_review(result.content, advisory_names))
+        critiques.extend(_merged_review(result, advisory_names))
     return critiques
 
 
@@ -97,13 +93,11 @@ def _advisory_names(config: ReviewConfig) -> list[str]:
     return [spec.name for spec in config.reviewers if not spec.gate]
 
 
-def _merged_review(content: Any, expected: list[str]) -> list[ReviewCritique]:
-    if not isinstance(content, MergedPanelReview):
-        raise TypeError(
-            "Expected MergedPanelReview from merged advisory, "
-            f"got {type(content).__name__}"
-        )
-    return split_merged_critiques(content, expected)
+def _merged_review(result: Any, expected: list[str]) -> list[ReviewCritique]:
+    """Takes the whole run result, not just its content, so a parse failure can
+    report the provider diagnostics that say why it did not parse."""
+    review = expect_schema(result, MergedPanelReview, source="merged advisory")
+    return split_merged_critiques(review, expected)
 
 
 def _panel_inputs(
@@ -129,12 +123,7 @@ async def areview_one(
     input_text: str, agent: Runner, *, sem: asyncio.Semaphore
 ) -> ReviewCritique:
     result = await acall(agent, input_text, sem=sem)
-    critique = result.content
-    if not isinstance(critique, ReviewCritique):
-        raise TypeError(
-            f"Expected ReviewCritique from reviewer, got {type(critique).__name__}"
-        )
-    return critique
+    return expect_schema(result, ReviewCritique, source="reviewer")
 
 
 async def arun_panel(
@@ -182,7 +171,7 @@ async def arun_panel(
             first_error = first_error or output
         elif advisory_names and index == len(gate_specs):
             try:
-                critiques.extend(_merged_review(output.content, advisory_names))
+                critiques.extend(_merged_review(output, advisory_names))
             except (TypeError, ValueError) as exc:
                 first_error = first_error or exc
         else:

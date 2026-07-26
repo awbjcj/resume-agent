@@ -146,6 +146,89 @@ async def run_with_cleanup(operation: Awaitable[_T], *runners: Any) -> _T:
                 logger.warning("Failed to close LLM runner", exc_info=True)
 
 
+_SchemaT = TypeVar("_SchemaT", bound=BaseModel)
+
+# Enough head to identify the shape, enough tail to see where it stopped.
+_PREVIEW_HEAD = 600
+_PREVIEW_TAIL = 400
+
+
+class UnparsedAgentOutput(TypeError):
+    """An agent returned raw content instead of the schema it was asked for.
+
+    agno leaves ``RunOutput.content`` as the raw ``str`` whenever it cannot
+    coerce a response into ``output_schema``, so this is the only signal that a
+    structured call failed. It subclasses ``TypeError`` because that is what
+    every call site raised before, and it carries the diagnostics that separate
+    a truncated response from a refusal or a rejected schema -- none of which
+    are recoverable from the type name alone, and none of which agno's Gemini
+    adapter reports (it discards ``finish_reason`` unless a function call was
+    malformed).
+    """
+
+
+def _preview(text: str) -> str:
+    """Head + tail of ``text``.
+
+    The tail is the diagnostic: a response cut off by an output-token ceiling
+    ends mid-JSON, which a head-only preview would hide entirely.
+    """
+    if len(text) <= _PREVIEW_HEAD + _PREVIEW_TAIL:
+        return text
+    elided = len(text) - _PREVIEW_HEAD - _PREVIEW_TAIL
+    return (
+        f"{text[:_PREVIEW_HEAD]}"
+        f" ... <{elided} chars elided> ... "
+        f"{text[-_PREVIEW_TAIL:]}"
+    )
+
+
+def _describe_unparsed(result: Any, content: Any, schema: type, source: str) -> str:
+    """Build the failure message, reading every field defensively.
+
+    ``RunOutput``'s shape drifts between agno versions, so a missing attribute
+    must degrade the report rather than raise over the failure it describes.
+    """
+    fields = [
+        (
+            f"Expected {schema.__name__} from {source} agent, "
+            f"got {type(content).__name__}"
+        )
+    ]
+    provider = getattr(result, "model_provider", None)
+    model = getattr(result, "model", None)
+    if provider or model:
+        fields.append(f"model={provider or '?'}:{model or '?'}")
+    status = getattr(result, "status", None)
+    if status is not None:
+        fields.append(f"status={getattr(status, 'value', status)}")
+    metrics = getattr(result, "metrics", None)
+    if metrics is not None:
+        # reasoning tokens are how we tell whether provider-side thinking was
+        # actually disabled, and output tokens whether a ceiling was reached.
+        fields.append(
+            f"tokens: in={getattr(metrics, 'input_tokens', 0)} "
+            f"out={getattr(metrics, 'output_tokens', 0)} "
+            f"reasoning={getattr(metrics, 'reasoning_tokens', 0)}"
+        )
+    if isinstance(content, str):
+        fields.append(f"chars={len(content)}")
+        return "; ".join(fields) + f"\ncontent: {_preview(content)}"
+    return "; ".join(fields)
+
+
+def expect_schema(result: Any, schema: type[_SchemaT], *, source: str) -> _SchemaT:
+    """Return ``result.content`` as ``schema``, or raise saying why it is not.
+
+    The single seam every structured-output call site should use, so a parse
+    failure is diagnosable from the error alone instead of needing a redeploy.
+    """
+    content = getattr(result, "content", None)
+    if isinstance(content, schema):
+        return content
+    raise UnparsedAgentOutput(_describe_unparsed(result, content, schema, source))
+
+
 # Providers selectable via a ``provider:model`` prefix on any model id. A bare id
 # (no recognised prefix) stays Anthropic, so existing config keeps working.
 PROVIDERS = ("anthropic", "openai", "gemini", "deepseek")

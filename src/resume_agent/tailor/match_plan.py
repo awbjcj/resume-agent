@@ -8,6 +8,7 @@ from resume_agent.llm_runner import (
     Runner,
     acall,
     build_model,
+    expect_schema,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -108,20 +109,11 @@ def build_match_plan_agent(
 
 
 def match_plan(input_text: str, agent: Runner) -> MatchPlan:
-    plan = agent.run(input_text).content
-    if not isinstance(plan, MatchPlan):
-        raise TypeError(
-            f"Expected MatchPlan from match-plan agent, got {type(plan).__name__}"
-        )
-    return plan
+    return expect_schema(agent.run(input_text), MatchPlan, source="match-plan")
 
 
 async def amatch_plan(
     input_text: str, agent: Runner, *, sem: asyncio.Semaphore
 ) -> MatchPlan:
-    plan = (await acall(agent, input_text, sem=sem)).content
-    if not isinstance(plan, MatchPlan):
-        raise TypeError(
-            f"Expected MatchPlan from match-plan agent, got {type(plan).__name__}"
-        )
-    return plan
+    result = await acall(agent, input_text, sem=sem)
+    return expect_schema(result, MatchPlan, source="match-plan")

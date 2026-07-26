@@ -1,6 +1,6 @@
 import asyncio
 
-from resume_agent.llm_runner import Runner, acall
+from resume_agent.llm_runner import Runner, acall, expect_schema
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.match_plan import MatchPlan
 from resume_agent.models.profile import ProfileFacts
@@ -37,21 +37,12 @@ def compose_tailor_input(
 
 
 def tailor(input_text: str, agent: Runner) -> ResumeContent:
-    result = agent.run(input_text)
-    content = result.content
-    if not isinstance(content, ResumeContent):
-        raise TypeError(f"Expected ResumeContent from tailor agent, got {type(content).__name__}")
-    return content
+    return expect_schema(agent.run(input_text), ResumeContent, source="tailor")
 
 
 async def atailor(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ResumeContent:
     result = await acall(agent, input_text, sem=sem)
-    content = result.content
-    if not isinstance(content, ResumeContent):
-        raise TypeError(
-            f"Expected ResumeContent from tailor agent, got {type(content).__name__}"
-        )
-    return content
+    return expect_schema(result, ResumeContent, source="tailor")
 
 
 def compose_revise_input(
@@ -99,18 +90,9 @@ def compose_revise_input(
 
 
 def revise(input_text: str, agent: Runner) -> ResumeContent:
-    result = agent.run(input_text)
-    content = result.content
-    if not isinstance(content, ResumeContent):
-        raise TypeError(f"Expected ResumeContent from reviser agent, got {type(content).__name__}")
-    return content
+    return expect_schema(agent.run(input_text), ResumeContent, source="reviser")
 
 
 async def arevise(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ResumeContent:
     result = await acall(agent, input_text, sem=sem)
-    content = result.content
-    if not isinstance(content, ResumeContent):
-        raise TypeError(
-            f"Expected ResumeContent from reviser agent, got {type(content).__name__}"
-        )
-    return content
+    return expect_schema(result, ResumeContent, source="reviser")

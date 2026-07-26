@@ -327,3 +327,89 @@ def test_tool_kwargs_bounds_tool_loop():
     from resume_agent.llm_runner import tool_kwargs
 
     assert tool_kwargs() == {"tool_call_limit": 15}
+
+
+# --- Unparsed structured output diagnostics -------------------------------
+#
+# agno leaves RunOutput.content as the raw str when it cannot parse a response
+# into output_schema. Every call site used to raise a bare TypeError naming only
+# the type, which destroyed the one piece of evidence that says WHY (truncated
+# vs refusal vs rejected schema). These pin the diagnostics onto the exception.
+
+
+class _Metrics:
+    def __init__(self, input_tokens=0, output_tokens=0, reasoning_tokens=0):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.reasoning_tokens = reasoning_tokens
+
+
+class _RunOutput:
+    def __init__(self, content, *, model=None, model_provider=None, metrics=None):
+        self.content = content
+        self.model = model
+        self.model_provider = model_provider
+        self.metrics = metrics
+
+
+def test_expect_schema_returns_content_when_it_already_matches():
+    from resume_agent.llm_runner import expect_schema
+    from resume_agent.models.profile import Contact
+
+    content = ResumeContent(contact=Contact(name="Ada"))
+    assert expect_schema(_RunOutput(content), ResumeContent, source="tailor") is content
+
+
+def test_unparsed_output_keeps_the_tail_so_truncation_is_visible():
+    # A response cut off by an output-token ceiling ends mid-JSON. Only the TAIL
+    # shows that, so the preview must never be head-only.
+    from resume_agent.llm_runner import UnparsedAgentOutput, expect_schema
+
+    truncated = '{"contact": {"name": "Ada"}, "experience": [{"company": "Acme' + (
+        "x" * 5000
+    )
+    with pytest.raises(UnparsedAgentOutput) as excinfo:
+        expect_schema(
+            _RunOutput(
+                truncated,
+                model="gemini-3.5-flash",
+                model_provider="Google",
+                metrics=_Metrics(input_tokens=12000, output_tokens=8192, reasoning_tokens=7900),
+            ),
+            ResumeContent,
+            source="tailor",
+        )
+    message = str(excinfo.value)
+    assert "ResumeContent" in message
+    assert "tailor" in message
+    assert "gemini-3.5-flash" in message
+    assert "Google" in message
+    assert f"chars={len(truncated)}" in message
+    assert '{"contact"' in message  # head survives
+    assert message.rstrip().endswith("xxx")  # tail survives
+    # reasoning_tokens is how we can tell whether thinking was actually disabled
+    assert "reasoning=7900" in message
+    assert "out=8192" in message
+
+
+def test_unparsed_output_is_still_a_type_error():
+    # Callers and existing tests catch TypeError; widening the diagnostics must
+    # not change what propagates through gather_isolated.
+    from resume_agent.llm_runner import UnparsedAgentOutput, expect_schema
+
+    with pytest.raises(TypeError):
+        expect_schema(_RunOutput("nope"), ResumeContent, source="tailor")
+    assert issubclass(UnparsedAgentOutput, TypeError)
+
+
+def test_unparsed_output_survives_a_result_without_metadata():
+    # RunOutput shape drifts between agno versions; diagnostics must degrade,
+    # never mask the failure they are describing.
+    from resume_agent.llm_runner import UnparsedAgentOutput, expect_schema
+
+    class _Bare:
+        content = ""
+
+    with pytest.raises(UnparsedAgentOutput) as excinfo:
+        expect_schema(_Bare(), ResumeContent, source="reviser")
+    assert "chars=0" in str(excinfo.value)
