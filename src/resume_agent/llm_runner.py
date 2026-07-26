@@ -606,12 +606,22 @@ def build_model(
     if provider == "gemini":
         Gemini = _compatible_gemini_class()
 
-        # Unlike Claude/DeepSeek, Gemini treats an unset thinking config as
-        # "provider decides" (an automatic, unbounded thinking budget) rather
-        # than off. Left unset, schema-heavy structured-output calls (e.g. the
-        # tailor agents) can spend the entire output-token budget on internal
-        # reasoning and get cut off mid-JSON. Disable it explicitly to match
-        # the other providers' non-reasoning default.
+        # Gemini treats an unset thinking config as "provider decides" (an
+        # automatic, unbounded budget) rather than off, so a non-reasoning agent
+        # has to bound it explicitly -- but HOW differs by model generation.
+        #
+        # Gemini 3 replaced thinking_budget with thinking_level and rejects the
+        # budget outright: thinking_budget=0 fails the entire request with 400
+        # INVALID_ARGUMENT before any generation, which agno then surfaces as a
+        # plain str (the error body) rather than the output_schema. Bound it
+        # with thinking_level="low" instead; that reports no thought tokens.
+        # Pre-3 ids have no thinking_level, so there 0 is still the way off.
+        if model.casefold().startswith("gemini-3"):
+            return Gemini(
+                id=model,
+                api_key=key,
+                thinking_level="high" if reasoning else "low",
+            )
         return Gemini(
             id=model,
             api_key=key,

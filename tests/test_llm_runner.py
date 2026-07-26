@@ -81,18 +81,31 @@ def test_build_model_gemini_branch():
     assert model.id == "gemini-2.0-flash"
 
 
-def test_build_model_gemini_disables_thinking_when_reasoning_not_requested():
-    # Unlike Claude/DeepSeek, Gemini treats an unset thinking config as
-    # "provider decides" (automatic budget), not "off" - so build_model must
-    # explicitly disable it to match the other providers' non-reasoning default.
-    model = build_model("gemini:gemini-3.5-flash", api_key="sk-test")
-    assert model.thinking_budget == 0
+def test_build_model_gemini_3_never_sends_thinking_budget():
+    # Verified live against gemini-3.6-flash: thinking_budget=0 fails the WHOLE
+    # request with 400 INVALID_ARGUMENT, generating nothing (in=0/out=0 tokens),
+    # and agno surfaces that error body as a plain str. Gemini 3 replaced the
+    # budget with thinking_level, so a non-reasoning agent bounds thinking with
+    # "low" -- which reports thoughts=None -- and never with a budget.
+    model = build_model("gemini:gemini-3.6-flash", api_key="sk-test")
+    assert model.thinking_budget is None
+    assert model.thinking_level == "low"
 
 
-def test_build_model_gemini_leaves_thinking_budget_unset_when_reasoning_requested():
+def test_build_model_gemini_3_uses_high_thinking_level_when_reasoning():
     model = build_model("gemini:gemini-3.5-flash", api_key="sk-test", reasoning=True)
     assert model.thinking_budget is None
     assert model.thinking_level == "high"
+
+
+def test_build_model_pre_gemini_3_still_disables_thinking_with_a_budget():
+    # Older Gemini ids have no thinking_level and treat an unset thinking config
+    # as "provider decides" (unbounded automatic budget) rather than off, so 0
+    # remains the way to disable it there. Not live-verified: the 2.x models are
+    # retired (404) on the current API.
+    model = build_model("gemini:gemini-2.0-flash", api_key="sk-test")
+    assert model.thinking_budget == 0
+    assert model.thinking_level is None
 
 
 def test_openai_response_schema_has_no_keywords_beside_refs():

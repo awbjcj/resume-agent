@@ -98,6 +98,26 @@ builder imports a concrete agno model class directly.
 - **Dependency note.** agno 2.6.x's Gemini import needs `google-genai`'s
   `step_delta` submodule, renamed to `stepdelta` in 2.9.0 — `pyproject.toml`
   caps it at `<2.9.0`. DeepSeek and OpenAI both ride the `openai` SDK.
+- **Gemini thinking is generation-specific — never send `thinking_budget` to
+  Gemini 3.** Gemini treats an unset thinking config as "provider decides"
+  (unbounded automatic budget), so non-reasoning agents must bound it. But
+  Gemini 3 replaced `thinking_budget` with `thinking_level` and **rejects the
+  budget outright**: `thinking_budget=0` fails the whole request with `400
+  INVALID_ARGUMENT` before generating anything, and agno then hands back the
+  error body as a plain `str` — surfacing as "Expected ResumeContent, got str"
+  rather than as an HTTP error. `build_model` therefore bounds Gemini 3 with
+  `thinking_level` (`low` when not reasoning, `high` when reasoning) and keeps
+  `thinking_budget=0` only for pre-3 ids. Verified live against
+  `gemini-3.6-flash`: `thinking_level="low"` reports no thought tokens;
+  `thinking_budget=0` is a hard 400.
+- **A structured-output call that returns `str` is diagnosed, not guessed.**
+  agno leaves `RunOutput.content` as the raw `str` whenever it cannot parse a
+  response into `output_schema`, which collapses truncation, refusal and a
+  rejected request into one indistinguishable symptom. `expect_schema` in
+  `llm_runner.py` is the single seam that raises `UnparsedAgentOutput` carrying
+  model, provider, run status, token counts (including `reasoning`) and a head
+  **and tail** preview — the tail is what shows a response was cut off. Use it
+  at every `output_schema` call site instead of a bare `isinstance` check.
 
 To add a provider: extend `PROVIDERS`, add its key to `Settings`, and add a branch
 to `build_model` with a lazy import. Nothing else changes.
