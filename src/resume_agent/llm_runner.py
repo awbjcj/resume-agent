@@ -615,6 +615,59 @@ def use_json_mode_for(model: Any, output_schema: Any = None) -> bool:
     ) == "Anthropic" and _anthropic_schema_exceeds_limits(output_schema)
 
 
+def _anthropic_thinking(
+    model: str, *, reasoning: bool
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return the ``(thinking, output_config)`` pair for a bare Claude id.
+
+    Anthropic has the same hazard as Gemini -- an unset thinking config is
+    "provider decides", not "off" -- but the default differs by generation:
+    omitting ``thinking`` runs ADAPTIVE on Sonnet 5 and Opus 5, and runs
+    without thinking on Opus 4.8/4.7 and everything older. Since
+    ``Settings.mid_model`` defaults to ``claude-sonnet-5``, leaving it unset
+    silently bought thinking on every non-reasoning agent -- and because
+    thinking shares the ``max_tokens`` budget with the response text, that
+    truncated large structured outputs into the unparsed-``str`` failure
+    ``expect_schema`` exists to diagnose. So bound it explicitly.
+    """
+    if reasoning:
+        return {"type": "adaptive"}, {"effort": "high"}
+    folded = model.casefold()
+    if folded.startswith(_ANTHROPIC_ALWAYS_THINKING):
+        # Fable/Mythos reject an explicit disabled config; only max_tokens bounds it.
+        return None, None
+    version = anthropic_version(model)
+    if version is None or version < _ANTHROPIC_MODERN:
+        # Pre-4.6 ids: omitting the config already means no thinking on that
+        # generation, so there is nothing to bound -- and agno rejects a thinking
+        # config on the Haiku 3/3.5 families outright.
+        return None, None
+    # Accepted on Sonnet 5, Opus 4.8/4.7/4.6 and Sonnet 4.6. On Opus 5 it is
+    # accepted only at effort `high` or below -- we send no `output_config` here,
+    # and the default effort is `high`, so this stays inside that limit.
+    return {"type": "disabled"}, None
+
+
+def _anthropic_max_tokens(model: str, *, reasoning: bool) -> int:
+    """Bound Claude's output budget instead of inheriting agno's 8192 default.
+
+    ``max_tokens`` caps thinking PLUS response text, so 8192 is shared between a
+    reasoning budget and the full JSON body -- enough to truncate a
+    ``ResumeContent`` or starve a scout's web-search tool loop, both of which
+    surface as an unparsed ``str`` rather than an HTTP error. These calls are
+    non-streaming, so stay near the SDK's ~16000 non-streaming guidance rather
+    than the models' 128K ceiling, and honor the per-model non-streaming ceiling
+    the SDK enforces (Opus 4/4.1 only) so a custom id cannot raise ValueError.
+    """
+    want = 32000 if reasoning else 16000
+    try:
+        from anthropic._constants import MODEL_NONSTREAMING_TOKENS
+    except ImportError:  # pragma: no cover - private SDK constant
+        return want
+    ceiling = MODEL_NONSTREAMING_TOKENS.get(model)
+    return min(want, ceiling) if ceiling else want
+
+
 def build_model(
     model_id: str,
     api_key: str | None = None,
@@ -676,12 +729,14 @@ def build_model(
         )
     from agno.models.anthropic import Claude
 
+    thinking, output_config = _anthropic_thinking(model, reasoning=reasoning)
     return Claude(
         id=model,
         api_key=key,
         cache_system_prompt=cache_system_prompt,
-        thinking={"type": "adaptive"} if reasoning else None,
-        output_config={"effort": "high"} if reasoning else None,
+        max_tokens=_anthropic_max_tokens(model, reasoning=reasoning),
+        thinking=thinking,
+        output_config=output_config,
     )
 
 
