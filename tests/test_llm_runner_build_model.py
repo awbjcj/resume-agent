@@ -102,13 +102,10 @@ def test_selected_tier_tuning_is_forwarded_by_provider(monkeypatch):
     settings = SimpleNamespace(
         cheap_model="gemini:gemini-3.5-flash",
         cheap_reasoning_effort="minimal",
-        cheap_response_verbosity=None,
         mid_model="claude-sonnet-5",
         mid_reasoning_effort="low",
-        mid_response_verbosity=None,
         premium_model="openai:gpt-5.5",
         premium_reasoning_effort="xhigh",
-        premium_response_verbosity="low",
     )
     monkeypatch.setattr(llm_runner, "get_settings", lambda: settings)
 
@@ -118,5 +115,4 @@ def test_selected_tier_tuning_is_forwarded_by_provider(monkeypatch):
 
     assert claude.output_config == {"effort": "low"}
     assert openai.reasoning_effort == "xhigh"
-    assert openai.verbosity == "low"
     assert gemini.thinking_level == "minimal"

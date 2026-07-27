@@ -3814,13 +3814,6 @@
             "title": "Reasoningefforts",
             "type": "array"
           },
-          "responseVerbosityLevels": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Responseverbositylevels",
-            "type": "array"
-          },
           "supportsNativeSearch": {
             "title": "Supportsnativesearch",
             "type": "boolean"
@@ -3835,8 +3828,7 @@
           "label",
           "supportsReasoning",
           "supportsNativeSearch",
-          "reasoningEfforts",
-          "responseVerbosityLevels"
+          "reasoningEfforts"
         ],
         "title": "ModelOption",
         "type": "object"
@@ -3859,17 +3851,6 @@
             ],
             "title": "Cheapreasoningeffort"
           },
-          "cheapResponseVerbosity": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cheapresponseverbosity"
-          },
           "midModel": {
             "default": "claude-sonnet-5",
             "title": "Midmodel",
@@ -3886,17 +3867,6 @@
             ],
             "title": "Midreasoningeffort"
           },
-          "midResponseVerbosity": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Midresponseverbosity"
-          },
           "premiumModel": {
             "default": "claude-opus-5",
             "title": "Premiummodel",
@@ -3912,17 +3882,6 @@
               }
             ],
             "title": "Premiumreasoningeffort"
-          },
-          "premiumResponseVerbosity": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Premiumresponseverbosity"
           }
         },
         "title": "ModelsConfigDoc",

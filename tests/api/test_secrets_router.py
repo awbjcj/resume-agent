@@ -115,7 +115,6 @@ def test_model_catalog_entries_carry_id_label_and_capability_flags(client):
     assert haiku["label"] and haiku["supportsReasoning"] is False
     assert opus["supportsReasoning"] is True
     assert opus["reasoningEfforts"] == ["low", "medium", "high", "max"]
-    assert opus["responseVerbosityLevels"] == []
     assert haiku["supportsNativeSearch"] is True  # anthropic has native search
 
     deepseek = next(row for row in body if row["provider"] == "deepseek")
@@ -124,7 +123,6 @@ def test_model_catalog_entries_carry_id_label_and_capability_flags(client):
     openai = next(row for row in body if row["provider"] == "openai")
     gpt = next(m for m in openai["models"] if m["id"] == "openai:gpt-5.5")
     assert gpt["reasoningEfforts"] == ["none", "low", "medium", "high", "xhigh"]
-    assert gpt["responseVerbosityLevels"] == ["low", "medium", "high"]
 
 
 def test_put_models_rejects_capabilities_the_selected_model_does_not_support(client):

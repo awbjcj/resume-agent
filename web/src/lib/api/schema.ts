@@ -3710,8 +3710,6 @@ export interface components {
             label: string;
             /** Reasoningefforts */
             reasoningEfforts: string[];
-            /** Responseverbositylevels */
-            responseVerbosityLevels: string[];
             /** Supportsnativesearch */
             supportsNativeSearch: boolean;
             /** Supportsreasoning */
@@ -3726,8 +3724,6 @@ export interface components {
             cheapModel: string;
             /** Cheapreasoningeffort */
             cheapReasoningEffort?: string | null;
-            /** Cheapresponseverbosity */
-            cheapResponseVerbosity?: string | null;
             /**
              * Midmodel
              * @default claude-sonnet-5
@@ -3735,8 +3731,6 @@ export interface components {
             midModel: string;
             /** Midreasoningeffort */
             midReasoningEffort?: string | null;
-            /** Midresponseverbosity */
-            midResponseVerbosity?: string | null;
             /**
              * Premiummodel
              * @default claude-opus-5
@@ -3744,8 +3738,6 @@ export interface components {
             premiumModel: string;
             /** Premiumreasoningeffort */
             premiumReasoningEffort?: string | null;
-            /** Premiumresponseverbosity */
-            premiumResponseVerbosity?: string | null;
         };
         /** MoveSkillIn */
         MoveSkillIn: {

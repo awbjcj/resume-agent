@@ -75,9 +75,6 @@ class ModelsConfigDoc(CamelModel):
     cheap_reasoning_effort: str | None = None
     mid_reasoning_effort: str | None = None
     premium_reasoning_effort: str | None = None
-    cheap_response_verbosity: str | None = None
-    mid_response_verbosity: str | None = None
-    premium_response_verbosity: str | None = None
 
 
 class ModelOption(CamelModel):
@@ -86,7 +83,6 @@ class ModelOption(CamelModel):
     supports_reasoning: bool
     supports_native_search: bool
     reasoning_efforts: list[str]
-    response_verbosity_levels: list[str]
 
 
 class ProviderModelCatalog(CamelModel):

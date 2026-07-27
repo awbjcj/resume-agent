@@ -33,9 +33,6 @@ _MODEL_ENV = {
     "cheap_reasoning_effort": "CHEAP_REASONING_EFFORT",
     "mid_reasoning_effort": "MID_REASONING_EFFORT",
     "premium_reasoning_effort": "PREMIUM_REASONING_EFFORT",
-    "cheap_response_verbosity": "CHEAP_RESPONSE_VERBOSITY",
-    "mid_response_verbosity": "MID_RESPONSE_VERBOSITY",
-    "premium_response_verbosity": "PREMIUM_RESPONSE_VERBOSITY",
 }
 
 _PROVIDER_KEY_ENV = {
@@ -92,7 +89,6 @@ def get_model_catalog(request: Request):
                 supports_reasoning=provider_capabilities(entry.id).supports_reasoning,
                 supports_native_search=supports_native_search(entry.id),
                 reasoning_efforts=list(entry.reasoning_efforts),
-                response_verbosity_levels=list(entry.response_verbosity_levels),
             )
             for entry in entries
         ]
@@ -120,7 +116,6 @@ def put_models(body: ModelsConfigDoc, request: Request):
         model_id = getattr(candidate, f"{tier}_model")
         entry = catalog_entry(model_id)
         effort = getattr(candidate, f"{tier}_reasoning_effort")
-        verbosity = getattr(candidate, f"{tier}_response_verbosity")
         if effort is not None and (
             entry is None or effort not in entry.reasoning_efforts
         ):
@@ -128,14 +123,6 @@ def put_models(body: ModelsConfigDoc, request: Request):
                 422,
                 "UNSUPPORTED_MODEL_SETTING",
                 f"{model_id} does not support reasoning effort {effort!r}",
-            )
-        if verbosity is not None and (
-            entry is None or verbosity not in entry.response_verbosity_levels
-        ):
-            raise ApiException(
-                422,
-                "UNSUPPORTED_MODEL_SETTING",
-                f"{model_id} does not support response verbosity {verbosity!r}",
             )
     updates = {_MODEL_ENV[f]: (v or "") for f, v in provided.items()}
     fresh = write_env_updates(updates, get_env_path(request))

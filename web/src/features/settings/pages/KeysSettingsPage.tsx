@@ -22,37 +22,18 @@ type ModelsDoc = {
   cheapReasoningEffort: string | null;
   midReasoningEffort: string | null;
   premiumReasoningEffort: string | null;
-  cheapResponseVerbosity: string | null;
-  midResponseVerbosity: string | null;
-  premiumResponseVerbosity: string | null;
 };
 
 type ModelField = {
   key: "cheapModel" | "midModel" | "premiumModel";
   effortKey: "cheapReasoningEffort" | "midReasoningEffort" | "premiumReasoningEffort";
-  verbosityKey: "cheapResponseVerbosity" | "midResponseVerbosity" | "premiumResponseVerbosity";
   label: string;
 };
 
 const MODEL_FIELDS: ModelField[] = [
-  {
-    key: "cheapModel",
-    effortKey: "cheapReasoningEffort",
-    verbosityKey: "cheapResponseVerbosity",
-    label: "Cheap tier model",
-  },
-  {
-    key: "midModel",
-    effortKey: "midReasoningEffort",
-    verbosityKey: "midResponseVerbosity",
-    label: "Mid tier model",
-  },
-  {
-    key: "premiumModel",
-    effortKey: "premiumReasoningEffort",
-    verbosityKey: "premiumResponseVerbosity",
-    label: "Premium tier model",
-  },
+  { key: "cheapModel", effortKey: "cheapReasoningEffort", label: "Cheap tier model" },
+  { key: "midModel", effortKey: "midReasoningEffort", label: "Mid tier model" },
+  { key: "premiumModel", effortKey: "premiumReasoningEffort", label: "Premium tier model" },
 ];
 
 export function KeysSettingsPage() {
@@ -99,11 +80,6 @@ export function KeysSettingsPage() {
                       )
                         ? draft[f.effortKey]
                         : null,
-                      [f.verbosityKey]: next?.responseVerbosityLevels.includes(
-                        draft[f.verbosityKey] ?? "",
-                      )
-                        ? draft[f.verbosityKey]
-                        : null,
                     });
                   }}
                 />
@@ -111,13 +87,9 @@ export function KeysSettingsPage() {
                   <ModelTuningControls
                     modelId={draft[f.key]}
                     reasoningEffort={draft[f.effortKey]}
-                    responseVerbosity={draft[f.verbosityKey]}
                     catalog={catalog.data}
                     onReasoningEffortChange={(value) =>
                       setDraft({ ...draft, [f.effortKey]: value })
-                    }
-                    onResponseVerbosityChange={(value) =>
-                      setDraft({ ...draft, [f.verbosityKey]: value })
                     }
                   />
                 )}

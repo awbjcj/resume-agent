@@ -12,10 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ProviderModelCatalog } from "./use-model-catalog";
 
 const CUSTOM_VALUE = "__custom__";
 const PROVIDER_DEFAULT = "__provider_default__";
+const TUNING_LABEL_CLASS =
+  "text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground";
 
 type ModelEntry = ProviderModelCatalog["models"][number];
 
@@ -130,7 +133,7 @@ export function ModelPicker({
   );
 }
 
-function TuningSelect({
+function TuningToggleGroup({
   label,
   value,
   levels,
@@ -142,67 +145,50 @@ function TuningSelect({
   onChange: (value: string | null) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-      {label}
-      <Select
-        value={value ?? PROVIDER_DEFAULT}
-        onValueChange={(next) => onChange(next === PROVIDER_DEFAULT ? null : next)}
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className={TUNING_LABEL_CLASS}>{label}</span>
+      <ToggleGroup
+        aria-label={label}
+        value={[value ?? PROVIDER_DEFAULT]}
+        onValueChange={(next) => {
+          const picked = next.at(-1);
+          if (!picked) return;
+          onChange(picked === PROVIDER_DEFAULT ? null : picked);
+        }}
       >
-        <SelectTrigger aria-label={label} className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={PROVIDER_DEFAULT}>Provider default</SelectItem>
-          {levels.map((level) => (
-            <SelectItem key={level} value={level}>
-              {level[0].toUpperCase() + level.slice(1)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </label>
+        <ToggleGroupItem value={PROVIDER_DEFAULT} className="h-7 rounded-full px-2.5 text-xs">
+          Default
+        </ToggleGroupItem>
+        {levels.map((level) => (
+          <ToggleGroupItem key={level} value={level} className="h-7 rounded-full px-2.5 text-xs">
+            {level[0].toUpperCase() + level.slice(1)}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
   );
 }
 
 export function ModelTuningControls({
   modelId,
   reasoningEffort,
-  responseVerbosity,
   catalog,
   onReasoningEffortChange,
-  onResponseVerbosityChange,
 }: {
   modelId: string;
   reasoningEffort: string | null;
-  responseVerbosity: string | null;
   catalog: ProviderModelCatalog[] | undefined;
   onReasoningEffortChange: (value: string | null) => void;
-  onResponseVerbosityChange: (value: string | null) => void;
 }) {
   const model = findCatalogModel(catalog, modelId);
-  if (!model) return null;
-  if (model.reasoningEfforts.length === 0 && model.responseVerbosityLevels.length === 0) {
-    return null;
-  }
+  if (!model || model.reasoningEfforts.length === 0) return null;
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {model.reasoningEfforts.length > 0 && (
-        <TuningSelect
-          label="Reasoning effort"
-          value={reasoningEffort}
-          levels={model.reasoningEfforts}
-          onChange={onReasoningEffortChange}
-        />
-      )}
-      {model.responseVerbosityLevels.length > 0 && (
-        <TuningSelect
-          label="Response verbosity"
-          value={responseVerbosity}
-          levels={model.responseVerbosityLevels}
-          onChange={onResponseVerbosityChange}
-        />
-      )}
-    </div>
+    <TuningToggleGroup
+      label="Effort"
+      value={reasoningEffort}
+      levels={model.reasoningEfforts}
+      onChange={onReasoningEffortChange}
+    />
   );
 }
