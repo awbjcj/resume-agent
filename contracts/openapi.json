@@ -3807,6 +3807,20 @@
             "title": "Label",
             "type": "string"
           },
+          "reasoningEfforts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoningefforts",
+            "type": "array"
+          },
+          "responseVerbosityLevels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Responseverbositylevels",
+            "type": "array"
+          },
           "supportsNativeSearch": {
             "title": "Supportsnativesearch",
             "type": "boolean"
@@ -3820,7 +3834,9 @@
           "id",
           "label",
           "supportsReasoning",
-          "supportsNativeSearch"
+          "supportsNativeSearch",
+          "reasoningEfforts",
+          "responseVerbosityLevels"
         ],
         "title": "ModelOption",
         "type": "object"
@@ -3832,15 +3848,81 @@
             "title": "Cheapmodel",
             "type": "string"
           },
+          "cheapReasoningEffort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheapreasoningeffort"
+          },
+          "cheapResponseVerbosity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheapresponseverbosity"
+          },
           "midModel": {
             "default": "claude-sonnet-5",
             "title": "Midmodel",
             "type": "string"
           },
+          "midReasoningEffort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Midreasoningeffort"
+          },
+          "midResponseVerbosity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Midresponseverbosity"
+          },
           "premiumModel": {
             "default": "claude-opus-4-8",
             "title": "Premiummodel",
             "type": "string"
+          },
+          "premiumReasoningEffort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premiumreasoningeffort"
+          },
+          "premiumResponseVerbosity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premiumresponseverbosity"
           }
         },
         "title": "ModelsConfigDoc",

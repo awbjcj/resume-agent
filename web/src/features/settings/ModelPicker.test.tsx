@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { ModelPicker } from "./ModelPicker";
+import { ModelPicker, ModelTuningControls } from "./ModelPicker";
 import type { ProviderModelCatalog } from "./use-model-catalog";
 
 const KNOWN_MODEL = "openai:gpt-5.5";
@@ -18,6 +18,8 @@ const CATALOG: ProviderModelCatalog[] = [
         label: "GPT-5.5",
         supportsReasoning: true,
         supportsNativeSearch: true,
+        reasoningEfforts: ["none", "low", "medium", "high", "xhigh"],
+        responseVerbosityLevels: ["low", "medium", "high"],
       },
     ],
   },
@@ -48,5 +50,29 @@ describe("ModelPicker", () => {
 
     expect(screen.queryByPlaceholderText(/provider:model-id/)).not.toBeInTheDocument();
     expect(screen.getByRole("combobox")).toHaveTextContent("GPT-5.5");
+  });
+
+  it("shows only tuning supported by the selected model", async () => {
+    const user = userEvent.setup();
+    const onEffort = vi.fn();
+    const onVerbosity = vi.fn();
+    render(
+      <ModelTuningControls
+        modelId={KNOWN_MODEL}
+        reasoningEffort={null}
+        responseVerbosity={null}
+        catalog={CATALOG}
+        onReasoningEffortChange={onEffort}
+        onResponseVerbosityChange={onVerbosity}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Reasoning effort" }));
+    await user.click(screen.getByRole("option", { name: "Xhigh" }));
+    expect(onEffort).toHaveBeenCalledWith("xhigh");
+
+    await user.click(screen.getByRole("combobox", { name: "Response verbosity" }));
+    await user.click(screen.getByRole("option", { name: "Low" }));
+    expect(onVerbosity).toHaveBeenCalledWith("low");
   });
 });

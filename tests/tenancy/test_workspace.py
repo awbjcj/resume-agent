@@ -77,6 +77,7 @@ def test_effective_settings_tracks_user_owned_provider_keys(tmp_path):
     paths.secrets_env.write_text(
         "ANTHROPIC_API_KEY=user-anthropic\n"
         "GITHUB_TOKEN=user-github\n"
+        "MID_REASONING_EFFORT=low\n"
         "SESSION_SECRET=attacker\n"
         "DB_URL=sqlite:///attacker.db\n",
         encoding="utf-8",
@@ -89,6 +90,7 @@ def test_effective_settings_tracks_user_owned_provider_keys(tmp_path):
     overlay = effective_settings(base, paths)
     assert overlay.settings.anthropic_api_key == "user-anthropic"
     assert overlay.settings.github_token == "user-github"
+    assert overlay.settings.mid_reasoning_effort == "low"
     assert overlay.settings.session_secret == "platform-secret"
     assert overlay.settings.db_url == paths.db_url
     assert overlay.own_key_providers == frozenset({"anthropic"})
@@ -112,7 +114,9 @@ def test_provisioning_seeds_every_registry_default(tmp_path):
 
     paths = provision_workspace(tmp_path / "data", "u1", template_dir=templates)
 
-    assert (paths.config_dir / "connectors.yaml").read_text("utf-8") == "companies: []\n"
+    assert (paths.config_dir / "connectors.yaml").read_text(
+        "utf-8"
+    ) == "companies: []\n"
     assert (paths.config_dir / "search.yaml").read_text("utf-8") == "titles: []\n"
     # Not in the registry, so provisioning no longer copies it.
     assert not (paths.config_dir / "unlisted.yaml").exists()

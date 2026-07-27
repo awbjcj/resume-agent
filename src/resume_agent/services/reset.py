@@ -37,8 +37,11 @@ _PIPELINE_TABLES: tuple[type[SQLModel], ...] = (
     Job,
 )
 _PROFILE_TABLES: tuple[type[SQLModel], ...] = (SkillSuggestion,)
-_PROFILE_DIRECTORIES = ("fragments", "documents")
-_PROFILE_FILES = ("facts.json", "matrix.json", "sources.json", "cluster_map.json")
+_PROFILE_DIRECTORIES = ("fragments",)
+# The source manifest and its documents are user-owned intake, not derived
+# profile output. Account-level resets preserve both; users remove/reset sources
+# through the dedicated source controls where that destructive intent is explicit.
+_PROFILE_FILES = ("facts.json", "matrix.json", "cluster_map.json")
 
 
 @dataclass(frozen=True)

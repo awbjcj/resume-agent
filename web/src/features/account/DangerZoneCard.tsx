@@ -63,14 +63,14 @@ const SCOPES = [
     label: "Profile",
     icon: ContactRound,
     description:
-      "Profile sources, extracted facts, skill matrix, fragments, and documents. Hand-written overrides stay.",
+      "Extracted facts, skill matrix, and fragments. Source documents and hand-written overrides stay.",
   },
   {
     value: "all",
     label: "Everything",
     icon: Layers3,
     description:
-      "Jobs and profile plus discovery caches. Configuration and API keys stay.",
+      "Jobs and derived profile data plus discovery caches. Sources, configuration, and API keys stay.",
   },
 ] as const;
 
@@ -150,7 +150,8 @@ export function DangerZoneCard({
               <CardTitle>Danger zone</CardTitle>
               <CardDescription>
                 Clear this workspace&apos;s data. Configuration, API keys, and
-                hand-written profile overrides are always kept.
+                sources are kept until you reset them explicitly. Hand-written
+                profile overrides are always kept.
               </CardDescription>
             </div>
           </div>

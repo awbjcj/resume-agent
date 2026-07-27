@@ -23,7 +23,10 @@ SECRET_FIELDS: dict[str, str] = {
 # tailoring pick a provider via Settings.mid_model (see llm_runner.split_provider),
 # so the gate isn't specific to Anthropic.
 LLM_KEY_ENV_VARS: tuple[str, ...] = (
-    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "DEEPSEEK_API_KEY",
 )
 
 
@@ -54,6 +57,12 @@ class ModelsConfigDoc(CamelModel):
     cheap_model: str = "claude-haiku-4-5-20251001"
     mid_model: str = "claude-sonnet-5"
     premium_model: str = "claude-opus-4-8"
+    cheap_reasoning_effort: str | None = None
+    mid_reasoning_effort: str | None = None
+    premium_reasoning_effort: str | None = None
+    cheap_response_verbosity: str | None = None
+    mid_response_verbosity: str | None = None
+    premium_response_verbosity: str | None = None
 
 
 class ModelOption(CamelModel):
@@ -61,6 +70,8 @@ class ModelOption(CamelModel):
     label: str
     supports_reasoning: bool
     supports_native_search: bool
+    reasoning_efforts: list[str]
+    response_verbosity_levels: list[str]
 
 
 class ProviderModelCatalog(CamelModel):
