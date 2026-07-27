@@ -13,7 +13,7 @@ DETERMINISTIC_GATES = frozenset({PROVENANCE_REVIEWER})
 class PanelVerdict(ExtensibleModel):
     passed: bool
     gate_passed: bool
-    aggregate_score: int
+    aggregate_score: int | None
     critiques: list[ReviewCritique] = Field(default_factory=list)
 
 
@@ -39,11 +39,19 @@ def aggregate(critiques: list[ReviewCritique], config: ReviewConfig) -> PanelVer
         if not r.gate and r.weight > 0 and r.name in by_name
     ]
     total_weight = sum(weight for weight, _ in weighted)
+    # No weighted critique means the advisory panel never produced a score. That
+    # is unknown, not zero: reporting 0 reads as "terrible resume" when it means
+    # "never measured", and a config with only gate reviewers has no quality bar
+    # to clear at all.
     aggregate_score = (
-        round(sum(weight * score for weight, score in weighted) / total_weight) if total_weight else 0
+        round(sum(weight * score for weight, score in weighted) / total_weight)
+        if total_weight
+        else None
     )
 
-    passed = gate_passed and aggregate_score >= config.score_threshold
+    passed = gate_passed and (
+        aggregate_score is None or aggregate_score >= config.score_threshold
+    )
     return PanelVerdict(
         passed=passed,
         gate_passed=gate_passed,

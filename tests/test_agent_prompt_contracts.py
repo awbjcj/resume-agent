@@ -107,7 +107,9 @@ def test_resume_writer_prompt_matches_provenance_reducer_contract():
     assert "source experience id" in rendered
     assert "source bullet id" in rendered
     assert "skill id" in rendered
-    assert "cited elsewhere" in rendered
+    # The summary used to be verified indirectly ("facts cited elsewhere"), which
+    # left it uncheckable by the gate. It now carries its own ids.
+    assert "summary_provenance" in rendered
     assert "contact, education, and languages" in rendered
 
 
@@ -146,3 +148,41 @@ def test_advisor_prompts_separate_research_from_formatting():
     assert "never invent" in search and "url" in search
     assert "do not use web search or outside knowledge" in formatter
     assert "exactly as an http(s) string present in research" in formatter
+
+
+def test_writer_and_reviser_forbid_unrenderable_inferred_skills():
+    # Task 4 makes this unreachable by construction; the instruction explains
+    # WHY if one ever arrives via a match plan or a stale revise critique.
+    for instructions in (_TAILOR_INSTRUCTIONS, RESUME_REVISER_INSTRUCTIONS):
+        text = _text(instructions)
+        assert "inferred" in text
+        assert "hard" in text
+
+
+def test_writer_and_reviser_do_not_license_broadening_a_skill_name():
+    # The fact-check reviewer fails a claim that "adds unsupported technology",
+    # so licensing the writer to normalize names for clarity guaranteed a
+    # contradiction. Casing, punctuation and listed aliases only.
+    for instructions in (_TAILOR_INSTRUCTIONS, RESUME_REVISER_INSTRUCTIONS):
+        text = _text(instructions)
+        assert "normalized for clarity" not in text
+        assert "alias" in text
+
+
+def test_writer_and_reviser_forbid_unsupported_outcomes_not_just_metrics():
+    # "saving hours of manual reporting effort" carries no number but is just as
+    # unsupported as an invented figure when the fact records only an activity.
+    for instructions in (_TAILOR_INSTRUCTIONS, RESUME_REVISER_INSTRUCTIONS):
+        text = _text(instructions)
+        assert "outcome" in text
+        assert "activity" in text
+
+
+def test_writer_and_reviser_require_summary_provenance():
+    for instructions in (_TAILOR_INSTRUCTIONS, RESUME_REVISER_INSTRUCTIONS):
+        assert "summary_provenance" in _text(instructions)
+
+
+def test_reviser_is_told_the_job_description_cannot_establish_a_fact():
+    text = _text(RESUME_REVISER_INSTRUCTIONS)
+    assert "job description" in text

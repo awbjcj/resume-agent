@@ -22,6 +22,7 @@ from resume_agent.tailor.provenance import (
     index_facts,
     provenance_critique,
     referenced_ids,
+    renderable_profile,
     resolve_evidence,
 )
 
@@ -195,3 +196,83 @@ def test_inferred_to_inferred_evidence_is_rejected():
     assert provenance_critique(
         _content(bullet_prov="proof", skill_prov=derived.id), facts
     ).passed is False
+
+
+def test_renderable_profile_drops_inferred_soft_and_domain_skills():
+    # The gate forbids rendering these, so the writer must never be offered them.
+    # A rule the writer cannot see is a rule it cannot follow.
+    for category in ("soft", "domain"):
+        facts, skill = _facts_with_inferred_skill(category=category)
+        assert skill.id in index_facts(facts)
+        assert skill.id not in index_facts(renderable_profile(facts))
+
+
+def test_renderable_profile_keeps_inferred_hard_skills_and_their_evidence():
+    facts, skill = _facts_with_inferred_skill(category="hard")
+    index = index_facts(renderable_profile(facts))
+    assert skill.id in index
+    assert "proof" in index  # the literal bullet backing it survives
+
+
+def test_renderable_profile_leaves_every_other_section_untouched():
+    facts, _ = _facts_with_inferred_skill(category="soft")
+    before = facts.model_dump(mode="json")
+    after = renderable_profile(facts).model_dump(mode="json")
+    del before["skills"], after["skills"]
+    assert before == after
+
+
+def test_renderable_profile_does_not_mutate_the_source_facts():
+    facts, skill = _facts_with_inferred_skill(category="soft")
+    renderable_profile(facts)
+    assert skill.id in index_facts(facts)
+
+
+def test_gate_still_rejects_an_inferred_soft_skill_reached_by_any_path():
+    # Narrowing the writer's menu must not relax the gate: if one arrives via a
+    # match plan, a stale revise critique, or a hand-edited resume, it still fails.
+    facts, skill = _facts_with_inferred_skill(category="soft")
+    assert provenance_critique(
+        _content(bullet_prov="proof", skill_prov=skill.id), facts
+    ).passed is False
+
+
+def test_summary_provenance_is_checked_like_every_other_citation():
+    facts = _facts()
+    content = _content()
+    content.summary = "Engineer who built X."
+    content.summary_provenance = ["b1"]
+    assert check_provenance(content, facts).ok is True
+
+    content.summary_provenance = ["ghost"]
+    report = check_provenance(content, facts)
+    assert report.ok is False
+    assert "ghost" in report.missing
+
+
+def test_summary_facts_reach_the_gate_reviewer_as_evidence():
+    # Without this the reviewer sees only facts cited by OTHER sections, so a
+    # true summary claim reads as unsupported purely because nothing else cited it.
+    facts = _facts()
+    facts.experience[0].bullets.append(Bullet(id="b2", text="Led the migration"))
+    content = _content()
+    content.summary = "Led the migration."
+    content.summary_provenance = ["b2"]
+    assert "b2" in resolve_evidence(content, facts)
+
+
+def test_summary_cannot_cite_an_inferred_skill():
+    facts, skill = _facts_with_inferred_skill(category="hard")
+    content = _content(bullet_prov="proof", skill_prov=skill.id)
+    content.summary = "Kubernetes expert."
+    content.summary_provenance = [skill.id]
+    # Inferred facts justify a skills-section entry only, never summary prose.
+    assert check_provenance(content, facts).ok is False
+
+
+def test_summary_without_provenance_still_validates_for_stored_versions():
+    facts = _facts()
+    content = _content()
+    content.summary = "Engineer."
+    assert content.summary_provenance == []
+    assert check_provenance(content, facts).ok is True

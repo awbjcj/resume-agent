@@ -35,6 +35,7 @@ def test_revise_input_orders_severities_and_keeps_locations():
         ResumeContent(contact=Contact(name="Ada")),
         [_critique()],
         ProfileFacts(contact=Contact(name="Ada")),
+        "Backend role",
     )
 
     assert text.index("unsupported metric") < text.index("missing keyword")
@@ -46,11 +47,12 @@ def test_revise_input_orders_severities_and_keeps_locations():
 def test_revise_input_preserves_unimplicated_and_handles_no_issues():
     facts = ProfileFacts(contact=Contact(name="Ada"))
     content = ResumeContent(contact=Contact(name="Ada"))
-    text = compose_revise_input(content, [_critique()], facts)
+    text = compose_revise_input(content, [_critique()], facts, "Backend role")
     clean = compose_revise_input(
         content,
         [ReviewCritique(reviewer="recruiter", score=95, passed=True)],
         facts,
+        "Backend role",
     )
 
     assert "byte-for-byte" in text

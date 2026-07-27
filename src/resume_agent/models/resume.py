@@ -77,6 +77,12 @@ class ResumeContent(ExtensibleModel):
 
     contact: Contact  # carried verbatim from ProfileFacts (no invention)
     summary: str | None = None
+    # Fact ids the summary draws on. The summary is prose with no per-claim
+    # provenance field, so without these the gate cannot check it and the
+    # evidence reviewer only ever sees facts cited by OTHER sections - which
+    # makes a true summary claim look unsupported. Empty is allowed so resumes
+    # stored before this field still validate.
+    summary_provenance: list[str] = Field(default_factory=list)
     experience: list[TailoredExperience] = Field(default_factory=list)
     projects: list[TailoredProject] = Field(default_factory=list)
     skills: dict[str, list[TailoredSkill]] = Field(default_factory=dict)

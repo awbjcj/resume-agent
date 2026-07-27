@@ -6,7 +6,8 @@ from resume_agent.models.review import Severity
 from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 from resume_agent.models.review import ReviewCritique, ReviewIssue
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.workflow import TailorRound, run_tailor_review
+from resume_agent.tailor.verdict import PanelVerdict
+from resume_agent.tailor.workflow import TailorRound, _has_regressed, run_tailor_review
 
 
 class _Result:
@@ -191,7 +192,10 @@ def test_loop_stops_at_max_rounds_when_never_passing():
     assert rounds[-1].verdict.passed is False
 
 
-def test_broken_provenance_short_circuits_panel():
+def test_broken_provenance_still_runs_the_panel():
+    # The panel used to be skipped when provenance failed. That saved one
+    # advisory call and cost two things: the round reported no score at all, and
+    # the reviser was handed a citation complaint with zero quality feedback.
     facts = ProfileFacts(
         contact=Contact(name="Ada"),
         experience=[
@@ -223,17 +227,14 @@ def test_broken_provenance_short_circuits_panel():
         async def arun(self, prompt):
             return self.run(prompt)
 
-    class _ExplodingReviewer:
-        def run(self, prompt):
-            raise AssertionError("panel should be skipped when provenance is broken")
-
-        async def arun(self, prompt):
-            return self.run(prompt)
-
     config = ReviewConfig(
         max_rounds=1,
         score_threshold=1,
-        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+        provenance_retry_budget=0,  # isolate: this test is about the panel running
+        reviewers=[
+            ReviewerSpec(name="fact-check", gate=True, weight=0),
+            ReviewerSpec(name="ats-keyword", weight=1),
+        ],
     )
 
     rounds = run_tailor_review(
@@ -242,13 +243,26 @@ def test_broken_provenance_short_circuits_panel():
         profile_facts=facts,
         config=config,
         tailor_agent=_BadTailor(),
-        reviewer_agents={"fact-check": _ExplodingReviewer()},
+        reviewer_agents={
+            "fact-check": _Good("fact-check"),
+            "ats-keyword": _Good("ats-keyword"),
+        },
         reviser_agent=_BadTailor(),
     )
 
+    verdict = rounds[0].verdict
     assert len(rounds) == 1
-    assert rounds[0].verdict.gate_passed is False
-    assert rounds[0].verdict.critiques[0].reviewer == "provenance"
+    assert verdict.critiques[0].reviewer == "provenance"
+    # The advisory panel ran, so the score is a real measurement...
+    assert [c.reviewer for c in verdict.critiques] == [
+        "provenance",
+        "fact-check",
+        "ats-keyword",
+    ]
+    assert verdict.aggregate_score == 95
+    # ...and the gate still blocks the round. Fact-lock is unchanged.
+    assert verdict.gate_passed is False
+    assert verdict.passed is False
 
 
 def test_match_plan_runs_only_when_enabled_and_is_normalized():
@@ -393,3 +407,297 @@ def test_early_stop_does_not_halt_before_any_clean_round():
     )
 
     assert len(rounds) == 3
+
+
+def _round(num: int, *, gate_passed: bool, score: int | None) -> TailorRound:
+    return TailorRound(
+        round_num=num,
+        content=ResumeContent(contact=Contact(name="Ada")),
+        verdict=PanelVerdict(
+            passed=False, gate_passed=gate_passed, aggregate_score=score
+        ),
+    )
+
+
+def test_regression_guard_ignores_unscored_rounds():
+    # A clean-but-unscored round carries no quality bar to regress from, so it
+    # must neither raise nor count as a baseline.
+    assert (
+        _has_regressed([_round(1, gate_passed=True, score=None), _round(2, gate_passed=True, score=50)])
+        is False
+    )
+
+
+def test_regression_guard_still_catches_a_real_score_drop():
+    assert (
+        _has_regressed([_round(1, gate_passed=True, score=80), _round(2, gate_passed=True, score=60)])
+        is True
+    )
+
+
+def test_regression_guard_catches_a_gate_regression():
+    assert (
+        _has_regressed([_round(1, gate_passed=True, score=80), _round(2, gate_passed=False, score=90)])
+        is True
+    )
+
+
+def test_revision_builds_on_the_best_round_not_the_last():
+    # A regressed round used to become the base for the next one, so a bad
+    # revision compounded instead of being discarded.
+    class _Scores:
+        def __init__(self):
+            self.scores = iter([80, 60, 90])
+
+        def run(self, prompt):
+            return _Result(
+                ReviewCritique(
+                    reviewer="ats-keyword", score=next(self.scores), passed=False
+                )
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    class _Reviser:
+        """Emits a uniquely named resume each round and records what it was given."""
+
+        def __init__(self):
+            self.calls = 0
+            self.received = []
+
+        def run(self, prompt):
+            self.received.append(prompt)
+            self.calls += 1
+            return _Result(ResumeContent(contact=Contact(name=f"revision-{self.calls}")))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    class _Draft:
+        def run(self, prompt):
+            return _Result(ResumeContent(contact=Contact(name="draft")))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    reviser = _Reviser()
+    rounds = run_tailor_review(
+        "jd",
+        JobCriteria(),
+        ProfileFacts(contact=Contact(name="Ada")),
+        ReviewConfig(
+            max_rounds=3,
+            score_threshold=95,
+            early_stop_on_regression=False,
+            reviewers=[ReviewerSpec(name="ats-keyword", weight=1)],
+        ),
+        _Draft(),
+        {"ats-keyword": _Scores()},
+        reviser,
+    )
+
+    assert [r.verdict.aggregate_score for r in rounds] == [80, 60, 90]
+    # Round 2 (score 60) regressed from round 1 (score 80), so the third round's
+    # revision is composed from round 1's content, not round 2's.
+    assert "draft" in reviser.received[1]
+    assert "revision-1" not in reviser.received[1]
+
+
+def test_revision_base_is_unchanged_when_rounds_improve():
+    # Regression guard: monotonic improvement must behave exactly as before.
+    class _Scores:
+        def __init__(self):
+            self.scores = iter([50, 70, 90])
+
+        def run(self, prompt):
+            return _Result(
+                ReviewCritique(
+                    reviewer="ats-keyword", score=next(self.scores), passed=False
+                )
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    class _Reviser:
+        def __init__(self):
+            self.calls = 0
+            self.received = []
+
+        def run(self, prompt):
+            self.received.append(prompt)
+            self.calls += 1
+            return _Result(ResumeContent(contact=Contact(name=f"revision-{self.calls}")))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    class _Draft:
+        def run(self, prompt):
+            return _Result(ResumeContent(contact=Contact(name="draft")))
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    reviser = _Reviser()
+    run_tailor_review(
+        "jd",
+        JobCriteria(),
+        ProfileFacts(contact=Contact(name="Ada")),
+        ReviewConfig(
+            max_rounds=3,
+            score_threshold=95,
+            early_stop_on_regression=False,
+            reviewers=[ReviewerSpec(name="ats-keyword", weight=1)],
+        ),
+        _Draft(),
+        {"ats-keyword": _Scores()},
+        reviser,
+    )
+
+    assert "revision-1" in reviser.received[1]
+
+
+def _slip_config(budget: int) -> ReviewConfig:
+    return ReviewConfig(
+        max_rounds=2,
+        # Unreachable on purpose: these tests measure how many rounds the budget
+        # buys, so the loop must run to exhaustion rather than stopping on success.
+        score_threshold=99,
+        provenance_retry_budget=budget,
+        reviewers=[
+            ReviewerSpec(name="fact-check", gate=True, weight=0),
+            ReviewerSpec(name="ats-keyword", weight=1),
+        ],
+    )
+
+
+class _BrokenThenFixed:
+    """Cites a ghost id on the first draft, a real one afterwards."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def run(self, prompt):
+        self.calls += 1
+        return _Result(
+            ResumeContent(
+                contact=Contact(name="Ada"),
+                experience=[
+                    TailoredExperience(
+                        company="AE",
+                        title="Eng",
+                        provenance="e1",
+                        bullets=[
+                            TailoredBullet(
+                                text="X",
+                                provenance="ghost" if self.calls == 1 else "b1",
+                            )
+                        ],
+                    )
+                ],
+            )
+        )
+
+    async def arun(self, prompt):
+        return self.run(prompt)
+
+
+def _slip_facts() -> ProfileFacts:
+    return ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[
+            Experience(
+                id="e1", company="AE", title="Eng", bullets=[Bullet(id="b1", text="X")]
+            )
+        ],
+    )
+
+
+def test_citation_slip_does_not_consume_a_quality_round():
+    # max_rounds=2, but round 1 failed only on a bad provenance id. Burning a
+    # quality pass on a typo left exactly one real review and no round to act on it.
+    drafter = _BrokenThenFixed()
+    rounds = run_tailor_review(
+        "jd",
+        JobCriteria(),
+        _slip_facts(),
+        _slip_config(budget=1),
+        drafter,
+        {"fact-check": _Good("fact-check"), "ats-keyword": _Good("ats-keyword")},
+        drafter,
+    )
+    assert len(rounds) == 3
+    assert rounds[0].verdict.gate_passed is False
+    assert rounds[-1].verdict.gate_passed is True
+
+
+def test_citation_slip_budget_is_bounded():
+    class _AlwaysBroken:
+        def run(self, prompt):
+            return _Result(
+                ResumeContent(
+                    contact=Contact(name="Ada"),
+                    experience=[
+                        TailoredExperience(
+                            company="AE",
+                            title="Eng",
+                            provenance="e1",
+                            bullets=[TailoredBullet(text="X", provenance="ghost")],
+                        )
+                    ],
+                )
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    rounds = run_tailor_review(
+        "jd",
+        JobCriteria(),
+        _slip_facts(),
+        _slip_config(budget=1),
+        _AlwaysBroken(),
+        {"fact-check": _Good("fact-check"), "ats-keyword": _Good("ats-keyword")},
+        _AlwaysBroken(),
+    )
+    assert len(rounds) == 3  # 2 configured + 1 free, then it stops
+
+
+def test_zero_budget_reproduces_the_old_round_counting():
+    drafter = _BrokenThenFixed()
+    rounds = run_tailor_review(
+        "jd",
+        JobCriteria(),
+        _slip_facts(),
+        _slip_config(budget=0),
+        drafter,
+        {"fact-check": _Good("fact-check"), "ats-keyword": _Good("ats-keyword")},
+        drafter,
+    )
+    assert len(rounds) == 2
+
+
+def test_a_round_failing_the_fact_check_gate_too_is_not_a_free_retry():
+    # Only a citation slip is free. A resume the panel also rejects needs a real
+    # revision round, and a free retry would just spend tokens.
+    class _FailGate:
+        def run(self, prompt):
+            return _Result(
+                ReviewCritique(reviewer="fact-check", score=0, passed=False)
+            )
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    rounds = run_tailor_review(
+        "jd",
+        JobCriteria(),
+        _slip_facts(),
+        _slip_config(budget=1),
+        _BrokenThenFixed(),
+        {"fact-check": _FailGate(), "ats-keyword": _Good("ats-keyword")},
+        _BrokenThenFixed(),
+    )
+    assert len(rounds) == 2

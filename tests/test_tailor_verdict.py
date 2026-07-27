@@ -62,6 +62,26 @@ def test_provenance_failure_blocks_gate_even_if_reviewers_pass():
     assert verdict.passed is False
 
 
+def test_no_advisory_critique_means_no_score_not_zero():
+    # A provenance failure used to skip the panel, leaving no weighted critique.
+    # The mean of nothing is unknown, not 0 - reporting 0 reads as "terrible
+    # resume" when it means "never measured".
+    verdict = aggregate([ReviewCritique(reviewer="provenance", score=0, passed=False)], _config())
+    assert verdict.aggregate_score is None
+    assert verdict.gate_passed is False
+    assert verdict.passed is False
+
+
+def test_gate_only_roster_scores_none_and_defers_to_the_gate():
+    config = ReviewConfig(
+        score_threshold=85,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+    verdict = aggregate([ReviewCritique(reviewer="fact-check", score=100, passed=True)], config)
+    assert verdict.aggregate_score is None
+    assert verdict.passed is True  # no advisory bar configured, so the gate decides
+
+
 def test_passing_provenance_critique_is_a_gate_not_scored():
     # A passing provenance critique gates (it's checked) but never moves the score.
     critiques = [

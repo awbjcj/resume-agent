@@ -32,6 +32,10 @@ class ReviewConfig(ExtensibleModel):
     tailor_tier: Literal["cheap", "mid", "premium"] = "premium"
     reviser_tier: Literal["cheap", "mid", "premium"] = "premium"
     early_stop_on_regression: bool = False
+    # Extra rounds granted when a round failed ONLY on provenance ids. Fixing a
+    # citation is cheap and should not consume one of the `max_rounds` quality
+    # passes. 0 reproduces the pre-fix round counting exactly.
+    provenance_retry_budget: int = Field(default=1, ge=0)
     length_budget: LengthBudget = Field(default_factory=LengthBudget)
     style_guide_path: str = "config/style_guide.md"
 

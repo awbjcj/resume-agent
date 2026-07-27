@@ -47,6 +47,9 @@ ProvenanceUse = Literal["skill", "bullet", "entity"]
 
 def _referenced_uses(content: ResumeContent) -> list[tuple[str, ProvenanceUse]]:
     uses: list[tuple[str, ProvenanceUse]] = []
+    # "entity" use, so the inferred-skill branch below rejects an inferred
+    # pointer in the summary exactly as it does for a bullet.
+    uses.extend((fact_id, "entity") for fact_id in content.summary_provenance)
     for exp in content.experience:
         uses.append((exp.provenance, "entity"))
         uses.extend((bullet.provenance, "bullet") for bullet in exp.bullets)
@@ -135,6 +138,32 @@ def provenance_critique(content: ResumeContent, facts: ProfileFacts) -> ReviewCr
             )
             for invalid in report.invalid
         ],
+    )
+
+
+def renderable_profile(facts: ProfileFacts) -> ProfileFacts:
+    """The writer's view of the profile: only facts it is allowed to render.
+
+    `check_provenance` rejects an inferred soft/domain skill wherever it is
+    cited, but those skills are still legal facts that the matrix and the match
+    plan legitimately use. Handing them to the writer as ordinary facts and then
+    failing the round for citing them makes the rule unlearnable, so the writer
+    is given a profile in which the forbidden pointers simply do not exist.
+
+    The gate keeps indexing the *full* facts, so a forbidden id arriving by any
+    other route still fails. This narrows the menu; it does not relax the rule.
+    """
+    return facts.model_copy(
+        update={
+            "skills": {
+                category: [
+                    skill
+                    for skill in skills
+                    if not (skill.inferred and skill.category != "hard")
+                ]
+                for category, skills in facts.skills.items()
+            }
+        }
     )
 
 
