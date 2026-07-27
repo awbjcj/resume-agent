@@ -247,6 +247,13 @@ class ModelCatalogEntry:
 
     id: str
     label: str
+    reasoning_efforts: tuple[str, ...] = ()
+    response_verbosity_levels: tuple[str, ...] = ()
+
+
+ResponseVerbosity = Literal["low", "medium", "high"]
+OpenAIResponsesReasoningEffort = Literal["minimal", "low", "medium", "high"]
+GeminiInteractionsThinkingLevel = Literal["minimal", "low", "medium", "high"]
 
 
 # Curated model choices per provider for the tier pickers, so a UI can offer a
@@ -256,29 +263,99 @@ class ModelCatalogEntry:
 MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
     "anthropic": [
         ModelCatalogEntry("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
-        ModelCatalogEntry("claude-sonnet-5", "Claude Sonnet 5"),
-        ModelCatalogEntry("claude-opus-4-8", "Claude Opus 4.8"),
+        ModelCatalogEntry(
+            "claude-sonnet-5", "Claude Sonnet 5", ("low", "medium", "high")
+        ),
+        ModelCatalogEntry(
+            "claude-opus-4-8",
+            "Claude Opus 4.8",
+            ("low", "medium", "high", "max"),
+        ),
     ],
     "openai": [
-        ModelCatalogEntry("openai:gpt-5.6-luna", "GPT-5.6 Luna"),
-        ModelCatalogEntry("openai:gpt-5.6-terra", "GPT-5.6 Terra"),
-        ModelCatalogEntry("openai:gpt-5.6-sol", "GPT-5.6 Sol"),
-        ModelCatalogEntry("openai:gpt-5.5-pro", "GPT-5.5 Pro"),
-        ModelCatalogEntry("openai:gpt-5.5", "GPT-5.5"),
-        ModelCatalogEntry("openai:gpt-5.4-mini", "GPT-5.4 Mini"),
+        ModelCatalogEntry(
+            "openai:gpt-5.6-luna",
+            "GPT-5.6 Luna",
+            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "openai:gpt-5.6-terra",
+            "GPT-5.6 Terra",
+            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "openai:gpt-5.6-sol",
+            "GPT-5.6 Sol",
+            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "openai:gpt-5.5-pro",
+            "GPT-5.5 Pro",
+            ("medium", "high", "xhigh"),
+            ("low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "openai:gpt-5.5",
+            "GPT-5.5",
+            ("none", "low", "medium", "high", "xhigh"),
+            ("low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "openai:gpt-5.4-mini",
+            "GPT-5.4 Mini",
+            ("none", "low", "medium", "high", "xhigh"),
+            ("low", "medium", "high"),
+        ),
     ],
     "gemini": [
-        ModelCatalogEntry("gemini:gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite"),
-        ModelCatalogEntry("gemini:gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
-        ModelCatalogEntry("gemini:gemini-3.6-flash", "Gemini 3.6 Flash"),
-        ModelCatalogEntry("gemini:gemini-3.5-flash", "Gemini 3.5 Flash"),
-        ModelCatalogEntry("gemini:gemini-3.1-pro-preview", "Gemini 3.1 Pro (Preview)"),
+        ModelCatalogEntry(
+            "gemini:gemini-3.5-flash-lite",
+            "Gemini 3.5 Flash Lite",
+            ("low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "gemini:gemini-3.1-flash-lite",
+            "Gemini 3.1 Flash Lite",
+            ("low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "gemini:gemini-3.6-flash",
+            "Gemini 3.6 Flash",
+            ("minimal", "low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "gemini:gemini-3.5-flash",
+            "Gemini 3.5 Flash",
+            ("minimal", "low", "medium", "high"),
+        ),
+        ModelCatalogEntry(
+            "gemini:gemini-3.1-pro-preview",
+            "Gemini 3.1 Pro (Preview)",
+            ("low", "medium", "high"),
+        ),
     ],
     "deepseek": [
         ModelCatalogEntry("deepseek:deepseek-v4-flash", "DeepSeek V4 Flash"),
         ModelCatalogEntry("deepseek:deepseek-v4-pro", "DeepSeek V4 Pro"),
     ],
 }
+
+
+def catalog_entry(model_id: str) -> ModelCatalogEntry | None:
+    """Return curated capabilities for a selectable model, if known."""
+    return next(
+        (
+            entry
+            for entries in MODEL_CATALOG.values()
+            for entry in entries
+            if entry.id == model_id
+        ),
+        None,
+    )
+
 
 OPENAI_WEB_SEARCH_TOOL = {"type": "web_search"}
 
@@ -578,6 +655,80 @@ def use_json_mode_for(model: Any, output_schema: Any = None) -> bool:
     ) == "Anthropic" and _anthropic_schema_exceeds_limits(output_schema)
 
 
+def _configured_model_option(model_id: str, suffix: str) -> str | None:
+    """Resolve per-tier tuning for ``model_id`` from effective settings.
+
+    Tuning belongs to a tier in the settings UI. If a user intentionally uses
+    the same model in more than one tier, the most capable tier wins so the
+    result is deterministic rather than dependent on call-site ordering.
+    """
+    settings = get_settings()
+    for tier in ("premium", "mid", "cheap"):
+        if getattr(settings, f"{tier}_model", None) == model_id:
+            value = getattr(settings, f"{tier}_{suffix}", None)
+            if value:
+                return str(value)
+    return None
+
+
+def _reasoning_effort_for(model_id: str, provider: str) -> str:
+    configured = _configured_model_option(model_id, "reasoning_effort")
+    entry = catalog_entry(model_id)
+    if configured and entry and configured in entry.reasoning_efforts:
+        return configured
+    return "max" if provider == "deepseek" else "high"
+
+
+def _response_verbosity_for(model_id: str) -> ResponseVerbosity | None:
+    configured = _configured_model_option(model_id, "response_verbosity")
+    entry = catalog_entry(model_id)
+    if not configured or not entry or configured not in entry.response_verbosity_levels:
+        return None
+    if configured == "low":
+        return "low"
+    if configured == "medium":
+        return "medium"
+    if configured == "high":
+        return "high"
+    return None
+
+
+def _openai_responses_reasoning_effort_for(
+    model_id: str,
+    provider: str,
+) -> OpenAIResponsesReasoningEffort | None:
+    """Adapt configured effort to the subset accepted by OpenAI Responses."""
+    effort = _reasoning_effort_for(model_id, provider)
+    if effort == "minimal":
+        return "minimal"
+    if effort == "low":
+        return "low"
+    if effort == "medium":
+        return "medium"
+    if effort == "high":
+        return "high"
+    if effort == "none":
+        return None
+    # The Responses integration does not support the UI's "xhigh" or "max"
+    # values, so retain enabled reasoning at its highest accepted level.
+    return "high"
+
+
+def _gemini_interactions_thinking_level_for(
+    model_id: str,
+    provider: str,
+) -> GeminiInteractionsThinkingLevel:
+    """Return a Gemini Interactions-compatible thinking level."""
+    effort = _reasoning_effort_for(model_id, provider)
+    if effort == "minimal":
+        return "minimal"
+    if effort == "low":
+        return "low"
+    if effort == "medium":
+        return "medium"
+    return "high"
+
+
 def build_model(
     model_id: str,
     api_key: str | None = None,
@@ -594,6 +745,7 @@ def build_model(
     """
     provider, model = split_provider(model_id)
     reasoning = reasoning and provider_capabilities(model_id).supports_reasoning
+    reasoning_effort = _reasoning_effort_for(model_id, provider) if reasoning else None
     key = api_key or resolve_api_key(model_id) or None
     if provider == "openai":
         OpenAIChat = _compatible_openai_chat_class()
@@ -601,7 +753,8 @@ def build_model(
         return OpenAIChat(
             id=model,
             api_key=key,
-            reasoning_effort="high" if reasoning else None,
+            reasoning_effort=reasoning_effort,
+            verbosity=_response_verbosity_for(model_id),
         )
     if provider == "gemini":
         Gemini = _compatible_gemini_class()
@@ -620,12 +773,12 @@ def build_model(
             return Gemini(
                 id=model,
                 api_key=key,
-                thinking_level="high" if reasoning else "low",
+                thinking_level=reasoning_effort if reasoning else "low",
             )
         return Gemini(
             id=model,
             api_key=key,
-            thinking_level="high" if reasoning else None,
+            thinking_level=reasoning_effort if reasoning else None,
             thinking_budget=None if reasoning else 0,
         )
     if provider == "deepseek":
@@ -635,7 +788,7 @@ def build_model(
             id=model,
             api_key=key,
             use_thinking=True if reasoning else None,
-            reasoning_effort="max" if reasoning else None,
+            reasoning_effort=reasoning_effort,
         )
     from agno.models.anthropic import Claude
 
@@ -644,7 +797,7 @@ def build_model(
         api_key=key,
         cache_system_prompt=cache_system_prompt,
         thinking={"type": "adaptive"} if reasoning else None,
-        output_config={"effort": "high"} if reasoning else None,
+        output_config={"effort": reasoning_effort} if reasoning else None,
     )
 
 
@@ -671,7 +824,12 @@ def build_search_equipped(
             OpenAIResponses(
                 id=model_name,
                 api_key=api_key,
-                reasoning_effort="high" if reasoning else None,
+                reasoning_effort=(
+                    _openai_responses_reasoning_effort_for(model_id, plan.provider)
+                    if reasoning
+                    else None
+                ),
+                verbosity=_response_verbosity_for(model_id),
                 store=False,
             ),
             [OPENAI_WEB_SEARCH_TOOL],
@@ -684,7 +842,11 @@ def build_search_equipped(
                 id=model_name,
                 api_key=api_key,
                 search=True,
-                thinking_level="high" if reasoning else None,
+                thinking_level=(
+                    _gemini_interactions_thinking_level_for(model_id, plan.provider)
+                    if reasoning
+                    else None
+                ),
                 store=False,
             ),
             [],

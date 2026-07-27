@@ -26,7 +26,7 @@ _PROVIDER_FIELDS = {
 _OVERLAY_FIELDS = frozenset(
     name
     for name, field in Settings.model_fields.items()
-    if field.annotation is str and name not in _PLATFORM_FIELDS
+    if field.annotation in (str, str | None) and name not in _PLATFORM_FIELDS
 )
 
 

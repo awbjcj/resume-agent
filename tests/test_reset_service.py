@@ -153,16 +153,19 @@ def test_profile_scope_clears_current_corpus_layout_only(session, paths):
     assert session.exec(select(Job)).first() is not None
     assert session.exec(select(Application)).first() is not None
     assert session.exec(select(Notification)).first() is not None
-    for name in ("facts.json", "matrix.json", "sources.json", "cluster_map.json"):
+    for name in ("facts.json", "matrix.json", "cluster_map.json"):
         assert not (paths.profile_dir / name).exists()
+    assert (paths.profile_dir / "sources.json").exists()
     assert (paths.profile_dir / "overrides.yaml").exists()
     assert (paths.profile_dir / "future-note.txt").read_text(encoding="utf-8") == "keep"
     assert not (paths.profile_dir / "sources").exists()
     assert paths.connector_runs_file.exists()
     assert not paths.taxonomy_file.exists()
-    for name in ("fragments", "documents"):
-        directory = paths.profile_dir / name
-        assert directory.is_dir() and list(directory.iterdir()) == []
+    fragments = paths.profile_dir / "fragments"
+    assert fragments.is_dir() and list(fragments.iterdir()) == []
+    assert (paths.profile_dir / "documents" / "manifest.json").read_text(
+        encoding="utf-8"
+    ) == "[]"
     assert (paths.output_dir / "acme" / "resume.pdf").exists()
 
 
@@ -189,6 +192,8 @@ def test_all_scope_preserves_config_secrets_and_overrides(session, paths):
     ) == "titles: []\n"
     assert (root / "secrets.env").exists()
     assert (paths.profile_dir / "overrides.yaml").exists()
+    assert (paths.profile_dir / "sources.json").exists()
+    assert (paths.profile_dir / "documents" / "manifest.json").exists()
     assert list(paths.scraper_recipes_dir.iterdir()) == []
     assert list(paths.workday_facets_dir.iterdir()) == []
 
@@ -286,10 +291,8 @@ def test_db_commit_failure_rolls_back_before_file_phase(session, paths, monkeypa
 def test_scope_paths_lists_every_destructive_target(paths):
     assert scope_paths(paths, ResetScope.profile) == (
         paths.profile_dir / "fragments",
-        paths.profile_dir / "documents",
         paths.profile_dir / "facts.json",
         paths.profile_dir / "matrix.json",
-        paths.profile_dir / "sources.json",
         paths.profile_dir / "cluster_map.json",
         paths.taxonomy_file,
     )

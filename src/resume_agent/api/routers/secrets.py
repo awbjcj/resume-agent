@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request
 from pydantic.alias_generators import to_camel
 
 from resume_agent.api.deps import get_env_path, refresh_app_settings
+from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.secrets import (
     SECRET_FIELDS,
     ModelOption,
@@ -17,6 +18,7 @@ from resume_agent.api.schemas.secrets import (
 from resume_agent.llm_runner import (
     MODEL_CATALOG,
     PROVIDER_LABELS,
+    catalog_entry,
     provider_capabilities,
     supports_native_search,
 )
@@ -28,6 +30,12 @@ _MODEL_ENV = {
     "cheap_model": "CHEAP_MODEL",
     "mid_model": "MID_MODEL",
     "premium_model": "PREMIUM_MODEL",
+    "cheap_reasoning_effort": "CHEAP_REASONING_EFFORT",
+    "mid_reasoning_effort": "MID_REASONING_EFFORT",
+    "premium_reasoning_effort": "PREMIUM_REASONING_EFFORT",
+    "cheap_response_verbosity": "CHEAP_RESPONSE_VERBOSITY",
+    "mid_response_verbosity": "MID_RESPONSE_VERBOSITY",
+    "premium_response_verbosity": "PREMIUM_RESPONSE_VERBOSITY",
 }
 
 _PROVIDER_KEY_ENV = {
@@ -83,6 +91,8 @@ def get_model_catalog(request: Request):
                 label=entry.label,
                 supports_reasoning=provider_capabilities(entry.id).supports_reasoning,
                 supports_native_search=supports_native_search(entry.id),
+                reasoning_efforts=list(entry.reasoning_efforts),
+                response_verbosity_levels=list(entry.response_verbosity_levels),
             )
             for entry in entries
         ]
@@ -104,7 +114,30 @@ def put_models(body: ModelsConfigDoc, request: Request):
     # sent are written — otherwise an omitted field would silently overwrite
     # a previously-configured value with the schema default.
     provided = body.model_dump(exclude_unset=True)
-    updates = {_MODEL_ENV[f]: v for f, v in provided.items()}
+    current = get_models(request)
+    candidate = current.model_copy(update=provided)
+    for tier in ("cheap", "mid", "premium"):
+        model_id = getattr(candidate, f"{tier}_model")
+        entry = catalog_entry(model_id)
+        effort = getattr(candidate, f"{tier}_reasoning_effort")
+        verbosity = getattr(candidate, f"{tier}_response_verbosity")
+        if effort is not None and (
+            entry is None or effort not in entry.reasoning_efforts
+        ):
+            raise ApiException(
+                422,
+                "UNSUPPORTED_MODEL_SETTING",
+                f"{model_id} does not support reasoning effort {effort!r}",
+            )
+        if verbosity is not None and (
+            entry is None or verbosity not in entry.response_verbosity_levels
+        ):
+            raise ApiException(
+                422,
+                "UNSUPPORTED_MODEL_SETTING",
+                f"{model_id} does not support response verbosity {verbosity!r}",
+            )
+    updates = {_MODEL_ENV[f]: (v or "") for f, v in provided.items()}
     fresh = write_env_updates(updates, get_env_path(request))
     refresh_app_settings(request.app, fresh)
     return get_models(request)

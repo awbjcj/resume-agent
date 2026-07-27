@@ -24,7 +24,7 @@ describe("DangerZoneCard", () => {
       "aria-pressed",
       "true",
     );
-    await user.click(screen.getByRole("button", { name: /profile sources/i }));
+    await user.click(screen.getByRole("button", { name: /^profile:/i }));
     await user.click(screen.getByRole("button", { name: "Reset data" }));
     expect(
       screen.getByRole("button", { name: "Export backup first" }),
