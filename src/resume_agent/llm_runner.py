@@ -249,10 +249,8 @@ class ModelCatalogEntry:
     id: str
     label: str
     reasoning_efforts: tuple[str, ...] = ()
-    response_verbosity_levels: tuple[str, ...] = ()
 
 
-ResponseVerbosity = Literal["low", "medium", "high"]
 OpenAIResponsesReasoningEffort = Literal["minimal", "low", "medium", "high"]
 GeminiInteractionsThinkingLevel = Literal["minimal", "low", "medium", "high"]
 
@@ -277,37 +275,31 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
             "openai:gpt-5.6-luna",
             "GPT-5.6 Luna",
             ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.6-terra",
             "GPT-5.6 Terra",
             ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.6-sol",
             "GPT-5.6 Sol",
             ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.5-pro",
             "GPT-5.5 Pro",
             ("medium", "high", "xhigh"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.5",
             "GPT-5.5",
             ("none", "low", "medium", "high", "xhigh"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.4-mini",
             "GPT-5.4 Mini",
             ("none", "low", "medium", "high", "xhigh"),
-            ("low", "medium", "high"),
         ),
     ],
     "gemini": [
@@ -762,20 +754,6 @@ def _reasoning_effort_for(model_id: str, provider: str) -> str:
     return "max" if provider == "deepseek" else "high"
 
 
-def _response_verbosity_for(model_id: str) -> ResponseVerbosity | None:
-    configured = _configured_model_option(model_id, "response_verbosity")
-    entry = catalog_entry(model_id)
-    if not configured or not entry or configured not in entry.response_verbosity_levels:
-        return None
-    if configured == "low":
-        return "low"
-    if configured == "medium":
-        return "medium"
-    if configured == "high":
-        return "high"
-    return None
-
-
 def _openai_responses_reasoning_effort_for(
     model_id: str, provider: str
 ) -> OpenAIResponsesReasoningEffort | None:
@@ -833,7 +811,6 @@ def build_model(
             id=model,
             api_key=key,
             reasoning_effort=reasoning_effort,
-            verbosity=_response_verbosity_for(model_id),
         )
     if provider == "gemini":
         Gemini = _compatible_gemini_class()
@@ -915,7 +892,6 @@ def build_search_equipped(
                     if reasoning
                     else None
                 ),
-                verbosity=_response_verbosity_for(model_id),
                 store=False,
             ),
             [OPENAI_WEB_SEARCH_TOOL],
