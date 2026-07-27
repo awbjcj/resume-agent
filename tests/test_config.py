@@ -57,13 +57,15 @@ def test_load_yaml_rejects_non_mapping(tmp_path):
 
 def test_settings_has_cheap_model_default():
     settings = _settings(env_file=None)
-    assert settings.cheap_model == "claude-haiku-4-5-20251001"
+    # The bare alias, not the date-suffixed full id: Anthropic's ids are complete
+    # as published, and appending a date is how you get a 404.
+    assert settings.cheap_model == "claude-haiku-4-5"
 
 
 def test_settings_has_model_tier_defaults():
     settings = _settings(env_file=None)
     assert settings.mid_model == "claude-sonnet-5"
-    assert settings.premium_model == "claude-opus-4-8"
+    assert settings.premium_model == "claude-opus-5"
 
 
 def test_concurrency_settings_defaults(monkeypatch):

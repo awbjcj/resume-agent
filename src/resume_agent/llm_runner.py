@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from copy import deepcopy
@@ -248,10 +249,8 @@ class ModelCatalogEntry:
     id: str
     label: str
     reasoning_efforts: tuple[str, ...] = ()
-    response_verbosity_levels: tuple[str, ...] = ()
 
 
-ResponseVerbosity = Literal["low", "medium", "high"]
 OpenAIResponsesReasoningEffort = Literal["minimal", "low", "medium", "high"]
 GeminiInteractionsThinkingLevel = Literal["minimal", "low", "medium", "high"]
 
@@ -262,52 +261,45 @@ GeminiInteractionsThinkingLevel = Literal["minimal", "low", "medium", "high"]
 # ids are Anthropic. Update this list as providers ship new models.
 MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
     "anthropic": [
-        ModelCatalogEntry("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
+        ModelCatalogEntry("claude-haiku-4-5", "Claude Haiku 4.5"),
         ModelCatalogEntry(
             "claude-sonnet-5", "Claude Sonnet 5", ("low", "medium", "high")
         ),
         ModelCatalogEntry(
-            "claude-opus-4-8",
-            "Claude Opus 4.8",
-            ("low", "medium", "high", "max"),
+            "claude-opus-4-8", "Claude Opus 4.8", ("low", "medium", "high", "max")
         ),
+        ModelCatalogEntry("claude-opus-5", "Claude Opus 5", ("low", "medium", "high")),
     ],
     "openai": [
         ModelCatalogEntry(
             "openai:gpt-5.6-luna",
             "GPT-5.6 Luna",
             ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.6-terra",
             "GPT-5.6 Terra",
             ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.6-sol",
             "GPT-5.6 Sol",
             ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.5-pro",
             "GPT-5.5 Pro",
             ("medium", "high", "xhigh"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.5",
             "GPT-5.5",
             ("none", "low", "medium", "high", "xhigh"),
-            ("low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.4-mini",
             "GPT-5.4 Mini",
             ("none", "low", "medium", "high", "xhigh"),
-            ("low", "medium", "high"),
         ),
     ],
     "gemini": [
@@ -359,18 +351,45 @@ def catalog_entry(model_id: str) -> ModelCatalogEntry | None:
 
 OPENAI_WEB_SEARCH_TOOL = {"type": "web_search"}
 
+# Claude ids name their family before the version (``claude-opus-4-8``,
+# ``claude-sonnet-5``, ``claude-haiku-4-5-20251001``). Pre-4 ids used the
+# opposite order (``claude-3-5-haiku-20241022``) and deliberately do not match,
+# so they classify as legacy -- which is exactly right, since every capability
+# gated on this parser arrived with the 4.6 generation.
+_ANTHROPIC_VERSION = re.compile(
+    r"^claude-(?:opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?"
+)
+# Adaptive thinking, `output_config.effort`, and the dynamic-filtering
+# web-search tool all require this generation or newer.
+_ANTHROPIC_MODERN = (4, 6)
+# Thinking is always on for these families; an explicit disabled config is a 400.
+_ANTHROPIC_ALWAYS_THINKING = ("claude-fable-", "claude-mythos-")
+
+
+def anthropic_version(model: str) -> tuple[int, int] | None:
+    """Parse a bare Claude id into a comparable ``(major, minor)``, or ``None``.
+
+    ``None`` means "older than the 4.x family, or not a recognizable Claude id" --
+    treat it as supporting none of the 4.6+ request surface.
+    """
+    match = _ANTHROPIC_VERSION.match(model.casefold())
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2) or 0)
+
 
 def anthropic_web_search_tool(model_id: str) -> dict[str, Any]:
     """Pick the Anthropic web-search tool variant for a (possibly bare) Claude model id.
 
-    ``web_search_20260209`` (dynamic filtering) requires Opus 4.6+ or Sonnet 4.6+;
-    Haiku models need the basic ``web_search_20250305`` type. Mirrors the
-    "haiku" check `provider_capabilities` already uses for reasoning support.
+    ``web_search_20260209`` (dynamic filtering) requires Opus 4.6+ / Sonnet 4.6+;
+    anything older -- Haiku 4.5, and any pre-4.6 id reachable through the custom
+    model field -- must get the basic ``web_search_20250305`` or the Messages API
+    rejects the tool definition with a 400 before any search runs.
     """
     _provider, model = split_provider(model_id)
-    tool_type = (
-        "web_search_20250305" if "haiku" in model.casefold() else "web_search_20260209"
-    )
+    version = anthropic_version(model)
+    modern = version is not None and version >= _ANTHROPIC_MODERN
+    tool_type = "web_search_20260209" if modern else "web_search_20250305"
     return {"type": tool_type, "name": "web_search", "max_uses": 5}
 
 
@@ -447,7 +466,15 @@ def provider_capabilities(model_id: str) -> ProviderCapabilities:
     provider, model = split_provider(model_id)
     folded = model.casefold()
     if provider == "anthropic" and folded.startswith("claude-"):
-        return ProviderCapabilities("haiku" not in folded, True, True)
+        # Reasoning means `thinking={"type": "adaptive"}` + `output_config.effort`,
+        # and BOTH arrived with the 4.6 generation: adaptive is rejected on 4.5 and
+        # older (they need `{"type": "enabled", "budget_tokens": N}`), and `effort`
+        # errors outright on Sonnet 4.5 / Haiku 4.5. agno cannot catch this for us --
+        # its NON_THINKING_MODELS guard only covers the Haiku 3 and 3.5 families --
+        # so a pre-4.6 id would reach the API and 400 at runtime.
+        version = anthropic_version(model)
+        reasoning = version is not None and version >= _ANTHROPIC_MODERN
+        return ProviderCapabilities(reasoning, True, True)
     if provider == "openai" and folded.startswith(("gpt-", "o1", "o3", "o4")):
         return ProviderCapabilities(
             folded.startswith(("gpt-5", "o1", "o3", "o4")), True, True
@@ -655,13 +682,61 @@ def use_json_mode_for(model: Any, output_schema: Any = None) -> bool:
     ) == "Anthropic" and _anthropic_schema_exceeds_limits(output_schema)
 
 
-def _configured_model_option(model_id: str, suffix: str) -> str | None:
-    """Resolve per-tier tuning for ``model_id`` from effective settings.
+def _anthropic_thinking(
+    model: str, *, reasoning: bool
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return the ``(thinking, output_config)`` pair for a bare Claude id.
 
-    Tuning belongs to a tier in the settings UI. If a user intentionally uses
-    the same model in more than one tier, the most capable tier wins so the
-    result is deterministic rather than dependent on call-site ordering.
+    Anthropic has the same hazard as Gemini -- an unset thinking config is
+    "provider decides", not "off" -- but the default differs by generation:
+    omitting ``thinking`` runs ADAPTIVE on Sonnet 5 and Opus 5, and runs
+    without thinking on Opus 4.8/4.7 and everything older. Since
+    ``Settings.mid_model`` defaults to ``claude-sonnet-5``, leaving it unset
+    silently bought thinking on every non-reasoning agent -- and because
+    thinking shares the ``max_tokens`` budget with the response text, that
+    truncated large structured outputs into the unparsed-``str`` failure
+    ``expect_schema`` exists to diagnose. So bound it explicitly.
     """
+    if reasoning:
+        return {"type": "adaptive"}, {"effort": "high"}
+    folded = model.casefold()
+    if folded.startswith(_ANTHROPIC_ALWAYS_THINKING):
+        # Fable/Mythos reject an explicit disabled config; only max_tokens bounds it.
+        return None, None
+    version = anthropic_version(model)
+    if version is None or version < _ANTHROPIC_MODERN:
+        # Pre-4.6 ids: omitting the config already means no thinking on that
+        # generation, so there is nothing to bound -- and agno rejects a thinking
+        # config on the Haiku 3/3.5 families outright.
+        return None, None
+    # Accepted on Sonnet 5, Opus 4.8/4.7/4.6 and Sonnet 4.6. On Opus 5 it is
+    # accepted only at effort `high` or below -- we send no `output_config` here,
+    # and the default effort is `high`, so this stays inside that limit.
+    return {"type": "disabled"}, None
+
+
+def _anthropic_max_tokens(model: str, *, reasoning: bool) -> int:
+    """Bound Claude's output budget instead of inheriting agno's 8192 default.
+
+    ``max_tokens`` caps thinking PLUS response text, so 8192 is shared between a
+    reasoning budget and the full JSON body -- enough to truncate a
+    ``ResumeContent`` or starve a scout's web-search tool loop, both of which
+    surface as an unparsed ``str`` rather than an HTTP error. These calls are
+    non-streaming, so stay near the SDK's ~16000 non-streaming guidance rather
+    than the models' 128K ceiling, and honor the per-model non-streaming ceiling
+    the SDK enforces (Opus 4/4.1 only) so a custom id cannot raise ValueError.
+    """
+    want = 32000 if reasoning else 16000
+    try:
+        from anthropic._constants import MODEL_NONSTREAMING_TOKENS
+    except ImportError:  # pragma: no cover - private SDK constant
+        return want
+    ceiling = MODEL_NONSTREAMING_TOKENS.get(model)
+    return min(want, ceiling) if ceiling else want
+
+
+def _configured_model_option(model_id: str, suffix: str) -> str | None:
+    """Resolve per-tier tuning for ``model_id`` from effective settings."""
     settings = get_settings()
     for tier in ("premium", "mid", "cheap"):
         if getattr(settings, f"{tier}_model", None) == model_id:
@@ -679,23 +754,8 @@ def _reasoning_effort_for(model_id: str, provider: str) -> str:
     return "max" if provider == "deepseek" else "high"
 
 
-def _response_verbosity_for(model_id: str) -> ResponseVerbosity | None:
-    configured = _configured_model_option(model_id, "response_verbosity")
-    entry = catalog_entry(model_id)
-    if not configured or not entry or configured not in entry.response_verbosity_levels:
-        return None
-    if configured == "low":
-        return "low"
-    if configured == "medium":
-        return "medium"
-    if configured == "high":
-        return "high"
-    return None
-
-
 def _openai_responses_reasoning_effort_for(
-    model_id: str,
-    provider: str,
+    model_id: str, provider: str
 ) -> OpenAIResponsesReasoningEffort | None:
     """Adapt configured effort to the subset accepted by OpenAI Responses."""
     effort = _reasoning_effort_for(model_id, provider)
@@ -709,14 +769,11 @@ def _openai_responses_reasoning_effort_for(
         return "high"
     if effort == "none":
         return None
-    # The Responses integration does not support the UI's "xhigh" or "max"
-    # values, so retain enabled reasoning at its highest accepted level.
     return "high"
 
 
 def _gemini_interactions_thinking_level_for(
-    model_id: str,
-    provider: str,
+    model_id: str, provider: str
 ) -> GeminiInteractionsThinkingLevel:
     """Return a Gemini Interactions-compatible thinking level."""
     effort = _reasoning_effort_for(model_id, provider)
@@ -754,7 +811,6 @@ def build_model(
             id=model,
             api_key=key,
             reasoning_effort=reasoning_effort,
-            verbosity=_response_verbosity_for(model_id),
         )
     if provider == "gemini":
         Gemini = _compatible_gemini_class()
@@ -775,10 +831,13 @@ def build_model(
                 api_key=key,
                 thinking_level=reasoning_effort if reasoning else "low",
             )
+        # Pre-3 ids have no thinking_level at all -- sending one is the mirror
+        # image of the thinking_budget-on-Gemini-3 failure, and agno forwards any
+        # non-None value straight into ThinkingConfig -- so 0 is the only way off
+        # here, and reasoning is left to the provider's own budget.
         return Gemini(
             id=model,
             api_key=key,
-            thinking_level=reasoning_effort if reasoning else None,
             thinking_budget=None if reasoning else 0,
         )
     if provider == "deepseek":
@@ -792,12 +851,16 @@ def build_model(
         )
     from agno.models.anthropic import Claude
 
+    thinking, output_config = _anthropic_thinking(model, reasoning=reasoning)
+    if output_config is not None and reasoning_effort is not None:
+        output_config = {"effort": reasoning_effort}
     return Claude(
         id=model,
         api_key=key,
         cache_system_prompt=cache_system_prompt,
-        thinking={"type": "adaptive"} if reasoning else None,
-        output_config={"effort": reasoning_effort} if reasoning else None,
+        max_tokens=_anthropic_max_tokens(model, reasoning=reasoning),
+        thinking=thinking,
+        output_config=output_config,
     )
 
 
@@ -829,7 +892,6 @@ def build_search_equipped(
                     if reasoning
                     else None
                 ),
-                verbosity=_response_verbosity_for(model_id),
                 store=False,
             ),
             [OPENAI_WEB_SEARCH_TOOL],
@@ -837,6 +899,9 @@ def build_search_equipped(
     if plan.strategy == "native_gemini":
         from agno.models.google.gemini_interactions import GeminiInteractions
 
+        # Same "unset means provider decides" rule `build_model` guards: leaving
+        # thinking_level unset buys an unbounded automatic budget, so a
+        # non-reasoning research agent bounds it at "low" rather than omitting it.
         return (
             GeminiInteractions(
                 id=model_name,
@@ -845,7 +910,7 @@ def build_search_equipped(
                 thinking_level=(
                     _gemini_interactions_thinking_level_for(model_id, plan.provider)
                     if reasoning
-                    else None
+                    else "low"
                 ),
                 store=False,
             ),

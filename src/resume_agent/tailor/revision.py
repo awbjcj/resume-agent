@@ -1,4 +1,4 @@
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, expect_schema
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 
@@ -17,7 +17,4 @@ def compose_user_revision_input(
 
 
 def apply_revision(input_text: str, agent: Runner) -> ResumeContent:
-    content = agent.run(input_text).content
-    if not isinstance(content, ResumeContent):
-        raise TypeError(f"Expected ResumeContent from revision agent, got {type(content).__name__}")
-    return content
+    return expect_schema(agent.run(input_text), ResumeContent, source="revision")

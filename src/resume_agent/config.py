@@ -25,15 +25,12 @@ class Settings(BaseSettings):
     linkedin_password: str = ""
     linkedin_user_data_dir: str = ".linkedin_profile"
     db_url: str = "sqlite:///data/resume_agent.db"
-    cheap_model: str = "claude-haiku-4-5-20251001"
+    cheap_model: str = "claude-haiku-4-5"
     mid_model: str = "claude-sonnet-5"
-    premium_model: str = "claude-opus-4-8"
+    premium_model: str = "claude-opus-5"
     cheap_reasoning_effort: str | None = None
     mid_reasoning_effort: str | None = None
     premium_reasoning_effort: str | None = None
-    cheap_response_verbosity: str | None = None
-    mid_response_verbosity: str | None = None
-    premium_response_verbosity: str | None = None
     transcribe_model: str = "gemini:gemini-2.5-flash"
     api_token: str = (
         ""  # when non-empty, the API requires Authorization: Bearer <token>

@@ -35,3 +35,14 @@ def test_search_builder_gates_incapable_reasoning_request():
         "openai:gpt-4o", mode="native", reasoning=True
     )
     assert model.reasoning_effort is None
+
+
+def test_native_gemini_search_bounds_thinking_when_not_reasoning():
+    # Gemini treats an unset thinking config as "provider decides" (unbounded
+    # automatic budget), so the non-reasoning research agent has to bound it --
+    # the same rule build_model follows. Only reasoning=True was covered before.
+    gemini, _ = build_search_equipped(
+        "gemini:gemini-3.5-flash", mode="native", reasoning=False
+    )
+    assert isinstance(gemini, GeminiInteractions)
+    assert gemini.thinking_level == "low"

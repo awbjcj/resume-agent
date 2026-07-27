@@ -25,6 +25,7 @@ from resume_agent.llm_runner import (
     Runner,
     acall,
     build_model,
+    expect_schema,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -241,12 +242,8 @@ def _all_claims(
     ]
 
 
-def _expect_fragment(content: object) -> SynthesizedFragment:
-    if not isinstance(content, SynthesizedFragment):
-        raise TypeError(
-            f"Expected SynthesizedFragment from agent, got {type(content).__name__}"
-        )
-    return content
+def _expect_fragment(result: object) -> SynthesizedFragment:
+    return expect_schema(result, SynthesizedFragment, source="synthesis")
 
 
 def _deterministic_pass(
@@ -285,14 +282,11 @@ def _entailment_payload(
 
 
 def _apply_verdicts(
-    content: object,
+    result: object,
     pending: list[tuple[tuple[int, int], SynthesizedClaim]],
     failures: dict[tuple[int, int], str],
 ) -> None:
-    if not isinstance(content, ClaimVerdicts):
-        raise TypeError(
-            f"Expected ClaimVerdicts from agent, got {type(content).__name__}"
-        )
+    content = expect_schema(result, ClaimVerdicts, source="synthesis entailment")
     verdicts = {verdict.index: verdict for verdict in content.verdicts}
     for index, (key, _) in enumerate(pending):
         verdict = verdicts.get(index)
@@ -317,8 +311,8 @@ def _verify(
     """
     failures, pending, tech_failures = _deterministic_pass(fragment, source_text)
     if pending:
-        content = entailment_agent.run(_entailment_payload(pending)).content
-        _apply_verdicts(content, pending, failures)
+        result = entailment_agent.run(_entailment_payload(pending))
+        _apply_verdicts(result, pending, failures)
     return failures, tech_failures
 
 
@@ -403,15 +397,15 @@ def synthesize_document(
     entailment_agent: Runner,
 ) -> tuple[SynthesizedFragment, list[str]]:
     """Synthesize, verify, repair once, drop the rest. Returns (fragment, drops)."""
-    content = synthesis_agent.run(compose_synthesis_input(doc_text, skeleton)).content
-    fragment = _expect_fragment(content).model_copy(deep=True)
+    result = synthesis_agent.run(compose_synthesis_input(doc_text, skeleton))
+    fragment = _expect_fragment(result).model_copy(deep=True)
     _apply_pinned_anchor(fragment, doc)
 
     failures, tech_failures = _verify(fragment, doc_text, entailment_agent)
     if failures or tech_failures:
         repaired = synthesis_agent.run(
             _repair_prompt(doc_text, skeleton, fragment, failures, tech_failures)
-        ).content
+        )
         fragment = _expect_fragment(repaired).model_copy(deep=True)
         _apply_pinned_anchor(fragment, doc)
         failures, tech_failures = _verify(fragment, doc_text, entailment_agent)
@@ -429,10 +423,8 @@ async def _averify(
 ) -> tuple[dict[tuple[int, int], str], dict[int, dict[str, str]]]:
     failures, pending, tech_failures = _deterministic_pass(fragment, source_text)
     if pending:
-        content = (
-            await acall(entailment_agent, _entailment_payload(pending), sem=sem)
-        ).content
-        _apply_verdicts(content, pending, failures)
+        result = await acall(entailment_agent, _entailment_payload(pending), sem=sem)
+        _apply_verdicts(result, pending, failures)
     return failures, tech_failures
 
 
@@ -450,7 +442,7 @@ async def asynthesize_document(
         await acall(
             synthesis_agent, compose_synthesis_input(doc_text, skeleton), sem=sem
         )
-    ).content
+    )
     fragment = _expect_fragment(content).model_copy(deep=True)
     _apply_pinned_anchor(fragment, doc)
 
@@ -458,13 +450,11 @@ async def asynthesize_document(
         fragment, doc_text, entailment_agent, sem=sem
     )
     if failures or tech_failures:
-        repaired = (
-            await acall(
-                synthesis_agent,
-                _repair_prompt(doc_text, skeleton, fragment, failures, tech_failures),
-                sem=sem,
-            )
-        ).content
+        repaired = await acall(
+            synthesis_agent,
+            _repair_prompt(doc_text, skeleton, fragment, failures, tech_failures),
+            sem=sem,
+        )
         fragment = _expect_fragment(repaired).model_copy(deep=True)
         _apply_pinned_anchor(fragment, doc)
         failures, tech_failures = await _averify(

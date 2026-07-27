@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from resume_agent.llm_runner import expect_schema
+
 
 class TurnRejected(ValueError):
     """A formatted turn failed validation against the session's rules."""
@@ -11,18 +13,19 @@ def format_with_retry(formatter, notes: object, schema, validate, *, label: str)
     """Format untrusted notes into ``schema`` and validate, retrying once.
 
     The retry feeds the rejection reason back to the formatter; a second
-    rejection propagates. Non-``schema`` output is a TypeError immediately.
+    rejection propagates. Non-``schema`` output raises ``UnparsedAgentOutput``
+    (a TypeError) immediately, carrying the model, provider, token counts, and a
+    response head/tail -- this seam is shared by the coach and interview stacks,
+    so a truncated or rejected turn is diagnosable in both without a redeploy.
     """
     prompt = f"{label} (UNTRUSTED):\n{notes}"
-    formatted = formatter.run(prompt).content
-    if not isinstance(formatted, schema):
-        raise TypeError(f"Expected {schema.__name__}, got {type(formatted).__name__}")
+    formatted = expect_schema(formatter.run(prompt), schema, source=label)
     try:
         return validate(formatted)
     except TurnRejected as first:
-        retry = formatter.run(f"{prompt}\n\nPREVIOUS OUTPUT REJECTED: {first}").content
-        if not isinstance(retry, schema):
-            raise TypeError(
-                f"Expected {schema.__name__}, got {type(retry).__name__}"
-            ) from first
+        result = formatter.run(f"{prompt}\n\nPREVIOUS OUTPUT REJECTED: {first}")
+        try:
+            retry = expect_schema(result, schema, source=f"{label} retry")
+        except TypeError as exc:
+            raise exc from first
         return validate(retry)

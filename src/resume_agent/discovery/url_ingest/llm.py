@@ -9,6 +9,7 @@ from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
+    expect_schema,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -43,13 +44,7 @@ def build_url_extract_agent(model_id: str | None = None) -> Runner:
 
 
 def extract_fields(text: str, agent: Runner) -> ExtractedJob:
-    result = agent.run(text)
-    extracted = result.content
-    if not isinstance(extracted, ExtractedJob):
-        raise TypeError(
-            f"Expected ExtractedJob from agent, got {type(extracted).__name__}"
-        )
-    return extracted
+    return expect_schema(agent.run(text), ExtractedJob, source="url-ingest")
 
 
 def html_to_text(html: str) -> str:

@@ -3710,8 +3710,6 @@ export interface components {
             label: string;
             /** Reasoningefforts */
             reasoningEfforts: string[];
-            /** Responseverbositylevels */
-            responseVerbosityLevels: string[];
             /** Supportsnativesearch */
             supportsNativeSearch: boolean;
             /** Supportsreasoning */
@@ -3721,13 +3719,11 @@ export interface components {
         ModelsConfigDoc: {
             /**
              * Cheapmodel
-             * @default claude-haiku-4-5-20251001
+             * @default claude-haiku-4-5
              */
             cheapModel: string;
             /** Cheapreasoningeffort */
             cheapReasoningEffort?: string | null;
-            /** Cheapresponseverbosity */
-            cheapResponseVerbosity?: string | null;
             /**
              * Midmodel
              * @default claude-sonnet-5
@@ -3735,17 +3731,13 @@ export interface components {
             midModel: string;
             /** Midreasoningeffort */
             midReasoningEffort?: string | null;
-            /** Midresponseverbosity */
-            midResponseVerbosity?: string | null;
             /**
              * Premiummodel
-             * @default claude-opus-4-8
+             * @default claude-opus-5
              */
             premiumModel: string;
             /** Premiumreasoningeffort */
             premiumReasoningEffort?: string | null;
-            /** Premiumresponseverbosity */
-            premiumResponseVerbosity?: string | null;
         };
         /** MoveSkillIn */
         MoveSkillIn: {

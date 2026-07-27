@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,7 +19,6 @@ const CATALOG: ProviderModelCatalog[] = [
         supportsReasoning: true,
         supportsNativeSearch: true,
         reasoningEfforts: ["none", "low", "medium", "high", "xhigh"],
-        responseVerbosityLevels: ["low", "medium", "high"],
       },
     ],
   },
@@ -52,27 +51,49 @@ describe("ModelPicker", () => {
     expect(screen.getByRole("combobox")).toHaveTextContent("GPT-5.5");
   });
 
-  it("shows only tuning supported by the selected model", async () => {
+  it("lets the user pick a reasoning effort level", async () => {
     const user = userEvent.setup();
     const onEffort = vi.fn();
-    const onVerbosity = vi.fn();
     render(
       <ModelTuningControls
         modelId={KNOWN_MODEL}
         reasoningEffort={null}
-        responseVerbosity={null}
         catalog={CATALOG}
         onReasoningEffortChange={onEffort}
-        onResponseVerbosityChange={onVerbosity}
       />,
     );
 
-    await user.click(screen.getByRole("combobox", { name: "Reasoning effort" }));
-    await user.click(screen.getByRole("option", { name: "Xhigh" }));
+    const effortGroup = screen.getByRole("group", { name: "Effort" });
+    await user.click(within(effortGroup).getByRole("button", { name: "Xhigh" }));
     expect(onEffort).toHaveBeenCalledWith("xhigh");
+  });
 
-    await user.click(screen.getByRole("combobox", { name: "Response verbosity" }));
-    await user.click(screen.getByRole("option", { name: "Low" }));
-    expect(onVerbosity).toHaveBeenCalledWith("low");
+  it("renders nothing when the selected model has no reasoning effort levels", () => {
+    const onEffort = vi.fn();
+    const { container } = render(
+      <ModelTuningControls
+        modelId="openai:no-reasoning"
+        reasoningEffort={null}
+        catalog={[
+          {
+            provider: "openai",
+            label: "OpenAI",
+            hasKey: true,
+            models: [
+              {
+                id: "openai:no-reasoning",
+                label: "No Reasoning",
+                supportsReasoning: false,
+                supportsNativeSearch: false,
+                reasoningEfforts: [],
+              },
+            ],
+          },
+        ]}
+        onReasoningEffortChange={onEffort}
+      />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
   });
 });

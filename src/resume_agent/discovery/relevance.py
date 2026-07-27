@@ -11,6 +11,7 @@ from resume_agent.llm_runner import (
     Runner,
     acall,
     build_model,
+    expect_schema,
     retry_kwargs,
     resolve_api_key,
     use_json_mode_for,
@@ -69,12 +70,7 @@ def judge_relevance(
     target_role: str, title: str | None, jd_text: str, agent: Runner
 ) -> RelevanceVerdict:
     result = agent.run(compose_relevance_input(target_role, title, jd_text))
-    verdict = result.content
-    if not isinstance(verdict, RelevanceVerdict):
-        raise TypeError(
-            f"Expected RelevanceVerdict from agent, got {type(verdict).__name__}"
-        )
-    return verdict
+    return expect_schema(result, RelevanceVerdict, source="relevance")
 
 
 async def ajudge_relevance(
@@ -88,9 +84,4 @@ async def ajudge_relevance(
     result = await acall(
         agent, compose_relevance_input(target_role, title, jd_text), sem=sem
     )
-    verdict = result.content
-    if not isinstance(verdict, RelevanceVerdict):
-        raise TypeError(
-            f"Expected RelevanceVerdict from agent, got {type(verdict).__name__}"
-        )
-    return verdict
+    return expect_schema(result, RelevanceVerdict, source="relevance")

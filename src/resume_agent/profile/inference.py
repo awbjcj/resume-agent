@@ -12,6 +12,7 @@ from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
+    expect_schema,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -64,12 +65,8 @@ def build_inference_agent(model_id: str | None = None) -> Runner:
 
 
 def infer_skills(facts: ProfileFacts, agent: Runner) -> list[InferredSkill]:
-    content = agent.run(facts.model_dump_json()).content
-    if not isinstance(content, InferredSkills):
-        raise TypeError(
-            f"Expected InferredSkills from agent, got {type(content).__name__}"
-        )
-    return content.skills
+    result = agent.run(facts.model_dump_json())
+    return expect_schema(result, InferredSkills, source="skill-inference").skills
 
 
 def apply_inferred(

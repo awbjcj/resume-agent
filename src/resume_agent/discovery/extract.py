@@ -10,6 +10,7 @@ from resume_agent.llm_runner import (
     Runner,
     acall,
     build_model,
+    expect_schema,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -70,21 +71,11 @@ def build_extract_agent(model_id: str | None = None) -> AgentRunner:
 
 def extract_job_criteria(jd_text: str, agent: Runner) -> JobCriteria:
     result = agent.run(jd_text)
-    extracted = result.content
-    if not isinstance(extracted, JobCriteriaExtract):
-        raise TypeError(
-            f"Expected JobCriteriaExtract from agent, got {type(extracted).__name__}"
-        )
-    return extracted.to_criteria()
+    return expect_schema(result, JobCriteriaExtract, source="extract").to_criteria()
 
 
 async def aextract_job_criteria(
     jd_text: str, agent: Runner, *, sem: asyncio.Semaphore
 ) -> JobCriteria:
     result = await acall(agent, jd_text, sem=sem)
-    extracted = result.content
-    if not isinstance(extracted, JobCriteriaExtract):
-        raise TypeError(
-            f"Expected JobCriteriaExtract from agent, got {type(extracted).__name__}"
-        )
-    return extracted.to_criteria()
+    return expect_schema(result, JobCriteriaExtract, source="extract").to_criteria()

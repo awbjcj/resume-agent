@@ -10,6 +10,7 @@ from resume_agent.llm_runner import (
     Runner,
     acall,
     build_model,
+    expect_schema,
     use_json_mode_for,
 )
 from resume_agent.models.profile import ProfileFacts
@@ -57,11 +58,7 @@ def build_extractor_agent(model_id: str | None = None) -> Runner:
 
 def extract_profile_facts(resume_text: str, agent: Runner) -> ProfileFacts:
     """Run the agent and return its ProfileFacts, validating the result type."""
-    result = agent.run(resume_text)
-    facts = result.content
-    if not isinstance(facts, ProfileFacts):
-        raise TypeError(f"Expected ProfileFacts from agent, got {type(facts).__name__}")
-    return facts
+    return expect_schema(agent.run(resume_text), ProfileFacts, source="profile-extract")
 
 
 async def aextract_profile_facts(
@@ -69,7 +66,4 @@ async def aextract_profile_facts(
 ) -> ProfileFacts:
     """Async sibling of extract_profile_facts for the fragment fan-out."""
     result = await acall(agent, resume_text, sem=sem)
-    facts = result.content
-    if not isinstance(facts, ProfileFacts):
-        raise TypeError(f"Expected ProfileFacts from agent, got {type(facts).__name__}")
-    return facts
+    return expect_schema(result, ProfileFacts, source="profile-extract")
