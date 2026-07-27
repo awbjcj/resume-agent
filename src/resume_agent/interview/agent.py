@@ -157,13 +157,17 @@ def normalize_debrief(turn: DebriefTurn, session: dict) -> InterviewDebrief:
         if not 1 <= item.score <= 5:
             raise TurnRejected(f"score out of range for {item.question_id!r}")
         reviews.append(
-            QuestionReview(
-                question_id=item.question_id,
-                question=item.question.strip(),
-                score=item.score,
-                strengths=[s.strip() for s in item.strengths if s.strip()],
-                improvements=[s.strip() for s in item.improvements if s.strip()],
-                suggested_answer=item.suggested_answer.strip(),
+            QuestionReview.model_validate(
+                {
+                    "question_id": item.question_id,
+                    "question": item.question.strip(),
+                    "score": item.score,
+                    "strengths": [s.strip() for s in item.strengths if s.strip()],
+                    "improvements": [
+                        s.strip() for s in item.improvements if s.strip()
+                    ],
+                    "suggested_answer": item.suggested_answer.strip(),
+                }
             )
         )
     return InterviewDebrief(
