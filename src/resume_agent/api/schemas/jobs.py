@@ -5,7 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from pydantic import computed_field
+
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.models.review import ReviewCritique
+from resume_agent.tailor.verdict import failing_gate_names
 
 
 class SkillTagOut(CamelModel):
@@ -100,6 +104,18 @@ class ResumeVersionOut(CamelModel):
     pdf_path: str | None
     critique_json: list[dict] | None
     created_at: datetime
+
+    @computed_field
+    @property
+    def failed_gates(self) -> list[str]:
+        """Which gates blocked this round, so the UI can name the real cause.
+
+        `fact_check_passed` is the AND of provenance and fact-check, so it alone
+        rendered "Fact-check failed" on rounds where fact-check never ran.
+        """
+        return failing_gate_names(
+            [ReviewCritique.model_validate(c) for c in self.critique_json or []]
+        )
 
 
 class CoverLetterOut(CamelModel):

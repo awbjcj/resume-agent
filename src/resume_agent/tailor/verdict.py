@@ -9,6 +9,27 @@ from resume_agent.tailor.review_config import ReviewConfig
 # critiques list like any gate, so aggregate stays the only verdict constructor.
 DETERMINISTIC_GATES = frozenset({PROVENANCE_REVIEWER})
 
+# Every gate that can block a round. `provenance` is deterministic; `fact-check`
+# is the configured integrity gate in both shipped rosters and is the one
+# reviewer that may not be edited. Stored critiques do not record gate-ness, so
+# read-side surfaces name the failing gate through this set rather than guessing
+# from severity - an advisory reviewer may also raise a blocking issue.
+GATE_REVIEWERS = DETERMINISTIC_GATES | frozenset({"fact-check"})
+
+
+def failing_gate_names(critiques: list[ReviewCritique]) -> list[str]:
+    """Which gates blocked this round, in the order they were recorded.
+
+    `fact_check_passed` on a stored version is the AND of every gate, so on its
+    own it cannot say WHICH one failed - and it labelled a provenance-only
+    failure as a fact-check failure on rounds where fact-check never ran.
+    """
+    return [
+        critique.reviewer
+        for critique in critiques
+        if critique.reviewer in GATE_REVIEWERS and not critique.passed
+    ]
+
 
 class PanelVerdict(ExtensibleModel):
     passed: bool

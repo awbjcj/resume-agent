@@ -26,6 +26,16 @@ type ResumeVersion = components["schemas"]["ResumeVersionOut"] & {
   parentVersionId?: number | null;
 };
 
+/**
+ * `factCheckPassed` is the AND of every gate, so on its own it labelled a
+ * provenance-only failure as a fact-check failure on rounds where the
+ * fact-check reviewer never ran. `failedGates` says which one actually blocked.
+ */
+export function failedGateLabel(failedGates: readonly string[] | undefined) {
+  if (!failedGates?.length) return "Fact-lock failed";
+  return `Fact-lock failed — ${failedGates.join(", ")}`;
+}
+
 export function VersionRow({
   jobId,
   version,
@@ -65,7 +75,9 @@ export function VersionRow({
             {justCreated ? <Badge>Just created</Badge> : null}
             <span className="text-muted-foreground">Score {version.reviewScore ?? "not scored"}</span>
             <Badge variant={version.factCheckPassed ? "outline" : "destructive"}>
-              {version.factCheckPassed ? "Fact-check passed" : "Fact-check failed"}
+              {version.factCheckPassed
+                ? "Fact-lock passed"
+                : failedGateLabel(version.failedGates)}
             </Badge>
             {version.parentVersionId && (
               <span className="text-xs text-muted-foreground">

@@ -383,6 +383,55 @@ re-raised, so a persistently-throttled board still surfaces as a per-URL failure
   `config/review_deep.yaml` through CLI `tailor --deep` or API `deep: true`.
   Advisory critiques are split back into their configured named rows, and each
   `TailorRound` records draft/panel/revise wall-clock seconds.
+- **A round's score is a measurement or it is `None` — never `0`.**
+  `PanelVerdict.aggregate_score` is the weighted mean over non-gate reviewers;
+  with no weighted critique the mean is *unknown*, so it is `None` and `passed`
+  falls back to `gate_passed`. It used to be `0`, and the panel used to be
+  skipped whenever the provenance gate failed, so 25% of stored rounds reported
+  `0` for a resume that was never measured. **The panel now always runs** — a
+  broken citation says nothing about quality, and skipping it left the reviser
+  with no advisory feedback for that round. `services/revision.py` and
+  `evals/metrics.py` already modelled the score as optional; the runtime is the
+  one that disagreed. `scripts/tailor_health.py` reports the distribution.
+- **The writer only ever sees facts it may render.** `renderable_profile()`
+  (`tailor/provenance.py`) strips inferred soft/domain skills from the profile
+  handed to the tailor and reviser, because `check_provenance` rejects them
+  wherever they are cited. The gate still indexes the **full** facts, so a
+  forbidden id arriving via a match plan or a hand-edited resume still fails —
+  this narrows the menu, it does not relax the rule. Match-plan input is
+  deliberately unfiltered (inferred skills legitimately guide emphasis).
+- **The summary carries its own provenance.** `ResumeContent.summary_provenance`
+  lists the fact ids the summary draws on, and rides the same `_referenced_uses`
+  path as every other citation (as an `entity` use, so an inferred pointer there
+  is rejected). Without it the gate could not check the summary at all and
+  `resolve_evidence` showed the reviewer only facts cited *elsewhere*, so a true
+  summary claim read as unsupported. Empty is valid — versions stored before the
+  field still validate.
+- **The reviser gets the job description; `jd_text` is required, not defaulted.**
+  It is handed `ats-keyword` and `hiring-manager` critiques, which are entirely
+  about fit, so without the JD it was being asked to fix complaints it could not
+  read. `compose_revise_input` orders stable context (profile, JD) before
+  volatile context (current resume, this round's critiques) to keep the
+  cacheable prefix intact across rounds. A revision builds on `_best_base` — the
+  best round so far by (gate-clean, score) — not the last, so a regressed round
+  cannot become the base for the next one.
+- **A citation slip is not a quality round.** A round that fails *only* on
+  provenance ids does not consume one of `max_rounds`, up to
+  `ReviewConfig.provenance_retry_budget` (default 1; `0` reproduces the old
+  counting). `_is_citation_slip` requires provenance to be the sole failing gate
+  *and* a real panel score, so a resume the panel also rejects still pays for its
+  round.
+- **Gate failures are named, not conflated.** `ResumeVersion.fact_check_passed`
+  is the AND of every gate, so it cannot say which one blocked — it labelled a
+  provenance-only failure as "Fact-check failed" on rounds where fact-check never
+  ran. `verdict.failing_gate_names` owns the rule and `ResumeVersionOut.failedGates`
+  carries it to the UI.
+- **`score_threshold` and `match_plan_enabled` are unmeasured.** Both shipped
+  rosters now set `score_bands: true` on every advisory reviewer (five private
+  scales were being averaged against one fixed threshold) and
+  `early_stop_on_regression: true`. The threshold stays at 85 and the match plan
+  stays off until the eval arms in `evals/RESULTS.md` are actually run — see the
+  2026-07-27 baseline entry there.
 - **Agent prompts are registry-projected; guidance is layered.**
   `prompts/registry.py` imports the complete invariant instruction composition
   from each production agent builder. Per-agent guidance lives in
