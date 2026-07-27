@@ -65,8 +65,9 @@ def test_reset_preview_lists_rows_and_every_path(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert "skill_suggestions: 0 rows" in result.output
-    assert str(tmp_path / "data" / "profile" / "documents") in result.output
-    assert str(tmp_path / "data" / "profile" / "sources.json") in result.output
+    assert str(tmp_path / "data" / "profile" / "documents") not in result.output
+    assert str(tmp_path / "data" / "profile" / "sources.json") not in result.output
+    assert str(tmp_path / "data" / "profile" / "facts.json") in result.output
     assert str(tmp_path / "data" / "taxonomy" / "skill_groups.json") in result.output
 
 

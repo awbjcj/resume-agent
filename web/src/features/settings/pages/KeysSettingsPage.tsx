@@ -2,7 +2,11 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GmailCard } from "../GmailCard";
-import { ModelPicker } from "../ModelPicker";
+import {
+  findCatalogModel,
+  ModelPicker,
+  ModelTuningControls,
+} from "../ModelPicker";
 import { SecretsForm } from "../forms/SecretsForm";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
@@ -11,12 +15,44 @@ import { useGmailConnectOutcome } from "../use-gmail";
 import { useModelCatalog } from "../use-model-catalog";
 import { useSaveSecrets, useSecrets } from "../use-secrets";
 
-type ModelsDoc = { cheapModel: string; midModel: string; premiumModel: string };
+type ModelsDoc = {
+  cheapModel: string;
+  midModel: string;
+  premiumModel: string;
+  cheapReasoningEffort: string | null;
+  midReasoningEffort: string | null;
+  premiumReasoningEffort: string | null;
+  cheapResponseVerbosity: string | null;
+  midResponseVerbosity: string | null;
+  premiumResponseVerbosity: string | null;
+};
 
-const MODEL_FIELDS: { key: keyof ModelsDoc; label: string }[] = [
-  { key: "cheapModel", label: "Cheap tier model" },
-  { key: "midModel", label: "Mid tier model" },
-  { key: "premiumModel", label: "Premium tier model" },
+type ModelField = {
+  key: "cheapModel" | "midModel" | "premiumModel";
+  effortKey: "cheapReasoningEffort" | "midReasoningEffort" | "premiumReasoningEffort";
+  verbosityKey: "cheapResponseVerbosity" | "midResponseVerbosity" | "premiumResponseVerbosity";
+  label: string;
+};
+
+const MODEL_FIELDS: ModelField[] = [
+  {
+    key: "cheapModel",
+    effortKey: "cheapReasoningEffort",
+    verbosityKey: "cheapResponseVerbosity",
+    label: "Cheap tier model",
+  },
+  {
+    key: "midModel",
+    effortKey: "midReasoningEffort",
+    verbosityKey: "midResponseVerbosity",
+    label: "Mid tier model",
+  },
+  {
+    key: "premiumModel",
+    effortKey: "premiumReasoningEffort",
+    verbosityKey: "premiumResponseVerbosity",
+    label: "Premium tier model",
+  },
 ];
 
 export function KeysSettingsPage() {
@@ -44,13 +80,50 @@ export function KeysSettingsPage() {
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-medium">Model tiers</h2>
         <FieldGroup>
-          {MODEL_FIELDS.map((f) => (
-            <Field key={f.key}>
-              <FieldLabel htmlFor={f.key}>{f.label}</FieldLabel>
-              <ModelPicker id={f.key} value={draft[f.key]} catalog={catalog.data}
-                onChange={(value) => setDraft({ ...draft, [f.key]: value })} />
-            </Field>
-          ))}
+          {MODEL_FIELDS.map((f) => {
+            const model = findCatalogModel(catalog.data, draft[f.key]);
+            return (
+              <Field key={f.key}>
+                <FieldLabel htmlFor={f.key}>{f.label}</FieldLabel>
+                <ModelPicker
+                  id={f.key}
+                  value={draft[f.key]}
+                  catalog={catalog.data}
+                  onChange={(value) => {
+                    const next = findCatalogModel(catalog.data, value);
+                    setDraft({
+                      ...draft,
+                      [f.key]: value,
+                      [f.effortKey]: next?.reasoningEfforts.includes(
+                        draft[f.effortKey] ?? "",
+                      )
+                        ? draft[f.effortKey]
+                        : null,
+                      [f.verbosityKey]: next?.responseVerbosityLevels.includes(
+                        draft[f.verbosityKey] ?? "",
+                      )
+                        ? draft[f.verbosityKey]
+                        : null,
+                    });
+                  }}
+                />
+                {model && (
+                  <ModelTuningControls
+                    modelId={draft[f.key]}
+                    reasoningEffort={draft[f.effortKey]}
+                    responseVerbosity={draft[f.verbosityKey]}
+                    catalog={catalog.data}
+                    onReasoningEffortChange={(value) =>
+                      setDraft({ ...draft, [f.effortKey]: value })
+                    }
+                    onResponseVerbosityChange={(value) =>
+                      setDraft({ ...draft, [f.verbosityKey]: value })
+                    }
+                  />
+                )}
+              </Field>
+            );
+          })}
         </FieldGroup>
         <SaveBar dirty={dirty} saving={saveModels.isPending}
           onSave={() => saveModels.mutate(draft as never)}

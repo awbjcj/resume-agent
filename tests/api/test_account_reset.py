@@ -132,6 +132,11 @@ def test_reset_profile_clears_corpus_and_keeps_pipeline(mu_app, mu_client):
     facts = paths.profile_dir / "facts.json"
     facts.parent.mkdir(parents=True, exist_ok=True)
     facts.write_text("{}", encoding="utf-8")
+    sources = paths.profile_dir / "sources.json"
+    sources.write_text('{"documents": [{"id": "resume"}]}', encoding="utf-8")
+    source_document = paths.profile_dir / "documents" / "resume.md"
+    source_document.parent.mkdir(parents=True, exist_ok=True)
+    source_document.write_text("source resume", encoding="utf-8")
     assert _login(mu_client, "alice", "alice-password").status_code == 200
 
     response = mu_client.post(
@@ -141,6 +146,8 @@ def test_reset_profile_clears_corpus_and_keeps_pipeline(mu_app, mu_client):
     assert response.status_code == 200, response.text
     assert response.json()["areasCleared"] == ["profile", "taxonomy"]
     assert not facts.exists()
+    assert sources.read_text(encoding="utf-8") == '{"documents": [{"id": "resume"}]}'
+    assert source_document.read_text(encoding="utf-8") == "source resume"
     assert (paths.profile_dir / "documents").is_dir()
     assert (paths.output_dir / "resume.pdf").exists()
     with WorkspaceSession(engine) as session:
@@ -174,3 +181,21 @@ def test_single_user_reset_uses_configured_app_paths(tmp_path: Path, monkeypatch
         assert list((data_dir / "progress").iterdir()) == []
         assert list(output_dir.iterdir()) == []
         assert (decoy / "keep.json").exists()
+
+
+def test_reset_all_preserves_sources_until_explicit_source_reset(mu_app, mu_client):
+    user_id = _add_user(mu_app)
+    paths, _engine = _seed_workspace(mu_app, user_id)
+    sources = paths.profile_dir / "sources.json"
+    sources.parent.mkdir(parents=True, exist_ok=True)
+    sources.write_text('{"documents": [{"id": "resume"}]}', encoding="utf-8")
+    source_document = paths.profile_dir / "documents" / "resume.md"
+    source_document.parent.mkdir(parents=True, exist_ok=True)
+    source_document.write_text("source resume", encoding="utf-8")
+    assert _login(mu_client, "alice", "alice-password").status_code == 200
+
+    response = mu_client.post("/api/account/reset?confirm=RESET", json={"scope": "all"})
+
+    assert response.status_code == 200, response.text
+    assert sources.read_text(encoding="utf-8") == '{"documents": [{"id": "resume"}]}'
+    assert source_document.read_text(encoding="utf-8") == "source resume"

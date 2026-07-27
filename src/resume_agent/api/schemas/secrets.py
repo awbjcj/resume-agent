@@ -18,6 +18,7 @@ def _tier_default(field: str) -> str:
     """
     return cast(str, Settings.model_fields[field].default)
 
+
 # schema field name -> .env variable. One place; GET, PUT, and setup-status use it.
 SECRET_FIELDS: dict[str, str] = {
     "anthropic_api_key": "ANTHROPIC_API_KEY",
@@ -37,7 +38,10 @@ SECRET_FIELDS: dict[str, str] = {
 # tailoring pick a provider via Settings.mid_model (see llm_runner.split_provider),
 # so the gate isn't specific to Anthropic.
 LLM_KEY_ENV_VARS: tuple[str, ...] = (
-    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "DEEPSEEK_API_KEY",
 )
 
 
@@ -68,6 +72,12 @@ class ModelsConfigDoc(CamelModel):
     cheap_model: str = _tier_default("cheap_model")
     mid_model: str = _tier_default("mid_model")
     premium_model: str = _tier_default("premium_model")
+    cheap_reasoning_effort: str | None = None
+    mid_reasoning_effort: str | None = None
+    premium_reasoning_effort: str | None = None
+    cheap_response_verbosity: str | None = None
+    mid_response_verbosity: str | None = None
+    premium_response_verbosity: str | None = None
 
 
 class ModelOption(CamelModel):
@@ -75,6 +85,8 @@ class ModelOption(CamelModel):
     label: str
     supports_reasoning: bool
     supports_native_search: bool
+    reasoning_efforts: list[str]
+    response_verbosity_levels: list[str]
 
 
 class ProviderModelCatalog(CamelModel):

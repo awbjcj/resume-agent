@@ -15,8 +15,17 @@ import {
 import type { ProviderModelCatalog } from "./use-model-catalog";
 
 const CUSTOM_VALUE = "__custom__";
+const PROVIDER_DEFAULT = "__provider_default__";
 
 type ModelEntry = ProviderModelCatalog["models"][number];
+
+export function findCatalogModel(
+  catalog: ProviderModelCatalog[] | undefined,
+  modelId: string,
+) {
+  return (catalog ?? []).flatMap((provider) => provider.models)
+    .find((model) => model.id === modelId);
+}
 
 function CapabilityBadges({ model }: { model: ModelEntry }) {
   if (!model.supportsReasoning && !model.supportsNativeSearch) return null;
@@ -115,6 +124,83 @@ export function ModelPicker({
             setCustomValue(e.target.value);
             onChange(e.target.value);
           }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TuningSelect({
+  label,
+  value,
+  levels,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  levels: string[];
+  onChange: (value: string | null) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+      {label}
+      <Select
+        value={value ?? PROVIDER_DEFAULT}
+        onValueChange={(next) => onChange(next === PROVIDER_DEFAULT ? null : next)}
+      >
+        <SelectTrigger aria-label={label} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={PROVIDER_DEFAULT}>Provider default</SelectItem>
+          {levels.map((level) => (
+            <SelectItem key={level} value={level}>
+              {level[0].toUpperCase() + level.slice(1)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
+  );
+}
+
+export function ModelTuningControls({
+  modelId,
+  reasoningEffort,
+  responseVerbosity,
+  catalog,
+  onReasoningEffortChange,
+  onResponseVerbosityChange,
+}: {
+  modelId: string;
+  reasoningEffort: string | null;
+  responseVerbosity: string | null;
+  catalog: ProviderModelCatalog[] | undefined;
+  onReasoningEffortChange: (value: string | null) => void;
+  onResponseVerbosityChange: (value: string | null) => void;
+}) {
+  const model = findCatalogModel(catalog, modelId);
+  if (!model) return null;
+  if (model.reasoningEfforts.length === 0 && model.responseVerbosityLevels.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {model.reasoningEfforts.length > 0 && (
+        <TuningSelect
+          label="Reasoning effort"
+          value={reasoningEffort}
+          levels={model.reasoningEfforts}
+          onChange={onReasoningEffortChange}
+        />
+      )}
+      {model.responseVerbosityLevels.length > 0 && (
+        <TuningSelect
+          label="Response verbosity"
+          value={responseVerbosity}
+          levels={model.responseVerbosityLevels}
+          onChange={onResponseVerbosityChange}
         />
       )}
     </div>
