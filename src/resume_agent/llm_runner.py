@@ -263,28 +263,34 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
     "anthropic": [
         ModelCatalogEntry("claude-haiku-4-5", "Claude Haiku 4.5"),
         ModelCatalogEntry(
-            "claude-sonnet-5", "Claude Sonnet 5", ("low", "medium", "high")
+            "claude-sonnet-5",
+            "Claude Sonnet 5",
+            ("low", "medium", "high", "xhigh", "max"),
         ),
         ModelCatalogEntry(
-            "claude-opus-4-8", "Claude Opus 4.8", ("low", "medium", "high", "max")
+            "claude-opus-4-8",
+            "Claude Opus 4.8",
+            ("low", "medium", "high", "xhigh", "max"),
         ),
-        ModelCatalogEntry("claude-opus-5", "Claude Opus 5", ("low", "medium", "high")),
+        ModelCatalogEntry(
+            "claude-opus-5", "Claude Opus 5", ("low", "medium", "high", "xhigh", "max")
+        ),
     ],
     "openai": [
         ModelCatalogEntry(
             "openai:gpt-5.6-luna",
             "GPT-5.6 Luna",
-            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("none", "low", "medium", "high", "xhigh", "max"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.6-terra",
             "GPT-5.6 Terra",
-            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("none", "low", "medium", "high", "xhigh", "max"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.6-sol",
             "GPT-5.6 Sol",
-            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("none", "low", "medium", "high", "xhigh", "max"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.5-pro",
@@ -306,7 +312,7 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
         ModelCatalogEntry(
             "gemini:gemini-3.5-flash-lite",
             "Gemini 3.5 Flash Lite",
-            ("low", "medium", "high"),
+            ("minimal", "low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "gemini:gemini-3.1-flash-lite",
@@ -330,8 +336,12 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
         ),
     ],
     "deepseek": [
-        ModelCatalogEntry("deepseek:deepseek-v4-flash", "DeepSeek V4 Flash"),
-        ModelCatalogEntry("deepseek:deepseek-v4-pro", "DeepSeek V4 Pro"),
+        ModelCatalogEntry(
+            "deepseek:deepseek-v4-flash", "DeepSeek V4 Flash", ("high", "max")
+        ),
+        ModelCatalogEntry(
+            "deepseek:deepseek-v4-pro", "DeepSeek V4 Pro", ("high", "max")
+        ),
     ],
 }
 

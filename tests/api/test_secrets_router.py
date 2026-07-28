@@ -114,7 +114,7 @@ def test_model_catalog_entries_carry_id_label_and_capability_flags(client):
     opus = next(m for m in anthropic["models"] if "opus" in m["id"])
     assert haiku["label"] and haiku["supportsReasoning"] is False
     assert opus["supportsReasoning"] is True
-    assert opus["reasoningEfforts"] == ["low", "medium", "high", "max"]
+    assert opus["reasoningEfforts"] == ["low", "medium", "high", "xhigh", "max"]
     assert haiku["supportsNativeSearch"] is True  # anthropic has native search
 
     deepseek = next(row for row in body if row["provider"] == "deepseek")
