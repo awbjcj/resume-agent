@@ -3,6 +3,7 @@ from sqlmodel import Session
 from resume_agent.db import init_db, make_engine
 from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
 from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
+from resume_agent.models.review import ReviewCritique
 from resume_agent.services.agents import TailorBundle
 from resume_agent.services.revision import revise_resume_version
 from resume_agent.tracking.repository import save_job, save_resume_version
@@ -95,3 +96,63 @@ def test_revise_resume_version_persists_lineage_and_fact_flag(monkeypatch):
         assert child.parent_version_id == parent.id
         assert child.fact_check_passed is False
         assert exports == [job.id]
+        # No panel ran (not a re-review), so no reviewer-configured gate
+        # applies to this round yet - an empty, KNOWN roster, not None.
+        assert child.gate_reviewers_json == []
+
+
+def test_revise_resume_version_records_gate_roster_on_re_review(monkeypatch, tmp_path):
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    monkeypatch.setattr(
+        "resume_agent.services.revision.load_facts", lambda path: _facts()
+    )
+    monkeypatch.setattr(
+        "resume_agent.services.revision.export_job_artifacts", lambda session, job_id: None
+    )
+    review_path = tmp_path / "review.yaml"
+    review_path.write_text(
+        "max_rounds: 1\n"
+        "reviewers:\n"
+        "  - name: fact-check\n"
+        "    gate: true\n"
+        "    weight: 0\n"
+        "  - name: ats-keyword\n"
+        "    gate: true\n"
+        "    weight: 0\n",
+        encoding="utf-8",
+    )
+
+    with Session(engine) as session:
+        job = save_job(
+            session, Job(source="manual", jd_text="jd", company="Acme", title="Eng")
+        )
+        assert job.id is not None
+        parent = save_resume_version(
+            session,
+            ResumeVersion(
+                job_id=job.id, round=1, content_json=_content().model_dump(mode="json")
+            ),
+        )
+        assert parent.id is not None
+        fact_check = _Agent(ReviewCritique(reviewer="fact-check", score=100, passed=True))
+        ats = _Agent(ReviewCritique(reviewer="ats-keyword", score=100, passed=True))
+        bundle = TailorBundle(
+            tailor=_Agent(_content()),
+            reviser=_Agent(_content()),
+            reviewers={"fact-check": fact_check, "ats-keyword": ats},
+            revision=_Agent(_content()),
+        )
+
+        child = revise_resume_version(
+            session,
+            parent.id,
+            "make it sharper",
+            re_review=True,
+            review_path=str(review_path),
+            bundle=bundle,
+        )
+
+        assert child is not None
+        # Recorded from the round's OWN config, gated reviewers only.
+        assert child.gate_reviewers_json == ["ats-keyword", "fact-check"]

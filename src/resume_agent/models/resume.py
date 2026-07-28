@@ -80,8 +80,11 @@ class ResumeContent(ExtensibleModel):
     # Fact ids the summary draws on. The summary is prose with no per-claim
     # provenance field, so without these the gate cannot check it and the
     # evidence reviewer only ever sees facts cited by OTHER sections - which
-    # makes a true summary claim look unsupported. Empty is allowed so resumes
-    # stored before this field still validate.
+    # makes a true summary claim look unsupported. Empty is allowed at this
+    # model level so resumes stored before this field existed still
+    # deserialize; `tailor.provenance.check_provenance` is what actually
+    # requires a nonempty summary to carry provenance ids, and it only runs
+    # against freshly produced tailor/revise rounds, never on load.
     summary_provenance: list[str] = Field(default_factory=list)
     experience: list[TailoredExperience] = Field(default_factory=list)
     projects: list[TailoredProject] = Field(default_factory=list)

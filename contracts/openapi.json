@@ -5180,6 +5180,12 @@
             "title": "Mergedadvisory",
             "type": "boolean"
           },
+          "provenanceRetryBudget": {
+            "default": 1,
+            "minimum": 0.0,
+            "title": "Provenanceretrybudget",
+            "type": "integer"
+          },
           "reviewers": {
             "items": {
               "$ref": "#/components/schemas/ReviewerEntry"

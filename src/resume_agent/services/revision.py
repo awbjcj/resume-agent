@@ -54,6 +54,9 @@ def revise_resume_version(
     critiques = [provenance]
     review_score = None
     fact_check_passed = provenance.passed
+    # No panel ran unless re-reviewed, so no reviewer-configured gate applies
+    # to this round yet - an empty (known) roster, not None/"unknown".
+    gate_reviewers: list[str] = []
     job = get_job(session, parent.job_id)
 
     if re_review and provenance.passed and job is not None:
@@ -62,6 +65,7 @@ def revise_resume_version(
         verdict = aggregate(critiques, config)
         review_score = verdict.aggregate_score
         fact_check_passed = verdict.gate_passed
+        gate_reviewers = sorted(r.name for r in config.reviewers if r.gate)
 
     child = save_resume_version(
         session,
@@ -72,6 +76,7 @@ def revise_resume_version(
             review_score=review_score,
             fact_check_passed=fact_check_passed,
             critique_json=[c.model_dump(mode="json") for c in critiques],
+            gate_reviewers_json=gate_reviewers,
             origin="revision",
             instruction=instruction,
             parent_version_id=parent.id,

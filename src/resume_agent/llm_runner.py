@@ -263,28 +263,34 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
     "anthropic": [
         ModelCatalogEntry("claude-haiku-4-5", "Claude Haiku 4.5"),
         ModelCatalogEntry(
-            "claude-sonnet-5", "Claude Sonnet 5", ("low", "medium", "high")
+            "claude-sonnet-5",
+            "Claude Sonnet 5",
+            ("low", "medium", "high", "xhigh", "max"),
         ),
         ModelCatalogEntry(
-            "claude-opus-4-8", "Claude Opus 4.8", ("low", "medium", "high", "max")
+            "claude-opus-4-8",
+            "Claude Opus 4.8",
+            ("low", "medium", "high", "xhigh", "max"),
         ),
-        ModelCatalogEntry("claude-opus-5", "Claude Opus 5", ("low", "medium", "high")),
+        ModelCatalogEntry(
+            "claude-opus-5", "Claude Opus 5", ("low", "medium", "high", "xhigh", "max")
+        ),
     ],
     "openai": [
         ModelCatalogEntry(
             "openai:gpt-5.6-luna",
             "GPT-5.6 Luna",
-            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("none", "low", "medium", "high", "xhigh", "max"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.6-terra",
             "GPT-5.6 Terra",
-            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("none", "low", "medium", "high", "xhigh", "max"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.6-sol",
             "GPT-5.6 Sol",
-            ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ("none", "low", "medium", "high", "xhigh", "max"),
         ),
         ModelCatalogEntry(
             "openai:gpt-5.5-pro",
@@ -306,7 +312,7 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
         ModelCatalogEntry(
             "gemini:gemini-3.5-flash-lite",
             "Gemini 3.5 Flash Lite",
-            ("low", "medium", "high"),
+            ("minimal", "low", "medium", "high"),
         ),
         ModelCatalogEntry(
             "gemini:gemini-3.1-flash-lite",
@@ -330,8 +336,12 @@ MODEL_CATALOG: dict[str, list[ModelCatalogEntry]] = {
         ),
     ],
     "deepseek": [
-        ModelCatalogEntry("deepseek:deepseek-v4-flash", "DeepSeek V4 Flash"),
-        ModelCatalogEntry("deepseek:deepseek-v4-pro", "DeepSeek V4 Pro"),
+        ModelCatalogEntry(
+            "deepseek:deepseek-v4-flash", "DeepSeek V4 Flash", ("high", "max")
+        ),
+        ModelCatalogEntry(
+            "deepseek:deepseek-v4-pro", "DeepSeek V4 Pro", ("high", "max")
+        ),
     ],
 }
 
@@ -901,21 +911,24 @@ def build_search_equipped(
 
         # Same "unset means provider decides" rule `build_model` guards: leaving
         # thinking_level unset buys an unbounded automatic budget, so a
-        # non-reasoning research agent bounds it at "low" rather than omitting it.
-        return (
-            GeminiInteractions(
-                id=model_name,
-                api_key=api_key,
-                search=True,
-                thinking_level=(
-                    _gemini_interactions_thinking_level_for(model_id, plan.provider)
-                    if reasoning
-                    else "low"
-                ),
-                store=False,
-            ),
-            [],
-        )
+        # non-reasoning research agent bounds it at "low" rather than omitting
+        # it - but only on Gemini 3, which is the only generation that accepts
+        # thinking_level at all. A pre-3 id (e.g. a custom gemini-2.5-* advisor
+        # model) has no thinking_level and mirrors the `build_model` guard by
+        # omitting it, leaving reasoning to the provider's own budget.
+        kwargs: dict[str, Any] = {
+            "id": model_name,
+            "api_key": api_key,
+            "search": True,
+            "store": False,
+        }
+        if model_name.casefold().startswith("gemini-3"):
+            kwargs["thinking_level"] = (
+                _gemini_interactions_thinking_level_for(model_id, plan.provider)
+                if reasoning
+                else "low"
+            )
+        return (GeminiInteractions(**kwargs), [])
 
     model = build_model(
         model_id,

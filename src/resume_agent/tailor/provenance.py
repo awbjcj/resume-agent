@@ -76,10 +76,21 @@ def referenced_ids(content: ResumeContent) -> set[str]:
 
 
 def check_provenance(content: ResumeContent, facts: ProfileFacts) -> ProvenanceReport:
-    """Validate existence and the restricted use of inferred skill pointers."""
+    """Validate existence and the restricted use of inferred skill pointers.
+
+    `summary_provenance` defaults to an empty list so a resume stored before the
+    field existed still deserializes, but a *newly checked* round with prose in
+    `summary` and nothing in `summary_provenance` is an unsupported claim the
+    fact-check reviewer would otherwise never notice was missing evidence for.
+    This function only runs against freshly produced content (tailor/revise
+    rounds), never against stored content on load, so it can enforce the
+    stricter rule without breaking legacy deserialization.
+    """
     index = index_facts(facts)
     missing = sorted(fact_id for fact_id in referenced_ids(content) if fact_id not in index)
     invalid: set[str] = set()
+    if content.summary and not content.summary_provenance:
+        invalid.add("summary: nonempty summary has no summary_provenance ids")
     for fact_id, usage in _referenced_uses(content):
         fact = index.get(fact_id)
         if fact is None or not getattr(fact, "inferred", False):

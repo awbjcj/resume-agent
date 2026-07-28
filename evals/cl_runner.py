@@ -23,7 +23,7 @@ from resume_agent.models.cover_letter import CoverLetterContent
 from resume_agent.models.profile import ProfileFacts
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CLCaseResult:
     case_id: str
     letter: CoverLetterContent

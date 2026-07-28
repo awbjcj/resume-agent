@@ -49,6 +49,7 @@ def _persist_rounds(
     session: Session,
     job: Job,
     rounds: list[TailorRound],
+    config: ReviewConfig,
     *,
     model: str | None = None,
 ) -> list[ResumeVersion]:
@@ -60,6 +61,11 @@ def _persist_rounds(
     if job.id is None:
         raise ValueError("Cannot tailor a job that has not been persisted")
     attempt = _next_attempt(session, job.id)
+    # Recorded once per call, not per round: every round in a single tailor run
+    # shares the same ReviewConfig, and this is what read-side callers (job
+    # detail, resume render) use instead of the CURRENT review config so a
+    # settings change after the fact doesn't relabel a round's own gates.
+    gate_reviewers = sorted(r.name for r in config.reviewers if r.gate)
     versions: list[ResumeVersion] = []
     for r in rounds:
         version = ResumeVersion(
@@ -71,6 +77,7 @@ def _persist_rounds(
             review_score=r.verdict.aggregate_score,
             fact_check_passed=r.verdict.gate_passed,
             critique_json=[c.model_dump(mode="json") for c in r.verdict.critiques],
+            gate_reviewers_json=gate_reviewers,
         )
         versions.append(save_resume_version(session, version))
     advance(job, JobStatus.tailored.value, never_regress=True)
@@ -122,7 +129,7 @@ def tailor_job(
             *runners,
         )
     )
-    return _persist_rounds(session, job, rounds)
+    return _persist_rounds(session, job, rounds, config)
 
 
 def tailor_jobs(
@@ -200,7 +207,9 @@ def tailor_jobs(
                 logger.warning("tailor job=%s failed", job_id, exc_info=error)
                 failures[job_id] = StageFailure.from_exception(error)
                 continue
-            results[job_id] = _persist_rounds(session, job, res.value, model=model)
+            results[job_id] = _persist_rounds(
+                session, job, res.value, config, model=model
+            )
     if reporter:
         reporter.done()
     return TailorOutcome(versions=results, failures=failures, model=model)
