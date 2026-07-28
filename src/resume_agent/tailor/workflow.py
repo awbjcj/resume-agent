@@ -10,13 +10,13 @@ from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.profile.matrix import SkillMatchContext
-from resume_agent.tailor.panel import arun_panel, run_panel
 from resume_agent.tailor.match_plan import (
     amatch_plan,
     compose_match_plan_input,
     match_plan,
     normalize_match_plan,
 )
+from resume_agent.tailor.panel import arun_panel, run_panel
 from resume_agent.tailor.provenance import PROVENANCE_REVIEWER, provenance_critique
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.tailoring import (
@@ -27,7 +27,7 @@ from resume_agent.tailor.tailoring import (
     revise,
     tailor,
 )
-from resume_agent.tailor.verdict import PanelVerdict, aggregate
+from resume_agent.tailor.verdict import PanelVerdict, aggregate, failing_gate_names
 
 
 class TailorRound(ExtensibleModel):
@@ -55,7 +55,7 @@ def _has_regressed(rounds: list[TailorRound]) -> bool:
     )
 
 
-def _is_citation_slip(verdict: PanelVerdict) -> bool:
+def _is_citation_slip(verdict: PanelVerdict, config: ReviewConfig) -> bool:
     """True when this round failed ONLY because provenance ids were wrong.
 
     A citation slip is cheap to fix and should not cost one of the `max_rounds`
@@ -69,27 +69,36 @@ def _is_citation_slip(verdict: PanelVerdict) -> bool:
     at all, which hands a weak resume a free round. Requiring a real panel score
     (`aggregate_score is not None`) keeps the retry tied to a round that actually
     produced feedback for the reviser to act on.
+
+    Only *gate* failures count against the slip: `aggregate()` deliberately
+    ignores an advisory reviewer's `passed` flag and scores it against
+    `score_threshold` instead, so a failing advisory verdict is not grounds to
+    deny the free retry.
     """
     if verdict.gate_passed or verdict.aggregate_score is None:
         return False
-    failed = {
-        critique.reviewer for critique in verdict.critiques if not critique.passed
-    }
+    config_gates = {r.name for r in config.reviewers if r.gate}
+    failed = set(failing_gate_names(verdict.critiques, config_gates))
     return failed == {PROVENANCE_REVIEWER}
 
 
 def _best_base(rounds: list[TailorRound]) -> TailorRound:
     """The round the next revision should build on.
 
-    Same ordering `tracking.repository.select_surfaced` uses to pick the version
-    the user is shown: gate-clean first, then highest score, then latest. Always
-    revising from the *last* round let a regression become the base for the next
-    one, so a bad revision compounded instead of being discarded.
+    Same policy `tracking.repository.select_surfaced` uses to pick the version
+    the user is shown: best-scoring gate-clean round, falling back to the
+    latest round when none is clean. Always revising from the *last* round let
+    a regression become the base for the next one, so a bad revision compounded
+    instead of being discarded; picking the highest-scoring round even when it
+    was never gate-clean could revise from a round whose citations were never
+    fixed, discarding a later round that already repaired them.
     """
+    clean = [round_ for round_ in rounds if round_.verdict.gate_passed]
+    if not clean:
+        return max(rounds, key=lambda round_: round_.round_num)
     return max(
-        rounds,
+        clean,
         key=lambda round_: (
-            round_.verdict.gate_passed,
             round_.verdict.aggregate_score
             if round_.verdict.aggregate_score is not None
             else -1,
@@ -161,7 +170,7 @@ def run_tailor_review(
         pending = {}
         # A citation slip is not a quality pass, so it does not consume one -
         # up to the configured budget.
-        if _is_citation_slip(verdict) and free_retries > 0:
+        if _is_citation_slip(verdict, config) and free_retries > 0:
             free_retries -= 1
         else:
             quality_rounds += 1
@@ -247,7 +256,7 @@ async def arun_tailor_review(
             )
         )
         pending = {}
-        if _is_citation_slip(verdict) and free_retries > 0:
+        if _is_citation_slip(verdict, config) and free_retries > 0:
             free_retries -= 1
         else:
             quality_rounds += 1
