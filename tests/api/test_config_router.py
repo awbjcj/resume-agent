@@ -77,6 +77,30 @@ def test_review_structural_knobs_round_trip(client):
     assert saved["reviserTier"] == "cheap"
 
 
+def test_review_provenance_retry_budget_survives_unrelated_saves(client):
+    """A save that only touches other knobs must not silently reset this one."""
+    body = client.get("/api/config/review").json()
+    assert body["provenanceRetryBudget"] == 1  # ReviewConfig's own default
+
+    put = client.put(
+        "/api/config/review",
+        json={**body, "provenanceRetryBudget": 0},
+    )
+    assert put.status_code == 200
+    assert put.json()["provenanceRetryBudget"] == 0
+
+    # Saving an unrelated knob afterward must not resurrect the old default.
+    body = client.get("/api/config/review").json()
+    response = client.put(
+        "/api/config/review",
+        json={**body, "mergedAdvisory": True},
+    )
+    assert response.status_code == 200
+    saved = client.get("/api/config/review").json()
+    assert saved["provenanceRetryBudget"] == 0
+    assert saved["mergedAdvisory"] is True
+
+
 def test_profile_repo_filters_round_trip_and_limit_is_bounded(client):
     response = client.put(
         "/api/config/profile",
