@@ -106,25 +106,41 @@ class ResumeVersionOut(CamelModel):
     critique_json: list[dict] | None
     created_at: datetime
     failed_gates: list[str] = Field(default_factory=list)
+    # The round's OWN recorded gate roster (`ResumeVersion.gate_reviewers_json`).
+    # None means a row written before this field existed - unknown, not empty -
+    # and `apply_gate_names` treats that as the signal to fall back to a
+    # caller-supplied roster. Never serialized: it exists only to drive
+    # `failed_gates`, not as a UI-facing field.
+    gate_reviewers_json: list[str] | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def _default_failed_gates(self) -> ResumeVersionOut:
         """Which gates blocked this round, so the UI can name the real cause.
 
         `fact_check_passed` is the AND of provenance and fact-check, so it alone
-        rendered "Fact-check failed" on rounds where fact-check never ran. This
-        default assumes the shipped fixed gate roster (`fact-check`); the review
-        settings UI lets a user mark any reviewer as a gate, so a caller that
-        knows the actual configured gates for this round should overwrite
-        `failed_gates` via `apply_gate_names` after validation.
+        rendered "Fact-check failed" on rounds where fact-check never ran. Uses
+        this round's own recorded gate roster when present; falls back to the
+        shipped fixed roster (`fact-check`) only for rows persisted before
+        `gate_reviewers_json` existed, pending a caller-supplied override via
+        `apply_gate_names`.
         """
         self.failed_gates = failing_gate_names(
-            [ReviewCritique.model_validate(c) for c in self.critique_json or []]
+            [ReviewCritique.model_validate(c) for c in self.critique_json or []],
+            self.gate_reviewers_json,
         )
         return self
 
     def apply_gate_names(self, gate_names: Iterable[str]) -> None:
-        """Recompute `failed_gates` against the review config's actual gates."""
+        """Recompute `failed_gates` against a fallback gate roster.
+
+        A no-op when this version already recorded its own gates
+        (`gate_reviewers_json is not None`) - overriding it with the CURRENT
+        review config would relabel history whenever settings change after the
+        round ran. Only legacy rows without a recorded roster fall back to
+        `gate_names`.
+        """
+        if self.gate_reviewers_json is not None:
+            return
         self.failed_gates = failing_gate_names(
             [ReviewCritique.model_validate(c) for c in self.critique_json or []],
             gate_names,

@@ -70,6 +70,12 @@ class ResumeVersion(SQLModel, table=True):
     review_score: int | None = None
     fact_check_passed: bool = False
     critique_json: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
+    # The configured gate reviewer names active for THIS round (provenance is
+    # always a gate and is never included here). None means "unknown" - a row
+    # written before this column existed - and read-side callers fall back to
+    # the current review config for it; [] is a known, empty roster (no
+    # reviewer-configured gates ran this round, only the deterministic ones).
+    gate_reviewers_json: list[str] | None = Field(default=None, sa_column=Column(JSON))
     attempt: int = Field(default=0, index=True)
     tailor_model: str | None = None
     origin: str = Field(default="tailor", index=True)

@@ -183,3 +183,20 @@ def ensure_resume_version_attempt_columns(engine: Engine) -> None:
             conn.execute(text("UPDATE resume_versions SET attempt = 1 WHERE attempt = 0"))
         if "tailor_model" not in cols:
             conn.execute(text("ALTER TABLE resume_versions ADD COLUMN tailor_model VARCHAR"))
+
+
+def ensure_resume_version_gate_reviewers_column(engine: Engine) -> None:
+    """Idempotently add ``resume_versions.gate_reviewers_json``.
+
+    Left NULL on existing rows (rather than backfilled) - the gate roster
+    active when they were tailored is not recoverable from the row itself, and
+    NULL is the caller-facing signal to fall back to the current review config.
+    """
+    cols = _table_columns(engine, "resume_versions")
+    if not cols:
+        return
+    with engine.begin() as conn:
+        if "gate_reviewers_json" not in cols:
+            conn.execute(
+                text("ALTER TABLE resume_versions ADD COLUMN gate_reviewers_json JSON")
+            )
