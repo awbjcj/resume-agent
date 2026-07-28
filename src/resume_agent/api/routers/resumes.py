@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_session
+from resume_agent.api.deps import get_config_store, get_session
 from resume_agent.api.errors import ApiException
+from resume_agent.api.schemas.config import ReviewConfigDoc
 from resume_agent.api.schemas.jobs import (
     ApplicationOut,
     ResumeVersionOut,
@@ -44,14 +46,17 @@ def download_pdf(
 
 
 @router.post("/resume-versions/{version_id}/render", response_model=ResumeVersionOut)
-def render_endpoint(version_id: int, session: Session = Depends(get_session)):
+def render_endpoint(version_id: int, request: Request, session: Session = Depends(get_session)):
     path = render_resume_version(session, version_id)
     if path is None:
         raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
     version = get_resume_version(session, version_id)
     if version is None:
         raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
-    return ResumeVersionOut.model_validate(version)
+    version_out = ResumeVersionOut.model_validate(version)
+    review_doc = cast(ReviewConfigDoc, get_config_store(request).get("review"))
+    version_out.apply_gate_names({r.name for r in review_doc.reviewers if r.gate})
+    return version_out
 
 
 @router.post("/jobs/{job_id}/select-resume/{version_id}", response_model=ApplicationOut)

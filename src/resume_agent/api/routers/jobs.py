@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_interview_dir, get_session
+from resume_agent.api.deps import get_config_store, get_interview_dir, get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.bulk import BulkRequest, BulkResultOut
+from resume_agent.api.schemas.config import ReviewConfigDoc
 from resume_agent.api.schemas.jobs import (
     ApplicationOut,
     ApplicationUpsert,
@@ -16,8 +19,8 @@ from resume_agent.api.schemas.jobs import (
     JobsImportError,
     JobsImportReportOut,
 )
-from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.api.schemas.runs import AddJobTextRequest
+from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.services import board
 from resume_agent.services.discovery import ActiveJobQuotaError, add_job_from_text
 from resume_agent.tenancy.limits import DEFAULT_MAX_ACTIVE_JOBS, active_limit
@@ -59,20 +62,27 @@ def import_jobs_endpoint(
     )
 
 
-def _job_detail_response(session: Session, job_id: int) -> JobDetail:
+def _job_detail_response(session: Session, job_id: int, request: Request) -> JobDetail:
     row = board.get_job_detail(session, job_id)
     if row is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
-    return JobDetail.model_validate(row)
+    detail = JobDetail.model_validate(row)
+    review_doc = cast(ReviewConfigDoc, get_config_store(request).get("review"))
+    gate_names = {r.name for r in review_doc.reviewers if r.gate}
+    for version in detail.resume_versions:
+        version.apply_gate_names(gate_names)
+    return detail
 
 
 @router.get("/jobs/{job_id}", response_model=JobDetail)
-def get_job_detail(job_id: int, session: Session = Depends(get_session)):
-    return _job_detail_response(session, job_id)
+def get_job_detail(job_id: int, request: Request, session: Session = Depends(get_session)):
+    return _job_detail_response(session, job_id, request)
 
 
 @router.patch("/jobs/{job_id}", response_model=JobDetail)
-def patch_job(job_id: int, patch: JobPatch, session: Session = Depends(get_session)):
+def patch_job(
+    job_id: int, patch: JobPatch, request: Request, session: Session = Depends(get_session)
+):
     if patch.status is not None:
         valid = {s.value for s in JobStatus}
         if patch.status not in valid:
@@ -84,7 +94,7 @@ def patch_job(job_id: int, patch: JobPatch, session: Session = Depends(get_sessi
     if patch.archived is not None:
         if board.set_archived(session, job_id, patch.archived) is None:
             raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
-    return _job_detail_response(session, job_id)
+    return _job_detail_response(session, job_id, request)
 
 
 @router.delete("/jobs/{job_id}", status_code=204)
@@ -163,7 +173,9 @@ def upsert_application(
 
 
 @router.post("/jobs", response_model=JobDetail, status_code=201)
-def create_manual_job(body: AddJobTextRequest, session: Session = Depends(get_session)):
+def create_manual_job(
+    body: AddJobTextRequest, request: Request, session: Session = Depends(get_session)
+):
     try:
         job = add_job_from_text(
             session,
@@ -180,4 +192,4 @@ def create_manual_job(body: AddJobTextRequest, session: Session = Depends(get_se
             409, "CONFLICT", "Duplicate job (same URL or JD already present)"
         )
     assert job.id is not None
-    return _job_detail_response(session, job.id)
+    return _job_detail_response(session, job.id, request)
