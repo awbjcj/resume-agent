@@ -39,6 +39,7 @@ from resume_agent.discovery.connectors.bamboohr import detail_url as bamboohr_de
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import AtsTarget, workday_external_path
 from resume_agent.discovery.connectors.greenhouse import (
+    fetch_greenhouse_board_name,
     fetch_greenhouse_job,
     parse_greenhouse,
 )
@@ -278,13 +279,23 @@ def _greenhouse_job_id(url: str) -> str | None:
     return _segment_after(url, "jobs") or None
 
 
+def _greenhouse_company_name(token: str) -> str:
+    # The board slug (e.g. "hooli") is rarely the org's display name; resolve
+    # it from the board endpoint so add-from-URL matches the company/title
+    # dedupe key GreenhouseConnector produces from the same board.
+    try:
+        return fetch_greenhouse_board_name(token) or token
+    except (httpx.HTTPError, KeyError, TypeError, ValueError):
+        return token
+
+
 def _read_greenhouse(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
     def api() -> ExtractedJob | None:
         job_id = _greenhouse_job_id(url)
         if job_id is None or not target.token:
             return None
         item = fetch_greenhouse_job(target.token, job_id)
-        rows = parse_greenhouse({"jobs": [item]}, target.token)
+        rows = parse_greenhouse({"jobs": [item]}, _greenhouse_company_name(target.token))
         return _extracted_from_row(rows[0]) if rows else None
 
     return _prefer(_api(api), _from_json_ld(html), read_greenhouse_posting(html))
@@ -432,16 +443,20 @@ def _read_personio(target: AtsTarget, url: str, html: str) -> ExtractedJob | Non
     return _prefer(_api(api), _from_json_ld(html))
 
 
+def _recruitee_slug(url: str) -> str | None:
+    return _segment_after(url, "o") or _last_segment(url)
+
+
 def _read_recruitee(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
     def api() -> ExtractedJob | None:
         # Recruitee keeps the qualifications in a `requirements` field separate
         # from `description`; parse_recruitee concatenates both, so the public
         # offers feed carries a JD the page's JSON-LD `description` truncates.
-        slug = _segment_after(url, "o") or _last_segment(url)
+        slug = _recruitee_slug(url)
         payload = _get_json(offers_url(target.token), follow_redirects=True)
         rows = parse_recruitee(payload, target.token)
         match = next(
-            (row for row in rows if row.url and slug and slug in row.url), None
+            (row for row in rows if row.url and slug and _recruitee_slug(row.url) == slug), None
         )
         return _extracted_from_row(match) if match is not None else None
 

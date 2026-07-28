@@ -74,6 +74,38 @@ def test_greenhouse_reader_delegates_to_html_scraper():
     assert extracted.company == "Hooli"
 
 
+def test_greenhouse_reader_resolves_the_board_display_name(monkeypatch):
+    # The board slug ("hooli") differs from the org's display name
+    # ("Hooli, Inc"); the API path must resolve it the same way
+    # GreenhouseConnector does so add-from-URL dedupes against board pulls.
+    job = {"title": "Dev", "location": {"name": "SF"}, "content": "<p>Write code.</p>"}
+    board = {"name": "Hooli, Inc"}
+
+    def fake_get(url, **kw):
+        return _Resp(board if url.endswith("/v1/boards/hooli") else job)
+
+    monkeypatch.setattr(ats_readers.httpx, "get", fake_get)
+    target = AtsTarget("greenhouse", token="hooli")
+    extracted = ATS_READERS["greenhouse"](target, "https://boards.greenhouse.io/hooli/jobs/1", "<html></html>")
+    assert extracted is not None
+    assert extracted.company == "Hooli, Inc"
+
+
+def test_greenhouse_reader_falls_back_to_token_when_board_name_lookup_fails(monkeypatch):
+    job = {"title": "Dev", "location": {"name": "SF"}, "content": "<p>Write code.</p>"}
+
+    def fake_get(url, **kw):
+        if url.endswith("/v1/boards/hooli"):
+            raise httpx.ConnectError("down")
+        return _Resp(job)
+
+    monkeypatch.setattr(ats_readers.httpx, "get", fake_get)
+    target = AtsTarget("greenhouse", token="hooli")
+    extracted = ATS_READERS["greenhouse"](target, "https://boards.greenhouse.io/hooli/jobs/1", "<html></html>")
+    assert extracted is not None
+    assert extracted.company == "hooli"
+
+
 # -- ashby: JSON-LD fast path, then board-API fallback -----------------------
 
 
@@ -507,6 +539,34 @@ def test_recruitee_prefers_the_offers_api_which_keeps_requirements(monkeypatch):
     assert extracted is not None
     assert "Help customers." in extracted.jd_text
     assert "3 years of SQL." in extracted.jd_text
+
+
+def test_recruitee_matches_the_offer_slug_exactly_not_as_a_substring(monkeypatch):
+    # "/o/engineer" is a substring of "/o/senior-engineer", so a naive `in`
+    # check must not let the longer offer's slug shadow the requested one.
+    payload = {
+        "offers": [
+            {
+                "careers_url": "https://channable.recruitee.com/o/senior-engineer",
+                "title": "Senior Engineer",
+                "company_name": "Channable",
+                "description": "<p>Lead the team.</p>",
+            },
+            {
+                "careers_url": "https://channable.recruitee.com/o/engineer",
+                "title": "Engineer",
+                "company_name": "Channable",
+                "description": "<p>Write code.</p>",
+            },
+        ]
+    }
+    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
+    target = AtsTarget("recruitee", token="channable")
+    url = "https://channable.recruitee.com/o/engineer"
+    extracted = ATS_READERS["recruitee"](target, url, "<html></html>")
+    assert extracted is not None
+    assert extracted.title == "Engineer"
+    assert "Write code." in extracted.jd_text
 
 
 def test_recruitee_falls_back_to_json_ld_when_the_offers_feed_is_unreachable(monkeypatch):
