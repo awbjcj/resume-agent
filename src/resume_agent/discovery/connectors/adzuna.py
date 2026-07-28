@@ -149,11 +149,14 @@ def enrich_adzuna_job(job: RawJob, page: PageContent | None) -> RawJob:
     else:
         target = identify_host(page.final_url)
         if target and target.ats == "greenhouse":
+            # None when the page yielded no description; the generic
+            # _best_detail_text pass below still gets its chance at it.
             extracted = read_greenhouse_posting(page.html)
-            title = extracted.title or title
-            company = extracted.company or company
-            location = extracted.location or location
-            jd_text = extracted.jd_text
+            if extracted is not None:
+                title = extracted.title or title
+                company = extracted.company or company
+                location = extracted.location or location
+                jd_text = extracted.jd_text
     jd_text = (
         jd_text if jd_text and is_materially_richer(jd_text, job.jd_text) else None
     )

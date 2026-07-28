@@ -31,14 +31,24 @@ def fetch_static(url: str) -> PageContent:
     return PageContent(html=resp.text, final_url=str(resp.url), rendered=False)
 
 
+def upgrade_if_shell(page: PageContent, *, allow_browser: bool = True) -> PageContent:
+    """Re-fetch an already-fetched page in a browser when it is a JS shell.
+
+    Takes the ``PageContent`` the caller already holds rather than a URL, so a
+    caller that has fetched statically to route the URL does not pay a second
+    request against the same host just to apply the shell policy.
+    """
+    if not allow_browser or not _looks_like_js_shell(page.html):
+        return page
+    return PageContent(
+        html=fetch_rendered(page.final_url), final_url=page.final_url, rendered=True
+    )
+
+
 def fetch_page(url: str, *, allow_browser: bool = True) -> PageContent:
     """Fetch a posting page. HTTP-first; render in-browser for LinkedIn or JS shells."""
     host = urlsplit(url).netloc.lower()
     if allow_browser and is_linkedin(host):
         html = fetch_rendered(url, wait_selector=_LINKEDIN_DETAIL_SELECTOR)
         return PageContent(html=html, final_url=url, rendered=True)
-    page = fetch_static(url)
-    if allow_browser and _looks_like_js_shell(page.html):
-        rendered = fetch_rendered(url)
-        return PageContent(html=rendered, final_url=page.final_url, rendered=True)
-    return page
+    return upgrade_if_shell(fetch_static(url), allow_browser=allow_browser)

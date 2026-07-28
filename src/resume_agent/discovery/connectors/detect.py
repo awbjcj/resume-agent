@@ -136,6 +136,12 @@ _SINGLETON_HOSTS: list[tuple[str, str]] = [
 ]
 
 
+#: Bespoke portals that are recognized by host but serve their listings from
+#: JavaScript rather than static HTML or a public JSON API. Callers that
+#: otherwise skip the browser for a recognized ATS must still render these.
+SINGLETON_ATS = frozenset(ats for _, ats in _SINGLETON_HOSTS)
+
+
 def _singleton(url: str) -> AtsTarget | None:
     """Bespoke portals identified by host alone (no token)."""
     host = (urlsplit(url).hostname or "").lower()

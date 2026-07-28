@@ -274,6 +274,47 @@ host suffix), `tenant` +
 
 ---
 
+## Single-URL ATS readers (`url_ingest/ats_readers.py`)
+
+Add-from-URL routes a pasted posting through `identify_host` (pure, no network)
+to a deterministic reader — the browser is never used for a recognized ATS.
+
+- **The ATS's own JSON API is tried first; the page's JSON-LD is the fallback.**
+  A posting page shows more than its body: location, workplace type, employment
+  type, department, and compensation live in a sidebar or top bar that the API
+  exposes as dedicated fields. schema.org `JobPosting` markup carries only a
+  subset and many boards emit none of it, so preferring JSON-LD because it is
+  free silently dropped exactly the facts this module exists to capture. The
+  API result wins whenever it resolves; JSON-LD fills blank fields and takes
+  over entirely when the API cannot resolve the job. `_prefer(*candidates)`
+  owns that rule — first candidate with a `jd_text` wins, the rest fill its gaps.
+- **Sidebar facts ride in `jd_text` as `Label: value` lines** (the shape
+  `ashby.parse_ashby` already used), so the relevance gate, criteria
+  extraction, and tailoring read them as part of the description.
+  `_json_ld_meta_lines` renders the schema.org equivalents — `baseSalary`,
+  `employmentType`, `jobLocationType`, `occupationalCategory` — which the
+  4-field description-only mapping used to discard.
+- **A reader returns `None`, never an `ExtractedJob` with an empty `jd_text`.**
+  That is the contract `service.job_from_url` keys its LLM fallback on; an
+  empty-but-present result suppresses the fallback and fails the ingest even
+  though the JD is sitting in the static HTML. `_api()` converts every lookup
+  failure to `None`, and it catches `ValueError` as well as `httpx.HTTPError`
+  because a maintenance page or bot interstitial served with status `200`
+  raises out of `.json()`, not out of the transport.
+- **Two host kinds are still browser-eligible:** an unrecognized one, and a
+  `detect.SINGLETON_ATS` portal (Tesla, Google Careers), which is recognized by
+  host but builds its listings in JavaScript — static HTML holds nothing for
+  either a reader or the LLM. Both reuse the already-fetched page via
+  `fetch.upgrade_if_shell` rather than issuing a second request for it.
+- **Routing reads the post-redirect `final_url`**, so a tracking or shortened
+  link that lands on LinkedIn still reaches `read_linkedin_posting`.
+- Workday goes through `workday.fetch_job_detail` (not a bare `httpx.get`) so a
+  pasted URL inherits the same 429/5xx retry a board pull gets, and stores
+  `jobPostingInfo.companyName` rather than the tenant slug — a slug as the
+  company breaks `dedup_key` against the same requisition pulled from the board.
+
+---
+
 ## Companies connector dispatch (`companies.py`)
 
 `CompaniesConnector.fetch` delegates to the `harvest` seam: for each URL in

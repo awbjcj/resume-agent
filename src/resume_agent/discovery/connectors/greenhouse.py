@@ -22,6 +22,20 @@ def fetch_greenhouse_board(token: str) -> dict:
     return resp.json()
 
 
+def fetch_greenhouse_job(token: str, job_id: str) -> dict:
+    """GET one Greenhouse posting by id -- same item shape as a board's ``jobs`` entry.
+
+    Lets a pasted posting URL reuse the board API's content rather than scraping
+    the rendered page, whose markup differs between the legacy ``boards.`` and
+    modern ``job-boards.`` layouts.
+    """
+    resp = httpx.get(
+        f"{_BASE}/{token}/jobs/{job_id}", params={"content": "true"}, timeout=30
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def fetch_greenhouse_board_name(token: str) -> str | None:
     """Resolve the organization name from Greenhouse's public board endpoint."""
     response = httpx.get(f"{_BASE}/{token}", timeout=30)

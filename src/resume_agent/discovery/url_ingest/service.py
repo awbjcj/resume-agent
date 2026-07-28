@@ -1,7 +1,7 @@
 from urllib.parse import urlsplit
 
 from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.detect import identify_host
+from resume_agent.discovery.connectors.detect import SINGLETON_ATS, identify_host
 from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
 from resume_agent.discovery.url_ingest.ats_readers import ATS_READERS
@@ -9,6 +9,7 @@ from resume_agent.discovery.url_ingest.fetch import (
     fetch_page,
     fetch_static,
     is_linkedin,
+    upgrade_if_shell,
 )
 from resume_agent.discovery.url_ingest.llm import extract_fields, html_to_text
 from resume_agent.discovery.url_ingest.models import ExtractedJob
@@ -33,9 +34,15 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
     (plain httpx, never a browser) and handed to its deterministic reader in
     ``ats_readers.ATS_READERS`` -- these boards have their own reliable JSON
     APIs (or JSON-LD on the page itself), so there is no need to ever render
-    them. Only an unrecognized host falls back to the JS-shell-aware
-    ``fetch_page`` (browser render when needed) plus the LLM. Returns None
-    when no job-description text could be extracted.
+    them, and the LLM fallback reads the same static HTML.
+
+    Two kinds of host are exempt and may still be rendered: an unrecognized
+    one, and a ``SINGLETON_ATS`` portal (Tesla, Google Careers), which is
+    recognized by host but builds its listings in JavaScript -- static HTML
+    holds nothing for either a reader or the LLM to read. Both reuse the
+    already-fetched page rather than issuing a second request for it.
+
+    Returns None when no job-description text could be extracted.
     """
     host = urlsplit(url).netloc.lower()
     if is_linkedin(host):
@@ -43,20 +50,23 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
         extracted = read_linkedin_posting(page.html)
     else:
         static_page = fetch_static(url)
-        target = identify_host(static_page.final_url)
-        if target is None:
-            extracted = None
+        # Route on the post-redirect URL: a tracking or shortened link only
+        # reveals the real host after the fetch.
+        if is_linkedin(urlsplit(static_page.final_url).netloc.lower()):
+            page = fetch_page(static_page.final_url, allow_browser=allow_browser)
+            extracted = read_linkedin_posting(page.html)
         else:
-            reader = ATS_READERS.get(target.ats)
-            extracted = reader(target, static_page.final_url, static_page.html) if reader else None
-        if extracted is None:
+            target = identify_host(static_page.final_url)
+            extracted = None
             if target is not None:
-                # Known ATS (or its reader couldn't resolve this specific job) --
-                # still never touch the browser; fall back to the LLM on the
-                # already-fetched static HTML.
-                extracted = extract_fields(html_to_text(static_page.html), agent)
-            else:
-                page = fetch_page(url, allow_browser=allow_browser)
+                reader = ATS_READERS.get(target.ats)
+                if reader is not None:
+                    extracted = reader(target, static_page.final_url, static_page.html)
+            if extracted is None:
+                if target is not None and target.ats not in SINGLETON_ATS:
+                    page = static_page
+                else:
+                    page = upgrade_if_shell(static_page, allow_browser=allow_browser)
                 extracted = extract_fields(html_to_text(page.html), agent)
     jd_text = clean_job_description_text(extracted.jd_text or "")
     if not jd_text:

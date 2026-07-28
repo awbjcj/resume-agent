@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 
-from resume_agent.discovery.connectors.detect import AtsTarget
+import httpx
+
+from resume_agent.discovery.connectors.detect import AtsTarget, identify_host
 from resume_agent.discovery.url_ingest import ats_readers
 from resume_agent.discovery.url_ingest.ats_readers import ATS_READERS, _from_json_ld
 
@@ -75,17 +77,52 @@ def test_greenhouse_reader_delegates_to_html_scraper():
 # -- ashby: JSON-LD fast path, then board-API fallback -----------------------
 
 
-def test_ashby_uses_json_ld_when_present(monkeypatch):
-    monkeypatch.setattr(ats_readers, "fetch_ashby_board", _fail)
-    target = AtsTarget("ashby", token="acme")
-    html = (
-        '<script type="application/ld+json">{"@type":"JobPosting","title":"Eng",'
-        '"description":"<p>Build things.</p>","hiringOrganization":{"name":"Acme"}}</script>'
+_ASHBY_JSON_LD = (
+    '<script type="application/ld+json">{"@type":"JobPosting","title":"Eng",'
+    '"description":"<p>Build things.</p>","hiringOrganization":{"name":"Acme"}}</script>'
+)
+
+
+def test_ashby_falls_back_to_json_ld_when_the_board_api_is_unreachable(monkeypatch):
+    monkeypatch.setattr(
+        ats_readers, "fetch_ashby_board",
+        lambda token: (_ for _ in ()).throw(httpx.ConnectError("down")),
     )
-    extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc-123", html)
+    target = AtsTarget("ashby", token="acme")
+    extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc-123", _ASHBY_JSON_LD)
     assert extracted is not None
     assert extracted.title == "Eng"
     assert extracted.company == "Acme"
+    assert "Build things." in extracted.jd_text
+
+
+def test_ashby_prefers_the_board_api_over_json_ld_for_its_sidebar_facts(monkeypatch):
+    # The board API is the ONLY source carrying compensation, workplace type,
+    # employment type, and department -- the job page's sidebar. JSON-LD has a
+    # description and nothing else, so preferring it silently dropped them.
+    payload = {
+        "jobs": [
+            {
+                "id": "abc-123",
+                "title": "Senior ML Engineer",
+                "location": "New York",
+                "workplaceType": "Hybrid",
+                "employmentType": "FullTime",
+                "department": "Engineering",
+                "compensation": {"compensationTierSummary": "$200K - $250K"},
+                "descriptionPlain": "Build LLM systems.",
+            }
+        ]
+    }
+    monkeypatch.setattr(ats_readers, "fetch_ashby_board", lambda token: payload)
+    target = AtsTarget("ashby", token="acme")
+    extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc-123", _ASHBY_JSON_LD)
+    assert extracted is not None
+    assert extracted.title == "Senior ML Engineer"
+    assert "Compensation: $200K - $250K" in extracted.jd_text
+    assert "Workplace Type: Hybrid" in extracted.jd_text
+    assert "Employment Type: Full time" in extracted.jd_text
+    assert "Department: Engineering" in extracted.jd_text
 
 
 def test_ashby_falls_back_to_board_api_and_matches_by_id(monkeypatch):
@@ -156,22 +193,62 @@ def test_smartrecruiters_falls_back_to_detail_endpoint(monkeypatch):
 # -- workable: account listing filtered by shortcode -------------------------
 
 
+# The bare "apply.workable.com/j/{code}" form carries no account slug, so
+# detect._l1 deliberately refuses it (there is no token to call the widget API
+# with) and it never reaches this reader. Drive the account-qualified form,
+# which is what detect actually resolves to a workable target.
+_WORKABLE_URL = "https://apply.workable.com/acme/j/5656BF6FBE"
+
+
+def test_workable_url_form_under_test_is_one_detect_actually_resolves():
+    target = identify_host(_WORKABLE_URL)
+    assert target is not None
+    assert (target.ats, target.token) == ("workable", "acme")
+    # ...and the bare form is refused, so no reader runs for it.
+    assert identify_host("https://apply.workable.com/j/5656BF6FBE") is None
+
+
 def test_workable_falls_back_to_account_listing_by_shortcode(monkeypatch):
     payload = _fixture_json("workable", "account.json")
     monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
     target = AtsTarget("workable", token="acme")
-    url = "https://apply.workable.com/j/5656BF6FBE"
-    extracted = ATS_READERS["workable"](target, url, "<html></html>")
+    extracted = ATS_READERS["workable"](target, _WORKABLE_URL, "<html></html>")
     assert extracted is not None
     assert extracted.title == "Senior Software Engineer"
     assert "Python" in extracted.jd_text
+
+
+def test_workable_keeps_requirements_and_benefits_sections(monkeypatch):
+    # `details=true` returns these as fields siblings of `description`; mapping
+    # only `description` dropped the entire qualifications block.
+    payload = {
+        "name": "Acme",
+        "jobs": [
+            {
+                "title": "Engineer",
+                "shortcode": "5656BF6FBE",
+                "description": "<p>Build services.</p>",
+                "requirements": "<p>5 years of Python.</p>",
+                "benefits": "<p>Full health cover.</p>",
+                "employment_type": "Full-time",
+                "department": "Engineering",
+            }
+        ],
+    }
+    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
+    target = AtsTarget("workable", token="acme")
+    extracted = ATS_READERS["workable"](target, _WORKABLE_URL, "<html></html>")
+    assert extracted is not None
+    assert "5 years of Python." in extracted.jd_text
+    assert "Full health cover." in extracted.jd_text
+    assert "Employment Type: Full-time" in extracted.jd_text
 
 
 def test_workable_returns_none_when_shortcode_not_found(monkeypatch):
     payload = _fixture_json("workable", "account.json")
     monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
     target = AtsTarget("workable", token="acme")
-    url = "https://apply.workable.com/j/NOTREAL"
+    url = "https://apply.workable.com/acme/j/NOTREAL"
     assert ATS_READERS["workable"](target, url, "<html></html>") is None
 
 
@@ -268,3 +345,211 @@ def test_workday_returns_none_when_url_has_no_matching_site():
     target = AtsTarget("workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM")
     url = "https://generalmotors.wd5.myworkdayjobs.com/en-US/OtherSite/job/x"
     assert ATS_READERS["workday"](target, url, "<html></html>") is None
+
+
+_WORKDAY_TARGET = AtsTarget(
+    "workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM"
+)
+_WORKDAY_URL = (
+    "https://generalmotors.wd5.myworkdayjobs.com/en-US/Careers_GM"
+    "/job/Detroit-Michigan/Software-Engineer_R123"
+)
+
+
+def test_workday_prefers_the_payload_company_name_over_the_tenant_slug(monkeypatch):
+    # target.tenant is a URL slug ("generalmotors"); storing it as the company
+    # breaks dedup against the same requisition pulled by the board connector,
+    # whose dedup_key is normalize(company)|normalize_title(title).
+    detail = {
+        "jobPostingInfo": {
+            "title": "Software Engineer",
+            "companyName": "General Motors",
+            "jobDescription": "<p>Build vehicle software.</p>",
+        }
+    }
+    monkeypatch.setattr(ats_readers, "fetch_job_detail", lambda target, path: detail)
+    extracted = ATS_READERS["workday"](_WORKDAY_TARGET, _WORKDAY_URL, "<html></html>")
+    assert extracted is not None
+    assert extracted.company == "General Motors"
+
+
+def test_workday_carries_the_header_strip_into_jd_text(monkeypatch):
+    detail = {
+        "jobPostingInfo": {
+            "title": "Software Engineer",
+            "location": "Detroit, Michigan",
+            "timeType": "Full time",
+            "remoteType": "Hybrid",
+            "jobReqId": "JR-12345",
+            "postedOn": "Posted 3 Days Ago",
+            "jobDescription": "<p>Build vehicle software.</p>",
+        }
+    }
+    monkeypatch.setattr(ats_readers, "fetch_job_detail", lambda target, path: detail)
+    extracted = ATS_READERS["workday"](_WORKDAY_TARGET, _WORKDAY_URL, "<html></html>")
+    assert extracted is not None
+    assert "Location: Detroit, Michigan" in extracted.jd_text
+    assert "Employment Type: Full time" in extracted.jd_text
+    assert "Workplace Type: Hybrid" in extracted.jd_text
+    assert "Requisition ID: JR-12345" in extracted.jd_text
+    assert "Build vehicle software." in extracted.jd_text
+
+
+def test_workday_reader_uses_the_throttle_retrying_fetch(monkeypatch):
+    # Workday boards throttle hard; a bare httpx.get would drop a pasted URL on
+    # the first 429 while the same job pulled from the board would retry.
+    calls: list[str] = []
+
+    def _detail(target, external_path):
+        calls.append(external_path)
+        return {"jobPostingInfo": {"title": "X", "jobDescription": "<p>Body.</p>"}}
+
+    monkeypatch.setattr(ats_readers, "fetch_job_detail", _detail)
+    monkeypatch.setattr(ats_readers.httpx, "get", _fail)
+    assert ATS_READERS["workday"](_WORKDAY_TARGET, _WORKDAY_URL, "<html></html>") is not None
+    assert calls == ["/job/Detroit-Michigan/Software-Engineer_R123"]
+
+
+# -- the null contract every reader owes service.job_from_url ----------------
+
+
+def test_readers_return_none_rather_than_an_empty_job_when_the_api_fails(monkeypatch):
+    # service.job_from_url falls back to the LLM only on None. An ExtractedJob
+    # carrying company/title but no jd_text suppressed that fallback, so the
+    # add-from-URL failed even though the JD sat in the static HTML.
+    json_ld_without_description = (
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Eng",'
+        '"hiringOrganization":{"name":"Acme"}}</script>'
+    )
+    monkeypatch.setattr(
+        ats_readers, "fetch_ashby_board",
+        lambda token: (_ for _ in ()).throw(httpx.ConnectError("down")),
+    )
+    target = AtsTarget("ashby", token="acme")
+    result = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc", json_ld_without_description)
+    assert result is None
+
+
+def test_a_non_json_api_response_is_a_miss_not_an_exception(monkeypatch):
+    # A maintenance page or bot interstitial served with status 200 raises
+    # ValueError out of .json() -- not httpx.HTTPError -- which propagated out
+    # of job_from_url as a 500 on add-from-URL.
+    class _HtmlResp:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _HtmlResp())
+    target = AtsTarget("smartrecruiters", token="acme")
+    url = "https://jobs.smartrecruiters.com/acme/744000134902606-engineer"
+    assert ATS_READERS["smartrecruiters"](target, url, "<html></html>") is None
+
+
+# -- JSON-LD top-bar fields --------------------------------------------------
+
+
+def test_json_ld_renders_the_pay_band_and_employment_type():
+    # schema.org carries these as dedicated fields; mapping only `description`
+    # lost the salary and employment type for every JSON-LD-backed board.
+    html = (
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Eng",'
+        '"description":"<p>Build things.</p>","hiringOrganization":{"name":"Acme"},'
+        '"employmentType":"FULL_TIME","jobLocationType":"TELECOMMUTE",'
+        '"applicantLocationRequirements":{"@type":"Country","name":"USA"},'
+        '"occupationalCategory":"Engineering",'
+        '"baseSalary":{"@type":"MonetaryAmount","currency":"USD","value":'
+        '{"@type":"QuantitativeValue","minValue":200000,"maxValue":250000,"unitText":"YEAR"}}}'
+        "</script>"
+    )
+    extracted = _from_json_ld(html)
+    assert extracted is not None
+    assert "Employment Type: Full time" in extracted.jd_text
+    assert "Workplace Type: Remote (USA)" in extracted.jd_text
+    assert "Department: Engineering" in extracted.jd_text
+    assert "Compensation: USD 200,000 - 250,000 per year" in extracted.jd_text
+    assert "Build things." in extracted.jd_text
+
+
+def test_json_ld_without_extras_still_yields_a_bare_description():
+    html = (
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Eng",'
+        '"description":"<p>Build things.</p>"}</script>'
+    )
+    extracted = _from_json_ld(html)
+    assert extracted is not None
+    assert extracted.jd_text == "Build things."
+
+
+# -- recruitee: the offers feed carries the requirements block ---------------
+
+
+def test_recruitee_prefers_the_offers_api_which_keeps_requirements(monkeypatch):
+    # Recruitee splits qualifications into a `requirements` field; the page's
+    # JSON-LD `description` alone omits the whole section.
+    payload = {
+        "offers": [
+            {
+                "careers_url": "https://channable.recruitee.com/o/support-engineer",
+                "title": "Support Eng",
+                "company_name": "Channable",
+                "location": "Utrecht",
+                "description": "<p>Help customers.</p>",
+                "requirements": "<p>3 years of SQL.</p>",
+            }
+        ]
+    }
+    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
+    target = AtsTarget("recruitee", token="channable")
+    url = "https://channable.recruitee.com/o/support-engineer"
+    extracted = ATS_READERS["recruitee"](target, url, "<html></html>")
+    assert extracted is not None
+    assert "Help customers." in extracted.jd_text
+    assert "3 years of SQL." in extracted.jd_text
+
+
+def test_recruitee_falls_back_to_json_ld_when_the_offers_feed_is_unreachable(monkeypatch):
+    monkeypatch.setattr(
+        ats_readers.httpx, "get",
+        lambda url, **kw: (_ for _ in ()).throw(httpx.ConnectError("down")),
+    )
+    html = (
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Support Eng",'
+        '"description":"<p>Help customers.</p>","hiringOrganization":{"name":"Channable"}}</script>'
+    )
+    target = AtsTarget("recruitee", token="channable")
+    extracted = ATS_READERS["recruitee"](target, "https://channable.recruitee.com/o/x", html)
+    assert extracted is not None
+    assert extracted.title == "Support Eng"
+
+
+# -- smartrecruiters URL shapes ----------------------------------------------
+
+
+def test_smartrecruiters_posting_id_handles_every_public_url_shape():
+    parse = ats_readers._smartrecruiters_posting_id
+    assert parse("https://jobs.smartrecruiters.com/acme/744000134902606-engineer") == "744000134902606"
+    assert parse("https://careers.smartrecruiters.com/acme/744000134902606") == "744000134902606"
+    # A dashed UUID id must not be truncated at its first "-".
+    assert (
+        parse("https://jobs.smartrecruiters.com/oneclick-ui/company/acme/publication/8f1e-4b2c-9d3a")
+        == "8f1e-4b2c-9d3a"
+    )
+
+
+def test_smartrecruiters_oneclick_url_resolves_the_real_company(monkeypatch):
+    # detect.py reads the first path segment as the token, which is the literal
+    # "oneclick-ui" for this form; the company sits after /company/.
+    seen: list[str] = []
+
+    def _get(url, **kw):
+        seen.append(url)
+        return _Resp({"name": "Engineer", "jobAd": {"sections": {"jobDescription": {"text": "<p>Body.</p>"}}}})
+
+    monkeypatch.setattr(ats_readers.httpx, "get", _get)
+    target = AtsTarget("smartrecruiters", token="oneclick-ui")
+    url = "https://jobs.smartrecruiters.com/oneclick-ui/company/acme/publication/8f1e-4b2c"
+    extracted = ATS_READERS["smartrecruiters"](target, url, "<html></html>")
+    assert extracted is not None
+    assert "/companies/acme/postings/8f1e-4b2c" in seen[0]

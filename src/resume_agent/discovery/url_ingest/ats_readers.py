@@ -7,16 +7,30 @@ an ``ExtractedJob`` -- reusing the same parsing building blocks the board-level
 connectors already rely on, so a single job's provenance is exactly as
 reliable as a full-board pull.
 
-Every reader tries the page's own JSON-LD ``JobPosting`` markup first (cheap,
-no extra request) and falls back to the ATS's own JSON API, keyed by an id
-parsed straight out of the pasted URL, when JSON-LD is absent or the page
-didn't carry a job description. A reader returns ``None`` only when it could
-not identify or fetch the specific job at all -- the caller then falls back to
-the LLM on the same static HTML, still without ever touching a browser.
+**The ATS's own JSON API is tried first, the page's JSON-LD second.** A job
+page shows more than its description body: location, workplace type,
+employment type, department, and compensation live in a sidebar or top bar
+that the ATS API exposes as dedicated fields. schema.org ``JobPosting`` markup
+carries only a subset of those and many boards emit none of it, so preferring
+JSON-LD (cheaper -- no extra request) silently dropped the very facts this
+module exists to capture. The API result wins whenever it resolves; JSON-LD
+fills any field the API left blank and takes over entirely when the API cannot
+resolve the job.
+
+Whichever source wins, the sidebar/top-bar facts are rendered as ``Label:
+value`` lines prepended to ``jd_text`` -- the same shape ``ashby.parse_ashby``
+already uses -- so the relevance gate, criteria extraction, and tailoring all
+read them as part of the description.
+
+A reader returns ``None`` -- never an ``ExtractedJob`` with an empty
+``jd_text`` -- when it could not resolve the job at all. That is the contract
+``service.job_from_url`` keys its LLM fallback on: an empty-but-present result
+would silently suppress the fallback and fail the ingest.
 """
 
+import re
 from collections.abc import Callable
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
@@ -24,9 +38,14 @@ from resume_agent.discovery.connectors.ashby import fetch_ashby_board, parse_ash
 from resume_agent.discovery.connectors.bamboohr import detail_url as bamboohr_detail_url
 from resume_agent.discovery.connectors.base import RawJob
 from resume_agent.discovery.connectors.detect import AtsTarget, workday_external_path
+from resume_agent.discovery.connectors.greenhouse import (
+    fetch_greenhouse_job,
+    parse_greenhouse,
+)
 from resume_agent.discovery.connectors.lever import fetch_lever_posting, parse_lever
 from resume_agent.discovery.connectors.personio import parse_personio
 from resume_agent.discovery.connectors.personio import search_url as personio_search_url
+from resume_agent.discovery.connectors.recruitee import offers_url, parse_recruitee
 from resume_agent.discovery.connectors.smartrecruiters import (
     detail_url as sr_detail_url,
 )
@@ -35,11 +54,17 @@ from resume_agent.discovery.connectors.workable import (
     account_url as workable_account_url,
 )
 from resume_agent.discovery.connectors.workable import parse_workable
-from resume_agent.discovery.connectors.workday import cxs_detail_url
+from resume_agent.discovery.connectors.workday import fetch_job_detail
 from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
 from resume_agent.discovery.url_ingest.models import ExtractedJob
 
 Reader = Callable[[AtsTarget, str, str], ExtractedJob | None]
+
+# Errors that mean "this ATS could not tell us about this job". A non-JSON body
+# (a maintenance page, a bot interstitial, an HTML 404 served with status 200)
+# raises ValueError out of ``.json()``, not httpx.HTTPError -- catching only the
+# latter turned a routine bad response into a 500 on add-from-URL.
+_API_ERRORS = (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError)
 
 
 def _extracted_from_row(row: RawJob) -> ExtractedJob:
@@ -61,6 +86,63 @@ def _segment_after(url: str, marker: str) -> str | None:
         return None
     idx = segments.index(marker)
     return segments[idx + 1] if idx + 1 < len(segments) else None
+
+
+def _with_meta(lines: list[str], jd_text: str) -> str:
+    """Prepend the sidebar/top-bar facts to a description body."""
+    kept = [line for line in lines if line]
+    if not kept:
+        return jd_text
+    return "\n".join(kept) + ("\n\n" + jd_text if jd_text else "")
+
+
+def _api(call: Callable[[], ExtractedJob | None]) -> ExtractedJob | None:
+    """Run an ATS API lookup, treating any failure as 'could not resolve'."""
+    try:
+        return call()
+    except _API_ERRORS:
+        return None
+
+
+def _prefer(*candidates: ExtractedJob | None) -> ExtractedJob | None:
+    """First candidate carrying a description wins; the rest fill its blanks.
+
+    Ordered most-authoritative first. Only a description makes a candidate
+    usable -- a result with company/title but no ``jd_text`` cannot become a
+    job -- but its scalar fields are still worth harvesting into the winner.
+    """
+    usable = [candidate for candidate in candidates if candidate is not None]
+    winner = next((candidate for candidate in usable if candidate.jd_text), None)
+    if winner is None:
+        return None
+    gaps = {
+        field: value
+        for field in ("company", "title", "location")
+        if getattr(winner, field) is None
+        and (value := next((getattr(o, field) for o in usable if getattr(o, field)), None))
+    }
+    return winner.model_copy(update=gaps) if gaps else winner
+
+
+# -- schema.org JobPosting ---------------------------------------------------
+
+_JSON_LD_EMPLOYMENT_LABELS = {
+    "FULL_TIME": "Full time",
+    "PART_TIME": "Part time",
+    "CONTRACTOR": "Contract",
+    "TEMPORARY": "Temporary",
+    "INTERN": "Internship",
+    "VOLUNTEER": "Volunteer",
+    "PER_DIEM": "Per diem",
+    "OTHER": "Other",
+}
+_JSON_LD_PERIODS = {
+    "HOUR": "per hour",
+    "DAY": "per day",
+    "WEEK": "per week",
+    "MONTH": "per month",
+    "YEAR": "per year",
+}
 
 
 def _json_ld_location(posting: dict) -> str | None:
@@ -87,6 +169,84 @@ def _json_ld_location(posting: dict) -> str | None:
     return None
 
 
+def _names(value) -> list[str]:
+    """Flatten a schema.org field that may be a string, an object, or a list of either."""
+    items = value if isinstance(value, list) else [value]
+    names: list[str] = []
+    for item in items:
+        if isinstance(item, str) and item.strip():
+            names.append(item.strip())
+        elif isinstance(item, dict):
+            name = item.get("name")
+            if isinstance(name, str) and name.strip():
+                names.append(name.strip())
+    return names
+
+
+def _amount(value) -> str | None:
+    if isinstance(value, int | float):
+        return f"{value:,.0f}"
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _json_ld_salary(posting: dict) -> str | None:
+    """Render ``baseSalary`` (a MonetaryAmount) the way the page's pay band reads."""
+    salary = posting.get("baseSalary") or posting.get("estimatedSalary")
+    if isinstance(salary, list):
+        salary = next((item for item in salary if isinstance(item, dict)), None)
+    if not isinstance(salary, dict):
+        return None
+    value = salary.get("value")
+    if not isinstance(value, dict):
+        return _amount(value)
+    low = _amount(value.get("minValue"))
+    high = _amount(value.get("maxValue"))
+    exact = _amount(value.get("value"))
+    span = f"{low} - {high}" if low and high else (low or high or exact)
+    if not span:
+        return None
+    currency = salary.get("currency") or value.get("currency")
+    period = _JSON_LD_PERIODS.get(str(value.get("unitText") or "").upper())
+    return " ".join(part for part in (currency, span, period) if part)
+
+
+def _json_ld_meta_lines(posting: dict) -> list[str]:
+    """The sidebar/top-bar facts schema.org markup carries beyond the body text.
+
+    ``description`` alone loses the pay band, employment type, and remote
+    status that a posting renders in its header -- fields the fit scorer and
+    tailoring rely on. Labels match ``ashby._sidebar_lines`` so a job read
+    through either path produces the same text shape.
+    """
+    lines = []
+    if location := _json_ld_location(posting):
+        lines.append(f"Location: {location}")
+
+    remote = posting.get("jobLocationType") == "TELECOMMUTE"
+    regions = _names(posting.get("applicantLocationRequirements"))
+    if remote and regions:
+        lines.append(f"Workplace Type: Remote ({', '.join(regions)})")
+    elif remote:
+        lines.append("Workplace Type: Remote")
+
+    types = [
+        _JSON_LD_EMPLOYMENT_LABELS.get(str(item).upper().replace("-", "_"), str(item))
+        for item in _names(posting.get("employmentType"))
+    ]
+    if types:
+        lines.append(f"Employment Type: {', '.join(types)}")
+
+    if departments := _names(posting.get("occupationalCategory")):
+        lines.append(f"Department: {', '.join(departments)}")
+
+    if salary := _json_ld_salary(posting):
+        lines.append(f"Compensation: {salary}")
+
+    return lines
+
+
 def _from_json_ld(html: str) -> ExtractedJob | None:
     """The page's own schema.org ``JobPosting`` markup, when present."""
     posting = jobposting_json_ld(html)
@@ -94,46 +254,84 @@ def _from_json_ld(html: str) -> ExtractedJob | None:
         return None
     organization = posting.get("hiringOrganization")
     company = organization.get("name") if isinstance(organization, dict) else None
+    body = html_to_markdown(posting.get("description") or "")
     return ExtractedJob(
         company=company,
         title=posting.get("title"),
         location=_json_ld_location(posting),
-        jd_text=html_to_markdown(posting.get("description") or ""),
+        jd_text=_with_meta(_json_ld_meta_lines(posting), body),
     )
 
 
+# -- per-ATS API lookups -----------------------------------------------------
+
+
+def _get_json(url: str, **kwargs) -> dict:
+    resp = httpx.get(url, timeout=30, **kwargs)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _greenhouse_job_id(url: str) -> str | None:
+    if gh_jid := parse_qs(urlsplit(url).query).get("gh_jid"):
+        return gh_jid[0]
+    return _segment_after(url, "jobs") or None
+
+
+def _read_greenhouse(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
+    def api() -> ExtractedJob | None:
+        job_id = _greenhouse_job_id(url)
+        if job_id is None or not target.token:
+            return None
+        item = fetch_greenhouse_job(target.token, job_id)
+        rows = parse_greenhouse({"jobs": [item]}, target.token)
+        return _extracted_from_row(rows[0]) if rows else None
+
+    return _prefer(_api(api), _from_json_ld(html), read_greenhouse_posting(html))
+
+
 def _read_ashby(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
-    extracted = _from_json_ld(html)
-    if extracted is not None and extracted.jd_text:
-        return extracted
-    job_id = _last_segment(url)
-    try:
+    def api() -> ExtractedJob | None:
+        job_id = _last_segment(url)
         payload = fetch_ashby_board(target.token)
-    except httpx.HTTPError:
-        return extracted
-    item = next((job for job in payload.get("jobs", []) if job.get("id") == job_id), None)
-    if item is None:
-        return extracted
-    return _extracted_from_row(parse_ashby({"jobs": [item]}, target.token)[0])
+        item = next((job for job in payload.get("jobs", []) if job.get("id") == job_id), None)
+        if item is None:
+            return None
+        return _extracted_from_row(parse_ashby({"jobs": [item]}, target.token)[0])
+
+    return _prefer(_api(api), _from_json_ld(html))
 
 
 def _read_lever(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
-    extracted = _from_json_ld(html)
-    if extracted is not None and extracted.jd_text:
-        return extracted
-    posting_id = _last_segment(url)
-    try:
-        payload = fetch_lever_posting(target.token, posting_id)
-    except httpx.HTTPError:
-        return extracted
-    return _extracted_from_row(parse_lever([payload], target.token)[0])
+    def api() -> ExtractedJob | None:
+        payload = fetch_lever_posting(target.token, _last_segment(url))
+        rows = parse_lever([payload], target.token)
+        return _extracted_from_row(rows[0]) if rows else None
+
+    return _prefer(_api(api), _from_json_ld(html))
+
+
+def _smartrecruiters_company(target: AtsTarget, url: str) -> str:
+    # The oneclick-ui URL form nests the company deeper than the first path
+    # segment detect.py reads, so the token would otherwise be "oneclick-ui".
+    return _segment_after(url, "company") or target.token
 
 
 def _smartrecruiters_posting_id(url: str) -> str | None:
+    """The posting id from any of SmartRecruiters' three public URL shapes.
+
+    ``/{company}/{id}-{slug}`` and ``/{company}/{id}`` put a numeric id first;
+    ``/oneclick-ui/company/{co}/publication/{uuid}`` uses a dashed UUID that a
+    naive split on "-" would truncate.
+    """
+    if publication := _segment_after(url, "publication"):
+        return publication
     segments = _path_segments(url)
     if len(segments) < 2:
         return None
-    return segments[1].split("-", 1)[0]
+    candidate = segments[-1]
+    leading_digits = re.match(r"^(\d+)", candidate)
+    return leading_digits.group(1) if leading_digits else candidate or None
 
 
 def _smartrecruiters_location(location: dict | None) -> str | None:
@@ -143,79 +341,111 @@ def _smartrecruiters_location(location: dict | None) -> str | None:
     return ", ".join(part for part in parts if part) or None
 
 
+def _smartrecruiters_meta(detail: dict) -> list[str]:
+    """The facts SmartRecruiters renders above the description body."""
+    lines = []
+    if location := _smartrecruiters_location(detail.get("location")):
+        remote = (detail.get("location") or {}).get("remote")
+        lines.append(f"Location: {location}{' (Remote)' if remote else ''}")
+    for label, key in (("Employment Type", "typeOfEmployment"), ("Experience Level", "experienceLevel")):
+        if name := (detail.get(key) or {}).get("label"):
+            lines.append(f"{label}: {name}")
+    if department := (detail.get("department") or {}).get("label"):
+        lines.append(f"Department: {department}")
+    if industry := (detail.get("industry") or {}).get("label"):
+        lines.append(f"Industry: {industry}")
+    return lines
+
+
 def _read_smartrecruiters(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
-    extracted = _from_json_ld(html)
-    if extracted is not None and extracted.jd_text:
-        return extracted
-    posting_id = _smartrecruiters_posting_id(url)
-    if posting_id is None:
-        return extracted
-    try:
-        resp = httpx.get(sr_detail_url(target.token, posting_id), timeout=30)
-        resp.raise_for_status()
-        detail = resp.json()
-    except httpx.HTTPError:
-        return extracted
-    sections = ((detail.get("jobAd") or {}).get("sections")) or {}
-    names = ("companyDescription", "jobDescription", "qualifications", "additionalInformation")
-    jd_text = html_to_markdown(
-        "\n".join((sections.get(name) or {}).get("text") or "" for name in names)
-    )
-    company = (detail.get("company") or {}).get("name") or target.token
-    return ExtractedJob(
-        company=company,
-        title=detail.get("name"),
-        location=_smartrecruiters_location(detail.get("location")),
-        jd_text=jd_text,
-    )
+    def api() -> ExtractedJob | None:
+        posting_id = _smartrecruiters_posting_id(url)
+        if posting_id is None:
+            return None
+        company = _smartrecruiters_company(target, url)
+        detail = _get_json(sr_detail_url(company, posting_id))
+        sections = ((detail.get("jobAd") or {}).get("sections")) or {}
+        names = ("companyDescription", "jobDescription", "qualifications", "additionalInformation")
+        body = html_to_markdown(
+            "\n".join((sections.get(name) or {}).get("text") or "" for name in names)
+        )
+        return ExtractedJob(
+            company=(detail.get("company") or {}).get("name") or company,
+            title=detail.get("name"),
+            location=_smartrecruiters_location(detail.get("location")),
+            jd_text=_with_meta(_smartrecruiters_meta(detail), body),
+        )
+
+    return _prefer(_api(api), _from_json_ld(html))
+
+
+def _workable_shortcode(url: str) -> str | None:
+    # Both "apply.workable.com/{company}/j/{code}" and the bare
+    # "apply.workable.com/j/{code}" share the /j/ marker.
+    return _segment_after(url, "j") or None
 
 
 def _read_workable(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
-    extracted = _from_json_ld(html)
-    if extracted is not None and extracted.jd_text:
-        return extracted
-    shortcode = _segment_after(url, "j")
-    if shortcode is None:
-        return extracted
-    try:
-        resp = httpx.get(
+    def api() -> ExtractedJob | None:
+        shortcode = _workable_shortcode(url)
+        if shortcode is None or not target.token:
+            return None
+        payload = _get_json(
             workable_account_url(target.token),
             params={"details": "true"},
-            timeout=30,
             follow_redirects=True,
         )
-        resp.raise_for_status()
-        payload = resp.json()
-    except httpx.HTTPError:
-        return extracted
-    item = next(
-        (job for job in payload.get("jobs") or [] if job.get("shortcode") == shortcode), None
-    )
-    if item is None:
-        return extracted
-    row = parse_workable({"name": payload.get("name"), "jobs": [item]}, target.token)[0]
-    return _extracted_from_row(row)
+        item = next(
+            (job for job in payload.get("jobs") or [] if job.get("shortcode") == shortcode), None
+        )
+        if item is None:
+            return None
+        row = parse_workable({"name": payload.get("name"), "jobs": [item]}, target.token)[0]
+        extracted = _extracted_from_row(row)
+        meta = []
+        if row.location:
+            meta.append(f"Location: {row.location}")
+        if employment := item.get("employment_type"):
+            meta.append(f"Employment Type: {employment}")
+        if department := item.get("department"):
+            meta.append(f"Department: {department}")
+        return extracted.model_copy(update={"jd_text": _with_meta(meta, extracted.jd_text)})
+
+    return _prefer(_api(api), _from_json_ld(html))
 
 
 def _read_personio(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
-    extracted = _from_json_ld(html)
-    if extracted is not None and extracted.jd_text:
-        return extracted
-    position_id = _segment_after(url, "job")
-    if position_id is None:
-        return extracted
-    try:
+    def api() -> ExtractedJob | None:
+        position_id = _segment_after(url, "job")
+        if position_id is None:
+            return None
         resp = httpx.get(
             personio_search_url(target.token, target.country), timeout=30, follow_redirects=True
         )
         resp.raise_for_status()
         rows = parse_personio(resp.text, target.token, target.country)
-    except (httpx.HTTPError, ValueError):
-        return extracted
-    match = next(
-        (row for row in rows if row.url and _last_segment(row.url) == position_id), None
-    )
-    return _extracted_from_row(match) if match is not None else extracted
+        match = next(
+            (row for row in rows if row.url and _last_segment(row.url) == position_id), None
+        )
+        return _extracted_from_row(match) if match is not None else None
+
+    return _prefer(_api(api), _from_json_ld(html))
+
+
+def _read_recruitee(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
+    def api() -> ExtractedJob | None:
+        # Recruitee keeps the qualifications in a `requirements` field separate
+        # from `description`; parse_recruitee concatenates both, so the public
+        # offers feed carries a JD the page's JSON-LD `description` truncates.
+        slug = _segment_after(url, "o") or _last_segment(url)
+        payload = _get_json(offers_url(target.token), follow_redirects=True)
+        rows = parse_recruitee(payload, target.token)
+        match = next(
+            (row for row in rows if row.url and slug and slug in row.url), None
+        )
+        return _extracted_from_row(match) if match is not None else None
+
+    return _prefer(_api(api), _from_json_ld(html))
 
 
 def _bamboohr_location(opening: dict) -> str | None:
@@ -230,53 +460,89 @@ def _bamboohr_location(opening: dict) -> str | None:
 
 
 def _read_bamboohr(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
-    extracted = _from_json_ld(html)
-    if extracted is not None and extracted.jd_text:
-        return extracted
-    opening_id = _segment_after(url, "careers")
-    if opening_id is None:
-        return extracted
-    try:
-        resp = httpx.get(bamboohr_detail_url(target.token, opening_id), timeout=30)
-        resp.raise_for_status()
-        opening = ((resp.json().get("result") or {}).get("jobOpening")) or {}
-    except httpx.HTTPError:
-        return extracted
-    if not opening:
-        return extracted
-    return ExtractedJob(
-        company=target.token,
-        title=opening.get("jobOpeningName"),
-        location=_bamboohr_location(opening),
-        jd_text=html_to_markdown(opening.get("description") or ""),
-    )
+    def api() -> ExtractedJob | None:
+        opening_id = _segment_after(url, "careers")
+        if opening_id is None:
+            return None
+        detail = _get_json(bamboohr_detail_url(target.token, opening_id))
+        opening = ((detail.get("result") or {}).get("jobOpening")) or {}
+        if not opening:
+            return None
+        location = _bamboohr_location(opening)
+        meta = []
+        if location:
+            meta.append(f"Location: {location}")
+        for label, key in (("Employment Type", "employmentStatusLabel"), ("Department", "departmentLabel")):
+            if value := opening.get(key):
+                meta.append(f"{label}: {value}")
+        if pay := opening.get("compensation"):
+            meta.append(f"Compensation: {pay}")
+        return ExtractedJob(
+            company=target.token,
+            title=opening.get("jobOpeningName"),
+            location=location,
+            jd_text=_with_meta(meta, html_to_markdown(opening.get("description") or "")),
+        )
+
+    return _prefer(_api(api), _from_json_ld(html))
+
+
+def _workday_meta(info: dict) -> list[str]:
+    """Workday's header strip: locations, time type, req id, posted date."""
+    lines = []
+    location = info.get("location") or info.get("jobRequisitionLocation")
+    if isinstance(location, dict):
+        location = location.get("descriptor")
+    if location:
+        lines.append(f"Location: {location}")
+    if additional := info.get("additionalLocations"):
+        names = [
+            item.get("descriptor") if isinstance(item, dict) else item for item in additional
+        ]
+        if joined := ", ".join(str(name) for name in names if name):
+            lines.append(f"Additional Locations: {joined}")
+    if remote := info.get("remoteType"):
+        lines.append(f"Workplace Type: {remote}")
+    if time_type := info.get("timeType"):
+        lines.append(f"Employment Type: {time_type}")
+    if job_family := info.get("jobFamily"):
+        lines.append(f"Department: {job_family}")
+    if req_id := info.get("jobReqId"):
+        lines.append(f"Requisition ID: {req_id}")
+    if posted := info.get("postedOn"):
+        lines.append(f"Posted: {posted}")
+    return lines
 
 
 def _read_workday(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
-    extracted = _from_json_ld(html)
-    if extracted is not None and extracted.jd_text:
-        return extracted
-    external_path = workday_external_path(target, url)
-    if external_path is None:
-        return extracted
-    try:
-        resp = httpx.get(cxs_detail_url(target, external_path), timeout=30)
-        resp.raise_for_status()
-        info = resp.json().get("jobPostingInfo") or {}
-    except httpx.HTTPError:
-        return extracted
-    if not info:
-        return extracted
-    return ExtractedJob(
-        company=target.tenant,
-        title=info.get("title"),
-        location=info.get("location"),
-        jd_text=html_to_markdown(info.get("jobDescription") or ""),
-    )
+    def api() -> ExtractedJob | None:
+        external_path = workday_external_path(target, url)
+        if external_path is None:
+            return None
+        info = fetch_job_detail(target, external_path).get("jobPostingInfo") or {}
+        if not info:
+            return None
+        company = info.get("companyName")
+        location = info.get("location")
+        return ExtractedJob(
+            # Prefer the payload's own company name; target.tenant is a URL slug
+            # ("generalmotors"), and a slug as the company breaks dedup against
+            # the same requisition ingested by the board connector.
+            company=(company.strip() if isinstance(company, str) and company.strip() else None)
+            or target.tenant,
+            title=info.get("title"),
+            location=location if isinstance(location, str) else None,
+            jd_text=_with_meta(
+                _workday_meta(info), html_to_markdown(info.get("jobDescription") or "")
+            ),
+        )
+
+    return _prefer(_api(api), _from_json_ld(html))
 
 
-def _read_greenhouse(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
-    return read_greenhouse_posting(html)
+def _json_ld_only(target: AtsTarget, url: str, html: str) -> ExtractedJob | None:
+    """Boards with no usable public single-job API: the page's own markup only."""
+    return _prefer(_from_json_ld(html))
 
 
 ATS_READERS: dict[str, Reader] = {
@@ -287,8 +553,8 @@ ATS_READERS: dict[str, Reader] = {
     "workable": _read_workable,
     "personio": _read_personio,
     "bamboohr": _read_bamboohr,
-    "recruitee": lambda target, url, html: _from_json_ld(html),
-    "breezy": lambda target, url, html: _from_json_ld(html),
-    "jazzhr": lambda target, url, html: _from_json_ld(html),
+    "recruitee": _read_recruitee,
+    "breezy": _json_ld_only,
+    "jazzhr": _json_ld_only,
     "workday": _read_workday,
 }

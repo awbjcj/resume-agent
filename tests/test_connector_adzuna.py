@@ -242,6 +242,22 @@ def test_enrich_adzuna_job_keeps_snippet_when_page_missing():
     assert enrich_adzuna_job(raw, None) is raw
 
 
+def test_enrich_adzuna_job_survives_an_unreadable_greenhouse_page():
+    # read_greenhouse_posting returns None when the page carries no description;
+    # the generic detail-text pass must still get its turn rather than the
+    # caller dereferencing a None.
+    words = " ".join(f"word{i}" for i in range(80))
+    page = PageContent(
+        html=f"<html><body><article>{words}</article></body></html>",
+        final_url="https://boards.greenhouse.io/acme/jobs/1",
+        rendered=True,
+    )
+
+    enriched = enrich_adzuna_job(_raw(), page)
+
+    assert "word0" in enriched.jd_text
+
+
 def test_enrich_jobs_batch_renders_once_and_enriches(monkeypatch):
     words = " ".join(f"word{i}" for i in range(80))
     page = PageContent(
