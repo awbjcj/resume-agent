@@ -901,24 +901,21 @@ def build_search_equipped(
 
         # Same "unset means provider decides" rule `build_model` guards: leaving
         # thinking_level unset buys an unbounded automatic budget, so a
-        # non-reasoning research agent bounds it at "low" rather than omitting
-        # it - but only on Gemini 3, which is the only generation that accepts
-        # thinking_level at all. A pre-3 id (e.g. a custom gemini-2.5-* advisor
-        # model) has no thinking_level and mirrors the `build_model` guard by
-        # omitting it, leaving reasoning to the provider's own budget.
-        kwargs: dict[str, Any] = {
-            "id": model_name,
-            "api_key": api_key,
-            "search": True,
-            "store": False,
-        }
-        if model_name.casefold().startswith("gemini-3"):
-            kwargs["thinking_level"] = (
-                _gemini_interactions_thinking_level_for(model_id, plan.provider)
-                if reasoning
-                else "low"
-            )
-        return (GeminiInteractions(**kwargs), [])
+        # non-reasoning research agent bounds it at "low" rather than omitting it.
+        return (
+            GeminiInteractions(
+                id=model_name,
+                api_key=api_key,
+                search=True,
+                thinking_level=(
+                    _gemini_interactions_thinking_level_for(model_id, plan.provider)
+                    if reasoning
+                    else "low"
+                ),
+                store=False,
+            ),
+            [],
+        )
 
     model = build_model(
         model_id,
