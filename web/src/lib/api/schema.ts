@@ -4170,14 +4170,8 @@ export interface components {
             }[] | null;
             /** Factcheckpassed */
             factCheckPassed: boolean;
-            /**
-             * Failedgates
-             * @description Which gates blocked this round, so the UI can name the real cause.
-             *
-             *     `fact_check_passed` is the AND of provenance and fact-check, so it alone
-             *     rendered "Fact-check failed" on rounds where fact-check never ran.
-             */
-            readonly failedGates: string[];
+            /** Failedgates */
+            failedGates?: string[];
             /** Id */
             id: number;
             /** Instruction */
