@@ -5,6 +5,7 @@ from resume_agent.tracking.migrate import (
     ensure_application_cover_letter_id_column,
     ensure_cover_letter_revision_columns,
     ensure_resume_version_attempt_columns,
+    ensure_resume_version_gate_reviewers_column,
     ensure_resume_version_revision_columns,
 )
 
@@ -85,3 +86,51 @@ def test_init_db_creates_attempt_columns():
         resume_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
 
     assert {"attempt", "tailor_model"}.issubset(resume_cols)
+
+
+def test_gate_reviewers_migration_leaves_existing_rows_null():
+    engine = make_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE resume_versions ("
+                "id INTEGER PRIMARY KEY, job_id INTEGER, round INTEGER)"
+            )
+        )
+        conn.execute(text("INSERT INTO resume_versions (id, job_id, round) VALUES (1, 1, 1)"))
+
+    ensure_resume_version_gate_reviewers_column(engine)
+
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
+        gate_reviewers = conn.execute(
+            text("SELECT gate_reviewers_json FROM resume_versions")
+        ).scalar()
+
+    assert "gate_reviewers_json" in cols
+    # NULL, not backfilled -- the gate roster active for a pre-migration row is
+    # not recoverable, and NULL is the read-side signal to fall back to the
+    # current review config instead of misreporting an empty roster.
+    assert gate_reviewers is None
+
+
+def test_gate_reviewers_migration_is_idempotent():
+    engine = make_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE resume_versions ("
+                "id INTEGER PRIMARY KEY, job_id INTEGER, round INTEGER)"
+            )
+        )
+    ensure_resume_version_gate_reviewers_column(engine)
+    ensure_resume_version_gate_reviewers_column(engine)  # must not raise
+
+
+def test_init_db_creates_gate_reviewers_column():
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    with engine.begin() as conn:
+        resume_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
+
+    assert "gate_reviewers_json" in resume_cols

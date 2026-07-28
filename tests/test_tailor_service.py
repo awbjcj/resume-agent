@@ -89,6 +89,9 @@ def test_tailor_job_persists_versions_and_marks_tailored():
         assert versions[0].round == 1
         assert versions[0].content_json is not None
         assert versions[0].content_json["contact"]["name"] == "Ada"
+        # Recorded from THIS round's config, not read back from current
+        # settings later - see test_apply_gate_names_does_not_relabel_*.
+        assert versions[0].gate_reviewers_json == ["fact-check"]
 
         stored = resume_versions_for_job(s, _require_id(job.id))
         assert len(stored) == 1

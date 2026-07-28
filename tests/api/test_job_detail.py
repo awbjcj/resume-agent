@@ -143,3 +143,65 @@ def test_failed_gates_names_the_gate_that_actually_blocked():
     assert _version(
         [{"reviewer": "provenance", "score": 100, "passed": True}, ok_fact, advisory], True
     ).failed_gates == []
+
+
+def test_apply_gate_names_does_not_relabel_a_version_with_its_own_recorded_gates():
+    """A version's own recorded roster wins over the CURRENT review config.
+
+    Without this, promoting `ats-keyword` to a gate after the fact would make
+    every already-stored version that failed it retroactively report
+    "ats-keyword" as a failed gate, even though it was advisory when that
+    round actually ran.
+    """
+    from resume_agent.api.schemas.jobs import ResumeVersionOut
+
+    version = ResumeVersionOut.model_validate(
+        {
+            "id": 1,
+            "job_id": 1,
+            "round": 1,
+            "review_score": None,
+            "fact_check_passed": True,
+            "pdf_path": None,
+            "critique_json": [
+                {"reviewer": "fact-check", "score": 100, "passed": True},
+                {"reviewer": "ats-keyword", "score": 30, "passed": False},
+            ],
+            "created_at": "2026-07-27T00:00:00",
+            # This round's OWN roster: only fact-check was a gate. ats-keyword
+            # failing does not block it.
+            "gate_reviewers_json": ["fact-check"],
+        }
+    )
+    assert version.failed_gates == []
+
+    # The review settings UI later promotes ats-keyword to a gate.
+    version.apply_gate_names({"fact-check", "ats-keyword"})
+
+    # The version's own history is unchanged by the later settings change.
+    assert version.failed_gates == []
+
+
+def test_apply_gate_names_still_overrides_legacy_rows_without_a_recorded_roster():
+    from resume_agent.api.schemas.jobs import ResumeVersionOut
+
+    version = ResumeVersionOut.model_validate(
+        {
+            "id": 1,
+            "job_id": 1,
+            "round": 1,
+            "review_score": None,
+            "fact_check_passed": True,
+            "pdf_path": None,
+            "critique_json": [
+                {"reviewer": "ats-keyword", "score": 30, "passed": False},
+            ],
+            "created_at": "2026-07-27T00:00:00",
+            # No gate_reviewers_json key -> pre-migration row, unknown roster.
+        }
+    )
+    assert version.gate_reviewers_json is None
+    assert version.failed_gates == []  # default roster: only fact-check/provenance
+
+    version.apply_gate_names({"ats-keyword"})
+    assert version.failed_gates == ["ats-keyword"]
