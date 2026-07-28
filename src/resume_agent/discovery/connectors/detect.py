@@ -18,15 +18,15 @@ _L1_HOSTS: list[tuple[str, str]] = [
 ]
 
 _SUBDOMAIN_HOSTS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.workable\.com$", re.I), "workable"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.recruitee\.com$", re.I), "recruitee"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.breezy\.hr$", re.I), "breezy"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.applytojob\.com$", re.I), "jazzhr"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.bamboohr\.com$", re.I), "bamboohr"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.workable\.com$", re.IGNORECASE), "workable"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.recruitee\.com$", re.IGNORECASE), "recruitee"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.breezy\.hr$", re.IGNORECASE), "breezy"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.applytojob\.com$", re.IGNORECASE), "jazzhr"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.bamboohr\.com$", re.IGNORECASE), "bamboohr"),
 ]
 
 _PERSONIO_HOST = re.compile(
-    r"^(?P<token>[a-z0-9-]+)\.jobs\.personio\.(?P<country>com|de)$", re.I
+    r"^(?P<token>[a-z0-9-]+)\.jobs\.personio\.(?P<country>com|de)$", re.IGNORECASE
 )
 
 _L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
