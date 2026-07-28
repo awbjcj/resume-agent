@@ -44,8 +44,11 @@ def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJ
     else:
         static_page = fetch_static(url)
         target = identify_host(static_page.final_url)
-        reader = ATS_READERS.get(target.ats) if target else None
-        extracted = reader(target, static_page.final_url, static_page.html) if reader else None
+        if target is None:
+            extracted = None
+        else:
+            reader = ATS_READERS.get(target.ats)
+            extracted = reader(target, static_page.final_url, static_page.html) if reader else None
         if extracted is None:
             if target is not None:
                 # Known ATS (or its reader couldn't resolve this specific job) --

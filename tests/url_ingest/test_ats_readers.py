@@ -67,6 +67,7 @@ def test_greenhouse_reader_delegates_to_html_scraper():
     )
     target = AtsTarget("greenhouse", token="hooli")
     extracted = ATS_READERS["greenhouse"](target, "https://boards.greenhouse.io/hooli/jobs/1", html)
+    assert extracted is not None
     assert extracted.title == "Dev"
     assert extracted.company == "Hooli"
 
@@ -82,6 +83,7 @@ def test_ashby_uses_json_ld_when_present(monkeypatch):
         '"description":"<p>Build things.</p>","hiringOrganization":{"name":"Acme"}}</script>'
     )
     extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc-123", html)
+    assert extracted is not None
     assert extracted.title == "Eng"
     assert extracted.company == "Acme"
 
@@ -98,6 +100,7 @@ def test_ashby_falls_back_to_board_api_and_matches_by_id(monkeypatch):
     monkeypatch.setattr(ats_readers, "fetch_ashby_board", lambda token: payload)
     target = AtsTarget("ashby", token="acme")
     extracted = ATS_READERS["ashby"](target, "https://jobs.ashbyhq.com/acme/abc-123", "<html></html>")
+    assert extracted is not None
     assert extracted.title == "Senior ML Engineer"
     assert "Build LLM systems." in extracted.jd_text
 
@@ -125,6 +128,7 @@ def test_lever_falls_back_to_single_posting_endpoint(monkeypatch):
     monkeypatch.setattr(ats_readers, "fetch_lever_posting", lambda token, pid: posting)
     target = AtsTarget("lever", token="acme")
     extracted = ATS_READERS["lever"](target, "https://jobs.lever.co/acme/abc-123", "<html></html>")
+    assert extracted is not None
     assert extracted.title == "Senior Backend Engineer"
     assert "payment systems" in extracted.jd_text
 
@@ -143,6 +147,7 @@ def test_smartrecruiters_falls_back_to_detail_endpoint(monkeypatch):
     target = AtsTarget("smartrecruiters", token="smartrecruiters")
     url = "https://jobs.smartrecruiters.com/smartrecruiters/744000134902606-senior-product-manager"
     extracted = ATS_READERS["smartrecruiters"](target, url, "<html></html>")
+    assert extracted is not None
     assert extracted.title == "Senior Product Manager (Career Sites)"
     assert extracted.company == "SmartRecruiters Inc"
     assert "great product" in extracted.jd_text
@@ -157,6 +162,7 @@ def test_workable_falls_back_to_account_listing_by_shortcode(monkeypatch):
     target = AtsTarget("workable", token="acme")
     url = "https://apply.workable.com/j/5656BF6FBE"
     extracted = ATS_READERS["workable"](target, url, "<html></html>")
+    assert extracted is not None
     assert extracted.title == "Senior Software Engineer"
     assert "Python" in extracted.jd_text
 
@@ -187,6 +193,7 @@ def test_personio_falls_back_to_search_filtered_by_id(monkeypatch):
     target = AtsTarget("personio", token="pitch", country="com")
     url = "https://pitch.jobs.personio.com/job/160959"
     extracted = ATS_READERS["personio"](target, url, "<html></html>")
+    assert extracted is not None
     assert extracted.title == "Frontend Performance Engineer"
     assert "React performance profiling" in extracted.jd_text
 
@@ -200,6 +207,7 @@ def test_bamboohr_falls_back_to_detail_endpoint(monkeypatch):
     target = AtsTarget("bamboohr", token="eleven")
     url = "https://eleven.bamboohr.com/careers/132"
     extracted = ATS_READERS["bamboohr"](target, url, "<html></html>")
+    assert extracted is not None
     assert extracted.title == "Senior AI Engineer"
     assert "AI-powered engineering workflows" in extracted.jd_text
 
@@ -214,6 +222,7 @@ def test_recruitee_reads_json_ld_from_the_pasted_page():
     )
     target = AtsTarget("recruitee", token="channable")
     extracted = ATS_READERS["recruitee"](target, "https://channable.recruitee.com/o/x", html)
+    assert extracted is not None
     assert extracted.title == "Support Eng"
     assert extracted.company == "Channable"
 
@@ -222,6 +231,7 @@ def test_breezy_reads_json_ld_fixture():
     html = _fixture("breezy", "detail.html")
     target = AtsTarget("breezy", token="masterworks")
     extracted = ATS_READERS["breezy"](target, "https://masterworks.breezy.hr/p/x", html)
+    assert extracted is not None
     assert extracted.title == "Art Tour Guide"
 
 
@@ -229,6 +239,7 @@ def test_jazzhr_reads_json_ld_fixture():
     html = _fixture("jazzhr", "detail.html")
     target = AtsTarget("jazzhr", token="utilidata")
     extracted = ATS_READERS["jazzhr"](target, "https://utilidata.applytojob.com/apply/x", html)
+    assert extracted is not None
     assert extracted.title == "Application Engineer, Data Center Software"
 
 
@@ -247,6 +258,7 @@ def test_workday_falls_back_to_cxs_detail_endpoint(monkeypatch):
     target = AtsTarget("workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM")
     url = "https://generalmotors.wd5.myworkdayjobs.com/en-US/Careers_GM/job/Detroit-Michigan/Software-Engineer_R123"
     extracted = ATS_READERS["workday"](target, url, "<html></html>")
+    assert extracted is not None
     assert extracted.title == "Software Engineer"
     assert extracted.company == "generalmotors"
     assert "vehicle software" in extracted.jd_text
