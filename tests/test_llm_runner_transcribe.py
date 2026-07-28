@@ -22,3 +22,18 @@ def test_availability_follows_key_and_provider(monkeypatch):
     assert llm_runner.transcription_available() is True
     monkeypatch.setattr(llm_runner, "resolve_api_key", lambda model_id: "")
     assert llm_runner.transcription_available() is False
+
+
+def test_every_model_default_is_a_catalogued_id():
+    # `gemini-2.5-flash` was retired by the provider ("no longer available to
+    # new users") and every transcription 404'd, deterministically. It was the
+    # one model default pointing outside the curated catalog, so nothing
+    # flagged the rot -- the tier defaults are all catalog ids. Keeping every
+    # default inside the catalog is what makes the next retirement visible,
+    # since MODEL_CATALOG is the list a human already maintains.
+    from resume_agent.config import Settings
+    from resume_agent.llm_runner import catalog_entry
+
+    for field in ("cheap_model", "mid_model", "premium_model", "transcribe_model"):
+        default = Settings.model_fields[field].default
+        assert catalog_entry(default) is not None, f"{field}={default} is not catalogued"

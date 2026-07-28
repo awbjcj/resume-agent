@@ -369,11 +369,14 @@ class _Metrics:
 
 
 class _RunOutput:
-    def __init__(self, content, *, model=None, model_provider=None, metrics=None):
+    def __init__(
+        self, content, *, model=None, model_provider=None, metrics=None, status=None
+    ):
         self.content = content
         self.model = model
         self.model_provider = model_provider
         self.metrics = metrics
+        self.status = status
 
 
 def test_expect_schema_returns_content_when_it_already_matches():
@@ -437,3 +440,46 @@ def test_unparsed_output_survives_a_result_without_metadata():
     with pytest.raises(UnparsedAgentOutput) as excinfo:
         expect_schema(_Bare(), ResumeContent, source="reviser")
     assert "chars=0" in str(excinfo.value)
+
+
+def test_expect_text_returns_content_for_a_completed_run():
+    from resume_agent.llm_runner import expect_text
+
+    assert expect_text(_RunOutput("coach notes"), source="coach notes") == "coach notes"
+
+
+def test_expect_text_rejects_an_errored_run_whose_content_is_the_error_body():
+    # agno does not raise when a provider rejects a request: it sets status to
+    # ERROR and -- because content was still None -- assigns the provider's
+    # error body to content as a plain str. A structured call site notices
+    # because the body is not the schema; a free-text one cannot tell an error
+    # body from a real answer. That is how a hard 400 ("Function tools with
+    # reasoning_effort are not supported ...") reached the coach formatter
+    # dressed as coach notes and surfaced two layers downstream as the
+    # nonsensical "opening turn proposed no topics".
+    from resume_agent.llm_runner import UnparsedAgentOutput, expect_text
+
+    errored = _RunOutput(
+        "Function tools with reasoning_effort are not supported for "
+        "gpt-5.6-terra in /v1/chat/completions.",
+        status="ERROR",
+        model="gpt-5.6-terra",
+        model_provider="OpenAI",
+    )
+    with pytest.raises(UnparsedAgentOutput) as excinfo:
+        expect_text(errored, source="coach notes")
+    message = str(excinfo.value)
+    assert "coach notes" in message
+    assert "reasoning_effort" in message
+    assert "OpenAI" in message
+
+
+def test_expect_text_rejects_blank_and_non_text_content():
+    # Blank notes are as unusable as an error body, and a non-str content means
+    # the run did not produce prose at all.
+    from resume_agent.llm_runner import UnparsedAgentOutput, expect_text
+
+    with pytest.raises(UnparsedAgentOutput):
+        expect_text(_RunOutput("   "), source="coach notes")
+    with pytest.raises(UnparsedAgentOutput):
+        expect_text(_RunOutput(None), source="coach notes")

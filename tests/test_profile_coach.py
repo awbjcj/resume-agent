@@ -151,3 +151,33 @@ def test_profile_overview_degrades_on_fresh_workspace(tmp_path):
     text = profile_overview(tmp_path)
     assert "(no facts yet)" in text
     assert "PREVIOUSLY ASKED" in text
+
+
+def test_unknown_opening_topic_names_the_valid_ids_so_the_retry_can_recover():
+    # Opening topic ids are generated positionally by the validator IN THIS SAME
+    # TURN, so the formatter cannot know them ahead of time and will sometimes
+    # emit a semantic slug it invented ("deep-agent-impact"). format_with_retry
+    # feeds the rejection reason back for exactly one retry, so that reason has
+    # to say what a valid id *is* -- otherwise the retry carries no more
+    # information than the attempt that just failed and the session dies.
+    with pytest.raises(TurnRejected, match="unknown topic") as excinfo:
+        normalize_opening(
+            OpeningTurn(
+                message="hi",
+                action="ask",
+                topic_id="deep-agent-impact",
+                topics=[NewTopic(gap="g1"), NewTopic(gap="g2")],
+            )
+        )
+    message = str(excinfo.value)
+    assert "t1" in message and "t2" in message
+
+
+def test_opening_format_instruction_states_the_positional_id_convention():
+    # The formatter is the only thing that fills topic_id, so if the prompt does
+    # not name the t1/t2 convention the model has to guess -- and a guess can
+    # never match a positionally generated id.
+    from resume_agent.profile.coach import _formatter_instructions
+
+    text = " ".join(_formatter_instructions(OpeningTurn))
+    assert "t1" in text
