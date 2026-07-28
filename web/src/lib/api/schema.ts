@@ -4170,6 +4170,8 @@ export interface components {
             }[] | null;
             /** Factcheckpassed */
             factCheckPassed: boolean;
+            /** Failedgates */
+            failedGates?: string[];
             /** Id */
             id: number;
             /** Instruction */
@@ -4237,6 +4239,11 @@ export interface components {
             modelTier: string;
             /** Name */
             name: string;
+            /**
+             * Scorebands
+             * @default false
+             */
+            scoreBands: boolean;
             /**
              * Weight
              * @default 1

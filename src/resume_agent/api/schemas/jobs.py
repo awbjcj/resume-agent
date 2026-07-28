@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 
+from pydantic import Field, model_validator
+
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.models.review import ReviewCritique
+from resume_agent.tailor.verdict import failing_gate_names
 
 
 class SkillTagOut(CamelModel):
@@ -100,6 +105,30 @@ class ResumeVersionOut(CamelModel):
     pdf_path: str | None
     critique_json: list[dict] | None
     created_at: datetime
+    failed_gates: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _default_failed_gates(self) -> ResumeVersionOut:
+        """Which gates blocked this round, so the UI can name the real cause.
+
+        `fact_check_passed` is the AND of provenance and fact-check, so it alone
+        rendered "Fact-check failed" on rounds where fact-check never ran. This
+        default assumes the shipped fixed gate roster (`fact-check`); the review
+        settings UI lets a user mark any reviewer as a gate, so a caller that
+        knows the actual configured gates for this round should overwrite
+        `failed_gates` via `apply_gate_names` after validation.
+        """
+        self.failed_gates = failing_gate_names(
+            [ReviewCritique.model_validate(c) for c in self.critique_json or []]
+        )
+        return self
+
+    def apply_gate_names(self, gate_names: Iterable[str]) -> None:
+        """Recompute `failed_gates` against the review config's actual gates."""
+        self.failed_gates = failing_gate_names(
+            [ReviewCritique.model_validate(c) for c in self.critique_json or []],
+            gate_names,
+        )
 
 
 class CoverLetterOut(CamelModel):

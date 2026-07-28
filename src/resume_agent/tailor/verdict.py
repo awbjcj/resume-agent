@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+
 from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
@@ -9,11 +11,43 @@ from resume_agent.tailor.review_config import ReviewConfig
 # critiques list like any gate, so aggregate stays the only verdict constructor.
 DETERMINISTIC_GATES = frozenset({PROVENANCE_REVIEWER})
 
+# The default configured gate when the caller has no ReviewConfig to consult
+# (e.g. reading a stored version outside a request that loaded one). `fact-check`
+# is the gate in both shipped rosters, but the review settings UI lets a user
+# mark ANY reviewer as a gate - callers that know which reviewers are actually
+# configured as gates for this round must pass `gate_names` instead of relying
+# on this default.
+DEFAULT_GATE_REVIEWERS = DETERMINISTIC_GATES | frozenset({"fact-check"})
+
+
+def failing_gate_names(
+    critiques: list[ReviewCritique], gate_names: Iterable[str] | None = None
+) -> list[str]:
+    """Which gates blocked this round, in the order they were recorded.
+
+    `fact_check_passed` on a stored version is the AND of every gate, so on its
+    own it cannot say WHICH one failed - and it labelled a provenance-only
+    failure as a fact-check failure on rounds where fact-check never ran.
+
+    `gate_names` should be the configured gate reviewers for the round these
+    critiques came from (`{r.name for r in config.reviewers if r.gate}`); it
+    defaults to `DEFAULT_GATE_REVIEWERS` only when the caller has no config to
+    consult. `provenance` is always a gate - it is deterministic, not configured.
+    """
+    gates = DETERMINISTIC_GATES | (
+        frozenset(gate_names) if gate_names is not None else DEFAULT_GATE_REVIEWERS
+    )
+    return [
+        critique.reviewer
+        for critique in critiques
+        if critique.reviewer in gates and not critique.passed
+    ]
+
 
 class PanelVerdict(ExtensibleModel):
     passed: bool
     gate_passed: bool
-    aggregate_score: int
+    aggregate_score: int | None
     critiques: list[ReviewCritique] = Field(default_factory=list)
 
 
@@ -39,11 +73,19 @@ def aggregate(critiques: list[ReviewCritique], config: ReviewConfig) -> PanelVer
         if not r.gate and r.weight > 0 and r.name in by_name
     ]
     total_weight = sum(weight for weight, _ in weighted)
+    # No weighted critique means the advisory panel never produced a score. That
+    # is unknown, not zero: reporting 0 reads as "terrible resume" when it means
+    # "never measured", and a config with only gate reviewers has no quality bar
+    # to clear at all.
     aggregate_score = (
-        round(sum(weight * score for weight, score in weighted) / total_weight) if total_weight else 0
+        round(sum(weight * score for weight, score in weighted) / total_weight)
+        if total_weight
+        else None
     )
 
-    passed = gate_passed and aggregate_score >= config.score_threshold
+    passed = gate_passed and (
+        aggregate_score is None or aggregate_score >= config.score_threshold
+    )
     return PanelVerdict(
         passed=passed,
         gate_passed=gate_passed,

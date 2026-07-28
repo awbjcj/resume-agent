@@ -33,3 +33,26 @@ def test_shipped_deep_config_matches_legacy_roster():
 
 def test_deep_example_registered_with_setup():
     assert "review_deep.yaml.example" in preflight._EXAMPLES
+
+
+def test_every_advisory_reviewer_shares_one_scoring_scale():
+    # Five reviewers scoring on five private scales were being averaged and
+    # compared to one fixed threshold. score_bands gives them a common rubric.
+    for path in ("config/review.yaml.example", "config/review_deep.yaml.example"):
+        cfg = load_review_config(path)
+        advisory = [reviewer for reviewer in cfg.reviewers if not reviewer.gate]
+        assert advisory, path
+        assert all(reviewer.score_bands for reviewer in advisory), path
+
+
+def test_fact_check_gate_keeps_its_own_scoring_rule():
+    # The gate fixes score=100 on pass; a shared band rubric would fight that.
+    for path in ("config/review.yaml.example", "config/review_deep.yaml.example"):
+        cfg = load_review_config(path)
+        gates = [reviewer for reviewer in cfg.reviewers if reviewer.gate]
+        assert all(not gate.score_bands for gate in gates), path
+
+
+def test_both_shipped_rosters_stop_on_regression():
+    for path in ("config/review.yaml.example", "config/review_deep.yaml.example"):
+        assert load_review_config(path).early_stop_on_regression is True, path

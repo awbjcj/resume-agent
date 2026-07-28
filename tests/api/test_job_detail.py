@@ -108,3 +108,38 @@ def test_pdf_download_filename_is_friendly(tmp_path):
         f'filename="Acme_Corp-Senior_Engineer-Resume-v{vid}.pdf"'
         in resp.headers["content-disposition"]
     )
+
+
+def test_failed_gates_names_the_gate_that_actually_blocked():
+    from resume_agent.api.schemas.jobs import ResumeVersionOut
+
+    def _version(critiques, fact_check_passed):
+        return ResumeVersionOut.model_validate(
+            {
+                "id": 1,
+                "job_id": 1,
+                "round": 1,
+                "review_score": None,
+                "fact_check_passed": fact_check_passed,
+                "pdf_path": None,
+                "critique_json": critiques,
+                "created_at": "2026-07-27T00:00:00",
+            }
+        )
+
+    prov = {"reviewer": "provenance", "score": 0, "passed": False}
+    fact = {"reviewer": "fact-check", "score": 0, "passed": False}
+    ok_fact = {"reviewer": "fact-check", "score": 100, "passed": True}
+    advisory = {"reviewer": "ats-keyword", "score": 40, "passed": False}
+
+    # The case the UI got wrong: provenance blocked, fact-check passed, yet the
+    # badge read "Fact-check failed".
+    assert _version([prov, ok_fact, advisory], False).failed_gates == ["provenance"]
+    assert _version([{"reviewer": "provenance", "score": 100, "passed": True}, fact], False).failed_gates == [
+        "fact-check"
+    ]
+    assert _version([prov, fact], False).failed_gates == ["provenance", "fact-check"]
+    # A failing advisory reviewer is not a gate.
+    assert _version(
+        [{"reviewer": "provenance", "score": 100, "passed": True}, ok_fact, advisory], True
+    ).failed_gates == []

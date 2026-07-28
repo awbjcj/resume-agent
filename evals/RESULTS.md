@@ -1,5 +1,43 @@
 # Eval Results Log
 
+## 2026-07-27 tailor scoring + fact-lock repair — PRE-CHANGE BASELINE
+
+Production baseline from `scripts/tailor_health.py` against the workspace DB
+(77 versions, 26 jobs) immediately before the repair branch. This is the
+reference point for re-measuring; **no eval arms have been run yet.**
+
+| metric | value |
+| ------ | ----- |
+| zero scores | 19 / 77 (all with `critiques == ['provenance']`) |
+| unscored (`review_score IS NULL`) | 0 |
+| gate failures — provenance | 19 |
+| gate failures — fact-check | 50 |
+| fact-check blocking issues | metric/number 53 · summary 31 · skill 28 · scope 17 · other 13 |
+| reviewer means | ats-keyword 55.1 · hiring-manager 51.7 · recruiter 61.5 · concision 76.7 |
+| jobs reaching `score_threshold: 85` | 0 / 26 |
+
+Round-over-round transitions as the script counts them (all pairs):
+improved 30, regressed 19, same 2. **Excluding pairs that touch a fabricated
+`0`** — the 19 rounds where the panel was skipped — it is improved 16,
+regressed 13, mean delta **+0.8**. The second figure is the one that shows the
+revise loop was a coin flip; the first is what the script will keep reporting,
+since a fabricated `0` is no longer reachable after this change.
+
+**Still outstanding — Phase D of the plan.** `score_threshold` (85) and
+`match_plan_enabled` (false) are deliberately unchanged. Deciding them requires
+the eval arms below, none of which have been run:
+
+| arm | config | status |
+| --- | ------ | ------ |
+| `before` | `dev` | not run |
+| `phaseAB` | scoring + fact-lock fixes | not run |
+| `phaseC` | + reviser JD, best-round base | not run |
+| `bands` | + `score_bands` | not run |
+| `matchplan` | `config/review.match_plan.yaml` | not run |
+
+Per `evals/CALIBRATION.md` the judge is still un-anchored (stand-in only), so
+when these run, only **relative** arm-to-arm deltas may be claimed.
+
 ## 2026-07 craft prompt enrichment
 
 **Decision:** Live after-arm cases were skipped at user direction. No

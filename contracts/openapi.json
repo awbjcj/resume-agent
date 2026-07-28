@@ -5076,6 +5076,13 @@
             "title": "Factcheckpassed",
             "type": "boolean"
           },
+          "failedGates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failedgates",
+            "type": "array"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -5224,6 +5231,11 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "scoreBands": {
+            "default": false,
+            "title": "Scorebands",
+            "type": "boolean"
           },
           "weight": {
             "default": 1,

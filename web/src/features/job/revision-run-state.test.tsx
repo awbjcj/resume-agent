@@ -19,6 +19,7 @@ const version = {
   round: 1,
   reviewScore: 90,
   factCheckPassed: true,
+  failedGates: [],
   critiqueJson: null,
   origin: "tailor",
   pdfPath: null,

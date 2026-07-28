@@ -2,6 +2,9 @@
 # Each model_tier resolves through CHEAP_MODEL / MID_MODEL / PREMIUM_MODEL.
 max_rounds: 3
 score_threshold: 85
+# Stop as soon as a round is worse than the best clean one so far. The loop keeps
+# its best round rather than its last, so stopping early never discards work.
+early_stop_on_regression: true
 style_guide_path: config/style_guide.md
 reviewers:
   - name: fact-check
@@ -12,18 +15,22 @@ reviewers:
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
   - name: recruiter
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
   - name: hiring-manager
     gate: false
     weight: 1
     model_tier: premium
+    score_bands: true
   - name: concision
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
 
 length_budget:
   max_experiences: 4

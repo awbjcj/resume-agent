@@ -19,18 +19,22 @@ reviewers:
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
   - name: recruiter
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
   - name: hiring-manager
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
   - name: concision
     gate: false
     weight: 1
     model_tier: mid
+    score_bands: true
 
 # Optional one-page budget handed to the tailor and surfaced to the concision
 # reviewer. Omit the block to accept these defaults.
