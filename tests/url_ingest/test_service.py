@@ -1,9 +1,15 @@
-import resume_agent.discovery.url_ingest.service as service
+from resume_agent.discovery.url_ingest import service
 from resume_agent.discovery.url_ingest.models import ExtractedJob, PageContent
 from resume_agent.discovery.url_ingest.service import read_linkedin_posting
 
 
 def _patch_fetch(monkeypatch, html, final_url):
+    """Patch both fetch paths: fetch_static for known-ATS/unknown-host dispatch,
+    fetch_page for the LinkedIn / JS-shell-upgrade branches."""
+    monkeypatch.setattr(
+        service, "fetch_static",
+        lambda url: PageContent(html=html, final_url=final_url, rendered=False),
+    )
     monkeypatch.setattr(
         service, "fetch_page",
         lambda url, allow_browser=True: PageContent(html=html, final_url=final_url, rendered=False),
@@ -81,12 +87,18 @@ def test_empty_jd_returns_none(monkeypatch):
 
 
 def test_recognized_ats_without_a_reader_falls_back_to_llm(monkeypatch):
-    # Lever is identified by detect.py but has no registered posting reader yet,
-    # so url_ingest should fall through to the LLM rather than fail.
+    # A host detect.py resolves but with no registered ats_readers entry (or
+    # whose reader can't locate this specific job) falls through to the LLM
+    # on the static HTML -- never the browser.
     _patch_fetch(
         monkeypatch,
         "<html><body><p>Some role.</p></body></html>",
-        "https://jobs.lever.co/acme/abc-123",
+        "https://jobs.example.com/acme/abc-123",
+    )
+    from resume_agent.discovery.connectors.detect import AtsTarget
+
+    monkeypatch.setattr(
+        service, "identify_host", lambda url: AtsTarget("unregistered-ats", token="acme")
     )
 
     class _LLM:
@@ -98,7 +110,37 @@ def test_recognized_ats_without_a_reader_falls_back_to_llm(monkeypatch):
         async def arun(self, prompt):
             return self.run(prompt)
 
-    job = service.job_from_url("https://jobs.lever.co/acme/abc-123", agent=_LLM())
+    job = service.job_from_url("https://jobs.example.com/acme/abc-123", agent=_LLM())
+
+    assert job is not None
+    assert job.jd_text == "real jd"
+
+
+def test_reader_returning_none_falls_back_to_llm_not_browser(monkeypatch):
+    # A registered reader that can't resolve this specific job (e.g. a
+    # mismatched id) falls back to the LLM on the same static HTML; fetch_page
+    # (the only browser-capable path) must never be called.
+    _patch_fetch(
+        monkeypatch,
+        "<html><body><p>Some role.</p></body></html>",
+        "https://jobs.ashbyhq.com/acme/missing-id",
+    )
+    monkeypatch.setattr(
+        service, "fetch_page",
+        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("browser must not be used")),
+    )
+    monkeypatch.setitem(service.ATS_READERS, "ashby", lambda target, url, html: None)
+
+    class _LLM:
+        def run(self, prompt):
+            class _R:
+                content = ExtractedJob(title="Eng", company="Acme", jd_text="real jd")
+            return _R()
+
+        async def arun(self, prompt):
+            return self.run(prompt)
+
+    job = service.job_from_url("https://jobs.ashbyhq.com/acme/missing-id", agent=_LLM())
 
     assert job is not None
     assert job.jd_text == "real jd"
