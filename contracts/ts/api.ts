@@ -4246,6 +4246,11 @@ export interface components {
             /** Name */
             name: string;
             /**
+             * Scorebands
+             * @default false
+             */
+            scoreBands: boolean;
+            /**
              * Weight
              * @default 1
              */

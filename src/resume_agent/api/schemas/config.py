@@ -37,6 +37,7 @@ class ReviewerEntry(CamelModel):
     gate: bool = False
     weight: int = 1
     model_tier: str = "mid"
+    score_bands: bool = False
 
 
 class LengthBudget(CamelModel):
@@ -48,12 +49,22 @@ class LengthBudget(CamelModel):
 def _default_reviewers() -> list[ReviewerEntry]:
     return [
         ReviewerEntry(name="fact-check", gate=True, weight=0, model_tier="premium"),
-        ReviewerEntry(name="ats-keyword", gate=False, weight=1, model_tier="mid"),
-        ReviewerEntry(name="recruiter", gate=False, weight=1, model_tier="mid"),
         ReviewerEntry(
-            name="hiring-manager", gate=False, weight=1, model_tier="premium"
+            name="ats-keyword", gate=False, weight=1, model_tier="mid", score_bands=True
         ),
-        ReviewerEntry(name="concision", gate=False, weight=1, model_tier="mid"),
+        ReviewerEntry(
+            name="recruiter", gate=False, weight=1, model_tier="mid", score_bands=True
+        ),
+        ReviewerEntry(
+            name="hiring-manager",
+            gate=False,
+            weight=1,
+            model_tier="premium",
+            score_bands=True,
+        ),
+        ReviewerEntry(
+            name="concision", gate=False, weight=1, model_tier="mid", score_bands=True
+        ),
     ]
 
 

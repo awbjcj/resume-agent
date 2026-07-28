@@ -5235,6 +5235,11 @@
             "title": "Name",
             "type": "string"
           },
+          "scoreBands": {
+            "default": false,
+            "title": "Scorebands",
+            "type": "boolean"
+          },
           "weight": {
             "default": 1,
             "title": "Weight",
