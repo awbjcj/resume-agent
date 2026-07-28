@@ -174,7 +174,11 @@ def test_run_case_judges_the_surfaced_best_clean_round():
     class _Draft:
         def run(self, prompt):
             return _Result(
-                ResumeContent(contact=Contact(name="Ada"), summary="Best round")
+                ResumeContent(
+                    contact=Contact(name="Ada"),
+                    summary="Best round",
+                    summary_provenance=["e1"],
+                )
             )
 
         async def arun(self, prompt):
@@ -183,7 +187,11 @@ def test_run_case_judges_the_surfaced_best_clean_round():
     class _Revision:
         def run(self, prompt):
             return _Result(
-                ResumeContent(contact=Contact(name="Ada"), summary="Worse round")
+                ResumeContent(
+                    contact=Contact(name="Ada"),
+                    summary="Worse round",
+                    summary_provenance=["e1"],
+                )
             )
 
         async def arun(self, prompt):
@@ -243,8 +251,12 @@ def test_run_case_judges_the_surfaced_best_clean_round():
     )
     judge = _CapturingJudge()
 
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        experience=[Experience(id="e1", company="Acme", title="Eng")],
+    )
     result = run_case(
-        case, ProfileFacts(contact=Contact(name="Ada")), config, bundle, judge
+        case, facts, config, bundle, judge
     )
 
     assert result.surfaced_round_num == 1

@@ -270,9 +270,18 @@ def test_summary_cannot_cite_an_inferred_skill():
     assert check_provenance(content, facts).ok is False
 
 
-def test_summary_without_provenance_still_validates_for_stored_versions():
+def test_summary_without_provenance_still_deserializes_for_stored_versions():
+    """The model itself tolerates a missing field (legacy rows); the gate does not."""
+    content = _content()
+    content.summary = "Engineer."
+    assert content.summary_provenance == []
+
+
+def test_summary_without_provenance_fails_the_gate():
     facts = _facts()
     content = _content()
     content.summary = "Engineer."
     assert content.summary_provenance == []
-    assert check_provenance(content, facts).ok is True
+    report = check_provenance(content, facts)
+    assert report.ok is False
+    assert any("summary_provenance" in item for item in report.invalid)
