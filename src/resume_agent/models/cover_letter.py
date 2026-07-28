@@ -15,7 +15,7 @@ class CoverLetterContent(ExtensibleModel):
     """Structured, fact-locked cover letter."""
 
     contact: Contact
-    recipient: str | None = None
     greeting: str
     paragraphs: list[CoverLetterParagraph] = Field(default_factory=list)
     closing: str
+    recipient: str | None = None
