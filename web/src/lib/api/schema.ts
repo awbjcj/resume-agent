@@ -4205,6 +4205,11 @@ export interface components {
              * @default false
              */
             mergedAdvisory: boolean;
+            /**
+             * Provenanceretrybudget
+             * @default 1
+             */
+            provenanceRetryBudget: number;
             /** Reviewers */
             reviewers?: components["schemas"]["ReviewerEntry"][];
             /**

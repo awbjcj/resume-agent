@@ -75,6 +75,7 @@ class ReviewConfigDoc(CamelModel):
     tailor_tier: Literal["cheap", "mid", "premium"] = "premium"
     reviser_tier: Literal["cheap", "mid", "premium"] = "premium"
     reviewers: list[ReviewerEntry] = Field(default_factory=_default_reviewers)
+    provenance_retry_budget: int = Field(default=1, ge=0)
     length_budget: LengthBudget | None = None
 
 
