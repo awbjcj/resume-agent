@@ -216,6 +216,24 @@ def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
     return _target_from_html(raw_html) if raw_html is not None else None
 
 
+def workday_external_path(target: AtsTarget, url: str) -> str | None:
+    """The cxs detail suffix (starting with ``/job/...``) for a pasted Workday URL.
+
+    Mirrors ``_workday_site_segment``'s locale-stripping but returns the
+    remainder *after* the site segment -- what ``cxs_detail_url`` needs --
+    instead of the site itself. ``None`` when the URL's site doesn't match
+    ``target.site`` (e.g. a raw ``/wday/cxs/...`` API URL was pasted instead
+    of a browsing URL).
+    """
+    segments = [segment for segment in urlsplit(url).path.split("/") if segment]
+    while segments and _LOCALE_SEGMENT.fullmatch(segments[0]):
+        segments.pop(0)
+    if not segments or segments[0].casefold() != target.site.casefold():
+        return None
+    remainder = segments[1:]
+    return "/" + "/".join(remainder) if remainder else None
+
+
 def identify_host(url: str) -> AtsTarget | None:
     """Resolve a URL to its ATS by host/path alone — bespoke singleton, then URL pattern.
 
