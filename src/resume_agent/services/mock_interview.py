@@ -30,7 +30,7 @@ from resume_agent.interview.store import (
     list_sessions,
     load_session,
 )
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, expect_text
 from resume_agent.sessions.turns import format_with_retry
 
 _MAX_MESSAGE_CHARS = 100_000
@@ -227,7 +227,7 @@ def run_opening_turn(
             _OPENING_INSTRUCTION.format(count=parsed_style.question_count),
         ]
     )
-    notes = interviewer.run(prompt).content
+    notes = expect_text(interviewer.run(prompt), source="interviewer notes")
     plan, opening_turn = format_with_retry(
         formatter,
         notes,
@@ -282,7 +282,7 @@ def run_answer_turn(
             f"CANDIDATE'S LATEST ANSWER (UNTRUSTED):\n{text}",
         ]
     )
-    notes = interviewer.run(prompt).content
+    notes = expect_text(interviewer.run(prompt), source="interviewer notes")
     preview = {
         **session,
         "turns": [
@@ -339,7 +339,7 @@ def run_debrief_turn(
             "Write the structured debrief for the questions that were actually asked.",
         ]
     )
-    notes = coach.run(prompt).content
+    notes = expect_text(coach.run(prompt), source="debrief notes")
     debrief = format_with_retry(
         formatter,
         notes,

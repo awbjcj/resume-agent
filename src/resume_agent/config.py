@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     cheap_reasoning_effort: str | None = None
     mid_reasoning_effort: str | None = None
     premium_reasoning_effort: str | None = None
-    transcribe_model: str = "gemini:gemini-2.5-flash"
+    transcribe_model: str = "gemini:gemini-3.5-flash-lite"
     api_token: str = (
         ""  # when non-empty, the API requires Authorization: Bearer <token>
     )

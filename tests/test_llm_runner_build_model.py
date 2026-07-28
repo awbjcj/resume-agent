@@ -116,3 +116,31 @@ def test_selected_tier_tuning_is_forwarded_by_provider(monkeypatch):
     assert claude.output_config == {"effort": "low"}
     assert openai.reasoning_effort == "xhigh"
     assert gemini.thinking_level == "minimal"
+
+
+def test_non_reasoning_openai_disables_effort_rather_than_omitting_it():
+    # Omitting `reasoning_effort` on a gpt-5.x id means "provider decides", not
+    # off -- and a provider-chosen effort combined with function tools is
+    # rejected outright by /v1/chat/completions ("To use function tools, use
+    # /v1/responses or set reasoning_effort to 'none'"), which agno then hands
+    # back as the error body in `.content` rather than raising. Same bug class
+    # as Gemini's thinking_budget and Anthropic's thinking: unset != disabled,
+    # and here it broke every tool-using agent (coach, interviewer) outright.
+    terra = build_model("openai:gpt-5.6-terra", api_key="k")
+    assert terra.reasoning_effort == "none"
+
+
+def test_openai_effort_stays_unset_when_none_is_not_a_selectable_effort():
+    # gpt-5.5-pro's catalog lists only medium/high/xhigh, so "none" would trade
+    # one 400 for another. Such a model cannot run function tools on
+    # chat/completions at all; the Responses API is the fix, not a fake effort.
+    pro = build_model("openai:gpt-5.5-pro", api_key="k")
+    assert pro.reasoning_effort is None
+
+
+def test_openai_effort_stays_unset_for_uncatalogued_model():
+    # A custom id entered through the tier picker's escape hatch has no catalog
+    # entry, so whether it accepts "none" is unknown -- keep the provider
+    # default rather than guessing into a different 400.
+    custom = build_model("openai:gpt-5.9-experimental", api_key="k")
+    assert custom.reasoning_effort is None

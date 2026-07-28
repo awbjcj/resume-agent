@@ -184,18 +184,15 @@ def _preview(text: str) -> str:
     )
 
 
-def _describe_unparsed(result: Any, content: Any, schema: type, source: str) -> str:
+def _describe_unparsed(result: Any, content: Any, headline: str) -> str:
     """Build the failure message, reading every field defensively.
 
     ``RunOutput``'s shape drifts between agno versions, so a missing attribute
     must degrade the report rather than raise over the failure it describes.
+    Shared by ``expect_schema`` and ``expect_text`` so both failures carry the
+    same model/status/token diagnostics.
     """
-    fields = [
-        (
-            f"Expected {schema.__name__} from {source} agent, "
-            f"got {type(content).__name__}"
-        )
-    ]
+    fields = [headline]
     provider = getattr(result, "model_provider", None)
     model = getattr(result, "model", None)
     if provider or model:
@@ -227,7 +224,52 @@ def expect_schema(result: Any, schema: type[_SchemaT], *, source: str) -> _Schem
     content = getattr(result, "content", None)
     if isinstance(content, schema):
         return content
-    raise UnparsedAgentOutput(_describe_unparsed(result, content, schema, source))
+    headline = (
+        f"Expected {schema.__name__} from {source} agent, "
+        f"got {type(content).__name__}"
+    )
+    raise UnparsedAgentOutput(_describe_unparsed(result, content, headline))
+
+
+def _run_failed(result: Any) -> bool:
+    """Whether agno marked this run as errored.
+
+    Read defensively and by value: ``status`` is a ``str`` Enum whose member
+    set drifts between agno versions, and a missing attribute must not be
+    mistaken for a failure.
+    """
+    status = getattr(result, "status", None)
+    return str(getattr(status, "value", status) or "").casefold() == "error"
+
+
+def expect_text(result: Any, *, source: str) -> str:
+    """Return ``result.content`` as usable prose, or raise saying why it is not.
+
+    The plain-text counterpart to ``expect_schema``, and it exists for the same
+    reason: **agno does not raise when a provider rejects a request.** It logs,
+    sets ``RunOutput.status`` to ``ERROR``, and -- because ``content`` was still
+    ``None`` -- assigns the provider's error body to ``content`` as a plain
+    ``str``. A structured call site notices, because an error body is not the
+    schema. A free-text one cannot tell an error body from a real answer.
+
+    That gap is how a hard 400 ("Function tools with reasoning_effort are not
+    supported for gpt-5.6-terra in /v1/chat/completions") reached the coach's
+    formatter dressed as coach notes, and surfaced two layers downstream as the
+    nonsensical ``TurnRejected: opening turn proposed no topics`` -- in a
+    different file, with a message that never mentions the provider.
+
+    Blank prose is rejected too: it is as unusable to a downstream formatter as
+    an error body, and silently formatting it produces the same empty agenda.
+    """
+    content = getattr(result, "content", None)
+    if not _run_failed(result) and isinstance(content, str) and content.strip():
+        return content
+    reason = "run failed" if _run_failed(result) else "no usable text"
+    headline = (
+        f"Expected prose from {source} agent, "
+        f"got {type(content).__name__} ({reason})"
+    )
+    raise UnparsedAgentOutput(_describe_unparsed(result, content, headline))
 
 
 # Providers selectable via a ``provider:model`` prefix on any model id. A bare id
@@ -782,6 +824,27 @@ def _openai_responses_reasoning_effort_for(
     return "high"
 
 
+def _openai_disabled_effort(model_id: str) -> str | None:
+    """The explicit "off" effort for an OpenAI id, when it has one.
+
+    On gpt-5.x an unset ``reasoning_effort`` means "the provider decides", not
+    off -- the same trap Gemini's ``thinking_budget`` and Anthropic's
+    ``thinking`` already have guards for here. It bites harder on OpenAI:
+    a provider-chosen effort combined with **function tools** is a hard 400 on
+    ``/v1/chat/completions`` ("To use function tools, use /v1/responses or set
+    reasoning_effort to 'none'"), so leaving it unset broke every tool-using
+    agent -- the coach and the interviewer -- outright.
+
+    Only ids whose catalog entry offers ``"none"`` can be turned off on
+    chat/completions. The rest (e.g. gpt-5.5-pro, which offers only
+    medium/high/xhigh) keep the provider default: sending them a "none" they do
+    not accept would trade one 400 for another, and the Responses API -- not a
+    fabricated effort -- is what unblocks function tools for those.
+    """
+    entry = catalog_entry(model_id)
+    return "none" if entry and "none" in entry.reasoning_efforts else None
+
+
 def _gemini_interactions_thinking_level_for(
     model_id: str, provider: str
 ) -> GeminiInteractionsThinkingLevel:
@@ -820,7 +883,9 @@ def build_model(
         return OpenAIChat(
             id=model,
             api_key=key,
-            reasoning_effort=reasoning_effort,
+            reasoning_effort=(
+                reasoning_effort if reasoning else _openai_disabled_effort(model_id)
+            ),
         )
     if provider == "gemini":
         Gemini = _compatible_gemini_class()

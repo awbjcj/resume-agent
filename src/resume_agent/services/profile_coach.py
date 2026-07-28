@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, expect_text
 from resume_agent.profile.coach import (
     CoachTurn,
     OpeningTurn,
@@ -152,7 +152,7 @@ def run_opening_turn(
         f"{_overview(root, engine)}\n\n"
         "This is the opening turn. Propose the highest-value bounded agenda and ask the first question."
     )
-    notes = coach.run(prompt).content
+    notes = expect_text(coach.run(prompt), source="coach notes")
     topics, validated = format_with_retry(
         formatter,
         notes,
@@ -195,7 +195,7 @@ def run_message_turn(
             f"USER'S LATEST MESSAGE (UNTRUSTED):\n{text}",
         ]
     )
-    notes = coach.run(prompt).content
+    notes = expect_text(coach.run(prompt), source="coach notes")
     preview = {**session, "turns": [*session["turns"], {"role": "user", "kind": "", "text": text, "topic_id": "", "at": "", "research_actions": []}]}
     validated = format_with_retry(
         formatter,
@@ -298,7 +298,7 @@ def run_recap_turn(
             + (f" Mention unsaved drafts: {', '.join(pending)}." if pending else ""),
         ]
     )
-    notes = coach.run(prompt).content
+    notes = expect_text(coach.run(prompt), source="coach notes")
     recap = format_with_retry(
         formatter,
         notes,
