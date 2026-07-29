@@ -13,14 +13,16 @@ settings snapshot built without either the host environment or project dotenv.
 Tests that pass ``env_path`` explicitly continue to exercise that file.
 """
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
 from resume_agent.api import app as app_module
 from resume_agent.api.app import create_app
 from resume_agent.api.auth import hash_password
-from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.password_policy import NullBreachChecker
+from resume_agent.api.runs.manager import RunManager
 from resume_agent.config import Settings
 from resume_agent.mail.mailer import NullMailer
 
@@ -35,8 +37,17 @@ def _isolate_default_app_settings(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _isolate_runs_root(tmp_path, monkeypatch):
+    # ``create_app`` always passes an explicit ``root=`` (computed from
+    # ``data_dir``, which itself defaults to the real repo's ``Path("data")``
+    # when a test omits both ``data_dir`` and ``runs_root``), so a plain
+    # ``setdefault`` can never intercept it — the key is already present.
+    # Redirect only that unisolated default; a caller that pinned its own
+    # ``data_dir``/``runs_root`` under ``tmp_path`` is already isolated.
+    unisolated_default = Path("data") / "runs"
+
     def factory(*args, **kwargs):
-        kwargs.setdefault("root", tmp_path / "runs")
+        if kwargs.get("root") == unisolated_default:
+            kwargs["root"] = tmp_path / "runs"
         return RunManager(*args, **kwargs)
 
     monkeypatch.setattr(app_module, "RunManager", factory)
