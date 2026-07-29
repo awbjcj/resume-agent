@@ -21,6 +21,7 @@ from resume_agent.api import auth, auth_codes
 from resume_agent.api.deps import get_session, get_settings_dep
 from resume_agent.api.errors import ApiException
 from resume_agent.api.password_policy import validate_password
+from resume_agent.api.routers.auth_register import rate_event
 from resume_agent.api.runs.manager import RunResetConflict
 from resume_agent.api.uploads import UploadTooLargeError, copy_upload
 from resume_agent.api.schemas.account import (
@@ -187,6 +188,7 @@ def set_email(
     settings: Settings = Depends(get_settings_dep),
 ) -> CodeSentResponse:
     context = require_context()
+    rate_event(request, body.email)
     code = auth_codes.generate_code()
     row_id = uuid.uuid4().hex[:12]
     with Session(request.app.state.system_engine) as session:
@@ -235,6 +237,7 @@ def verify_account_email(
     settings: Settings = Depends(get_settings_dep),
 ) -> MeResponse:
     context = require_context()
+    rate_event(request, body.email)
     now = datetime.now(timezone.utc)
     with Session(request.app.state.system_engine) as session:
         row = (
