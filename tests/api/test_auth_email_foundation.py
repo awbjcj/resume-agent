@@ -18,7 +18,9 @@ SETTINGS = Settings.model_validate({"session_secret": "secret"})
 
 
 def test_null_mailer_is_the_offline_transport():
-    mailer = build_mailer(Settings.model_validate({}))
+    # smtp_host must be pinned, not defaulted: Settings reads the real cwd .env,
+    # so a developer with SMTP configured would otherwise get a live SmtpMailer.
+    mailer = build_mailer(Settings.model_validate({"smtp_host": ""}))
     assert isinstance(mailer, NullMailer)
     mailer.send(to="a@example.com", subject="subject", body="body")
     assert mailer.sent == [("a@example.com", "subject", "body")]

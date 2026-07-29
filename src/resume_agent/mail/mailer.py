@@ -51,6 +51,17 @@ class SmtpMailer:
                     client.login(self.settings.smtp_username, self.settings.smtp_password)
                 client.send_message(message)
         except (OSError, smtplib.SMTPException) as error:
+            # Callers turn this into a fixed "503 MAIL_UNAVAILABLE" body, so the
+            # cause is recorded here or it is lost. Never log the password.
+            logger.warning(
+                "SMTP delivery to %s failed via %s:%s (starttls=%s, auth=%s): %s",
+                to,
+                self.settings.smtp_host,
+                self.settings.smtp_port,
+                self.settings.smtp_starttls,
+                "on" if self.settings.smtp_username else "off",
+                error,
+            )
             raise MailDeliveryError(str(error)) from error
 
     def notify(self, *, to: str, subject: str, body: str) -> None:
