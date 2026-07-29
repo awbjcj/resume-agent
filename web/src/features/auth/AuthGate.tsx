@@ -53,5 +53,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (me.data.authRequired && !me.data.username) {
     return <Navigate to="/login" replace />;
   }
+  if (me.data.needsEmail) {
+    return <Navigate to="/complete-profile" replace />;
+  }
   return <>{children}</>;
 }
