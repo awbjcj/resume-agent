@@ -88,10 +88,31 @@ def gmail_connect(request: Request):
     settings = get_settings_dep(request)
     _require_client(settings)
     flow = _build_flow(settings, _redirect_uri(request))
+    extra: dict[str, str] = {"include_granted_scopes": "true"}
+    email = _account_email(request)
+    if email:
+        extra["login_hint"] = email
     url, _state = flow.authorization_url(
-        access_type="offline", prompt="consent", state=_issue_state(request)
+        access_type="offline",
+        prompt="consent",
+        state=_issue_state(request),
+        **extra,
     )
     return GmailConnectOut(auth_url=url)
+
+
+def _account_email(request: Request) -> str:
+    context = current_context()
+    engine = getattr(request.app.state, "system_engine", None)
+    if context is None or engine is None:
+        return ""
+    from sqlalchemy.orm import Session as SystemSession
+
+    from resume_agent.tenancy.system_db import User
+
+    with SystemSession(engine) as session:
+        user = session.get(User, context.user_id)
+        return user.email or "" if user is not None else ""
 
 
 def _finish(outcome: str) -> RedirectResponse:

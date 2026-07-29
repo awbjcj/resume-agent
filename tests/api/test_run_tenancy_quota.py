@@ -28,7 +28,7 @@ def _add_user(app, username: str, password: str) -> None:
 
 def _login(client, username: str, password: str) -> None:
     response = client.post(
-        "/api/auth/login", json={"username": username, "password": password}
+        "/api/auth/login", json={"identifier": username, "password": password}
     )
     assert response.status_code == 200
 

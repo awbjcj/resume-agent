@@ -20,7 +20,9 @@ from resume_agent.api import app as app_module
 from resume_agent.api.app import create_app
 from resume_agent.api.auth import hash_password
 from resume_agent.api.runs.manager import RunManager
+from resume_agent.api.password_policy import NullBreachChecker
 from resume_agent.config import Settings
+from resume_agent.mail.mailer import NullMailer
 
 
 @pytest.fixture(autouse=True)
@@ -49,13 +51,16 @@ def mu_app(tmp_path):
         "SESSION_SECRET=test-session-secret\n",
         encoding="utf-8",
     )
-    return create_app(
+    application = create_app(
         db_url=f"sqlite:///{(tmp_path / 'data' / 'ignored.db').as_posix()}",
         env_path=env,
         data_dir=tmp_path / "data",
         runs_root=tmp_path / "legacy-runs",
         config_dir=tmp_path / "templates",
     )
+    application.state.mailer = NullMailer()
+    application.state.breach_checker = NullBreachChecker()
+    return application
 
 
 @pytest.fixture

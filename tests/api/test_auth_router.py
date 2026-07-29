@@ -37,10 +37,17 @@ def test_login_sets_cookie_and_unlocks_guarded_api(tmp_path):
         assert client.get("/api/pipeline").status_code == 401
         response = client.post(
             "/api/auth/login",
-            json={"username": "owner", "password": "hunter2"},
+            json={"identifier": "owner", "password": "hunter2"},
         )
         assert response.status_code == 200
-        assert response.json() == {"username": "owner", "authRequired": True}
+        assert response.json() == {
+            "username": "owner",
+            "email": None,
+            "emailVerified": False,
+            "needsEmail": False,
+            "googleLinked": False,
+            "authRequired": True,
+        }
         assert "ra_session" in response.cookies
         assert client.get("/api/pipeline").status_code == 200
 
@@ -59,7 +66,7 @@ def test_login_verifies_password_for_unknown_username(tmp_path, monkeypatch):
     with _client(app) as client:
         response = client.post(
             "/api/auth/login",
-            json={"username": "unknown", "password": "wrong"},
+            json={"identifier": "unknown", "password": "wrong"},
         )
     assert response.status_code == 401
     assert calls == ["wrong"]
@@ -70,9 +77,15 @@ def test_me_is_public_state_probe_and_logout_clears_cookie(tmp_path):
     with _client(app) as client:
         assert client.get("/api/auth/me").json() == {
             "username": None,
+            "email": None,
+            "emailVerified": False,
+            "needsEmail": False,
+            "googleLinked": False,
             "authRequired": True,
         }
-        client.post("/api/auth/login", json={"username": "owner", "password": "hunter2"})
+        client.post(
+            "/api/auth/login", json={"identifier": "owner", "password": "hunter2"}
+        )
         assert client.get("/api/auth/me").json()["username"] == "owner"
         client.post("/api/auth/logout")
         assert client.get("/api/pipeline").status_code == 401
@@ -103,14 +116,14 @@ def test_login_rejects_bad_credentials_and_unconfigured_mode(tmp_path):
     with _client(app) as client:
         response = client.post(
             "/api/auth/login",
-            json={"username": "owner", "password": "wrong"},
+            json={"identifier": "owner", "password": "wrong"},
         )
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
     with _client(create_app(db_url="sqlite://")) as client:
         response = client.post(
-            "/api/auth/login", json={"username": "x", "password": "y"}
+            "/api/auth/login", json={"identifier": "x", "password": "y"}
         )
         assert response.status_code == 400
         assert response.json()["error"]["code"] == "AUTH_NOT_CONFIGURED"

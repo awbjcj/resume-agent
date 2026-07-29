@@ -12,7 +12,11 @@ def _client(**kw):
 def test_health_ok():
     resp = _client().get("/api/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    assert resp.json() == {
+        "status": "ok",
+        "mailConfigured": False,
+        "googleOauthConfigured": False,
+    }
 
 
 def test_no_auth_by_default():

@@ -110,6 +110,7 @@ def _authenticated_user(
                 cookie,
                 request.app.state.settings,
                 password_hash=candidate.password_hash,
+                epoch=candidate.session_epoch,
             ):
                 user = candidate
         if user is None:

@@ -19,7 +19,7 @@ from resume_agent.api.deps import (
     require_token,
 )
 from resume_agent.api.errors import ApiException, install_error_handlers
-from resume_agent.api.rate_limit import FailedAttemptLimiter
+from resume_agent.api.password_policy import HibpBreachChecker
 from resume_agent.api.routers import account as account_router
 from resume_agent.api.routers import admin as admin_router
 from resume_agent.api.routers import admin_invites as admin_invites_router
@@ -27,6 +27,9 @@ from resume_agent.api.routers import admin_system as admin_system_router
 from resume_agent.api.routers import admin_users as admin_users_router
 from resume_agent.api.routers import analytics as analytics_router
 from resume_agent.api.routers import auth as auth_router
+from resume_agent.api.routers import auth_google as auth_google_router
+from resume_agent.api.routers import auth_password as auth_password_router
+from resume_agent.api.routers import auth_register as auth_register_router
 from resume_agent.api.routers import boards, health, resumes
 from resume_agent.api.routers import coach as coach_router
 from resume_agent.api.routers import config as config_router
@@ -60,6 +63,7 @@ from resume_agent.tenancy.bootstrap import build_context, ensure_bootstrapped
 from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.engines import EngineRegistry
 from resume_agent.tenancy.system_db import init_system_db, make_system_engine
+from resume_agent.mail.mailer import build_mailer
 from resume_agent.tenancy.workspace import workspace_paths
 
 
@@ -169,7 +173,8 @@ def create_app(
     app.state.document_store = DocumentStore(
         app.state.data_dir / "profile" / "documents"
     )
-    app.state.login_limiter = FailedAttemptLimiter()
+    app.state.mailer = build_mailer(resolved_settings)
+    app.state.breach_checker = HibpBreachChecker()
     app.state.gmail_oauth_states = {}
     # Falls back to a path under data_dir (not the separate RUNS_ROOT constant) so
     # that overriding data_dir — as most tests do to avoid touching the real repo —
@@ -252,6 +257,10 @@ def create_app(
     guarded = [Depends(require_token), Depends(get_user_context)]
     app.include_router(health.router, prefix="/api")
     app.include_router(auth_router.router, prefix="/api")
+    app.include_router(auth_google_router.router, prefix="/api")
+    app.include_router(auth_google_router.callback_router, prefix="/api")
+    app.include_router(auth_register_router.router, prefix="/api")
+    app.include_router(auth_password_router.router, prefix="/api")
     app.include_router(auth_router.link_router, prefix="/api", dependencies=guarded)
     download_guarded = [Depends(require_token), Depends(get_download_user_context)]
     app.include_router(

@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -9,7 +10,7 @@ from resume_agent.tenancy.system_db import InviteCode, User
 
 def _login(client, username="owner", password="owner-password"):
     return client.post(
-        "/api/auth/login", json={"username": username, "password": password}
+        "/api/auth/login", json={"identifier": username, "password": password}
     )
 
 
@@ -44,34 +45,41 @@ def test_login_uses_system_user_and_upgrades_weak_seed_hash(mu_app, mu_client):
 
 def test_register_consumes_invite_and_provisions_workspace(mu_app, mu_client):
     raw = _invite(mu_app)
+    password = "correct-horse-battery-staple"
     response = mu_client.post(
         "/api/auth/register",
         json={
-            "username": "alice",
-            "password": "long-enough-password",
+            "email": "alice@example.com",
+            "password": password,
             "inviteCode": raw,
         },
     )
-    assert response.status_code == 201
+    assert response.status_code == 202
+    match = re.search(r"\b(\d{6})\b", mu_app.state.mailer.sent[-1][2])
+    assert match
+    assert mu_client.post(
+        "/api/auth/verify-email",
+        json={"email": "alice@example.com", "code": match.group(1)},
+    ).status_code == 200
     with Session(mu_app.state.system_engine) as session:
         alice = session.execute(
             select(User).where(User.username == "alice")
         ).scalar_one()
     assert (mu_app.state.data_dir / "users" / alice.id / "profile").is_dir()
-    assert _login(mu_client, "alice", "long-enough-password").status_code == 200
+    assert _login(mu_client, "alice@example.com", password).status_code == 200
 
 
 def test_register_validates_inputs_and_failed_invites(mu_app, mu_client):
     invalid = mu_client.post(
         "/api/auth/register",
-        json={"username": "../bad", "password": "short", "inviteCode": "bad"},
+        json={"email": "bad", "password": "short", "inviteCode": "bad"},
     )
     assert invalid.status_code == 422
     unknown = mu_client.post(
         "/api/auth/register",
         json={
-            "username": "valid-user",
-            "password": "long-enough!",
+            "email": "valid-user@example.com",
+            "password": "correct-horse-battery-staple",
             "inviteCode": "inv_bogus",
         },
     )

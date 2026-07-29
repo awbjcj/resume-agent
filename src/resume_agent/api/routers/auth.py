@@ -6,11 +6,10 @@ from datetime import datetime, timezone
 from typing import Literal, cast
 
 from fastapi import APIRouter, Depends, Request, Response
-from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from resume_agent.api import auth
+from resume_agent.api import attempts, auth
 from resume_agent.api.deps import get_settings_dep
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.auth import (
@@ -18,13 +17,10 @@ from resume_agent.api.schemas.auth import (
     LinkTokenResponse,
     LoginRequest,
     MeResponse,
-    RegisterRequest,
 )
 from resume_agent.config import Settings
-from resume_agent.tenancy.context import new_user_id, require_context
-from resume_agent.tenancy.secrets import hash_secret
-from resume_agent.tenancy.system_db import InviteCode, User
-from resume_agent.tenancy.workspace import provision_workspace
+from resume_agent.tenancy.context import require_context
+from resume_agent.tenancy.system_db import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 link_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -35,27 +31,33 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _rate_gate(request: Request, username: str) -> None:
-    if request.app.state.login_limiter.blocked(username, _client_ip(request)):
+def _rate_gate(request: Request, identifier: str) -> None:
+    engine = getattr(request.app.state, "system_engine", None)
+    if engine is not None and attempts.blocked(
+        engine, email=identifier, ip=_client_ip(request)
+    ):
         raise ApiException(
             429, "RATE_LIMITED", "Too many failed attempts; try again later"
         )
 
 
-def _record_failure(request: Request, username: str) -> None:
-    request.app.state.login_limiter.record_failure(username, _client_ip(request))
+def _record_failure(request: Request, identifier: str) -> None:
+    engine = getattr(request.app.state, "system_engine", None)
+    if engine is not None and not attempts.record_failure(
+        engine, email=identifier, ip=_client_ip(request)
+    ):
+        raise ApiException(
+            429, "RATE_LIMITED", "Too many failed attempts; try again later"
+        )
 
 
-def _set_session_cookie(request: Request, response: Response, token: str) -> None:
-    response.set_cookie(
-        auth.SESSION_COOKIE,
-        token,
-        max_age=auth.SESSION_LIFETIME_SECONDS,
-        httponly=True,
-        secure=request.url.scheme == "https",
-        samesite="lax",
-        path="/",
-    )
+def resolve_login_user(session: Session, identifier: str) -> User | None:
+    return session.execute(
+        select(User).where(
+            (User.email == identifier)
+            | (User.email.is_(None) & (User.username == identifier))
+        )
+    ).scalars().first()
 
 
 @router.post("/login")
@@ -68,44 +70,58 @@ def login(
     system_engine = getattr(request.app.state, "system_engine", None)
     if system_engine is None:
         return _legacy_login(body, request, response, settings)
-    _rate_gate(request, body.username)
+    _rate_gate(request, body.identifier)
     with Session(system_engine) as session:
-        user = (
-            session.execute(select(User).where(User.username == body.username))
-            .scalars()
-            .first()
-        )
+        user = resolve_login_user(session, body.identifier)
         password_hash = (
             user.password_hash if user is not None else auth.DUMMY_PASSWORD_HASH
         )
         password_valid = auth.verify_password(body.password, password_hash)
-        if user is None or not password_valid:
-            _record_failure(request, body.username)
+        now = datetime.now(timezone.utc)
+        locked = user is not None and attempts.is_locked(user, now)
+        if user is None or not password_valid or locked:
+            if user is not None and not locked:
+                attempts.register_lockout(user, now)
+                session.commit()
+            _record_failure(request, body.identifier)
             time.sleep(FAILED_LOGIN_DELAY_SECONDS)
             raise ApiException(401, "UNAUTHORIZED", "Invalid username or password")
         if user.disabled_at is not None:
-            _record_failure(request, body.username)
+            _record_failure(request, body.identifier)
             raise ApiException(403, "USER_DISABLED", "This account is disabled")
         if auth.hash_needs_upgrade(user.password_hash):
             user.password_hash = auth.hash_password(body.password)
-        user.last_active_at = datetime.now(timezone.utc)
+        attempts.clear_lockout(user)
+        user.last_active_at = now
         session.commit()
         session.refresh(user)
-        user_id, username, role, password_hash = (
+        user_id, username, role, password_hash, epoch, email, verified, google_sub = (
             user.id,
             user.username,
             user.role,
             user.password_hash,
+            user.session_epoch,
+            user.email,
+            user.email_verified_at,
+            user.google_sub,
         )
-    request.app.state.login_limiter.reset(body.username, _client_ip(request))
-    _set_session_cookie(
+    attempts.reset(system_engine, email=body.identifier, ip=_client_ip(request))
+    auth.set_session_cookie(
         request,
         response,
-        auth.issue_user_session(settings, user_id=user_id, password_hash=password_hash),
+        auth.issue_user_session(
+            settings, user_id=user_id, password_hash=password_hash, epoch=epoch
+        ),
     )
     # The users.role CHECK constraint guarantees 'admin' | 'user' at the DB layer.
     return MeResponse(
-        username=username, role=cast(Literal["admin", "user"], role), auth_required=True
+        username=username,
+        email=email,
+        email_verified=verified is not None,
+        needs_email=email is None,
+        google_linked=google_sub is not None,
+        role=cast(Literal["admin", "user"], role),
+        auth_required=True,
     )
 
 
@@ -118,75 +134,14 @@ def _legacy_login(
     if not auth.session_auth_configured(settings):
         raise ApiException(400, "AUTH_NOT_CONFIGURED", "Session auth is not configured")
     username_valid = hmac.compare_digest(
-        body.username.encode(), settings.auth_username.encode()
+        body.identifier.encode(), settings.auth_username.encode()
     )
     password_valid = auth.verify_password(body.password, settings.auth_password_hash)
     if not (username_valid and password_valid):
         time.sleep(FAILED_LOGIN_DELAY_SECONDS)
         raise ApiException(401, "UNAUTHORIZED", "Invalid username or password")
-    _set_session_cookie(request, response, auth.issue_session(settings))
+    auth.set_session_cookie(request, response, auth.issue_session(settings))
     return MeResponse(username=settings.auth_username, auth_required=True)
-
-
-@router.post("/register", status_code=201)
-def register(body: RegisterRequest, request: Request) -> MeResponse:
-    system_engine = getattr(request.app.state, "system_engine", None)
-    if system_engine is None:
-        raise ApiException(
-            400, "AUTH_NOT_CONFIGURED", "Registration requires multi-user mode"
-        )
-    _rate_gate(request, body.username)
-    now = datetime.now(timezone.utc)
-    try:
-        with Session(system_engine) as session:
-            session.execute(text("BEGIN IMMEDIATE"))
-            invite = (
-                session.execute(
-                    select(InviteCode).where(
-                        InviteCode.code_hash == hash_secret(body.invite_code)
-                    )
-                )
-                .scalars()
-                .first()
-            )
-            if invite is None or invite.revoked_at is not None:
-                _record_failure(request, body.username)
-                raise ApiException(400, "INVITE_INVALID", "Unknown invitation code")
-            expires_at = invite.expires_at
-            if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
-            if expires_at <= now:
-                _record_failure(request, body.username)
-                raise ApiException(400, "INVITE_EXPIRED", "Invitation code expired")
-            if invite.used_at is not None:
-                _record_failure(request, body.username)
-                raise ApiException(400, "INVITE_USED", "Invitation code already used")
-            if session.execute(
-                select(User.id).where(User.username == body.username)
-            ).first():
-                _record_failure(request, body.username)
-                raise ApiException(409, "USERNAME_TAKEN", "That username is taken")
-            user = User(
-                id=new_user_id(),
-                username=body.username,
-                password_hash=auth.hash_password(body.password),
-                role="user",
-            )
-            session.add(user)
-            invite.used_by = user.id
-            invite.used_at = now
-            session.commit()
-            user_id = user.id
-    except IntegrityError as error:
-        _record_failure(request, body.username)
-        raise ApiException(409, "USERNAME_TAKEN", "That username is taken") from error
-    provision_workspace(
-        request.app.state.data_dir,
-        user_id,
-        template_dir=request.app.state.template_config_dir,
-    )
-    request.app.state.login_limiter.reset(body.username, _client_ip(request))
-    return MeResponse(username=body.username, role="user", auth_required=True)
 
 
 @router.post("/logout")
@@ -214,13 +169,20 @@ def me(request: Request, settings: Settings = Depends(get_settings_dep)) -> MeRe
             user is None
             or user.disabled_at is not None
             or auth.verify_user_session(
-                token, settings, password_hash=user.password_hash
+                token,
+                settings,
+                password_hash=user.password_hash,
+                epoch=user.session_epoch,
             )
             is None
         ):
             return MeResponse(auth_required=True)
         return MeResponse(
             username=user.username,
+            email=user.email,
+            email_verified=user.email_verified_at is not None,
+            needs_email=user.email is None,
+            google_linked=user.google_sub is not None,
             role=cast(Literal["admin", "user"], user.role),
             auth_required=True,
         )
