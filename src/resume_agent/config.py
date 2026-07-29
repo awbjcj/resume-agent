@@ -61,6 +61,17 @@ class Settings(BaseSettings):
     follow_up_days: int = Field(default=14, ge=0)  # 0 = reminders off
     gmail_max_messages: int = Field(default=50, ge=1)
 
+    # Platform mail is process-level configuration. It is intentionally kept
+    # outside the per-workspace secrets overlay used by Gmail.
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    app_base_url: str = ""
+    auth_email: str = ""
+
 
 @lru_cache
 def env_settings() -> Settings:
