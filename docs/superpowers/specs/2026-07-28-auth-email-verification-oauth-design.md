@@ -38,14 +38,14 @@ detection; magic-link passwordless sign-in; OAuth providers other than Google;
 
 ## Decisions taken
 
-| Decision | Choice | Rejected alternative |
-|---|---|---|
-| Mail transport | SMTP via `Settings`, stdlib `smtplib` | Transactional HTTP API — vendor lock for no benefit at this scale |
-| Login identifier | Email replaces username | Accepting either — two unique identifiers to rate-limit and disambiguate |
-| Signup gate | Invite code **and** verified email | Verification replacing invites — opens the shared LLM key to the internet |
-| Recovery | Emailed single-use code | Emailed temporary password — a live credential that persists in the inbox |
-| Google scopes | `openid email profile` only; Gmail stays a separate, pre-warmed opt-in | One combined consent — asks a stranger for inbox access before they trust the product |
-| Login page | Split canvas (branded panel + form column) | Centered card — visibly resizes across a six-screen flow |
+| Decision         | Choice                                                                 | Rejected alternative                                                                  |
+| ---------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Mail transport   | SMTP via `Settings`, stdlib `smtplib`                                  | Transactional HTTP API — vendor lock for no benefit at this scale                     |
+| Login identifier | Email replaces username                                                | Accepting either — two unique identifiers to rate-limit and disambiguate              |
+| Signup gate      | Invite code **and** verified email                                     | Verification replacing invites — opens the shared LLM key to the internet             |
+| Recovery         | Emailed single-use code                                                | Emailed temporary password — a live credential that persists in the inbox             |
+| Google scopes    | `openid email profile` only; Gmail stays a separate, pre-warmed opt-in | One combined consent — asks a stranger for inbox access before they trust the product |
+| Login page       | Split canvas (branded panel + form column)                             | Centered card — visibly resizes across a six-screen flow                              |
 
 ## Two mail actors
 
@@ -81,12 +81,12 @@ class Mailer(Protocol):
 The two methods differ **only** in failure handling, and the distinction is
 load-bearing:
 
-- `send()` **raises `MailDeliveryError`**. Used where the mail *is* the flow —
+- `send()` **raises `MailDeliveryError`**. Used where the mail _is_ the flow —
   the verification code, the reset code. If delivery fails, the calling endpoint
   must fail loudly rather than strand the user awaiting an email that will never
   arrive.
 - `notify()` **catches every exception and logs**. Used for security notices. A
-  dead SMTP host must never make a password change fail *after* the hash has
+  dead SMTP host must never make a password change fail _after_ the hash has
   already been rotated.
 
 `SmtpMailer` uses stdlib `smtplib.SMTP` with STARTTLS (or `SMTP_SSL` when
@@ -109,7 +109,7 @@ app_base_url: str = ""         # absolute base for links in mail bodies
 
 `app_base_url` is not used for the codes themselves — those are typed into a
 screen the user already has open. It exists for the security notices, which must
-give a recipient who did *not* initiate the action somewhere to go: the
+give a recipient who did _not_ initiate the action somewhere to go: the
 "password changed" and "Google linked" messages link to `{app_base_url}/login`
 and `{app_base_url}/forgot-password`. When blank the notices omit the links
 rather than emitting a relative URL.
@@ -149,15 +149,24 @@ This design adds `tenancy/migrate_system.py`, copying the idempotent
 
 ### `users` — new columns
 
-| Column | Type | Notes |
-|---|---|---|
-| `email` | `String(320)`, unique, indexed, **nullable** | The login identifier. Nullable solely so pre-existing rows survive migration. Stored casefolded. |
-| `email_verified_at` | `DateTime(tz)` nullable | Timestamp, not a flag — you will want to know when. |
-| `google_sub` | `String(64)`, unique, nullable | Google's stable subject id. |
-| `session_epoch` | `Integer`, not null, default 0 | Mixed into the session HMAC. |
-| `failed_login_count` | `Integer`, not null, default 0 | Consecutive failures; drives lockout tiers. Reset to 0 on any success. |
-| `locked_until` | `DateTime(tz)` nullable | Progressive lockout. |
-| `password_hash` | **relaxed to nullable** | Google-only accounts have no password. |
+| Column               | Type                                           | Notes                                                                                            |
+| -------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `email`              | `String(320)`, unique, indexed, **nullable**   | The login identifier. Nullable solely so pre-existing rows survive migration. Stored casefolded. |
+| `email_verified_at`  | `DateTime(tz)` nullable                        | Timestamp, not a flag — you will want to know when.                                              |
+| `google_sub`         | `String(64)`, unique, nullable                 | Google's stable subject id.                                                                      |
+| `session_epoch`      | `Integer`, not null, default 0                 | Mixed into the session HMAC.                                                                     |
+| `failed_login_count` | `Integer`, not null, default 0                 | Consecutive failures; drives lockout tiers. Reset to 0 on any success.                           |
+| `locked_until`       | `DateTime(tz)` nullable                        | Progressive lockout.                                                                             |
+| `password_hash`      | unchanged `NOT NULL`; `""` means "no password" | Google-only accounts.                                                                            |
+
+`password_hash` stays `NOT NULL` with an empty-string sentinel rather than
+becoming nullable: SQLite cannot relax a `NOT NULL` constraint via
+`ALTER TABLE`, so nullability would force a full table rebuild (create, copy,
+drop, rename) on a live volume for no behavioral gain. The sentinel also keeps
+a freshly-created schema byte-identical to a migrated one, which a rebuild
+would not. `verify_password(pw, "")` already fails closed — it raises inside
+`split(":")` and returns `False` — so the sentinel is safe by construction. A
+`has_password(user) -> bool` helper is the single reader of that meaning.
 
 `username` is **kept** and demoted to a display name. It is not dropped: SQLite
 cannot drop a unique constraint without a full table rebuild, the column is
@@ -244,7 +253,7 @@ Request: `{ email, password, inviteCode, displayName? }`
    immediately, so `verify-email` never re-validates.
 3. Validate the invite: exists, not revoked, not expired, not used. Invalid →
    `400 INVITE_INVALID` / `INVITE_EXPIRED` / `INVITE_USED`. Invite validity is
-   *not* enumeration-sensitive; the code is a secret the caller already holds.
+   _not_ enumeration-sensitive; the code is a secret the caller already holds.
 4. If a `User` with this email already exists → **return the same `202`** and
    `notify()` the real account holder that someone attempted signup with their
    address, pointing at password reset. (§5, enumeration.)
@@ -340,11 +349,11 @@ restart, so a redeploy hands an attacker a clean budget.
 
 `api/attempts.py`, backed by `login_attempts`. Three concurrent scopes:
 
-| Scope | Budget | Catches |
-|---|---|---|
-| `email_ip` | 10 / 15 min | today's rule, preserved |
-| `email` | 20 / hour | distributed attempts on one account |
-| `ip` | 50 / hour | spraying across many accounts |
+| Scope      | Budget      | Catches                             |
+| ---------- | ----------- | ----------------------------------- |
+| `email_ip` | 10 / 15 min | today's rule, preserved             |
+| `email`    | 20 / hour   | distributed attempts on one account |
+| `ip`       | 50 / hour   | spraying across many accounts       |
 
 Exceeding any scope → `429 RATE_LIMITED`. Rows older than the longest window are
 pruned on each write, so the table stays small without a sweeper.
@@ -360,12 +369,12 @@ an email-scoped budget on at gate time.
 Each failed authentication against a known account increments
 `users.failed_login_count` and, at a tier boundary, writes `users.locked_until`:
 
-| `failed_login_count` | Lock |
-|---|---|
-| 5 | 1 minute |
-| 10 | 15 minutes |
-| 15 | 60 minutes |
-| every 5 thereafter | 60 minutes |
+| `failed_login_count` | Lock       |
+| -------------------- | ---------- |
+| 5                    | 1 minute   |
+| 10                   | 15 minutes |
+| 15                   | 60 minutes |
+| every 5 thereafter   | 60 minutes |
 
 Both fields reset — count to 0, `locked_until` to `NULL` — on any successful
 authentication, including a successful password reset or Google sign-in. The
@@ -379,11 +388,11 @@ tells an attacker their guesses are landing on a real account.
 Endpoints must not reveal whether an address is registered. This **changes
 existing behavior**: `register` currently answers `409 USERNAME_TAKEN`.
 
-| Endpoint | Existing address | Unknown address |
-|---|---|---|
-| `register` | `202 {status: sent}` + notice email to holder | `202 {status: sent}` + code email |
-| `password/forgot` | `202 {status: sent}` + code email | `202 {status: sent}`, no email |
-| `login` | `401 UNAUTHORIZED` | `401 UNAUTHORIZED` (dummy-hash compare) |
+| Endpoint          | Existing address                              | Unknown address                         |
+| ----------------- | --------------------------------------------- | --------------------------------------- |
+| `register`        | `202 {status: sent}` + notice email to holder | `202 {status: sent}` + code email       |
+| `password/forgot` | `202 {status: sent}` + code email             | `202 {status: sent}`, no email          |
+| `login`           | `401 UNAUTHORIZED`                            | `401 UNAUTHORIZED` (dummy-hash compare) |
 
 The tradeoff, accepted: a user who forgets they already have an account is told
 by email rather than on screen. The existing `DUMMY_PASSWORD_HASH` compare
@@ -405,9 +414,9 @@ key = hmac.new(session_secret, f"{namespace}:{password_hash or ''}:{epoch}", sha
 
 Two consequences, both free:
 
-- **Google-only accounts work.** `password_hash` is `NULL`, contributing an
-  empty string; sessions stay unique because the signed payload carries
-  `user_id`.
+- **Google-only accounts work.** `password_hash` is the empty-string sentinel,
+  contributing nothing to the key; sessions stay unique because the signed
+  payload carries `user_id`.
 - **Sign out everywhere is one integer.** `POST /api/account/sessions/revoke-all`
   increments `session_epoch` and re-issues the caller's own cookie so the
   current device stays signed in. No session table, no sweep.
@@ -513,7 +522,7 @@ that does not verify ownership, signs in, and inherits the account. Requiring
 The `id_token` is verified with `google.oauth2.id_token.verify_oauth2_token`
 against the configured client id — the claims are never read unverified.
 
-Users created through branch 3 have `password_hash = NULL` and no password.
+Users created through branch 3 have `password_hash = ""` and no password.
 
 ### Gmail sync pre-wiring
 
@@ -540,20 +549,20 @@ via reset first.
 
 ## 9. API surface
 
-| Method | Path | Auth | Purpose |
-|---|---|---|---|
-| `POST` | `/api/auth/register` | none | Start signup; writes pending row, sends code |
-| `POST` | `/api/auth/verify-email` | none | Consume code, create user, sign in |
-| `POST` | `/api/auth/resend-code` | none | New code for a pending signup |
-| `POST` | `/api/auth/login` | none | `email` + `password` (was `username`) |
-| `POST` | `/api/auth/password/forgot` | none | Send reset code |
-| `POST` | `/api/auth/password/reset` | none | Consume code, rotate hash, sign in |
-| `GET` | `/api/auth/google/start` | none | Authorization URL |
-| `GET` | `/api/auth/google/callback` | none | Exchange, resolve, sign in |
-| `POST` | `/api/account/email` | session | Set/change email on a legacy account |
-| `POST` | `/api/account/email/verify` | session | Verify that address |
-| `POST` | `/api/account/sessions/revoke-all` | session | Bump epoch |
-| `DELETE` | `/api/account/google` | session | Unlink |
+| Method   | Path                               | Auth    | Purpose                                      |
+| -------- | ---------------------------------- | ------- | -------------------------------------------- |
+| `POST`   | `/api/auth/register`               | none    | Start signup; writes pending row, sends code |
+| `POST`   | `/api/auth/verify-email`           | none    | Consume code, create user, sign in           |
+| `POST`   | `/api/auth/resend-code`            | none    | New code for a pending signup                |
+| `POST`   | `/api/auth/login`                  | none    | `email` + `password` (was `username`)        |
+| `POST`   | `/api/auth/password/forgot`        | none    | Send reset code                              |
+| `POST`   | `/api/auth/password/reset`         | none    | Consume code, rotate hash, sign in           |
+| `GET`    | `/api/auth/google/start`           | none    | Authorization URL                            |
+| `GET`    | `/api/auth/google/callback`        | none    | Exchange, resolve, sign in                   |
+| `POST`   | `/api/account/email`               | session | Set/change email on a legacy account         |
+| `POST`   | `/api/account/email/verify`        | session | Verify that address                          |
+| `POST`   | `/api/account/sessions/revoke-all` | session | Bump epoch                                   |
+| `DELETE` | `/api/account/google`              | session | Unlink                                       |
 
 ### Contract changes (breaking)
 
@@ -595,14 +604,14 @@ gradient has a dark-mode variant rather than a single fixed image.
 
 ### Routes
 
-| Route | Screen |
-|---|---|
-| `/login` | Google button, `or` divider, email + password, forgot link |
-| `/register` | Google button, `or` divider, email + password + invite + display name |
-| `/verify-email` | 6-box code entry, resend with cooldown |
-| `/forgot-password` | Email field, always-succeeds confirmation |
-| `/reset-password` | Code + new password + strength meter |
-| `/complete-profile` | Legacy email collection, then verification |
+| Route               | Screen                                                                |
+| ------------------- | --------------------------------------------------------------------- |
+| `/login`            | Google button, `or` divider, email + password, forgot link            |
+| `/register`         | Google button, `or` divider, email + password + invite + display name |
+| `/verify-email`     | 6-box code entry, resend with cooldown                                |
+| `/forgot-password`  | Email field, always-succeeds confirmation                             |
+| `/reset-password`   | Code + new password + strength meter                                  |
+| `/complete-profile` | Legacy email collection, then verification                            |
 
 ### New components
 
@@ -643,8 +652,8 @@ Everything stays offline: no SMTP, no HIBP, no Google.
   legacy admin logs in by username, receives `needsEmail`, completes
   verification, and afterward can no longer log in by username.
 - **Sessions** — an epoch bump invalidates a previously-valid cookie; revoke-all
-  keeps the caller signed in; a Google-only account (`password_hash IS NULL`)
-  gets a valid, verifiable session.
+  keeps the caller signed in; a Google-only account (`password_hash == ""`)
+  gets a valid, verifiable session and still cannot log in with a password.
 - **Codes** — expiry, five-attempt destruction, single use, and that a consumed
   reset code cannot be replayed.
 - **Web** — `OtpInput` paste and keyboard navigation; `AuthLayout` at mobile and
@@ -672,11 +681,11 @@ regenerated in that same phase.
 
 ## Risks
 
-| Risk | Mitigation |
-|---|---|
-| SMTP misconfigured in production silently logs codes | `mailConfigured` on `/api/health`; admin banner; documented in the deploy guide |
-| SMTP provider rate limits or greylists the sender | Resend capped at 3/hour/email; `MailDeliveryError` surfaces as `503`, not a hang |
-| HIBP outage blocks all registration | Fails open by design; rules 1–3 still enforced |
-| Legacy admin locked out on deploy | Username fallback (§7), covered by the migration test |
-| Google consent screen unverified-app warning | Pre-existing — the same client already requests sensitive Gmail scopes today; sign-in scopes are non-sensitive and add no new review burden |
-| Breaking contract change to `login` | Single-owner deployment; contract regenerated and gated in the same change |
+| Risk                                                 | Mitigation                                                                                                                                  |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| SMTP misconfigured in production silently logs codes | `mailConfigured` on `/api/health`; admin banner; documented in the deploy guide                                                             |
+| SMTP provider rate limits or greylists the sender    | Resend capped at 3/hour/email; `MailDeliveryError` surfaces as `503`, not a hang                                                            |
+| HIBP outage blocks all registration                  | Fails open by design; rules 1–3 still enforced                                                                                              |
+| Legacy admin locked out on deploy                    | Username fallback (§7), covered by the migration test                                                                                       |
+| Google consent screen unverified-app warning         | Pre-existing — the same client already requests sensitive Gmail scopes today; sign-in scopes are non-sensitive and add no new review burden |
+| Breaking contract change to `login`                  | Single-owner deployment; contract regenerated and gated in the same change                                                                  |

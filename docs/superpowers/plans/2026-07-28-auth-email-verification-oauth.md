@@ -28,37 +28,37 @@
 
 **New — backend**
 
-| Path | Responsibility |
-|---|---|
-| `src/resume_agent/mail/__init__.py` | Package marker |
-| `src/resume_agent/mail/mailer.py` | `Mailer` protocol, `SmtpMailer`, `NullMailer`, `MailDeliveryError`, `build_mailer` |
-| `src/resume_agent/mail/messages.py` | Plain-text message bodies |
-| `src/resume_agent/tenancy/migrate_system.py` | Additive `system.db` column/index migration |
-| `src/resume_agent/api/password_policy.py` | `validate_password`, `BreachChecker`, `HibpBreachChecker`, `NullBreachChecker` |
-| `src/resume_agent/api/data/common_passwords.txt` | Offline common-password floor |
-| `src/resume_agent/api/attempts.py` | Durable rate-limit budgets + account lockout tiers |
-| `src/resume_agent/api/auth_codes.py` | Code generation, hashing, and attempt-counting verification |
-| `src/resume_agent/api/routers/auth_register.py` | `register`, `verify-email`, `resend-code` |
-| `src/resume_agent/api/routers/auth_password.py` | `password/forgot`, `password/reset` |
-| `src/resume_agent/api/routers/auth_google.py` | `google/start`, `google/callback` |
-| `src/resume_agent/api/schemas/auth_email.py` | Schemas for the above routers |
+| Path                                             | Responsibility                                                                     |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `src/resume_agent/mail/__init__.py`              | Package marker                                                                     |
+| `src/resume_agent/mail/mailer.py`                | `Mailer` protocol, `SmtpMailer`, `NullMailer`, `MailDeliveryError`, `build_mailer` |
+| `src/resume_agent/mail/messages.py`              | Plain-text message bodies                                                          |
+| `src/resume_agent/tenancy/migrate_system.py`     | Additive `system.db` column/index migration                                        |
+| `src/resume_agent/api/password_policy.py`        | `validate_password`, `BreachChecker`, `HibpBreachChecker`, `NullBreachChecker`     |
+| `src/resume_agent/api/data/common_passwords.txt` | Offline common-password floor                                                      |
+| `src/resume_agent/api/attempts.py`               | Durable rate-limit budgets + account lockout tiers                                 |
+| `src/resume_agent/api/auth_codes.py`             | Code generation, hashing, and attempt-counting verification                        |
+| `src/resume_agent/api/routers/auth_register.py`  | `register`, `verify-email`, `resend-code`                                          |
+| `src/resume_agent/api/routers/auth_password.py`  | `password/forgot`, `password/reset`                                                |
+| `src/resume_agent/api/routers/auth_google.py`    | `google/start`, `google/callback`                                                  |
+| `src/resume_agent/api/schemas/auth_email.py`     | Schemas for the above routers                                                      |
 
 **Modified — backend**
 
-| Path | Change |
-|---|---|
-| `config.py` | SMTP + `app_base_url` + `auth_email` settings |
-| `tenancy/system_db.py` | `users` columns; `PendingRegistration`, `PasswordResetCode`, `LoginAttempt` |
-| `tenancy/bootstrap.py` | Seed admin email from `AUTH_EMAIL` |
-| `api/auth.py` | `session_epoch` in HMAC key; `set_session_cookie`; OAuth state signing |
-| `api/deps.py:_authenticated_user` | Pass `epoch=` to `verify_user_session` |
-| `api/app.py` | `app.state.mailer`, `app.state.breach_checker`, run `migrate_system_db`, mount new routers |
-| `api/routers/auth.py` | Login by email + legacy username fallback; lockout; `MeResponse` fields |
-| `api/routers/account.py` | Email set/verify, `sessions/revoke-all`, `DELETE /google`, policy on change-password |
-| `api/routers/gmail.py` | `login_hint` + `include_granted_scopes` |
-| `api/routers/health.py` | `HealthOut` with `mailConfigured` |
-| `api/schemas/auth.py` | `email` replaces `username`; `MeResponse` fields |
-| `api/schemas/account.py` | Email/verify request schemas |
+| Path                              | Change                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| `config.py`                       | SMTP + `app_base_url` + `auth_email` settings                                              |
+| `tenancy/system_db.py`            | `users` columns; `PendingRegistration`, `PasswordResetCode`, `LoginAttempt`                |
+| `tenancy/bootstrap.py`            | Seed admin email from `AUTH_EMAIL`                                                         |
+| `api/auth.py`                     | `session_epoch` in HMAC key; `set_session_cookie`; OAuth state signing                     |
+| `api/deps.py:_authenticated_user` | Pass `epoch=` to `verify_user_session`                                                     |
+| `api/app.py`                      | `app.state.mailer`, `app.state.breach_checker`, run `migrate_system_db`, mount new routers |
+| `api/routers/auth.py`             | Login by email + legacy username fallback; lockout; `MeResponse` fields                    |
+| `api/routers/account.py`          | Email set/verify, `sessions/revoke-all`, `DELETE /google`, policy on change-password       |
+| `api/routers/gmail.py`            | `login_hint` + `include_granted_scopes`                                                    |
+| `api/routers/health.py`           | `HealthOut` with `mailConfigured`                                                          |
+| `api/schemas/auth.py`             | `email` replaces `username`; `MeResponse` fields                                           |
+| `api/schemas/account.py`          | Email/verify request schemas                                                               |
 
 **New — web** (all under `web/src/features/auth/` unless noted)
 
@@ -73,11 +73,13 @@
 ### Task 1: Mail seam
 
 **Files:**
+
 - Create: `src/resume_agent/mail/__init__.py`, `src/resume_agent/mail/mailer.py`, `src/resume_agent/mail/messages.py`
 - Modify: `src/resume_agent/config.py` (after the Gmail block, around line 62)
 - Test: `tests/test_mailer.py`
 
 **Interfaces:**
+
 - Consumes: `resume_agent.config.Settings`
 - Produces:
   - `Mailer` protocol with `send(*, to: str, subject: str, body: str) -> None` and `notify(...) -> None`
@@ -396,11 +398,13 @@ git commit -m "Adds the platform outbound-mail seam with raising send and swallo
 ### Task 2: System DB schema and migration
 
 **Files:**
+
 - Modify: `src/resume_agent/tenancy/system_db.py`
 - Create: `src/resume_agent/tenancy/migrate_system.py`
 - Test: `tests/tenancy/test_migrate_system.py`
 
 **Interfaces:**
+
 - Consumes: `SystemBase`, `utc_now` from `tenancy/system_db.py`
 - Produces:
   - `User` gains `email: Mapped[str | None]`, `email_verified_at: Mapped[datetime | None]`, `google_sub: Mapped[str | None]`, `session_epoch: Mapped[int]`, `failed_login_count: Mapped[int]`, `locked_until: Mapped[datetime | None]`
@@ -726,12 +730,14 @@ git commit -m "Adds email identity columns, code tables, and an additive system.
 ### Task 3: `session_epoch` in the session HMAC
 
 **Files:**
+
 - Modify: `src/resume_agent/api/auth.py:90-141`
 - Modify: `src/resume_agent/api/deps.py:_authenticated_user` (~line 110)
 - Modify: `src/resume_agent/api/routers/auth.py:104` (the `issue_user_session` call)
 - Test: `tests/api/test_session_epoch.py`
 
 **Interfaces:**
+
 - Consumes: `Settings.session_secret`
 - Produces:
   - `issue_user_session(settings, *, user_id: str, password_hash: str, epoch: int = 0, now: float | None = None) -> str`
@@ -934,11 +940,13 @@ git commit -m "Mixes session_epoch into the session HMAC so revocation stays tab
 ### Task 4: `password_policy.py` and the breach checker
 
 **Files:**
+
 - Create: `src/resume_agent/api/password_policy.py`
 - Create: `src/resume_agent/api/data/common_passwords.txt`
 - Test: `tests/api/test_password_policy.py`
 
 **Interfaces:**
+
 - Consumes: `ApiException` from `api/errors.py`
 - Produces:
   - `MIN_LENGTH = 12`, `MAX_LENGTH = 1024`
@@ -1210,12 +1218,14 @@ git commit -m "Adds the password policy with an offline floor and HIBP k-anonymi
 ### Task 5: Wire the policy into change-password
 
 **Files:**
+
 - Modify: `src/resume_agent/api/app.py` (app state, ~line 172)
 - Modify: `src/resume_agent/api/routers/account.py` (the `change_password` handler)
 - Modify: `tests/api/conftest.py` (the `mu_app` fixture)
 - Test: `tests/api/test_account_password.py`
 
 **Interfaces:**
+
 - Consumes: `validate_password`, `build_mailer`, `messages.password_changed`, `auth.set_session_cookie`
 - Produces: `app.state.mailer: Mailer`, `app.state.breach_checker: BreachChecker`
 
@@ -1423,10 +1433,12 @@ git commit -m "Applies the password policy, epoch bump, and change notice to cha
 ### Task 6: `api/attempts.py`
 
 **Files:**
+
 - Create: `src/resume_agent/api/attempts.py`
 - Test: `tests/api/test_attempts.py`
 
 **Interfaces:**
+
 - Consumes: `LoginAttempt`, `User` from `tenancy/system_db.py`
 - Produces:
   - `Budget(scope: str, limit: int, window: timedelta)` frozen dataclass
@@ -1750,12 +1762,14 @@ git commit -m "Adds durable three-scope rate limiting and progressive account lo
 ### Task 7: Replace the in-memory limiter at the login call site
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/auth.py` (lines 31–47 and the `login` handler)
 - Modify: `src/resume_agent/api/app.py` (drop `app.state.login_limiter`)
 - Delete: `src/resume_agent/api/rate_limit.py`
 - Test: `tests/api/test_login_lockout.py`
 
 **Interfaces:**
+
 - Consumes: `api.attempts`
 - Produces, in `routers/auth.py`:
   - `_rate_gate(request: Request, identifier: str, *, scopes: frozenset[str] | None = None) -> None`
@@ -1942,10 +1956,12 @@ git commit -m "Replaces the in-memory login limiter with durable budgets and acc
 ### Task 8: Code generation and verification helper
 
 **Files:**
+
 - Create: `src/resume_agent/api/auth_codes.py`
 - Test: `tests/api/test_auth_codes.py`
 
 **Interfaces:**
+
 - Consumes: `Settings.session_secret`
 - Produces:
   - `CODE_TTL = timedelta(minutes=15)`, `MAX_ATTEMPTS = 5`
@@ -2146,12 +2162,14 @@ git commit -m "Adds peppered six-digit codes with TTL and attempt exhaustion"
 ### Task 9: Registration schemas and the register endpoint
 
 **Files:**
+
 - Create: `src/resume_agent/api/schemas/auth_email.py`
 - Create: `src/resume_agent/api/routers/auth_register.py`
 - Modify: `src/resume_agent/api/app.py` (mount the router, unguarded, next to `auth_router.router`)
 - Test: `tests/api/test_auth_register.py`
 
 **Interfaces:**
+
 - Consumes: `auth_codes`, `password_policy.validate_password`, `attempts`, `mail.messages`, `PendingRegistration`, `InviteCode`, `User`, `hash_secret`
 - Produces:
   - `RegisterRequest(email: EmailStr, password: str, invite_code: str, display_name: str | None)`
@@ -2543,10 +2561,12 @@ git commit -m "Adds registration that emails a code without creating the account
 ### Task 10: Verify-email and resend-code
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/auth_register.py` (append two handlers)
 - Test: `tests/api/test_auth_verify_email.py`
 
 **Interfaces:**
+
 - Consumes: everything from Task 9
 - Produces: `POST /api/auth/verify-email -> MeResponse`, `POST /api/auth/resend-code -> CodeSentResponse`
 
@@ -2885,12 +2905,14 @@ git commit -m "Creates the account only on verified code, consuming the invite a
 ### Task 11: Login by email, with the legacy username fallback
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/auth.py`
 - Modify: `src/resume_agent/api/routers/auth.py` (`login`, `me`)
 - Modify: `src/resume_agent/tenancy/bootstrap.py` (seed `AUTH_EMAIL`)
 - Test: `tests/api/test_login_email.py`
 
 **Interfaces:**
+
 - Consumes: `attempts`, `auth`, `User`
 - Produces:
   - `LoginRequest(identifier: str, password: str)` — the wire field is `identifier`
@@ -3084,11 +3106,13 @@ git commit -m "Makes email the login identifier with a username fallback for pre
 ### Task 12: Forgot and reset password
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/auth_password.py`
 - Modify: `src/resume_agent/api/app.py` (mount, unguarded)
 - Test: `tests/api/test_auth_password_reset.py`
 
 **Interfaces:**
+
 - Consumes: `auth_codes`, `validate_password`, `attempts`, `messages`, `PasswordResetCode`
 - Produces: `POST /api/auth/password/forgot -> CodeSentResponse`, `POST /api/auth/password/reset -> MeResponse`
 
@@ -3455,6 +3479,7 @@ git commit -m "Adds password recovery by emailed single-use code with full sessi
 ### Task 13: Account email adoption, revoke-all, and health
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/account.py`
 - Modify: `src/resume_agent/api/schemas/account.py`
 - Modify: `src/resume_agent/api/routers/health.py`
@@ -3462,6 +3487,7 @@ git commit -m "Adds password recovery by emailed single-use code with full sessi
 - Test: `tests/api/test_account_email.py`, `tests/api/test_health.py`
 
 **Interfaces:**
+
 - Produces:
   - `POST /api/account/email` — `{ email }` → `CodeSentResponse`
   - `POST /api/account/email/verify` — `{ email, code }` → `MeResponse`
@@ -3811,10 +3837,12 @@ git commit -m "Adds account email adoption, sign-out-everywhere, and mailConfigu
 ### Task 14: OAuth state signing
 
 **Files:**
+
 - Modify: `src/resume_agent/api/auth.py` (append)
 - Test: `tests/api/test_oauth_state.py`
 
 **Interfaces:**
+
 - Consumes: `Settings.session_secret`, `_sign_user`
 - Produces:
   - `OAUTH_STATE_TTL_SECONDS = 600`
@@ -3960,12 +3988,14 @@ git commit -m "Adds signed pre-account OAuth state carrying mode and invite"
 ### Task 15: Google start and callback
 
 **Files:**
+
 - Create: `src/resume_agent/api/routers/auth_google.py`
 - Create: `src/resume_agent/api/schemas/auth_google.py`
 - Modify: `src/resume_agent/api/app.py` (mount both routers unguarded)
 - Test: `tests/api/test_auth_google.py`
 
 **Interfaces:**
+
 - Consumes: `auth.issue_oauth_state`, `auth.verify_oauth_state`, `auth.set_session_cookie`, `attempts.IP_ONLY`, `InviteCode`, `User`, `provision_workspace`, `messages.google_linked`
 - Produces:
   - `GET /api/auth/google/start?mode=&invite=` → `GoogleStartOut(auth_url: str)`
@@ -4530,11 +4560,13 @@ git commit -m "Adds Google sign-in pinned to sub and refusing unverified email l
 ### Task 16: Gmail pre-wiring and unlink
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/gmail.py` (`gmail_connect`)
 - Modify: `src/resume_agent/api/routers/account.py` (append `DELETE /google`)
 - Test: `tests/api/test_gmail_prewire.py`
 
 **Interfaces:**
+
 - Produces: `DELETE /api/account/google -> MeResponse`; `gmail_connect` now passes `login_hint` and `include_granted_scopes`
 
 - [ ] **Step 1: Write the failing test**
@@ -4756,10 +4788,12 @@ git commit -m "Pre-wires Gmail connect for Google accounts and adds a safe unlin
 ### Task 17: `AuthLayout` split canvas
 
 **Files:**
+
 - Create: `web/src/features/auth/AuthLayout.tsx`
 - Test: `web/src/features/auth/AuthLayout.test.tsx`
 
 **Interfaces:**
+
 - Produces: `AuthLayout({ title, description, icon, children, footer })` where `title: string`, `description: string`, `icon: ReactNode`, `children: ReactNode`, `footer?: ReactNode`
 
 **Why a fixed split rather than the current centered card:** this flow grows from two screens to six, and their heights differ sharply — a six-box code input is short, a password screen with a strength meter and a Google button is tall. A centered card visibly jumps size between steps. With a fixed split only the right column changes and the composition holds still.
@@ -4781,14 +4815,20 @@ describe("AuthLayout", () => {
         <p>Form goes here</p>
       </AuthLayout>,
     );
-    expect(screen.getByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Sign in" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Welcome back")).toBeInTheDocument();
     expect(screen.getByText("Form goes here")).toBeInTheDocument();
   });
 
   it("renders the footer when given one", () => {
     render(
-      <AuthLayout title="Sign in" description="d" footer={<span>Footer slot</span>}>
+      <AuthLayout
+        title="Sign in"
+        description="d"
+        footer={<span>Footer slot</span>}
+      >
         <p>c</p>
       </AuthLayout>,
     );
@@ -4854,7 +4894,9 @@ export function AuthLayout({
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,color-mix(in_oklab,var(--primary-foreground)_22%,transparent),transparent_55%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,color-mix(in_oklab,var(--primary-foreground)_8%,transparent)_1px,transparent_1px),linear-gradient(to_bottom,color-mix(in_oklab,var(--primary-foreground)_8%,transparent)_1px,transparent_1px)] bg-[size:3rem_3rem]" />
-        <p className="relative text-lg font-semibold tracking-tight">Resume Agent</p>
+        <p className="relative text-lg font-semibold tracking-tight">
+          Resume Agent
+        </p>
         <div className="relative max-w-md">
           <p className="text-3xl font-semibold leading-tight tracking-tight">
             Every bullet traces back to a fact you actually wrote.
@@ -4864,7 +4906,9 @@ export function AuthLayout({
             from one workspace.
           </p>
         </div>
-        <p className="relative text-xs opacity-70">Your private command center.</p>
+        <p className="relative text-xs opacity-70">
+          Your private command center.
+        </p>
       </div>
 
       <main className="flex w-full items-center justify-center bg-background p-6 lg:w-[45%]">
@@ -4904,10 +4948,12 @@ git commit -m "Adds the split-canvas auth shell"
 ### Task 18: `OtpInput`, strength meter, and Google button
 
 **Files:**
+
 - Create: `web/src/features/auth/OtpInput.tsx`, `web/src/features/auth/strength.ts`, `web/src/features/auth/PasswordStrengthMeter.tsx`, `web/src/features/auth/GoogleButton.tsx`
 - Test: `web/src/features/auth/OtpInput.test.tsx`, `web/src/features/auth/strength.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `OtpInput({ value, onChange, disabled, label })` — `value: string`, `onChange: (next: string) => void`, `label: string`
   - `scorePassword(password: string): { score: 0 | 1 | 2 | 3 | 4; hint: string }`
@@ -4933,7 +4979,9 @@ describe("scorePassword", () => {
   });
 
   it("scores a long mixed password high", () => {
-    expect(scorePassword("quartz-Lantern-42-drift!").score).toBeGreaterThanOrEqual(3);
+    expect(
+      scorePassword("quartz-Lantern-42-drift!").score,
+    ).toBeGreaterThanOrEqual(3);
   });
 
   it("penalizes a repeated run", () => {
@@ -4982,7 +5030,9 @@ function Harness({ onChange }: { onChange?: (next: string) => void }) {
 describe("OtpInput", () => {
   it("renders six boxes under one group label", () => {
     render(<Harness />);
-    expect(screen.getByRole("group", { name: "Verification code" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Verification code" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("textbox")).toHaveLength(6);
   });
 
@@ -5065,15 +5115,24 @@ function hasRun(password: string): boolean {
 function hasSequence(password: string): boolean {
   const lowered = password.toLowerCase();
   for (let index = 0; index + 3 < lowered.length; index += 1) {
-    const codes = [0, 1, 2, 3].map((offset) => lowered.charCodeAt(index + offset));
-    if (codes.every((code, offset) => offset === 0 || code === codes[offset - 1] + 1)) {
+    const codes = [0, 1, 2, 3].map((offset) =>
+      lowered.charCodeAt(index + offset),
+    );
+    if (
+      codes.every(
+        (code, offset) => offset === 0 || code === codes[offset - 1] + 1,
+      )
+    ) {
       return true;
     }
   }
   return false;
 }
 
-export function scorePassword(password: string): { score: StrengthScore; hint: string } {
+export function scorePassword(password: string): {
+  score: StrengthScore;
+  hint: string;
+} {
   if (!password) return { score: 0, hint: "Use at least 12 characters." };
 
   const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((pattern) =>
@@ -5132,7 +5191,12 @@ export function PasswordStrengthMeter({ password }: { password: string }) {
 - [ ] **Step 5: Write `OtpInput.tsx`**
 
 ```tsx
-import { useRef, type ChangeEvent, type ClipboardEvent, type KeyboardEvent } from "react";
+import {
+  useRef,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from "react";
 
 const LENGTH = 6;
 
@@ -5166,33 +5230,38 @@ export function OtpInput({
     onChange(next.join("").replace(/ /g, ""));
   };
 
-  const handleChange = (index: number) => (event: ChangeEvent<HTMLInputElement>) => {
-    const digit = event.target.value.replace(/\D/g, "").slice(-1);
-    if (!digit) return;
-    write(index, digit);
-    focus(index + 1);
-  };
-
-  const handleKeyDown = (index: number) => (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Backspace") {
-      event.preventDefault();
-      if (digits[index].trim()) {
-        write(index, " ");
-      } else {
-        write(index - 1 >= 0 ? index - 1 : 0, " ");
-        focus(index - 1);
-      }
-    } else if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      focus(index - 1);
-    } else if (event.key === "ArrowRight") {
-      event.preventDefault();
+  const handleChange =
+    (index: number) => (event: ChangeEvent<HTMLInputElement>) => {
+      const digit = event.target.value.replace(/\D/g, "").slice(-1);
+      if (!digit) return;
+      write(index, digit);
       focus(index + 1);
-    }
-  };
+    };
+
+  const handleKeyDown =
+    (index: number) => (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        if (digits[index].trim()) {
+          write(index, " ");
+        } else {
+          write(index - 1 >= 0 ? index - 1 : 0, " ");
+          focus(index - 1);
+        }
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        focus(index - 1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        focus(index + 1);
+      }
+    };
 
   const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
-    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, LENGTH);
+    const pasted = event.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, LENGTH);
     if (!pasted) return;
     event.preventDefault();
     onChange(pasted);
@@ -5298,10 +5367,12 @@ git commit -m "Adds the OTP input, advisory strength meter, and Google start but
 ### Task 19: Rebuild login and register on the new contract
 
 **Files:**
+
 - Modify: `web/src/features/auth/LoginPage.tsx`, `web/src/features/auth/RegisterPage.tsx`
 - Test: `web/src/features/auth/LoginPage.test.tsx`, `web/src/features/auth/RegisterPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `AuthLayout`, `GoogleButton`, `PasswordStrengthMeter`, `api` client
 - Produces: `LoginPage`, `RegisterPage`; register navigates to `/verify-email?email=<address>` on 202
 
@@ -5321,7 +5392,9 @@ import { server } from "@/test/server";
 import { LoginPage } from "./LoginPage";
 
 function wrap() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/login"]}>
@@ -5340,13 +5413,20 @@ describe("LoginPage", () => {
     server.use(
       http.post("/api/auth/login", async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ username: "ada", email: "ada@example.com", authRequired: true });
+        return HttpResponse.json({
+          username: "ada",
+          email: "ada@example.com",
+          authRequired: true,
+        });
       }),
     );
     const user = userEvent.setup();
     wrap();
     await user.type(screen.getByLabelText(/email/i), "ada@example.com");
-    await user.type(screen.getByLabelText(/password/i), "quartz-lantern-42-drift");
+    await user.type(
+      screen.getByLabelText(/password/i),
+      "quartz-lantern-42-drift",
+    );
     await user.click(screen.getByRole("button", { name: /^sign in$/i }));
     expect(await screen.findByText("Dashboard")).toBeInTheDocument();
     expect(body).toEqual({
@@ -5359,7 +5439,12 @@ describe("LoginPage", () => {
     server.use(
       http.post("/api/auth/login", () =>
         HttpResponse.json(
-          { error: { code: "UNAUTHORIZED", message: "Invalid email or password" } },
+          {
+            error: {
+              code: "UNAUTHORIZED",
+              message: "Invalid email or password",
+            },
+          },
           { status: 401 },
         ),
       ),
@@ -5369,12 +5454,16 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/email/i), "ada@example.com");
     await user.type(screen.getByLabelText(/password/i), "wrong-password-here");
     await user.click(screen.getByRole("button", { name: /^sign in$/i }));
-    expect(await screen.findByText(/invalid email or password/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/invalid email or password/i),
+    ).toBeInTheDocument();
   });
 
   it("offers Google and forgot-password entry points", () => {
     wrap();
-    expect(screen.getByRole("button", { name: /continue with google/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /continue with google/i }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /forgot/i })).toBeInTheDocument();
   });
 });
@@ -5394,7 +5483,9 @@ import { server } from "@/test/server";
 import { RegisterPage } from "./RegisterPage";
 
 function wrap() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/register"]}>
@@ -5409,7 +5500,10 @@ function wrap() {
 
 async function fill(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/email/i), "ada@example.com");
-  await user.type(screen.getByLabelText(/^password$/i), "quartz-lantern-42-drift");
+  await user.type(
+    screen.getByLabelText(/^password$/i),
+    "quartz-lantern-42-drift",
+  );
   await user.type(screen.getByLabelText(/invite/i), "inv_abcdefgh");
 }
 
@@ -5438,7 +5532,12 @@ describe("RegisterPage", () => {
     server.use(
       http.post("/api/auth/register", () =>
         HttpResponse.json(
-          { error: { code: "PASSWORD_WEAK", message: "That password is too common" } },
+          {
+            error: {
+              code: "PASSWORD_WEAK",
+              message: "That password is too common",
+            },
+          },
           { status: 400 },
         ),
       ),
@@ -5454,14 +5553,18 @@ describe("RegisterPage", () => {
     const user = userEvent.setup();
     const { container } = wrap();
     await user.type(screen.getByLabelText(/^password$/i), "abc");
-    expect(container.querySelector("[data-slot='password-strength']")).toBeInTheDocument();
+    expect(
+      container.querySelector("[data-slot='password-strength']"),
+    ).toBeInTheDocument();
   });
 
   it("never blocks submit on a weak-looking password", async () => {
     const user = userEvent.setup();
     wrap();
     await user.type(screen.getByLabelText(/^password$/i), "abc");
-    expect(screen.getByRole("button", { name: /create account/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /create account/i }),
+    ).toBeEnabled();
   });
 });
 ```
@@ -5480,7 +5583,12 @@ import { KeyRoundIcon } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
@@ -5515,7 +5623,10 @@ export function LoginPage() {
       footer={
         <span className="text-muted-foreground">
           Need an account?{" "}
-          <Link className="text-foreground underline underline-offset-4" to="/register">
+          <Link
+            className="text-foreground underline underline-offset-4"
+            to="/register"
+          >
             Register with an invite
           </Link>
         </span>
@@ -5565,7 +5676,11 @@ export function LoginPage() {
             {login.isError && <FieldError>{login.error.message}</FieldError>}
           </Field>
         </FieldGroup>
-        <Button className="mt-6 w-full" type="submit" disabled={login.isPending}>
+        <Button
+          className="mt-6 w-full"
+          type="submit"
+          disabled={login.isPending}
+        >
           {login.isPending && <Spinner data-icon="inline-start" />}
           {login.isPending ? "Signing in…" : "Sign in"}
         </Button>
@@ -5586,7 +5701,12 @@ import { UserPlus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
@@ -5605,12 +5725,19 @@ export function RegisterPage() {
     mutationFn: () =>
       unwrap(
         api.POST("/api/auth/register", {
-          body: { email, password, inviteCode, displayName: displayName || undefined },
+          body: {
+            email,
+            password,
+            inviteCode,
+            displayName: displayName || undefined,
+          },
         }),
       ),
     onSuccess: () => {
       // No account exists yet — the code is what creates it.
-      navigate(`/verify-email?email=${encodeURIComponent(email)}`, { replace: true });
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`, {
+        replace: true,
+      });
     },
   });
 
@@ -5627,7 +5754,10 @@ export function RegisterPage() {
       footer={
         <span className="text-muted-foreground">
           Already have an account?{" "}
-          <Link className="text-foreground underline underline-offset-4" to="/login">
+          <Link
+            className="text-foreground underline underline-offset-4"
+            to="/login"
+          >
             Sign in
           </Link>
         </span>
@@ -5665,7 +5795,9 @@ export function RegisterPage() {
             <PasswordStrengthMeter password={password} />
           </Field>
           <Field>
-            <FieldLabel htmlFor="register-name">Display name (optional)</FieldLabel>
+            <FieldLabel htmlFor="register-name">
+              Display name (optional)
+            </FieldLabel>
             <Input
               id="register-name"
               autoComplete="name"
@@ -5683,10 +5815,16 @@ export function RegisterPage() {
               aria-invalid={register.isError || undefined}
               required
             />
-            {register.isError && <FieldError>{register.error.message}</FieldError>}
+            {register.isError && (
+              <FieldError>{register.error.message}</FieldError>
+            )}
           </Field>
         </FieldGroup>
-        <Button className="mt-6 w-full" type="submit" disabled={register.isPending}>
+        <Button
+          className="mt-6 w-full"
+          type="submit"
+          disabled={register.isPending}
+        >
           {register.isPending && <Spinner data-icon="inline-start" />}
           {register.isPending ? "Sending code…" : "Create account"}
         </Button>
@@ -5715,11 +5853,13 @@ git commit -m "Rebuilds login and register on the split canvas and email contrac
 ### Task 20: Verify, forgot, reset, complete-profile, and routing
 
 **Files:**
+
 - Create: `web/src/features/auth/VerifyEmailPage.tsx`, `ForgotPasswordPage.tsx`, `ResetPasswordPage.tsx`, `CompleteProfilePage.tsx`
 - Modify: `web/src/features/auth/AuthGate.tsx`, `web/src/app/router.tsx`
 - Test: `web/src/features/auth/VerifyEmailPage.test.tsx`, `web/src/features/auth/ResetPasswordPage.test.tsx`, `web/src/features/auth/AuthGate.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `AuthLayout`, `OtpInput`, `PasswordStrengthMeter`, `useMe`
 - Produces: the four page components; `AuthGate` redirects to `/complete-profile` when `needsEmail` is true
 
@@ -5739,7 +5879,9 @@ import { server } from "@/test/server";
 import { VerifyEmailPage } from "./VerifyEmailPage";
 
 function wrap(search = "?email=ada%40example.com") {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/verify-email${search}`]}>
@@ -5764,7 +5906,11 @@ describe("VerifyEmailPage", () => {
     server.use(
       http.post("/api/auth/verify-email", async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ username: "ada", email: "ada@example.com", authRequired: true });
+        return HttpResponse.json({
+          username: "ada",
+          email: "ada@example.com",
+          authRequired: true,
+        });
       }),
     );
     const user = userEvent.setup();
@@ -5780,7 +5926,9 @@ describe("VerifyEmailPage", () => {
     server.use(
       http.post("/api/auth/verify-email", () =>
         HttpResponse.json(
-          { error: { code: "CODE_INVALID", message: "That code is not valid" } },
+          {
+            error: { code: "CODE_INVALID", message: "That code is not valid" },
+          },
           { status: 400 },
         ),
       ),
@@ -5838,10 +5986,14 @@ import { server } from "@/test/server";
 import { ResetPasswordPage } from "./ResetPasswordPage";
 
 function wrap() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/reset-password?email=ada%40example.com"]}>
+      <MemoryRouter
+        initialEntries={["/reset-password?email=ada%40example.com"]}
+      >
         <Routes>
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<div>Dashboard</div>} />
@@ -5857,14 +6009,21 @@ describe("ResetPasswordPage", () => {
     server.use(
       http.post("/api/auth/password/reset", async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ username: "ada", email: "ada@example.com", authRequired: true });
+        return HttpResponse.json({
+          username: "ada",
+          email: "ada@example.com",
+          authRequired: true,
+        });
       }),
     );
     const user = userEvent.setup();
     wrap();
     await user.click(screen.getAllByRole("textbox")[0]);
     await user.paste("482913");
-    await user.type(screen.getByLabelText(/new password/i), "cobalt-meridian-77-x");
+    await user.type(
+      screen.getByLabelText(/new password/i),
+      "cobalt-meridian-77-x",
+    );
     await user.click(screen.getByRole("button", { name: /reset password/i }));
     expect(await screen.findByText("Dashboard")).toBeInTheDocument();
     expect(body).toEqual({
@@ -5878,7 +6037,12 @@ describe("ResetPasswordPage", () => {
     server.use(
       http.post("/api/auth/password/reset", () =>
         HttpResponse.json(
-          { error: { code: "PASSWORD_WEAK", message: "That password is too common" } },
+          {
+            error: {
+              code: "PASSWORD_WEAK",
+              message: "That password is too common",
+            },
+          },
           { status: 400 },
         ),
       ),
@@ -5897,24 +6061,42 @@ describe("ResetPasswordPage", () => {
 Append to `web/src/features/auth/AuthGate.test.tsx` (or the existing `auth.test.tsx`):
 
 ```tsx
-  it("routes a pre-email account to complete-profile", async () => {
-    server.use(
-      http.get("/api/auth/me", () =>
-        HttpResponse.json({ username: "owner", authRequired: true, needsEmail: true }),
-      ),
-    );
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter initialEntries={["/"]}>
-          <Routes>
-            <Route path="/complete-profile" element={<div>Complete profile</div>} />
-            <Route path="/" element={<AuthGate><div>App content</div></AuthGate>} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-    expect(await screen.findByText("Complete profile")).toBeInTheDocument();
-  });
+it("routes a pre-email account to complete-profile", async () => {
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json({
+        username: "owner",
+        authRequired: true,
+        needsEmail: true,
+      }),
+    ),
+  );
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route
+            path="/complete-profile"
+            element={<div>Complete profile</div>}
+          />
+          <Route
+            path="/"
+            element={
+              <AuthGate>
+                <div>App content</div>
+              </AuthGate>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText("Complete profile")).toBeInTheDocument();
+});
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -5954,7 +6136,8 @@ export function VerifyEmailPage() {
     },
   });
   const resend = useMutation({
-    mutationFn: () => unwrap(api.POST("/api/auth/resend-code", { body: { email } })),
+    mutationFn: () =>
+      unwrap(api.POST("/api/auth/resend-code", { body: { email } })),
     onSuccess: () => setCode(""),
   });
 
@@ -6036,7 +6219,9 @@ export function ForgotPasswordPage() {
     // The endpoint answers identically for known and unknown addresses, so
     // the UI must not branch on the result either.
     onSuccess: () =>
-      navigate(`/reset-password?email=${encodeURIComponent(email)}`, { replace: true }),
+      navigate(`/reset-password?email=${encodeURIComponent(email)}`, {
+        replace: true,
+      }),
   });
 
   const submit = (event: FormEvent) => {
@@ -6050,7 +6235,10 @@ export function ForgotPasswordPage() {
       description="Enter your email and we'll send a single-use code."
       icon={<LifeBuoy aria-hidden="true" />}
       footer={
-        <Link className="text-muted-foreground underline underline-offset-4" to="/login">
+        <Link
+          className="text-muted-foreground underline underline-offset-4"
+          to="/login"
+        >
           Back to sign in
         </Link>
       }
@@ -6070,7 +6258,11 @@ export function ForgotPasswordPage() {
             />
           </Field>
         </FieldGroup>
-        <Button className="mt-6 w-full" type="submit" disabled={forgot.isPending}>
+        <Button
+          className="mt-6 w-full"
+          type="submit"
+          disabled={forgot.isPending}
+        >
           {forgot.isPending && <Spinner data-icon="inline-start" />}
           {forgot.isPending ? "Sending…" : "Send reset code"}
         </Button>
@@ -6110,7 +6302,9 @@ export function ResetPasswordPage() {
   const reset = useMutation({
     mutationFn: () =>
       unwrap(
-        api.POST("/api/auth/password/reset", { body: { email, code, newPassword } }),
+        api.POST("/api/auth/password/reset", {
+          body: { email, code, newPassword },
+        }),
       ),
     onSuccess: (me) => {
       queryClient.setQueryData(["auth", "me"], me);
@@ -6161,7 +6355,9 @@ export function ResetPasswordPage() {
         <Button
           className="mt-6 w-full"
           type="submit"
-          disabled={code.length < CODE_LENGTH || !newPassword || reset.isPending}
+          disabled={
+            code.length < CODE_LENGTH || !newPassword || reset.isPending
+          }
         >
           {reset.isPending && <Spinner data-icon="inline-start" />}
           {reset.isPending ? "Resetting…" : "Reset password"}
@@ -6202,7 +6398,8 @@ export function CompleteProfilePage() {
   const queryClient = useQueryClient();
 
   const request = useMutation({
-    mutationFn: () => unwrap(api.POST("/api/account/email", { body: { email } })),
+    mutationFn: () =>
+      unwrap(api.POST("/api/account/email", { body: { email } })),
     onSuccess: () => setSent(true),
   });
   const confirm = useMutation({
@@ -6276,28 +6473,36 @@ export function CompleteProfilePage() {
 In `AuthGate.tsx`, before the existing sign-in redirect:
 
 ```tsx
-  if (me.data.authRequired && !me.data.username) {
-    return <Navigate to="/login" replace />;
-  }
-  if (me.data.needsEmail) {
-    return <Navigate to="/complete-profile" replace />;
-  }
+if (me.data.authRequired && !me.data.username) {
+  return <Navigate to="/login" replace />;
+}
+if (me.data.needsEmail) {
+  return <Navigate to="/complete-profile" replace />;
+}
 ```
 
 In `web/src/app/router.tsx`, add the lazy imports beside the existing ones and four routes beside `/login` and `/register` (line 123):
 
 ```tsx
 const VerifyEmailPage = lazy(() =>
-  import("@/features/auth/VerifyEmailPage").then((m) => ({ default: m.VerifyEmailPage })),
+  import("@/features/auth/VerifyEmailPage").then((m) => ({
+    default: m.VerifyEmailPage,
+  })),
 );
 const ForgotPasswordPage = lazy(() =>
-  import("@/features/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })),
+  import("@/features/auth/ForgotPasswordPage").then((m) => ({
+    default: m.ForgotPasswordPage,
+  })),
 );
 const ResetPasswordPage = lazy(() =>
-  import("@/features/auth/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })),
+  import("@/features/auth/ResetPasswordPage").then((m) => ({
+    default: m.ResetPasswordPage,
+  })),
 );
 const CompleteProfilePage = lazy(() =>
-  import("@/features/auth/CompleteProfilePage").then((m) => ({ default: m.CompleteProfilePage })),
+  import("@/features/auth/CompleteProfilePage").then((m) => ({
+    default: m.CompleteProfilePage,
+  })),
 );
 ```
 
@@ -6327,11 +6532,13 @@ git commit -m "Adds the verify, forgot, reset, and complete-profile screens with
 ### Task 21: Account security card
 
 **Files:**
+
 - Create: `web/src/features/account/SecurityCard.tsx`
 - Modify: `web/src/features/account/AccountPage.tsx`
 - Test: `web/src/features/account/SecurityCard.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useMe`, `api`
 - Produces: `SecurityCard()` rendering Google link state and "Sign out everywhere"
 
@@ -6352,7 +6559,9 @@ import { SecurityCard } from "./SecurityCard";
 
 function wrap(me: Record<string, unknown>) {
   server.use(http.get("/api/auth/me", () => HttpResponse.json(me)));
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
@@ -6364,28 +6573,54 @@ function wrap(me: Record<string, unknown>) {
 
 describe("SecurityCard", () => {
   it("offers to connect Google when it is not linked", async () => {
-    wrap({ username: "ada", email: "ada@example.com", authRequired: true, googleLinked: false });
-    expect(await screen.findByRole("button", { name: /continue with google/i })).toBeInTheDocument();
+    wrap({
+      username: "ada",
+      email: "ada@example.com",
+      authRequired: true,
+      googleLinked: false,
+    });
+    expect(
+      await screen.findByRole("button", { name: /continue with google/i }),
+    ).toBeInTheDocument();
   });
 
   it("offers to unlink when Google is linked", async () => {
-    wrap({ username: "ada", email: "ada@example.com", authRequired: true, googleLinked: true });
-    expect(await screen.findByRole("button", { name: /unlink/i })).toBeInTheDocument();
+    wrap({
+      username: "ada",
+      email: "ada@example.com",
+      authRequired: true,
+      googleLinked: true,
+    });
+    expect(
+      await screen.findByRole("button", { name: /unlink/i }),
+    ).toBeInTheDocument();
   });
 
   it("surfaces the lockout refusal when unlinking would lock the account out", async () => {
     server.use(
       http.delete("/api/account/google", () =>
         HttpResponse.json(
-          { error: { code: "PASSWORD_REQUIRED", message: "Set a password before unlinking Google" } },
+          {
+            error: {
+              code: "PASSWORD_REQUIRED",
+              message: "Set a password before unlinking Google",
+            },
+          },
           { status: 409 },
         ),
       ),
     );
     const user = userEvent.setup();
-    wrap({ username: "ada", email: "ada@example.com", authRequired: true, googleLinked: true });
+    wrap({
+      username: "ada",
+      email: "ada@example.com",
+      authRequired: true,
+      googleLinked: true,
+    });
     await user.click(await screen.findByRole("button", { name: /unlink/i }));
-    expect(await screen.findByText(/set a password before unlinking/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/set a password before unlinking/i),
+    ).toBeInTheDocument();
   });
 
   it("signs out other devices", async () => {
@@ -6397,8 +6632,15 @@ describe("SecurityCard", () => {
       }),
     );
     const user = userEvent.setup();
-    wrap({ username: "ada", email: "ada@example.com", authRequired: true, googleLinked: false });
-    await user.click(await screen.findByRole("button", { name: /sign out everywhere/i }));
+    wrap({
+      username: "ada",
+      email: "ada@example.com",
+      authRequired: true,
+      googleLinked: false,
+    });
+    await user.click(
+      await screen.findByRole("button", { name: /sign out everywhere/i }),
+    );
     await screen.findByText(/signed out/i);
     expect(revoked).toBe(true);
   });
