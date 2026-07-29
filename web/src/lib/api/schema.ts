@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/api/account/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Email */
+        post: operations["set_email_api_account_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify Account Email */
+        post: operations["verify_account_email_api_account_email_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/export": {
         parameters: {
             query?: never;
@@ -16,6 +50,23 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink Google */
+        delete: operations["unlink_google_api_account_google_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -66,6 +117,23 @@ export interface paths {
         put?: never;
         /** Reset Data */
         post: operations["reset_data_api_account_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/sessions/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke All Sessions */
+        post: operations["revoke_all_sessions_api_account_sessions_revoke_all_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -331,6 +399,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/google/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Start */
+        get: operations["google_start_api_auth_google_start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/link-token": {
         parameters: {
             query?: never;
@@ -399,6 +484,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/password/forgot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forgot Password */
+        post: operations["forgot_password_api_auth_password_forgot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/password/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Password */
+        post: operations["reset_password_api_auth_password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/register": {
         parameters: {
             query?: never;
@@ -410,6 +529,40 @@ export interface paths {
         put?: never;
         /** Register */
         post: operations["register_api_auth_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/resend-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend Code */
+        post: operations["resend_code_api_auth_resend_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify Email */
+        post: operations["verify_email_api_auth_verify_email_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2921,6 +3074,15 @@ export interface components {
              */
             topicId: string;
         };
+        /** CodeSentResponse */
+        CodeSentResponse: {
+            /**
+             * Status
+             * @default sent
+             * @constant
+             */
+            status: "sent";
+        };
         /** CohortOut */
         CohortOut: {
             /** Applications */
@@ -3159,6 +3321,14 @@ export interface components {
             /** Records */
             records?: components["schemas"]["ErrorRecordOut"][];
         };
+        /** ForgotPasswordRequest */
+        ForgotPasswordRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+        };
         /** GmailConnectOut */
         GmailConnectOut: {
             /** Authurl */
@@ -3184,6 +3354,11 @@ export interface components {
              */
             scopes: string[];
         };
+        /** GoogleStartOut */
+        GoogleStartOut: {
+            /** Authurl */
+            authUrl: string;
+        };
         /** GuidanceUpdate */
         GuidanceUpdate: {
             /** Guidance */
@@ -3193,6 +3368,18 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HealthOut */
+        HealthOut: {
+            /** Googleoauthconfigured */
+            googleOauthConfigured: boolean;
+            /** Mailconfigured */
+            mailConfigured: boolean;
+            /**
+             * Status
+             * @default ok
+             */
+            status: string;
         };
         /** InterviewDebriefOut */
         InterviewDebriefOut: {
@@ -3609,10 +3796,10 @@ export interface components {
         };
         /** LoginRequest */
         LoginRequest: {
+            /** Identifier */
+            identifier: string;
             /** Password */
             password: string;
-            /** Username */
-            username: string;
         };
         /** ManualEntryOut */
         ManualEntryOut: {
@@ -3697,6 +3884,23 @@ export interface components {
              * @default false
              */
             authRequired: boolean;
+            /** Email */
+            email?: string | null;
+            /**
+             * Emailverified
+             * @default false
+             */
+            emailVerified: boolean;
+            /**
+             * Googlelinked
+             * @default false
+             */
+            googleLinked: boolean;
+            /**
+             * Needsemail
+             * @default false
+             */
+            needsEmail: boolean;
             /** Role */
             role?: ("admin" | "user") | null;
             /** Username */
@@ -4070,12 +4274,17 @@ export interface components {
         };
         /** RegisterRequest */
         RegisterRequest: {
+            /** Displayname */
+            displayName?: string | null;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
             /** Invitecode */
             inviteCode: string;
             /** Password */
             password: string;
-            /** Username */
-            username: string;
         };
         /** RenderConfigDoc */
         RenderConfigDoc: {
@@ -4111,10 +4320,13 @@ export interface components {
             /** Scopes */
             scopes?: string[];
         };
-        /** ResetPasswordRequest */
-        ResetPasswordRequest: {
-            /** Password */
-            password: string;
+        /** ResendCodeRequest */
+        ResendCodeRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
         };
         /** ResetReportOut */
         ResetReportOut: {
@@ -4383,6 +4595,14 @@ export interface components {
             linkedinPassword?: string | null;
             /** Openaiapikey */
             openaiApiKey?: string | null;
+        };
+        /** SetEmailRequest */
+        SetEmailRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
         };
         /** SetGroupIn */
         SetGroupIn: {
@@ -4860,6 +5080,43 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VerifyAccountEmailRequest */
+        VerifyAccountEmailRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+        };
+        /** VerifyEmailRequest */
+        VerifyEmailRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+        };
+        /** ResetPasswordRequest */
+        resume_agent__api__schemas__admin_users__ResetPasswordRequest: {
+            /** Password */
+            password: string;
+        };
+        /** ResetPasswordRequest */
+        resume_agent__api__schemas__auth_email__ResetPasswordRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Newpassword */
+            newPassword: string;
+        };
         /** AddSkillIn */
         resume_agent__api__schemas__profile__AddSkillIn: {
             /** Category */
@@ -4929,6 +5186,76 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    set_email_api_account_email_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_account_email_api_account_email_verify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyAccountEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_workspace_api_account_export_get: {
         parameters: {
             query?: never;
@@ -4947,6 +5274,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_google_api_account_google_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5060,6 +5418,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResetReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_all_sessions_api_account_sessions_revoke_all_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -5591,7 +5982,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ResetPasswordRequest"];
+                "application/json": components["schemas"]["resume_agent__api__schemas__admin_users__ResetPasswordRequest"];
             };
         };
         responses: {
@@ -5716,6 +6107,38 @@ export interface operations {
             };
         };
     };
+    google_start_api_auth_google_start_get: {
+        parameters: {
+            query?: {
+                mode?: string;
+                invite?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     mint_link_token_api_auth_link_token_post: {
         parameters: {
             query?: never;
@@ -5826,6 +6249,72 @@ export interface operations {
             };
         };
     };
+    forgot_password_api_auth_password_forgot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgotPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_password_api_auth_password_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["resume_agent__api__schemas__auth_email__ResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     register_api_auth_register_post: {
         parameters: {
             query?: never;
@@ -5840,7 +6329,73 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            201: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_code_api_auth_resend_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_email_api_auth_verify_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6957,9 +7512,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["HealthOut"];
                 };
             };
         };

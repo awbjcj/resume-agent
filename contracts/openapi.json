@@ -1728,6 +1728,18 @@
         "title": "CoachTurnOut",
         "type": "object"
       },
+      "CodeSentResponse": {
+        "properties": {
+          "status": {
+            "const": "sent",
+            "default": "sent",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "CodeSentResponse",
+        "type": "object"
+      },
       "CohortOut": {
         "properties": {
           "applications": {
@@ -2335,6 +2347,20 @@
         "title": "ErrorRecordsOut",
         "type": "object"
       },
+      "ForgotPasswordRequest": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "ForgotPasswordRequest",
+        "type": "object"
+      },
       "GmailConnectOut": {
         "properties": {
           "authUrl": {
@@ -2379,6 +2405,19 @@
         "title": "GmailStatusOut",
         "type": "object"
       },
+      "GoogleStartOut": {
+        "properties": {
+          "authUrl": {
+            "title": "Authurl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authUrl"
+        ],
+        "title": "GoogleStartOut",
+        "type": "object"
+      },
       "GuidanceUpdate": {
         "properties": {
           "guidance": {
@@ -2404,6 +2443,29 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthOut": {
+        "properties": {
+          "googleOauthConfigured": {
+            "title": "Googleoauthconfigured",
+            "type": "boolean"
+          },
+          "mailConfigured": {
+            "title": "Mailconfigured",
+            "type": "boolean"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mailConfigured",
+          "googleOauthConfigured"
+        ],
+        "title": "HealthOut",
         "type": "object"
       },
       "InterviewDebriefOut": {
@@ -3497,21 +3559,21 @@
       },
       "LoginRequest": {
         "properties": {
+          "identifier": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Identifier",
+            "type": "string"
+          },
           "password": {
             "maxLength": 1024,
             "minLength": 1,
             "title": "Password",
             "type": "string"
-          },
-          "username": {
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Username",
-            "type": "string"
           }
         },
         "required": [
-          "username",
+          "identifier",
           "password"
         ],
         "title": "LoginRequest",
@@ -3765,6 +3827,32 @@
           "authRequired": {
             "default": false,
             "title": "Authrequired",
+            "type": "boolean"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "emailVerified": {
+            "default": false,
+            "title": "Emailverified",
+            "type": "boolean"
+          },
+          "googleLinked": {
+            "default": false,
+            "title": "Googlelinked",
+            "type": "boolean"
+          },
+          "needsEmail": {
+            "default": false,
+            "title": "Needsemail",
             "type": "boolean"
           },
           "role": {
@@ -4843,6 +4931,23 @@
       },
       "RegisterRequest": {
         "properties": {
+          "displayName": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayname"
+          },
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
           "inviteCode": {
             "maxLength": 128,
             "minLength": 8,
@@ -4851,18 +4956,13 @@
           },
           "password": {
             "maxLength": 1024,
-            "minLength": 12,
+            "minLength": 1,
             "title": "Password",
-            "type": "string"
-          },
-          "username": {
-            "pattern": "^[a-z][a-z0-9._-]{2,31}$",
-            "title": "Username",
             "type": "string"
           }
         },
         "required": [
-          "username",
+          "email",
           "password",
           "inviteCode"
         ],
@@ -4945,19 +5045,18 @@
         "title": "ReprocessParams",
         "type": "object"
       },
-      "ResetPasswordRequest": {
+      "ResendCodeRequest": {
         "properties": {
-          "password": {
-            "maxLength": 1024,
-            "minLength": 12,
-            "title": "Password",
+          "email": {
+            "format": "email",
+            "title": "Email",
             "type": "string"
           }
         },
         "required": [
-          "password"
+          "email"
         ],
-        "title": "ResetPasswordRequest",
+        "title": "ResendCodeRequest",
         "type": "object"
       },
       "ResetReportOut": {
@@ -5704,6 +5803,20 @@
           }
         },
         "title": "SecretsUpdate",
+        "type": "object"
+      },
+      "SetEmailRequest": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "SetEmailRequest",
         "type": "object"
       },
       "SetGroupIn": {
@@ -7220,6 +7333,88 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VerifyAccountEmailRequest": {
+        "properties": {
+          "code": {
+            "pattern": "^\\d{6}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "code"
+        ],
+        "title": "VerifyAccountEmailRequest",
+        "type": "object"
+      },
+      "VerifyEmailRequest": {
+        "properties": {
+          "code": {
+            "pattern": "^\\d{6}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "code"
+        ],
+        "title": "VerifyEmailRequest",
+        "type": "object"
+      },
+      "resume_agent__api__schemas__admin_users__ResetPasswordRequest": {
+        "properties": {
+          "password": {
+            "maxLength": 1024,
+            "minLength": 12,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "ResetPasswordRequest",
+        "type": "object"
+      },
+      "resume_agent__api__schemas__auth_email__ResetPasswordRequest": {
+        "properties": {
+          "code": {
+            "pattern": "^\\d{6}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Newpassword",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "code",
+          "newPassword"
+        ],
+        "title": "ResetPasswordRequest",
+        "type": "object"
+      },
       "resume_agent__api__schemas__profile__AddSkillIn": {
         "properties": {
           "category": {
@@ -7412,6 +7607,124 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/account/email": {
+      "post": {
+        "operationId": "set_email_api_account_email_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Email",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/email/verify": {
+      "post": {
+        "operationId": "verify_account_email_api_account_email_verify_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyAccountEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Account Email",
+        "tags": [
+          "account"
+        ]
+      }
+    },
     "/api/account/export": {
       "get": {
         "operationId": "export_workspace_api_account_export_get",
@@ -7454,6 +7767,55 @@
           }
         },
         "summary": "Export Workspace",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/google": {
+      "delete": {
+        "operationId": "unlink_google_api_account_google_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlink Google",
         "tags": [
           "account"
         ]
@@ -7659,6 +8021,59 @@
           }
         },
         "summary": "Reset Data",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/sessions/revoke-all": {
+      "post": {
+        "operationId": "revoke_all_sessions_api_account_sessions_revoke_all_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Revoke All Sessions Api Account Sessions Revoke All Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke All Sessions",
         "tags": [
           "account"
         ]
@@ -8550,7 +8965,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResetPasswordRequest"
+                "$ref": "#/components/schemas/resume_agent__api__schemas__admin_users__ResetPasswordRequest"
               }
             }
           },
@@ -8749,6 +9164,60 @@
         "summary": "Get Analytics"
       }
     },
+    "/api/auth/google/start": {
+      "get": {
+        "operationId": "google_start_api_auth_google_start_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "login",
+              "pattern": "^(login|register)$",
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "invite",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Invite",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleStartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Google Start",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/link-token": {
       "post": {
         "operationId": "mint_link_token_api_auth_link_token_post",
@@ -8895,21 +9364,62 @@
         ]
       }
     },
-    "/api/auth/register": {
+    "/api/auth/password/forgot": {
       "post": {
-        "operationId": "register_api_auth_register_post",
+        "operationId": "forgot_password_api_auth_password_forgot_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "201": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forgot Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password/reset": {
+      "post": {
+        "operationId": "reset_password_api_auth_password_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/resume_agent__api__schemas__auth_email__ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -8930,7 +9440,130 @@
             "description": "Validation Error"
           }
         },
+        "summary": "Reset Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "operationId": "register_api_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
         "summary": "Register",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/resend-code": {
+      "post": {
+        "operationId": "resend_code_api_auth_resend_code_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend Code",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/verify-email": {
+      "post": {
+        "operationId": "verify_email_api_auth_verify_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Email",
         "tags": [
           "auth"
         ]
@@ -10661,11 +11294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Health Api Health Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HealthOut"
                 }
               }
             },
