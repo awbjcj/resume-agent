@@ -3,6 +3,34 @@
 **Date:** 2026-07-28
 **Status:** Design approved, ready for planning
 
+## Correctness amendments
+
+The implementation-plan audit found several places where the original prose
+could not be implemented safely or consistently. These amendments are part of
+the approved contract:
+
+- The transitional login request field is `identifier`, not `EmailStr email`,
+  because legacy username login must reach the resolver. It is removed in a
+  later versioned cleanup after every account has an email.
+- Rate-limit checks and records are atomic. Authentication failures use the
+  three documented scopes; resend uses its own durable 3/email/hour budget.
+  Every endpoint named in this design records the event its gate counts.
+- A verification transaction is the only SQLite writer for its operation.
+  It rechecks invite expiry/usage and email uniqueness, and provisioning cannot
+  leave a committed account plus consumed invite when filesystem setup fails.
+- Password-reset and email-adoption rows are purpose-isolated in every query.
+  Adoption rechecks uniqueness at consume time and returns `EMAIL_TAKEN` on a
+  race.
+- Google email-linking is allowed only when `google_sub IS NULL`; an existing
+  different subject is never replaced. Only the boolean `True` satisfies the
+  `email_verified` claim. Google successes clear progressive lockout, and
+  start/callback failures participate in the IP budget.
+- `HealthOut` additively exposes `googleOauthConfigured` so the required
+  disabled Google UI has a reliable capability signal.
+- The auth UI includes the official Google mark, disabled-state tooltips, an
+  exact resend cooldown, position-preserving OTP edits, a correct-address path
+  during legacy adoption, and an `AlertDialog` before revoking sessions.
+
 ## Problem
 
 Accounts today have no email address. `User` (`tenancy/system_db.py:30`) carries a

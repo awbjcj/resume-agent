@@ -620,6 +620,19 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   Both the coach and interview stores are adapters of the Session substrate
   (`sessions/store.py`); custody bugs are fixed there, once. `TurnRejected` and
   `format_with_retry` live in `sessions/turns.py`, shared by both stacks.
+- **Email identity is authoritative in multi-user auth.** Verified email is the
+  login identifier; the legacy username fallback is accepted only while a user
+  has no email. Registration, reset, and email-adoption codes are single-use,
+  purpose-isolated rows with bounded attempts. Password changes, resets, and
+  explicit revoke-all increment `session_epoch`; the current response receives
+  a freshly signed cookie while older cookies stop verifying. Rate budgets are
+  durable SQLite rows and every check-plus-record operation uses one
+  `BEGIN IMMEDIATE` writer transaction.
+- **Google identity is pinned to `sub`, not email.** An exact boolean
+  `email_verified` claim is required before the first email-based link; a
+  different existing `google_sub` is never overwritten. Sign-in scopes remain
+  identity-only. Gmail consent is a separate incremental flow and keeps its
+  readonly + compose scopes; `gmail.send` remains out of scope.
 - **Gmail is multi-user; drafts only, never send.** The platform OAuth client
   (`GOOGLE_OAUTH_CLIENT_ID/SECRET`) can be overridden per user via
   `secrets.env`; per-user tokens live at `{workspace}/gmail_token.json`

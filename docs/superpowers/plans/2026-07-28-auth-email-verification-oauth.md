@@ -24,6 +24,74 @@
 - Pydantic request/response schemas subclass `CamelModel` (`api/schemas/base.py`) — snake_case in Python, camelCase on the wire.
 - Errors raise `ApiException(status, CODE, message)` from `api/errors.py`.
 
+## Correctness Amendments (implementation-authoritative)
+
+The task snippets below are a sequencing aid, not copy-paste authority. The
+following corrections resolve conflicts found during the plan/spec audit and
+must be applied wherever a later snippet disagrees:
+
+1. **One transaction owns each SQLite write.** Code-verification handlers must
+   never call a helper that opens a second write session while their
+   `BEGIN IMMEDIATE` transaction is active. Attempt rows are written after the
+   verification transaction commits or rolls back, or through the same
+   `Session`. Invite validity (including expiry) and email uniqueness are
+   rechecked inside the consuming transaction. Workspace provisioning failure
+   must not leave a usable account with a consumed invite; provision before the
+   final commit or compensate the database change on failure.
+2. **Rate limits are explicit request budgets, not accidental login failures.**
+   Keep the three authentication-failure scopes from the design, and add a
+   purpose-specific durable `resend_email` budget of exactly 3 requests per
+   email per rolling hour. Do not approximate this by burning three units of a
+   10-per-15-minute budget (that draft permits four sends and pollutes unrelated
+   scopes). Register, verify, forgot, reset, Google start, and Google callback
+   must actually record the events their gates count. A gate/check plus record
+   is performed in one transaction so concurrent requests cannot overrun it.
+3. **Enumeration-sensitive work remains symmetric.** Existing and unknown
+   addresses return byte-identical register/forgot responses and perform the
+   same password/code hashing work. Mail delivery is intentionally the only
+   unavoidable external difference. Disabled accounts follow the unknown
+   forgot-password branch.
+4. **Login uses `identifier`, intentionally.** The approved design simultaneously
+   requires an `EmailStr` wire field and a one-deploy legacy username fallback;
+   those cannot both be true because Pydantic rejects a username before the
+   fallback runs. The transitional contract is `{ identifier, password }`,
+   normalized with `strip().casefold()`. The UI labels it Email and explains the
+   legacy exception. After all rows have email, remove the fallback and migrate
+   the field to `email` in a separately versioned contract change.
+5. **Reset and email-adoption codes do not erase each other.** All CRUD queries
+   on the shared `password_reset_codes` table filter by purpose
+   (`pending_email IS NULL` for resets, non-null for adoption). Email ownership
+   is checked again when an adoption code is consumed, with `IntegrityError`
+   mapped to `409 EMAIL_TAKEN` rather than a 500.
+6. **OAuth linking is monotonic and lockout-aware.** Email matching may set
+   `google_sub` only when it is currently null; a different existing subject is
+   never overwritten. Treat `email_verified` as true only when the verified
+   claim is the boolean `True`. Every successful Google sign-in clears account
+   lockout and relevant failure budgets. Both start and failed callback events
+   participate in the IP-only budget. Sign-in requests identity scopes only,
+   use an online flow without forced consent, and continue verifying the ID
+   token against the configured client-id audience.
+7. **Notifications describe the action that happened.** Add a distinct
+   `google_unlinked` message; never reuse the “linked” body for unlink. Complete
+   `MeResponse` consistently includes role, `needsEmail`, verification, and
+   link state on every authenticated success path.
+8. **UI requirements are behavioral contracts.** Use the installed Base-UI
+   shadcn components and semantic tokens: `Progress` for strength,
+   `Tooltip` around a disabled Google trigger, and `AlertDialog` before
+   revoke-all. `GoogleButton` includes the official Google G mark and is
+   disabled with a reason when OAuth is unavailable (health exposes additive
+   `googleOauthConfigured`) or registration has no invite. `OtpInput` preserves
+   digit positions when editing rather than collapsing gaps. Resend displays a
+   real cooldown, and complete-profile lets a user correct a mistyped address.
+   Mobile auth screens retain the existing card treatment while desktop uses
+   the split canvas.
+9. **Tests cover the corrected failure modes.** Add regressions for exact
+   3/hour resend behavior across IPs, no SQLite self-deadlock, invite expiry at
+   consume time, provisioning rollback, adoption/reset coexistence, adoption
+   email race, already-linked OAuth subjects, Google lockout clearing and IP
+   throttling, exact boolean `email_verified`, OTP middle-digit edits, disabled
+   Google explanations, resend cooldown, and revoke confirmation.
+
 ## File Structure
 
 **New — backend**
