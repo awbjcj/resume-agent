@@ -7,6 +7,13 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from resume_agent.tenancy.context import current_context
+from resume_agent.tenancy.costs import has_active_rate, normalize_provider
+from resume_agent.tenancy.quotas import (
+    DEFAULT_GLOBAL_MONTHLY_COST_QUOTA_MICROS,
+    GlobalCostQuotaExceededError,
+    charge_shared_cost,
+    global_monthly_cost,
+)
 from resume_agent.tenancy.system_db import SystemSetting, UsageEvent, User
 
 DEFAULT_WEEKLY_TOKEN_BUDGET = 10_000_000
@@ -18,6 +25,24 @@ BUDGET_WINDOW = timedelta(days=7)
 
 class BudgetExceededError(RuntimeError):
     code = "BUDGET_EXCEEDED"
+
+
+class CostRateUnavailableError(RuntimeError):
+    code = "COST_RATE_UNAVAILABLE"
+
+
+def _agent_identity(agent: object) -> tuple[str, str]:
+    model = getattr(agent, "model", None)
+    model_id = str(getattr(model, "id", None) or getattr(agent, "model_id", None) or "")
+    provider: object = getattr(model, "provider", None)
+    get_provider = getattr(model, "get_provider", None)
+    if not provider and callable(get_provider):
+        provider = get_provider()
+    if not provider and model_id:
+        from resume_agent.llm_runner import split_provider
+
+        provider, model_id = split_provider(model_id)
+    return normalize_provider(str(provider or "")), model_id
 
 
 def system_default(engine: Engine, key: str, fallback: int) -> int:
@@ -67,11 +92,7 @@ def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
     context = current_context()
     if context is None or context.system_engine is None:
         return
-    model = getattr(agent, "model", None)
-    model_id = getattr(model, "id", None) or getattr(agent, "model_id", None) or ""
-    from resume_agent.llm_runner import split_provider
-
-    provider = split_provider(str(model_id))[0] if model_id else ""
+    provider, model_id = _agent_identity(agent)
     if provider and provider in context.own_key_providers:
         return
     with Session(context.system_engine) as session:
@@ -81,6 +102,36 @@ def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
                 "shared platform models are disabled for this account; add your own API key"
             )
         override = user.weekly_token_budget if user is not None else None
+    if context.settings.cost_quota_enforcement == "enforce":
+        if not model_id or not has_active_rate(
+            context.system_engine, provider, model_id, now=now
+        ):
+            raise CostRateUnavailableError(
+                f"no active cost rate for {provider or 'unknown'}:{model_id or 'unknown'}"
+            )
+        if context.role != "admin":
+            charge_shared_cost(
+                context.system_engine,
+                context.user_id,
+                0,
+                now=now,
+                preflight=True,
+            )
+        global_budget = (
+            context.settings.global_monthly_cost_quota_micros
+            or DEFAULT_GLOBAL_MONTHLY_COST_QUOTA_MICROS
+        )
+        if (
+            global_budget
+            and global_monthly_cost(context.system_engine, now=now) >= global_budget
+        ):
+            raise GlobalCostQuotaExceededError(
+                "platform monthly cost quota is exhausted"
+            )
+        return
+
+    # Stage one compatibility: shadow-price every call while the previous
+    # weighted-token enforcement remains the active gate.
     enforce_budget(
         context.system_engine,
         user_id=context.user_id,
@@ -122,6 +173,16 @@ def enforce_budget(
 def enforce_active_budget(*, now: datetime | None = None) -> None:
     context = current_context()
     if context is None or context.system_engine is None:
+        return
+    if context.settings.cost_quota_enforcement == "enforce":
+        if not context.is_admin:
+            charge_shared_cost(
+                context.system_engine,
+                context.user_id,
+                0,
+                now=now,
+                preflight=True,
+            )
         return
     with Session(context.system_engine) as session:
         user = session.get(User, context.user_id)

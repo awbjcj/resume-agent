@@ -24,6 +24,7 @@ from resume_agent.api.password_policy import HibpBreachChecker
 from resume_agent.api.routers import account as account_router
 from resume_agent.api.routers import admin as admin_router
 from resume_agent.api.routers import admin_invites as admin_invites_router
+from resume_agent.api.routers import admin_quotas as admin_quotas_router
 from resume_agent.api.routers import admin_system as admin_system_router
 from resume_agent.api.routers import admin_users as admin_users_router
 from resume_agent.api.routers import analytics as analytics_router
@@ -362,6 +363,7 @@ def create_app(
     app.include_router(admin_users_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_invites_router.router, prefix="/api", dependencies=guarded)
     app.include_router(admin_system_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(admin_quotas_router.router, prefix="/api", dependencies=guarded)
 
     # Serve the built SPA when present. Registered AFTER the API + docs routes so
     # they take precedence; the catch-all is excluded from the OpenAPI schema so

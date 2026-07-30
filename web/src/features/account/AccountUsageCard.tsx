@@ -25,10 +25,17 @@ export function AccountUsageCard({
   usage: AccountUsage;
   isAdmin: boolean;
 }) {
-  const unlimited = isAdmin || usage.budget === 0;
-  const percent = unlimited
+  const quota = usage.quota;
+  const unlimited = isAdmin || quota?.recurringAllowanceMicros == null;
+  const percent = unlimited || !quota?.recurringAllowanceMicros
     ? 0
-    : Math.min(100, (usage.weightedTotal / usage.budget) * 100);
+    : Math.min(100, (quota.spendMicros / quota.recurringAllowanceMicros) * 100);
+  const money = (micros: number | null | undefined) =>
+    micros == null
+      ? "Unlimited"
+      : new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(
+          micros / 1_000_000,
+        );
 
   return (
     <Card className="h-full">
@@ -39,16 +46,16 @@ export function AccountUsageCard({
           </div>
           <div className="flex flex-col gap-1">
             <CardTitle>
-              <h3>Weekly usage</h3>
+              <h3>Shared-cost allowance</h3>
             </CardTitle>
             <CardDescription>
-              Shared-provider usage is measured across a rolling seven-day window.
+              Platform-key cost draws from your recurring allowance, then durable credits.
             </CardDescription>
           </div>
         </div>
         <CardAction>
           <Badge variant={unlimited ? "default" : "outline"}>
-            {unlimited ? "Unlimited" : "7 days"}
+            {isAdmin ? "Quota exempt" : quota?.enforcementStatus ?? "Unavailable"}
           </Badge>
         </CardAction>
       </CardHeader>
@@ -58,15 +65,16 @@ export function AccountUsageCard({
             <InfinityIcon aria-hidden="true" />
             <AlertTitle>No usage ceiling</AlertTitle>
             <AlertDescription>
-              Administrator token usage is recorded for visibility but is never blocked.
+              Administrator usage is recorded for visibility and still counts toward the
+              platform cap, but has no user-level allowance ceiling.
             </AlertDescription>
           </Alert>
         ) : (
           <Progress value={percent}>
-            <ProgressLabel>Shared token budget</ProgressLabel>
+            <ProgressLabel>Recurring shared-key allowance</ProgressLabel>
             <ProgressValue>
               {() =>
-                `${usage.weightedTotal.toLocaleString()} / ${usage.budget.toLocaleString()}`
+                `${money(quota?.spendMicros)} / ${money(quota?.recurringAllowanceMicros)}`
               }
             </ProgressValue>
           </Progress>
@@ -74,25 +82,47 @@ export function AccountUsageCard({
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-lg bg-muted/55 p-4">
             <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Shared weighted tokens
+              Remaining balance
             </dt>
             <dd className="mt-1 text-xl font-semibold tabular-nums">
-              {usage.weightedTotal.toLocaleString()}
+              {money(quota?.remainingMicros)}
             </dd>
           </div>
           <div className="rounded-lg bg-muted/55 p-4">
             <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Own-key weighted tokens
+              Durable credits
             </dt>
             <dd className="mt-1 text-xl font-semibold tabular-nums">
-              {usage.ownKeyWeightedTotal.toLocaleString()}
+              {money(quota?.creditBalanceMicros)}
+            </dd>
+          </div>
+          <div className="rounded-lg bg-muted/55 p-4">
+            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Shared tokens
+            </dt>
+            <dd className="mt-1 text-xl font-semibold tabular-nums">
+              {(usage.sharedTokens?.totalTokens ?? 0).toLocaleString()}
+            </dd>
+          </div>
+          <div className="rounded-lg bg-muted/55 p-4">
+            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              BYOK tokens
+            </dt>
+            <dd className="mt-1 text-xl font-semibold tabular-nums">
+              {(usage.byokTokens?.totalTokens ?? 0).toLocaleString()}
             </dd>
           </div>
         </dl>
+        {quota ? (
+          <p className={`text-xs ${quota.overageMicros > 0 ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+            {quota.overageMicros > 0 ? `${money(quota.overageMicros)} overage · ` : ""}
+            Resets {new Date(quota.nextResetAt).toLocaleString()}.
+          </p>
+        ) : null}
       </CardContent>
       <CardFooter className="justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          Own-key calls do not count against shared limits.
+          BYOK use is estimated for visibility and never reduces your quota.
         </p>
         <a
           href="/api/account/export"

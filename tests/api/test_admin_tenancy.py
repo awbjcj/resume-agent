@@ -41,10 +41,15 @@ def test_admin_user_management_is_role_guarded(mu_app, mu_client):
     assert _login(mu_client).status_code == 200
     users = mu_client.get("/api/admin/users").json()["users"]
     assert {user["username"] for user in users} == {"owner", "alice"}
+    deprecated = mu_client.patch(
+        f"/api/admin/users/{alice_id}",
+        json={"weeklyTokenBudget": 500},
+    )
+    assert deprecated.status_code == 422
+    assert deprecated.json()["error"]["code"] == "TOKEN_QUOTA_DEPRECATED"
     assert (
         mu_client.patch(
-            f"/api/admin/users/{alice_id}",
-            json={"weeklyTokenBudget": 500, "disabled": True},
+            f"/api/admin/users/{alice_id}", json={"disabled": True}
         ).status_code
         == 200
     )
@@ -71,11 +76,7 @@ def test_admin_invites_defaults_usage_and_failure_safe_delete(mu_app, mu_client)
     assert (
         mu_client.put(
             "/api/admin/system/defaults",
-            json={
-                "weeklyTokenBudget": 5000,
-                "maxActiveJobs": 50,
-                "maxConcurrentRuns": 1,
-            },
+            json={"maxActiveJobs": 50, "maxConcurrentRuns": 1},
         ).status_code
         == 200
     )
@@ -243,22 +244,36 @@ def test_active_job_limit_applies_to_manual_ingest(mu_app, mu_client):
 def test_active_job_limit_does_not_apply_to_admin(mu_app, mu_client):
     assert _login(mu_client).status_code == 200
     owner_id = mu_app.state.default_context.user_id
-    assert mu_client.patch(
-        f"/api/admin/users/{owner_id}", json={"maxActiveJobs": 1}
-    ).status_code == 200
+    assert (
+        mu_client.patch(
+            f"/api/admin/users/{owner_id}", json={"maxActiveJobs": 1}
+        ).status_code
+        == 200
+    )
 
-    assert mu_client.post("/api/jobs", json={"jdText": "first admin role"}).status_code == 201
-    assert mu_client.post("/api/jobs", json={"jdText": "second admin role"}).status_code == 201
+    assert (
+        mu_client.post("/api/jobs", json={"jdText": "first admin role"}).status_code
+        == 201
+    )
+    assert (
+        mu_client.post("/api/jobs", json={"jdText": "second admin role"}).status_code
+        == 201
+    )
 
 
 def test_active_job_limit_applies_to_file_import(mu_app, mu_client):
     alice_id = _add_user(mu_app)
     assert _login(mu_client).status_code == 200
-    assert mu_client.patch(
-        f"/api/admin/users/{alice_id}", json={"maxActiveJobs": 1}
-    ).status_code == 200
+    assert (
+        mu_client.patch(
+            f"/api/admin/users/{alice_id}", json={"maxActiveJobs": 1}
+        ).status_code
+        == 200
+    )
     assert _login(mu_client, "alice", "alice-password").status_code == 200
-    assert mu_client.post("/api/jobs", json={"jdText": "existing role"}).status_code == 201
+    assert (
+        mu_client.post("/api/jobs", json={"jdText": "existing role"}).status_code == 201
+    )
 
     imported = mu_client.post(
         "/api/jobs/import",

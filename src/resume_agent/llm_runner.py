@@ -7,6 +7,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
 from inspect import isawaitable
+from types import SimpleNamespace
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from pydantic import BaseModel
@@ -1092,6 +1093,11 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
         raise ValueError(
             f"no API key configured for transcription provider {provider!r}"
         )
+    from resume_agent.tenancy.limits import enforce_agent_budget
+
+    enforce_agent_budget(
+        SimpleNamespace(model=SimpleNamespace(id=model, provider=provider))
+    )
     if provider == "gemini":
         from google import genai
         from google.genai import types
@@ -1104,6 +1110,26 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
                 _TRANSCRIBE_PROMPT,
             ],
         )
+        usage = getattr(response, "usage_metadata", None)
+        from resume_agent.tenancy.costs import MeteredUsage
+        from resume_agent.tenancy.usage import record_direct_usage
+
+        input_tokens = int(getattr(usage, "prompt_token_count", 0) or 0)
+        output_tokens = int(getattr(usage, "candidates_token_count", 0) or 0)
+        record_direct_usage(
+            MeteredUsage(
+                provider=provider,
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cache_read_tokens=int(
+                    getattr(usage, "cached_content_token_count", 0) or 0
+                ),
+                reasoning_tokens=int(getattr(usage, "thoughts_token_count", 0) or 0),
+                audio_input_tokens=input_tokens,
+                total_tokens=int(getattr(usage, "total_token_count", 0) or 0),
+            )
+        )
         return (response.text or "").strip()
     import io
 
@@ -1113,4 +1139,20 @@ def transcribe(audio: bytes, mime_type: str, *, model_id: str | None = None) -> 
     buffer = io.BytesIO(audio)
     buffer.name = _OPENAI_AUDIO_NAMES.get(mime_type, "audio.webm")
     result = client.audio.transcriptions.create(model=model, file=buffer)
+    usage = getattr(result, "usage", None)
+    from resume_agent.tenancy.costs import MeteredUsage
+    from resume_agent.tenancy.usage import record_direct_usage
+
+    input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+    output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+    record_direct_usage(
+        MeteredUsage(
+            provider=provider,
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            audio_input_tokens=input_tokens,
+            total_tokens=int(getattr(usage, "total_tokens", 0) or 0),
+        )
+    )
     return result.text.strip()

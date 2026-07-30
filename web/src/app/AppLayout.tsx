@@ -9,6 +9,7 @@ import {
   Settings,
   CircleUserRound,
   ShieldCheck,
+  Banknote,
   Sparkles,
   Target,
   UserRound,
@@ -138,7 +139,10 @@ export function AppLayout() {
                 <NavMenuItem item={{ to: "/settings", label: "Settings", icon: Settings }} />
                 <NavMenuItem item={{ to: "/account", label: "Account", icon: CircleUserRound }} />
                 {me.data?.role === "admin" && (
-                  <NavMenuItem item={{ to: "/admin", label: "Admin", icon: ShieldCheck }} />
+                  <>
+                    <NavMenuItem item={{ to: "/admin", label: "Admin", icon: ShieldCheck }} />
+                    <NavMenuItem item={{ to: "/admin/quotas", label: "Cost quotas", icon: Banknote }} />
+                  </>
                 )}
               </SidebarMenu>
             </SidebarGroupContent>

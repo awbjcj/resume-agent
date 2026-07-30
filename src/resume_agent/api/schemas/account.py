@@ -49,6 +49,43 @@ class AccountUsage(CamelModel):
     weighted_total: float
     own_key_weighted_total: float
     budget: int
+    quota: "QuotaSnapshotOut | None" = None
+    costs: "CostTotals" = Field(default_factory=lambda: CostTotals())
+    shared_tokens: "TokenTotals" = Field(default_factory=lambda: TokenTotals())
+    byok_tokens: "TokenTotals" = Field(default_factory=lambda: TokenTotals())
+    all_tokens: "TokenTotals" = Field(default_factory=lambda: TokenTotals())
+
+
+class TokenTotals(CamelModel):
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+    audio_tokens: int = 0
+    total_tokens: int = 0
+
+
+class CostTotals(CamelModel):
+    shared_quota_cost_micros: int = 0
+    byok_estimated_cost_micros: int = 0
+    tool_cost_micros: int = 0
+    unpriced_call_count: int = 0
+
+
+class QuotaSnapshotOut(CamelModel):
+    tier_id: str
+    tier_name: str
+    period_start: datetime
+    period_end: datetime
+    recurring_allowance_micros: int | None
+    allowance_override_micros: int | None
+    spend_micros: int
+    credit_balance_micros: int
+    remaining_micros: int | None
+    overage_micros: int
+    next_reset_at: datetime
+    enforcement_status: str
 
 
 class ResetRequest(CamelModel):

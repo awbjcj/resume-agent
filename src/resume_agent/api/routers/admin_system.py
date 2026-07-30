@@ -7,7 +7,13 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from resume_agent.api.deps import require_admin
-from resume_agent.api.schemas.admin_system import SystemDefaults, UsageReport, UserUsage
+from resume_agent.api.errors import ApiException
+from resume_agent.api.schemas.admin_system import (
+    SystemDefaults,
+    SystemDefaultsUpdate,
+    UsageReport,
+    UserUsage,
+)
 from resume_agent.tenancy.context import UserContext
 from resume_agent.tenancy.limits import (
     DEFAULT_MAX_ACTIVE_JOBS,
@@ -41,12 +47,18 @@ def get_defaults(
 
 @router.put("/defaults")
 def put_defaults(
-    body: SystemDefaults,
+    body: SystemDefaultsUpdate,
     request: Request,
     _context: UserContext = Depends(require_admin),
 ) -> SystemDefaults:
+    if "weekly_token_budget" in body.model_fields_set:
+        raise ApiException(
+            422,
+            "TOKEN_QUOTA_DEPRECATED",
+            "Token budgets are analytics-only; manage member cost quotas instead",
+        )
     with Session(request.app.state.system_engine) as session:
-        for key in _DEFAULTS:
+        for key in ("max_active_jobs", "max_concurrent_runs"):
             row = session.get(SystemSetting, key)
             value = str(getattr(body, key))
             if row is None:
@@ -54,7 +66,7 @@ def put_defaults(
             else:
                 row.value = value
         session.commit()
-    return body
+    return get_defaults(request, _context)
 
 
 @router.get("/usage")

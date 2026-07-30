@@ -32,7 +32,9 @@ SQLite plus a Railway volume still requires a single replica.
    | `SECURE_COOKIES`     | `true` (also the image default; startup fails without HTTPS `APP_BASE_URL`) |
    | `DISABLE_API_DOCS`   | `true` (also the image default) |
    | `GLOBAL_DAILY_SIGNUP_LIMIT` | Maximum verification emails started per rolling day |
-   | `GLOBAL_WEEKLY_TOKEN_BUDGET` | Shared-key circuit breaker; `0` disables the global cap |
+   | `COST_QUOTA_ENFORCEMENT` | `shadow` dual-records USD while token enforcement remains active; `enforce` enables cost quotas |
+   | `GLOBAL_MONTHLY_COST_QUOTA_MICROS` | Shared-key UTC calendar-month cap in USD micro-units; defaults to `$500` |
+   | `GLOBAL_WEEKLY_TOKEN_BUDGET` | Deprecated stage-one token circuit breaker; used only while cost quotas are in `shadow` mode |
    | `OPEN_SIGNUP_SHARED_KEYS` | Keep `false`; promote trusted users individually through the admin API |
 
    Add shared platform LLM keys as Railway variables. Users add their own keys

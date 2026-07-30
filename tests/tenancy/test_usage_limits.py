@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from agno.metrics import ModelMetrics, RunMetrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -158,6 +159,51 @@ def test_usage_writes_to_context_engine_and_tracks_own_key(tmp_path):
         assert session.execute(select(UsageEvent)).scalar_one().own_key is True
     first.dispose()
     second.dispose()
+
+
+def test_usage_records_each_agno_model_detail_with_exact_provider_identity(tmp_path):
+    engine = make_system_engine(tmp_path)
+    init_system_db(engine)
+    response = SimpleNamespace(
+        metrics=RunMetrics(
+            details={
+                "model": [
+                    ModelMetrics(
+                        id="gpt-5.6-terra",
+                        provider="OpenAI",
+                        input_tokens=12,
+                        output_tokens=5,
+                        reasoning_tokens=3,
+                    )
+                ],
+                "output_model": [
+                    ModelMetrics(
+                        id="claude-haiku-4-5",
+                        provider="Anthropic",
+                        input_tokens=7,
+                        output_tokens=2,
+                    )
+                ],
+            }
+        )
+    )
+    agent = SimpleNamespace(model=SimpleNamespace(id="bare-id"))
+    with use_context(_context(tmp_path, engine, own_keys=frozenset({"openai"}))):
+        from resume_agent.tenancy.usage import record_call
+
+        record_call(agent, response)
+    with Session(engine) as session:
+        events = (
+            session.execute(select(UsageEvent).order_by(UsageEvent.id)).scalars().all()
+        )
+    assert [(event.provider, event.model) for event in events] == [
+        ("openai", "gpt-5.6-terra"),
+        ("anthropic", "claude-haiku-4-5"),
+    ]
+    assert events[0].own_key is True
+    assert events[0].reasoning_tokens == 3
+    assert events[1].reasoning_mode == "OUTPUT_MODEL"
+    engine.dispose()
 
 
 def test_budget_window_exemptions_and_active_guard(tmp_path):

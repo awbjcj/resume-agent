@@ -14,6 +14,22 @@ _USER_COLUMNS = (
     ("shared_key_access", "BOOLEAN NOT NULL DEFAULT 1"),
 )
 
+_USAGE_COLUMNS = (
+    ("cache_write_tokens", "INTEGER NOT NULL DEFAULT 0"),
+    ("reasoning_tokens", "INTEGER NOT NULL DEFAULT 0"),
+    ("audio_input_tokens", "INTEGER NOT NULL DEFAULT 0"),
+    ("audio_output_tokens", "INTEGER NOT NULL DEFAULT 0"),
+    ("total_tokens", "INTEGER NOT NULL DEFAULT 0"),
+    ("cost_micros", "INTEGER"),
+    ("quota_cost_micros", "INTEGER NOT NULL DEFAULT 0"),
+    ("tool_cost_micros", "INTEGER NOT NULL DEFAULT 0"),
+    ("provider_cost_micros", "INTEGER"),
+    ("rate_id", "VARCHAR(32)"),
+    ("pricing_status", "VARCHAR(24) NOT NULL DEFAULT 'LEGACY_UNPRICED'"),
+    ("reasoning_effort", "VARCHAR(24)"),
+    ("reasoning_mode", "VARCHAR(24)"),
+)
+
 
 def _columns(connection, table: str) -> set[str]:
     return {row[1] for row in connection.execute(text(f"PRAGMA table_info({table})"))}
@@ -27,6 +43,21 @@ def migrate_system_db(engine: Engine) -> None:
         for name, ddl in _USER_COLUMNS:
             if name not in existing:
                 connection.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+        usage_columns = _columns(connection, "usage_events")
+        for name, ddl in _USAGE_COLUMNS:
+            if usage_columns and name not in usage_columns:
+                connection.execute(
+                    text(f"ALTER TABLE usage_events ADD COLUMN {name} {ddl}")
+                )
+        if usage_columns:
+            connection.execute(
+                text(
+                    "UPDATE usage_events SET "
+                    "cache_write_tokens = cache_creation_tokens, "
+                    "total_tokens = input_tokens + output_tokens "
+                    "WHERE pricing_status = 'LEGACY_UNPRICED'"
+                )
+            )
         connection.execute(
             text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)")
         )

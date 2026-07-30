@@ -3,13 +3,35 @@
     "schemas": {
       "AccountUsage": {
         "properties": {
+          "allTokens": {
+            "$ref": "#/components/schemas/TokenTotals"
+          },
           "budget": {
             "title": "Budget",
             "type": "integer"
           },
+          "byokTokens": {
+            "$ref": "#/components/schemas/TokenTotals"
+          },
+          "costs": {
+            "$ref": "#/components/schemas/CostTotals"
+          },
           "ownKeyWeightedTotal": {
             "title": "Ownkeyweightedtotal",
             "type": "number"
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuotaSnapshotOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sharedTokens": {
+            "$ref": "#/components/schemas/TokenTotals"
           },
           "weightedTotal": {
             "title": "Weightedtotal",
@@ -1804,6 +1826,32 @@
         "title": "CohortOut",
         "type": "object"
       },
+      "CostTotals": {
+        "properties": {
+          "byokEstimatedCostMicros": {
+            "default": 0,
+            "title": "Byokestimatedcostmicros",
+            "type": "integer"
+          },
+          "sharedQuotaCostMicros": {
+            "default": 0,
+            "title": "Sharedquotacostmicros",
+            "type": "integer"
+          },
+          "toolCostMicros": {
+            "default": 0,
+            "title": "Toolcostmicros",
+            "type": "integer"
+          },
+          "unpricedCallCount": {
+            "default": 0,
+            "title": "Unpricedcallcount",
+            "type": "integer"
+          }
+        },
+        "title": "CostTotals",
+        "type": "object"
+      },
       "CoverLetterOut": {
         "properties": {
           "createdAt": {
@@ -3573,6 +3621,256 @@
         "title": "LinkTokenResponse",
         "type": "object"
       },
+      "LlmRateCreate": {
+        "properties": {
+          "cacheReadMicrosPerMillion": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cachereadmicrospermillion"
+          },
+          "cacheWriteMicrosPerMillion": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cachewritemicrospermillion"
+          },
+          "contextMaxTokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contextmaxtokens"
+          },
+          "contextMinTokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Contextmintokens",
+            "type": "integer"
+          },
+          "effectiveFrom": {
+            "format": "date-time",
+            "title": "Effectivefrom",
+            "type": "string"
+          },
+          "effectiveTo": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectiveto"
+          },
+          "inputMicrosPerMillion": {
+            "minimum": 0.0,
+            "title": "Inputmicrospermillion",
+            "type": "integer"
+          },
+          "model": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "outputMicrosPerMillion": {
+            "minimum": 0.0,
+            "title": "Outputmicrospermillion",
+            "type": "integer"
+          },
+          "provider": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "sourceUrl": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Sourceurl",
+            "type": "string"
+          },
+          "toolMicrosPerUnit": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolmicrosperunit"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "inputMicrosPerMillion",
+          "outputMicrosPerMillion",
+          "effectiveFrom",
+          "sourceUrl",
+          "reason"
+        ],
+        "title": "LlmRateCreate",
+        "type": "object"
+      },
+      "LlmRateOut": {
+        "properties": {
+          "cacheReadMicrosPerMillion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cachereadmicrospermillion"
+          },
+          "cacheWriteMicrosPerMillion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cachewritemicrospermillion"
+          },
+          "contextMaxTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contextmaxtokens"
+          },
+          "contextMinTokens": {
+            "title": "Contextmintokens",
+            "type": "integer"
+          },
+          "effectiveFrom": {
+            "format": "date-time",
+            "title": "Effectivefrom",
+            "type": "string"
+          },
+          "effectiveTo": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectiveto"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inputMicrosPerMillion": {
+            "title": "Inputmicrospermillion",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "outputMicrosPerMillion": {
+            "title": "Outputmicrospermillion",
+            "type": "integer"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "sourceUrl": {
+            "title": "Sourceurl",
+            "type": "string"
+          },
+          "toolMicrosPerUnit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolmicrosperunit"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "model",
+          "contextMinTokens",
+          "contextMaxTokens",
+          "inputMicrosPerMillion",
+          "cacheReadMicrosPerMillion",
+          "cacheWriteMicrosPerMillion",
+          "outputMicrosPerMillion",
+          "toolMicrosPerUnit",
+          "effectiveFrom",
+          "effectiveTo",
+          "sourceUrl"
+        ],
+        "title": "LlmRateOut",
+        "type": "object"
+      },
+      "LlmRatePage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/LlmRateOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "LlmRatePage",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "identifier": {
@@ -4888,6 +5186,863 @@
           "questionId"
         ],
         "title": "QuestionReviewOut",
+        "type": "object"
+      },
+      "QuotaAccountOut": {
+        "properties": {
+          "allowanceMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowancemicros"
+          },
+          "byokCostMicros": {
+            "title": "Byokcostmicros",
+            "type": "integer"
+          },
+          "creditBalanceMicros": {
+            "title": "Creditbalancemicros",
+            "type": "integer"
+          },
+          "disabled": {
+            "title": "Disabled",
+            "type": "boolean"
+          },
+          "overageMicros": {
+            "title": "Overagemicros",
+            "type": "integer"
+          },
+          "overrideMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overridemicros"
+          },
+          "periodEnd": {
+            "format": "date-time",
+            "title": "Periodend",
+            "type": "string"
+          },
+          "periodStart": {
+            "format": "date-time",
+            "title": "Periodstart",
+            "type": "string"
+          },
+          "recurringRemainingMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurringremainingmicros"
+          },
+          "remainingMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remainingmicros"
+          },
+          "sharedCostMicros": {
+            "title": "Sharedcostmicros",
+            "type": "integer"
+          },
+          "spentMicros": {
+            "title": "Spentmicros",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "EXHAUSTED",
+              "OVERAGE",
+              "UNLIMITED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tierId": {
+            "title": "Tierid",
+            "type": "string"
+          },
+          "totalTokens": {
+            "title": "Totaltokens",
+            "type": "integer"
+          },
+          "userId": {
+            "title": "Userid",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "username",
+          "disabled",
+          "tierId",
+          "allowanceMicros",
+          "overrideMicros",
+          "spentMicros",
+          "recurringRemainingMicros",
+          "creditBalanceMicros",
+          "remainingMicros",
+          "overageMicros",
+          "periodStart",
+          "periodEnd",
+          "status",
+          "sharedCostMicros",
+          "byokCostMicros",
+          "totalTokens"
+        ],
+        "title": "QuotaAccountOut",
+        "type": "object"
+      },
+      "QuotaAccountPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaAccountOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "QuotaAccountPage",
+        "type": "object"
+      },
+      "QuotaAccountPatch": {
+        "properties": {
+          "allowanceOverrideMicros": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowanceoverridemicros"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "tierId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tierid"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "QuotaAccountPatch",
+        "type": "object"
+      },
+      "QuotaLedgerEntryOut": {
+        "properties": {
+          "actorUserId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actoruserid"
+          },
+          "amountMicros": {
+            "title": "Amountmicros",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "creditMicros": {
+            "title": "Creditmicros",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "overageMicros": {
+            "title": "Overagemicros",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "recurringMicros": {
+            "title": "Recurringmicros",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "amountMicros",
+          "recurringMicros",
+          "creditMicros",
+          "overageMicros",
+          "actorUserId",
+          "reason",
+          "createdAt"
+        ],
+        "title": "QuotaLedgerEntryOut",
+        "type": "object"
+      },
+      "QuotaLedgerPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaLedgerEntryOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "QuotaLedgerPage",
+        "type": "object"
+      },
+      "QuotaOperationCommit": {
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Idempotencykey",
+            "type": "string"
+          },
+          "previewId": {
+            "title": "Previewid",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "previewId",
+          "reason",
+          "idempotencyKey"
+        ],
+        "title": "QuotaOperationCommit",
+        "type": "object"
+      },
+      "QuotaOperationOut": {
+        "properties": {
+          "actionType": {
+            "title": "Actiontype",
+            "type": "string"
+          },
+          "actorUserId": {
+            "title": "Actoruserid",
+            "type": "string"
+          },
+          "affectedCount": {
+            "title": "Affectedcount",
+            "type": "integer"
+          },
+          "amountMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountmicros"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "targetType": {
+            "title": "Targettype",
+            "type": "string"
+          },
+          "targetValue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetvalue"
+          }
+        },
+        "required": [
+          "id",
+          "actionType",
+          "targetType",
+          "targetValue",
+          "amountMicros",
+          "reason",
+          "affectedCount",
+          "actorUserId",
+          "createdAt"
+        ],
+        "title": "QuotaOperationOut",
+        "type": "object"
+      },
+      "QuotaOperationPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaOperationOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "QuotaOperationPage",
+        "type": "object"
+      },
+      "QuotaOperationPreviewCreate": {
+        "properties": {
+          "actionType": {
+            "enum": [
+              "RESET_CURRENT_PERIOD",
+              "GRANT_CREDIT",
+              "DEBIT_CREDIT"
+            ],
+            "title": "Actiontype",
+            "type": "string"
+          },
+          "amountMicros": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountmicros"
+          },
+          "targetType": {
+            "enum": [
+              "USER",
+              "TIER",
+              "ALL_MEMBERS"
+            ],
+            "title": "Targettype",
+            "type": "string"
+          },
+          "targetValue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetvalue"
+          }
+        },
+        "required": [
+          "targetType",
+          "actionType"
+        ],
+        "title": "QuotaOperationPreviewCreate",
+        "type": "object"
+      },
+      "QuotaOperationPreviewOut": {
+        "properties": {
+          "actionType": {
+            "title": "Actiontype",
+            "type": "string"
+          },
+          "affectedCount": {
+            "title": "Affectedcount",
+            "type": "integer"
+          },
+          "amountMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountmicros"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "targetType": {
+            "title": "Targettype",
+            "type": "string"
+          },
+          "targetValue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetvalue"
+          },
+          "totalEffectMicros": {
+            "title": "Totaleffectmicros",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetValue",
+          "actionType",
+          "amountMicros",
+          "affectedCount",
+          "totalEffectMicros",
+          "expiresAt"
+        ],
+        "title": "QuotaOperationPreviewOut",
+        "type": "object"
+      },
+      "QuotaPlatformSummary": {
+        "properties": {
+          "monthlyCapMicros": {
+            "title": "Monthlycapmicros",
+            "type": "integer"
+          },
+          "monthlySpendMicros": {
+            "title": "Monthlyspendmicros",
+            "type": "integer"
+          },
+          "nextResetAt": {
+            "format": "date-time",
+            "title": "Nextresetat",
+            "type": "string"
+          },
+          "remainingMicros": {
+            "title": "Remainingmicros",
+            "type": "integer"
+          },
+          "unpricedCallCount": {
+            "title": "Unpricedcallcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "monthlySpendMicros",
+          "monthlyCapMicros",
+          "remainingMicros",
+          "unpricedCallCount",
+          "nextResetAt"
+        ],
+        "title": "QuotaPlatformSummary",
+        "type": "object"
+      },
+      "QuotaSnapshotOut": {
+        "properties": {
+          "allowanceOverrideMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowanceoverridemicros"
+          },
+          "creditBalanceMicros": {
+            "title": "Creditbalancemicros",
+            "type": "integer"
+          },
+          "enforcementStatus": {
+            "title": "Enforcementstatus",
+            "type": "string"
+          },
+          "nextResetAt": {
+            "format": "date-time",
+            "title": "Nextresetat",
+            "type": "string"
+          },
+          "overageMicros": {
+            "title": "Overagemicros",
+            "type": "integer"
+          },
+          "periodEnd": {
+            "format": "date-time",
+            "title": "Periodend",
+            "type": "string"
+          },
+          "periodStart": {
+            "format": "date-time",
+            "title": "Periodstart",
+            "type": "string"
+          },
+          "recurringAllowanceMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurringallowancemicros"
+          },
+          "remainingMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remainingmicros"
+          },
+          "spendMicros": {
+            "title": "Spendmicros",
+            "type": "integer"
+          },
+          "tierId": {
+            "title": "Tierid",
+            "type": "string"
+          },
+          "tierName": {
+            "title": "Tiername",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tierId",
+          "tierName",
+          "periodStart",
+          "periodEnd",
+          "recurringAllowanceMicros",
+          "allowanceOverrideMicros",
+          "spendMicros",
+          "creditBalanceMicros",
+          "remainingMicros",
+          "overageMicros",
+          "nextResetAt",
+          "enforcementStatus"
+        ],
+        "title": "QuotaSnapshotOut",
+        "type": "object"
+      },
+      "QuotaTierCreate": {
+        "properties": {
+          "allowanceMicros": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowancemicros"
+          },
+          "cycleCount": {
+            "maximum": 52.0,
+            "minimum": 1.0,
+            "title": "Cyclecount",
+            "type": "integer"
+          },
+          "cycleUnit": {
+            "enum": [
+              "WEEK",
+              "MONTH"
+            ],
+            "title": "Cycleunit",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[A-Z][A-Z0-9_]{1,31}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "cycleUnit",
+          "cycleCount",
+          "reason"
+        ],
+        "title": "QuotaTierCreate",
+        "type": "object"
+      },
+      "QuotaTierOut": {
+        "properties": {
+          "allowanceMicros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowancemicros"
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
+          "cycleCount": {
+            "title": "Cyclecount",
+            "type": "integer"
+          },
+          "cycleUnit": {
+            "enum": [
+              "WEEK",
+              "MONTH"
+            ],
+            "title": "Cycleunit",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "isDefault": {
+            "title": "Isdefault",
+            "type": "boolean"
+          },
+          "memberCount": {
+            "default": 0,
+            "title": "Membercount",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "spendMicros": {
+            "default": 0,
+            "title": "Spendmicros",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "cycleUnit",
+          "cycleCount",
+          "allowanceMicros",
+          "isDefault",
+          "archivedAt"
+        ],
+        "title": "QuotaTierOut",
+        "type": "object"
+      },
+      "QuotaTierPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaTierOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "QuotaTierPage",
+        "type": "object"
+      },
+      "QuotaTierPatch": {
+        "properties": {
+          "allowanceMicros": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowancemicros"
+          },
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
+          },
+          "cycleCount": {
+            "anyOf": [
+              {
+                "maximum": 52.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cyclecount"
+          },
+          "cycleUnit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "WEEK",
+                  "MONTH"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycleunit"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "QuotaTierPatch",
         "type": "object"
       },
       "RedoParams": {
@@ -6931,6 +8086,38 @@
         "title": "SystemDefaults",
         "type": "object"
       },
+      "SystemDefaultsUpdate": {
+        "properties": {
+          "maxActiveJobs": {
+            "minimum": 0.0,
+            "title": "Maxactivejobs",
+            "type": "integer"
+          },
+          "maxConcurrentRuns": {
+            "minimum": 0.0,
+            "title": "Maxconcurrentruns",
+            "type": "integer"
+          },
+          "weeklyTokenBudget": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weeklytokenbudget"
+          }
+        },
+        "required": [
+          "maxActiveJobs",
+          "maxConcurrentRuns"
+        ],
+        "title": "SystemDefaultsUpdate",
+        "type": "object"
+      },
       "TailorParams": {
         "properties": {
           "approved": {
@@ -7081,6 +8268,47 @@
           "tokens"
         ],
         "title": "TokenList",
+        "type": "object"
+      },
+      "TokenTotals": {
+        "properties": {
+          "audioTokens": {
+            "default": 0,
+            "title": "Audiotokens",
+            "type": "integer"
+          },
+          "cacheReadTokens": {
+            "default": 0,
+            "title": "Cachereadtokens",
+            "type": "integer"
+          },
+          "cacheWriteTokens": {
+            "default": 0,
+            "title": "Cachewritetokens",
+            "type": "integer"
+          },
+          "inputTokens": {
+            "default": 0,
+            "title": "Inputtokens",
+            "type": "integer"
+          },
+          "outputTokens": {
+            "default": 0,
+            "title": "Outputtokens",
+            "type": "integer"
+          },
+          "reasoningTokens": {
+            "default": 0,
+            "title": "Reasoningtokens",
+            "type": "integer"
+          },
+          "totalTokens": {
+            "default": 0,
+            "title": "Totaltokens",
+            "type": "integer"
+          }
+        },
+        "title": "TokenTotals",
         "type": "object"
       },
       "TranscribeAvailabilityOut": {
@@ -8588,6 +9816,992 @@
         ]
       }
     },
+    "/api/admin/llm-rates": {
+      "get": {
+        "operationId": "list_rates_api_admin_llm_rates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmRatePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Rates",
+        "tags": [
+          "admin-quotas"
+        ]
+      },
+      "post": {
+        "operationId": "create_rate_api_admin_llm_rates_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmRateCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmRateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Rate",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/quota-accounts": {
+      "get": {
+        "operationId": "list_accounts_api_admin_quota_accounts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tier",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tier"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "balance",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Balance"
+            }
+          },
+          {
+            "in": "query",
+            "name": "disabled",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Disabled"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaAccountPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Accounts",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/quota-accounts/{user_id}": {
+      "get": {
+        "operationId": "get_account_api_admin_quota_accounts__user_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaAccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Account",
+        "tags": [
+          "admin-quotas"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_account_api_admin_quota_accounts__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaAccountPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaAccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Account",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/quota-accounts/{user_id}/ledger": {
+      "get": {
+        "operationId": "account_ledger_api_admin_quota_accounts__user_id__ledger_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaLedgerPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Account Ledger",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/quota-operation-previews": {
+      "post": {
+        "operationId": "preview_operation_api_admin_quota_operation_previews_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaOperationPreviewCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaOperationPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Operation",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/quota-operations": {
+      "get": {
+        "operationId": "list_operations_api_admin_quota_operations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaOperationPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Operations",
+        "tags": [
+          "admin-quotas"
+        ]
+      },
+      "post": {
+        "operationId": "commit_operation_api_admin_quota_operations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaOperationCommit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaOperationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commit Operation",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/quota-summary": {
+      "get": {
+        "operationId": "quota_summary_api_admin_quota_summary_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaPlatformSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Quota Summary",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/quota-tiers": {
+      "get": {
+        "operationId": "list_tiers_api_admin_quota_tiers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaTierPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tiers",
+        "tags": [
+          "admin-quotas"
+        ]
+      },
+      "post": {
+        "operationId": "create_tier_api_admin_quota_tiers_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaTierCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaTierOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Tier",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
+    "/api/admin/quota-tiers/{tier_id}": {
+      "get": {
+        "operationId": "get_tier_api_admin_quota_tiers__tier_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tier_id",
+            "required": true,
+            "schema": {
+              "title": "Tier Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaTierOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tier",
+        "tags": [
+          "admin-quotas"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_tier_api_admin_quota_tiers__tier_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tier_id",
+            "required": true,
+            "schema": {
+              "title": "Tier Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaTierPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaTierOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Tier",
+        "tags": [
+          "admin-quotas"
+        ]
+      }
+    },
     "/api/admin/system/defaults": {
       "get": {
         "operationId": "get_defaults_api_admin_system_defaults_get",
@@ -8660,7 +10874,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SystemDefaults"
+                "$ref": "#/components/schemas/SystemDefaultsUpdate"
               }
             }
           },

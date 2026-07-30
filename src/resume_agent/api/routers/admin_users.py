@@ -85,6 +85,12 @@ def patch_user(
     request: Request,
     context: UserContext = Depends(require_admin),
 ) -> dict[str, str]:
+    if "weekly_token_budget" in body.model_fields_set:
+        raise ApiException(
+            422,
+            "TOKEN_QUOTA_DEPRECATED",
+            "Token budgets are analytics-only; manage this member's cost quota instead",
+        )
     with Session(request.app.state.system_engine) as session:
         user = session.get(User, user_id)
         if user is None:
@@ -97,7 +103,7 @@ def patch_user(
             if body.disabled and user.id == context.user_id:
                 raise ApiException(409, "SELF_DISABLE", "Cannot disable yourself")
             user.disabled_at = datetime.now(timezone.utc) if body.disabled else None
-        for field in ("weekly_token_budget", "max_active_jobs", "max_concurrent_runs"):
+        for field in ("max_active_jobs", "max_concurrent_runs"):
             if field in body.model_fields_set:
                 setattr(user, field, getattr(body, field))
         if body.shared_key_access is not None:

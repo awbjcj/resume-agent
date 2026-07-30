@@ -1,9 +1,11 @@
 import { ShieldCheck } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
 import { DataArchiveCard } from "@/features/account/DataArchiveCard";
 import { useMe } from "@/features/auth/AuthGate";
 import { AdminInviteCard } from "./AdminInviteCard";
@@ -24,12 +26,16 @@ export function AdminPage() {
         title="Administration"
         sub="Manage member access, operational limits, invitation codes, and complete system backups."
       />
+      <nav aria-label="Administration sections" className="-mt-5 flex gap-2">
+        <Button variant="secondary" size="sm">Access &amp; data</Button>
+        <Button variant="outline" size="sm" render={<Link to="/admin/quotas" />}>Cost quotas</Button>
+      </nav>
       <Alert className="-mt-5">
         <ShieldCheck aria-hidden="true" />
         <AlertTitle>Administrator access is unlimited</AlertTitle>
         <AlertDescription>
-          Token budgets, active-job caps, and maximum concurrency do not apply to
-          administrators. The defaults below govern member accounts only.
+          Cost allowances, active-job caps, and maximum concurrency do not apply to
+          administrators. Their shared-key spend still counts against the platform cap.
         </AlertDescription>
       </Alert>
       <MailWarning />

@@ -26,6 +26,7 @@ from resume_agent.api.runs.manager import RunResetConflict
 from resume_agent.api.uploads import UploadTooLargeError, copy_upload
 from resume_agent.api.schemas.account import (
     AccountUsage,
+    CostTotals,
     PasswordChangeRequest,
     ResetReportOut,
     ResetRequest,
@@ -34,6 +35,8 @@ from resume_agent.api.schemas.account import (
     TokenCreateRequest,
     TokenInfo,
     TokenList,
+    TokenTotals,
+    QuotaSnapshotOut,
     VerifyAccountEmailRequest,
 )
 from resume_agent.api.schemas.auth import MeResponse
@@ -55,6 +58,7 @@ from resume_agent.tenancy.limits import (
     system_default,
     weekly_usage,
 )
+from resume_agent.tenancy.quotas import quota_snapshot
 from resume_agent.tenancy.secrets import hash_secret, mint_secret
 from resume_agent.tenancy.system_db import (
     ApiToken,
@@ -526,6 +530,53 @@ def account_usage(request: Request) -> AccountUsage:
                 UsageEvent.ts >= cutoff,
             )
         ).scalar_one()
+        rows = session.execute(
+            select(
+                UsageEvent.own_key,
+                func.coalesce(func.sum(UsageEvent.input_tokens), 0),
+                func.coalesce(func.sum(UsageEvent.output_tokens), 0),
+                func.coalesce(func.sum(UsageEvent.cache_read_tokens), 0),
+                func.coalesce(func.sum(UsageEvent.cache_write_tokens), 0),
+                func.coalesce(func.sum(UsageEvent.reasoning_tokens), 0),
+                func.coalesce(
+                    func.sum(
+                        UsageEvent.audio_input_tokens + UsageEvent.audio_output_tokens
+                    ),
+                    0,
+                ),
+                func.coalesce(func.sum(UsageEvent.total_tokens), 0),
+                func.coalesce(func.sum(UsageEvent.cost_micros), 0),
+                func.coalesce(func.sum(UsageEvent.quota_cost_micros), 0),
+                func.coalesce(func.sum(UsageEvent.tool_cost_micros), 0),
+                func.sum(func.iif(UsageEvent.pricing_status != "PRICED", 1, 0)),
+            )
+            .where(UsageEvent.user_id == context.user_id)
+            .group_by(UsageEvent.own_key)
+        ).all()
+    token_groups = {
+        bool(row[0]): TokenTotals(
+            input_tokens=int(row[1]),
+            output_tokens=int(row[2]),
+            cache_read_tokens=int(row[3]),
+            cache_write_tokens=int(row[4]),
+            reasoning_tokens=int(row[5]),
+            audio_tokens=int(row[6]),
+            total_tokens=int(row[7]),
+        )
+        for row in rows
+    }
+    shared_tokens = token_groups.get(False, TokenTotals())
+    byok_tokens = token_groups.get(True, TokenTotals())
+    all_tokens = TokenTotals(
+        **{
+            field: getattr(shared_tokens, field) + getattr(byok_tokens, field)
+            for field in TokenTotals.model_fields
+        }
+    )
+    shared_cost = sum(int(row[9]) for row in rows)
+    byok_cost = sum(int(row[8]) for row in rows if bool(row[0]))
+    tool_cost = sum(int(row[10]) for row in rows)
+    unpriced = sum(int(row[11] or 0) for row in rows)
     budget = (
         0
         if context.is_admin
@@ -534,8 +585,43 @@ def account_usage(request: Request) -> AccountUsage:
             system_default(engine, "weekly_token_budget", DEFAULT_WEEKLY_TOKEN_BUDGET),
         )
     )
+    snapshot = None
+    if not context.is_admin:
+        current = quota_snapshot(engine, context.user_id)
+        snapshot = QuotaSnapshotOut(
+            tier_id=current.tier_id,
+            tier_name=current.tier_name,
+            period_start=current.period_start,
+            period_end=current.period_end,
+            recurring_allowance_micros=current.allowance_micros,
+            allowance_override_micros=current.override_micros,
+            spend_micros=current.spent_micros,
+            credit_balance_micros=current.credit_balance_micros,
+            remaining_micros=current.remaining_micros,
+            overage_micros=current.overage_micros,
+            next_reset_at=current.period_end,
+            enforcement_status=(
+                "SHADOW"
+                if context.settings.cost_quota_enforcement == "shadow"
+                else "OVERAGE"
+                if current.overage_micros
+                else "EXHAUSTED"
+                if current.remaining_micros == 0
+                else "ACTIVE"
+            ),
+        )
     return AccountUsage(
         weighted_total=weekly_usage(engine, context.user_id),
         own_key_weighted_total=float(own_key),
         budget=budget,
+        quota=snapshot,
+        costs=CostTotals(
+            shared_quota_cost_micros=shared_cost,
+            byok_estimated_cost_micros=byok_cost,
+            tool_cost_micros=tool_cost,
+            unpriced_call_count=unpriced,
+        ),
+        shared_tokens=shared_tokens,
+        byok_tokens=byok_tokens,
+        all_tokens=all_tokens,
     )

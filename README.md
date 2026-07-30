@@ -109,8 +109,11 @@ SESSION_SECRET=<long random value>
 After signing in, create a single-use invite on the **Admin** page or with
 `resume-agent admin invite`. Members register at `/register`; each receives a
 separate database, profile corpus, configuration, secrets, output, and run
-history. Administrators can set weekly shared-key budgets, active-job caps, and
-concurrent-run caps. Members manage their own keys, tokens, password, and
+history. Administrators manage recurring USD-cost allowances, durable credits,
+effective-dated LLM rates, active-job caps, and concurrent-run caps. Token usage
+remains available as shared/BYOK analytics but does not control quotas after the
+[cost quota rollout](docs/cost-quotas.md) reaches enforcement. Members manage
+their own keys, tokens, password, and
 workspace export in the web UI. The remote member workflow is web-first; the
 local domain CLI can select an existing workspace with `--user USERNAME`.
 

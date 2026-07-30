@@ -261,6 +261,164 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/llm-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rates */
+        get: operations["list_rates_api_admin_llm_rates_get"];
+        put?: never;
+        /** Create Rate */
+        post: operations["create_rate_api_admin_llm_rates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/quota-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Accounts */
+        get: operations["list_accounts_api_admin_quota_accounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/quota-accounts/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Account */
+        get: operations["get_account_api_admin_quota_accounts__user_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Account */
+        patch: operations["patch_account_api_admin_quota_accounts__user_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/quota-accounts/{user_id}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Account Ledger */
+        get: operations["account_ledger_api_admin_quota_accounts__user_id__ledger_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/quota-operation-previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Operation */
+        post: operations["preview_operation_api_admin_quota_operation_previews_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/quota-operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Operations */
+        get: operations["list_operations_api_admin_quota_operations_get"];
+        put?: never;
+        /** Commit Operation */
+        post: operations["commit_operation_api_admin_quota_operations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/quota-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quota Summary */
+        get: operations["quota_summary_api_admin_quota_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/quota-tiers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tiers */
+        get: operations["list_tiers_api_admin_quota_tiers_get"];
+        put?: never;
+        /** Create Tier */
+        post: operations["create_tier_api_admin_quota_tiers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/quota-tiers/{tier_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Tier */
+        get: operations["get_tier_api_admin_quota_tiers__tier_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Tier */
+        patch: operations["patch_tier_api_admin_quota_tiers__tier_id__patch"];
+        trace?: never;
+    };
     "/api/admin/system/defaults": {
         parameters: {
             query?: never;
@@ -2476,10 +2634,15 @@ export interface components {
     schemas: {
         /** AccountUsage */
         AccountUsage: {
+            allTokens?: components["schemas"]["TokenTotals"];
             /** Budget */
             budget: number;
+            byokTokens?: components["schemas"]["TokenTotals"];
+            costs?: components["schemas"]["CostTotals"];
             /** Ownkeyweightedtotal */
             ownKeyWeightedTotal: number;
+            quota?: components["schemas"]["QuotaSnapshotOut"] | null;
+            sharedTokens?: components["schemas"]["TokenTotals"];
             /** Weightedtotal */
             weightedTotal: number;
         };
@@ -3108,6 +3271,29 @@ export interface components {
             responseRate: number;
             /** Responses */
             responses: number;
+        };
+        /** CostTotals */
+        CostTotals: {
+            /**
+             * Byokestimatedcostmicros
+             * @default 0
+             */
+            byokEstimatedCostMicros: number;
+            /**
+             * Sharedquotacostmicros
+             * @default 0
+             */
+            sharedQuotaCostMicros: number;
+            /**
+             * Toolcostmicros
+             * @default 0
+             */
+            toolCostMicros: number;
+            /**
+             * Unpricedcallcount
+             * @default 0
+             */
+            unpricedCallCount: number;
         };
         /** CoverLetterOut */
         CoverLetterOut: {
@@ -3801,6 +3987,79 @@ export interface components {
             /** Token */
             token: string;
         };
+        /** LlmRateCreate */
+        LlmRateCreate: {
+            /** Cachereadmicrospermillion */
+            cacheReadMicrosPerMillion?: number | null;
+            /** Cachewritemicrospermillion */
+            cacheWriteMicrosPerMillion?: number | null;
+            /** Contextmaxtokens */
+            contextMaxTokens?: number | null;
+            /**
+             * Contextmintokens
+             * @default 0
+             */
+            contextMinTokens: number;
+            /**
+             * Effectivefrom
+             * Format: date-time
+             */
+            effectiveFrom: string;
+            /** Effectiveto */
+            effectiveTo?: string | null;
+            /** Inputmicrospermillion */
+            inputMicrosPerMillion: number;
+            /** Model */
+            model: string;
+            /** Outputmicrospermillion */
+            outputMicrosPerMillion: number;
+            /** Provider */
+            provider: string;
+            /** Reason */
+            reason: string;
+            /** Sourceurl */
+            sourceUrl: string;
+            /** Toolmicrosperunit */
+            toolMicrosPerUnit?: number | null;
+        };
+        /** LlmRateOut */
+        LlmRateOut: {
+            /** Cachereadmicrospermillion */
+            cacheReadMicrosPerMillion: number | null;
+            /** Cachewritemicrospermillion */
+            cacheWriteMicrosPerMillion: number | null;
+            /** Contextmaxtokens */
+            contextMaxTokens: number | null;
+            /** Contextmintokens */
+            contextMinTokens: number;
+            /**
+             * Effectivefrom
+             * Format: date-time
+             */
+            effectiveFrom: string;
+            /** Effectiveto */
+            effectiveTo: string | null;
+            /** Id */
+            id: string;
+            /** Inputmicrospermillion */
+            inputMicrosPerMillion: number;
+            /** Model */
+            model: string;
+            /** Outputmicrospermillion */
+            outputMicrosPerMillion: number;
+            /** Provider */
+            provider: string;
+            /** Sourceurl */
+            sourceUrl: string;
+            /** Toolmicrosperunit */
+            toolMicrosPerUnit: number | null;
+        };
+        /** LlmRatePage */
+        LlmRatePage: {
+            /** Data */
+            data: components["schemas"]["LlmRateOut"][];
+            pagination: components["schemas"]["Pagination"];
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Identifier */
@@ -4255,6 +4514,296 @@ export interface components {
              * @default
              */
             suggestedAnswer: string;
+        };
+        /** QuotaAccountOut */
+        QuotaAccountOut: {
+            /** Allowancemicros */
+            allowanceMicros: number | null;
+            /** Byokcostmicros */
+            byokCostMicros: number;
+            /** Creditbalancemicros */
+            creditBalanceMicros: number;
+            /** Disabled */
+            disabled: boolean;
+            /** Overagemicros */
+            overageMicros: number;
+            /** Overridemicros */
+            overrideMicros: number | null;
+            /**
+             * Periodend
+             * Format: date-time
+             */
+            periodEnd: string;
+            /**
+             * Periodstart
+             * Format: date-time
+             */
+            periodStart: string;
+            /** Recurringremainingmicros */
+            recurringRemainingMicros: number | null;
+            /** Remainingmicros */
+            remainingMicros: number | null;
+            /** Sharedcostmicros */
+            sharedCostMicros: number;
+            /** Spentmicros */
+            spentMicros: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ACTIVE" | "EXHAUSTED" | "OVERAGE" | "UNLIMITED";
+            /** Tierid */
+            tierId: string;
+            /** Totaltokens */
+            totalTokens: number;
+            /** Userid */
+            userId: string;
+            /** Username */
+            username: string;
+        };
+        /** QuotaAccountPage */
+        QuotaAccountPage: {
+            /** Data */
+            data: components["schemas"]["QuotaAccountOut"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /** QuotaAccountPatch */
+        QuotaAccountPatch: {
+            /** Allowanceoverridemicros */
+            allowanceOverrideMicros?: number | null;
+            /** Reason */
+            reason: string;
+            /** Tierid */
+            tierId?: string | null;
+        };
+        /** QuotaLedgerEntryOut */
+        QuotaLedgerEntryOut: {
+            /** Actoruserid */
+            actorUserId: string | null;
+            /** Amountmicros */
+            amountMicros: number;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Creditmicros */
+            creditMicros: number;
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Overagemicros */
+            overageMicros: number;
+            /** Reason */
+            reason: string | null;
+            /** Recurringmicros */
+            recurringMicros: number;
+        };
+        /** QuotaLedgerPage */
+        QuotaLedgerPage: {
+            /** Data */
+            data: components["schemas"]["QuotaLedgerEntryOut"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /** QuotaOperationCommit */
+        QuotaOperationCommit: {
+            /** Idempotencykey */
+            idempotencyKey: string;
+            /** Previewid */
+            previewId: string;
+            /** Reason */
+            reason: string;
+        };
+        /** QuotaOperationOut */
+        QuotaOperationOut: {
+            /** Actiontype */
+            actionType: string;
+            /** Actoruserid */
+            actorUserId: string;
+            /** Affectedcount */
+            affectedCount: number;
+            /** Amountmicros */
+            amountMicros: number | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
+            /** Targettype */
+            targetType: string;
+            /** Targetvalue */
+            targetValue: string | null;
+        };
+        /** QuotaOperationPage */
+        QuotaOperationPage: {
+            /** Data */
+            data: components["schemas"]["QuotaOperationOut"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /** QuotaOperationPreviewCreate */
+        QuotaOperationPreviewCreate: {
+            /**
+             * Actiontype
+             * @enum {string}
+             */
+            actionType: "RESET_CURRENT_PERIOD" | "GRANT_CREDIT" | "DEBIT_CREDIT";
+            /** Amountmicros */
+            amountMicros?: number | null;
+            /**
+             * Targettype
+             * @enum {string}
+             */
+            targetType: "USER" | "TIER" | "ALL_MEMBERS";
+            /** Targetvalue */
+            targetValue?: string | null;
+        };
+        /** QuotaOperationPreviewOut */
+        QuotaOperationPreviewOut: {
+            /** Actiontype */
+            actionType: string;
+            /** Affectedcount */
+            affectedCount: number;
+            /** Amountmicros */
+            amountMicros: number | null;
+            /**
+             * Expiresat
+             * Format: date-time
+             */
+            expiresAt: string;
+            /** Id */
+            id: string;
+            /** Targettype */
+            targetType: string;
+            /** Targetvalue */
+            targetValue: string | null;
+            /** Totaleffectmicros */
+            totalEffectMicros: number;
+        };
+        /** QuotaPlatformSummary */
+        QuotaPlatformSummary: {
+            /** Monthlycapmicros */
+            monthlyCapMicros: number;
+            /** Monthlyspendmicros */
+            monthlySpendMicros: number;
+            /**
+             * Nextresetat
+             * Format: date-time
+             */
+            nextResetAt: string;
+            /** Remainingmicros */
+            remainingMicros: number;
+            /** Unpricedcallcount */
+            unpricedCallCount: number;
+        };
+        /** QuotaSnapshotOut */
+        QuotaSnapshotOut: {
+            /** Allowanceoverridemicros */
+            allowanceOverrideMicros: number | null;
+            /** Creditbalancemicros */
+            creditBalanceMicros: number;
+            /** Enforcementstatus */
+            enforcementStatus: string;
+            /**
+             * Nextresetat
+             * Format: date-time
+             */
+            nextResetAt: string;
+            /** Overagemicros */
+            overageMicros: number;
+            /**
+             * Periodend
+             * Format: date-time
+             */
+            periodEnd: string;
+            /**
+             * Periodstart
+             * Format: date-time
+             */
+            periodStart: string;
+            /** Recurringallowancemicros */
+            recurringAllowanceMicros: number | null;
+            /** Remainingmicros */
+            remainingMicros: number | null;
+            /** Spendmicros */
+            spendMicros: number;
+            /** Tierid */
+            tierId: string;
+            /** Tiername */
+            tierName: string;
+        };
+        /** QuotaTierCreate */
+        QuotaTierCreate: {
+            /** Allowancemicros */
+            allowanceMicros?: number | null;
+            /** Cyclecount */
+            cycleCount: number;
+            /**
+             * Cycleunit
+             * @enum {string}
+             */
+            cycleUnit: "WEEK" | "MONTH";
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
+        };
+        /** QuotaTierOut */
+        QuotaTierOut: {
+            /** Allowancemicros */
+            allowanceMicros: number | null;
+            /** Archivedat */
+            archivedAt: string | null;
+            /** Cyclecount */
+            cycleCount: number;
+            /**
+             * Cycleunit
+             * @enum {string}
+             */
+            cycleUnit: "WEEK" | "MONTH";
+            /** Id */
+            id: string;
+            /** Isdefault */
+            isDefault: boolean;
+            /**
+             * Membercount
+             * @default 0
+             */
+            memberCount: number;
+            /** Name */
+            name: string;
+            /**
+             * Spendmicros
+             * @default 0
+             */
+            spendMicros: number;
+        };
+        /** QuotaTierPage */
+        QuotaTierPage: {
+            /** Data */
+            data: components["schemas"]["QuotaTierOut"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /** QuotaTierPatch */
+        QuotaTierPatch: {
+            /** Allowancemicros */
+            allowanceMicros?: number | null;
+            /** Archived */
+            archived?: boolean | null;
+            /** Cyclecount */
+            cycleCount?: number | null;
+            /** Cycleunit */
+            cycleUnit?: ("WEEK" | "MONTH") | null;
+            /** Name */
+            name?: string | null;
+            /** Reason */
+            reason: string;
         };
         /**
          * RedoParams
@@ -4950,6 +5499,15 @@ export interface components {
             /** Weeklytokenbudget */
             weeklyTokenBudget: number;
         };
+        /** SystemDefaultsUpdate */
+        SystemDefaultsUpdate: {
+            /** Maxactivejobs */
+            maxActiveJobs: number;
+            /** Maxconcurrentruns */
+            maxConcurrentRuns: number;
+            /** Weeklytokenbudget */
+            weeklyTokenBudget?: number | null;
+        };
         /** TailorParams */
         TailorParams: {
             /**
@@ -5011,6 +5569,44 @@ export interface components {
         TokenList: {
             /** Tokens */
             tokens: components["schemas"]["TokenInfo"][];
+        };
+        /** TokenTotals */
+        TokenTotals: {
+            /**
+             * Audiotokens
+             * @default 0
+             */
+            audioTokens: number;
+            /**
+             * Cachereadtokens
+             * @default 0
+             */
+            cacheReadTokens: number;
+            /**
+             * Cachewritetokens
+             * @default 0
+             */
+            cacheWriteTokens: number;
+            /**
+             * Inputtokens
+             * @default 0
+             */
+            inputTokens: number;
+            /**
+             * Outputtokens
+             * @default 0
+             */
+            outputTokens: number;
+            /**
+             * Reasoningtokens
+             * @default 0
+             */
+            reasoningTokens: number;
+            /**
+             * Totaltokens
+             * @default 0
+             */
+            totalTokens: number;
         };
         /** TranscribeAvailabilityOut */
         TranscribeAvailabilityOut: {
@@ -5773,6 +6369,495 @@ export interface operations {
             };
         };
     };
+    list_rates_api_admin_llm_rates_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmRatePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_rate_api_admin_llm_rates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmRateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmRateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_accounts_api_admin_quota_accounts_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                search?: string | null;
+                tier?: string | null;
+                status?: string | null;
+                balance?: string | null;
+                disabled?: boolean | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaAccountPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_account_api_admin_quota_accounts__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaAccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_account_api_admin_quota_accounts__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaAccountPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaAccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    account_ledger_api_admin_quota_accounts__user_id__ledger_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaLedgerPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_operation_api_admin_quota_operation_previews_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaOperationPreviewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaOperationPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_operations_api_admin_quota_operations_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaOperationPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_operation_api_admin_quota_operations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaOperationCommit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaOperationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quota_summary_api_admin_quota_summary_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaPlatformSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tiers_api_admin_quota_tiers_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                include_archived?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaTierPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_tier_api_admin_quota_tiers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaTierCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaTierOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tier_api_admin_quota_tiers__tier_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                tier_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaTierOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_tier_api_admin_quota_tiers__tier_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                tier_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaTierPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaTierOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_defaults_api_admin_system_defaults_get: {
         parameters: {
             query?: never;
@@ -5815,7 +6900,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SystemDefaults"];
+                "application/json": components["schemas"]["SystemDefaultsUpdate"];
             };
         };
         responses: {

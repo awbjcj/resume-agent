@@ -21,17 +21,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { api, unwrap } from "@/lib/api/client";
 
 type SystemDefaults = {
-  weeklyTokenBudget: number;
   maxActiveJobs: number;
   maxConcurrentRuns: number;
 };
 
 const LIMIT_FIELDS = [
-  {
-    key: "weeklyTokenBudget",
-    label: "Weekly tokens",
-    description: "Shared-provider weighted tokens",
-  },
   {
     key: "maxActiveJobs",
     label: "Active jobs",
@@ -83,7 +77,7 @@ export function AdminLimitsCard() {
               <h3>Member defaults</h3>
             </CardTitle>
             <CardDescription>
-              Baseline limits for member accounts without a user-specific override.
+              Non-financial workspace limits. Cost allowances are managed in Cost quotas.
             </CardDescription>
           </div>
         </div>

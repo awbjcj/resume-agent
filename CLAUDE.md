@@ -182,8 +182,8 @@ engines before a staged, rollback-safe removal.
 ### Public network trust boundary (ADR-0008)
 
 A source-based threat model (`resume-agent-threat-model.md`,
-`security_best_practices_report.md`, repo root) drove three mandatory
-chokepoints that every future user-influenced fetch, download, or callback
+`security_best_practices_report.md`, repo root) drove mandatory chokepoints
+that every future user-influenced fetch, download, render, or archive import
 must go through — see ADR-0008.
 
 - **One egress gateway for user-influenced URLs.** `security/outbound.py`'s
@@ -202,8 +202,8 @@ must go through — see ADR-0008.
   bare `httpx.get`; `services/sources.py` re-exports its resolver rather than
   keeping its own copy. A bare `httpx.get`/`.get(follow_redirects=True)` on a
   user-supplied URL anywhere in the codebase is a regression.
-- **Tenant-confined artifact paths.** `tenancy/storage.py::artifact_path` is
-  the only way a download route may turn a stored `pdf_path` into a
+- **Tenant-confined artifact and render paths.** `tenancy/storage.py::artifact_path`
+  is the only way a download route may turn a stored `pdf_path` into a
   `FileResponse` target. In multi-user mode (a tenancy context is active) it
   resolves the path beneath the tenant's own `output/` directory and raises
   `TenantPathError` for anything that resolves outside it — including an
@@ -216,9 +216,15 @@ must go through — see ADR-0008.
   value _before_ the atomic swap and refuses the import outright
   (`INVALID_ARCHIVE`) if a row can't be normalized; `resumes.py` and
   `cover_letters.py`'s download handlers resolve through `artifact_path` and
-  treat `TenantPathError` as "not found," never as a 500. Local single-user
-  mode (no tenancy context) keeps the historical explicit-path behavior
-  unchanged.
+  treat `TenantPathError` as "not found," never as a 500. `render/service.py`
+  and `cover_letter/render.py` write new artifacts under the active tenant's
+  `context.paths.output_dir` rather than `RenderConfig.output_dir`, and
+  `render/templates.py::template_path_for` refuses a legacy `template_path` in
+  multi-user mode (`TemplateNotFoundError`) except the one literal legacy
+  value that maps to the bundled `classic` template — a persisted or imported
+  custom path can no longer select an arbitrary file. Local single-user mode
+  (no tenancy context) keeps the historical explicit-path behavior for all of
+  the above unchanged.
 - **Callback and cookie decisions read configuration, never forwarded
   headers.** `api/public_url.py::public_url` builds the Google sign-in and
   Gmail OAuth redirect URIs from `Settings.app_base_url` when set, never from
@@ -228,15 +234,60 @@ must go through — see ADR-0008.
   flag independent of `request.url.scheme` (also proxy-dependent);
   `Settings.allowed_hosts` wires `TrustedHostMiddleware`; `Settings.disable_api_docs`
   hides `/docs`, `/redoc`, and `/openapi.json`. The Dockerfile sets
-  `SECURE_COOKIES=true` and `DISABLE_API_DOCS=true` by default — a production
-  deploy additionally needs `APP_BASE_URL` and `ALLOWED_HOSTS` set (see
-  `docs/deploy-railway.md`).
+  `SECURE_COOKIES=true` and `DISABLE_API_DOCS=true` by default and refuses to
+  start unless `APP_BASE_URL` is an HTTPS origin — a production deploy
+  additionally needs `ALLOWED_HOSTS` set (see `docs/deploy-railway.md`).
+- **Archive extraction is resource-bounded, not just path-validated.**
+  `services/backup.py::_extract_validated` streams `tarfile` members instead of
+  materializing `getmembers()`, and rejects an archive during the scan (before
+  `extractall`) once it exceeds `max_members` (10,000), any single member's
+  size (512 MB), total expanded bytes (2 GB), or a >200:1 compression ratio
+  against the compressed file's own size. `services/settings_bundle.py`'s
+  bundle extractor now delegates to the same function with its own tighter
+  bundle-sized limits instead of duplicating the size/member checks — one
+  compression-bomb policy, two configured budgets.
 
-The threat-model documents also record P1/P2 items not yet implemented
-(shared-key Sybil budgets, OAuth state browser-binding, archive expansion
-limits, worker-process isolation for Typst/document parsing, CSRF tokens,
-security headers/CSP, envelope-encrypted secrets) — check them before assuming
-a related gap is already closed.
+### Registration modes and platform spend governance (ADR-0009)
+
+`Settings.registration_mode` (`closed` / `invite` / `open`) is a business
+decision independent of shared-key eligibility: open registration lets anyone
+verify an email and create an account, but `User.shared_key_access` (default
+`True` for invited users, `Settings.open_signup_shared_keys` — default
+`False` — for open self-registered ones) decides whether that account may use
+the _platform's_ LLM keys at all versus needing to bring its own. This closes
+the Sybil-multiplication gap the threat model flagged: creating accounts
+cheaply no longer creates shared-key spend by itself.
+
+- `api/attempts.py::consume_global_signup` is an atomic (`BEGIN IMMEDIATE`),
+  rolling-24h counter independent of per-email/per-IP attempt budgets, capping
+  total verification emails sent per day (`Settings.global_daily_signup_limit`)
+  regardless of how many distinct emails/IPs originate them.
+- `tenancy/limits.py::enforce_agent_budget` runs before every LLM call
+  (`llm_runner.py`'s `AgentRunner.run`/`arun` and direct transcription). A
+  non-admin account without `shared_key_access` is rejected when its resolved
+  provider has no per-user key. In `shadow` mode, the legacy rolling token
+  guard remains active while calls dual-record exact token metrics and USD
+  micro-cost. In `enforce` mode, an exact active rate is required before a
+  shared-key call, user cost allowance and credit balances are checked, and a
+  platform-wide UTC calendar-month shared-key cost is checked against
+  `Settings.global_monthly_cost_quota_micros`. Administrators bypass only the
+  user allowance; their shared-key cost still consumes the platform cap. BYOK
+  calls retain token and estimated-cost analytics but have zero quota charge.
+- Open self-registration additionally seeds lower active-job and concurrency
+  ceilings (`open_signup_max_active_jobs`,
+  `open_signup_max_concurrent_runs`). Its legacy token override is retained
+  only for stage-one rollback and stops controlling access after cost
+  enforcement is enabled.
+
+The threat-model documents still record items **not yet implemented**: OAuth
+state is not bound to the initiating browser or atomically consumed
+(browser-binding, not just the existing HMAC), there is no explicit CSRF
+token/Origin check for cookie-authenticated mutations, Typst/document
+parsing/transcription still run in the API process rather than an isolated
+worker, user provider keys are plaintext in `secrets.env` rather than
+envelope-encrypted, and there is no dedicated security audit-event stream.
+Check `resume-agent-threat-model.md` and `security_best_practices_report.md`
+before assuming a related gap is already closed.
 
 ### Fact-lock
 
