@@ -103,7 +103,7 @@ builder imports a concrete agno model class directly.
   (unbounded automatic budget), so non-reasoning agents must bound it. But
   Gemini 3 replaced `thinking_budget` with `thinking_level` and **rejects the
   budget outright**: `thinking_budget=0` fails the whole request with `400
-  INVALID_ARGUMENT` before generating anything, and agno then hands back the
+INVALID_ARGUMENT` before generating anything, and agno then hands back the
   error body as a plain `str` — surfacing as "Expected ResumeContent, got str"
   rather than as an HTTP error. `build_model` therefore bounds Gemini 3 with
   `thinking_level` (`low` when not reasoning, `high` when reasoning) and keeps
@@ -129,14 +129,14 @@ builder imports a concrete agno model class directly.
   arrived with 4.6. Both adaptive thinking + `output_config.effort`
   (`provider_capabilities`) and the `web_search_20260209` tool variant
   (`anthropic_web_search_tool`) gate on `>= (4, 6)`. The old `"haiku" in
-  model` heuristic was right only for the catalog and 400'd for any pre-4.6 id
+model` heuristic was right only for the catalog and 400'd for any pre-4.6 id
   entered through the tier picker's custom field; agno cannot catch this
   because its `NON_THINKING_MODELS` covers only Haiku 3 and 3.5.
 - **Model-tier defaults live only on `Settings`.** `ModelsConfigDoc`
   (`api/schemas/secrets.py`) and `WizardState` (`setup/state.py`) derive theirs
   via `Settings.model_fields[...].default` instead of restating literals —
   which is how the wizard silently fell a generation behind (`claude-sonnet-4-6`
-  vs `claude-sonnet-5`) while a test *named* for that invariant kept passing by
+  vs `claude-sonnet-5`) while a test _named_ for that invariant kept passing by
   restating the literals too.
 - **A structured-output call that returns `str` is diagnosed, not guessed.**
   agno leaves `RunOutput.content` as the raw `str` whenever it cannot parse a
@@ -178,6 +178,116 @@ general API authorization. Limits use `NULL = system default` and `0 =
 unlimited`; admins and calls made with a user's own provider key are exempt from
 shared-key budget enforcement. Admin user deletion evicts open workspace
 engines before a staged, rollback-safe removal.
+
+### Public network trust boundary (ADR-0008)
+
+A source-based threat model (`resume-agent-threat-model.md`,
+`security_best_practices_report.md`, repo root) drove mandatory chokepoints
+that every future user-influenced fetch, download, render, or archive import
+must go through — see ADR-0008.
+
+- **One egress gateway for user-influenced URLs.** `security/outbound.py`'s
+  `fetch_public_text`/`resolve_public_url` is the only place allowed to make an
+  HTTP(S) request to a URL a user supplied. It rejects non-`http(s)` schemes,
+  embedded credentials, and any resolved address that is not globally routable
+  (`ip_address(...).is_global`), then **pins the connection to the address it
+  validated** while preserving the original `Host`/SNI — so a second,
+  attacker-controlled DNS answer after the check (rebinding) can't steer the
+  real request at a private address. Every redirect hop is revalidated the
+  same way (`follow_redirects=False`, manual hop loop, capped at 5), and the
+  response is capped by declared and actual byte count with a content-type
+  allowlist (`text/*`, `application/xhtml+xml`). `profile/intake.py`,
+  `discovery/url_ingest/fetch.py::fetch_static`, and
+  `discovery/connectors/detect.py::_get_html` all call through it instead of a
+  bare `httpx.get`; `services/sources.py` re-exports its resolver rather than
+  keeping its own copy. A bare `httpx.get`/`.get(follow_redirects=True)` on a
+  user-supplied URL anywhere in the codebase is a regression.
+- **Tenant-confined artifact and render paths.** `tenancy/storage.py::artifact_path`
+  is the only way a download route may turn a stored `pdf_path` into a
+  `FileResponse` target. In multi-user mode (a tenancy context is active) it
+  resolves the path beneath the tenant's own `output/` directory and raises
+  `TenantPathError` for anything that resolves outside it — including an
+  absolute path or `..` restored from an **imported** workspace archive, which
+  is the actual attack: a tenant controls their own exported/re-imported
+  `resume_versions`/`cover_letters` rows, so a sink that trusts stored paths
+  verbatim lets an import plant a path pointing at another tenant's (or the
+  host's) files. `api/routers/account.py::_validate_workspace_stage` normalizes
+  every `pdf_path` in an imported database to a tenant-relative `output/...`
+  value _before_ the atomic swap and refuses the import outright
+  (`INVALID_ARCHIVE`) if a row can't be normalized; `resumes.py` and
+  `cover_letters.py`'s download handlers resolve through `artifact_path` and
+  treat `TenantPathError` as "not found," never as a 500. `render/service.py`
+  and `cover_letter/render.py` write new artifacts under the active tenant's
+  `context.paths.output_dir` rather than `RenderConfig.output_dir`, and
+  `render/templates.py::template_path_for` refuses a legacy `template_path` in
+  multi-user mode (`TemplateNotFoundError`) except the one literal legacy
+  value that maps to the bundled `classic` template — a persisted or imported
+  custom path can no longer select an arbitrary file. Local single-user mode
+  (no tenancy context) keeps the historical explicit-path behavior for all of
+  the above unchanged.
+- **Callback and cookie decisions read configuration, never forwarded
+  headers.** `api/public_url.py::public_url` builds the Google sign-in and
+  Gmail OAuth redirect URIs from `Settings.app_base_url` when set, never from
+  `X-Forwarded-Host`/`-Proto` — those are attacker-controlled unless a proxy
+  strips them, and Railway's default Uvicorn setup does not declare a trusted
+  proxy policy. `Settings.secure_cookies` forces the session cookie's `Secure`
+  flag independent of `request.url.scheme` (also proxy-dependent);
+  `Settings.allowed_hosts` wires `TrustedHostMiddleware`; `Settings.disable_api_docs`
+  hides `/docs`, `/redoc`, and `/openapi.json`. The Dockerfile sets
+  `SECURE_COOKIES=true` and `DISABLE_API_DOCS=true` by default and refuses to
+  start unless `APP_BASE_URL` is an HTTPS origin — a production deploy
+  additionally needs `ALLOWED_HOSTS` set (see `docs/deploy-railway.md`).
+- **Archive extraction is resource-bounded, not just path-validated.**
+  `services/backup.py::_extract_validated` streams `tarfile` members instead of
+  materializing `getmembers()`, and rejects an archive during the scan (before
+  `extractall`) once it exceeds `max_members` (10,000), any single member's
+  size (512 MB), total expanded bytes (2 GB), or a >200:1 compression ratio
+  against the compressed file's own size. `services/settings_bundle.py`'s
+  bundle extractor now delegates to the same function with its own tighter
+  bundle-sized limits instead of duplicating the size/member checks — one
+  compression-bomb policy, two configured budgets.
+
+### Registration modes and platform spend governance (ADR-0009)
+
+`Settings.registration_mode` (`closed` / `invite` / `open`) is a business
+decision independent of shared-key eligibility: open registration lets anyone
+verify an email and create an account, but `User.shared_key_access` (default
+`True` for invited users, `Settings.open_signup_shared_keys` — default
+`False` — for open self-registered ones) decides whether that account may use
+the _platform's_ LLM keys at all versus needing to bring its own. This closes
+the Sybil-multiplication gap the threat model flagged: creating accounts
+cheaply no longer creates shared-key spend by itself.
+
+- `api/attempts.py::consume_global_signup` is an atomic (`BEGIN IMMEDIATE`),
+  rolling-24h counter independent of per-email/per-IP attempt budgets, capping
+  total verification emails sent per day (`Settings.global_daily_signup_limit`)
+  regardless of how many distinct emails/IPs originate them.
+- `tenancy/limits.py::enforce_agent_budget` runs before every LLM call
+  (`llm_runner.py`'s `AgentRunner.run`/`arun`) and layers three checks: a
+  non-admin account without `shared_key_access` is rejected outright when its
+  resolved model has no per-user key configured (`context.own_key_providers`);
+  otherwise the pre-existing per-user weekly token budget (`enforce_budget`,
+  unchanged) still applies; and finally a platform-wide rolling-7-day sum (`global_weekly_usage`, summing `UsageEvent.weighted_total`
+  where `own_key=False`) is checked against `Settings.global_weekly_token_budget`
+  — the circuit breaker that caps total shared-key spend regardless of how
+  many accounts exist. A user's own provider key is exempt from both the
+  per-user and global shared-key budgets (same `own_key` accounting ADR-0003
+  established).
+- Open self-registration additionally seeds a lower per-account ceiling —
+  `Settings.open_signup_weekly_token_budget`, `open_signup_max_active_jobs`,
+  `open_signup_max_concurrent_runs` — onto the new `User` row, so an
+  operator can run `registration_mode=open` with materially tighter defaults
+  than an invited user gets, without a second code path.
+
+The threat-model documents still record items **not yet implemented**: OAuth
+state is not bound to the initiating browser or atomically consumed
+(browser-binding, not just the existing HMAC), there is no explicit CSRF
+token/Origin check for cookie-authenticated mutations, Typst/document
+parsing/transcription still run in the API process rather than an isolated
+worker, user provider keys are plaintext in `secrets.env` rather than
+envelope-encrypted, and there is no dedicated security audit-event stream.
+Check `resume-agent-threat-model.md` and `security_best_practices_report.md`
+before assuming a related gap is already closed.
 
 ### Fact-lock
 
@@ -426,7 +536,7 @@ re-raised, so a persistently-throttled board still surfaces as a per-URL failure
   `TailorRound` records draft/panel/revise wall-clock seconds.
 - **A round's score is a measurement or it is `None` — never `0`.**
   `PanelVerdict.aggregate_score` is the weighted mean over non-gate reviewers;
-  with no weighted critique the mean is *unknown*, so it is `None` and `passed`
+  with no weighted critique the mean is _unknown_, so it is `None` and `passed`
   falls back to `gate_passed`. It used to be `0`, and the panel used to be
   skipped whenever the provenance gate failed, so 25% of stored rounds reported
   `0` for a resume that was never measured. **The panel now always runs** — a
@@ -445,7 +555,7 @@ re-raised, so a persistently-throttled board still surfaces as a per-URL failure
   lists the fact ids the summary draws on, and rides the same `_referenced_uses`
   path as every other citation (as an `entity` use, so an inferred pointer there
   is rejected). Without it the gate could not check the summary at all and
-  `resolve_evidence` showed the reviewer only facts cited *elsewhere*, so a true
+  `resolve_evidence` showed the reviewer only facts cited _elsewhere_, so a true
   summary claim read as unsupported. Empty is valid — versions stored before the
   field still validate.
 - **The reviser gets the job description; `jd_text` is required, not defaulted.**
@@ -456,11 +566,11 @@ re-raised, so a persistently-throttled board still surfaces as a per-URL failure
   cacheable prefix intact across rounds. A revision builds on `_best_base` — the
   best round so far by (gate-clean, score) — not the last, so a regressed round
   cannot become the base for the next one.
-- **A citation slip is not a quality round.** A round that fails *only* on
+- **A citation slip is not a quality round.** A round that fails _only_ on
   provenance ids does not consume one of `max_rounds`, up to
   `ReviewConfig.provenance_retry_budget` (default 1; `0` reproduces the old
   counting). `_is_citation_slip` requires provenance to be the sole failing gate
-  *and* a real panel score, so a resume the panel also rejects still pays for its
+  _and_ a real panel score, so a resume the panel also rejects still pays for its
   round.
 - **Gate failures are named, not conflated.** `ResumeVersion.fact_check_passed`
   is the AND of every gate, so it cannot say which one blocked — it labelled a
@@ -658,7 +768,7 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   set as a tar.gz (`GET/POST /api/settings/bundle`), replacing the sections a
   bundle names and leaving the rest untouched — a bundle can add or replace
   settings but never clear them. Reset (`POST
-  /api/settings/sections/{id}/reset`) copies the shipped `.example` when one
+/api/settings/sections/{id}/reset`) copies the shipped `.example` when one
   exists and deletes the file otherwise, which is the same rule
   `provision_workspace` uses to seed a fresh workspace. Import validation uses
   the artifacts' **models** but not their read-time loaders:
