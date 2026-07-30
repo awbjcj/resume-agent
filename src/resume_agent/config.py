@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     auth_username: str = ""
     auth_password_hash: str = ""
     session_secret: str = ""
+    secure_cookies: bool = False
+    allowed_hosts: str = ""
+    disable_api_docs: bool = False
+    registration_mode: Literal["closed", "invite", "open"] = "invite"
+    global_daily_signup_limit: int = Field(default=50, ge=1)
+    global_weekly_token_budget: int = Field(default=50_000_000, ge=0)
+    open_signup_shared_keys: bool = False
+    open_signup_weekly_token_budget: int = Field(default=250_000, ge=0)
+    open_signup_max_active_jobs: int = Field(default=100, ge=0)
+    open_signup_max_concurrent_runs: int = Field(default=1, ge=0)
     browser_enabled: bool = True
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
     # Concurrency + retry for LLM fan-out (discovery + tailor).

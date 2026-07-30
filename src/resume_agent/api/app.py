@@ -7,10 +7,11 @@ from concurrent.futures import Executor
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from resume_agent.api.deps import (
     get_download_user_context,
@@ -55,6 +56,7 @@ from resume_agent.api.routers import suggestions as suggestions_router
 from resume_agent.api.routers import taxonomy as taxonomy_router
 from resume_agent.api.routers import transcribe as transcribe_router
 from resume_agent.api.runs.manager import RunManager
+from resume_agent.api.public_url import validate_public_origin
 from resume_agent.config import Settings, get_settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.services.config_store import YamlConfigStore
@@ -103,6 +105,13 @@ def create_app(
     resolved_settings = settings.model_copy(
         update={"db_url": resolved_db, "api_token": resolved_token}
     )
+    if resolved_settings.secure_cookies:
+        if not resolved_settings.app_base_url:
+            raise RuntimeError("APP_BASE_URL is required when SECURE_COOKIES=true")
+        if not validate_public_origin(resolved_settings.app_base_url).startswith(
+            "https://"
+        ):
+            raise RuntimeError("APP_BASE_URL must use HTTPS when SECURE_COOKIES=true")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -163,8 +172,29 @@ def create_app(
         if app.state.system_engine is not None:
             app.state.system_engine.dispose()
 
-    app = FastAPI(title="Resume Agent API", version="0.1.0", lifespan=lifespan)
+    docs_url = None if resolved_settings.disable_api_docs else "/docs"
+    redoc_url = None if resolved_settings.disable_api_docs else "/redoc"
+    openapi_url = None if resolved_settings.disable_api_docs else "/openapi.json"
+    app = FastAPI(
+        title="Resume Agent API",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
+    )
     app.state.settings = resolved_settings
+    if resolved_settings.disable_api_docs:
+
+        def _docs_disabled() -> None:
+            raise HTTPException(status_code=404)
+
+        for disabled_path in ("/docs", "/redoc", "/openapi.json"):
+            app.add_api_route(
+                disabled_path,
+                _docs_disabled,
+                include_in_schema=False,
+            )
     app.state.db_url = resolved_db
     app.state.template_config_dir = Path(config_dir or "config")
     app.state.config_store = YamlConfigStore(config_dir=app.state.template_config_dir)
@@ -238,6 +268,19 @@ def create_app(
         return ctx.settings if ctx is not None else app.state.settings
 
     app.dependency_overrides[get_settings_dep] = _settings_override
+    allowed_hosts = [
+        host.strip()
+        for host in resolved_settings.allowed_hosts.split(",")
+        if host.strip()
+    ]
+    if resolved_settings.app_base_url:
+        from urllib.parse import urlsplit
+
+        configured_host = urlsplit(resolved_settings.app_base_url).hostname
+        if configured_host and configured_host not in allowed_hosts:
+            allowed_hosts.append(configured_host)
+    if allowed_hosts:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
     origins = [
         o.strip() for o in resolved_settings.cors_origins.split(",") if o.strip()
     ]

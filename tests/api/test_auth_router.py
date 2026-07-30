@@ -13,8 +13,7 @@ def _auth_env(tmp_path, extra: str = ""):
         "AUTH_USERNAME=owner\n"
         f"AUTH_PASSWORD_HASH={hash_password('hunter2', iterations=1000)}\n"
         "SESSION_SECRET=test-secret\n"
-        "BROWSER_ENABLED=false\n"
-        + extra,
+        "BROWSER_ENABLED=false\n" + extra,
         encoding="utf-8",
     )
     return env
@@ -52,6 +51,49 @@ def test_login_sets_cookie_and_unlocks_guarded_api(tmp_path):
         assert client.get("/api/pipeline").status_code == 200
 
 
+def test_production_cookie_setting_forces_secure_over_proxy_http(tmp_path):
+    app = create_app(
+        db_url="sqlite://",
+        env_path=_auth_env(
+            tmp_path,
+            "SECURE_COOKIES=true\nAPP_BASE_URL=https://public.example\n",
+        ),
+    )
+    with TestClient(app, base_url="http://public.example") as client:
+        response = client.post(
+            "/api/auth/login",
+            json={"identifier": "owner", "password": "hunter2"},
+        )
+    assert response.status_code == 200
+    assert "Secure" in response.headers["set-cookie"]
+
+
+def test_secure_cookie_mode_requires_a_canonical_https_origin(tmp_path):
+    with pytest.raises(RuntimeError, match="APP_BASE_URL is required"):
+        create_app(
+            db_url="sqlite://",
+            env_path=_auth_env(tmp_path, "SECURE_COOKIES=true\n"),
+        )
+
+
+def test_production_can_disable_api_docs_and_reject_unknown_hosts(tmp_path):
+    app = create_app(
+        db_url="sqlite://",
+        env_path=_auth_env(
+            tmp_path,
+            "DISABLE_API_DOCS=true\nALLOWED_HOSTS=public.example\n",
+        ),
+    )
+    with TestClient(app, base_url="https://public.example") as client:
+        assert client.get("/docs").status_code == 404
+        assert client.get("/openapi.json").status_code == 404
+        rejected = client.get(
+            "/api/health",
+            headers={"host": "attacker.example"},
+        )
+    assert rejected.status_code == 400
+
+
 def test_login_verifies_password_for_unknown_username(tmp_path, monkeypatch):
     from resume_agent.api.routers import auth as auth_router
 
@@ -60,7 +102,9 @@ def test_login_verifies_password_for_unknown_username(tmp_path, monkeypatch):
     monkeypatch.setattr(
         auth_router.auth,
         "verify_password",
-        lambda password, stored: calls.append(password) or real_verify(password, stored),
+        lambda password, stored: (
+            calls.append(password) or real_verify(password, stored)
+        ),
     )
     app = create_app(db_url="sqlite://", env_path=_auth_env(tmp_path))
     with _client(app) as client:

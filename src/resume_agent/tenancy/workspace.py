@@ -10,6 +10,8 @@ from resume_agent.setup.env_writer import parse_env
 _PLATFORM_FIELDS = frozenset(
     {
         "api_token",
+        "allowed_hosts",
+        "app_base_url",
         "auth_password_hash",
         "auth_username",
         "cors_origins",

@@ -33,6 +33,9 @@ COPY --from=web /build/web/dist ./web/dist
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-ENV BROWSER_ENABLED=false
+ENV BROWSER_ENABLED=false \
+    SECURE_COOKIES=true \
+    DISABLE_API_DOCS=true \
+    REGISTRATION_MODE=open
 EXPOSE 8000
 ENTRYPOINT ["/entrypoint.sh"]

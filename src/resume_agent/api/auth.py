@@ -153,12 +153,13 @@ def verify_user_session(
 
 
 def set_session_cookie(request: Request, response: Response, token: str) -> None:
+    settings = request.app.state.settings
     response.set_cookie(
         SESSION_COOKIE,
         token,
         max_age=SESSION_LIFETIME_SECONDS,
         httponly=True,
-        secure=request.url.scheme == "https",
+        secure=settings.secure_cookies or request.url.scheme == "https",
         samesite="lax",
         path="/",
     )
