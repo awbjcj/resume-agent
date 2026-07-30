@@ -12,6 +12,7 @@ from resume_agent.tenancy.system_db import SystemSetting, UsageEvent, User
 DEFAULT_WEEKLY_TOKEN_BUDGET = 10_000_000
 DEFAULT_MAX_ACTIVE_JOBS = 2_000
 DEFAULT_MAX_CONCURRENT_RUNS = 2
+DEFAULT_GLOBAL_WEEKLY_TOKEN_BUDGET = 50_000_000
 BUDGET_WINDOW = timedelta(days=7)
 
 
@@ -46,6 +47,53 @@ def weekly_usage(engine: Engine, user_id: str, *, now: datetime | None = None) -
             )
         ).scalar_one()
     return float(total)
+
+
+def global_weekly_usage(engine: Engine, *, now: datetime | None = None) -> float:
+    moment = now or datetime.now(timezone.utc)
+    with Session(engine) as session:
+        total = session.execute(
+            select(func.coalesce(func.sum(UsageEvent.weighted_total), 0.0)).where(
+                UsageEvent.own_key.is_(False),
+                UsageEvent.ts >= moment - BUDGET_WINDOW,
+            )
+        ).scalar_one()
+    return float(total)
+
+
+def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
+    """Enforce account eligibility plus user/global spend before an LLM call."""
+
+    context = current_context()
+    if context is None or context.system_engine is None:
+        return
+    model = getattr(agent, "model", None)
+    model_id = getattr(model, "id", None) or getattr(agent, "model_id", None) or ""
+    from resume_agent.llm_runner import split_provider
+
+    provider = split_provider(str(model_id))[0] if model_id else ""
+    if provider and provider in context.own_key_providers:
+        return
+    with Session(context.system_engine) as session:
+        user = session.get(User, context.user_id)
+        if user is not None and user.role != "admin" and not user.shared_key_access:
+            raise BudgetExceededError(
+                "shared platform models are disabled for this account; add your own API key"
+            )
+        override = user.weekly_token_budget if user is not None else None
+    enforce_budget(
+        context.system_engine,
+        user_id=context.user_id,
+        role=context.role,
+        budget_override=override,
+        now=now,
+    )
+    global_budget = context.settings.global_weekly_token_budget
+    if (
+        global_budget
+        and global_weekly_usage(context.system_engine, now=now) >= global_budget
+    ):
+        raise BudgetExceededError("platform weekly token budget is exhausted")
 
 
 def enforce_budget(

@@ -72,6 +72,9 @@ class AgentRunner:
         settings = get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
+                from resume_agent.tenancy.limits import enforce_agent_budget
+
+                enforce_agent_budget(self._agent)
                 response = self._agent.run(prompt)
                 from resume_agent.tenancy.usage import record_call
 
@@ -87,6 +90,9 @@ class AgentRunner:
         settings = get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
+                from resume_agent.tenancy.limits import enforce_agent_budget
+
+                enforce_agent_budget(self._agent)
                 response = await self._agent.arun(prompt)
                 from resume_agent.tenancy.usage import record_call
 
@@ -225,8 +231,7 @@ def expect_schema(result: Any, schema: type[_SchemaT], *, source: str) -> _Schem
     if isinstance(content, schema):
         return content
     headline = (
-        f"Expected {schema.__name__} from {source} agent, "
-        f"got {type(content).__name__}"
+        f"Expected {schema.__name__} from {source} agent, got {type(content).__name__}"
     )
     raise UnparsedAgentOutput(_describe_unparsed(result, content, headline))
 
@@ -266,8 +271,7 @@ def expect_text(result: Any, *, source: str) -> str:
         return content
     reason = "run failed" if _run_failed(result) else "no usable text"
     headline = (
-        f"Expected prose from {source} agent, "
-        f"got {type(content).__name__} ({reason})"
+        f"Expected prose from {source} agent, got {type(content).__name__} ({reason})"
     )
     raise UnparsedAgentOutput(_describe_unparsed(result, content, headline))
 
