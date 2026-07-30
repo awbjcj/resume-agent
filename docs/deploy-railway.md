@@ -32,10 +32,62 @@ replica, and one owner login.
 
 5. Deploy and sign in at the Railway-provided domain.
 
-## Gmail OAuth (optional)
+## Email delivery
 
-Gmail powers scheduled inbox sync, stale-application reminders, and the
-email-draft writer (readonly + compose scopes only — it never sends mail).
+Verification codes, password resets, and security notices need a working
+mailer. Confirm `GET /api/health` reports `"mailConfigured": true` after
+deploying.
+
+> **Railway blocks outbound SMTP below the Pro plan.** Port 587 fails with
+> `[Errno 101] Network is unreachable` regardless of the credentials, because
+> the egress is null-routed rather than refused. Use the HTTPS backend below
+> unless you are on Pro — and note Railway requires a redeploy after upgrading
+> before SMTP starts working.
+
+### Resend (works on every plan)
+
+1. Create an API key at [resend.com](https://resend.com) (the free tier covers
+   3,000 emails/month).
+2. Verify a sending domain under **Domains**. Without one you can only send
+   from `onboarding@resend.dev`, and only to the address that owns the Resend
+   account — enough to test, not enough to invite anyone.
+3. Add Railway variables:
+
+   | Variable         | Value                                             |
+   | ---------------- | ------------------------------------------------- |
+   | `RESEND_API_KEY` | The key you just created                          |
+   | `MAIL_FROM`      | `noreply@your-verified-domain.com`                |
+
+`RESEND_API_KEY` takes precedence over any `SMTP_*` variables, so you can
+leave a previous SMTP attempt in place. `MAIL_FROM` falls back to `SMTP_FROM`
+if you already set that.
+
+### SMTP (Pro plan only)
+
+Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and
+`SMTP_FROM`. All five matter: **omitting `SMTP_USERNAME` silently skips
+authentication entirely**, and Gmail refuses unauthenticated relay with
+`530 5.7.0 Authentication Required`. The failure log names which one you hit —
+it reports `auth=off` when the username is missing.
+
+If `SMTP_HOST` is unset and no Resend key is present, the app falls back to
+`NullMailer` and **logs verification codes to the console instead of sending
+them**, which is a working local setup but not a working deployment.
+
+## Google sign-in and Gmail OAuth (optional)
+
+One Google OAuth client covers two separate features:
+
+- **Google sign-in** — "Continue with Google" on the login and register pages.
+  Identity scopes only (`openid`, `userinfo.email`, `userinfo.profile`).
+  Until it is configured, `GET /api/health` reports
+  `"googleOauthConfigured": false` and the button renders disabled with
+  "Google sign-in is not configured on this server."
+- **Gmail** — scheduled inbox sync, stale-application reminders, and the
+  email-draft writer (readonly + compose scopes only — it never sends mail).
+  This is a separate, incremental consent the user grants later from
+  Settings → Keys.
+
 It needs a Google OAuth **Web application** client; this is a different
 client type from the **Desktop app** client used by the local CLI's
 `config/gmail_credentials.json` flow, which doesn't apply to a deployed app.
@@ -50,13 +102,20 @@ client type from the **Desktop app** client used by the local CLI's
    explicitly-added users and refuses sign-in for anyone else.
 3. Create credentials (APIs & Services → Credentials → Create Credentials →
    OAuth client ID) of type **Web application**.
-4. Add an **Authorized redirect URI**:
-   `https://YOUR-APP.up.railway.app/api/gmail/callback`. The app derives this
-   URL itself from the request's `X-Forwarded-Proto`/`X-Forwarded-Host`
-   headers, which Railway sets automatically — nothing else to configure on
-   the app side. Add a second redirect URI for local testing if you also run
-   `resume-agent serve` on your machine, e.g.
-   `http://localhost:8000/api/gmail/callback`.
+4. Add **both** Authorized redirect URIs — the two features use different
+   callbacks, and registering only one fails the other with
+   `redirect_uri_mismatch`:
+
+   ```
+   https://YOUR-APP.up.railway.app/api/auth/google/callback   # sign-in
+   https://YOUR-APP.up.railway.app/api/gmail/callback         # Gmail
+   ```
+
+   The app derives these URLs itself from the request's
+   `X-Forwarded-Proto`/`X-Forwarded-Host` headers, which Railway sets
+   automatically — nothing else to configure on the app side. Add the
+   `http://localhost:8000` equivalents too if you also run `resume-agent serve`
+   on your machine.
 5. Add Railway variables:
 
    | Variable                     | Value                             |

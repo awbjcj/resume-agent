@@ -63,6 +63,15 @@ class Settings(BaseSettings):
 
     # Platform mail is process-level configuration. It is intentionally kept
     # outside the per-workspace secrets overlay used by Gmail.
+    #
+    # Two delivery backends: an HTTPS transactional API (Resend) and SMTP.
+    # `resend_api_key` wins when both are set, because hosts that block
+    # outbound SMTP -- Railway does so below the Pro plan, where port 587
+    # fails with ENETUNREACH regardless of credentials -- leave HTTPS as the
+    # only path that can work. `mail_from` is the backend-neutral sender and
+    # falls back to `smtp_from` so an SMTP-era deploy needs no renaming.
+    resend_api_key: str = ""
+    mail_from: str = ""
     smtp_host: str = ""
     smtp_port: int = Field(default=587, ge=1, le=65535)
     smtp_username: str = ""
