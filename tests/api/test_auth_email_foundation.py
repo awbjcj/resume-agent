@@ -60,6 +60,7 @@ def test_system_migration_preserves_legacy_users(tmp_path):
         assert user is not None
         assert user.email is None
         assert user.session_epoch == 0
+        assert user.shared_key_access is True
 
 
 def test_session_epoch_revokes_an_existing_cookie():

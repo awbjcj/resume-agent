@@ -34,7 +34,7 @@ export function AdminUsersCard({ currentUsername }: { currentUsername: string })
       body,
     }: {
       id: string;
-      body: { role?: string; disabled?: boolean };
+      body: { role?: string; disabled?: boolean; sharedKeyAccess?: boolean };
     }) =>
       unwrap(
         api.PATCH("/api/admin/users/{user_id}", {
@@ -122,6 +122,11 @@ export function AdminUsersCard({ currentUsername }: { currentUsername: string })
                     <div className="flex flex-wrap gap-1.5">
                       <Badge variant={isAdmin ? "default" : "outline"}>{user.role}</Badge>
                       {user.disabledAt ? <Badge variant="destructive">Disabled</Badge> : null}
+                      {!isAdmin ? (
+                        <Badge variant={user.sharedKeyAccess ? "secondary" : "outline"}>
+                          {user.sharedKeyAccess ? "Shared models" : "BYOK only"}
+                        </Badge>
+                      ) : null}
                     </div>
                   </TableCell>
                   <TableCell className="tabular-nums">
@@ -144,6 +149,21 @@ export function AdminUsersCard({ currentUsername }: { currentUsername: string })
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
+                      {!isAdmin ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={patch.isPending}
+                          onClick={() =>
+                            patch.mutate({
+                              id: user.id,
+                              body: { sharedKeyAccess: !user.sharedKeyAccess },
+                            })
+                          }
+                        >
+                          {user.sharedKeyAccess ? "Revoke shared" : "Grant shared"}
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="outline"

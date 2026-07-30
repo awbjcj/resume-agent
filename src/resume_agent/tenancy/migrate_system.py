@@ -11,6 +11,7 @@ _USER_COLUMNS = (
     ("session_epoch", "INTEGER NOT NULL DEFAULT 0"),
     ("failed_login_count", "INTEGER NOT NULL DEFAULT 0"),
     ("locked_until", "DATETIME"),
+    ("shared_key_access", "BOOLEAN NOT NULL DEFAULT 1"),
 )
 
 

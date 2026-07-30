@@ -2566,6 +2566,11 @@ export interface components {
             maxConcurrentRuns?: number | null;
             /** Role */
             role: string;
+            /**
+             * Sharedkeyaccess
+             * @default true
+             */
+            sharedKeyAccess: boolean;
             /** Username */
             username: string;
             /** Weeklytokenbudget */
@@ -2591,6 +2596,8 @@ export interface components {
             maxConcurrentRuns?: number | null;
             /** Role */
             role?: string | null;
+            /** Sharedkeyaccess */
+            sharedKeyAccess?: boolean | null;
             /** Weeklytokenbudget */
             weeklyTokenBudget?: number | null;
         };
@@ -4281,7 +4288,10 @@ export interface components {
              * Format: email
              */
             email: string;
-            /** Invitecode */
+            /**
+             * Invitecode
+             * @default
+             */
             inviteCode: string;
             /** Password */
             password: string;

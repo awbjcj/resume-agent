@@ -302,6 +302,11 @@
             "title": "Role",
             "type": "string"
           },
+          "sharedKeyAccess": {
+            "default": true,
+            "title": "Sharedkeyaccess",
+            "type": "boolean"
+          },
           "username": {
             "title": "Username",
             "type": "string"
@@ -395,6 +400,17 @@
               }
             ],
             "title": "Role"
+          },
+          "sharedKeyAccess": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharedkeyaccess"
           },
           "weeklyTokenBudget": {
             "anyOf": [
@@ -4949,8 +4965,8 @@
             "type": "string"
           },
           "inviteCode": {
+            "default": "",
             "maxLength": 128,
-            "minLength": 8,
             "title": "Invitecode",
             "type": "string"
           },
@@ -4963,8 +4979,7 @@
         },
         "required": [
           "email",
-          "password",
-          "inviteCode"
+          "password"
         ],
         "title": "RegisterRequest",
         "type": "object"

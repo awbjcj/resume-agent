@@ -25,6 +25,7 @@ IP_ONLY = frozenset({"ip"})
 RESEND_ONLY = frozenset({"resend_email"})
 DEFAULT_SCOPES = frozenset({"email_ip", "email", "ip"})
 _MAX_WINDOW = timedelta(hours=1)
+_SIGNUP_WINDOW = timedelta(days=1)
 
 
 def _identifiers(email: str, ip: str) -> dict[str, str]:
@@ -100,6 +101,42 @@ def consume(
                     occurred_at=moment,
                 )
             )
+        session.commit()
+    return True
+
+
+def consume_global_signup(
+    engine: Engine, *, limit: int, now: datetime | None = None
+) -> bool:
+    """Atomically enforce a platform-wide pending-signup mail budget."""
+
+    moment = now or datetime.now(timezone.utc)
+    with Session(engine) as session:
+        session.execute(text("BEGIN IMMEDIATE"))
+        session.execute(
+            delete(LoginAttempt).where(
+                LoginAttempt.scope == "signup_global",
+                LoginAttempt.occurred_at < moment - _SIGNUP_WINDOW,
+            )
+        )
+        count = session.execute(
+            select(func.count())
+            .select_from(LoginAttempt)
+            .where(
+                LoginAttempt.scope == "signup_global",
+                LoginAttempt.occurred_at > moment - _SIGNUP_WINDOW,
+            )
+        ).scalar_one()
+        if count >= limit:
+            session.rollback()
+            return False
+        session.add(
+            LoginAttempt(
+                scope="signup_global",
+                identifier="global",
+                occurred_at=moment,
+            )
+        )
         session.commit()
     return True
 

@@ -49,6 +49,50 @@ def _register(client, invite, *, email=EMAIL):
     )
 
 
+def test_open_registration_needs_no_invite_and_starts_byok_only(mu_app):
+    mu_app.state.settings = mu_app.state.settings.model_copy(
+        update={"registration_mode": "open"}
+    )
+    with TestClient(mu_app, base_url="https://testserver") as client:
+        sent = client.post(
+            "/api/auth/register",
+            json={
+                "email": EMAIL,
+                "password": PASSWORD,
+                "displayName": "Ada",
+            },
+        )
+        assert sent.status_code == 202
+        verified = client.post(
+            "/api/auth/verify-email",
+            json={"email": EMAIL, "code": _last_code(mu_app)},
+        )
+        assert verified.status_code == 200
+    with Session(mu_app.state.system_engine) as session:
+        user = session.execute(select(User).where(User.email == EMAIL)).scalar_one()
+        assert user.shared_key_access is False
+        assert user.weekly_token_budget == 250_000
+        assert user.max_active_jobs == 100
+        assert user.max_concurrent_runs == 1
+
+
+def test_open_registration_has_a_platform_daily_capacity(mu_app):
+    mu_app.state.settings = mu_app.state.settings.model_copy(
+        update={"registration_mode": "open", "global_daily_signup_limit": 1}
+    )
+    with TestClient(mu_app, base_url="https://testserver") as client:
+        first = client.post(
+            "/api/auth/register",
+            json={"email": EMAIL, "password": PASSWORD},
+        )
+        second = client.post(
+            "/api/auth/register",
+            json={"email": "grace@example.com", "password": PASSWORD},
+        )
+    assert first.status_code == 202
+    assert second.status_code == 429
+
+
 def test_register_verify_login_and_reset_flow(mu_app):
     with TestClient(mu_app, base_url="https://testserver") as client:
         invite = _invite(mu_app)

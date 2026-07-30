@@ -187,6 +187,11 @@ def google_callback(
     display_name = str(claims.get("name") or "").strip()[:64]
     if not subject or not email:
         return _failure(request, "/login?error=exchange_failed")
+    if parsed.mode == "register" and not attempts.consume_global_signup(
+        engine,
+        limit=settings.global_daily_signup_limit,
+    ):
+        return _failure(request, "/register?error=rate_limited")
 
     now = datetime.now(timezone.utc)
     with Session(engine, expire_on_commit=False) as session:
@@ -238,27 +243,30 @@ def google_callback(
         if not verified:
             session.rollback()
             return _failure(request, "/register?error=unverified_google")
-        invite = (
-            session.execute(
-                select(InviteCode).where(InviteCode.code_hash == parsed.invite_hash)
-            )
-            .scalars()
-            .first()
-            if parsed.invite_hash
-            else None
-        )
-        expires = None if invite is None else invite.expires_at
-        if expires is not None and expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        if (
-            invite is None
-            or invite.revoked_at is not None
-            or invite.used_at is not None
-            or expires is None
-            or expires <= now
-        ):
+        if settings.registration_mode == "closed":
             session.rollback()
-            return _failure(request, "/register?error=invite_invalid")
+            return _failure(request, "/register?error=registration_closed")
+        invite = None
+        if settings.registration_mode == "invite":
+            invite = (
+                session.execute(
+                    select(InviteCode).where(InviteCode.code_hash == parsed.invite_hash)
+                )
+                .scalars()
+                .first()
+            )
+            expires = None if invite is None else invite.expires_at
+            if expires is not None and expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if (
+                invite is None
+                or invite.revoked_at is not None
+                or invite.used_at is not None
+                or expires is None
+                or expires <= now
+            ):
+                session.rollback()
+                return _failure(request, "/register?error=invite_invalid")
 
         user_id = new_user_id()
         user = User(
@@ -272,10 +280,31 @@ def google_callback(
             password_hash="",
             role="user",
             last_active_at=now,
+            shared_key_access=(
+                settings.open_signup_shared_keys
+                if settings.registration_mode == "open"
+                else True
+            ),
+            weekly_token_budget=(
+                settings.open_signup_weekly_token_budget
+                if settings.registration_mode == "open"
+                else None
+            ),
+            max_active_jobs=(
+                settings.open_signup_max_active_jobs
+                if settings.registration_mode == "open"
+                else None
+            ),
+            max_concurrent_runs=(
+                settings.open_signup_max_concurrent_runs
+                if settings.registration_mode == "open"
+                else None
+            ),
         )
         session.add(user)
-        invite.used_by = user.id
-        invite.used_at = now
+        if invite is not None:
+            invite.used_by = user.id
+            invite.used_at = now
         workspace = workspace_paths(request.app.state.data_dir, user.id).root
         try:
             provision_workspace(

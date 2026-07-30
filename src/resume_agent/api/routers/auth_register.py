@@ -86,22 +86,29 @@ def register(
     request: Request,
     settings: Settings = Depends(get_settings_dep),
 ) -> CodeSentResponse:
+    if settings.registration_mode == "closed":
+        raise ApiException(403, "REGISTRATION_CLOSED", "Registration is closed")
     rate_event(request, body.email)
     engine = system_engine(request)
+    if not attempts.consume_global_signup(
+        engine,
+        limit=settings.global_daily_signup_limit,
+    ):
+        raise ApiException(429, "RATE_LIMITED", "Registration capacity reached")
     now = datetime.now(timezone.utc)
     with Session(engine) as session:
-        invite = (
-            session.execute(
-                select(InviteCode).where(
-                    InviteCode.code_hash == hash_secret(body.invite_code)
+        invite_hash = hash_secret(body.invite_code) if body.invite_code else ""
+        if settings.registration_mode == "invite":
+            invite = (
+                session.execute(
+                    select(InviteCode).where(InviteCode.code_hash == invite_hash)
                 )
+                .scalars()
+                .first()
             )
-            .scalars()
-            .first()
-        )
-        error = _invite_error(invite, now)
-        if error:
-            raise error
+            error = _invite_error(invite, now)
+            if error:
+                raise error
         validate_password(
             body.password,
             email=body.email,
@@ -131,7 +138,9 @@ def register(
                 email=body.email,
                 password_hash=auth.hash_password(body.password),
                 display_name=body.display_name,
-                invite_code_hash=hash_secret(body.invite_code),
+                invite_code_hash=invite_hash
+                if settings.registration_mode == "invite"
+                else "",
                 code_hash=auth_codes.hash_code(code, settings),
                 expires_at=auth_codes.expires_at(now),
             )
@@ -149,6 +158,8 @@ def verify_email(
     response: Response,
     settings: Settings = Depends(get_settings_dep),
 ) -> MeResponse:
+    if settings.registration_mode == "closed":
+        raise ApiException(403, "REGISTRATION_CLOSED", "Registration is closed")
     rate_event(request, body.email)
     engine = system_engine(request)
     invalid = False
@@ -179,19 +190,22 @@ def verify_email(
                 invalid = True
         if not invalid and pending is not None:
             now = datetime.now(timezone.utc)
-            invite = (
-                session.execute(
-                    select(InviteCode).where(
-                        InviteCode.code_hash == pending.invite_code_hash
+            invite = None
+            if pending.invite_code_hash:
+                invite = (
+                    session.execute(
+                        select(InviteCode).where(
+                            InviteCode.code_hash == pending.invite_code_hash
+                        )
                     )
+                    .scalars()
+                    .first()
                 )
-                .scalars()
-                .first()
-            )
-            error = _invite_error(invite, now)
-            if error:
-                session.rollback()
-                raise error
+                error = _invite_error(invite, now)
+                if error:
+                    session.rollback()
+                    raise error
+            open_signup = not pending.invite_code_hash
             user_id = new_user_id()
             user = User(
                 id=user_id,
@@ -204,11 +218,23 @@ def verify_email(
                 email_verified_at=now,
                 password_hash=pending.password_hash,
                 role="user",
+                shared_key_access=(
+                    settings.open_signup_shared_keys if open_signup else True
+                ),
+                weekly_token_budget=(
+                    settings.open_signup_weekly_token_budget if open_signup else None
+                ),
+                max_active_jobs=(
+                    settings.open_signup_max_active_jobs if open_signup else None
+                ),
+                max_concurrent_runs=(
+                    settings.open_signup_max_concurrent_runs if open_signup else None
+                ),
             )
             session.add(user)
-            assert invite is not None
-            invite.used_by = user.id
-            invite.used_at = now
+            if invite is not None:
+                invite.used_by = user.id
+                invite.used_at = now
             session.delete(pending)
             try:
                 session.flush()

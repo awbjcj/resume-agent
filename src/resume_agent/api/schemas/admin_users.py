@@ -14,6 +14,7 @@ class AdminUser(CamelModel):
     weekly_token_budget: int | None = None
     max_active_jobs: int | None = None
     max_concurrent_runs: int | None = None
+    shared_key_access: bool = True
     weekly_usage: float = 0
     active_jobs: int = 0
 
@@ -28,6 +29,7 @@ class AdminUserPatch(CamelModel):
     weekly_token_budget: int | None = Field(default=None, ge=0)
     max_active_jobs: int | None = Field(default=None, ge=0)
     max_concurrent_runs: int | None = Field(default=None, ge=0)
+    shared_key_access: bool | None = None
 
     @field_validator("role")
     @classmethod

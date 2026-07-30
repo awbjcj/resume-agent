@@ -69,6 +69,7 @@ def list_users(
                     weekly_token_budget=row.weekly_token_budget,
                     max_active_jobs=row.max_active_jobs,
                     max_concurrent_runs=row.max_concurrent_runs,
+                    shared_key_access=row.shared_key_access,
                     weekly_usage=weekly_usage(engine, row.id),
                     active_jobs=_active_jobs(request, row.id),
                 )
@@ -99,6 +100,8 @@ def patch_user(
         for field in ("weekly_token_budget", "max_active_jobs", "max_concurrent_runs"):
             if field in body.model_fields_set:
                 setattr(user, field, getattr(body, field))
+        if body.shared_key_access is not None:
+            user.shared_key_access = body.shared_key_access
         session.commit()
     return {"status": "updated"}
 

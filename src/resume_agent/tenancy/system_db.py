@@ -44,6 +44,9 @@ class User(SystemBase):
     weekly_token_budget: Mapped[int | None] = mapped_column(Integer)
     max_active_jobs: Mapped[int | None] = mapped_column(Integer)
     max_concurrent_runs: Mapped[int | None] = mapped_column(Integer)
+    shared_key_access: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
     email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     google_sub: Mapped[str | None] = mapped_column(String(64), unique=True)
@@ -87,7 +90,9 @@ class PendingRegistration(SystemBase):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
@@ -100,7 +105,9 @@ class PasswordResetCode(SystemBase):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     pending_email: Mapped[str | None] = mapped_column(String(320))
