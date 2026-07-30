@@ -26,6 +26,11 @@ evals/reports/*
 # force-included into the wheel).
 !src/resume_agent/taxonomy/data/
 !src/resume_agent/taxonomy/data/sic_codes.json
+# Same story for the password-policy common-passwords wordlist: package data
+# read via importlib.resources at request time, not local state.
+!src/resume_agent/api/data/
+!src/resume_agent/api/data/__init__.py
+!src/resume_agent/api/data/common_passwords.txt
 *.pdf
 
 # Local browser sessions / calibration captures
