@@ -414,6 +414,10 @@ Copied from `.env.example`. Loaded automatically.
 | `LINKEDIN_USER_DATA_DIR`               | Where the logged-in browser session is cached (default `.linkedin_profile`). |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Platform Gmail OAuth **Web application** client for the API/web app (CLI-only use skips these — see [Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts)). |
 | `DB_URL`                               | Database location (default `sqlite:///data/resume_agent.db`).                |
+| `APP_BASE_URL`                         | Canonical public origin (e.g. `https://your-app.up.railway.app`), used to build OAuth callback URIs instead of trusting forwarded headers. Required for a public deploy — see [Deploying to Railway](docs/deploy-railway.md). |
+| `ALLOWED_HOSTS`                        | Comma-separated `Host` header allowlist (`TrustedHostMiddleware`). Blank locally; set in production.        |
+| `SECURE_COOKIES`                       | Forces the session cookie's `Secure` flag regardless of request scheme. `false` locally; `true` in the shipped Docker image. |
+| `DISABLE_API_DOCS`                     | Hides `/docs`, `/redoc`, and `/openapi.json`. `false` locally; `true` in the shipped Docker image.           |
 
 #### Choosing an LLM provider
 
@@ -536,6 +540,14 @@ setup and the checks your change must pass (`make verify`). Please branch from
 Found a vulnerability? Please report it privately — see the
 [security policy](.github/SECURITY.md). Do not open a public issue for security
 reports.
+
+The repository root also carries a self-audit of the public multi-user
+deployment: `resume-agent-threat-model.md` (trust boundaries, attacker model,
+prioritized threat table) and `security_best_practices_report.md` (findings
+with severity, evidence, and fixes). See [ADR-0008](docs/adr/0008-egress-gateway-tenant-storage-canonical-origin.md)
+for the architectural response already shipped (SSRF-safe outbound gateway,
+tenant-confined artifact downloads, configuration-only OAuth/cookie origin)
+and the P0/P1 items still open.
 
 ## License
 
