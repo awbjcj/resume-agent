@@ -7,17 +7,21 @@ import uuid
 from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal, cast
 
 from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlmodel import Session as WorkspaceSession
 from starlette.background import BackgroundTask
 
-from resume_agent.api import auth
+from resume_agent.api import auth, auth_codes
 from resume_agent.api.deps import get_session, get_settings_dep
 from resume_agent.api.errors import ApiException
+from resume_agent.api.password_policy import validate_password
+from resume_agent.api.routers.auth_register import rate_event
 from resume_agent.api.runs.manager import RunResetConflict
 from resume_agent.api.uploads import UploadTooLargeError, copy_upload
 from resume_agent.api.schemas.account import (
@@ -25,12 +29,18 @@ from resume_agent.api.schemas.account import (
     PasswordChangeRequest,
     ResetReportOut,
     ResetRequest,
+    SetEmailRequest,
     TokenCreated,
     TokenCreateRequest,
     TokenInfo,
     TokenList,
+    VerifyAccountEmailRequest,
 )
+from resume_agent.api.schemas.auth import MeResponse
+from resume_agent.api.schemas.auth_email import CodeSentResponse
 from resume_agent.config import Settings
+from resume_agent.mail import messages
+from resume_agent.mail.mailer import MailDeliveryError
 from resume_agent.services.backup import (
     InvalidArchiveError,
     UnsafeArchiveError,
@@ -46,7 +56,13 @@ from resume_agent.tenancy.limits import (
     weekly_usage,
 )
 from resume_agent.tenancy.secrets import hash_secret, mint_secret
-from resume_agent.tenancy.system_db import ApiToken, UsageEvent, User
+from resume_agent.tenancy.system_db import (
+    ApiToken,
+    PasswordResetCode,
+    UsageEvent,
+    User,
+    has_password,
+)
 from resume_agent.tenancy.workspace import workspace_paths
 
 router = APIRouter(prefix="/account", tags=["account"])
@@ -136,22 +152,201 @@ def change_password(
             body.current_password, user.password_hash
         ):
             raise ApiException(401, "UNAUTHORIZED", "Current password is incorrect")
+        validate_password(
+            body.new_password,
+            email=user.email or "",
+            display_name=user.username,
+            checker=request.app.state.breach_checker,
+        )
         user.password_hash = auth.hash_password(body.new_password)
+        user.session_epoch += 1
         session.commit()
-        password_hash = user.password_hash
+        password_hash, epoch, email = (
+            user.password_hash,
+            user.session_epoch,
+            user.email,
+        )
     token = auth.issue_user_session(
-        settings, user_id=context.user_id, password_hash=password_hash
+        settings,
+        user_id=context.user_id,
+        password_hash=password_hash,
+        epoch=epoch,
     )
-    response.set_cookie(
-        auth.SESSION_COOKIE,
-        token,
-        max_age=auth.SESSION_LIFETIME_SECONDS,
-        httponly=True,
-        secure=request.url.scheme == "https",
-        samesite="lax",
-        path="/",
-    )
+    auth.set_session_cookie(request, response, token)
+    if email:
+        message = messages.password_changed(settings.app_base_url)
+        request.app.state.mailer.notify(
+            to=email, subject=message.subject, body=message.body
+        )
     return {"status": "changed"}
+
+
+@router.post("/email", status_code=202)
+def set_email(
+    body: SetEmailRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings_dep),
+) -> CodeSentResponse:
+    context = require_context()
+    rate_event(request, body.email)
+    code = auth_codes.generate_code()
+    row_id = uuid.uuid4().hex[:12]
+    with Session(request.app.state.system_engine) as session:
+        owner = session.execute(
+            select(User.id).where(User.email == body.email)
+        ).scalar()
+        if owner is not None and owner != context.user_id:
+            raise ApiException(409, "EMAIL_TAKEN", "That email is already in use")
+        session.execute(
+            delete(PasswordResetCode).where(
+                PasswordResetCode.user_id == context.user_id,
+                PasswordResetCode.pending_email.is_not(None),
+            )
+        )
+        session.add(
+            PasswordResetCode(
+                id=row_id,
+                user_id=context.user_id,
+                code_hash=auth_codes.hash_code(code, settings),
+                expires_at=auth_codes.expires_at(),
+                pending_email=body.email,
+            )
+        )
+        session.commit()
+    message = messages.verification_code(code)
+    try:
+        request.app.state.mailer.send(
+            to=body.email, subject=message.subject, body=message.body
+        )
+    except MailDeliveryError as exc:
+        with Session(request.app.state.system_engine) as session:
+            session.execute(
+                delete(PasswordResetCode).where(
+                    PasswordResetCode.id == row_id,
+                )
+            )
+            session.commit()
+        raise ApiException(503, "MAIL_UNAVAILABLE", "Unable to send email") from exc
+    return CodeSentResponse()
+
+
+@router.post("/email/verify")
+def verify_account_email(
+    body: VerifyAccountEmailRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings_dep),
+) -> MeResponse:
+    context = require_context()
+    rate_event(request, body.email)
+    now = datetime.now(timezone.utc)
+    with Session(request.app.state.system_engine) as session:
+        row = (
+            session.execute(
+                select(PasswordResetCode).where(
+                    PasswordResetCode.user_id == context.user_id,
+                    PasswordResetCode.pending_email == body.email,
+                    PasswordResetCode.consumed_at.is_(None),
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if row is None:
+            raise ApiException(400, "CODE_INVALID", "Invalid verification code")
+        verdict = auth_codes.check_code(
+            cast(auth_codes.CodeRow, row), body.code, settings, now=now
+        )
+        if verdict is not auth_codes.CodeVerdict.OK:
+            session.commit()
+            raise ApiException(
+                400, f"CODE_{verdict.value.upper()}", "Invalid verification code"
+            )
+        user = session.get(User, context.user_id)
+        if user is None:
+            raise ApiException(404, "NOT_FOUND", "Account not found")
+        owner = session.execute(
+            select(User.id).where(User.email == body.email)
+        ).scalar()
+        if owner is not None and owner != user.id:
+            raise ApiException(409, "EMAIL_TAKEN", "That email is already in use")
+        user.email = body.email
+        user.email_verified_at = now
+        row.consumed_at = now
+        try:
+            session.commit()
+        except IntegrityError as exc:
+            session.rollback()
+            raise ApiException(
+                409, "EMAIL_TAKEN", "That email is already in use"
+            ) from exc
+        return MeResponse(
+            username=user.username,
+            email=user.email,
+            email_verified=True,
+            needs_email=False,
+            google_linked=user.google_sub is not None,
+            role=cast(Literal["admin", "user"], user.role),
+            auth_required=True,
+        )
+
+
+@router.post("/sessions/revoke-all")
+def revoke_all_sessions(
+    request: Request,
+    response: Response,
+    settings: Settings = Depends(get_settings_dep),
+) -> dict[str, str]:
+    context = require_context()
+    with Session(request.app.state.system_engine) as session:
+        user = session.get(User, context.user_id)
+        if user is None:
+            raise ApiException(404, "NOT_FOUND", "Account not found")
+        user.session_epoch += 1
+        session.commit()
+        token = auth.issue_user_session(
+            settings,
+            user_id=user.id,
+            password_hash=user.password_hash,
+            epoch=user.session_epoch,
+        )
+    auth.set_session_cookie(request, response, token)
+    return {"status": "revoked"}
+
+
+@router.delete("/google")
+def unlink_google(request: Request) -> MeResponse:
+    context = require_context()
+    settings = request.app.state.settings
+    with Session(request.app.state.system_engine) as session:
+        user = session.get(User, context.user_id)
+        if user is None:
+            raise ApiException(404, "NOT_FOUND", "Account not found")
+        if not has_password(user):
+            raise ApiException(
+                409, "PASSWORD_REQUIRED", "Set a password before unlinking Google"
+            )
+        user.google_sub = None
+        session.commit()
+        email, username, role, verified = (
+            user.email,
+            user.username,
+            user.role,
+            user.email_verified_at is not None,
+        )
+    if email:
+        message = messages.google_unlinked(settings.app_base_url)
+        request.app.state.mailer.notify(
+            to=email, subject=message.subject, body=message.body
+        )
+    return MeResponse(
+        username=username,
+        email=email,
+        email_verified=verified,
+        needs_email=email is None,
+        google_linked=False,
+        role=cast(Literal["admin", "user"], role),
+        auth_required=True,
+    )
 
 
 @router.post("/reset")

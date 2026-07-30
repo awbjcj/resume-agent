@@ -234,6 +234,19 @@ def cxs_detail_url(target: AtsTarget, external_path: str) -> str:
     return f"{_base(target)}/wday/cxs/{target.tenant}/{target.site}{external_path}"
 
 
+def fetch_job_detail(target: AtsTarget, external_path: str) -> dict:
+    """GET one Workday posting's cxs detail payload, with the throttle retry.
+
+    Workday boards throttle aggressively, so every call -- including a one-off
+    lookup for a pasted URL -- goes through ``_request_with_retry`` rather than
+    a bare ``httpx.get`` that a single 429 would defeat.
+    """
+    resp = _request_with_retry(
+        lambda: httpx.get(cxs_detail_url(target, external_path), timeout=30)
+    )
+    return resp.json()
+
+
 def apply_detail(row: WorkdayRow, detail: dict) -> None:
     info = detail.get("jobPostingInfo") or {}
     row.jd_text = html_to_markdown(info.get("jobDescription", ""))
@@ -330,10 +343,7 @@ def _fetch_detail(target: AtsTarget, row: WorkdayRow) -> dict | None:
     # No detail path -> cannot fetch a description; skip rather than GET a bad URL.
     if not row.external_path:
         return None
-    resp = _request_with_retry(
-        lambda: httpx.get(cxs_detail_url(target, row.external_path), timeout=30)
-    )
-    return resp.json()
+    return fetch_job_detail(target, row.external_path)
 
 
 def fetch_workday(

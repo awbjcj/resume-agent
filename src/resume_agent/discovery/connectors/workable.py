@@ -22,6 +22,21 @@ def _location(item: dict) -> str | None:
     )
 
 
+def _jd_html(item: dict) -> str:
+    """Workable splits a posting across three sibling fields; keep all of them.
+
+    ``details=true`` returns ``requirements`` and ``benefits`` alongside
+    ``description``. Dropping them loses the entire qualifications block --
+    exactly the skill-bearing text the relevance gate and tailoring read.
+    """
+    sections = (
+        item.get("description"),
+        item.get("requirements"),
+        item.get("benefits"),
+    )
+    return "\n".join(section for section in sections if section)
+
+
 def parse_workable(payload: dict, account: str) -> list[RawJob]:
     company = payload.get("name") or account
     return [
@@ -31,7 +46,7 @@ def parse_workable(payload: dict, account: str) -> list[RawJob]:
             company=company,
             title=item.get("title"),
             location=_location(item),
-            jd_text=html_to_markdown(item.get("description") or ""),
+            jd_text=html_to_markdown(_jd_html(item)),
             posted_at=parse_iso_datetime(item.get("published_on")),
         )
         for item in payload.get("jobs") or []

@@ -3,24 +3,25 @@
 from __future__ import annotations
 
 import hmac
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncGenerator, Iterator
+from contextlib import aclosing
 from datetime import datetime, timezone
 
 from fastapi import Depends, Header, Request
-from sqlalchemy.engine import Engine
-from sqlmodel import Session
 from sqlalchemy import select
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session as SystemSession
+from sqlmodel import Session
 
 from resume_agent.api.errors import ApiException
 from resume_agent.config import Settings
-from resume_agent.tenancy.context import UserContext, current_context, use_context
+from resume_agent.services.config_store import YamlConfigStore
+from resume_agent.services.profile_documents import DocumentStore
 from resume_agent.tenancy.bootstrap import build_context
+from resume_agent.tenancy.context import UserContext, current_context, use_context
 from resume_agent.tenancy.secrets import hash_secret
 from resume_agent.tenancy.system_db import ApiToken, User
 from resume_agent.tenancy.workspace import WorkspacePaths
-from resume_agent.services.config_store import YamlConfigStore
-from resume_agent.services.profile_documents import DocumentStore
 
 
 def get_settings_dep(request: Request) -> Settings:
@@ -110,6 +111,7 @@ def _authenticated_user(
                 cookie,
                 request.app.state.settings,
                 password_hash=candidate.password_hash,
+                epoch=candidate.session_epoch,
             ):
                 user = candidate
         if user is None:
@@ -149,7 +151,7 @@ def _authenticated_user(
 
 async def _activate_user_context(
     request: Request, *, link_purpose: str | None = None
-) -> AsyncIterator[UserContext | None]:
+) -> AsyncGenerator[UserContext | None]:
     system_engine = getattr(request.app.state, "system_engine", None)
     if system_engine is None:
         yield None
@@ -172,24 +174,29 @@ async def _activate_user_context(
         yield context
 
 
-async def get_user_context(request: Request) -> AsyncIterator[UserContext | None]:
+async def get_user_context(request: Request) -> AsyncGenerator[UserContext | None]:
     """Authenticate session/PAT and activate the request's tenant context."""
-    async for context in _activate_user_context(request):
-        yield context
+    async with aclosing(_activate_user_context(request)) as agen:
+        async for context in agen:
+            yield context
 
 
-async def get_sse_user_context(request: Request) -> AsyncIterator[UserContext | None]:
+async def get_sse_user_context(request: Request) -> AsyncGenerator[UserContext | None]:
     """Authenticate SSE by normal credentials or a purpose-bound short token."""
-    async for context in _activate_user_context(request, link_purpose="sse"):
-        yield context
+    async with aclosing(_activate_user_context(request, link_purpose="sse")) as agen:
+        async for context in agen:
+            yield context
 
 
 async def get_download_user_context(
     request: Request,
-) -> AsyncIterator[UserContext | None]:
+) -> AsyncGenerator[UserContext | None]:
     """Authenticate a selected download by credentials or a short capability."""
-    async for context in _activate_user_context(request, link_purpose="download"):
-        yield context
+    async with aclosing(
+        _activate_user_context(request, link_purpose="download")
+    ) as agen:
+        async for context in agen:
+            yield context
 
 
 def require_token(

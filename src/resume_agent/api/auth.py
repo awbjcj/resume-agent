@@ -6,6 +6,9 @@ import hashlib
 import hmac
 import secrets
 import time
+from dataclasses import dataclass
+
+from fastapi import Request, Response
 
 from resume_agent.config import Settings
 
@@ -13,6 +16,7 @@ SESSION_COOKIE = "ra_session"
 SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60
 _PBKDF2_ITERATIONS = 600_000
 LINK_TOKEN_TTL_SECONDS = 10 * 60
+OAUTH_STATE_TTL_SECONDS = 10 * 60
 DUMMY_PASSWORD_HASH = f"pbkdf2:{_PBKDF2_ITERATIONS}:{'00' * 16}:{'00' * 32}"
 
 
@@ -88,11 +92,16 @@ def verify_session(
 
 
 def _sign_user(
-    settings: Settings, payload: str, password_hash: str, *, namespace: str = "session"
+    settings: Settings,
+    payload: str,
+    password_hash: str,
+    *,
+    namespace: str = "session",
+    epoch: int = 0,
 ) -> str:
     key = hmac.new(
         settings.session_secret.encode("utf-8"),
-        f"{namespace}:{password_hash}".encode("utf-8"),
+        f"{namespace}:{password_hash}:{epoch}".encode("utf-8"),
         hashlib.sha256,
     ).digest()
     return hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -103,11 +112,12 @@ def issue_user_session(
     *,
     user_id: str,
     password_hash: str,
+    epoch: int = 0,
     now: float | None = None,
 ) -> str:
     expiry = int((time.time() if now is None else now) + SESSION_LIFETIME_SECONDS)
     payload = f"{user_id}:{expiry}"
-    return f"{payload}:{_sign_user(settings, payload, password_hash)}"
+    return f"{payload}:{_sign_user(settings, payload, password_hash, epoch=epoch)}"
 
 
 def parse_session_user_id(token: str) -> str | None:
@@ -123,6 +133,7 @@ def verify_user_session(
     settings: Settings,
     *,
     password_hash: str,
+    epoch: int = 0,
     now: float | None = None,
 ) -> str | None:
     if not settings.session_secret:
@@ -133,12 +144,24 @@ def verify_user_session(
     except (AttributeError, TypeError, ValueError):
         return None
     payload = f"{user_id}:{expiry}"
-    expected = _sign_user(settings, payload, password_hash)
+    expected = _sign_user(settings, payload, password_hash, epoch=epoch)
     if not hmac.compare_digest(signature, expected):
         return None
     if (time.time() if now is None else now) >= expiry:
         return None
     return user_id
+
+
+def set_session_cookie(request: Request, response: Response, token: str) -> None:
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_LIFETIME_SECONDS,
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/",
+    )
 
 
 def issue_link_token(
@@ -177,3 +200,46 @@ def verify_link_token(
     if (time.time() if now is None else now) >= expiry:
         return None
     return user_id
+
+
+@dataclass(frozen=True)
+class OAuthState:
+    mode: str
+    invite_hash: str
+
+
+def issue_oauth_state(
+    settings: Settings,
+    *,
+    mode: str,
+    invite_hash: str = "",
+    now: float | None = None,
+) -> str:
+    if mode not in {"login", "register"}:
+        raise ValueError("unsupported OAuth mode")
+    expiry = int((time.time() if now is None else now) + OAUTH_STATE_TTL_SECONDS)
+    nonce = secrets.token_urlsafe(12)
+    payload = f"{mode}:{invite_hash}:{nonce}:{expiry}"
+    signature = _sign_user(settings, payload, "", namespace="oauth")
+    return f"{payload}:{signature}"
+
+
+def verify_oauth_state(
+    state: str, settings: Settings, *, now: float | None = None
+) -> OAuthState | None:
+    if not settings.session_secret:
+        return None
+    try:
+        mode, invite_hash, nonce, expiry_text, signature = state.split(":")
+        expiry = int(expiry_text)
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if mode not in {"login", "register"} or not nonce:
+        return None
+    payload = f"{mode}:{invite_hash}:{nonce}:{expiry}"
+    expected = _sign_user(settings, payload, "", namespace="oauth")
+    if not hmac.compare_digest(signature, expected):
+        return None
+    if (time.time() if now is None else now) >= expiry:
+        return None
+    return OAuthState(mode=mode, invite_hash=invite_hash)

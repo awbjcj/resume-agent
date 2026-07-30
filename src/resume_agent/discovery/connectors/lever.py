@@ -29,6 +29,13 @@ def fetch_lever_board(token: str) -> list:
     return resp.json()
 
 
+def fetch_lever_posting(token: str, posting_id: str) -> dict:
+    """GET a single Lever posting by id -- same shape as one ``fetch_lever_board`` item."""
+    resp = httpx.get(f"{_BASE}/{token}/{posting_id}", params={"mode": "json"}, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def _assemble_jd(item: dict) -> str:
     """Stitch a Lever posting's opening, list sections, and closing into text.
 

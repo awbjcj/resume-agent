@@ -11,6 +11,7 @@ import { DataArchiveCard } from "./DataArchiveCard";
 import { DangerZoneCard } from "./DangerZoneCard";
 import { PasswordCard } from "./PasswordCard";
 import { PersonalTokensCard } from "./PersonalTokensCard";
+import { SecurityCard } from "./SecurityCard";
 
 export function AccountPage() {
   const me = useMe();
@@ -57,6 +58,7 @@ export function AccountPage() {
           <PasswordCard />
         </div>
         <PersonalTokensCard />
+        <SecurityCard />
       </section>
 
       <section aria-labelledby="account-data" className="flex flex-col gap-4">

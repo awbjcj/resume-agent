@@ -18,15 +18,15 @@ _L1_HOSTS: list[tuple[str, str]] = [
 ]
 
 _SUBDOMAIN_HOSTS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.workable\.com$", re.I), "workable"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.recruitee\.com$", re.I), "recruitee"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.breezy\.hr$", re.I), "breezy"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.applytojob\.com$", re.I), "jazzhr"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.bamboohr\.com$", re.I), "bamboohr"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.workable\.com$", re.IGNORECASE), "workable"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.recruitee\.com$", re.IGNORECASE), "recruitee"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.breezy\.hr$", re.IGNORECASE), "breezy"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.applytojob\.com$", re.IGNORECASE), "jazzhr"),
+    (re.compile(r"^(?P<token>[a-z0-9-]+)\.bamboohr\.com$", re.IGNORECASE), "bamboohr"),
 ]
 
 _PERSONIO_HOST = re.compile(
-    r"^(?P<token>[a-z0-9-]+)\.jobs\.personio\.(?P<country>com|de)$", re.I
+    r"^(?P<token>[a-z0-9-]+)\.jobs\.personio\.(?P<country>com|de)$", re.IGNORECASE
 )
 
 _L2_MARKERS: list[tuple[str, re.Pattern[str]]] = [
@@ -136,6 +136,12 @@ _SINGLETON_HOSTS: list[tuple[str, str]] = [
 ]
 
 
+#: Bespoke portals that are recognized by host but serve their listings from
+#: JavaScript rather than static HTML or a public JSON API. Callers that
+#: otherwise skip the browser for a recognized ATS must still render these.
+SINGLETON_ATS = frozenset(ats for _, ats in _SINGLETON_HOSTS)
+
+
 def _singleton(url: str) -> AtsTarget | None:
     """Bespoke portals identified by host alone (no token)."""
     host = (urlsplit(url).hostname or "").lower()
@@ -214,6 +220,24 @@ def _target_from_html(raw_html: str) -> AtsTarget | None:
 def _l2(url: str, *, client: httpx.Client | None = None) -> AtsTarget | None:
     raw_html = _get_html(url, client=client)
     return _target_from_html(raw_html) if raw_html is not None else None
+
+
+def workday_external_path(target: AtsTarget, url: str) -> str | None:
+    """The cxs detail suffix (starting with ``/job/...``) for a pasted Workday URL.
+
+    Mirrors ``_workday_site_segment``'s locale-stripping but returns the
+    remainder *after* the site segment -- what ``cxs_detail_url`` needs --
+    instead of the site itself. ``None`` when the URL's site doesn't match
+    ``target.site`` (e.g. a raw ``/wday/cxs/...`` API URL was pasted instead
+    of a browsing URL).
+    """
+    segments = [segment for segment in urlsplit(url).path.split("/") if segment]
+    while segments and _LOCALE_SEGMENT.fullmatch(segments[0]):
+        segments.pop(0)
+    if not segments or segments[0].casefold() != target.site.casefold():
+        return None
+    remainder = segments[1:]
+    return "/" + "/".join(remainder) if remainder else None
 
 
 def identify_host(url: str) -> AtsTarget | None:

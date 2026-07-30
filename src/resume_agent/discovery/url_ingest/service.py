@@ -1,19 +1,23 @@
-from typing import Callable
 from urllib.parse import urlsplit
 
 from resume_agent.discovery.connectors.base import RawJob
-from resume_agent.discovery.connectors.detect import identify_host
+from resume_agent.discovery.connectors.detect import SINGLETON_ATS, identify_host
 from resume_agent.discovery.connectors.text import clean_job_description_text
 from resume_agent.discovery.scraper.parser import parse_detail_meta, parse_job_detail
-from resume_agent.discovery.url_ingest.fetch import fetch_page, is_linkedin
-from resume_agent.discovery.url_ingest.greenhouse import read_greenhouse_posting
+from resume_agent.discovery.url_ingest.ats_readers import ATS_READERS
+from resume_agent.discovery.url_ingest.fetch import (
+    fetch_page,
+    fetch_static,
+    is_linkedin,
+    upgrade_if_shell,
+)
 from resume_agent.discovery.url_ingest.llm import extract_fields, html_to_text
 from resume_agent.discovery.url_ingest.models import ExtractedJob
 from resume_agent.llm_runner import Runner
 
 
 def read_linkedin_posting(html: str) -> ExtractedJob:
-    """Read a single LinkedIn posting page into structured fields."""
+    """Read a single posting page into structured fields."""
     meta = parse_detail_meta(html)
     return ExtractedJob(
         title=meta.title,
@@ -23,27 +27,47 @@ def read_linkedin_posting(html: str) -> ExtractedJob:
     )
 
 
-# ats -> reader(html) -> ExtractedJob. A single posting page per ATS, keyed by the
-# identity detect.py resolves. Mirrors connectors._BACKENDS; LinkedIn is handled
-# separately because it is a scraper target, not an ATS detect_ats knows.
-_READERS: dict[str, Callable[[str], ExtractedJob]] = {
-    "greenhouse": read_greenhouse_posting,
-}
-
-
 def job_from_url(url: str, *, agent: Runner, allow_browser: bool = True) -> RawJob | None:
     """Fetch a posting URL, route to the right reader, and build a RawJob.
 
+    A host ``identify_host`` recognizes as a known ATS is fetched *statically*
+    (plain httpx, never a browser) and handed to its deterministic reader in
+    ``ats_readers.ATS_READERS`` -- these boards have their own reliable JSON
+    APIs (or JSON-LD on the page itself), so there is no need to ever render
+    them, and the LLM fallback reads the same static HTML.
+
+    Two kinds of host are exempt and may still be rendered: an unrecognized
+    one, and a ``SINGLETON_ATS`` portal (Tesla, Google Careers), which is
+    recognized by host but builds its listings in JavaScript -- static HTML
+    holds nothing for either a reader or the LLM to read. Both reuse the
+    already-fetched page rather than issuing a second request for it.
+
     Returns None when no job-description text could be extracted.
     """
-    page = fetch_page(url, allow_browser=allow_browser)
-    host = urlsplit(page.final_url).netloc.lower()
+    host = urlsplit(url).netloc.lower()
     if is_linkedin(host):
+        page = fetch_page(url, allow_browser=allow_browser)
         extracted = read_linkedin_posting(page.html)
     else:
-        target = identify_host(page.final_url)
-        reader = _READERS.get(target.ats) if target else None
-        extracted = reader(page.html) if reader else extract_fields(html_to_text(page.html), agent)
+        static_page = fetch_static(url)
+        # Route on the post-redirect URL: a tracking or shortened link only
+        # reveals the real host after the fetch.
+        if is_linkedin(urlsplit(static_page.final_url).netloc.lower()):
+            page = fetch_page(static_page.final_url, allow_browser=allow_browser)
+            extracted = read_linkedin_posting(page.html)
+        else:
+            target = identify_host(static_page.final_url)
+            extracted = None
+            if target is not None:
+                reader = ATS_READERS.get(target.ats)
+                if reader is not None:
+                    extracted = reader(target, static_page.final_url, static_page.html)
+            if extracted is None:
+                if target is not None and target.ats not in SINGLETON_ATS:
+                    page = static_page
+                else:
+                    page = upgrade_if_shell(static_page, allow_browser=allow_browser)
+                extracted = extract_fields(html_to_text(page.html), agent)
     jd_text = clean_job_description_text(extracted.jd_text or "")
     if not jd_text:
         return None

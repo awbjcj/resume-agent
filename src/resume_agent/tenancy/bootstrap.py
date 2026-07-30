@@ -10,7 +10,7 @@ from resume_agent.config import Settings
 from resume_agent.tenancy.context import UserContext, new_user_id
 from resume_agent.tenancy.engines import EngineRegistry
 from resume_agent.tenancy.migrate import adopt_legacy_root, is_legacy_root
-from resume_agent.tenancy.system_db import User
+from resume_agent.tenancy.system_db import User, utc_now
 from resume_agent.tenancy.workspace import effective_settings, provision_workspace
 
 
@@ -47,6 +47,8 @@ def ensure_bootstrapped(
                 id=new_user_id(),
                 username=settings.auth_username,
                 password_hash=settings.auth_password_hash,
+                email=settings.auth_email or None,
+                email_verified_at=utc_now() if settings.auth_email else None,
                 role="admin",
             )
             session.add(admin)

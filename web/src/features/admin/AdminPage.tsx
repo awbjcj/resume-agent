@@ -9,6 +9,7 @@ import { useMe } from "@/features/auth/AuthGate";
 import { AdminInviteCard } from "./AdminInviteCard";
 import { AdminLimitsCard } from "./AdminLimitsCard";
 import { AdminUsersCard } from "./AdminUsersCard";
+import { MailWarning } from "./MailWarning";
 
 export function AdminPage() {
   const me = useMe();
@@ -31,6 +32,7 @@ export function AdminPage() {
           administrators. The defaults below govern member accounts only.
         </AlertDescription>
       </Alert>
+      <MailWarning />
 
       <section aria-labelledby="admin-controls" className="flex flex-col gap-4">
         <div>

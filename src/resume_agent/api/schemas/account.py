@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import Field
+from pydantic import EmailStr, Field, field_validator
 
 from resume_agent.api.schemas.base import CamelModel
 
@@ -30,6 +30,19 @@ class TokenList(CamelModel):
 class PasswordChangeRequest(CamelModel):
     current_password: str = Field(min_length=1, max_length=1024)
     new_password: str = Field(min_length=12, max_length=1024)
+
+
+class SetEmailRequest(CamelModel):
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().casefold()
+
+
+class VerifyAccountEmailRequest(SetEmailRequest):
+    code: str = Field(pattern=r"^\d{6}$")
 
 
 class AccountUsage(CamelModel):

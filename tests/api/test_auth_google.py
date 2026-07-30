@@ -1,0 +1,185 @@
+from datetime import datetime, timedelta, timezone
+
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from resume_agent.api import auth
+from resume_agent.tenancy.secrets import hash_secret
+from resume_agent.tenancy.system_db import InviteCode, User
+
+
+CLIENT = {"google_oauth_client_id": "cid", "google_oauth_client_secret": "secret"}
+
+
+class _FakeFlow:
+    class Credentials:
+        id_token = "token"
+
+    credentials = Credentials()
+
+    def __init__(self):
+        self.authorization_kwargs = None
+
+    def authorization_url(self, **kwargs):
+        self.authorization_kwargs = kwargs
+        return "https://accounts.google.com/o/oauth2/auth?test=1", kwargs["state"]
+
+    def fetch_token(self, code=""):
+        assert code == "code"
+
+
+def _configure(app):
+    app.state.settings = app.state.settings.model_copy(update=CLIENT)
+
+
+def _fake_google(monkeypatch, claims):
+    from resume_agent.api.routers import auth_google
+
+    flow = _FakeFlow()
+    monkeypatch.setattr(auth_google, "_build_flow", lambda *_args: flow)
+    monkeypatch.setattr(auth_google, "_verify_id_token", lambda *_args: claims)
+    return flow
+
+
+def _callback(client, app, *, mode="login", invite_hash=""):
+    state = auth.issue_oauth_state(
+        app.state.settings, mode=mode, invite_hash=invite_hash
+    )
+    return client.get(
+        "/api/auth/google/callback",
+        params={"code": "code", "state": state},
+        follow_redirects=False,
+    )
+
+
+def test_google_start_requires_client_and_uses_identity_only_prompt(
+    mu_app, monkeypatch
+):
+    with TestClient(mu_app) as client:
+        assert client.get("/api/auth/google/start").status_code == 409
+    _configure(mu_app)
+    flow = _fake_google(monkeypatch, {})
+    with TestClient(mu_app) as client:
+        response = client.get("/api/auth/google/start")
+    assert response.status_code == 200
+    assert response.json()["authUrl"].startswith("https://accounts.google.com/")
+    assert flow.authorization_kwargs is not None
+    assert flow.authorization_kwargs["prompt"] == "select_account"
+
+
+def test_google_start_participates_in_the_ip_budget(mu_app, monkeypatch):
+    _configure(mu_app)
+    _fake_google(monkeypatch, {})
+    with TestClient(mu_app) as client:
+        for _ in range(50):
+            assert client.get("/api/auth/google/start").status_code == 200
+        assert client.get("/api/auth/google/start").status_code == 429
+
+
+def test_google_email_link_is_strict_and_monotonic(mu_app, monkeypatch):
+    _configure(mu_app)
+    _fake_google(
+        monkeypatch,
+        {"sub": "attacker-sub", "email": "owner@example.com", "email_verified": True},
+    )
+    with TestClient(mu_app) as client:
+        with Session(mu_app.state.system_engine) as session:
+            owner = (
+                session.execute(select(User).where(User.username == "owner"))
+                .scalars()
+                .one()
+            )
+            owner.email = "owner@example.com"
+            owner.email_verified_at = datetime.now(timezone.utc)
+            owner.google_sub = "original-sub"
+            owner.failed_login_count = 9
+            owner.locked_until = datetime.now(timezone.utc) + timedelta(hours=1)
+            session.commit()
+        response = _callback(client, mu_app)
+    assert response.headers["location"] == "/login?error=google_conflict"
+    with Session(mu_app.state.system_engine) as session:
+        owner = (
+            session.execute(select(User).where(User.username == "owner"))
+            .scalars()
+            .one()
+        )
+        assert owner.google_sub == "original-sub"
+
+    _fake_google(
+        monkeypatch,
+        {"sub": "original-sub", "email": "owner@example.com", "email_verified": "true"},
+    )
+    with TestClient(mu_app) as client:
+        signed_in = _callback(client, mu_app)
+        assert signed_in.headers["location"] == "/"
+    with Session(mu_app.state.system_engine) as session:
+        owner = (
+            session.execute(select(User).where(User.username == "owner"))
+            .scalars()
+            .one()
+        )
+        assert owner.failed_login_count == 0
+        assert owner.locked_until is None
+
+
+def test_google_requires_exact_verified_boolean_before_email_link(mu_app, monkeypatch):
+    _configure(mu_app)
+    _fake_google(
+        monkeypatch,
+        {"sub": "new-sub", "email": "owner@example.com", "email_verified": "true"},
+    )
+    with TestClient(mu_app) as client:
+        with Session(mu_app.state.system_engine) as session:
+            owner = (
+                session.execute(select(User).where(User.username == "owner"))
+                .scalars()
+                .one()
+            )
+            owner.email = "owner@example.com"
+            owner.email_verified_at = datetime.now(timezone.utc)
+            session.commit()
+        response = _callback(client, mu_app)
+    assert response.headers["location"] == "/login?error=unverified_google"
+    with Session(mu_app.state.system_engine) as session:
+        owner = (
+            session.execute(select(User).where(User.username == "owner"))
+            .scalars()
+            .one()
+        )
+        assert owner.google_sub is None
+
+
+def test_google_registration_consumes_invite_and_provisions_workspace(
+    mu_app, monkeypatch
+):
+    _configure(mu_app)
+    invite = "inv_google_123"
+    _fake_google(
+        monkeypatch,
+        {"sub": "google-new", "email": "new@example.com", "email_verified": True},
+    )
+    with TestClient(mu_app) as client:
+        with Session(mu_app.state.system_engine) as session:
+            session.add(
+                InviteCode(
+                    id="googleinvite",
+                    code_hash=hash_secret(invite),
+                    created_by="u1",
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+                )
+            )
+            session.commit()
+        response = _callback(
+            client, mu_app, mode="register", invite_hash=hash_secret(invite)
+        )
+        assert response.headers["location"] == "/"
+        assert client.get("/api/auth/me").json()["email"] == "new@example.com"
+    with Session(mu_app.state.system_engine) as session:
+        invite_row = session.get(InviteCode, "googleinvite")
+        assert invite_row is not None
+        user = session.get(User, invite_row.used_by)
+        assert user is not None
+        assert user.password_hash == ""
+        assert user.email_verified_at is not None
+    assert (mu_app.state.data_dir / "users" / user.id).is_dir()

@@ -11,7 +11,7 @@ from resume_agent.tenancy.workspace import provision_workspace
 
 def _login(client, username="owner", password="owner-password"):
     return client.post(
-        "/api/auth/login", json={"username": username, "password": password}
+        "/api/auth/login", json={"identifier": username, "password": password}
     )
 
 
@@ -135,11 +135,14 @@ def test_account_password_usage_and_export(mu_app, mu_client):
     assert exported.headers["content-type"] == "application/gzip"
     changed = mu_client.post(
         "/api/account/password",
-        json={"currentPassword": "owner-password", "newPassword": "new-owner-password"},
+        json={
+            "currentPassword": "owner-password",
+            "newPassword": "cobalt-meridian-77-x",
+        },
     )
     assert changed.status_code == 200
     mu_client.cookies.clear()
-    assert _login(mu_client, password="new-owner-password").status_code == 200
+    assert _login(mu_client, password="cobalt-meridian-77-x").status_code == 200
 
 
 def test_account_import_requires_confirmation(mu_client):

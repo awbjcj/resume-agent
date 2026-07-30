@@ -16,6 +16,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { api, unwrap } from "@/lib/api/client";
+import { PasswordStrengthMeter } from "@/features/auth/PasswordStrengthMeter";
 
 export function PasswordCard() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -70,6 +71,7 @@ export function PasswordCard() {
                 onChange={(event) => setCurrentPassword(event.target.value)}
                 required
               />
+              <PasswordStrengthMeter password={newPassword} />
             </Field>
             <Field data-invalid={password.isError || undefined}>
               <FieldLabel htmlFor="new-password">New password</FieldLabel>

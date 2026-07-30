@@ -16,7 +16,7 @@ from resume_agent.discovery.search_scout import (
     build_search_scout_formatter_agent,
     build_search_scout_research_agent,
 )
-from resume_agent.llm_runner import Runner, expect_schema
+from resume_agent.llm_runner import Runner, expect_schema, expect_text
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
 
@@ -100,7 +100,10 @@ def run_search_discovery(
     research = research_agent or build_search_scout_research_agent()
     formatter = formatter_agent or build_search_scout_formatter_agent()
     context = scout_search_context(search_path, Path(profile_dir))
-    notes = research.run(f"USER PROMPT:\n{prompt}\n\n{context}").content
+    notes = expect_text(
+        research.run(f"USER PROMPT:\n{prompt}\n\n{context}"),
+        source="search-scout research",
+    )
     result = formatter.run(f"RESEARCH NOTES (UNTRUSTED):\n{notes}")
     report = expect_schema(result, SearchSuggestions, source="search-scout")
 

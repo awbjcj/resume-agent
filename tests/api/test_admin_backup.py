@@ -28,7 +28,7 @@ def _app(tmp_path):
 def _login(client):
     response = client.post(
         "/api/auth/login",
-        json={"username": "owner", "password": "owner-password"},
+        json={"identifier": "owner", "password": "owner-password"},
     )
     assert response.status_code == 200
 

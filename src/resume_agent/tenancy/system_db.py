@@ -44,6 +44,12 @@ class User(SystemBase):
     weekly_token_budget: Mapped[int | None] = mapped_column(Integer)
     max_active_jobs: Mapped[int | None] = mapped_column(Integer)
     max_concurrent_runs: Mapped[int | None] = mapped_column(Integer)
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    google_sub: Mapped[str | None] = mapped_column(String(64), unique=True)
+    session_epoch: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_login_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
@@ -67,6 +73,55 @@ class InviteCode(SystemBase):
     used_by: Mapped[str | None] = mapped_column(String(12))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PendingRegistration(SystemBase):
+    __tablename__ = "pending_registrations"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(64))
+    invite_code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class PasswordResetCode(SystemBase):
+    __tablename__ = "password_reset_codes"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    pending_email: Mapped[str | None] = mapped_column(String(320))
+
+
+class LoginAttempt(SystemBase):
+    __tablename__ = "login_attempts"
+    __table_args__ = (
+        Index("ix_login_attempts_scope_id_ts", "scope", "identifier", "occurred_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scope: Mapped[str] = mapped_column(String(32), nullable=False)
+    identifier: Mapped[str] = mapped_column(String(400), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+def has_password(user: User) -> bool:
+    return bool(user.password_hash)
 
 
 class ApiToken(SystemBase):
@@ -127,3 +182,8 @@ def make_system_engine(data_root: Path | str) -> Engine:
 
 def init_system_db(engine: Engine) -> None:
     SystemBase.metadata.create_all(engine)
+    # Keep every entry point (API, CLI, restore) on the same additive schema.
+    # Local import avoids a module cycle while the declarative models load.
+    from resume_agent.tenancy.migrate_system import migrate_system_db
+
+    migrate_system_db(engine)

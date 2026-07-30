@@ -24,17 +24,31 @@ def _looks_like_js_shell(html: str) -> bool:
     return len(body.get_text(" ", strip=True)) < _SHELL_TEXT_THRESHOLD
 
 
+def fetch_static(url: str) -> PageContent:
+    """Plain, non-browser GET. Known-ATS hosts use only this -- never the browser."""
+    resp = httpx.get(url, headers=_HEADERS, follow_redirects=True, timeout=20.0)
+    resp.raise_for_status()
+    return PageContent(html=resp.text, final_url=str(resp.url), rendered=False)
+
+
+def upgrade_if_shell(page: PageContent, *, allow_browser: bool = True) -> PageContent:
+    """Re-fetch an already-fetched page in a browser when it is a JS shell.
+
+    Takes the ``PageContent`` the caller already holds rather than a URL, so a
+    caller that has fetched statically to route the URL does not pay a second
+    request against the same host just to apply the shell policy.
+    """
+    if not allow_browser or not _looks_like_js_shell(page.html):
+        return page
+    return PageContent(
+        html=fetch_rendered(page.final_url), final_url=page.final_url, rendered=True
+    )
+
+
 def fetch_page(url: str, *, allow_browser: bool = True) -> PageContent:
     """Fetch a posting page. HTTP-first; render in-browser for LinkedIn or JS shells."""
     host = urlsplit(url).netloc.lower()
     if allow_browser and is_linkedin(host):
         html = fetch_rendered(url, wait_selector=_LINKEDIN_DETAIL_SELECTOR)
         return PageContent(html=html, final_url=url, rendered=True)
-    resp = httpx.get(url, headers=_HEADERS, follow_redirects=True, timeout=20.0)
-    resp.raise_for_status()
-    html = resp.text
-    final_url = str(resp.url)
-    if allow_browser and _looks_like_js_shell(html):
-        rendered = fetch_rendered(url)
-        return PageContent(html=rendered, final_url=final_url, rendered=True)
-    return PageContent(html=html, final_url=final_url, rendered=False)
+    return upgrade_if_shell(fetch_static(url), allow_browser=allow_browser)

@@ -110,6 +110,10 @@ const LoginPage = lazy(() =>
 const RegisterPage = lazy(() =>
   import("@/features/auth/RegisterPage").then((m) => ({ default: m.RegisterPage })),
 );
+const VerifyEmailPage = lazy(() => import("@/features/auth/VerifyEmailPage").then((m) => ({ default: m.VerifyEmailPage })));
+const ForgotPasswordPage = lazy(() => import("@/features/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import("@/features/auth/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
+const CompleteProfilePage = lazy(() => import("@/features/auth/CompleteProfilePage").then((m) => ({ default: m.CompleteProfilePage })));
 const AccountPage = lazy(() =>
   import("@/features/account/AccountPage").then((m) => ({ default: m.AccountPage })),
 );
@@ -122,6 +126,10 @@ const page = (node: ReactNode) => <Suspense fallback={<BoardSkeleton />}>{node}<
 export const router = createBrowserRouter([
   { path: "/login", element: page(<LoginPage />) },
   { path: "/register", element: page(<RegisterPage />) },
+  { path: "/verify-email", element: page(<VerifyEmailPage />) },
+  { path: "/forgot-password", element: page(<ForgotPasswordPage />) },
+  { path: "/reset-password", element: page(<ResetPasswordPage />) },
+  { path: "/complete-profile", element: page(<CompleteProfilePage />) },
   {
     path: "/",
     element: <AuthGate><AppLayout /></AuthGate>,

@@ -15,7 +15,7 @@ from resume_agent.tracking.tables import Job
 
 def _login(client, username="owner", password="owner-password"):
     return client.post(
-        "/api/auth/login", json={"username": username, "password": password}
+        "/api/auth/login", json={"identifier": username, "password": password}
     )
 
 

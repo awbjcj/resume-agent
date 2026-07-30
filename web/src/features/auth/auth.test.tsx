@@ -19,6 +19,7 @@ function wrap(ui: ReactNode, initialPath = "/") {
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/login" element={<div>Login route</div>} />
+          <Route path="/complete-profile" element={<div>Complete profile</div>} />
           <Route path="/" element={<AuthGate>{ui}</AuthGate>} />
         </Routes>
       </MemoryRouter>
@@ -44,6 +45,16 @@ describe("AuthGate", () => {
     );
     wrap(<div>App content</div>);
     expect(await screen.findByText("Login route")).toBeInTheDocument();
+  });
+
+  it("redirects legacy accounts to complete their profile", async () => {
+    server.use(
+      http.get("/api/auth/me", () =>
+        HttpResponse.json({ username: "owner", authRequired: true, needsEmail: true }),
+      ),
+    );
+    wrap(<div>App content</div>);
+    expect(await screen.findByText("Complete profile")).toBeInTheDocument();
   });
 
   it("fails closed with a retry action on network errors", async () => {
@@ -81,7 +92,7 @@ describe("LoginPage", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    await user.type(screen.getByLabelText(/username/i), "owner");
+    await user.type(screen.getByLabelText(/email/i), "owner@example.com");
     await user.type(screen.getByLabelText(/password/i), "wrong");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -104,32 +115,30 @@ describe("LogoutButton", () => {
 });
 
 describe("RegisterPage", () => {
-  it("submits invite registration and signs the user in", async () => {
+  it("submits invite registration and opens email verification", async () => {
     let registered = false;
     server.use(
       http.post("/api/auth/register", () => {
         registered = true;
-        return HttpResponse.json(
-          { username: "alice", role: "user", authRequired: true },
-          { status: 201 },
-        );
+        return HttpResponse.json({ status: "sent" }, { status: 202 });
       }),
-      http.post("/api/auth/login", () =>
-        HttpResponse.json({ username: "alice", role: "user", authRequired: true }),
-      ),
     );
     const user = userEvent.setup();
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/register"]}>
-          <RegisterPage />
+          <Routes>
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<div>Verify route</div>} />
+          </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    await user.type(screen.getByLabelText(/^username$/i), "alice");
-    await user.type(screen.getByLabelText(/^password$/i), "long-alice-password");
+    await user.type(screen.getByLabelText(/^email$/i), "alice@example.com");
+    await user.type(screen.getByLabelText(/^password$/i), "long-safe-password-42");
     await user.type(screen.getByLabelText(/invite code/i), "inv_example");
     await user.click(screen.getByRole("button", { name: /create account/i }));
     expect(registered).toBe(true);
+    expect(await screen.findByText("Verify route")).toBeInTheDocument();
   });
 });

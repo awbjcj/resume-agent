@@ -118,7 +118,12 @@ def normalize_opening(turn: OpeningTurn) -> tuple[list[CoachTopic], ValidatedTur
     topics = [_make_topic(index, topic) for index, topic in enumerate(raw_topics, 1)]
     topic_id = turn.topic_id.strip() or topics[0].id
     if topic_id not in {topic.id for topic in topics}:
-        raise TurnRejected(f"unknown topic: {topic_id!r}")
+        # Opening ids are generated positionally right here, so the formatter is
+        # guessing at an id space that did not exist when it answered. Naming the
+        # valid ids is what lets `format_with_retry`'s single retry recover; a
+        # bare "unknown topic" gives the retry nothing the first attempt lacked.
+        valid = ", ".join(topic.id for topic in topics)
+        raise TurnRejected(f"unknown topic: {topic_id!r} (valid ids: {valid})")
     return topics, ValidatedTurn(
         coach_turn=CoachTurnRecord(
             role="coach",
@@ -393,7 +398,12 @@ _FORMAT_INSTRUCTIONS = [
 _OPENING_FORMAT_INSTRUCTION = (
     "This is the opening turn: copy every agenda item the coach proposed into "
     "`topics`, each with its gap, why it matters, and any related reference. "
-    "An opening turn with no topics is invalid."
+    "An opening turn with no topics is invalid. "
+    "Topic ids are assigned positionally from the order you list them -- the "
+    "first topic is `t1`, the second `t2`, and so on. Set `topic_id` to the id "
+    "of the topic the coach's question is about (`t1` unless the question is "
+    "clearly about a later one), or leave it empty. Never invent an id of your "
+    "own: a descriptive slug can never match a positional id and fails the turn."
 )
 
 
