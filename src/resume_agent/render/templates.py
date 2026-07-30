@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.paths import resolve_tenant_path
 
 
@@ -96,5 +97,11 @@ def template_path_for(config) -> Path:
     if config.template:
         return resolve_template(config.template).path
     if config.template_path:
+        if current_context() is not None:
+            if Path(config.template_path).as_posix() == "templates/resume.typ":
+                return resolve_template("classic").path
+            raise TemplateNotFoundError(
+                "Legacy template paths are disabled in multi-user mode; use a template id."
+            )
         return Path(config.template_path)
     return resolve_template("classic").path

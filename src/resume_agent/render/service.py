@@ -8,6 +8,7 @@ from resume_agent.render.export import export_job_artifacts, job_dir, resume_pdf
 from resume_agent.render.render_config import RenderConfig
 from resume_agent.render.renderer import render_pdf
 from resume_agent.render.templates import template_path_for
+from resume_agent.tenancy.context import current_context
 from resume_agent.tenancy.paths import resolve_tenant_path
 from resume_agent.tracking.repository import (
     get_job,
@@ -33,10 +34,14 @@ def render_version(
     job = get_job(session, version.job_id)
 
     content = ResumeContent.model_validate(version.content_json or {})
+    context = current_context()
+    output_base: str | Path = (
+        context.paths.output_dir if context is not None else config.output_dir
+    )
     out_dir = (
-        job_dir(config.output_dir, job)
+        job_dir(output_base, job)
         if job is not None
-        else resolve_tenant_path(config.output_dir)
+        else resolve_tenant_path(output_base)
     )
     out_path = out_dir / resume_pdf_name(version)
 
@@ -53,5 +58,5 @@ def render_version(
         assert job.id is not None
         job.status = JobStatus.rendered.value
         save_job(session, job)
-        export_job_artifacts(session, job.id, base=config.output_dir)
+        export_job_artifacts(session, job.id, base=output_base)
     return out_path

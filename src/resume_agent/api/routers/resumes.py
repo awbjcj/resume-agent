@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import cast
 
 from fastapi import APIRouter, Depends, Request
@@ -19,6 +18,7 @@ from resume_agent.api.schemas.jobs import (
 from resume_agent.render.export import resume_download_name
 from resume_agent.services.board import select_resume_version
 from resume_agent.services.rendering import render_resume_version
+from resume_agent.tenancy.storage import TenantPathError, artifact_path
 from resume_agent.tracking.repository import get_job, get_resume_version
 
 router = APIRouter()
@@ -32,21 +32,25 @@ def download_pdf(
     version = get_resume_version(session, version_id)
     if version is None:
         raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
-    if not version.pdf_path or not Path(version.pdf_path).exists():
+    try:
+        path = artifact_path(version.pdf_path) if version.pdf_path else None
+    except TenantPathError:
+        path = None
+    if path is None or not path.is_file():
         raise ApiException(404, "NOT_FOUND", "No rendered PDF for this version")
     job = get_job(session, version.job_id)
-    filename = (
-        resume_download_name(job, version) if job is not None else Path(version.pdf_path).name
-    )
+    filename = resume_download_name(job, version) if job is not None else path.name
     return FileResponse(
-        version.pdf_path,
+        path,
         media_type="application/pdf",
         filename=filename,
     )
 
 
 @router.post("/resume-versions/{version_id}/render", response_model=ResumeVersionOut)
-def render_endpoint(version_id: int, request: Request, session: Session = Depends(get_session)):
+def render_endpoint(
+    version_id: int, request: Request, session: Session = Depends(get_session)
+):
     path = render_resume_version(session, version_id)
     if path is None:
         raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")

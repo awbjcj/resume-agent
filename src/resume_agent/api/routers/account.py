@@ -6,7 +6,7 @@ import tempfile
 import uuid
 from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal, cast
 
 from fastapi import APIRouter, Depends, Request, Response, UploadFile
@@ -69,14 +69,46 @@ router = APIRouter(prefix="/account", tags=["account"])
 link_router = APIRouter(prefix="/account", tags=["account"])
 
 
-def _validate_workspace_stage(stage: Path) -> None:
+def _normalized_artifact_path(value: str, *, workspace_root: Path) -> str:
+    """Convert legacy artifact paths to a tenant-relative output path."""
+
+    raw = value.replace("\\", "/")
+    posix = PurePosixPath(raw)
+    windows = PureWindowsPath(value)
+    if ".." in posix.parts or ".." in windows.parts:
+        raise InvalidArchiveError("workspace database contains an unsafe artifact path")
+
+    candidate = Path(value)
+    if candidate.is_absolute():
+        try:
+            relative = candidate.resolve().relative_to(workspace_root.resolve())
+            parts = relative.parts
+        except ValueError:
+            parts = posix.parts
+    else:
+        parts = posix.parts
+
+    try:
+        output_index = next(i for i, part in enumerate(parts) if part == "output")
+    except StopIteration as exc:
+        raise InvalidArchiveError(
+            "workspace database contains an artifact outside output"
+        ) from exc
+    tail = parts[output_index + 1 :]
+    if not tail:
+        raise InvalidArchiveError(
+            "workspace database contains an invalid artifact path"
+        )
+    normalized = PurePosixPath("output", *tail)
+    return normalized.as_posix()
+
+
+def _validate_workspace_stage(stage: Path, *, workspace_root: Path) -> None:
     database = stage / "resume_agent.db"
     if not database.is_file():
         raise InvalidArchiveError("workspace archive is missing resume_agent.db")
     try:
-        with closing(
-            sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True)
-        ) as connection:
+        with closing(sqlite3.connect(database)) as connection:
             if connection.execute("PRAGMA quick_check").fetchone() != ("ok",):
                 raise InvalidArchiveError("workspace database failed integrity check")
             tables = {
@@ -85,6 +117,22 @@ def _validate_workspace_stage(stage: Path) -> None:
                     "SELECT name FROM sqlite_master WHERE type = 'table'"
                 )
             }
+            for table in ("resume_versions", "cover_letters"):
+                if table not in tables:
+                    continue
+                rows = connection.execute(
+                    f"SELECT id, pdf_path FROM {table} WHERE pdf_path IS NOT NULL"
+                ).fetchall()
+                for row_id, value in rows:
+                    normalized = _normalized_artifact_path(
+                        value,
+                        workspace_root=workspace_root,
+                    )
+                    connection.execute(
+                        f"UPDATE {table} SET pdf_path = ? WHERE id = ?",
+                        (normalized, row_id),
+                    )
+            connection.commit()
     except sqlite3.Error as exc:
         raise InvalidArchiveError("workspace database is not valid SQLite") from exc
     if "jobs" not in tables:
@@ -439,9 +487,15 @@ def import_workspace(
             import_data_root(
                 archive,
                 paths.root,
-                validate_staged=_validate_workspace_stage,
+                validate_staged=lambda stage: _validate_workspace_stage(
+                    stage,
+                    workspace_root=paths.root,
+                ),
                 before_swap=lambda: registry.evict(context.user_id),
                 after_swap=lambda: registry.get(context.user_id, paths.db_url),
+                max_members=4_096,
+                max_expanded_bytes=512 * 1024 * 1024,
+                max_member_bytes=256 * 1024 * 1024,
             )
         except UploadTooLargeError as exc:
             raise ApiException(413, "UPLOAD_TOO_LARGE", str(exc)) from exc

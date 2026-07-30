@@ -1,11 +1,15 @@
 from pathlib import Path
 
+import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
+from resume_agent.config import Settings
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.profile import Contact
 from resume_agent.render.render_config import RenderConfig
 from resume_agent.render.service import render_version
+from resume_agent.tenancy.context import UserContext, use_context
+from resume_agent.tenancy.workspace import WorkspacePaths
 from resume_agent.tracking.repository import (
     get_resume_version,
     save_job,
@@ -72,6 +76,61 @@ def test_render_version_sets_path_and_marks_rendered(tmp_path):
         assert refreshed is not None
         assert refreshed.pdf_path == str(path)
         assert job.status == JobStatus.rendered.value
+
+
+def test_multi_user_render_forces_output_root_and_rejects_legacy_template(tmp_path):
+    workspace = WorkspacePaths(tmp_path / "users" / "alice")
+    workspace.output_dir.mkdir(parents=True)
+    context = UserContext(
+        user_id="alice0000000",
+        username="alice",
+        role="user",
+        paths=workspace,
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        engine=None,
+        system_engine=None,
+        own_key_providers=frozenset(),
+    )
+    outside = tmp_path / "outside"
+    config = RenderConfig(
+        template_path=str(tmp_path / "untrusted.typ"),
+        output_dir=str(outside),
+    )
+    with _session() as session:
+        job = save_job(session, Job(source="manual", jd_text="jd"))
+        version = save_resume_version(
+            session,
+            ResumeVersion(
+                job_id=_require_id(job.id),
+                content_json=ResumeContent(contact=Contact(name="Ada")).model_dump(
+                    mode="json"
+                ),
+            ),
+        )
+        with use_context(context), pytest.raises(ValueError, match="template paths"):
+            render_version(
+                session,
+                _require_id(version.id),
+                config,
+                render_fn=lambda *_args, **_kwargs: outside / "not-used.pdf",
+            )
+
+        def fake_render(_content, output_path, _template_path, **_kwargs):
+            path = Path(output_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"%PDF")
+            return path
+
+        with use_context(context):
+            rendered = render_version(
+                session,
+                _require_id(version.id),
+                RenderConfig(template="classic", output_dir=str(outside)),
+                render_fn=fake_render,
+            )
+        assert rendered is not None
+        assert rendered.is_relative_to(workspace.output_dir)
+    assert not outside.exists()
 
 
 def test_render_version_uses_distinct_paths_for_versions_same_job_same_day(tmp_path):
