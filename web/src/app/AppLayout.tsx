@@ -140,7 +140,7 @@ export function AppLayout() {
                 <NavMenuItem item={{ to: "/account", label: "Account", icon: CircleUserRound }} />
                 {me.data?.role === "admin" && (
                   <>
-                    <NavMenuItem item={{ to: "/admin", label: "Admin", icon: ShieldCheck }} />
+                    <NavMenuItem item={{ to: "/admin", label: "Admin", end: true, icon: ShieldCheck }} />
                     <NavMenuItem item={{ to: "/admin/quotas", label: "Cost quotas", icon: Banknote }} />
                   </>
                 )}

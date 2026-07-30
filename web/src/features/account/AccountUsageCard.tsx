@@ -26,6 +26,7 @@ export function AccountUsageCard({
   isAdmin: boolean;
 }) {
   const quota = usage.quota;
+  const costs = usage.costs;
   const unlimited = isAdmin || quota?.recurringAllowanceMicros == null;
   const percent = unlimited || !quota?.recurringAllowanceMicros
     ? 0
@@ -82,18 +83,18 @@ export function AccountUsageCard({
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-lg bg-muted/55 p-4">
             <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Remaining balance
+              {isAdmin ? "Shared-key spend" : "Remaining balance"}
             </dt>
             <dd className="mt-1 text-xl font-semibold tabular-nums">
-              {money(quota?.remainingMicros)}
+              {isAdmin ? money(costs?.sharedQuotaCostMicros ?? 0) : money(quota?.remainingMicros)}
             </dd>
           </div>
           <div className="rounded-lg bg-muted/55 p-4">
             <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Durable credits
+              {isAdmin ? "BYOK estimated spend" : "Durable credits"}
             </dt>
             <dd className="mt-1 text-xl font-semibold tabular-nums">
-              {money(quota?.creditBalanceMicros)}
+              {isAdmin ? money(costs?.byokEstimatedCostMicros ?? 0) : money(quota?.creditBalanceMicros)}
             </dd>
           </div>
           <div className="rounded-lg bg-muted/55 p-4">

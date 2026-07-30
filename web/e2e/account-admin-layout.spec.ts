@@ -78,3 +78,32 @@ test("admin makes the unlimited policy and member controls explicit", async ({ p
   await expect(page.getByText("Member defaults")).toBeVisible();
   await expect(page.getByText("Tokens, jobs, and concurrency")).toBeVisible();
 });
+
+test("cost quotas keeps one sidebar destination active and contains narrow layouts", async ({ page }) => {
+  await mockShell(page);
+  const paged = (data: unknown[]) => ({
+    data,
+    pagination: { page: 1, pageSize: 100, totalItems: data.length, totalPages: 1 },
+  });
+  await page.route("**/api/admin/quota-summary", (route) => route.fulfill({ json: {
+    monthlySpendMicros: 125_000_000,
+    monthlyCapMicros: 500_000_000,
+    remainingMicros: 375_000_000,
+    unpricedCallCount: 2,
+    nextResetAt: "2026-08-01T00:00:00Z",
+  } }));
+  await page.route("**/api/admin/quota-tiers?*", (route) => route.fulfill({ json: paged([]) }));
+  await page.route("**/api/admin/quota-accounts?*", (route) => route.fulfill({ json: paged([]) }));
+  await page.route("**/api/admin/llm-rates?*", (route) => route.fulfill({ json: paged([]) }));
+  await page.route("**/api/admin/quota-operations?*", (route) => route.fulfill({ json: paged([]) }));
+
+  await page.goto("/admin/quotas");
+
+  await expect(page.getByRole("heading", { name: "Cost quotas" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Cost quotas" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Admin", exact: true })).not.toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "View my usage" })).toHaveAttribute("href", "/account");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

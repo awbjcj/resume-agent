@@ -41,6 +41,8 @@ describe("AdminQuotasPage", () => {
     const user = userEvent.setup();
     renderPage();
     expect(await screen.findByRole("heading", { name: "Cost quotas" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View my usage" })).toHaveAttribute("href", "/account");
+    expect(screen.getByText(/administrators are quota-exempt/i)).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "alice" })).toBeInTheDocument();
 
     await user.type(screen.getByRole("textbox", { name: "Search members" }), "missing");
