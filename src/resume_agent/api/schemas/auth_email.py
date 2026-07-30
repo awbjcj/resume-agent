@@ -16,16 +16,13 @@ class EmailBody(CamelModel):
 
 class RegisterRequest(EmailBody):
     password: str = Field(min_length=1, max_length=1024)
-    invite_code: str = Field(default="", max_length=128)
+    invite_code: str = Field(default="", pattern=r"^(?:.{8,128})?$")
     display_name: str | None = Field(default=None, max_length=64)
 
-    @field_validator("invite_code")
+    @field_validator("invite_code", mode="before")
     @classmethod
-    def valid_optional_invite(cls, value: str) -> str:
-        value = value.strip()
-        if value and len(value) < 8:
-            raise ValueError("invite code must be at least 8 characters")
-        return value
+    def normalize_optional_invite(cls, value: str) -> str:
+        return value.strip()
 
 
 class VerifyEmailRequest(EmailBody):

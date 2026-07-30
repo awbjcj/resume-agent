@@ -4966,7 +4966,7 @@
           },
           "inviteCode": {
             "default": "",
-            "maxLength": 128,
+            "pattern": "^(?:.{8,128})?$",
             "title": "Invitecode",
             "type": "string"
           },
