@@ -17,8 +17,16 @@ def _confine(path: Path | str, root: Path, *, prefix: str | None = None) -> Path
     else:
         parts = candidate.parts
         if prefix is not None and parts and parts[0] == prefix:
-            parts = parts[1:]
-        resolved = root.joinpath(*parts).resolve()
+            # Tenant-root-relative convention used by workspace-import
+            # normalization (``account.py``): strip the leading marker and
+            # join onto the confined root.
+            resolved = root.joinpath(*parts[1:]).resolve()
+        else:
+            # A plain relative path -- e.g. a freshly rendered ``pdf_path``
+            # when ``data_dir`` itself is configured relatively, in which
+            # case ``root`` is also relative and both resolve against the
+            # same process CWD.
+            resolved = candidate.resolve()
     if not resolved.is_relative_to(root):
         raise TenantPathError(f"path is outside the tenant {root.name} root")
     return resolved
