@@ -117,6 +117,16 @@ their own keys, tokens, password, and
 workspace export in the web UI. The remote member workflow is web-first; the
 local domain CLI can select an existing workspace with `--user USERNAME`.
 
+`REGISTRATION_MODE` (`invite` by default, or `closed`/`open`) controls whether
+an invite is required at all — it is a separate decision from whether an
+account can use the _platform's_ shared LLM keys. Self-registered accounts
+under `open` mode only get shared-key access if `OPEN_SIGNUP_SHARED_KEYS=true`
+(default `false`); otherwise they're BYOK-only until an admin grants it.
+`GLOBAL_DAILY_SIGNUP_LIMIT` and `GLOBAL_WEEKLY_TOKEN_BUDGET` cap total
+verification emails and total shared-key spend platform-wide, regardless of
+how many accounts exist — see [Deploying to Railway](docs/deploy-railway.md)
+for the full variable list and recommended production posture.
+
 ### Gmail setup (for `sync-status`, sync, reminders, and email drafts)
 
 Gmail powers the CLI's `sync-status`, plus (in the API/web app) scheduled
@@ -124,7 +134,7 @@ background inbox sync, stale-application follow-up reminders, and the
 email-draft writer. It only ever **reads** mail (readonly scope) and
 **creates drafts** (compose scope) — it never sends anything. There's no
 password in `.env`; it authenticates via a Google OAuth client, and which
-*type* of client you create depends on how you run the app:
+_type_ of client you create depends on how you run the app:
 
 **CLI, single machine** — an OAuth **Desktop app** client, stored as a file:
 
@@ -405,22 +415,22 @@ Deferred (not yet exposed over HTTP): `profile build` and LinkedIn `scrape`.
 
 Copied from `.env.example`. Loaded automatically.
 
-| Key                                    | Purpose                                                                      |
-| -------------------------------------- | ---------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                    | Powers `discover`, `tailor`, and `cover-letter` with Claude (the default).   |
-| `OPENAI_API_KEY`                       | Optional; needed only if a model tier is prefixed `openai:`.                 |
-| `GEMINI_API_KEY`                       | Optional; needed only if a model tier is prefixed `gemini:`.                 |
-| `DEEPSEEK_API_KEY`                     | Optional; needed only if a model tier is prefixed `deepseek:`.               |
-| `GITHUB_TOKEN`                         | Optional; enriches `profile build`.                                          |
-| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`     | Optional; enable the Adzuna connector for `pull`.                            |
-| `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | Burner credentials for `scrape`.                                             |
-| `LINKEDIN_USER_DATA_DIR`               | Where the logged-in browser session is cached (default `.linkedin_profile`). |
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Platform Gmail OAuth **Web application** client for the API/web app (CLI-only use skips these — see [Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts)). |
-| `DB_URL`                               | Database location (default `sqlite:///data/resume_agent.db`).                |
-| `APP_BASE_URL`                         | Canonical public origin (e.g. `https://your-app.up.railway.app`), used to build OAuth callback URIs instead of trusting forwarded headers. Required for a public deploy — see [Deploying to Railway](docs/deploy-railway.md). |
-| `ALLOWED_HOSTS`                        | Comma-separated `Host` header allowlist (`TrustedHostMiddleware`). Blank locally; set in production.        |
-| `SECURE_COOKIES`                       | Forces the session cookie's `Secure` flag regardless of request scheme. `false` locally; `true` in the shipped Docker image. |
-| `DISABLE_API_DOCS`                     | Hides `/docs`, `/redoc`, and `/openapi.json`. `false` locally; `true` in the shipped Docker image.           |
+| Key                                                     | Purpose                                                                                                                                                                                                                       |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`                                     | Powers `discover`, `tailor`, and `cover-letter` with Claude (the default).                                                                                                                                                    |
+| `OPENAI_API_KEY`                                        | Optional; needed only if a model tier is prefixed `openai:`.                                                                                                                                                                  |
+| `GEMINI_API_KEY`                                        | Optional; needed only if a model tier is prefixed `gemini:`.                                                                                                                                                                  |
+| `DEEPSEEK_API_KEY`                                      | Optional; needed only if a model tier is prefixed `deepseek:`.                                                                                                                                                                |
+| `GITHUB_TOKEN`                                          | Optional; enriches `profile build`.                                                                                                                                                                                           |
+| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`                      | Optional; enable the Adzuna connector for `pull`.                                                                                                                                                                             |
+| `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD`                  | Burner credentials for `scrape`.                                                                                                                                                                                              |
+| `LINKEDIN_USER_DATA_DIR`                                | Where the logged-in browser session is cached (default `.linkedin_profile`).                                                                                                                                                  |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Platform Gmail OAuth **Web application** client for the API/web app (CLI-only use skips these — see [Gmail setup](#gmail-setup-for-sync-status-sync-reminders-and-email-drafts)).                                             |
+| `DB_URL`                                                | Database location (default `sqlite:///data/resume_agent.db`).                                                                                                                                                                 |
+| `APP_BASE_URL`                                          | Canonical public origin (e.g. `https://your-app.up.railway.app`), used to build OAuth callback URIs instead of trusting forwarded headers. Required for a public deploy — see [Deploying to Railway](docs/deploy-railway.md). |
+| `ALLOWED_HOSTS`                                         | Comma-separated `Host` header allowlist (`TrustedHostMiddleware`). Blank locally; set in production.                                                                                                                          |
+| `SECURE_COOKIES`                                        | Forces the session cookie's `Secure` flag regardless of request scheme. `false` locally; `true` in the shipped Docker image.                                                                                                  |
+| `DISABLE_API_DOCS`                                      | Hides `/docs`, `/redoc`, and `/openapi.json`. `false` locally; `true` in the shipped Docker image.                                                                                                                            |
 
 #### Choosing an LLM provider
 
@@ -488,16 +498,16 @@ silently re-based).
 
 ## Where things live
 
-| Path                                                  | Contents                                                                         |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `data/resume_agent.db`                                | All jobs, resume versions, cover letters, and applications (SQLite).             |
-| `data/profile/facts.json`                             | Your fact-lock profile.                                                          |
-| `data/connector_runs.json`                            | Per-connector run history that `sources` reads.                                  |
-| `data/gmail_token.json`                               | Cached Gmail OAuth token for CLI/local-mode `sync-status` (git-ignored). The API/web app stores each user's token inside their own workspace instead. |
-| `output/`                                             | Rendered resume **and** cover-letter PDFs (cover letters are suffixed `cl<id>`). |
-| `.linkedin_profile/`                                  | Cached LinkedIn browser session (git-ignored).                                   |
+| Path                                                  | Contents                                                                                                                                                        |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data/resume_agent.db`                                | All jobs, resume versions, cover letters, and applications (SQLite).                                                                                            |
+| `data/profile/facts.json`                             | Your fact-lock profile.                                                                                                                                         |
+| `data/connector_runs.json`                            | Per-connector run history that `sources` reads.                                                                                                                 |
+| `data/gmail_token.json`                               | Cached Gmail OAuth token for CLI/local-mode `sync-status` (git-ignored). The API/web app stores each user's token inside their own workspace instead.           |
+| `output/`                                             | Rendered resume **and** cover-letter PDFs (cover letters are suffixed `cl<id>`).                                                                                |
+| `.linkedin_profile/`                                  | Cached LinkedIn browser session (git-ignored).                                                                                                                  |
 | `config/gmail_credentials.json`                       | Your Gmail OAuth **Desktop app** client secret for CLI-only use (git-ignored; you provide it). The API/web app uses `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` instead. |
-| `templates/resume.typ` / `templates/cover_letter.typ` | The Typst templates the renderers use.                                           |
+| `templates/resume.typ` / `templates/cover_letter.typ` | The Typst templates the renderers use.                                                                                                                          |
 
 `data/`, `output/`, `.env`, `.linkedin_profile/`, and `config/gmail_credentials.json`
 are all git-ignored.

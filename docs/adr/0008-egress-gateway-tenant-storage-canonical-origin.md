@@ -33,11 +33,22 @@ external attacker — could exploit:
    `X-Forwarded-Host`/`-Proto` — correct only if the edge proxy is guaranteed
    to strip/replace those headers, which Railway's default Uvicorn setup does
    not declare.
+4. **Path-bearing render configuration.** `render/templates.py::template_path_for`
+   accepted an arbitrary `template_path`/`output_dir` from `RenderConfig`, and
+   `render/service.py`/`cover_letter/render.py` wrote new PDFs under that
+   config value rather than the tenant's own output directory — the same
+   escape as (2), reachable through render configuration instead of import.
+5. **Unbounded archive extraction.** `services/backup.py::_extract_validated`
+   validated member paths/types/duplicates but called `tar.getmembers()` /
+   `extractall()` with no cap on member count, per-file size, total expanded
+   bytes, or compression ratio, so an imported archive could exhaust disk,
+   memory, or CPU shared by every tenant.
 
 Fixing each call site ad hoc would leave the same class of bug reachable the
-next time someone adds a URL fetch, a download route, or an OAuth-adjacent
-redirect — exactly the "several trusted helpers exist, but sensitive paths can
-bypass them" pattern the report calls out as the main weakness.
+next time someone adds a URL fetch, a download route, an OAuth-adjacent
+redirect, or an import path — exactly the "several trusted helpers exist, but
+sensitive paths can bypass them" pattern the report calls out as the main
+weakness.
 
 ## Decision
 
@@ -54,12 +65,20 @@ through them:
   tenant's `output/` root. `account.py`'s workspace-import validator
   normalizes every imported `pdf_path` to a tenant-relative value (or rejects
   the import) *before* the atomic swap, so the confinement holds even for
-  data the tenant fully controls.
+  data the tenant fully controls. `render/service.py` and
+  `cover_letter/render.py` write new artifacts under the tenant context's
+  output directory rather than `RenderConfig.output_dir`, and
+  `render/templates.py` refuses a legacy `template_path` in multi-user mode.
 - `api/public_url.py::public_url` builds OAuth callback URIs from
   `Settings.app_base_url`, never forwarded headers. `Settings.secure_cookies`,
   `Settings.allowed_hosts` (→ `TrustedHostMiddleware`), and
   `Settings.disable_api_docs` make the remaining proxy-dependent decisions
   explicit configuration instead of implicit header trust.
+- `services/backup.py::_extract_validated` streams archive members and rejects
+  the import mid-scan once member count, per-file size, total expanded bytes,
+  or compression ratio crosses a configured budget; `services/settings_bundle.py`
+  delegates to the same function with its own tighter limits instead of a
+  second, independently-maintained size check.
 
 Fixing each finding independently (patching `fetch_static`'s client, adding a
 one-off path check in each router) was rejected: it reproduces the same
