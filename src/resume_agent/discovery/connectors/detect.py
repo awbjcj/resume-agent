@@ -5,6 +5,8 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
+from resume_agent.security.outbound import fetch_public_text
+
 _TOKEN = r"([A-Za-z0-9_-]+)"
 
 _L1_HOSTS: list[tuple[str, str]] = [
@@ -19,7 +21,10 @@ _L1_HOSTS: list[tuple[str, str]] = [
 
 _SUBDOMAIN_HOSTS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^(?P<token>[a-z0-9-]+)\.workable\.com$", re.IGNORECASE), "workable"),
-    (re.compile(r"^(?P<token>[a-z0-9-]+)\.recruitee\.com$", re.IGNORECASE), "recruitee"),
+    (
+        re.compile(r"^(?P<token>[a-z0-9-]+)\.recruitee\.com$", re.IGNORECASE),
+        "recruitee",
+    ),
     (re.compile(r"^(?P<token>[a-z0-9-]+)\.breezy\.hr$", re.IGNORECASE), "breezy"),
     (re.compile(r"^(?P<token>[a-z0-9-]+)\.applytojob\.com$", re.IGNORECASE), "jazzhr"),
     (re.compile(r"^(?P<token>[a-z0-9-]+)\.bamboohr\.com$", re.IGNORECASE), "bamboohr"),
@@ -195,11 +200,13 @@ def _l1(url: str) -> AtsTarget | None:
 def _get_html(url: str, *, client: httpx.Client | None = None) -> str | None:
     """Fetch raw HTML for L2 sniffing. Network errors are treated as no match."""
     try:
-        getter = client.get if client is not None else httpx.get
-        resp = getter(url, timeout=30, follow_redirects=True)
-        resp.raise_for_status()
-        return resp.text
-    except httpx.HTTPError:
+        return fetch_public_text(
+            url,
+            client=client,
+            timeout=30.0,
+            max_bytes=1_000_000,
+        ).text
+    except (httpx.HTTPError, ValueError):
         return None
 
 
@@ -254,9 +261,7 @@ def detect_ats(url: str, *, client: httpx.Client | None = None) -> AtsTarget | N
     return inspect_ats(url, client=client).target
 
 
-def inspect_ats(
-    url: str, *, client: httpx.Client | None = None
-) -> AtsInspection:
+def inspect_ats(url: str, *, client: httpx.Client | None = None) -> AtsInspection:
     """Resolve an ATS while preserving reachability for an unknown host."""
     target = identify_host(url)
     if target is not None:

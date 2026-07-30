@@ -26,7 +26,11 @@ from resume_agent.discovery.connectors.config import (
 from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, inspect_ats
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
-from resume_agent.discovery.connectors.registry import ConnectorSpec, find_unit, spec_for
+from resume_agent.discovery.connectors.registry import (
+    ConnectorSpec,
+    find_unit,
+    spec_for,
+)
 from resume_agent.discovery.connectors.sources import (
     NATIVE_URL_KINDS as NATIVE_URL_KINDS,
     SourceView,
@@ -36,7 +40,7 @@ from resume_agent.discovery.connectors.sources import (
     scrape_target_id as scrape_target_id,
 )
 from resume_agent.discovery.search_config import load_search_config
-from resume_agent.profile.intake import _resolve_host
+from resume_agent.security.outbound import resolve_host as _resolve_host
 from resume_agent.services.discovery import DEFAULT_CONNECTORS, DEFAULT_SEARCH
 from resume_agent.tenancy.paths import resolve_tenant_path
 
@@ -154,7 +158,9 @@ def _scrape_url(url: str | None) -> str:
     default_port = (parsed.scheme == "http" and port == 80) or (
         parsed.scheme == "https" and port == 443
     )
-    netloc = normalized_host if port is None or default_port else f"{normalized_host}:{port}"
+    netloc = (
+        normalized_host if port is None or default_port else f"{normalized_host}:{port}"
+    )
     path = parsed.path.rstrip("/") or "/"
     return urlunsplit((parsed.scheme, netloc, path, parsed.query, ""))
 
@@ -338,11 +344,7 @@ def _append_unit(
     label: str | None,
 ) -> str:
     """Append one new unit through the spec table; return its source id."""
-    if (
-        spec.new_unit is None
-        or spec.unit_items is None
-        or not spec.admits(target)
-    ):
+    if spec.new_unit is None or spec.unit_items is None or not spec.admits(target):
         raise SourceError(f"Sources of kind '{spec.kind}' cannot be added.")
     source_id, payload = spec.new_unit(target, url, label)
     if any(unit.source_id == source_id for unit in spec.units(config)):
