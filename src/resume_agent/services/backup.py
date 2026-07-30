@@ -20,6 +20,12 @@ class InvalidArchiveError(ValueError):
     """The upload is not a readable, non-empty data-root archive."""
 
 
+DEFAULT_MAX_ARCHIVE_MEMBERS = 10_000
+DEFAULT_MAX_ARCHIVE_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024
+DEFAULT_MAX_ARCHIVE_MEMBER_BYTES = 512 * 1024 * 1024
+DEFAULT_MAX_COMPRESSION_RATIO = 200
+
+
 def sqlite_snapshot(db_file: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with (
@@ -95,17 +101,48 @@ def _validate_member(member: tarfile.TarInfo) -> None:
         raise UnsafeArchiveError(f"unsupported member type: {member.name}")
 
 
-def _extract_validated(archive: Path, destination: Path) -> None:
+def _extract_validated(
+    archive: Path,
+    destination: Path,
+    *,
+    max_members: int = DEFAULT_MAX_ARCHIVE_MEMBERS,
+    max_expanded_bytes: int = DEFAULT_MAX_ARCHIVE_EXPANDED_BYTES,
+    max_member_bytes: int = DEFAULT_MAX_ARCHIVE_MEMBER_BYTES,
+    max_compression_ratio: int = DEFAULT_MAX_COMPRESSION_RATIO,
+) -> None:
     try:
         with tarfile.open(archive, "r:gz") as tar:
-            members = tar.getmembers()
-            for member in members:
+            members: list[tarfile.TarInfo] = []
+            names: set[str] = set()
+            expanded_bytes = 0
+            for member in tar:
+                if len(members) >= max_members:
+                    raise InvalidArchiveError(
+                        f"archive contains more than {max_members:,} members"
+                    )
                 _validate_member(member)
+                if member.name in names:
+                    raise InvalidArchiveError("archive contains duplicate paths")
+                names.add(member.name)
+                if member.isfile():
+                    if member.size < 0:
+                        raise InvalidArchiveError("archive contains an oversized member")
+                    expanded_bytes += member.size
+                    if expanded_bytes > max_expanded_bytes:
+                        raise InvalidArchiveError(
+                            "archive expands beyond the configured storage limit"
+                        )
+                    if member.size > max_member_bytes:
+                        raise InvalidArchiveError("archive contains an oversized member")
+                members.append(member)
             if not any(member.isfile() for member in members):
                 raise InvalidArchiveError("archive contains no files")
-            names = [member.name for member in members]
-            if len(names) != len(set(names)):
-                raise InvalidArchiveError("archive contains duplicate paths")
+            compressed_bytes = max(archive.stat().st_size, 1)
+            if (
+                expanded_bytes > 10 * 1024 * 1024
+                and expanded_bytes > compressed_bytes * max_compression_ratio
+            ):
+                raise InvalidArchiveError("archive compression ratio is unsafe")
             tar.extractall(destination, members=members, filter="data")
     except (tarfile.ReadError, EOFError) as exc:
         raise InvalidArchiveError("upload is not a readable tar.gz archive") from exc
@@ -125,6 +162,9 @@ def import_data_root(
     validate_staged: Callable[[Path], None] | None = None,
     before_swap: Callable[[], None] | None = None,
     after_swap: Callable[[], None] | None = None,
+    max_members: int = DEFAULT_MAX_ARCHIVE_MEMBERS,
+    max_expanded_bytes: int = DEFAULT_MAX_ARCHIVE_EXPANDED_BYTES,
+    max_member_bytes: int = DEFAULT_MAX_ARCHIVE_MEMBER_BYTES,
 ) -> None:
     """Stage and replace the root, retaining rollback until validation succeeds."""
     data_root = data_root.resolve()
@@ -133,7 +173,13 @@ def import_data_root(
     rollback = Path(tempfile.mkdtemp(prefix=".ra-import-rollback-", dir=data_root))
     preserve_rollback = False
     try:
-        _extract_validated(archive, stage)
+        _extract_validated(
+            archive,
+            stage,
+            max_members=max_members,
+            max_expanded_bytes=max_expanded_bytes,
+            max_member_bytes=max_member_bytes,
+        )
         if validate_staged is not None:
             validate_staged(stage)
         if before_swap is not None:

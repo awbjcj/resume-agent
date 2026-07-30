@@ -10,6 +10,7 @@ from resume_agent.services.backup import (
     export_data_root,
     import_data_root,
     sqlite_snapshot,
+    _extract_validated,
 )
 
 
@@ -87,6 +88,23 @@ def test_import_rejects_traversal_and_empty_archives_before_touching_root(tmp_pa
     with pytest.raises(InvalidArchiveError):
         import_data_root(empty, root)
     assert (root / "profile" / "facts.json").exists()
+
+
+def test_archive_limits_are_checked_before_extraction(tmp_path):
+    payload = tmp_path / "payload.txt"
+    payload.write_bytes(b"12345")
+    archive = tmp_path / "limited.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.add(payload, arcname="one.txt")
+        tar.add(payload, arcname="two.txt")
+
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    with pytest.raises(InvalidArchiveError, match="more than 1"):
+        _extract_validated(archive, destination, max_members=1)
+    with pytest.raises(InvalidArchiveError, match="storage limit"):
+        _extract_validated(archive, destination, max_expanded_bytes=9)
+    assert list(destination.iterdir()) == []
 
 
 def test_import_rolls_back_when_install_move_fails(tmp_path, monkeypatch):

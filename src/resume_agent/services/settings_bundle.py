@@ -29,7 +29,11 @@ from resume_agent.profile.matrix import load_overrides
 from resume_agent.prompts.guidance import MAX_GUIDANCE_CHARS
 from resume_agent.render.render_config import RenderConfig
 from resume_agent.render.templates import validate_custom_stem
-from resume_agent.services.backup import UnsafeArchiveError, _extract_validated
+from resume_agent.services.backup import (
+    InvalidArchiveError,
+    UnsafeArchiveError,
+    _extract_validated,
+)
 from resume_agent.settings_sections import (
     SECTIONS_BY_ID,
     SETTINGS_SECTIONS,
@@ -183,21 +187,16 @@ def validate_member(arcname: str, path: Path) -> None:
 
 def _extract_bundle_validated(archive: Path, destination: Path) -> None:
     """Reject archive bombs before delegating to the shared safe extractor."""
-    with tarfile.open(archive, "r:gz") as tar:
-        members = tar.getmembers()
-        if len(members) > _MAX_BUNDLE_MEMBERS:
-            raise InvalidBundleError(
-                f"bundle contains more than {_MAX_BUNDLE_MEMBERS} members"
-            )
-        extracted_bytes = sum(
-            member.size for member in members if member.isfile()
+    try:
+        _extract_validated(
+            archive,
+            destination,
+            max_members=_MAX_BUNDLE_MEMBERS,
+            max_expanded_bytes=_MAX_BUNDLE_EXTRACTED_BYTES,
+            max_member_bytes=_MAX_BUNDLE_EXTRACTED_BYTES,
         )
-        if extracted_bytes > _MAX_BUNDLE_EXTRACTED_BYTES:
-            raise InvalidBundleError(
-                "bundle expands beyond the "
-                f"{_MAX_BUNDLE_EXTRACTED_BYTES // (1024 * 1024)} MB limit"
-            )
-    _extract_validated(archive, destination)
+    except InvalidArchiveError as error:
+        raise InvalidBundleError(str(error)) from error
 
 
 def read_bundle_manifest(archive: Path) -> BundleManifest:

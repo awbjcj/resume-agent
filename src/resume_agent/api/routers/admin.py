@@ -12,6 +12,7 @@ from starlette.background import BackgroundTask
 
 from resume_agent.api.deps import refresh_app_settings, require_admin
 from resume_agent.api.errors import ApiException
+from resume_agent.api.uploads import UploadTooLargeError, copy_upload
 from resume_agent.config import Settings, env_settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.services.backup import (
@@ -80,8 +81,10 @@ def import_root(
     _refuse_if_running(request)
     with tempfile.TemporaryDirectory() as temporary:
         archive = Path(temporary) / "import.tar.gz"
-        with archive.open("wb") as destination:
-            shutil.copyfileobj(file.file, destination)
+        try:
+            copy_upload(file, archive, max_bytes=1024 * 1024 * 1024)
+        except UploadTooLargeError as exc:
+            raise ApiException(413, "UPLOAD_TOO_LARGE", str(exc)) from exc
         was_multiuser = request.app.state.system_engine is not None
         runtime_disposed = False
 
