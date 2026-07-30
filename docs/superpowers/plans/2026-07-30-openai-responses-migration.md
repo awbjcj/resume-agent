@@ -1,12 +1,14 @@
 # OpenAI Responses API Migration Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** Implement in-line with test-driven development. Do not delegate
+> tasks or use subagent execution. Steps use checkbox (`- [ ]`) syntax for
+> tracking.
 
 **Goal:** Route every OpenAI agno agent through `/v1/responses` instead of `/v1/chat/completions`, so reasoning effort and function tools can be used together and the configured effort reaches the wire verbatim.
 
 **Architecture:** One new private seam, `_build_openai_responses()`, holds every OpenAI request-shaping rule (effort, output cap, `store`, schema compatibility). Both `build_model()` and `build_search_equipped()` call it, so no other OpenAI construction site remains. Three workaround helpers written to route around chat/completions limitations are deleted.
 
-**Tech Stack:** Python 3.12, agno 2.6.x, openai SDK, pydantic v2, pytest, ruff.
+**Tech Stack:** Python 3.12, agno 2.8.2 (locked), openai SDK, pydantic v2, pytest, ruff.
 
 **Spec:** `docs/superpowers/specs/2026-07-30-openai-responses-migration-design.md`
 
@@ -28,7 +30,8 @@
 | File | Responsibility | Change |
 |---|---|---|
 | `src/resume_agent/llm_runner.py` | The single provider-construction seam | Modified — OpenAI branch only |
-| `tests/test_llm_runner_build_model.py` | `build_model` per-provider construction | Modified — 5 existing tests rewritten, 4 added |
+| `tests/test_llm_runner.py` | Cross-provider construction and schema compatibility | Modified — OpenAI class and Responses schema path assertions rewritten |
+| `tests/test_llm_runner_build_model.py` | `build_model` per-provider construction | Modified — chat-era assertions rewritten and request-shaping regressions added |
 | `tests/test_llm_runner_search_equipped.py` | Search-equipped construction | Modified — 2 existing tests rewritten, 1 added |
 | `tests/test_agent_json_mode.py` | Structured-output mode per provider | Unchanged — verified still passing |
 | `CLAUDE.md` | Developer reference | Modified — LLM providers section |
@@ -144,11 +147,27 @@ def test_openai_effort_ordering_covers_every_catalogued_value():
     for entry in llm_runner.MODEL_CATALOG["openai"]:
         for effort in entry.reasoning_efforts:
             assert effort in llm_runner._EFFORT_ORDER
+
+
+def test_openai_reasoning_fallback_uses_the_nearest_supported_effort(monkeypatch):
+    entries = [
+        *llm_runner.MODEL_CATALOG["openai"],
+        llm_runner.ModelCatalogEntry(
+            "openai:gpt-future", "GPT Future", ("medium", "xhigh")
+        ),
+    ]
+    monkeypatch.setitem(llm_runner.MODEL_CATALOG, "openai", entries)
+
+    # The default is high. Both candidates are one step away, so prefer the
+    # lower-cost value instead of silently escalating to xhigh.
+    assert llm_runner._openai_effort(
+        "openai:gpt-future", reasoning=True
+    ) == "medium"
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_build_model.py -k openai_effort -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_build_model.py -k "openai_effort or openai_reasoning" -v`
 
 Expected: FAIL — `AttributeError: module 'resume_agent.llm_runner' has no attribute '_openai_effort'`
 
@@ -186,20 +205,24 @@ def _openai_effort(model_id: str, *, reasoning: bool) -> str | None:
         return None
     if not reasoning:
         return min(entry.reasoning_efforts, key=_EFFORT_ORDER.index)
-    configured = _reasoning_effort_for(model_id, "openai")
-    if configured in entry.reasoning_efforts:
-        return configured
-    # `_reasoning_effort_for` falls back to "high", which every current OpenAI
-    # entry declares. Clamp anyway so a future entry without it cannot send an
-    # effort the model rejects.
-    return max(entry.reasoning_efforts, key=_EFFORT_ORDER.index)
+    selected = _reasoning_effort_for(model_id, "openai")
+    if selected in entry.reasoning_efforts:
+        return selected
+    target = _EFFORT_ORDER.index(selected)
+    return min(
+        entry.reasoning_efforts,
+        key=lambda effort: (
+            abs(_EFFORT_ORDER.index(effort) - target),
+            _EFFORT_ORDER.index(effort),
+        ),
+    )
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_build_model.py -k openai_effort -v`
+Run: `.venv/Scripts/python.exe -m pytest tests/test_llm_runner_build_model.py -k "openai_effort or openai_reasoning" -v`
 
-Expected: PASS (5 tests)
+Expected: PASS
 
 - [ ] **Step 5: Lint and commit**
 
@@ -371,6 +394,8 @@ The migration proper. This is where the endpoint changes and the chat-era workar
 | `test_non_reasoning_openai_disables_effort_rather_than_omitting_it` | `terra.reasoning_effort == "none"` | effort moved to `.reasoning`; the docstring describes the deleted workaround |
 | `test_openai_effort_stays_unset_when_none_is_not_a_selectable_effort` | `pro.reasoning_effort is None` | **inverts** — gpt-5.5-pro now gets its floor, `medium` |
 | `test_openai_effort_stays_unset_for_uncatalogued_model` | `custom.reasoning_effort is None` | still unset, but must now assert no `reasoning` attribute value |
+| `tests/test_llm_runner.py::test_build_model_openai_branch` | returns `OpenAIChat` | endpoint class changes to `OpenAIResponses` |
+| `tests/test_llm_runner.py::test_openai_response_schema_has_no_keywords_beside_refs` | reads `response_format.json_schema.schema` | Responses emits `text.format.schema` |
 
 - [ ] **Step 1: Rewrite the invalidated tests and add the new ones**
 
@@ -421,6 +446,26 @@ def test_openai_reasoning_is_no_longer_clamped_off_for_tool_use(monkeypatch):
 
     pro = build_model("openai:gpt-5.5-pro", api_key="k", reasoning=True)
     assert pro.reasoning == {"effort": "high"}
+    params = pro.get_request_params(
+        messages=[],
+        tools=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "lookup_profile",
+                    "description": "Look up a profile",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": [],
+                        "additionalProperties": False,
+                    },
+                },
+            }
+        ],
+    )
+    assert params["reasoning"] == {"effort": "high"}
+    assert params["tools"][0]["name"] == "lookup_profile"
     # A non-reasoning agent gets the catalog floor, not "none" and not unset.
     assert build_model("openai:gpt-5.5-pro", api_key="k").reasoning == {
         "effort": "medium"
@@ -510,8 +555,7 @@ def _build_openai_responses(
         # "xhigh", and "max" would fail pyright despite being valid on the API.
         reasoning={"effort": effort} if effort is not None else None,
         max_output_tokens=_openai_max_output_tokens(reasoning=reasoning),
-        # Explicit: with `store` unset agno sends store=True for any gpt-5* id,
-        # which would retain tenant career data on OpenAI. False additionally
+        # Explicit: disable provider-managed response state. False additionally
         # makes agno replay encrypted reasoning items across tool-call turns.
         store=False,
     )
@@ -662,18 +706,30 @@ lossy xhigh/max-to-high down-mapping."
 - Consumes: everything from Tasks 1-4.
 - Produces: nothing.
 
-- [ ] **Step 1: Run the full suite**
+- [ ] **Step 1: Run the repository verification suite**
 
-Run: `.venv/Scripts/python.exe -m pytest`
+Run both:
 
-Expected: PASS, with no more failures than were present on `main` before this branch. If any test outside `tests/test_llm_runner_*.py` fails, stop and report which — it means a call site depended on OpenAI construction details this plan assumed were private.
+```bash
+make verify
+.venv/Scripts/python.exe -m pytest
+```
+
+`make verify` covers Python and web lint, API tests, web tests, and the frontend
+build. The explicit pytest command is still required because this repository's
+`make verify` invokes `tests/api`, not the complete Python suite.
+
+Expected: both PASS.
+If any test outside `tests/test_llm_runner_*.py` fails, investigate before
+changing it; a call site may have depended on OpenAI construction details this
+plan assumed were private.
 
 - [ ] **Step 2: Confirm the deletions actually happened**
 
 Run:
 
 ```bash
-grep -n "_openai_disabled_effort\|_openai_responses_reasoning_effort_for\|_compatible_openai_chat_class\|OpenAIResponsesReasoningEffort\|OpenAIChat" src/resume_agent/llm_runner.py
+rg -n "_openai_disabled_effort|_openai_responses_reasoning_effort_for|_compatible_openai_chat_class|OpenAIResponsesReasoningEffort|OpenAIChat" src/resume_agent/llm_runner.py
 ```
 
 Expected: no output. Any hit is a leftover.
@@ -709,9 +765,9 @@ In the `## LLM providers (llm_runner.py)` section, add these bullets after the "
   `thinking` and Gemini's `thinking_level`. Only an uncatalogued custom id
   sends no `reasoning` at all, because its vocabulary is unknown; the
   compatibility shim pops the empty dict agno would otherwise emit.
-- **`store=False` is mandatory, not a preference.** With `store` unset agno
-  sends `store=True` for any `gpt-5*` id, retaining tenant resume and JD
-  content on OpenAI. `False` also makes agno replay encrypted reasoning items
+- **`store=False` is mandatory, not a preference.** It disables
+  provider-managed response state; it is not a broader data-retention
+  guarantee. `False` also makes agno replay encrypted reasoning items
   across tool-call turns, which preserves the model's chain through a tool call
   — at the cost of billing those replayed items as **input** tokens each turn,
   so multi-tool agents (coach, interviewer, scouts) legitimately report higher

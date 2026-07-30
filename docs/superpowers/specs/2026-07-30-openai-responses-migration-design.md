@@ -130,10 +130,11 @@ _EFFORT_ORDER = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
   uncatalogued id typed into the tier picker's custom field has no known
   vocabulary, so nothing is sent. This is safe on Responses in a way it was not
   on chat/completions, because a provider-chosen effort no longer breaks tools.
-- `reasoning=True` returns `_reasoning_effort_for()`'s result, clamped into that
-  entry's `reasoning_efforts`. That helper falls back to `"high"`, which every
-  current OpenAI entry declares; the clamp exists so a future entry without
-  `high` cannot send an effort the model rejects.
+- `reasoning=True` returns `_reasoning_effort_for()`'s result when the entry
+  declares it. Otherwise it chooses the nearest declared value in
+  `_EFFORT_ORDER`, preferring the lower effort on a tie. That makes the future
+  model fallback deterministic without unexpectedly jumping to the model's
+  most expensive effort.
 - `reasoning=False` returns the entry's floor,
   `min(entry.reasoning_efforts, key=_EFFORT_ORDER.index)`. Ordering comes from
   the explicit table, not from declaration order in `MODEL_CATALOG`.
@@ -184,11 +185,11 @@ effort-scaled cap is deliberately not pre-tuned on speculation.
 
 ### 3. Statefulness
 
-`store=False`, unconditionally. agno then appends
+`store=False`, unconditionally. This disables provider-managed response state;
+it is not a broader data-retention guarantee. agno then appends
 `reasoning.encrypted_content` to `include` for any `gpt-5*`, `o3*`, or
 `o4-mini*` id, so reasoning items survive across tool-call turns without manual
-wiring. Nothing is retained on OpenAI's servers, which keeps tenant career data
-out of provider storage and matches what `build_search_equipped` already does.
+wiring and matches what `build_search_equipped` already does.
 
 **Cost consequence:** replayed encrypted reasoning items bill as *input* tokens
 on every subsequent tool turn. `tenancy/usage.py` reads `input_tokens`
@@ -255,13 +256,14 @@ seam.
 ## Testing
 
 The offline suite fakes agents, so these assert on constructed request
-parameters rather than live calls. Files: `tests/test_llm_runner_build_model.py`,
-`tests/test_llm_runner_search_equipped.py`, `tests/test_agent_json_mode.py`.
+parameters rather than live calls. Files: `tests/test_llm_runner.py`,
+`tests/test_llm_runner_build_model.py`, `tests/test_llm_runner_search_equipped.py`,
+`tests/test_agent_json_mode.py`.
 
 | # | Assertion | Pins |
 |---|---|---|
 | 1 | openai branch returns `OpenAIResponses`, never `OpenAIChat` | the migration itself |
-| 2 | tools and reasoning coexist; no clamp to `"none"` | the bug being fixed |
+| 2 | one constructed request contains both a function tool and non-`none` reasoning | the bug being fixed |
 | 3 | `gpt-5.5-pro` non-reasoning resolves to `medium`; `gpt-5.6-terra` to `none` | effort floor |
 | 4 | `reasoning=True` sends `xhigh` and `max` verbatim | regression pin against re-introducing the down-mapping |
 | 5 | uncatalogued id sends no `reasoning` key at all | the empty-dict fix |
