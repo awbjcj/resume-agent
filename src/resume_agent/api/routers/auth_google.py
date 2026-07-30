@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from resume_agent.api import attempts, auth
 from resume_agent.api.deps import get_settings_dep
 from resume_agent.api.errors import ApiException
+from resume_agent.api.public_url import public_url
 from resume_agent.api.schemas.auth_google import GoogleStartOut
 from resume_agent.config import Settings
 from resume_agent.mail import messages
@@ -49,9 +50,7 @@ def _require_client(settings: Settings) -> None:
 
 
 def _redirect_uri(request: Request) -> str:
-    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-    host = request.headers.get("x-forwarded-host") or request.url.netloc
-    return f"{proto}://{host}/api/auth/google/callback"
+    return public_url(request, "/api/auth/google/callback")
 
 
 def _build_flow(settings: Settings, redirect_uri: str) -> Any:

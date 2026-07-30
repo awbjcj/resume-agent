@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 from resume_agent.api import auth as auth_module
 from resume_agent.api.deps import get_data_dir, get_settings_dep
 from resume_agent.api.errors import ApiException
+from resume_agent.api.public_url import public_url
 from resume_agent.api.schemas.gmail import GmailConnectOut, GmailStatusOut
 from resume_agent.config import Settings, get_settings
 from resume_agent.gmail import auth as gmail_auth
@@ -57,9 +58,7 @@ def _build_flow(settings: Settings, redirect_uri: str) -> Any:
 
 
 def _redirect_uri(request: Request) -> str:
-    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-    host = request.headers.get("x-forwarded-host") or request.url.netloc
-    return f"{proto}://{host}/api/gmail/callback"
+    return public_url(request, "/api/gmail/callback")
 
 
 def _require_client(settings: Settings) -> None:

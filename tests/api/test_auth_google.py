@@ -69,6 +69,31 @@ def test_google_start_requires_client_and_uses_identity_only_prompt(
     assert flow.authorization_kwargs["prompt"] == "select_account"
 
 
+def test_google_callback_uses_configured_origin_not_forwarded_host(mu_app, monkeypatch):
+    from resume_agent.api.routers import auth_google
+
+    _configure(mu_app)
+    mu_app.state.settings = mu_app.state.settings.model_copy(
+        update={"app_base_url": "https://resume.example"}
+    )
+    flow = _FakeFlow()
+
+    def build_flow(_settings, redirect_uri):
+        assert redirect_uri == "https://resume.example/api/auth/google/callback"
+        return flow
+
+    monkeypatch.setattr(auth_google, "_build_flow", build_flow)
+    with TestClient(mu_app, base_url="http://internal") as client:
+        response = client.get(
+            "/api/auth/google/start",
+            headers={
+                "x-forwarded-host": "attacker.example",
+                "x-forwarded-proto": "http",
+            },
+        )
+    assert response.status_code == 200
+
+
 def test_google_start_participates_in_the_ip_budget(mu_app, monkeypatch):
     _configure(mu_app)
     _fake_google(monkeypatch, {})
