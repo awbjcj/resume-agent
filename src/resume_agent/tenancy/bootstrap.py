@@ -75,6 +75,16 @@ def build_context(
 ) -> UserContext:
     paths = provision_workspace(data_root, user.id, template_dir=template_dir)
     overlay = effective_settings(base_settings, paths)
+    platform_provider_keys = {
+        provider: key
+        for provider, key in {
+            "anthropic": base_settings.anthropic_api_key,
+            "openai": base_settings.openai_api_key,
+            "gemini": base_settings.gemini_api_key,
+            "deepseek": base_settings.deepseek_api_key,
+        }.items()
+        if key
+    }
     return UserContext(
         user_id=user.id,
         username=user.username,
@@ -84,4 +94,6 @@ def build_context(
         engine=registry.get(user.id, paths.db_url),
         system_engine=system_engine,
         own_key_providers=overlay.own_key_providers,
+        platform_provider_keys=platform_provider_keys,
+        user_provider_keys=overlay.user_provider_keys,
     )

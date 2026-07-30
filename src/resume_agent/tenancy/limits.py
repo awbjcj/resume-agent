@@ -13,6 +13,7 @@ from resume_agent.tenancy.quotas import (
     GlobalCostQuotaExceededError,
     charge_shared_cost,
     global_monthly_cost,
+    quota_snapshot,
 )
 from resume_agent.tenancy.system_db import SystemSetting, UsageEvent, User
 
@@ -76,16 +77,84 @@ def weekly_usage(engine: Engine, user_id: str, *, now: datetime | None = None) -
 
 def global_weekly_usage(engine: Engine, *, now: datetime | None = None) -> float:
     moment = now or datetime.now(timezone.utc)
-    admin_ids = select(User.id).where(User.role == "admin")
     with Session(engine) as session:
         total = session.execute(
             select(func.coalesce(func.sum(UsageEvent.weighted_total), 0.0)).where(
                 UsageEvent.own_key.is_(False),
                 UsageEvent.ts >= moment - BUDGET_WINDOW,
-                UsageEvent.user_id.not_in(admin_ids),
             )
         ).scalar_one()
     return float(total)
+
+
+def selected_key_is_own(provider: str, agent: object | None = None) -> bool:
+    """Return whether the active call selected the user's provider key."""
+
+    context = current_context()
+    if context is None:
+        return False
+    model = getattr(agent, "model", None)
+    if model is not None:
+        selected_model = context.selected_model_own_keys.get(id(model))
+        if selected_model is not None:
+            return selected_model
+    selected = context.selected_own_key_providers.get(provider)
+    return provider in context.own_key_providers if selected is None else selected
+
+
+def shared_key_available(
+    provider: str, model_id: str, *, now: datetime | None = None
+) -> bool:
+    """Whether a Railway/provider key may fund the active user's next call."""
+
+    context = current_context()
+    if context is None or provider not in context.platform_provider_keys:
+        return False
+    if context.system_engine is None:
+        return True
+    with Session(context.system_engine) as session:
+        user = session.get(User, context.user_id)
+        if user is not None and not user.shared_key_access:
+            return False
+        override = user.weekly_token_budget if user is not None else None
+    if context.settings.cost_quota_enforcement == "enforce":
+        if not model_id or not has_active_rate(
+            context.system_engine, provider, model_id, now=now
+        ):
+            return False
+        if not context.is_admin:
+            remaining = quota_snapshot(
+                context.system_engine, context.user_id, now=now
+            ).remaining_micros
+            if remaining is not None and remaining <= 0:
+                return False
+        global_budget = (
+            context.settings.global_monthly_cost_quota_micros
+            or DEFAULT_GLOBAL_MONTHLY_COST_QUOTA_MICROS
+        )
+        return not (
+            global_budget
+            and global_monthly_cost(context.system_engine, now=now) >= global_budget
+        )
+    if not context.is_admin:
+        budget = resolve_limit(
+            override,
+            system_default(
+                context.system_engine,
+                "weekly_token_budget",
+                DEFAULT_WEEKLY_TOKEN_BUDGET,
+            ),
+        )
+        if (
+            budget
+            and weekly_usage(context.system_engine, context.user_id, now=now) >= budget
+        ):
+            return False
+    global_budget = context.settings.global_weekly_token_budget
+    return not (
+        global_budget
+        and global_weekly_usage(context.system_engine, now=now) >= global_budget
+    )
 
 
 def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
@@ -95,11 +164,11 @@ def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
     if context is None or context.system_engine is None:
         return
     provider, model_id = _agent_identity(agent)
-    if provider and provider in context.own_key_providers:
+    if provider and selected_key_is_own(provider, agent):
         return
     with Session(context.system_engine) as session:
         user = session.get(User, context.user_id)
-        if user is not None and user.role != "admin" and not user.shared_key_access:
+        if user is not None and not user.shared_key_access:
             raise BudgetExceededError(
                 "shared platform models are disabled for this account; add your own API key"
             )
@@ -124,8 +193,7 @@ def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
             or DEFAULT_GLOBAL_MONTHLY_COST_QUOTA_MICROS
         )
         if (
-            context.role != "admin"
-            and global_budget
+            global_budget
             and global_monthly_cost(context.system_engine, now=now) >= global_budget
         ):
             raise GlobalCostQuotaExceededError(
@@ -144,8 +212,7 @@ def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
     )
     global_budget = context.settings.global_weekly_token_budget
     if (
-        context.role != "admin"
-        and global_budget
+        global_budget
         and global_weekly_usage(context.system_engine, now=now) >= global_budget
     ):
         raise BudgetExceededError("platform weekly token budget is exhausted")

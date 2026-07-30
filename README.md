@@ -118,10 +118,11 @@ workspace export in the web UI. The remote member workflow is web-first; the
 local domain CLI can select an existing workspace with `--user USERNAME`.
 
 `REGISTRATION_MODE` (`invite` by default, or `closed`/`open`) controls whether
-an invite is required at all — it is a separate decision from whether an
-account can use the _platform's_ shared LLM keys. Self-registered accounts
-under `open` mode only get shared-key access if `OPEN_SIGNUP_SHARED_KEYS=true`
-(default `false`); otherwise they're BYOK-only until an admin grants it.
+an invite is required at all. Every administrator, free member, and subscriber
+can use the platform's shared LLM keys. Configure those keys as Railway
+environment variables; they are selected before a workspace key. Once the
+applicable account or platform allowance is exhausted, calls automatically use
+that user's key for the provider when one is configured.
 `GLOBAL_DAILY_SIGNUP_LIMIT` and `GLOBAL_WEEKLY_TOKEN_BUDGET` cap total
 verification emails and total shared-key spend platform-wide, regardless of
 how many accounts exist — see [Deploying to Railway](docs/deploy-railway.md)
@@ -417,10 +418,10 @@ Copied from `.env.example`. Loaded automatically.
 
 | Key                                                     | Purpose                                                                                                                                                                                                                       |
 | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                                     | Powers `discover`, `tailor`, and `cover-letter` with Claude (the default).                                                                                                                                                    |
-| `OPENAI_API_KEY`                                        | Optional; needed only if a model tier is prefixed `openai:`.                                                                                                                                                                  |
-| `GEMINI_API_KEY`                                        | Optional; needed only if a model tier is prefixed `gemini:`.                                                                                                                                                                  |
-| `DEEPSEEK_API_KEY`                                      | Optional; needed only if a model tier is prefixed `deepseek:`.                                                                                                                                                                |
+| `ANTHROPIC_API_KEY`                                     | Shared Claude credential (the default provider); set it as a Railway environment variable in hosted deployments.                                                                                                             |
+| `OPENAI_API_KEY`                                        | Shared OpenAI credential for tiers prefixed `openai:`; set it as a Railway environment variable.                                                                                                                             |
+| `GEMINI_API_KEY`                                        | Shared Gemini credential for tiers prefixed `gemini:`; set it as a Railway environment variable.                                                                                                                             |
+| `DEEPSEEK_API_KEY`                                      | Shared DeepSeek credential for tiers prefixed `deepseek:`; set it as a Railway environment variable.                                                                                                                         |
 | `GITHUB_TOKEN`                                          | Optional; enriches `profile build`.                                                                                                                                                                                           |
 | `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`                      | Optional; enable the Adzuna connector for `pull`.                                                                                                                                                                             |
 | `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD`                  | Burner credentials for `scrape`.                                                                                                                                                                                              |

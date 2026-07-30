@@ -30,6 +30,8 @@ _USAGE_COLUMNS = (
     ("reasoning_mode", "VARCHAR(24)"),
 )
 
+_SHARED_KEYS_ALL_ACCOUNTS_MARKER = "migration_shared_keys_all_accounts_v1"
+
 
 def _columns(connection, table: str) -> set[str]:
     return {row[1] for row in connection.execute(text(f"PRAGMA table_info({table})"))}
@@ -43,6 +45,27 @@ def migrate_system_db(engine: Engine) -> None:
         for name, ddl in _USER_COLUMNS:
             if name not in existing:
                 connection.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+        connection.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS system_settings ("
+                "key VARCHAR(80) PRIMARY KEY, "
+                "value VARCHAR(160) NOT NULL, "
+                "updated_at DATETIME NOT NULL)"
+            )
+        )
+        migrated_shared_access = connection.execute(
+            text("SELECT 1 FROM system_settings WHERE key = :key"),
+            {"key": _SHARED_KEYS_ALL_ACCOUNTS_MARKER},
+        ).first()
+        if migrated_shared_access is None:
+            connection.execute(text("UPDATE users SET shared_key_access = 1"))
+            connection.execute(
+                text(
+                    "INSERT INTO system_settings (key, value, updated_at) "
+                    "VALUES (:key, 'complete', CURRENT_TIMESTAMP)"
+                ),
+                {"key": _SHARED_KEYS_ALL_ACCOUNTS_MARKER},
+            )
         usage_columns = _columns(connection, "usage_events")
         for name, ddl in _USAGE_COLUMNS:
             if usage_columns and name not in usage_columns:

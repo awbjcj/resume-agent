@@ -185,7 +185,9 @@ def record_call(agent: object, response: object) -> None:
                 detail,
                 model_type=model_type,
             )
-            own_key = usage.provider in context.own_key_providers
+            from resume_agent.tenancy.limits import selected_key_is_own
+
+            own_key = selected_key_is_own(usage.provider, agent)
             priced = calculate_cost(context.system_engine, usage)
             event = UsageEvent(
                 user_id=context.user_id,

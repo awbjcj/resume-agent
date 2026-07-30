@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from resume_agent.config import Settings
-from resume_agent.llm_runner import AgentRunner
+from resume_agent.llm_runner import AgentRunner, resolve_api_key
 from resume_agent.tenancy.context import UserContext, use_context
 from resume_agent.tenancy.limits import (
     BudgetExceededError,
@@ -145,7 +145,7 @@ def test_global_platform_budget_stops_new_shared_key_calls(tmp_path):
     engine.dispose()
 
 
-def test_admin_is_exempt_from_global_platform_budget(tmp_path):
+def test_admin_stops_using_shared_key_at_global_platform_budget(tmp_path):
     engine = make_system_engine(tmp_path)
     init_system_db(engine)
     now = datetime.now(timezone.utc)
@@ -165,11 +165,12 @@ def test_admin_is_exempt_from_global_platform_budget(tmp_path):
     context = _context(tmp_path, engine, role="admin")
     context = UserContext(**{**context.__dict__, "user_id": "admin000001"})
     with use_context(context):
-        AgentRunner(FakeAgent()).run("allowed")
+        with pytest.raises(BudgetExceededError, match="platform weekly"):
+            AgentRunner(FakeAgent()).run("blocked")
     engine.dispose()
 
 
-def test_admin_usage_does_not_count_toward_global_platform_budget(tmp_path):
+def test_admin_usage_counts_toward_global_platform_budget(tmp_path):
     engine = make_system_engine(tmp_path)
     init_system_db(engine)
     now = datetime.now(timezone.utc)
@@ -196,7 +197,55 @@ def test_admin_usage_does_not_count_toward_global_platform_budget(tmp_path):
         )
         session.commit()
     with use_context(_context(tmp_path, engine)):
-        AgentRunner(FakeAgent()).run("allowed")
+        with pytest.raises(BudgetExceededError, match="platform weekly"):
+            AgentRunner(FakeAgent()).run("blocked")
+    engine.dispose()
+
+
+def test_reusable_agent_prefers_platform_then_falls_back_to_user_key(tmp_path):
+    engine = make_system_engine(tmp_path)
+    init_system_db(engine)
+    with Session(engine) as session:
+        session.add(
+            User(
+                id="abc123def456",
+                username="alice",
+                password_hash="hash",
+                role="user",
+                weekly_token_budget=100,
+            )
+        )
+        session.commit()
+    context = _context(tmp_path, engine, own_keys=frozenset({"anthropic"}))
+    context = UserContext(
+        **{
+            **context.__dict__,
+            "platform_provider_keys": {"anthropic": "railway-key"},
+            "user_provider_keys": {"anthropic": "user-key"},
+        }
+    )
+
+    class KeyCapturingAgent(FakeAgent):
+        def __init__(self) -> None:
+            self.model = SimpleNamespace(
+                id="claude-test", provider="anthropic", api_key=None
+            )
+            self.keys: list[str | None] = []
+
+        def run(self, prompt):
+            self.keys.append(self.model.api_key)
+            return super().run(prompt)
+
+    agent = KeyCapturingAgent()
+    with use_context(context):
+        assert resolve_api_key("claude-test") == "railway-key"
+        runner = AgentRunner(agent)
+        runner.run("shared")
+        runner.run("personal")
+    assert agent.keys == ["railway-key", "user-key"]
+    with Session(engine) as session:
+        events = session.execute(select(UsageEvent).order_by(UsageEvent.id)).scalars()
+        assert [event.own_key for event in events] == [False, True]
     engine.dispose()
 
 

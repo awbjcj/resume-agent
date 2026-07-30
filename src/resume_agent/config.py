@@ -46,7 +46,6 @@ class Settings(BaseSettings):
     global_weekly_token_budget: int = Field(default=50_000_000, ge=0)
     cost_quota_enforcement: Literal["shadow", "enforce"] = "shadow"
     global_monthly_cost_quota_micros: int = Field(default=500_000_000, ge=0)
-    open_signup_shared_keys: bool = False
     open_signup_weekly_token_budget: int = Field(default=250_000, ge=0)
     open_signup_max_active_jobs: int = Field(default=100, ge=0)
     open_signup_max_concurrent_runs: int = Field(default=1, ge=0)

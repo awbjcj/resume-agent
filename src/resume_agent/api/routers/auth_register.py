@@ -219,9 +219,7 @@ def verify_email(
                 email_verified_at=now,
                 password_hash=pending.password_hash,
                 role="user",
-                shared_key_access=(
-                    settings.open_signup_shared_keys if open_signup else True
-                ),
+                shared_key_access=True,
                 weekly_token_budget=(
                     settings.open_signup_weekly_token_budget if open_signup else None
                 ),

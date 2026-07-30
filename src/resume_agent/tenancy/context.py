@@ -27,6 +27,14 @@ class UserContext:
     engine: Engine | None
     system_engine: Engine | None
     own_key_providers: frozenset[str]
+    platform_provider_keys: dict[str, str] = field(default_factory=dict, repr=False)
+    user_provider_keys: dict[str, str] = field(default_factory=dict, repr=False)
+    selected_own_key_providers: dict[str, bool] = field(
+        default_factory=dict, repr=False, compare=False
+    )
+    selected_model_own_keys: dict[int, bool] = field(
+        default_factory=dict, repr=False, compare=False
+    )
 
     @property
     def workspace(self) -> Path:

@@ -94,6 +94,7 @@ def test_effective_settings_tracks_user_owned_provider_keys(tmp_path):
     assert overlay.settings.session_secret == "platform-secret"
     assert overlay.settings.db_url == paths.db_url
     assert overlay.own_key_providers == frozenset({"anthropic"})
+    assert overlay.user_provider_keys == {"anthropic": "user-anthropic"}
 
 
 def test_seedable_entries_are_config_files_that_ship_an_example():

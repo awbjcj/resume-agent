@@ -73,6 +73,7 @@ class AgentRunner:
         settings = get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
+                refresh_agent_api_key(self._agent)
                 from resume_agent.tenancy.limits import enforce_agent_budget
 
                 enforce_agent_budget(self._agent)
@@ -91,6 +92,7 @@ class AgentRunner:
         settings = get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
+                refresh_agent_api_key(self._agent)
                 from resume_agent.tenancy.limits import enforce_agent_budget
 
                 enforce_agent_budget(self._agent)
@@ -557,15 +559,75 @@ def supports_native_search(model_id: str) -> bool:
 
 
 def resolve_api_key(model_id: str) -> str:
-    """Return the configured key for ``model_id``'s provider, or ``""`` if unset."""
+    """Select the shared provider key first, then fall back to the user's key."""
     provider, _ = split_provider(model_id)
+    from resume_agent.tenancy.context import current_context
+
+    context = current_context()
+    if context is not None:
+        platform_key = context.platform_provider_keys.get(provider, "")
+        user_key = context.user_provider_keys.get(provider, "")
+        if platform_key:
+            from resume_agent.tenancy.limits import shared_key_available
+
+            use_shared = shared_key_available(provider, split_provider(model_id)[1])
+            use_own = not use_shared and bool(user_key)
+            context.selected_own_key_providers[provider] = use_own
+            return user_key if use_own else platform_key
+        if user_key:
+            context.selected_own_key_providers[provider] = True
+            return user_key
     s = get_settings()
-    return {
+    key = {
         "anthropic": s.anthropic_api_key,
         "openai": s.openai_api_key,
         "gemini": s.gemini_api_key,
         "deepseek": s.deepseek_api_key,
     }.get(provider, "")
+    if context is not None:
+        context.selected_own_key_providers[provider] = (
+            provider in context.own_key_providers
+        )
+    return key
+
+
+def refresh_agent_api_key(agent: object) -> None:
+    """Refresh a reusable agent when its shared allowance changes key source."""
+
+    from resume_agent.tenancy.context import current_context
+    from resume_agent.tenancy.costs import normalize_provider
+
+    context = current_context()
+    model = getattr(agent, "model", None)
+    if context is None or model is None:
+        return
+    provider_value = getattr(model, "provider", None)
+    get_provider = getattr(model, "get_provider", None)
+    if not provider_value and callable(get_provider):
+        provider_value = get_provider()
+    provider = normalize_provider(str(provider_value or ""))
+    if (
+        provider not in context.platform_provider_keys
+        and provider not in context.user_provider_keys
+    ):
+        return
+    model_name = str(getattr(model, "id", "") or "")
+    if not provider or not model_name:
+        return
+    model_id = model_name if provider == "anthropic" else f"{provider}:{model_name}"
+    selected = resolve_api_key(model_id) or None
+    context.selected_model_own_keys[id(model)] = context.selected_own_key_providers[
+        provider
+    ]
+    if getattr(model, "api_key", None) == selected:
+        return
+    model.api_key = selected
+    # Agno caches clients after first use. Clearing them makes the next request
+    # honor the newly selected credential instead of retaining the old client.
+    if hasattr(model, "client"):
+        model.client = None
+    if hasattr(model, "async_client"):
+        model.async_client = None
 
 
 def missing_model_keys(settings) -> list[str]:

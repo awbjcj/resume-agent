@@ -35,11 +35,11 @@ SQLite plus a Railway volume still requires a single replica.
    | `COST_QUOTA_ENFORCEMENT` | `shadow` dual-records USD while token enforcement remains active; `enforce` enables cost quotas |
    | `GLOBAL_MONTHLY_COST_QUOTA_MICROS` | Shared-key UTC calendar-month cap in USD micro-units; defaults to `$500` |
    | `GLOBAL_WEEKLY_TOKEN_BUDGET` | Deprecated stage-one token circuit breaker; used only while cost quotas are in `shadow` mode |
-   | `OPEN_SIGNUP_SHARED_KEYS` | Keep `false`; promote trusted users individually through the admin API |
-
-   Add shared platform LLM keys as Railway variables. Users add their own keys
-   under Settings → Keys; those persist only in their tenant workspace. Public
-   accounts start BYOK-only unless an administrator grants shared-key access.
+   Add `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and/or
+   `DEEPSEEK_API_KEY` as Railway variables. Every admin, free member, and
+   subscriber uses a matching shared key first. Users add fallback keys under
+   Settings → Keys; those persist only in their tenant workspace and take over
+   automatically after the account or platform shared allowance is exhausted.
 
 5. Deploy and sign in at the Railway-provided domain.
 
@@ -202,9 +202,10 @@ local browser. To update the cloud snapshot:
   sessions; changing only the password hash does not revoke existing cookies.
 - The container forces Secure cookies and disables API docs. It refuses to
   start unless `APP_BASE_URL` is an HTTPS origin.
-- Keep `OPEN_SIGNUP_SHARED_KEYS=false`. Use the admin user patch endpoint to
-  grant `sharedKeyAccess` only after review; per-user limits and the global
-  weekly circuit breaker are both enforced before provider calls.
+- Shared LLM credentials come only from Railway environment variables. All
+  account tiers use them first; per-user limits and the global circuit breaker
+  are checked before each provider call, and a configured workspace key becomes
+  the fallback after shared capacity is exhausted.
 - User-influenced HTTP fetches use a shared public-address policy that pins DNS,
   revalidates redirects, and caps response bytes. Add an external egress
   firewall if your Railway/network plan supports destination controls.

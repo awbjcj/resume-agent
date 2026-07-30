@@ -20,6 +20,12 @@ when `COST_QUOTA_ENFORCEMENT=enforce`.
 - `SUBSCRIBER` starts with `$20` monthly from assignment. Month-end assignments
   clamp without drifting (January 31 → February 28 → March 31).
 - Shared platform keys have a `$500` UTC calendar-month cap by default.
+- Administrators, free members, and subscribers all use shared platform keys
+  first. Administrator usage counts toward the platform cap; member usage also
+  consumes the member's recurring allowance and credits.
+- After the applicable shared allowance is exhausted, the provider call uses
+  the member's workspace key when configured. Without a workspace key, the
+  existing quota-exhausted error is returned before any provider request.
 - Credits survive resets and tier changes. Recurring allowance is spent first.
 - Resetting a current period forgives its spend, refunds credits consumed in the
   period, and preserves its anchor.

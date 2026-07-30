@@ -85,6 +85,7 @@ class WorkspacePaths:
 class SettingsOverlay:
     settings: Settings
     own_key_providers: frozenset[str]
+    user_provider_keys: dict[str, str]
 
 
 def workspace_paths(data_root: Path | str, user_id: str) -> WorkspacePaths:
@@ -133,12 +134,17 @@ def provision_workspace(
 
 def effective_settings(base: Settings, paths: WorkspacePaths) -> SettingsOverlay:
     updates: dict[str, object] = {"db_url": paths.db_url}
+    user_provider_keys: dict[str, str] = {}
     if paths.secrets_env.is_file():
         values = parse_env(paths.secrets_env.read_text(encoding="utf-8"))
         for env_name, value in values.items():
             field_name = env_name.lower()
             if field_name in _OVERLAY_FIELDS and value:
                 updates[field_name] = value
+                for provider, provider_field in _PROVIDER_FIELDS.items():
+                    if field_name == provider_field:
+                        user_provider_keys[provider] = value
+                        break
     settings = base.model_copy(update=updates)
     own_keys = frozenset(
         provider
@@ -146,4 +152,8 @@ def effective_settings(base: Settings, paths: WorkspacePaths) -> SettingsOverlay
         if getattr(settings, field_name, "")
         and getattr(settings, field_name, "") != getattr(base, field_name, "")
     )
-    return SettingsOverlay(settings=settings, own_key_providers=own_keys)
+    return SettingsOverlay(
+        settings=settings,
+        own_key_providers=own_keys,
+        user_provider_keys=user_provider_keys,
+    )

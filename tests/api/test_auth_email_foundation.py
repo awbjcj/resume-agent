@@ -62,6 +62,14 @@ def test_system_migration_preserves_legacy_users(tmp_path):
         assert user.session_epoch == 0
         assert user.shared_key_access is True
 
+        # The rollout upgrades existing accounts once without defeating a
+        # later explicit administrator revocation.
+        user.shared_key_access = False
+        session.commit()
+    migrate_system_db(engine)
+    with Session(engine) as session:
+        assert session.get(User, "u1").shared_key_access is False
+
 
 def test_session_epoch_revokes_an_existing_cookie():
     token = auth.issue_user_session(

@@ -281,11 +281,7 @@ def google_callback(
             password_hash="",
             role="user",
             last_active_at=now,
-            shared_key_access=(
-                settings.open_signup_shared_keys
-                if settings.registration_mode == "open"
-                else True
-            ),
+            shared_key_access=True,
             weekly_token_budget=(
                 settings.open_signup_weekly_token_budget
                 if settings.registration_mode == "open"

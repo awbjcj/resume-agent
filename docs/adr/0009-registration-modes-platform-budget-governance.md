@@ -94,3 +94,19 @@ purpose — bounding spend an attacker can generate via *newly registered*
 accounts — is unaffected, since `shared_key_access` and the per-account
 budgets still gate every non-admin account exactly as before; only the
 single, operator-controlled admin role is now unbounded.
+
+## Amendment 2 (2026-07-30)
+
+The product policy now grants shared-key access by default to administrators,
+free members, and subscribers, including open-registration accounts. Platform
+provider credentials come from Railway environment variables and are selected
+before a user's workspace credential. When the applicable account allowance or
+global platform cap is exhausted, calls fall back to the user's credential for
+that provider; without one, the existing quota error remains fail-closed.
+
+This supersedes the earlier `open_signup_shared_keys=false` recommendation and
+the admin-cap exemption. A one-time migration enables existing accounts, while
+later explicit admin revocations remain durable. Admin shared usage now counts
+toward, and is bounded by, the global platform cap. The signup-rate limit,
+per-member allowance, and global cap remain the economic-abuse controls for
+open registration.

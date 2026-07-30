@@ -70,7 +70,7 @@ def test_open_registration_needs_no_invite_and_starts_byok_only(mu_app):
         assert verified.status_code == 200
     with Session(mu_app.state.system_engine) as session:
         user = session.execute(select(User).where(User.email == EMAIL)).scalar_one()
-        assert user.shared_key_access is False
+        assert user.shared_key_access is True
         assert user.weekly_token_budget == 250_000
         assert user.max_active_jobs == 100
         assert user.max_concurrent_runs == 1

@@ -12,6 +12,7 @@ from resume_agent.tenancy.costs import MeteredUsage, calculate_cost, seed_llm_ra
 from resume_agent.tenancy.limits import CostRateUnavailableError, enforce_agent_budget
 from resume_agent.tenancy.quotas import (
     CostQuotaExceededError,
+    GlobalCostQuotaExceededError,
     change_tier,
     charge_shared_cost,
     ensure_quota_account,
@@ -166,9 +167,7 @@ def test_effective_rate_version_preserves_historical_sonnet_price(tmp_path):
         output_tokens=1_000_000,
     )
     july = calculate_cost(engine, usage, now=NOW)
-    september = calculate_cost(
-        engine, usage, now=datetime(2026, 9, 2, tzinfo=UTC)
-    )
+    september = calculate_cost(engine, usage, now=datetime(2026, 9, 2, tzinfo=UTC))
     assert july.total_micros == 12_000_000
     assert september.total_micros == 18_000_000
     assert july.rate_id != september.rate_id
@@ -220,7 +219,7 @@ def test_concurrent_in_flight_charges_create_bounded_overage_atomically(tmp_path
         charge_shared_cost(engine, "abc123def456", 0, now=NOW, preflight=True)
 
 
-def test_admin_is_fully_exempt_from_global_cost_quota(tmp_path):
+def test_admin_shared_usage_is_bounded_by_global_cost_quota(tmp_path):
     engine = _engine(tmp_path)
     with Session(engine) as session:
         session.add(
@@ -248,11 +247,11 @@ def test_admin_is_fully_exempt_from_global_cost_quota(tmp_path):
     agent = SimpleNamespace(
         model=SimpleNamespace(id="claude-haiku-4-5", provider="anthropic")
     )
-    with use_context(context):
+    with use_context(context), pytest.raises(GlobalCostQuotaExceededError):
         enforce_agent_budget(agent, now=NOW)
 
 
-def test_admin_usage_does_not_count_toward_global_cost_quota_for_other_users(tmp_path):
+def test_admin_usage_counts_toward_global_cost_quota_for_other_users(tmp_path):
     engine = _engine(tmp_path)
     with Session(engine) as session:
         session.add(
@@ -292,5 +291,5 @@ def test_admin_usage_does_not_count_toward_global_cost_quota_for_other_users(tmp
     agent = SimpleNamespace(
         model=SimpleNamespace(id="claude-haiku-4-5", provider="anthropic")
     )
-    with use_context(context):
+    with use_context(context), pytest.raises(GlobalCostQuotaExceededError):
         enforce_agent_budget(agent, now=NOW)
