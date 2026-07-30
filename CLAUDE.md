@@ -93,6 +93,20 @@ builder imports a concrete agno model class directly.
 - **Lazy SDK imports.** `build_model` imports the agno provider class _inside_ its
   branch, so a Claude-only run never imports `openai` or `google-genai`, and a
   missing optional SDK fails only when that provider is actually selected.
+- **OpenAI agents use `/v1/responses`.** `_build_openai_responses` is the only
+  OpenAI construction site; both `build_model` and `build_search_equipped` use
+  it so reasoning, output-budget, and state policies cannot drift. Responses
+  allows reasoning and function tools in the same request.
+- **OpenAI effort uses `reasoning={"effort": ...}`.** Agno's typed
+  `reasoning_effort` field omits valid Responses values such as `none`, `xhigh`,
+  and `max`. A catalogued non-reasoning model receives its lowest declared
+  effort; an uncatalogued id omits `reasoning` because its vocabulary is
+  unknown.
+- **OpenAI output and state are explicit.** `max_output_tokens` leaves room for
+  reasoning plus visible structured output. `store=False` disables
+  provider-managed response state (not broader provider retention), while
+  Agno requests `reasoning.encrypted_content` so stateless tool turns can replay
+  opaque reasoning items. Those replayed items count as later input tokens.
 - **Tiers unchanged.** `model_for_tier` still maps `cheap`/`mid`/`premium` →
   `Settings.{cheap,mid,premium}_model`; the prefix lives inside those ids.
 - **Dependency note.** agno 2.6.x's Gemini import needs `google-genai`'s
