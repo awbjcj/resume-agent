@@ -76,11 +76,13 @@ def weekly_usage(engine: Engine, user_id: str, *, now: datetime | None = None) -
 
 def global_weekly_usage(engine: Engine, *, now: datetime | None = None) -> float:
     moment = now or datetime.now(timezone.utc)
+    admin_ids = select(User.id).where(User.role == "admin")
     with Session(engine) as session:
         total = session.execute(
             select(func.coalesce(func.sum(UsageEvent.weighted_total), 0.0)).where(
                 UsageEvent.own_key.is_(False),
                 UsageEvent.ts >= moment - BUDGET_WINDOW,
+                UsageEvent.user_id.not_in(admin_ids),
             )
         ).scalar_one()
     return float(total)
@@ -122,7 +124,8 @@ def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
             or DEFAULT_GLOBAL_MONTHLY_COST_QUOTA_MICROS
         )
         if (
-            global_budget
+            context.role != "admin"
+            and global_budget
             and global_monthly_cost(context.system_engine, now=now) >= global_budget
         ):
             raise GlobalCostQuotaExceededError(
@@ -141,7 +144,8 @@ def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
     )
     global_budget = context.settings.global_weekly_token_budget
     if (
-        global_budget
+        context.role != "admin"
+        and global_budget
         and global_weekly_usage(context.system_engine, now=now) >= global_budget
     ):
         raise BudgetExceededError("platform weekly token budget is exhausted")

@@ -76,3 +76,21 @@ single, operator-visible number regardless of signup volume.
   is still no cross-account identity/device signal, so an attacker who only
   wants BYOK-tier resources (compute/storage, not LLM spend) is not
   meaningfully slowed by this decision alone.
+
+## Amendment (2026-07-30)
+
+The platform-wide cap (`global_weekly_token_budget` in shadow mode,
+`global_monthly_cost_quota_micros` in enforce mode) originally applied to
+every shared-key call regardless of role, on the reasoning above that "even
+then the global budget can reject a call that a per-user budget alone would
+have allowed." In practice this meant the sole trusted operator account could
+be locked out of their own platform by the cumulative spend of every other
+user, with no override — `enforce_agent_budget` (`tenancy/limits.py`) now
+exempts `role == "admin"` from the platform-wide cap in both modes, and
+`global_monthly_cost` / `global_weekly_usage` exclude admin-attributed
+`UsageEvent` rows from the sum entirely, so admin usage neither triggers nor
+counts toward exhausting the cap for other accounts. The cap's Sybil-defense
+purpose — bounding spend an attacker can generate via *newly registered*
+accounts — is unaffected, since `shared_key_access` and the per-account
+budgets still gate every non-admin account exactly as before; only the
+single, operator-controlled admin role is now unbounded.

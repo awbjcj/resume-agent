@@ -284,9 +284,15 @@ cheaply no longer creates shared-key spend by itself.
   micro-cost. In `enforce` mode, an exact active rate is required before a
   shared-key call, user cost allowance and credit balances are checked, and a
   platform-wide UTC calendar-month shared-key cost is checked against
-  `Settings.global_monthly_cost_quota_micros`. Administrators bypass only the
-  user allowance; their shared-key cost still consumes the platform cap. BYOK
-  calls retain token and estimated-cost analytics but have zero quota charge.
+  `Settings.global_monthly_cost_quota_micros`. Administrators are fully
+  exempt from both the per-user allowance and the platform-wide cap — an
+  admin's own usage is also excluded from the sum that feeds the cap
+  (`global_monthly_cost` / `global_weekly_usage` both filter out
+  `User.role == "admin"`), so admin traffic can never exhaust shared-key
+  budget on behalf of other accounts. This reverses the original ADR-0009
+  design, which counted admin spend against the platform cap; see the
+  ADR's Consequences section for the superseded rationale. BYOK calls
+  retain token and estimated-cost analytics but have zero quota charge.
 - Open self-registration additionally seeds lower active-job and concurrency
   ceilings (`open_signup_max_active_jobs`,
   `open_signup_max_concurrent_runs`). Its legacy token override is retained

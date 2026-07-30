@@ -145,6 +145,61 @@ def test_global_platform_budget_stops_new_shared_key_calls(tmp_path):
     engine.dispose()
 
 
+def test_admin_is_exempt_from_global_platform_budget(tmp_path):
+    engine = make_system_engine(tmp_path)
+    init_system_db(engine)
+    now = datetime.now(timezone.utc)
+    with Session(engine) as session:
+        session.add(
+            User(
+                id="admin000001",
+                username="owner",
+                password_hash="hash",
+                role="admin",
+            )
+        )
+        session.add(
+            UsageEvent(user_id="someoneelse", ts=now, weighted_total=50_000_001)
+        )
+        session.commit()
+    context = _context(tmp_path, engine, role="admin")
+    context = UserContext(**{**context.__dict__, "user_id": "admin000001"})
+    with use_context(context):
+        AgentRunner(FakeAgent()).run("allowed")
+    engine.dispose()
+
+
+def test_admin_usage_does_not_count_toward_global_platform_budget(tmp_path):
+    engine = make_system_engine(tmp_path)
+    init_system_db(engine)
+    now = datetime.now(timezone.utc)
+    with Session(engine) as session:
+        session.add(
+            User(
+                id="admin000001",
+                username="owner",
+                password_hash="hash",
+                role="admin",
+            )
+        )
+        session.add(
+            User(
+                id="abc123def456",
+                username="alice",
+                password_hash="hash",
+                role="user",
+                shared_key_access=True,
+            )
+        )
+        session.add(
+            UsageEvent(user_id="admin000001", ts=now, weighted_total=50_000_001)
+        )
+        session.commit()
+    with use_context(_context(tmp_path, engine)):
+        AgentRunner(FakeAgent()).run("allowed")
+    engine.dispose()
+
+
 def test_usage_writes_to_context_engine_and_tracks_own_key(tmp_path):
     first = make_system_engine(tmp_path / "first")
     second = make_system_engine(tmp_path / "second")

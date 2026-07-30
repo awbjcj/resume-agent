@@ -404,12 +404,14 @@ def change_tier(
 def global_monthly_cost(engine: Engine, *, now: datetime | None = None) -> int:
     moment = now or datetime.now(UTC)
     start = datetime(moment.year, moment.month, 1, tzinfo=UTC)
+    admin_ids = select(User.id).where(User.role == "admin")
     with Session(engine) as session:
         total = session.execute(
             select(func.coalesce(func.sum(UsageEvent.cost_micros), 0)).where(
                 UsageEvent.own_key.is_(False),
                 UsageEvent.ts >= start,
                 UsageEvent.cost_micros.is_not(None),
+                UsageEvent.user_id.not_in(admin_ids),
             )
         ).scalar_one()
         return int(total or 0)

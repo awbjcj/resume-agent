@@ -12,7 +12,6 @@ from resume_agent.tenancy.costs import MeteredUsage, calculate_cost, seed_llm_ra
 from resume_agent.tenancy.limits import CostRateUnavailableError, enforce_agent_budget
 from resume_agent.tenancy.quotas import (
     CostQuotaExceededError,
-    GlobalCostQuotaExceededError,
     change_tier,
     charge_shared_cost,
     ensure_quota_account,
@@ -221,7 +220,7 @@ def test_concurrent_in_flight_charges_create_bounded_overage_atomically(tmp_path
         charge_shared_cost(engine, "abc123def456", 0, now=NOW, preflight=True)
 
 
-def test_admin_is_user_exempt_but_still_stopped_by_platform_cap(tmp_path):
+def test_admin_is_fully_exempt_from_global_cost_quota(tmp_path):
     engine = _engine(tmp_path)
     with Session(engine) as session:
         session.add(
@@ -249,5 +248,49 @@ def test_admin_is_user_exempt_but_still_stopped_by_platform_cap(tmp_path):
     agent = SimpleNamespace(
         model=SimpleNamespace(id="claude-haiku-4-5", provider="anthropic")
     )
-    with use_context(context), pytest.raises(GlobalCostQuotaExceededError):
+    with use_context(context):
+        enforce_agent_budget(agent, now=NOW)
+
+
+def test_admin_usage_does_not_count_toward_global_cost_quota_for_other_users(tmp_path):
+    engine = _engine(tmp_path)
+    with Session(engine) as session:
+        session.add(
+            User(
+                id="admin000001",
+                username="owner",
+                password_hash="hash",
+                role="admin",
+            )
+        )
+        session.add(
+            UsageEvent(
+                user_id="admin000001",
+                ts=NOW,
+                provider="anthropic",
+                model="claude-haiku-4-5",
+                cost_micros=500_000_000,
+                quota_cost_micros=500_000_000,
+                pricing_status="PRICED",
+            )
+        )
+        session.commit()
+    context = UserContext(
+        user_id="abc123def456",
+        username="alice",
+        role="user",
+        paths=WorkspacePaths(tmp_path / "users" / "abc123def456"),
+        settings=Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            cost_quota_enforcement="enforce",
+            global_monthly_cost_quota_micros=1,
+        ),
+        engine=None,
+        system_engine=engine,
+        own_key_providers=frozenset(),
+    )
+    agent = SimpleNamespace(
+        model=SimpleNamespace(id="claude-haiku-4-5", provider="anthropic")
+    )
+    with use_context(context):
         enforce_agent_budget(agent, now=NOW)
