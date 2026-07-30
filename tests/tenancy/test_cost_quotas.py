@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
+import threading
 from types import SimpleNamespace
 import pytest
 from sqlalchemy.orm import Session
@@ -9,6 +11,7 @@ from resume_agent.tenancy.context import UserContext, use_context
 from resume_agent.tenancy.limits import CostRateUnavailableError, enforce_agent_budget
 from resume_agent.tenancy.quotas import (
     CostQuotaExceededError,
+    GlobalCostQuotaExceededError,
     change_tier,
     charge_shared_cost,
     ensure_quota_account,
@@ -18,6 +21,7 @@ from resume_agent.tenancy.quotas import (
 )
 from resume_agent.tenancy.system_db import (
     QuotaTier,
+    UsageEvent,
     User,
     init_system_db,
     make_system_engine,
@@ -194,4 +198,56 @@ def test_enforcement_rejects_unknown_shared_rate_but_allows_byok(tmp_path):
             }
         )
     ):
+        enforce_agent_budget(agent, now=NOW)
+
+
+def test_concurrent_in_flight_charges_create_bounded_overage_atomically(tmp_path):
+    engine = _engine(tmp_path)
+    ensure_quota_account(engine, "abc123def456", now=NOW)
+    charge_shared_cost(engine, "abc123def456", 900_000, now=NOW)
+    barrier = threading.Barrier(2)
+
+    def finish_call() -> None:
+        barrier.wait(timeout=5)
+        charge_shared_cost(engine, "abc123def456", 200_000, now=NOW)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        list(executor.map(lambda _index: finish_call(), range(2)))
+
+    snapshot = quota_snapshot(engine, "abc123def456", now=NOW)
+    assert snapshot.spent_micros == 1_300_000
+    assert snapshot.overage_micros == 300_000
+    with pytest.raises(CostQuotaExceededError):
+        charge_shared_cost(engine, "abc123def456", 0, now=NOW, preflight=True)
+
+
+def test_admin_is_user_exempt_but_still_stopped_by_platform_cap(tmp_path):
+    engine = _engine(tmp_path)
+    with Session(engine) as session:
+        session.add(
+            UsageEvent(
+                user_id="admin000001",
+                ts=NOW,
+                provider="anthropic",
+                model="claude-haiku-4-5",
+                cost_micros=500_000_000,
+                quota_cost_micros=500_000_000,
+                pricing_status="PRICED",
+            )
+        )
+        session.commit()
+    context = UserContext(
+        user_id="admin000001",
+        username="owner",
+        role="admin",
+        paths=WorkspacePaths(tmp_path / "users" / "admin000001"),
+        settings=Settings(_env_file=None, cost_quota_enforcement="enforce"),
+        engine=None,
+        system_engine=engine,
+        own_key_providers=frozenset(),
+    )
+    agent = SimpleNamespace(
+        model=SimpleNamespace(id="claude-haiku-4-5", provider="anthropic")
+    )
+    with use_context(context), pytest.raises(GlobalCostQuotaExceededError):
         enforce_agent_budget(agent, now=NOW)

@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from resume_agent.api.auth import hash_password
-from resume_agent.tenancy.system_db import User
+from resume_agent.tenancy.system_db import LlmRate, User
 
 
 def _login(client, username="owner", password="owner-password"):
@@ -63,6 +64,7 @@ def test_quota_console_manages_tiers_accounts_and_audited_operations(mu_app, mu_
     )
     assert preview.status_code == 201
     assert preview.json()["affectedCount"] == 2
+    assert preview.json()["expiresAt"].endswith("Z")
     commit_body = {
         "previewId": preview.json()["id"],
         "reason": "service recovery grant",
@@ -93,3 +95,45 @@ def test_member_usage_exposes_cost_quota_and_separate_token_totals(mu_app, mu_cl
     assert body["costs"]["sharedQuotaCostMicros"] == 0
     assert body["sharedTokens"]["totalTokens"] == 0
     assert body["byokTokens"]["totalTokens"] == 0
+
+
+def test_future_rate_version_closes_matching_open_version(mu_app, mu_client):
+    assert _login(mu_client).status_code == 200
+    effective_from = "2027-01-01T00:00:00Z"
+
+    created = mu_client.post(
+        "/api/admin/llm-rates",
+        json={
+            "provider": "anthropic",
+            "model": "claude-haiku-4-5",
+            "contextMinTokens": 0,
+            "effectiveFrom": effective_from,
+            "inputMicrosPerMillion": 1_100_000,
+            "cacheReadMicrosPerMillion": 110_000,
+            "cacheWriteMicrosPerMillion": 1_375_000,
+            "outputMicrosPerMillion": 5_500_000,
+            "toolMicrosPerUnit": 10_000,
+            "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
+            "reason": "scheduled provider price update",
+        },
+    )
+
+    assert created.status_code == 201, created.text
+    with Session(mu_app.state.system_engine) as session:
+        versions = (
+            session.execute(
+                select(LlmRate)
+                .where(
+                    LlmRate.provider == "anthropic",
+                    LlmRate.model == "claude-haiku-4-5",
+                    LlmRate.context_min_tokens == 0,
+                    LlmRate.context_max_tokens.is_(None),
+                )
+                .order_by(LlmRate.effective_from)
+            )
+            .scalars()
+            .all()
+        )
+    assert len(versions) == 2
+    assert versions[0].effective_to == datetime(2027, 1, 1)
+    assert versions[1].effective_to is None

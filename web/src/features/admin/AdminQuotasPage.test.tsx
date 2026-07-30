@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
+import { axe } from "vitest-axe";
 import { describe, expect, it } from "vitest";
 
 import { server } from "@/test/server";
@@ -54,5 +55,12 @@ describe("AdminQuotasPage", () => {
     await user.click(screen.getByRole("button", { name: "Preview" }));
     await waitFor(() => expect(screen.getByText("1 accounts frozen")).toBeInTheDocument());
     expect(screen.getByText(/Total effect \$1.00/)).toBeInTheDocument();
+  });
+
+  it("has no automated accessibility violations in the default console", async () => {
+    const { container } = renderPage();
+    expect(await screen.findByRole("heading", { name: "Cost quotas" })).toBeInTheDocument();
+    const results = await axe(container);
+    expect(results.violations).toEqual([]);
   });
 });

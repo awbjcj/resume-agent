@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_serializer, field_validator
 
 from resume_agent.api.schemas.base import CamelModel, Page
 
@@ -9,7 +9,18 @@ CycleUnit = Literal["WEEK", "MONTH"]
 QuotaStatus = Literal["ACTIVE", "EXHAUSTED", "OVERAGE", "UNLIMITED"]
 
 
-class QuotaTierOut(CamelModel):
+class UtcCamelModel(CamelModel):
+    @field_serializer("*", when_used="json", check_fields=False)
+    def serialize_utc(self, value):
+        if not isinstance(value, datetime):
+            return value
+        aware = (
+            value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+        )
+        return aware.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+class QuotaTierOut(UtcCamelModel):
     id: str
     name: str
     cycle_unit: CycleUnit
@@ -21,7 +32,7 @@ class QuotaTierOut(CamelModel):
     spend_micros: int = 0
 
 
-class QuotaPlatformSummary(CamelModel):
+class QuotaPlatformSummary(UtcCamelModel):
     monthly_spend_micros: int
     monthly_cap_micros: int
     remaining_micros: int
@@ -51,7 +62,7 @@ class QuotaTierPatch(CamelModel):
     reason: str = Field(min_length=1, max_length=500)
 
 
-class QuotaAccountOut(CamelModel):
+class QuotaAccountOut(UtcCamelModel):
     user_id: str
     username: str
     disabled: bool
@@ -75,7 +86,7 @@ class QuotaAccountPage(Page[QuotaAccountOut]):
     pass
 
 
-class QuotaLedgerEntryOut(CamelModel):
+class QuotaLedgerEntryOut(UtcCamelModel):
     id: int
     kind: str
     amount_micros: int
@@ -104,7 +115,7 @@ class QuotaOperationPreviewCreate(CamelModel):
     amount_micros: int | None = Field(default=None, ge=1)
 
 
-class QuotaOperationPreviewOut(CamelModel):
+class QuotaOperationPreviewOut(UtcCamelModel):
     id: str
     target_type: str
     target_value: str | None
@@ -121,7 +132,7 @@ class QuotaOperationCommit(CamelModel):
     idempotency_key: str = Field(min_length=8, max_length=64)
 
 
-class QuotaOperationOut(CamelModel):
+class QuotaOperationOut(UtcCamelModel):
     id: str
     action_type: str
     target_type: str
@@ -137,7 +148,7 @@ class QuotaOperationPage(Page[QuotaOperationOut]):
     pass
 
 
-class LlmRateOut(CamelModel):
+class LlmRateOut(UtcCamelModel):
     id: str
     provider: str
     model: str
@@ -171,3 +182,12 @@ class LlmRateCreate(CamelModel):
     effective_to: datetime | None = None
     source_url: str = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("effective_from", "effective_to")
+    @classmethod
+    def require_utc_timestamp(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            raise ValueError("effective timestamps must include a UTC offset")
+        return value.astimezone(timezone.utc)

@@ -57,8 +57,10 @@ function Metric({ label, value, detail, warning = false }: { label: string; valu
   return (
     <div className={`border-l-2 px-4 py-2 ${warning ? "border-amber-500" : "border-primary/50"}`}>
       <dt className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</dt>
-      <dd className="mt-1 font-mono text-2xl font-semibold tabular-nums">{value}</dd>
-      <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+      <dd className="mt-1">
+        <span className="block font-mono text-2xl font-semibold tabular-nums">{value}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">{detail}</span>
+      </dd>
     </div>
   );
 }
@@ -67,6 +69,7 @@ function AccountDrawer({ account, open, onOpenChange }: { account: QuotaAccount 
   const queryClient = useQueryClient();
   const [tierId, setTierId] = useState("");
   const [override, setOverride] = useState("");
+  const [clearOverride, setClearOverride] = useState(false);
   const [reason, setReason] = useState("");
   const ledger = useQuery({
     queryKey: ["admin", "quota-ledger", account?.userId],
@@ -80,14 +83,15 @@ function AccountDrawer({ account, open, onOpenChange }: { account: QuotaAccount 
       if (!account) throw new Error("No member selected");
       const body: { tierId?: string; allowanceOverrideMicros?: number | null; reason: string } = { reason };
       if (tierId) body.tierId = tierId;
-      if (override !== "") body.allowanceOverrideMicros = Math.round(Number(override) * 1_000_000);
+      if (clearOverride) body.allowanceOverrideMicros = null;
+      else if (override !== "") body.allowanceOverrideMicros = Math.round(Number(override) * 1_000_000);
       return unwrap(api.PATCH("/api/admin/quota-accounts/{user_id}", {
         params: { path: { user_id: account.userId } }, body,
       }));
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "quota-accounts"] });
-      setTierId(""); setOverride(""); setReason("");
+      setTierId(""); setOverride(""); setClearOverride(false); setReason("");
     },
   });
   return (
@@ -111,15 +115,15 @@ function AccountDrawer({ account, open, onOpenChange }: { account: QuotaAccount 
             </div>
             <div className="space-y-2">
               <Label htmlFor="drawer-override">Allowance override in USD</Label>
-              <Input id="drawer-override" inputMode="decimal" placeholder="Leave blank to keep current" value={override} onChange={(event) => setOverride(event.target.value)} />
-              <p className="text-xs text-muted-foreground">Enter 0 for no recurring allowance. Clear an override from the API by sending null.</p>
+              <Input id="drawer-override" inputMode="decimal" disabled={clearOverride} placeholder="Leave blank to keep current" value={override} onChange={(event) => setOverride(event.target.value)} />
+              <label className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={clearOverride} onChange={(event) => setClearOverride(event.target.checked)} />Clear override and inherit the tier allowance</label>
             </div>
             <div className="space-y-2">
               <Label htmlFor="drawer-reason">Audit reason</Label>
               <Textarea id="drawer-reason" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this change needed?" />
             </div>
             {patch.isError ? <Alert variant="destructive"><AlertTitle>Update failed</AlertTitle><AlertDescription>{patch.error.message}</AlertDescription></Alert> : null}
-            <Button disabled={!reason.trim() || (!tierId && override === "") || patch.isPending} onClick={() => patch.mutate()}>{patch.isPending ? "Saving…" : "Save quota change"}</Button>
+            <Button disabled={!reason.trim() || (!tierId && override === "" && !clearOverride) || patch.isPending} onClick={() => patch.mutate()}>{patch.isPending ? "Saving…" : "Save quota change"}</Button>
             <section aria-labelledby="member-ledger" className="space-y-3 border-t pt-5">
               <h3 id="member-ledger" className="font-semibold">Recent ledger</h3>
               {ledger.isPending ? <Skeleton className="h-24 w-full" /> : ledger.data?.data.length ? (
@@ -164,7 +168,7 @@ function BulkCommandBar({ accounts }: { accounts: QuotaAccount[] }) {
   const validAmount = actionType === "RESET_CURRENT_PERIOD" || Number(amount) > 0;
   return (
     <Card className="border-amber-500/30 bg-amber-500/[0.03]">
-      <CardHeader><CardTitle><h3 className="flex items-center gap-2"><Banknote className="size-4" /> Bulk quota command</h3></CardTitle><CardDescription>Freeze the target set, inspect the monetary effect, then commit with a reason.</CardDescription></CardHeader>
+      <CardHeader><CardTitle><h2 className="flex items-center gap-2"><Banknote className="size-4" /> Bulk quota command</h2></CardTitle><CardDescription>Freeze the target set, inspect the monetary effect, then commit with a reason.</CardDescription></CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 lg:grid-cols-[0.8fr_1fr_1fr_0.8fr_1.5fr_auto]">
           <label className="space-y-1 text-xs font-medium">Scope<select aria-label="Target scope" className="mt-1 h-9 w-full rounded-lg border bg-background px-2 text-sm" value={targetType} onChange={(event) => { setTargetType(event.target.value as typeof targetType); setPreview(null); }}><option value="USER">User</option><option value="TIER">Tier</option><option value="ALL_MEMBERS">All members</option></select></label>

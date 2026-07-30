@@ -24,6 +24,7 @@ from resume_agent.config import Settings
 from resume_agent.mail import messages
 from resume_agent.mail.mailer import MailDeliveryError
 from resume_agent.tenancy.context import new_user_id
+from resume_agent.tenancy.quotas import assign_new_member
 from resume_agent.tenancy.secrets import hash_secret
 from resume_agent.tenancy.system_db import InviteCode, PendingRegistration, User
 from resume_agent.tenancy.workspace import provision_workspace, workspace_paths
@@ -232,6 +233,7 @@ def verify_email(
                 ),
             )
             session.add(user)
+            assign_new_member(session, user.id, now=now)
             if invite is not None:
                 invite.used_by = user.id
                 invite.used_at = now

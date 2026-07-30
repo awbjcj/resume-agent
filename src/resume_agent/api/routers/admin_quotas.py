@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, true
 from sqlalchemy.orm import Session
 
 from resume_agent.api.deps import require_admin
@@ -564,6 +564,40 @@ def create_rate(
             422, "INVALID_CONTEXT_BAND", "Context maximum is below minimum"
         )
     with Session(request.app.state.system_engine) as session:
+        context_max_clause = (
+            LlmRate.context_max_tokens.is_(None)
+            if body.context_max_tokens is None
+            else LlmRate.context_max_tokens == body.context_max_tokens
+        )
+        predecessor = (
+            session.execute(
+                select(LlmRate)
+                .where(
+                    LlmRate.provider == values["provider"],
+                    LlmRate.model == body.model,
+                    LlmRate.context_min_tokens == body.context_min_tokens,
+                    context_max_clause,
+                    LlmRate.effective_to.is_(None),
+                    LlmRate.effective_from < body.effective_from,
+                )
+                .order_by(LlmRate.effective_from.desc())
+            )
+            .scalars()
+            .first()
+        )
+        if predecessor is not None:
+            predecessor.effective_to = body.effective_from
+            session.flush()
+        incoming_context_end_clause = (
+            true()
+            if body.context_max_tokens is None
+            else LlmRate.context_min_tokens <= body.context_max_tokens
+        )
+        incoming_effective_end_clause = (
+            true()
+            if body.effective_to is None
+            else LlmRate.effective_from < body.effective_to
+        )
         overlap = session.execute(
             select(LlmRate.id).where(
                 LlmRate.provider == values["provider"],
@@ -572,21 +606,16 @@ def create_rate(
                     LlmRate.context_max_tokens.is_(None),
                     LlmRate.context_max_tokens >= body.context_min_tokens,
                 ),
-                or_(
-                    body.context_max_tokens is None,
-                    LlmRate.context_min_tokens <= body.context_max_tokens,
-                ),
+                incoming_context_end_clause,
                 or_(
                     LlmRate.effective_to.is_(None),
                     LlmRate.effective_to > body.effective_from,
                 ),
-                or_(
-                    body.effective_to is None,
-                    LlmRate.effective_from < body.effective_to,
-                ),
+                incoming_effective_end_clause,
             )
         ).first()
         if overlap:
+            session.rollback()
             raise ApiException(
                 409,
                 "RATE_RANGE_OVERLAP",

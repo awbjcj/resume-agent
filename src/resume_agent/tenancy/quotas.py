@@ -100,6 +100,14 @@ def seed_quota_accounts(engine: Engine) -> None:
         ensure_quota_account(engine, user_id)
 
 
+def assign_new_member(
+    session: Session, user_id: str, *, now: datetime | None = None
+) -> None:
+    """Create the FREE account and anchored first period in a signup transaction."""
+
+    _ensure_in_session(session, user_id, now or datetime.now(timezone.utc))
+
+
 def _aware(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
 
