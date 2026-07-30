@@ -67,9 +67,11 @@ def test_build_model_cache_defaults_off_and_other_providers_ignore_it():
 
 
 def test_build_model_openai_branch():
-    OpenAIChat = pytest.importorskip("agno.models.openai").OpenAIChat
+    OpenAIResponses = pytest.importorskip(
+        "agno.models.openai.responses"
+    ).OpenAIResponses
     model = build_model("openai:gpt-5.4-mini", api_key="sk-test")
-    assert isinstance(model, OpenAIChat)
+    assert isinstance(model, OpenAIResponses)
     assert model.id == "gpt-5.4-mini"
     assert model.api_key == "sk-test"
 
@@ -123,7 +125,7 @@ def test_openai_response_schema_has_no_keywords_beside_refs():
     model = build_model("openai:gpt-5.6-terra", api_key="sk-test")
 
     params = model.get_request_params(response_format=ResumeContent)
-    schema = params["response_format"]["json_schema"]["schema"]
+    schema = params["text"]["format"]["schema"]
 
     assert schema["$defs"]["Education"]["properties"]["source"] == {
         "$ref": "#/$defs/Source"

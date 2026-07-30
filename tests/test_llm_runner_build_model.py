@@ -14,8 +14,8 @@ def test_reasoning_parameters_are_attached_for_capable_models():
     assert claude.thinking == {"type": "adaptive"}
     assert claude.output_config == {"effort": "high"}
 
-    openai = build_model("openai:gpt-5.6", api_key="k", reasoning=True)
-    assert openai.reasoning_effort == "high"
+    openai = build_model("openai:gpt-5.6-terra", api_key="k", reasoning=True)
+    assert openai.reasoning == {"effort": "high"}
 
     gemini = build_model("gemini:gemini-3.5-flash", api_key="k", reasoning=True)
     assert gemini.thinking_level == "high"
@@ -114,33 +114,195 @@ def test_selected_tier_tuning_is_forwarded_by_provider(monkeypatch):
     gemini = build_model("gemini:gemini-3.5-flash", api_key="k", reasoning=True)
 
     assert claude.output_config == {"effort": "low"}
-    assert openai.reasoning_effort == "xhigh"
+    assert openai.reasoning == {"effort": "xhigh"}
     assert gemini.thinking_level == "minimal"
 
 
-def test_non_reasoning_openai_disables_effort_rather_than_omitting_it():
-    # Omitting `reasoning_effort` on a gpt-5.x id means "provider decides", not
-    # off -- and a provider-chosen effort combined with function tools is
-    # rejected outright by /v1/chat/completions ("To use function tools, use
-    # /v1/responses or set reasoning_effort to 'none'"), which agno then hands
-    # back as the error body in `.content` rather than raising. Same bug class
-    # as Gemini's thinking_budget and Anthropic's thinking: unset != disabled,
-    # and here it broke every tool-using agent (coach, interviewer) outright.
-    terra = build_model("openai:gpt-5.6-terra", api_key="k")
-    assert terra.reasoning_effort == "none"
+def test_openai_agents_are_built_on_the_responses_endpoint():
+    from agno.models.openai.responses import OpenAIResponses
+
+    model = build_model("openai:gpt-5.6-terra", api_key="k")
+    assert isinstance(model, OpenAIResponses)
+    assert model.id == "gpt-5.6-terra"
 
 
-def test_openai_effort_stays_unset_when_none_is_not_a_selectable_effort():
-    # gpt-5.5-pro's catalog lists only medium/high/xhigh, so "none" would trade
-    # one 400 for another. Such a model cannot run function tools on
-    # chat/completions at all; the Responses API is the fix, not a fake effort.
-    pro = build_model("openai:gpt-5.5-pro", api_key="k")
-    assert pro.reasoning_effort is None
+def test_openai_reasoning_and_function_tools_share_the_same_request(monkeypatch):
+    settings = SimpleNamespace(
+        cheap_model=None,
+        cheap_reasoning_effort=None,
+        mid_model=None,
+        mid_reasoning_effort=None,
+        premium_model=None,
+        premium_reasoning_effort=None,
+    )
+    monkeypatch.setattr(llm_runner, "get_settings", lambda: settings)
+
+    model = build_model("openai:gpt-5.5-pro", api_key="k", reasoning=True)
+    params = model.get_request_params(
+        messages=[],
+        tools=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "lookup_profile",
+                    "description": "Look up a profile",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": [],
+                        "additionalProperties": False,
+                    },
+                },
+            }
+        ],
+    )
+
+    assert params["reasoning"] == {"effort": "high"}
+    assert params["tools"][0]["name"] == "lookup_profile"
+    assert not hasattr(llm_runner, "_openai_disabled_effort")
 
 
-def test_openai_effort_stays_unset_for_uncatalogued_model():
-    # A custom id entered through the tier picker's escape hatch has no catalog
-    # entry, so whether it accepts "none" is unknown -- keep the provider
-    # default rather than guessing into a different 400.
+def test_openai_non_reasoning_effort_uses_the_catalog_floor():
+    assert build_model("openai:gpt-5.5-pro", api_key="k").reasoning == {
+        "effort": "medium"
+    }
+    assert build_model("openai:gpt-5.6-terra", api_key="k").reasoning == {
+        "effort": "none"
+    }
+
+
+def test_openai_uncatalogued_model_sends_no_reasoning_at_all():
     custom = build_model("openai:gpt-5.9-experimental", api_key="k")
-    assert custom.reasoning_effort is None
+    assert custom.reasoning is None
+    assert "reasoning" not in custom.get_request_params(messages=[])
+
+
+def test_openai_never_uses_provider_managed_response_state():
+    model = build_model("openai:gpt-5.6-terra", api_key="k")
+    assert model.store is False
+    params = model.get_request_params(messages=[])
+    assert params["store"] is False
+    assert params["include"] == ["reasoning.encrypted_content"]
+
+
+def test_openai_bounds_the_output_budget():
+    assert build_model(
+        "openai:gpt-5.6-terra", api_key="k"
+    ).max_output_tokens == 16000
+    assert (
+        build_model("openai:gpt-5.6-terra", api_key="k", reasoning=True)
+        .max_output_tokens
+        == 32000
+    )
+
+
+def test_openai_effort_floor_is_the_lowest_effort_the_model_declares():
+    assert (
+        llm_runner._openai_effort("openai:gpt-5.6-terra", reasoning=False)
+        == "none"
+    )
+    assert (
+        llm_runner._openai_effort("openai:gpt-5.4-mini", reasoning=False)
+        == "none"
+    )
+    assert (
+        llm_runner._openai_effort("openai:gpt-5.5-pro", reasoning=False)
+        == "medium"
+    )
+
+
+def test_openai_effort_is_unset_for_an_uncatalogued_model():
+    model_id = "openai:gpt-5.9-experimental"
+    assert llm_runner._openai_effort(model_id, reasoning=False) is None
+    assert llm_runner._openai_effort(model_id, reasoning=True) is None
+
+
+def test_openai_reasoning_effort_defaults_to_high_within_the_catalog(monkeypatch):
+    settings = SimpleNamespace(
+        cheap_model=None,
+        cheap_reasoning_effort=None,
+        mid_model=None,
+        mid_reasoning_effort=None,
+        premium_model=None,
+        premium_reasoning_effort=None,
+    )
+    monkeypatch.setattr(llm_runner, "get_settings", lambda: settings)
+
+    assert (
+        llm_runner._openai_effort("openai:gpt-5.6-terra", reasoning=True)
+        == "high"
+    )
+    assert (
+        llm_runner._openai_effort("openai:gpt-5.5-pro", reasoning=True) == "high"
+    )
+
+
+def test_openai_reasoning_effort_honours_configured_tier_tuning(monkeypatch):
+    settings = SimpleNamespace(
+        cheap_model=None,
+        cheap_reasoning_effort=None,
+        mid_model=None,
+        mid_reasoning_effort=None,
+        premium_model="openai:gpt-5.6-terra",
+        premium_reasoning_effort="max",
+    )
+    monkeypatch.setattr(llm_runner, "get_settings", lambda: settings)
+
+    assert (
+        llm_runner._openai_effort("openai:gpt-5.6-terra", reasoning=True) == "max"
+    )
+
+
+def test_openai_effort_ordering_covers_every_catalogued_value():
+    for entry in llm_runner.MODEL_CATALOG["openai"]:
+        for effort in entry.reasoning_efforts:
+            assert effort in llm_runner._EFFORT_ORDER
+
+
+def test_openai_reasoning_fallback_uses_the_nearest_supported_effort(monkeypatch):
+    entries = [
+        *llm_runner.MODEL_CATALOG["openai"],
+        llm_runner.ModelCatalogEntry(
+            "openai:gpt-future", "GPT Future", ("medium", "xhigh")
+        ),
+    ]
+    monkeypatch.setitem(llm_runner.MODEL_CATALOG, "openai", entries)
+
+    assert (
+        llm_runner._openai_effort("openai:gpt-future", reasoning=True)
+        == "medium"
+    )
+
+
+def test_responses_shim_strips_ref_siblings_from_the_output_schema():
+    from pydantic import BaseModel, Field
+
+    class Inner(BaseModel):
+        a: str
+
+    class Outer(BaseModel):
+        inner: Inner = Field(description="the inner thing")
+
+    model = llm_runner._compatible_openai_responses_class()(
+        id="gpt-5.6-terra", api_key="k"
+    )
+    params = model.get_request_params(messages=[], response_format=Outer)
+
+    node = params["text"]["format"]["schema"]["properties"]["inner"]
+    assert "$ref" in node
+    assert "description" not in node
+
+
+def test_responses_shim_drops_an_empty_reasoning_object():
+    model = llm_runner._compatible_openai_responses_class()(
+        id="gpt-5.6-terra", api_key="k"
+    )
+    assert "reasoning" not in model.get_request_params(messages=[])
+
+
+def test_responses_shim_keeps_a_populated_reasoning_object():
+    model = llm_runner._compatible_openai_responses_class()(
+        id="gpt-5.6-terra", api_key="k", reasoning={"effort": "xhigh"}
+    )
+    params = model.get_request_params(messages=[])
+    assert params["reasoning"] == {"effort": "xhigh"}

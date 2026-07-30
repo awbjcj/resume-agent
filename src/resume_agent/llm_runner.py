@@ -298,7 +298,6 @@ class ModelCatalogEntry:
     reasoning_efforts: tuple[str, ...] = ()
 
 
-OpenAIResponsesReasoningEffort = Literal["minimal", "low", "medium", "high"]
 GeminiInteractionsThinkingLevel = Literal["minimal", "low", "medium", "high"]
 
 
@@ -646,32 +645,34 @@ def _without_ref_siblings(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 @lru_cache(maxsize=1)
-def _compatible_openai_chat_class():
-    from agno.models.openai import OpenAIChat
+def _compatible_openai_responses_class():
+    from agno.models.openai.responses import OpenAIResponses
 
-    class CompatibleOpenAIChat(OpenAIChat):
-        """OpenAI adapter that emits legal reference nodes for response_format."""
+    class CompatibleOpenAIResponses(OpenAIResponses):
+        """Emit legal reference nodes and omit empty reasoning configuration."""
 
         def get_request_params(
             self,
+            messages=None,
             response_format=None,
             tools=None,
             tool_choice=None,
-            run_response=None,
         ):
             params = super().get_request_params(
+                messages=messages,
                 response_format=response_format,
                 tools=tools,
                 tool_choice=tool_choice,
-                run_response=run_response,
             )
-            json_schema = params.get("response_format", {}).get("json_schema", {})
-            schema = json_schema.get("schema")
+            text_format = params.get("text", {}).get("format", {})
+            schema = text_format.get("schema")
             if isinstance(schema, dict):
-                json_schema["schema"] = _without_ref_siblings(schema)
+                text_format["schema"] = _without_ref_siblings(schema)
+            if not params.get("reasoning"):
+                params.pop("reasoning", None)
             return params
 
-    return CompatibleOpenAIChat
+    return CompatibleOpenAIResponses
 
 
 @lru_cache(maxsize=1)
@@ -811,43 +812,50 @@ def _reasoning_effort_for(model_id: str, provider: str) -> str:
     return "max" if provider == "deepseek" else "high"
 
 
-def _openai_responses_reasoning_effort_for(
-    model_id: str, provider: str
-) -> OpenAIResponsesReasoningEffort | None:
-    """Adapt configured effort to the subset accepted by OpenAI Responses."""
-    effort = _reasoning_effort_for(model_id, provider)
-    if effort == "minimal":
-        return "minimal"
-    if effort == "low":
-        return "low"
-    if effort == "medium":
-        return "medium"
-    if effort == "high":
-        return "high"
-    if effort == "none":
-        return None
-    return "high"
+_EFFORT_ORDER = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
-def _openai_disabled_effort(model_id: str) -> str | None:
-    """The explicit "off" effort for an OpenAI id, when it has one.
-
-    On gpt-5.x an unset ``reasoning_effort`` means "the provider decides", not
-    off -- the same trap Gemini's ``thinking_budget`` and Anthropic's
-    ``thinking`` already have guards for here. It bites harder on OpenAI:
-    a provider-chosen effort combined with **function tools** is a hard 400 on
-    ``/v1/chat/completions`` ("To use function tools, use /v1/responses or set
-    reasoning_effort to 'none'"), so leaving it unset broke every tool-using
-    agent -- the coach and the interviewer -- outright.
-
-    Only ids whose catalog entry offers ``"none"`` can be turned off on
-    chat/completions. The rest (e.g. gpt-5.5-pro, which offers only
-    medium/high/xhigh) keep the provider default: sending them a "none" they do
-    not accept would trade one 400 for another, and the Responses API -- not a
-    fabricated effort -- is what unblocks function tools for those.
-    """
+def _openai_effort(model_id: str, *, reasoning: bool) -> str | None:
+    """Resolve the explicit effort for a catalogued OpenAI model."""
     entry = catalog_entry(model_id)
-    return "none" if entry and "none" in entry.reasoning_efforts else None
+    if entry is None or not entry.reasoning_efforts:
+        return None
+    if not reasoning:
+        return min(entry.reasoning_efforts, key=_EFFORT_ORDER.index)
+
+    selected = _reasoning_effort_for(model_id, "openai")
+    if selected in entry.reasoning_efforts:
+        return selected
+    target = _EFFORT_ORDER.index(selected)
+    return min(
+        entry.reasoning_efforts,
+        key=lambda effort: (
+            abs(_EFFORT_ORDER.index(effort) - target),
+            _EFFORT_ORDER.index(effort),
+        ),
+    )
+
+
+def _openai_max_output_tokens(*, reasoning: bool) -> int:
+    """Leave room for visible output after Responses API reasoning tokens."""
+    return 32000 if reasoning else 16000
+
+
+def _build_openai_responses(
+    model_id: str, *, api_key: str | None, reasoning: bool
+) -> Any:
+    """Build an OpenAI model with the shared Responses request policy."""
+    OpenAIResponses = _compatible_openai_responses_class()
+    effort = _openai_effort(model_id, reasoning=reasoning)
+    return OpenAIResponses(
+        id=split_provider(model_id)[1],
+        api_key=api_key,
+        # Agno's reasoning_effort Literal omits valid Responses values.
+        reasoning={"effort": effort} if effort is not None else None,
+        max_output_tokens=_openai_max_output_tokens(reasoning=reasoning),
+        # Agno requests encrypted reasoning for stateless tool-call replay.
+        store=False,
+    )
 
 
 def _gemini_interactions_thinking_level_for(
@@ -883,15 +891,7 @@ def build_model(
     reasoning_effort = _reasoning_effort_for(model_id, provider) if reasoning else None
     key = api_key or resolve_api_key(model_id) or None
     if provider == "openai":
-        OpenAIChat = _compatible_openai_chat_class()
-
-        return OpenAIChat(
-            id=model,
-            api_key=key,
-            reasoning_effort=(
-                reasoning_effort if reasoning else _openai_disabled_effort(model_id)
-            ),
-        )
+        return _build_openai_responses(model_id, api_key=key, reasoning=reasoning)
     if provider == "gemini":
         Gemini = _compatible_gemini_class()
 
@@ -961,19 +961,8 @@ def build_search_equipped(
     reasoning = reasoning and provider_capabilities(model_id).supports_reasoning
 
     if plan.strategy == "native_openai":
-        from agno.models.openai.responses import OpenAIResponses
-
         return (
-            OpenAIResponses(
-                id=model_name,
-                api_key=api_key,
-                reasoning_effort=(
-                    _openai_responses_reasoning_effort_for(model_id, plan.provider)
-                    if reasoning
-                    else None
-                ),
-                store=False,
-            ),
+            _build_openai_responses(model_id, api_key=api_key, reasoning=reasoning),
             [OPENAI_WEB_SEARCH_TOOL],
         )
     if plan.strategy == "native_gemini":
