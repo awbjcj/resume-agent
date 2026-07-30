@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRound } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -9,11 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { api, unwrap } from "@/lib/api/client";
 import { AuthLayout } from "./AuthLayout";
+import { AuthNotice, callbackErrorMessage } from "./AuthNotice";
 import { GoogleButton } from "./GoogleButton";
 
 export function LoginPage() {
+  const [params] = useSearchParams();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  // The Google callback can only report a refusal by redirecting here with
+  // ?error=<code>; without this the page rendered as an empty form.
+  const calloutError = callbackErrorMessage(params.get("error"));
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const login = useMutation({
@@ -34,6 +39,7 @@ export function LoginPage() {
       icon={<KeyRound aria-hidden="true" />}
       footer={<p className="text-center text-muted-foreground">New here? <Link className="font-medium text-foreground underline underline-offset-4" to="/register">Create an account</Link></p>}
     >
+      {calloutError ? <AuthNotice tone="error">{calloutError}</AuthNotice> : null}
       <form onSubmit={submit}>
         <FieldGroup>
           <Field>

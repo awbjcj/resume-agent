@@ -101,6 +101,30 @@ describe("LoginPage", () => {
   });
 });
 
+describe("auth callback notices", () => {
+  it("explains a Google sign-in that bounced back to login", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/login?error=google_conflict"]}>
+          <LoginPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(/already linked/i);
+  });
+
+  it("names an unknown callback code rather than rendering a blank form", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/login?error=something_new"]}>
+          <LoginPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(/didn.t complete/i);
+  });
+});
+
 describe("LogoutButton", () => {
   it("is hidden in open mode", async () => {
     server.use(
@@ -140,5 +164,69 @@ describe("RegisterPage", () => {
     await user.click(screen.getByRole("button", { name: /create account/i }));
     expect(registered).toBe(true);
     expect(await screen.findByText("Verify route")).toBeInTheDocument();
+  });
+
+  it("prefills a Google identity and still requires the emailed code", async () => {
+    let sent: { email?: string; displayName?: string | null } = {};
+    server.use(
+      http.post("/api/auth/register", async ({ request }) => {
+        sent = (await request.json()) as typeof sent;
+        return HttpResponse.json({ status: "sent" }, { status: 202 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter
+          initialEntries={[
+            "/register?from=google&email=newcomer%40umich.edu&name=New+Comer",
+          ]}
+        >
+          <Routes>
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<div>Verify route</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByLabelText(/^email$/i)).toHaveValue("newcomer@umich.edu");
+    expect(screen.getByLabelText(/display name/i)).toHaveValue("New Comer");
+    // Scoped by text, not by role: the password strength meter is a second
+    // role="status" live region on this page.
+    expect(screen.getByText(/no account matches/i)).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/^password$/i), "long-safe-password-42");
+    await user.type(screen.getByLabelText(/invite code/i), "inv_example");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    expect(await screen.findByText("Verify route")).toBeInTheDocument();
+    expect(sent.email).toBe("newcomer@umich.edu");
+    expect(sent.displayName).toBe("New Comer");
+  });
+
+  it("keeps the prefilled email editable", async () => {
+    let sent: { email?: string } = {};
+    server.use(
+      http.post("/api/auth/register", async ({ request }) => {
+        sent = (await request.json()) as typeof sent;
+        return HttpResponse.json({ status: "sent" }, { status: 202 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/register?from=google&email=wrong%40umich.edu"]}>
+          <Routes>
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<div>Verify route</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await user.clear(screen.getByLabelText(/^email$/i));
+    await user.type(screen.getByLabelText(/^email$/i), "right@umich.edu");
+    await user.type(screen.getByLabelText(/^password$/i), "long-safe-password-42");
+    await user.type(screen.getByLabelText(/invite code/i), "inv_example");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    expect(await screen.findByText("Verify route")).toBeInTheDocument();
+    expect(sent.email).toBe("right@umich.edu");
   });
 });
