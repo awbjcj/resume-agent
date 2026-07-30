@@ -1808,7 +1808,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "python-docx", specifier = ">=1.2.0" },
     { name = "python-pptx", specifier = ">=1.0.2" },
-    { name = "ruff", specifier = ">=0.15.18,<0.16.0" },
+    { name = "ruff", specifier = ">=0.15.18,<0.17.0" },
 ]
 
 [[package]]
