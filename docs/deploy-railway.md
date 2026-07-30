@@ -1,7 +1,8 @@
 # Deploying to Railway
 
-This is a single-user deployment: one service, one persistent volume, one
-replica, and one owner login.
+This is a public multi-user deployment: one service, one persistent volume,
+one replica, an owner/admin account, and email-verified self-registration.
+SQLite plus a Railway volume still requires a single replica.
 
 ## One-time setup
 
@@ -24,11 +25,19 @@ replica, and one owner login.
    | `AUTH_PASSWORD_HASH` | Output from `hash-password`       |
    | `SESSION_SECRET`     | The generated 64-character secret |
    | `API_TOKEN`          | Optional bearer token for scripts |
+   | `APP_BASE_URL`       | Canonical HTTPS origin, for example `https://resume.example.com` |
+   | `ALLOWED_HOSTS`      | Canonical host, for example `resume.example.com` |
    | `BROWSER_ENABLED`    | `false` (also the image default)  |
+   | `REGISTRATION_MODE`  | `open` for public registration; use `invite` for a controlled launch |
+   | `SECURE_COOKIES`     | `true` (also the image default; startup fails without HTTPS `APP_BASE_URL`) |
+   | `DISABLE_API_DOCS`   | `true` (also the image default) |
+   | `GLOBAL_DAILY_SIGNUP_LIMIT` | Maximum verification emails started per rolling day |
+   | `GLOBAL_WEEKLY_TOKEN_BUDGET` | Shared-key circuit breaker; `0` disables the global cap |
+   | `OPEN_SIGNUP_SHARED_KEYS` | Keep `false`; promote trusted users individually through the admin API |
 
-   Add LLM, GitHub, Adzuna, and LinkedIn secrets after login under Settings →
-   Keys. They persist in the volume-backed `.env`. Do not also set those in
-   Railway, because platform environment variables take precedence.
+   Add shared platform LLM keys as Railway variables. Users add their own keys
+   under Settings → Keys; those persist only in their tenant workspace. Public
+   accounts start BYOK-only unless an administrator grants shared-key access.
 
 5. Deploy and sign in at the Railway-provided domain.
 
@@ -111,9 +120,8 @@ client type from the **Desktop app** client used by the local CLI's
    https://YOUR-APP.up.railway.app/api/gmail/callback         # Gmail
    ```
 
-   The app derives these URLs itself from the request's
-   `X-Forwarded-Proto`/`X-Forwarded-Host` headers, which Railway sets
-   automatically — nothing else to configure on the app side. Add the
+   The app derives these URLs only from `APP_BASE_URL`; forwarded host headers
+   are never trusted for OAuth callbacks. Add the
    `http://localhost:8000` equivalents too if you also run `resume-agent serve`
    on your machine.
 5. Add Railway variables:
@@ -190,3 +198,11 @@ local browser. To update the cloud snapshot:
   skips its browser fallback.
 - Session cookies last 30 days. Rotate `SESSION_SECRET` to invalidate all live
   sessions; changing only the password hash does not revoke existing cookies.
+- The container forces Secure cookies and disables API docs. It refuses to
+  start unless `APP_BASE_URL` is an HTTPS origin.
+- Keep `OPEN_SIGNUP_SHARED_KEYS=false`. Use the admin user patch endpoint to
+  grant `sharedKeyAccess` only after review; per-user limits and the global
+  weekly circuit breaker are both enforced before provider calls.
+- User-influenced HTTP fetches use a shared public-address policy that pins DNS,
+  revalidates redirects, and caps response bytes. Add an external egress
+  firewall if your Railway/network plan supports destination controls.
