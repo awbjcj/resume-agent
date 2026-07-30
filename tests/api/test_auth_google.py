@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -148,6 +149,52 @@ def test_google_requires_exact_verified_boolean_before_email_link(mu_app, monkey
             .one()
         )
         assert owner.google_sub is None
+
+
+def test_google_login_without_an_account_prefills_registration(mu_app, monkeypatch):
+    """A login-mode miss hands the verified Google identity to the signup form.
+
+    It used to dead-end on /login?error=no_account, which the login page renders
+    as a blank form. No account is created here: the emailed code, not Google,
+    is what proves ownership of the address typed into that form.
+    """
+    _configure(mu_app)
+    _fake_google(
+        monkeypatch,
+        {
+            "sub": "google-stranger",
+            "email": "Newcomer@Umich.edu",
+            "email_verified": True,
+            "name": "New Comer",
+        },
+    )
+    with TestClient(mu_app) as client:
+        response = _callback(client, mu_app)
+    query = parse_qs(urlparse(response.headers["location"]).query)
+    assert urlparse(response.headers["location"]).path == "/register"
+    assert query["email"] == ["newcomer@umich.edu"]
+    assert query["name"] == ["New Comer"]
+    assert query["from"] == ["google"]
+    with Session(mu_app.state.system_engine) as session:
+        assert (
+            session.execute(select(User).where(User.google_sub == "google-stranger"))
+            .scalars()
+            .first()
+            is None
+        )
+
+
+def test_google_login_prefill_omits_a_name_google_did_not_send(mu_app, monkeypatch):
+    _configure(mu_app)
+    _fake_google(
+        monkeypatch,
+        {"sub": "google-nameless", "email": "nameless@example.com"},
+    )
+    with TestClient(mu_app) as client:
+        response = _callback(client, mu_app)
+    query = parse_qs(urlparse(response.headers["location"]).query)
+    assert query["email"] == ["nameless@example.com"]
+    assert "name" not in query
 
 
 def test_google_registration_consumes_invite_and_provisions_workspace(

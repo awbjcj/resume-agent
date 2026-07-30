@@ -6,6 +6,7 @@ import logging
 import shutil
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import RedirectResponse
@@ -120,6 +121,20 @@ def _failure(request: Request, target: str) -> RedirectResponse:
     return _finish(target)
 
 
+def _signup_target(email: str, name: str) -> str:
+    """Carry the Google identity to the signup form as an editable prefill.
+
+    Deliberately *not* a link: nothing here sets ``google_sub``, because a query
+    string is not proof of anything. The emailed verification code establishes
+    ownership of whatever address is submitted; a later Google sign-in then
+    links by verified email through the ``by_email`` branch above.
+    """
+    query = {"from": "google", "email": email}
+    if name:
+        query["name"] = name
+    return f"/register?{urlencode(query)}"
+
+
 def _sign_in(request: Request, settings: Settings, user: User) -> RedirectResponse:
     response = _finish("/")
     auth.set_session_cookie(
@@ -168,6 +183,9 @@ def google_callback(
     subject = str(claims.get("sub") or "")
     email = str(claims.get("email") or "").strip().casefold()
     verified = claims.get("email_verified") is True
+    # Capped to RegisterRequest.display_name's max_length so a long Google name
+    # cannot prefill the form with a value the register endpoint would reject.
+    display_name = str(claims.get("name") or "").strip()[:64]
     if not subject or not email:
         return _failure(request, "/login?error=exchange_failed")
 
@@ -216,7 +234,8 @@ def google_callback(
 
         if parsed.mode != "register":
             session.rollback()
-            return _failure(request, "/login?error=no_account")
+            logger.info("Google sign-in matched no account; routing to signup")
+            return _finish(_signup_target(email, display_name))
         if not verified:
             session.rollback()
             return _failure(request, "/register?error=unverified_google")
@@ -246,7 +265,7 @@ def google_callback(
         user = User(
             id=user_id,
             username=_available_username(
-                session, str(claims.get("name") or email.partition("@")[0]), user_id
+                session, display_name or email.partition("@")[0], user_id
             ),
             email=email,
             email_verified_at=now,
