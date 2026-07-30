@@ -31,6 +31,8 @@ def _metric(metrics: object, name: str) -> int:
     value = _value(metrics, name, 0) or 0
     if isinstance(value, (list, tuple)):
         value = sum(item or 0 for item in value)
+    if not isinstance(value, (int, float, str)):
+        return 0
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -39,8 +41,10 @@ def _metric(metrics: object, name: str) -> int:
 
 def _provider_cost_micros(metrics: object) -> int | None:
     value = _value(metrics, "cost")
+    if not isinstance(value, (int, float, str)):
+        return None
     try:
-        return round(float(value) * 1_000_000) if value is not None else None
+        return round(float(value) * 1_000_000)
     except (TypeError, ValueError):
         return None
 

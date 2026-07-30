@@ -4,7 +4,7 @@ import calendar
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, text
 from sqlalchemy.engine import Engine
@@ -105,11 +105,11 @@ def assign_new_member(
 ) -> None:
     """Create the FREE account and anchored first period in a signup transaction."""
 
-    _ensure_in_session(session, user_id, now or datetime.now(timezone.utc))
+    _ensure_in_session(session, user_id, now or datetime.now(UTC))
 
 
 def _aware(value: datetime) -> datetime:
-    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
 def _add_months(anchor: datetime, months: int) -> datetime:
@@ -193,9 +193,10 @@ def _ensure_in_session(
 def _snapshot(
     account: QuotaAccount, period: QuotaPeriod, tier: QuotaTier
 ) -> QuotaSnapshot:
-    unlimited = period.allowance_micros is None
+    allowance = period.allowance_micros
+    unlimited = allowance is None
     recurring_remaining = (
-        None if unlimited else max(0, period.allowance_micros - period.spent_micros)
+        None if allowance is None else max(0, allowance - period.spent_micros)
     )
     remaining = (
         None
@@ -222,7 +223,7 @@ def _snapshot(
 def ensure_quota_account(
     engine: Engine, user_id: str, *, now: datetime | None = None
 ) -> QuotaSnapshot:
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     with Session(engine) as session:
         session.execute(text("BEGIN IMMEDIATE"))
         account, period, tier = _ensure_in_session(session, user_id, moment)
@@ -245,7 +246,7 @@ def charge_shared_cost(
     preflight: bool = False,
     usage_event_id: int | None = None,
 ) -> QuotaSnapshot:
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     with Session(engine) as session:
         session.execute(text("BEGIN IMMEDIATE"))
         account, period, tier = _ensure_in_session(session, user_id, moment)
@@ -294,7 +295,7 @@ def grant_credit(
 ) -> QuotaSnapshot:
     if amount_micros <= 0:
         raise ValueError("credit must be positive")
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     with Session(engine) as session:
         account, period, tier = _ensure_in_session(session, user_id, moment)
         account.credit_balance_micros += amount_micros
@@ -316,7 +317,7 @@ def debit_credit(
 ) -> QuotaSnapshot:
     if amount_micros <= 0:
         raise ValueError("debit must be positive")
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     with Session(engine) as session:
         account, period, tier = _ensure_in_session(session, user_id, moment)
         if account.credit_balance_micros < amount_micros:
@@ -338,7 +339,7 @@ def debit_credit(
 def reset_current_period(
     engine: Engine, user_id: str, *, now: datetime | None = None
 ) -> QuotaSnapshot:
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     with Session(engine) as session:
         account, period, tier = _ensure_in_session(session, user_id, moment)
         refunded = period.credit_spent_micros
@@ -369,7 +370,7 @@ def change_tier(
     actor_user_id: str | None = None,
     reason: str | None = None,
 ) -> QuotaSnapshot:
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     with Session(engine) as session:
         account, period, _old_tier = _ensure_in_session(session, user_id, moment)
         tier = session.get(QuotaTier, tier_id)
@@ -401,18 +402,17 @@ def change_tier(
 
 
 def global_monthly_cost(engine: Engine, *, now: datetime | None = None) -> int:
-    moment = now or datetime.now(timezone.utc)
-    start = datetime(moment.year, moment.month, 1, tzinfo=timezone.utc)
+    moment = now or datetime.now(UTC)
+    start = datetime(moment.year, moment.month, 1, tzinfo=UTC)
     with Session(engine) as session:
-        return int(
-            session.execute(
-                select(func.coalesce(func.sum(UsageEvent.cost_micros), 0)).where(
-                    UsageEvent.own_key.is_(False),
-                    UsageEvent.ts >= start,
-                    UsageEvent.cost_micros.is_not(None),
-                )
-            ).scalar_one()
-        )
+        total = session.execute(
+            select(func.coalesce(func.sum(UsageEvent.cost_micros), 0)).where(
+                UsageEvent.own_key.is_(False),
+                UsageEvent.ts >= start,
+                UsageEvent.cost_micros.is_not(None),
+            )
+        ).scalar_one()
+        return int(total or 0)
 
 
 def create_operation_preview(
@@ -425,7 +425,7 @@ def create_operation_preview(
     amount_micros: int | None,
     now: datetime | None = None,
 ) -> QuotaOperationPreview:
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     if target_type not in {"USER", "TIER", "ALL_MEMBERS"}:
         raise ValueError("invalid quota target")
     if action_type not in {"RESET_CURRENT_PERIOD", "GRANT_CREDIT", "DEBIT_CREDIT"}:
@@ -470,7 +470,7 @@ def execute_operation(
     idempotency_key: str,
     now: datetime | None = None,
 ) -> QuotaOperation:
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     if not reason.strip():
         raise ValueError("reason is required")
     with Session(engine, expire_on_commit=False) as session:

@@ -1,13 +1,14 @@
-from datetime import datetime, timezone
-from concurrent.futures import ThreadPoolExecutor
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from types import SimpleNamespace
+
 import pytest
 from sqlalchemy.orm import Session
 
-from resume_agent.tenancy.costs import MeteredUsage, calculate_cost, seed_llm_rates
 from resume_agent.config import Settings
 from resume_agent.tenancy.context import UserContext, use_context
+from resume_agent.tenancy.costs import MeteredUsage, calculate_cost, seed_llm_rates
 from resume_agent.tenancy.limits import CostRateUnavailableError, enforce_agent_budget
 from resume_agent.tenancy.quotas import (
     CostQuotaExceededError,
@@ -28,8 +29,7 @@ from resume_agent.tenancy.system_db import (
 )
 from resume_agent.tenancy.workspace import WorkspacePaths
 
-
-NOW = datetime(2026, 7, 30, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
 
 
 def _engine(tmp_path):
@@ -88,7 +88,7 @@ def test_free_period_credit_reset_and_bounded_overage(tmp_path):
     engine = _engine(tmp_path)
     account = ensure_quota_account(engine, "abc123def456", now=NOW)
     assert account.tier_id == "FREE"
-    assert account.period_end == datetime(2026, 8, 6, 12, 0, tzinfo=timezone.utc)
+    assert account.period_end == datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
     assert account.allowance_micros == 1_000_000
 
     charge_shared_cost(engine, "abc123def456", 900_000, now=NOW)
@@ -123,7 +123,7 @@ def test_tier_change_starts_monthly_period_and_preserves_credit(tmp_path):
     assert changed.allowance_micros == 20_000_000
     assert changed.credit_balance_micros == 500_000
     assert changed.period_start == NOW
-    assert changed.period_end == datetime(2026, 8, 30, 12, 0, tzinfo=timezone.utc)
+    assert changed.period_end == datetime(2026, 8, 30, 12, 0, tzinfo=UTC)
 
 
 def test_custom_tier_zero_is_zero_not_unlimited(tmp_path):
@@ -146,16 +146,16 @@ def test_custom_tier_zero_is_zero_not_unlimited(tmp_path):
 
 def test_month_end_anchor_clamps_without_drifting(tmp_path):
     engine = _engine(tmp_path)
-    jan_31 = datetime(2026, 1, 31, 9, 30, tzinfo=timezone.utc)
+    jan_31 = datetime(2026, 1, 31, 9, 30, tzinfo=UTC)
     ensure_quota_account(engine, "abc123def456", now=jan_31)
     feb = change_tier(engine, "abc123def456", "SUBSCRIBER", now=jan_31)
-    assert feb.period_end == datetime(2026, 2, 28, 9, 30, tzinfo=timezone.utc)
+    assert feb.period_end == datetime(2026, 2, 28, 9, 30, tzinfo=UTC)
     rolled = quota_snapshot(
         engine,
         "abc123def456",
-        now=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        now=datetime(2026, 3, 1, tzinfo=UTC),
     )
-    assert rolled.period_end == datetime(2026, 3, 31, 9, 30, tzinfo=timezone.utc)
+    assert rolled.period_end == datetime(2026, 3, 31, 9, 30, tzinfo=UTC)
 
 
 def test_effective_rate_version_preserves_historical_sonnet_price(tmp_path):
@@ -168,7 +168,7 @@ def test_effective_rate_version_preserves_historical_sonnet_price(tmp_path):
     )
     july = calculate_cost(engine, usage, now=NOW)
     september = calculate_cost(
-        engine, usage, now=datetime(2026, 9, 2, tzinfo=timezone.utc)
+        engine, usage, now=datetime(2026, 9, 2, tzinfo=UTC)
     )
     assert july.total_micros == 12_000_000
     assert september.total_micros == 18_000_000
@@ -182,7 +182,7 @@ def test_enforcement_rejects_unknown_shared_rate_but_allows_byok(tmp_path):
         username="alice",
         role="user",
         paths=WorkspacePaths(tmp_path / "users" / "abc123def456"),
-        settings=Settings(_env_file=None, cost_quota_enforcement="enforce"),
+        settings=Settings(_env_file=None, cost_quota_enforcement="enforce"),  # type: ignore[call-arg]
         engine=None,
         system_engine=engine,
         own_key_providers=frozenset(),
@@ -241,7 +241,7 @@ def test_admin_is_user_exempt_but_still_stopped_by_platform_cap(tmp_path):
         username="owner",
         role="admin",
         paths=WorkspacePaths(tmp_path / "users" / "admin000001"),
-        settings=Settings(_env_file=None, cost_quota_enforcement="enforce"),
+        settings=Settings(_env_file=None, cost_quota_enforcement="enforce"),  # type: ignore[call-arg]
         engine=None,
         system_engine=engine,
         own_key_providers=frozenset(),
