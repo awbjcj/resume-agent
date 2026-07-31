@@ -264,13 +264,15 @@ must go through — see ADR-0008.
 ### Registration modes and platform spend governance (ADR-0009)
 
 `Settings.registration_mode` (`closed` / `invite` / `open`) is a business
-decision independent of shared-key eligibility: open registration lets anyone
-verify an email and create an account, but `User.shared_key_access` (default
-`True` for invited users, `Settings.open_signup_shared_keys` — default
-`False` — for open self-registered ones) decides whether that account may use
-the _platform's_ LLM keys at all versus needing to bring its own. This closes
-the Sybil-multiplication gap the threat model flagged: creating accounts
-cheaply no longer creates shared-key spend by itself.
+decision independent of shared-key eligibility. `User.shared_key_access`
+(`auth_register.py`, `auth_google.py`) defaults to `True` for every new
+account, invited or self-registered — there is no `open_signup_shared_keys`
+setting; ADR-0009's Consequences section records that the original
+per-signup-path default was superseded once the signup-rate limit
+(`Settings.global_daily_signup_limit`), per-member allowance, and the
+platform-wide monthly cap (below) became the actual Sybil-multiplication
+controls. An admin can still flip `shared_key_access` off per user through the
+admin-users API.
 
 - `api/attempts.py::consume_global_signup` is an atomic (`BEGIN IMMEDIATE`),
   rolling-24h counter independent of per-email/per-IP attempt budgets, capping
