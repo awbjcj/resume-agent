@@ -68,7 +68,9 @@ def test_system_migration_preserves_legacy_users(tmp_path):
         session.commit()
     migrate_system_db(engine)
     with Session(engine) as session:
-        assert session.get(User, "u1").shared_key_access is False
+        user = session.get(User, "u1")
+        assert user is not None
+        assert user.shared_key_access is False
 
 
 def test_session_epoch_revokes_an_existing_cookie():

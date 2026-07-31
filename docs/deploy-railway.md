@@ -19,22 +19,23 @@ SQLite plus a Railway volume still requires a single replica.
 
 4. Add Railway variables:
 
-   | Variable             | Value                             |
-   | -------------------- | --------------------------------- |
-   | `AUTH_USERNAME`      | Owner login name                  |
-   | `AUTH_PASSWORD_HASH` | Output from `hash-password`       |
-   | `SESSION_SECRET`     | The generated 64-character secret |
-   | `API_TOKEN`          | Optional bearer token for scripts |
-   | `APP_BASE_URL`       | Canonical HTTPS origin, for example `https://resume.example.com` |
-   | `ALLOWED_HOSTS`      | Canonical host, for example `resume.example.com` |
-   | `BROWSER_ENABLED`    | `false` (also the image default)  |
-   | `REGISTRATION_MODE`  | `open` for public registration; use `invite` for a controlled launch |
-   | `SECURE_COOKIES`     | `true` (also the image default; startup fails without HTTPS `APP_BASE_URL`) |
-   | `DISABLE_API_DOCS`   | `true` (also the image default) |
-   | `GLOBAL_DAILY_SIGNUP_LIMIT` | Maximum verification emails started per rolling day |
-   | `COST_QUOTA_ENFORCEMENT` | `shadow` dual-records USD while token enforcement remains active; `enforce` enables cost quotas |
-   | `GLOBAL_MONTHLY_COST_QUOTA_MICROS` | Shared-key UTC calendar-month cap in USD micro-units; defaults to `$500` |
-   | `GLOBAL_WEEKLY_TOKEN_BUDGET` | Deprecated stage-one token circuit breaker; used only while cost quotas are in `shadow` mode |
+   | Variable                           | Value                                                                                           |
+   | ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+   | `AUTH_USERNAME`                    | Owner login name                                                                                |
+   | `AUTH_PASSWORD_HASH`               | Output from `hash-password`                                                                     |
+   | `SESSION_SECRET`                   | The generated 64-character secret                                                               |
+   | `API_TOKEN`                        | Optional bearer token for scripts                                                               |
+   | `APP_BASE_URL`                     | Canonical HTTPS origin, for example `https://resume.example.com`                                |
+   | `ALLOWED_HOSTS`                    | Canonical host, for example `resume.example.com`                                                |
+   | `BROWSER_ENABLED`                  | `false` (also the image default)                                                                |
+   | `REGISTRATION_MODE`                | `open` for public registration; use `invite` for a controlled launch                            |
+   | `SECURE_COOKIES`                   | `true` (also the image default; startup fails without HTTPS `APP_BASE_URL`)                     |
+   | `DISABLE_API_DOCS`                 | `true` (also the image default)                                                                 |
+   | `GLOBAL_DAILY_SIGNUP_LIMIT`        | Maximum verification emails started per rolling day                                             |
+   | `COST_QUOTA_ENFORCEMENT`           | `shadow` dual-records USD while token enforcement remains active; `enforce` enables cost quotas |
+   | `GLOBAL_MONTHLY_COST_QUOTA_MICROS` | Shared-key UTC calendar-month cap in USD micro-units; defaults to `$500`                        |
+   | `GLOBAL_WEEKLY_TOKEN_BUDGET`       | Deprecated stage-one token circuit breaker; used only while cost quotas are in `shadow` mode    |
+
    Add `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and/or
    `DEEPSEEK_API_KEY` as Railway variables. Every admin, free member, and
    subscriber uses a matching shared key first. Users add fallback keys under
@@ -64,10 +65,10 @@ deploying.
    account — enough to test, not enough to invite anyone.
 3. Add Railway variables:
 
-   | Variable         | Value                                             |
-   | ---------------- | ------------------------------------------------- |
-   | `RESEND_API_KEY` | The key you just created                          |
-   | `MAIL_FROM`      | `noreply@your-verified-domain.com`                |
+   | Variable         | Value                              |
+   | ---------------- | ---------------------------------- |
+   | `RESEND_API_KEY` | The key you just created           |
+   | `MAIL_FROM`      | `noreply@your-verified-domain.com` |
 
 `RESEND_API_KEY` takes precedence over any `SMTP_*` variables, so you can
 leave a previous SMTP attempt in place. `MAIL_FROM` falls back to `SMTP_FROM`
@@ -126,6 +127,7 @@ client type from the **Desktop app** client used by the local CLI's
    are never trusted for OAuth callbacks. Add the
    `http://localhost:8000` equivalents too if you also run `resume-agent serve`
    on your machine.
+
 5. Add Railway variables:
 
    | Variable                     | Value                             |
