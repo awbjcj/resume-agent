@@ -2,7 +2,7 @@
 
 import pytest
 
-from resume_agent.sessions.turns import TurnRejected, format_with_retry
+from resume_agent.sessions.turns import DraftRejected, TurnRejected, format_with_retry
 
 
 class _Out:
@@ -27,7 +27,7 @@ class _Formatter:
 def test_happy_path_formats_once():
     formatter = _Formatter([_Out("ok")])
     result = format_with_retry(
-        formatter, "raw notes", _Out, lambda out: out, label="COACH NOTES"
+        formatter, "raw notes", _Out, lambda out, strict: out, label="COACH NOTES"
     )
     assert result.value == "ok"
     assert formatter.prompts == ["COACH NOTES (UNTRUSTED):\nraw notes"]
@@ -36,30 +36,38 @@ def test_happy_path_formats_once():
 def test_wrong_type_raises_typeerror():
     formatter = _Formatter(["not the schema"])
     with pytest.raises(TypeError, match="Expected _Out"):
-        format_with_retry(formatter, "n", _Out, lambda out: out, label="X")
+        format_with_retry(formatter, "n", _Out, lambda out, strict: out, label="X")
 
 
 def test_rejection_retries_once_with_feedback():
     formatter = _Formatter([_Out("bad"), _Out("good")])
 
-    def validate(out):
+    modes = []
+
+    def validate(out, strict):
+        modes.append(strict)
         if out.value == "bad":
             raise TurnRejected("quote missing")
         return out
 
     result = format_with_retry(formatter, "n", _Out, validate, label="INTERVIEWER NOTES")
     assert result.value == "good"
+    assert modes == [True, False]
     assert "PREVIOUS OUTPUT REJECTED: quote missing" in formatter.prompts[1]
 
 
 def test_second_rejection_propagates():
     formatter = _Formatter([_Out("bad"), _Out("bad")])
 
-    def validate(out):
+    def validate(out, strict):
         raise TurnRejected("still wrong")
 
     with pytest.raises(TurnRejected):
         format_with_retry(formatter, "n", _Out, validate, label="X")
+
+
+def test_draft_rejected_remains_a_turn_rejection():
+    assert issubclass(DraftRejected, TurnRejected)
 
 
 def test_turn_rejected_is_one_class_everywhere():

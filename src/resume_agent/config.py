@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     open_signup_max_active_jobs: int = Field(default=100, ge=0)
     open_signup_max_concurrent_runs: int = Field(default=1, ge=0)
     browser_enabled: bool = True
+    stream_enabled: bool = True
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
     # Concurrency + retry for LLM fan-out (discovery + tailor).
     llm_concurrency: int = Field(default=8, ge=1)

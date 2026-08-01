@@ -2,7 +2,7 @@ import asyncio
 import logging
 import re
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
@@ -13,6 +13,15 @@ from typing import Any, Literal, Protocol, TypeVar, cast
 from pydantic import BaseModel
 
 from resume_agent.config import Settings, get_settings
+from resume_agent.sessions.stream import (
+    Completed,
+    Failed,
+    ReasoningDelta,
+    StreamEvent,
+    TextDelta,
+    ToolCompleted,
+    ToolStarted,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +116,56 @@ class AgentRunner:
                 await asyncio.sleep(settings.llm_retry_delay * (2**attempt))
         raise AssertionError("unreachable")
 
+    def stream(self, prompt: str) -> Iterator[StreamEvent]:
+        """Yield provider-neutral events, retrying only before visible output."""
+        settings = get_settings()
+        for attempt in range(settings.llm_retries + 1):
+            emitted = False
+            try:
+                refresh_agent_api_key(self._agent)
+                from resume_agent.tenancy.limits import enforce_agent_budget
+
+                enforce_agent_budget(self._agent)
+                raw_stream = self._agent.run(
+                    prompt,
+                    stream=True,
+                    stream_events=True,
+                    yield_run_output=True,
+                )
+                terminal_output: Any | None = None
+                for raw in raw_stream:
+                    tag = _stream_event_tag(raw)
+                    if tag is None:
+                        terminal_output = raw
+                        continue
+                    for event in _map_stream_event(tag, raw):
+                        if isinstance(event, Failed):
+                            yield event
+                            return
+                        emitted = True
+                        yield event
+                if terminal_output is None:
+                    yield Failed(
+                        "The model stream ended without a final response.",
+                        "MISSING_RUN_OUTPUT",
+                    )
+                    return
+                from resume_agent.tenancy.usage import record_call
+
+                record_call(self._agent, terminal_output)
+                yield Completed(terminal_output)
+                return
+            except Exception as exc:
+                if (
+                    emitted
+                    or attempt >= settings.llm_retries
+                    or not is_transient(exc)
+                ):
+                    yield Failed(str(exc), type(exc).__name__)
+                    return
+                time.sleep(settings.llm_retry_delay * (2**attempt))
+        raise AssertionError("unreachable")
+
     async def aclose(self) -> None:
         """Close and detach the SDK's cached async client on its active loop."""
         model = cast(_ModelWithAsyncClient | None, getattr(self._agent, "model", None))
@@ -124,6 +183,66 @@ class AgentRunner:
         finally:
             if getattr(model, "async_client", None) is client:
                 model.async_client = None
+
+
+def _stream_event_tag(raw: Any) -> str | None:
+    """Return Agno's stable event value; a terminal RunOutput has no event."""
+    event = getattr(raw, "event", None)
+    if event is None:
+        return None
+    value = getattr(event, "value", event)
+    return value if isinstance(value, str) and value else ""
+
+
+def _stream_preview(value: object, limit: int = 160) -> str:
+    text = value if isinstance(value, str) else repr(value)
+    compact = " ".join(text.split())
+    return compact if len(compact) <= limit else compact[: limit - 1] + "…"
+
+
+def _map_stream_event(tag: str, raw: Any) -> list[StreamEvent]:
+    """Map one pinned-Agno event to zero or more stable application events."""
+    if tag in {"RunContent", "RunIntermediateContent"}:
+        events: list[StreamEvent] = []
+        reasoning = getattr(raw, "reasoning_content", None)
+        if isinstance(reasoning, str) and reasoning:
+            events.append(ReasoningDelta(reasoning))
+        content = getattr(raw, "content", None)
+        if isinstance(content, str) and content:
+            events.append(TextDelta(content))
+        return events
+    if tag == "ReasoningContentDelta":
+        content = getattr(raw, "reasoning_content", None) or getattr(
+            raw, "content", ""
+        )
+        return [ReasoningDelta(content)] if isinstance(content, str) and content else []
+    if tag == "ToolCallStarted":
+        tool = getattr(raw, "tool", None)
+        name = str(getattr(tool, "tool_name", "") or "tool")
+        call_id = str(getattr(tool, "tool_call_id", "") or name)
+        return [
+            ToolStarted(
+                call_id, name, _stream_preview(getattr(tool, "tool_args", ""))
+            )
+        ]
+    if tag in {"ToolCallCompleted", "ToolCallError"}:
+        tool = getattr(raw, "tool", None)
+        name = str(getattr(tool, "tool_name", "") or "tool")
+        call_id = str(getattr(tool, "tool_call_id", "") or name)
+        error = getattr(raw, "error", None) or getattr(
+            tool, "tool_call_error", None
+        )
+        ok = tag == "ToolCallCompleted" and not error
+        result = error if error else getattr(tool, "result", "")
+        return [ToolCompleted(call_id, name, _stream_preview(result), ok)]
+    if tag == "RunError":
+        message = getattr(raw, "content", None) or "The model reported an error."
+        code = getattr(raw, "error_type", None) or "RunError"
+        return [Failed(str(message), str(code))]
+    if tag == "RunCancelled":
+        message = getattr(raw, "reason", None) or "cancelled"
+        return [Failed(str(message), "CANCELLED")]
+    return []
 
 
 async def aclose_runner(runner: Any) -> None:
