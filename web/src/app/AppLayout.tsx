@@ -6,6 +6,7 @@ import {
   Kanban,
   LayoutDashboard,
   MessageCircleMore,
+  MessagesSquare,
   Settings,
   CircleUserRound,
   ShieldCheck,
@@ -26,13 +27,16 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import { RunActions } from "@/features/runs/RunActions";
 import { ActiveInterviewBanner } from "@/features/interview/ActiveInterviewBanner";
+import { useInterviewSessions } from "@/features/interview/use-interview";
 import { RunPanel } from "@/features/runs/RunPanel";
 import { useRehydrateRuns } from "@/features/runs/use-rehydrate-runs";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -54,6 +58,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     items: [
       { to: "/profile", label: "Profile", icon: UserRound },
       { to: "/coach", label: "Profile coach", icon: MessageCircleMore },
+      { to: "/interview", label: "Mock interviews", icon: MessagesSquare },
     ],
   },
   {
@@ -73,13 +78,14 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   },
 ];
 
-function NavMenuItem({ item }: { item: NavItem }) {
+function NavMenuItem({ item, badge }: { item: NavItem; badge?: number }) {
   // base-ui render prop keeps a single interactive element (the NavLink);
   // NavLink sets aria-current="page" when active.
+  const badged = Boolean(badge);
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        className="h-10 rounded-lg px-3 text-[0.95rem]"
+        className={cn("h-10 rounded-lg px-3 text-[0.95rem]", badged && "pr-9")}
         render={
           <NavLink to={item.to} end={item.end}>
             <item.icon className="size-4" aria-hidden="true" />
@@ -87,6 +93,15 @@ function NavMenuItem({ item }: { item: NavItem }) {
           </NavLink>
         }
       />
+      {badged ? (
+        // The badge's own `peer-data-[size=default]:top-1.5` assumes an h-8
+        // button; ours is h-10, so centre it — `!` is needed to outrank that
+        // higher-specificity variant.
+        <SidebarMenuBadge className="top-1/2! -translate-y-1/2 bg-primary/15 text-primary">
+          {badge}
+          <span className="sr-only"> in progress</span>
+        </SidebarMenuBadge>
+      ) : null}
     </SidebarMenuItem>
   );
 }
@@ -94,6 +109,14 @@ function NavMenuItem({ item }: { item: NavItem }) {
 export function AppLayout() {
   useRehydrateRuns();
   const me = useMe();
+  // Shares the cached query the interview banner already runs, so the nav count
+  // costs no extra request.
+  const interviewSessions = useInterviewSessions();
+  const navBadges: Record<string, number> = {
+    "/interview": (interviewSessions.data?.sessions ?? []).filter(
+      (session) => session.status === "active",
+    ).length,
+  };
   return (
     <SidebarProvider>
       <Sidebar className="border-r border-sidebar-border/80 bg-sidebar/95">
@@ -124,7 +147,7 @@ export function AppLayout() {
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">
                   {group.items.map((item) => (
-                    <NavMenuItem key={item.to} item={item} />
+                    <NavMenuItem key={item.to} item={item} badge={navBadges[item.to]} />
                   ))}
                 </SidebarMenu>
               </SidebarGroupContent>

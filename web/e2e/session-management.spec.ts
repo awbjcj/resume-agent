@@ -35,6 +35,26 @@ test("dashboard attention and in-progress cards lead into the interview hub", as
   await expect(page.getByText("Tell me about a difficult project.")).toBeVisible();
 });
 
+test("the sidebar is a direct entry point to the interview hub", async ({ page }) => {
+  await page.goto("/");
+  const navLink = page.getByRole("link", { name: "Mock interviews" });
+  await expect(navLink).toBeVisible();
+  // The badge counts sessions still in progress, centred on the taller nav row
+  // (its own default offset assumes a shorter button).
+  await expect(page.getByText("1 in progress")).toBeVisible();
+  const centres = await page.evaluate(() => {
+    const label = [...document.querySelectorAll("a span")].find((s) => s.textContent === "Mock interviews")!;
+    const badge = document.querySelector("[data-slot=sidebar-menu-badge]")!;
+    const box = (el: Element) => { const r = el.getBoundingClientRect(); return r.top + r.height / 2; };
+    return { label: box(label), badge: box(badge) };
+  });
+  expect(Math.abs(centres.label - centres.badge)).toBeLessThanOrEqual(1);
+  await navLink.click();
+  await expect(page).toHaveURL(/\/interview$/);
+  await expect(page.getByRole("heading", { name: "Sessions" })).toBeVisible();
+  await expect(page.getByText("Tell me about a difficult project.")).toBeVisible();
+});
+
 test("session management remains aligned at mobile width", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/interview?session=s1");
