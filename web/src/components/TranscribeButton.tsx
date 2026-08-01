@@ -93,9 +93,12 @@ export function TranscribeButton({
       </Button>
     );
   }
+  // The icon-only phases use `icon-sm` so this button is the same 36px square as
+  // the composer's send/stop control it sits beside; `recording` keeps the wider
+  // `sm` size because it also renders the elapsed-seconds readout.
   if (phase === "uploading") {
     return (
-      <Button type="button" variant="ghost" size="sm" disabled aria-label="Transcribing">
+      <Button type="button" variant="ghost" size="icon-sm" disabled aria-label="Transcribing">
         <Loader2 className="h-4 w-4 animate-spin" />
       </Button>
     );
@@ -105,7 +108,7 @@ export function TranscribeButton({
       <Button
         type="button"
         variant="outline"
-        size="sm"
+        size="icon-sm"
         onClick={() => blobRef.current && void send(blobRef.current)}
         aria-label="Retry transcription"
       >
@@ -117,7 +120,7 @@ export function TranscribeButton({
     <Button
       type="button"
       variant="ghost"
-      size="sm"
+      size="icon-sm"
       disabled={disabled}
       onClick={() => void start()}
       aria-label="Record a voice answer"
