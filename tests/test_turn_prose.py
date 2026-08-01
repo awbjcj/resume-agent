@@ -1,5 +1,5 @@
 from resume_agent.sessions.stream import TextDelta
-from resume_agent.sessions.turns import DELIMITER, ProseEmitter
+from resume_agent.sessions.turns import DELIMITER, MARKER_MAX_LEN, ProseEmitter
 
 
 class _Recorder:
@@ -70,14 +70,19 @@ def test_holdback_flushes_on_finish_and_finish_is_idempotent():
 
 
 def test_long_prose_streams_before_finish():
+    # The holdback floor is whatever the longest possible marker needs, so a
+    # marker arriving one delta at a time can never be flushed as prose. A
+    # caller asking for less gets the floor, not their number.
     sink = _Recorder()
     emitter = ProseEmitter(sink, holdback=8)
+    floor = MARKER_MAX_LEN + 2
+    body = "x" * (floor + 10)
 
-    emitter.feed("abcdefghijklmnopqrstuvwx")
+    emitter.feed(body)
 
-    assert sink.text == "abcdefgh"
+    assert sink.text == "x" * 10
     emitter.finish()
-    assert sink.text == "abcdefghijklmnopqrstuvwx"
+    assert sink.text == body
 
 
 def test_full_output_preserves_delimiter_and_metadata_for_formatter():

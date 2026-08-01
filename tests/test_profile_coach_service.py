@@ -208,28 +208,37 @@ def test_partial_stream_failure_leaves_session_byte_equivalent(tmp_path):
     assert load_session(tmp_path, sid) == before
 
 
-def test_missing_delimiter_fails_the_turn_instead_of_leaking_formatter_input(tmp_path):
+def test_missing_delimiter_degrades_instead_of_losing_the_turn(tmp_path):
+    # DeepSeek v4 never emits the sentinel -- verified against the live coach
+    # prompt with thinking on and off, while Claude honours it -- and the run
+    # completes normally, so there is nothing to retry. Failing here threw away
+    # a perfectly good answer the formatter can still structure, so the whole
+    # response becomes both the visible reply and the formatter's notes.
     sid = _open(tmp_path)["sessionId"]
-    before = load_session(tmp_path, sid)
+    reply = "Strong answer with no delimiter at all."
 
     class NoDelimiterStream(StreamingAgent):
         def __init__(self):
-            self.full = "Strong answer with no delimiter at all."
+            self.full = reply
 
-    with pytest.raises(RuntimeError, match="delimiter"):
-        run_message_turn(
-            FakeReporter(),
-            profile_dir=tmp_path,
-            session_id=sid,
-            message="I improved deploys.",
-            coach_agent=NoDelimiterStream(),
-            formatter_agent=FakeAgent(
-                CoachTurn(message="must not persist", action="ask", topic_id="t1")
-            ),
-            sink=RecordingSink(),
-        )
+    formatter = FakeAgent(
+        CoachTurn(message="formatted", action="ask", topic_id="t1")
+    )
+    view = run_message_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        session_id=sid,
+        message="I improved deploys.",
+        coach_agent=NoDelimiterStream(),
+        formatter_agent=formatter,
+        sink=RecordingSink(),
+    )
 
-    assert load_session(tmp_path, sid) == before
+    # The undelimited response reaches the formatter as notes...
+    assert reply in formatter.prompts[0]
+    # ...and the prose the user already watched stream is what gets stored,
+    # not the formatter's paraphrase.
+    assert view["turns"][-1]["text"] == reply
 
 
 def test_stream_checks_cancellation_before_each_visible_event(tmp_path):
