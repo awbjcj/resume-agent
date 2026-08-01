@@ -5,7 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from pydantic.alias_generators import to_camel
 
-from resume_agent.api.deps import get_env_path, refresh_app_settings
+from resume_agent.api.deps import (
+    get_env_path,
+    get_settings_dep,
+    refresh_app_settings,
+)
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.secrets import (
     SECRET_FIELDS,
@@ -19,6 +23,7 @@ from resume_agent.llm_runner import (
     MODEL_CATALOG,
     PROVIDER_LABELS,
     catalog_entry,
+    model_access_available,
     provider_capabilities,
     supports_native_search,
 )
@@ -33,13 +38,6 @@ _MODEL_ENV = {
     "cheap_reasoning_effort": "CHEAP_REASONING_EFFORT",
     "mid_reasoning_effort": "MID_REASONING_EFFORT",
     "premium_reasoning_effort": "PREMIUM_REASONING_EFFORT",
-}
-
-_PROVIDER_KEY_ENV = {
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "gemini": "GEMINI_API_KEY",
-    "deepseek": "DEEPSEEK_API_KEY",
 }
 
 
@@ -79,7 +77,7 @@ def get_models(request: Request):
 
 @router.get("/config/models/catalog", response_model=list[ProviderModelCatalog])
 def get_model_catalog(request: Request):
-    env = read_env(get_env_path(request))
+    settings = get_settings_dep(request)
     catalogs = []
     for provider, entries in MODEL_CATALOG.items():
         models = [
@@ -96,7 +94,10 @@ def get_model_catalog(request: Request):
             ProviderModelCatalog(
                 provider=provider,
                 label=PROVIDER_LABELS[provider],
-                has_key=bool(env.get(_PROVIDER_KEY_ENV[provider])),
+                has_key=any(
+                    model_access_available(entry.id, settings=settings)
+                    for entry in entries
+                ),
                 models=models,
             )
         )

@@ -8,7 +8,6 @@ from typing import cast
 from fastapi import APIRouter, Request
 
 from resume_agent.api.schemas.config import ProfileConfigDoc, SearchConfigDoc
-from resume_agent.api.schemas.secrets import LLM_KEY_ENV_VARS
 from resume_agent.api.schemas.setup import (
     ProfileStatus,
     SearchStatus,
@@ -16,12 +15,11 @@ from resume_agent.api.schemas.setup import (
     SetupStatusOut,
     SourcesStatus,
 )
-from resume_agent.services.env_config import read_env
+from resume_agent.llm_runner import MODEL_CATALOG, provider_access_available
 from resume_agent.services.sources import list_sources
 from resume_agent.api.deps import (
     get_config_store,
     get_document_store,
-    get_env_path,
     get_profile_dir,
     get_settings_dep,
 )
@@ -31,15 +29,17 @@ router = APIRouter()
 
 @router.get("/setup/status", response_model=SetupStatusOut)
 def get_setup_status(request: Request):
-    env = read_env(get_env_path(request))
+    settings = get_settings_dep(request)
     secrets = SecretsStatus(
-        anthropic_key=bool(env.get("ANTHROPIC_API_KEY")),
-        any_llm_key=any(env.get(k) for k in LLM_KEY_ENV_VARS),
+        anthropic_key=provider_access_available("anthropic", settings=settings),
+        any_llm_key=any(
+            provider_access_available(provider, settings=settings)
+            for provider in MODEL_CATALOG
+        ),
     )
 
     document_store = get_document_store(request)
     config_store = get_config_store(request)
-    settings = get_settings_dep(request)
     docs = document_store.list()
     facts_path = get_profile_dir(request) / "facts.json"
     facts_built_at = (

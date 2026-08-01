@@ -13,9 +13,9 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from resume_agent.api.deps import (
     get_config_store,
     get_document_store,
-    get_env_path,
     get_profile_dir,
     get_run_manager,
+    get_settings_dep,
 )
 from resume_agent.api.errors import ApiException
 from resume_agent.api.uploads import UploadTooLargeError, read_upload_async
@@ -40,7 +40,7 @@ from resume_agent.api.schemas.profile import (
     UrlIn,
 )
 from resume_agent.api.schemas.runs import RunOut
-from resume_agent.api.schemas.secrets import LLM_KEY_ENV_VARS
+from resume_agent.llm_runner import model_access_available
 from resume_agent.profile.corpus import (
     _UNSET,
     SourceMode,
@@ -56,7 +56,6 @@ from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
 from resume_agent.profile.synthesis import profile_skeleton
 from resume_agent.services import profile_build, profile_groups, profile_skills
-from resume_agent.services.env_config import read_env
 from resume_agent.services.profile_documents import DocumentError, DocumentStore
 from resume_agent.taxonomy.groups import SKILL_GROUPS
 
@@ -97,19 +96,12 @@ def delete_document(doc_id: str, request: Request):
 
 @router.post("/profile/build", response_model=RunOut, status_code=202)
 def launch_profile_build(request: Request, mgr: RunManager = Depends(get_run_manager)):
-    # Read the key from the injected env_path — NOT app.state.settings, which
-    # create_app seeds from the global get_settings() (the real .env / OS env)
-    # and never re-reads env_path at startup. Using env_path keeps this gate
-    # consistent with GET /api/setup/status and makes the offline test
-    # deterministic regardless of the developer's real env. Any configured LLM
-    # key satisfies this — profile build uses Settings.mid_model, which may
-    # select a non-Anthropic provider (see llm_runner.split_provider).
-    env = read_env(get_env_path(request))
-    if not any(env.get(k) for k in LLM_KEY_ENV_VARS):
+    settings = get_settings_dep(request)
+    if not model_access_available(settings.mid_model, settings=settings):
         raise ApiException(
             400,
             "SETUP_INCOMPLETE",
-            "No LLM API key is set — add one in Settings > API Keys",
+            "No funded LLM key is available — add one in Settings > API Keys",
         )
     return _launch_build(request, mgr)
 
