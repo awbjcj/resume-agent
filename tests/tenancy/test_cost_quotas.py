@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session
 
 from resume_agent.config import Settings
 from resume_agent.tenancy.context import UserContext, use_context
-from resume_agent.tenancy.costs import MeteredUsage, calculate_cost, seed_llm_rates
+from resume_agent.tenancy.costs import (
+    MeteredUsage,
+    calculate_cost,
+    find_rate,
+    seed_llm_rates,
+)
 from resume_agent.tenancy.limits import CostRateUnavailableError, enforce_agent_budget
 from resume_agent.tenancy.quotas import (
     CostQuotaExceededError,
@@ -71,6 +76,58 @@ def test_seeded_rate_prices_cache_and_reasoning_without_double_charge(tmp_path):
     assert priced.tool_micros == 20_000
     assert priced.pricing_status == "PRICED"
     assert priced.rate_id
+
+
+def test_seeded_model_prices_use_current_openai_and_deepseek_rates(tmp_path):
+    engine = _engine(tmp_path)
+    current = datetime(2026, 8, 2, tzinfo=UTC)
+
+    expected_openai = {
+        "gpt-5.6-sol": (2_500_000, 250_000, 3_125_000, 15_000_000),
+        "gpt-5.6-terra": (1_000_000, 100_000, 1_250_000, 6_000_000),
+        "gpt-5.6-luna": (100_000, 10_000, 125_000, 600_000),
+    }
+    for model, expected in expected_openai.items():
+        rate = find_rate(engine, "openai", model, now=current)
+        assert rate is not None
+        assert (
+            rate.input_micros_per_million,
+            rate.cache_read_micros_per_million,
+            rate.cache_write_micros_per_million,
+            rate.output_micros_per_million,
+        ) == expected
+
+    expected_deepseek = {
+        "deepseek-v4-flash": (140_000, 2_800, 280_000),
+        "deepseek-v4-pro": (435_000, 3_625, 870_000),
+    }
+    for model, expected in expected_deepseek.items():
+        rate = find_rate(engine, "deepseek", model, now=current)
+        assert rate is not None
+        assert (
+            rate.input_micros_per_million,
+            rate.cache_read_micros_per_million,
+            rate.output_micros_per_million,
+        ) == expected
+
+
+def test_openai_price_version_preserves_previous_gpt_5_6_rate(tmp_path):
+    engine = _engine(tmp_path)
+    usage = MeteredUsage(
+        provider="openai",
+        model="gpt-5.6-terra",
+        input_tokens=1_000_000,
+        output_tokens=1_000_000,
+    )
+
+    before_update = calculate_cost(engine, usage, now=NOW)
+    after_update = calculate_cost(
+        engine, usage, now=datetime(2026, 8, 2, tzinfo=UTC)
+    )
+
+    assert before_update.total_micros == 17_500_000
+    assert after_update.total_micros == 7_000_000
+    assert before_update.rate_id != after_update.rate_id
 
 
 def test_unknown_rate_is_explicit(tmp_path):

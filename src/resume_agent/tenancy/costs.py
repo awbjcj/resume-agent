@@ -169,6 +169,11 @@ def _micros_per_million(dollars: float) -> int:
 
 def seed_llm_rates(engine: Engine) -> None:
     start = datetime(2026, 7, 28, tzinfo=timezone.utc)
+    # Keep the original seed rates for historical usage.  OpenAI's published
+    # standard prices changed after this seed was introduced, so active usage
+    # must resolve to a separately versioned rate rather than retroactively
+    # repricing events from July.
+    openai_price_update = datetime(2026, 8, 1, tzinfo=timezone.utc)
     sonnet_intro_end = datetime(2026, 9, 1, tzinfo=timezone.utc)
     openai = "https://developers.openai.com/api/docs/pricing"
     anthropic = "https://platform.claude.com/docs/en/about-claude/pricing"
@@ -303,6 +308,46 @@ def seed_llm_rates(engine: Engine) -> None:
                         else None
                     ),
                     source_url=source,
+                )
+            )
+        for model in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
+            legacy_rate = (
+                session.execute(
+                    select(LlmRate).where(
+                        LlmRate.provider == "openai",
+                        LlmRate.model == model,
+                        LlmRate.effective_from == start,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if legacy_rate is not None:
+                legacy_rate.effective_to = openai_price_update
+
+        # Standard OpenAI pricing, verified against the official pricing page
+        # on 2026-08-01.  Cache writes use OpenAI's published 1.25x input
+        # multiplier for GPT-5.6.
+        for model, input_rate, cache_read, cache_write, output_rate in (
+            ("gpt-5.6-sol", 2.5, 0.25, 3.125, 15),
+            ("gpt-5.6-terra", 1, 0.1, 1.25, 6),
+            ("gpt-5.6-luna", 0.1, 0.01, 0.125, 0.6),
+        ):
+            key = ("openai", model, 0, stamp(openai_price_update))
+            if key in existing:
+                continue
+            session.add(
+                LlmRate(
+                    id=uuid.uuid4().hex,
+                    provider="openai",
+                    model=model,
+                    input_micros_per_million=_micros_per_million(input_rate),
+                    cache_read_micros_per_million=_micros_per_million(cache_read),
+                    cache_write_micros_per_million=_micros_per_million(cache_write),
+                    output_micros_per_million=_micros_per_million(output_rate),
+                    tool_micros_per_unit=10_000,
+                    effective_from=openai_price_update,
+                    source_url=openai,
                 )
             )
         sonnet_intro = (
