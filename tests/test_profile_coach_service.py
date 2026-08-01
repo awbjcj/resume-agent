@@ -1,10 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 
 from resume_agent.profile.coach import CoachTurn, DraftNote, NewTopic, OpeningTurn
 from resume_agent.profile.coach_store import load_session
+from resume_agent.sessions.stream import Completed, Failed, Notice, TextDelta, ToolStarted
 from resume_agent.services.profile_coach import (
     approve_draft,
     discard_draft,
@@ -46,6 +48,38 @@ class FakeAgent:
 
     async def arun(self, prompt: str) -> FakeResult:
         return self.run(prompt)
+
+
+class RecordingSink:
+    def __init__(self):
+        self.events = []
+
+    def emit(self, event):
+        self.events.append(event)
+
+    def close(self):
+        pass
+
+    @property
+    def text(self):
+        return "".join(
+            event.text for event in self.events if isinstance(event, TextDelta)
+        )
+
+
+class StreamingAgent:
+    def __init__(self, prose: str, metadata: str = "action: ask\ntopic: t1"):
+        self.full = f"{prose}\n---METADATA---\n{metadata}"
+
+    def stream(self, prompt):
+        split = max(1, len(self.full) // 2)
+        yield TextDelta(self.full[:split])
+        yield ToolStarted("call-1", "search_corpus", "Kafka")
+        yield TextDelta(self.full[split:])
+        yield Completed(SimpleNamespace(content=self.full))
+
+    def run(self, prompt):
+        return SimpleNamespace(content=self.full)
 
 
 def _open(profile_dir):
@@ -114,6 +148,173 @@ def test_opening_and_message_turn_create_durable_views(tmp_path):
     )
     assert updated["turns"][-2]["topicId"] == "t1"
     assert updated["turns"][-1]["kind"] == "question"
+
+
+def test_message_streams_prose_and_stores_the_same_text(tmp_path):
+    sid = _open(tmp_path)["sessionId"]
+    sink = RecordingSink()
+
+    run_message_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        session_id=sid,
+        message="I improved deploys.",
+        coach_agent=StreamingAgent("Strong answer."),
+        formatter_agent=FakeAgent(
+            CoachTurn(message="Formatter drift.", action="ask", topic_id="t1")
+        ),
+        sink=sink,
+    )
+
+    assert sink.text == "Strong answer."
+    assert session_view(tmp_path, sid)["turns"][-1]["text"] == sink.text
+    assert any(isinstance(event, ToolStarted) for event in sink.events)
+    assert not any(isinstance(event, Completed) for event in sink.events)
+
+
+def test_partial_stream_failure_leaves_session_byte_equivalent(tmp_path):
+    sid = _open(tmp_path)["sessionId"]
+    before = load_session(tmp_path, sid)
+
+    class BrokenStream(StreamingAgent):
+        def stream(self, prompt):
+            yield TextDelta("Partial answer")
+            yield Failed("provider lost", "PROVIDER_ERROR")
+
+    with pytest.raises(RuntimeError, match="provider lost"):
+        run_message_turn(
+            FakeReporter(),
+            profile_dir=tmp_path,
+            session_id=sid,
+            message="I improved deploys.",
+            coach_agent=BrokenStream("unused"),
+            formatter_agent=FakeAgent(
+                CoachTurn(message="must not persist", action="ask", topic_id="t1")
+            ),
+            sink=RecordingSink(),
+        )
+
+    assert load_session(tmp_path, sid) == before
+
+
+def test_stream_checks_cancellation_before_each_visible_event(tmp_path):
+    sid = _open(tmp_path)["sessionId"]
+    before = load_session(tmp_path, sid)
+
+    class Cancelled(RuntimeError):
+        pass
+
+    class CancellingReporter(FakeReporter):
+        checks = 0
+
+        def checkpoint(self):
+            self.checks += 1
+            if self.checks == 2:
+                raise Cancelled("stop")
+
+    sink = RecordingSink()
+    with pytest.raises(Cancelled):
+        run_message_turn(
+            CancellingReporter(),
+            profile_dir=tmp_path,
+            session_id=sid,
+            message="I improved deploys.",
+            coach_agent=StreamingAgent("Strong answer."),
+            formatter_agent=FakeAgent(
+                CoachTurn(message="ignored", action="ask", topic_id="t1")
+            ),
+            sink=sink,
+        )
+
+    assert load_session(tmp_path, sid) == before
+    assert not any(isinstance(event, ToolStarted) for event in sink.events)
+
+
+def test_stream_disabled_uses_blocking_formatter_message(tmp_path, monkeypatch):
+    sid = _open(tmp_path)["sessionId"]
+    monkeypatch.setattr(
+        "resume_agent.sessions.turns.get_settings",
+        lambda: SimpleNamespace(stream_enabled=False),
+    )
+    sink = RecordingSink()
+
+    run_message_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        session_id=sid,
+        message="I improved deploys.",
+        coach_agent=StreamingAgent("Streamed text."),
+        formatter_agent=FakeAgent(
+            CoachTurn(message="Blocking text.", action="ask", topic_id="t1")
+        ),
+        sink=sink,
+    )
+
+    assert sink.events == []
+    assert session_view(tmp_path, sid)["turns"][-1]["text"] == "Blocking text."
+
+
+def test_bad_draft_notice_is_durable_and_emitted_before_terminal(tmp_path):
+    sid = _open(tmp_path)["sessionId"]
+    bad = CoachTurn(
+        message="Drafted.",
+        action="draft",
+        topic_id="t1",
+        draft_note=DraftNote(title="T", summary="S", quotes=["never said"]),
+    )
+    sink = RecordingSink()
+
+    run_message_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        session_id=sid,
+        message="I led it.",
+        coach_agent=StreamingAgent("Drafted."),
+        formatter_agent=FakeAgent(bad, bad),
+        sink=sink,
+    )
+
+    turn = session_view(tmp_path, sid)["turns"][-1]
+    assert "quote check" in turn["notice"].lower()
+    assert session_view(tmp_path, sid)["draftNotes"] == []
+    assert any(isinstance(event, Notice) for event in sink.events)
+
+
+def test_streamed_prose_survives_structural_formatter_failure(tmp_path):
+    sid = _open(tmp_path)["sessionId"]
+    bad = CoachTurn(message="", action="ask", topic_id="missing")
+    sink = RecordingSink()
+
+    view = run_message_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        session_id=sid,
+        message="I improved deploys.",
+        coach_agent=StreamingAgent("Could you quantify that?"),
+        formatter_agent=FakeAgent(bad, bad),
+        sink=sink,
+    )
+
+    assert view["turns"][-1]["text"] == "Could you quantify that?"
+    assert "details could not be read" in view["turns"][-1]["notice"]
+    assert any(isinstance(event, Notice) for event in sink.events)
+
+
+def test_blocking_formatter_message_survives_structural_failure(tmp_path):
+    sid = _open(tmp_path)["sessionId"]
+    bad = CoachTurn(message="Could you quantify that?", action="ask", topic_id="missing")
+
+    view = run_message_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        session_id=sid,
+        message="I improved deploys.",
+        coach_agent=FakeAgent("notes"),
+        formatter_agent=FakeAgent(bad, bad),
+    )
+
+    assert view["turns"][-1]["text"] == "Could you quantify that?"
+    assert view["turns"][-1]["notice"]
 
 
 def test_formatter_retries_once_and_failed_turn_leaves_no_residue(tmp_path):

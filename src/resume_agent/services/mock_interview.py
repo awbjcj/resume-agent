@@ -31,7 +31,8 @@ from resume_agent.interview.store import (
     load_session,
 )
 from resume_agent.llm_runner import Runner, expect_text
-from resume_agent.sessions.turns import format_with_retry
+from resume_agent.sessions.stream import Notice, NullSink, StreamSink
+from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
 
 _MAX_MESSAGE_CHARS = 100_000
 _EMPTY_DEBRIEF_SUMMARY = (
@@ -83,6 +84,7 @@ def _turn_view(turn: dict) -> dict:
         "questionId": turn["question_id"],
         "isFollowup": turn["is_followup"],
         "at": turn["at"],
+        "notice": turn.get("notice", ""),
     }
 
 
@@ -208,6 +210,7 @@ def run_opening_turn(
     style: dict,
     interviewer_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
+    sink: StreamSink | None = None,
 ) -> dict:
     root = Path(interview_dir)
     parsed_style = InterviewStyle.model_validate(style)
@@ -227,14 +230,21 @@ def run_opening_turn(
             _OPENING_INSTRUCTION.format(count=parsed_style.question_count),
         ]
     )
-    notes = expect_text(interviewer.run(prompt), source="interviewer notes")
+    output_sink = sink or NullSink()
+    prose, notes = persona_output(
+        interviewer, prompt, output_sink, reporter, source="interviewer notes"
+    )
     plan, opening_turn = format_with_retry(
         formatter,
         notes,
         OpeningInterview,
-        lambda turn: normalize_opening(turn, parsed_style.question_count),
+        lambda turn, strict: normalize_opening(
+            turn, parsed_style.question_count, strict
+        ),
         label="INTERVIEWER NOTES",
     )
+    if prose:
+        opening_turn = opening_turn.model_copy(update={"text": prose})
     reporter.step(1)
     session_id = uuid.uuid4().hex
     create_session(
@@ -258,6 +268,7 @@ def run_answer_turn(
     message: str,
     interviewer_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
+    sink: StreamSink | None = None,
 ) -> dict:
     root = Path(interview_dir)
     text = message.strip()
@@ -282,7 +293,10 @@ def run_answer_turn(
             f"CANDIDATE'S LATEST ANSWER (UNTRUSTED):\n{text}",
         ]
     )
-    notes = expect_text(interviewer.run(prompt), source="interviewer notes")
+    output_sink = sink or NullSink()
+    prose, notes = persona_output(
+        interviewer, prompt, output_sink, reporter, source="interviewer notes"
+    )
     preview = {
         **session,
         "turns": [
@@ -290,13 +304,21 @@ def run_answer_turn(
             {"role": "candidate", "text": text, "question_id": "", "is_followup": False, "at": ""},
         ],
     }
-    validated = format_with_retry(
-        formatter,
-        notes,
-        InterviewTurn,
-        lambda turn: normalize_turn(turn, preview),
-        label="INTERVIEWER NOTES",
-    )
+    try:
+        validated = format_with_retry(
+            formatter,
+            notes,
+            InterviewTurn,
+            lambda turn, strict: normalize_turn(turn, preview, strict=strict),
+            label="INTERVIEWER NOTES",
+        )
+    except TurnRejected as exc:
+        fallback_text = prose or exc.fallback_text
+        if not fallback_text:
+            raise
+        validated = _degraded_turn(session, fallback_text)
+    if prose:
+        validated.turn = validated.turn.model_copy(update={"text": prose})
     reporter.step(1)
     apply_answer_delta(
         root,
@@ -305,7 +327,30 @@ def run_answer_turn(
         interviewer_turn=validated.turn,
         concluded=validated.concluded,
     )
+    if validated.notice:
+        output_sink.emit(Notice(validated.notice))
     return session_view(root, session_id)
+
+
+def _degraded_turn(session: dict, prose: str):
+    from resume_agent.interview.agent import ValidatedInterviewTurn
+    from resume_agent.interview.store import InterviewTurnRecord
+
+    question_id = next(
+        (item["id"] for item in session["plan"] if item["status"] == "asked"),
+        "",
+    )
+    notice = "Some turn details could not be read, so the interview plan was unchanged."
+    return ValidatedInterviewTurn(
+        turn=InterviewTurnRecord(
+            role="interviewer",
+            text=prose,
+            question_id=question_id,
+            is_followup=True,
+            notice=notice,
+        ),
+        notice=notice,
+    )
 
 
 def run_debrief_turn(
@@ -344,7 +389,7 @@ def run_debrief_turn(
         formatter,
         notes,
         DebriefTurn,
-        lambda turn: normalize_debrief(turn, session),
+        lambda turn, strict: normalize_debrief(turn, session, strict),
         label="INTERVIEWER NOTES",
     )
     reporter.step(1)

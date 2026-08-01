@@ -41,6 +41,12 @@ def test_normalize_opening_caps_plan_and_defaults_question():
     assert record.question_id == "q1"
 
 
+def test_interviewer_persona_defines_visible_prose_metadata_boundary():
+    instructions = " ".join(persona_instructions(InterviewStyle()))
+    assert "---METADATA---" in instructions
+    assert "shown to the candidate verbatim" in instructions
+
+
 def test_normalize_opening_rejects_empty_plan():
     with pytest.raises(TurnRejected, match="no plan"):
         normalize_opening(OpeningInterview(message="Hi"), question_count=8)
@@ -51,6 +57,7 @@ def test_normalize_turn_rejects_unknown_question():
         normalize_turn(
             InterviewTurn(message="Next", action="ask", question_id="q9"),
             _session({"q1": "asked", "q2": "pending"}),
+            strict=False,
         )
 
 

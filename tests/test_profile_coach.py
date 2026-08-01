@@ -17,6 +17,7 @@ from resume_agent.profile.coach import (
     render_agenda,
     render_transcript,
 )
+from resume_agent.sessions.turns import DraftRejected
 
 
 def test_opening_formatter_instructions_require_agenda_topics():
@@ -27,6 +28,14 @@ def test_opening_formatter_instructions_require_agenda_topics():
     assert "topics" in opening
     # Ongoing turns have no agenda field, so their instructions stay untouched.
     assert _formatter_instructions(CoachTurn) == _FORMAT_INSTRUCTIONS
+
+
+def test_persona_instructions_define_visible_prose_metadata_boundary():
+    from resume_agent.profile.coach import _COACH_INSTRUCTIONS
+
+    instructions = " ".join(_COACH_INSTRUCTIONS)
+    assert "---METADATA---" in instructions
+    assert "shown to the user verbatim" in instructions
 
 
 def _session(user_texts=("I cut deploy time from 40 min to 6 min.",), n_topics=2):
@@ -88,7 +97,7 @@ def test_message_action_state_machine_and_single_draft():
 
 def test_quote_must_come_from_one_user_turn():
     session = _session(user_texts=("alpha beta", "gamma delta"))
-    with pytest.raises(TurnRejected, match="quote"):
+    with pytest.raises(DraftRejected, match="quote"):
         normalize_turn(
             CoachTurn(
                 message="draft",
@@ -108,6 +117,52 @@ def test_quote_must_come_from_one_user_turn():
         session,
     )
     assert valid.draft is not None
+
+
+def test_bad_draft_degrades_to_notice_only_in_lenient_mode():
+    session = _session(user_texts=("I led the migration.",))
+    turn = CoachTurn(
+        message="That gives us useful ownership evidence.",
+        action="draft",
+        topic_id="t1",
+        draft_note=DraftNote(
+            title="Migration ownership",
+            summary="Led the migration.",
+            quotes=["I invented this"],
+        ),
+    )
+
+    with pytest.raises(DraftRejected):
+        normalize_turn(turn, session, strict=True)
+    validated = normalize_turn(turn, session, strict=False)
+
+    assert validated.draft is None
+    assert "quote check" in validated.notice.lower()
+    assert validated.coach_turn.notice == validated.notice
+    assert validated.coach_turn.text == turn.message
+
+
+def test_closed_topic_remains_structural_in_lenient_mode():
+    session = _session()
+    session["topics"][0]["status"] = "drafted"
+
+    with pytest.raises(TurnRejected, match="open topic") as exc:
+        normalize_turn(
+            CoachTurn(
+                message="Again.",
+                action="draft",
+                topic_id="t1",
+                draft_note=DraftNote(
+                    title="T",
+                    summary="S",
+                    quotes=["I cut deploy time"],
+                ),
+            ),
+            session,
+            strict=False,
+        )
+
+    assert not isinstance(exc.value, DraftRejected)
 
 
 def test_add_and_skip_updates_are_bounded_and_consistent():

@@ -21,6 +21,7 @@ from resume_agent.services.mock_interview import (
     session_view,
     sessions_view,
 )
+from resume_agent.sessions.stream import Completed, Notice, TextDelta, ToolStarted
 from resume_agent.tracking.tables import Job, ResumeVersion
 
 _ids: tuple[int, int] = (0, 0)
@@ -43,6 +44,40 @@ class FakeReporter:
 
     def step(self, n=1):
         pass
+
+    def checkpoint(self):
+        pass
+
+
+class RecordingSink:
+    def __init__(self):
+        self.events = []
+
+    def emit(self, event):
+        self.events.append(event)
+
+    def close(self):
+        pass
+
+    @property
+    def text(self):
+        return "".join(
+            event.text for event in self.events if isinstance(event, TextDelta)
+        )
+
+
+class StreamingRunner(FakeRunner):
+    def __init__(self, prose: str):
+        self.full = f"{prose}\n---METADATA---\naction: ask\nquestion: q2"
+
+    def stream(self, prompt):
+        yield TextDelta(self.full[:8])
+        yield ToolStarted("call-1", "read_jd", "")
+        yield TextDelta(self.full[8:])
+        yield Completed(SimpleNamespace(content=self.full))
+
+    def run(self, prompt):
+        return SimpleNamespace(content=self.full)
 
 
 @pytest.fixture()
@@ -140,6 +175,66 @@ def test_full_interview_flow(tmp_path, engine):
     assert view["debrief"]["summary"] == "Good technical depth."
     summary = sessions_view(tmp_path)["sessions"][0]
     assert summary["overallScore"] == 3.5
+
+
+def test_answer_streams_and_stores_interviewer_prose(tmp_path, engine):
+    sid = _open(tmp_path, engine)["sessionId"]
+    sink = RecordingSink()
+
+    run_answer_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        session_id=sid,
+        message="I shipped a FastAPI service.",
+        interviewer_agent=StreamingRunner("Tell me about ownership."),
+        formatter_agent=FakeRunner(
+            [InterviewTurn(message="ignored", action="ask", question_id="q2")]
+        ),
+        sink=sink,
+    )
+
+    assert sink.text == "Tell me about ownership."
+    assert session_view(tmp_path, sid)["turns"][-1]["text"] == sink.text
+    assert any(isinstance(event, ToolStarted) for event in sink.events)
+
+
+def test_streamed_question_survives_structural_formatter_failure(tmp_path, engine):
+    sid = _open(tmp_path, engine)["sessionId"]
+    bad = InterviewTurn(message="", action="ask", question_id="missing")
+    sink = RecordingSink()
+
+    view = run_answer_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        session_id=sid,
+        message="I shipped a FastAPI service.",
+        interviewer_agent=StreamingRunner("Tell me about ownership."),
+        formatter_agent=FakeRunner([bad, bad]),
+        sink=sink,
+    )
+
+    assert view["turns"][-1]["text"] == "Tell me about ownership."
+    assert "plan was unchanged" in view["turns"][-1]["notice"]
+    assert any(isinstance(event, Notice) for event in sink.events)
+
+
+def test_blocking_formatter_question_survives_structural_failure(tmp_path, engine):
+    sid = _open(tmp_path, engine)["sessionId"]
+    bad = InterviewTurn(
+        message="Tell me about ownership.", action="ask", question_id="missing"
+    )
+
+    view = run_answer_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        session_id=sid,
+        message="I shipped a FastAPI service.",
+        interviewer_agent=FakeRunner(["notes"]),
+        formatter_agent=FakeRunner([bad, bad]),
+    )
+
+    assert view["turns"][-1]["text"] == "Tell me about ownership."
+    assert view["turns"][-1]["notice"]
 
 
 def test_debrief_without_answers_ends_deterministically_and_skips_llm(tmp_path, engine):

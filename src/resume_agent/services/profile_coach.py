@@ -5,10 +5,11 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from resume_agent.llm_runner import Runner, expect_text
+from resume_agent.llm_runner import Runner
 from resume_agent.profile.coach import (
     CoachTurn,
     OpeningTurn,
+    ValidatedTurn,
     build_coach_agent,
     build_coach_formatter_agent,
     normalize_opening,
@@ -20,6 +21,7 @@ from resume_agent.profile.coach import (
 )
 from resume_agent.profile.coach_store import (
     apply_turn_delta,
+    CoachTurnRecord,
     coach_lock,
     create_session,
     end_session,
@@ -33,7 +35,8 @@ from resume_agent.profile.intake import add_note_source
 from resume_agent.profile.interview import make_corpus_tools
 from resume_agent.profile.snapshot import profile_snapshot, snapshot_diff
 from resume_agent.services.profile_build import run_corpus_build
-from resume_agent.sessions.turns import format_with_retry
+from resume_agent.sessions.stream import Notice, NullSink, StreamSink
+from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
 
 _MAX_MESSAGE_CHARS = 100_000
 _EMPTY_SESSION_RECAP = (
@@ -53,6 +56,7 @@ def _camel_turn(turn: dict) -> dict:
         "text": turn["text"],
         "topicId": turn["topic_id"],
         "at": turn["at"],
+        "notice": turn.get("notice", ""),
         "researchActions": [
             _camel_action(action) for action in turn.get("research_actions", [])
         ],
@@ -144,6 +148,7 @@ def run_opening_turn(
     engine=None,
     coach_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
+    sink: StreamSink | None = None,
 ) -> dict:
     root = Path(profile_dir)
     reporter.begin(1, "Reviewing your profile")
@@ -152,7 +157,10 @@ def run_opening_turn(
         f"{_overview(root, engine)}\n\n"
         "This is the opening turn. Propose the highest-value bounded agenda and ask the first question."
     )
-    notes = expect_text(coach.run(prompt), source="coach notes")
+    output_sink = sink or NullSink()
+    prose, notes = persona_output(
+        coach, prompt, output_sink, reporter, source="coach notes"
+    )
     topics, validated = format_with_retry(
         formatter,
         notes,
@@ -160,6 +168,10 @@ def run_opening_turn(
         normalize_opening,
         label="COACH NOTES",
     )
+    if prose:
+        validated.coach_turn = validated.coach_turn.model_copy(
+            update={"text": prose}
+        )
     reporter.step(1)
     session_id = uuid.uuid4().hex
     create_session(root, session_id, topics, validated.coach_turn)
@@ -175,6 +187,7 @@ def run_message_turn(
     engine=None,
     coach_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
+    sink: StreamSink | None = None,
 ) -> dict:
     root = Path(profile_dir)
     text = message.strip()
@@ -195,15 +208,28 @@ def run_message_turn(
             f"USER'S LATEST MESSAGE (UNTRUSTED):\n{text}",
         ]
     )
-    notes = expect_text(coach.run(prompt), source="coach notes")
-    preview = {**session, "turns": [*session["turns"], {"role": "user", "kind": "", "text": text, "topic_id": "", "at": "", "research_actions": []}]}
-    validated = format_with_retry(
-        formatter,
-        notes,
-        CoachTurn,
-        lambda turn: normalize_turn(turn, preview),
-        label="COACH NOTES",
+    output_sink = sink or NullSink()
+    prose, notes = persona_output(
+        coach, prompt, output_sink, reporter, source="coach notes"
     )
+    preview = {**session, "turns": [*session["turns"], {"role": "user", "kind": "", "text": text, "topic_id": "", "at": "", "research_actions": []}]}
+    try:
+        validated = format_with_retry(
+            formatter,
+            notes,
+            CoachTurn,
+            lambda turn, strict: normalize_turn(turn, preview, strict=strict),
+            label="COACH NOTES",
+        )
+    except TurnRejected as exc:
+        fallback_text = prose or exc.fallback_text
+        if not fallback_text:
+            raise
+        validated = _degraded_turn(session, fallback_text)
+    if prose:
+        validated.coach_turn = validated.coach_turn.model_copy(
+            update={"text": prose}
+        )
     reporter.step(1)
     apply_turn_delta(
         root,
@@ -214,7 +240,37 @@ def run_message_turn(
         skipped_topic_ids=validated.skipped_topic_ids,
         draft=validated.draft,
     )
+    if validated.notice:
+        output_sink.emit(Notice(validated.notice))
     return session_view(root, session_id)
+
+
+def _degraded_turn(session: dict, prose: str) -> ValidatedTurn:
+    open_ids = {
+        topic["id"] for topic in session["topics"] if topic["status"] == "open"
+    }
+    topic_id = next(
+        (
+            turn["topic_id"]
+            for turn in reversed(session["turns"])
+            if turn["topic_id"] in open_ids
+        ),
+        next(
+            (topic["id"] for topic in session["topics"] if topic["status"] == "open"),
+            "",
+        ),
+    )
+    notice = "Some turn details could not be read, so no note was attached."
+    return ValidatedTurn(
+        coach_turn=CoachTurnRecord(
+            role="coach",
+            kind="question",
+            text=prose,
+            topic_id=topic_id,
+            notice=notice,
+        ),
+        notice=notice,
+    )
 
 
 def _primary_exists(profile_dir: Path) -> bool:
@@ -274,6 +330,7 @@ def run_recap_turn(
     session_id: str,
     coach_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
+    sink: StreamSink | None = None,
 ) -> dict:
     root = Path(profile_dir)
     session = load_session(root, session_id)
@@ -298,16 +355,31 @@ def run_recap_turn(
             + (f" Mention unsaved drafts: {', '.join(pending)}." if pending else ""),
         ]
     )
-    notes = expect_text(coach.run(prompt), source="coach notes")
-    recap = format_with_retry(
-        formatter,
-        notes,
-        CoachTurn,
-        lambda turn: normalize_recap(turn, session),
-        label="COACH NOTES",
+    output_sink = sink or NullSink()
+    prose, notes = persona_output(
+        coach, prompt, output_sink, reporter, source="coach notes"
     )
+    notice = ""
+    try:
+        recap = format_with_retry(
+            formatter,
+            notes,
+            CoachTurn,
+            lambda turn, strict: normalize_recap(turn, session, strict),
+            label="COACH NOTES",
+        )
+    except TurnRejected as exc:
+        fallback_text = prose or exc.fallback_text
+        if not fallback_text:
+            raise
+        recap = fallback_text
+        notice = "Some recap details could not be read."
+    if prose:
+        recap = prose
     reporter.step(1)
-    end_session(root, session_id, recap)
+    end_session(root, session_id, recap, notice=notice)
+    if notice:
+        output_sink.emit(Notice(notice))
     return session_view(root, session_id)
 
 

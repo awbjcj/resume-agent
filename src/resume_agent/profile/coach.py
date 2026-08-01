@@ -32,7 +32,7 @@ from resume_agent.profile.corpus import load_manifest
 from resume_agent.profile.interview import ResearchAction, asked_questions
 from resume_agent.profile.matrix import load_matrix
 from resume_agent.profile.store import load_facts
-from resume_agent.sessions.turns import TurnRejected
+from resume_agent.sessions.turns import DraftRejected, TurnRejected
 
 AGENDA_CAP = 12
 TRANSCRIPT_CHAR_CAP = 12_000
@@ -81,6 +81,7 @@ class ValidatedTurn:
     new_topics: list[CoachTopic] = field(default_factory=list)
     skipped_topic_ids: list[str] = field(default_factory=list)
     draft: CoachDraftNote | None = None
+    notice: str = ""
 
 
 def _norm(text: str) -> str:
@@ -106,7 +107,10 @@ def _actions(turn: CoachTurn) -> list[ResearchAction]:
     ]
 
 
-def normalize_opening(turn: OpeningTurn) -> tuple[list[CoachTopic], ValidatedTurn]:
+def normalize_opening(
+    turn: OpeningTurn, strict: bool = True
+) -> tuple[list[CoachTopic], ValidatedTurn]:
+    del strict
     message = turn.message.strip()
     if not message:
         raise TurnRejected("empty message")
@@ -135,7 +139,34 @@ def normalize_opening(turn: OpeningTurn) -> tuple[list[CoachTopic], ValidatedTur
     )
 
 
-def normalize_turn(turn: CoachTurn, session: dict) -> ValidatedTurn:
+def _build_draft(
+    turn: CoachTurn, session: dict
+) -> CoachDraftNote:
+    note = turn.draft_note
+    if note is None or not note.title.strip() or not note.summary.strip():
+        raise DraftRejected("draft turn without a complete draft note")
+    quotes = [quote.strip() for quote in note.quotes if quote.strip()]
+    if not quotes:
+        raise DraftRejected("draft note has no quotes")
+    user_turns = [
+        _norm(row["text"])
+        for row in session["turns"]
+        if row["role"] == "user" and row["text"].strip()
+    ]
+    for quote in quotes:
+        if not any(_norm(quote) in user_turn for user_turn in user_turns):
+            raise DraftRejected(f"fabricated quote: {quote[:60]!r}")
+    return CoachDraftNote(
+        topic_id=turn.topic_id,
+        title=note.title.strip(),
+        summary=note.summary.strip(),
+        quotes=quotes,
+    )
+
+
+def normalize_turn(
+    turn: CoachTurn, session: dict, *, strict: bool = True
+) -> ValidatedTurn:
     message = turn.message.strip()
     if not message:
         raise TurnRejected("empty message")
@@ -166,6 +197,7 @@ def normalize_turn(turn: CoachTurn, session: dict) -> ValidatedTurn:
         skipped.append(update.topic_id)
 
     draft: CoachDraftNote | None = None
+    notice = ""
     if turn.action == "draft":
         if topic["status"] != "open":
             raise TurnRejected("a draft requires an open topic")
@@ -173,26 +205,12 @@ def normalize_turn(turn: CoachTurn, session: dict) -> ValidatedTurn:
             raise TurnRejected("a topic cannot be drafted and skipped together")
         if any(row["topic_id"] == turn.topic_id for row in session["draft_notes"]):
             raise TurnRejected("draft already exists for topic")
-        note = turn.draft_note
-        if note is None or not note.title.strip() or not note.summary.strip():
-            raise TurnRejected("draft turn without a complete draft note")
-        quotes = [quote.strip() for quote in note.quotes if quote.strip()]
-        if not quotes:
-            raise TurnRejected("draft note has no quotes")
-        user_turns = [
-            _norm(row["text"])
-            for row in session["turns"]
-            if row["role"] == "user" and row["text"].strip()
-        ]
-        for quote in quotes:
-            if not any(_norm(quote) in user_turn for user_turn in user_turns):
-                raise TurnRejected(f"fabricated quote: {quote[:60]!r}")
-        draft = CoachDraftNote(
-            topic_id=turn.topic_id,
-            title=note.title.strip(),
-            summary=note.summary.strip(),
-            quotes=quotes,
-        )
+        try:
+            draft = _build_draft(turn, session)
+        except DraftRejected:
+            if strict:
+                raise
+            notice = "Note not attached — quote check failed."
     elif turn.draft_note is not None:
         raise TurnRejected("draft note on a non-draft turn")
 
@@ -202,15 +220,18 @@ def normalize_turn(turn: CoachTurn, session: dict) -> ValidatedTurn:
             kind="draft_note" if draft is not None else "question",
             text=message,
             topic_id=turn.topic_id,
+            notice=notice,
             research_actions=_actions(turn),
         ),
         new_topics=new_topics,
         skipped_topic_ids=skipped,
         draft=draft,
+        notice=notice,
     )
 
 
-def normalize_recap(turn: CoachTurn, session: dict) -> str:
+def normalize_recap(turn: CoachTurn, session: dict, strict: bool = True) -> str:
+    del strict
     message = turn.message.strip()
     if turn.action != "recap":
         raise TurnRejected("recap action required")
@@ -387,6 +408,7 @@ _COACH_INSTRUCTIONS = [
     "When a topic has what, where, and how measured, emit a draft using only the user's claims and exact quotes.",
     "Honor skip requests and add a bounded agenda topic only when a new evidence gap emerges.",
     "Use corpus tools when the user's existing material would ground the next question.",
+    "Write the user-facing reply first as plain prose. Then emit `---METADATA---` on its own line followed by the action, topic id, topic updates, draft fields with exact quotes, and research actions. Everything above the marker is shown to the user verbatim; everything below it is formatter input and is never shown.",
 ]
 
 _FORMAT_INSTRUCTIONS = [

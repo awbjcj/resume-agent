@@ -37,6 +37,7 @@ class CoachTurnRecord(ExtensibleModel):
     text: str = ""
     topic_id: str = ""
     at: str = ""
+    notice: str = ""
     research_actions: list[ResearchAction] = Field(default_factory=list)
 
 
@@ -193,7 +194,9 @@ def set_draft_status(
     return mutate_session(profile_dir, session_id, apply)
 
 
-def end_session(profile_dir: Path | str, session_id: str, recap: str) -> dict:
+def end_session(
+    profile_dir: Path | str, session_id: str, recap: str, *, notice: str = ""
+) -> dict:
     def apply(session: dict) -> None:
         if session["status"] != "active":
             raise ValueError("session ended")
@@ -202,7 +205,9 @@ def end_session(profile_dir: Path | str, session_id: str, recap: str) -> dict:
         session["ended_at"] = now
         session["recap"] = recap
         session["turns"].append(
-            CoachTurnRecord(role="coach", kind="recap", text=recap, at=now).model_dump(mode="json")
+            CoachTurnRecord(
+                role="coach", kind="recap", text=recap, at=now, notice=notice
+            ).model_dump(mode="json")
         )
 
     return mutate_session(profile_dir, session_id, apply)
