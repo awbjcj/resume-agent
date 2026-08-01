@@ -42,6 +42,31 @@ def test_non_reasoning_claude_disables_thinking_rather_than_omitting_it():
     assert sonnet.output_config is None
 
 
+def test_openai_asks_for_a_reasoning_summary_whenever_it_sends_a_reasoning_config():
+    # agno's Responses adapter copies every output_text delta into
+    # reasoning_content when `reasoning` is set and `reasoning_summary` is not:
+    #
+    #     if self.reasoning is not None and self.reasoning_summary is None:
+    #         model_response.reasoning_content = stream_event.delta
+    #
+    # Since a catalogued id always gets an explicit effort (even "none"), that
+    # fired on EVERY OpenAI agent -- the visible answer was duplicated into the
+    # reasoning channel token by token, so the coach thread rendered one
+    # collapsible and one markdown block per token. Verified live: with a
+    # summary requested the duplication drops to zero at every effort, and a
+    # genuinely reasoning call streams real summaries instead of an echo.
+    for reasoning in (False, True):
+        model = build_model("openai:gpt-5.6-terra", api_key="k", reasoning=reasoning)
+        assert model.reasoning is not None
+        assert model.reasoning_summary == "auto"
+
+    # An uncatalogued id sends no reasoning config at all -- its effort
+    # vocabulary is unknown -- so it must not ask for a summary either.
+    unknown = build_model("openai:gpt-experimental-preview", api_key="k")
+    assert unknown.reasoning is None
+    assert unknown.reasoning_summary is None
+
+
 def test_non_reasoning_deepseek_disables_thinking_rather_than_omitting_it():
     # Third instance of the "unset means provider decides" trap, after Gemini and
     # Anthropic. agno 2.8.2 reads use_thinking=None as the provider default, and
@@ -173,7 +198,10 @@ def test_openai_reasoning_and_function_tools_share_the_same_request(monkeypatch)
         ],
     )
 
-    assert params["reasoning"] == {"effort": "high"}
+    # The summary rides along because it is what stops agno relabelling the
+    # visible answer as reasoning; search-equipped agents go through the same
+    # builder, so they inherit it.
+    assert params["reasoning"] == {"effort": "high", "summary": "auto"}
     assert params["tools"][0]["name"] == "lookup_profile"
     assert not hasattr(llm_runner, "_openai_disabled_effort")
 

@@ -212,9 +212,15 @@ def _map_stream_event(tag: str, raw: Any) -> list[StreamEvent]:
     if tag in {"RunContent", "RunIntermediateContent"}:
         events: list[StreamEvent] = []
         reasoning = getattr(raw, "reasoning_content", None)
-        if isinstance(reasoning, str) and reasoning:
-            events.append(ReasoningDelta(reasoning))
         content = getattr(raw, "content", None)
+        # A provider adapter that hands back the visible answer as "reasoning"
+        # is not giving us reasoning. Forwarding the echo alternates the two
+        # event kinds on every delta, which flushes the sink per token and
+        # splits the reply into one disclosure plus one markdown block per
+        # token. `build_model` stops OpenAI producing the echo in the first
+        # place; this keeps the seam honest for any provider that does.
+        if isinstance(reasoning, str) and reasoning and reasoning != content:
+            events.append(ReasoningDelta(reasoning))
         if isinstance(content, str) and content:
             events.append(TextDelta(content))
         return events
@@ -1071,6 +1077,19 @@ def _build_openai_responses(
         api_key=api_key,
         # Agno's reasoning_effort Literal omits valid Responses values.
         reasoning={"effort": effort} if effort is not None else None,
+        # Ask for a summary whenever a reasoning config is sent, including at
+        # effort "none". Agno's Responses adapter treats "reasoning requested
+        # but no summary requested" as "the visible output text *is* the
+        # reasoning" and copies every output_text delta into reasoning_content.
+        # Because a catalogued id always carries an explicit effort, that fired
+        # on every OpenAI agent: the reply was duplicated into the reasoning
+        # channel token by token, alternating the two event kinds on each delta
+        # so the chat rendered one disclosure and one markdown block per token.
+        # Verified live on gpt-5.6-terra -- accepted at every effort, drops the
+        # duplication to zero, and a real reasoning call streams genuine
+        # summaries (752 reasoning tokens) instead of an echo of its answer.
+        # An uncatalogued id sends no reasoning config, so it asks for nothing.
+        reasoning_summary="auto" if effort is not None else None,
         max_output_tokens=_openai_max_output_tokens(reasoning=reasoning),
         # Agno requests encrypted reasoning for stateless tool-call replay.
         store=False,

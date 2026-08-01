@@ -100,6 +100,44 @@ def test_stream_maps_real_agno_content_enum_to_text_delta(_no_budget):
     assert _no_budget == [output]
 
 
+def test_reasoning_that_merely_echoes_the_visible_answer_is_not_reasoning():
+    # agno's OpenAI Responses adapter copies output_text deltas into
+    # reasoning_content whenever a reasoning config is sent without a summary.
+    # We fix that at the request (build_model asks for a summary), but the seam
+    # must not forward an echo either: duplicating the reply into the reasoning
+    # channel alternates the two kinds on every delta, which flushes the sink
+    # per token and renders one collapsible plus one markdown block per token.
+    agent = _FakeAgent(
+        [[
+            _Event(RunEvent.run_content, content="Hello", reasoning_content="Hello"),
+            _Event(RunEvent.run_content, content=" there", reasoning_content=" there"),
+            _Output("Hello there"),
+        ]]
+    )
+
+    events = list(AgentRunner(agent).stream("p"))
+
+    assert [event for event in events if isinstance(event, ReasoningDelta)] == []
+    assert [event for event in events if isinstance(event, TextDelta)] == [
+        TextDelta("Hello"),
+        TextDelta(" there"),
+    ]
+
+
+def test_genuine_reasoning_alongside_different_content_is_still_forwarded():
+    agent = _FakeAgent(
+        [[
+            _Event(RunEvent.run_content, content="Yes.", reasoning_content="weighing it"),
+            _Output("Yes."),
+        ]]
+    )
+
+    events = list(AgentRunner(agent).stream("p"))
+
+    assert ReasoningDelta("weighing it") in events
+    assert TextDelta("Yes.") in events
+
+
 def test_stream_maps_reasoning_and_tool_events_with_call_identity():
     tool = _Tool("call-7", "search_corpus", {"q": "Kafka"}, result="3 hits")
     agent = _FakeAgent(

@@ -107,6 +107,22 @@ builder imports a concrete agno model class directly.
   provider-managed response state (not broader provider retention), while
   Agno requests `reasoning.encrypted_content` so stateless tool turns can replay
   opaque reasoning items. Those replayed items count as later input tokens.
+- **OpenAI must always request a reasoning summary — otherwise agno relabels the
+  answer as reasoning.** agno's Responses adapter reads "a `reasoning` config
+  was sent but no `reasoning_summary`" as "the visible output text *is* the
+  reasoning" and copies **every** `output_text` delta into `reasoning_content`.
+  Because a catalogued id always carries an explicit effort (even `none`), that
+  fired on every OpenAI agent: each delta arrived as a `ReasoningDelta` *and* a
+  byte-identical `TextDelta`, alternating the two kinds on every token, so the
+  chat rendered one "Show reasoning" disclosure plus one markdown block per
+  token (239 SSE events on a coach turn where 16 suffice).
+  `_build_openai_responses` therefore sends `reasoning_summary="auto"` whenever
+  it sends `reasoning`, and nothing when the id is uncatalogued. Verified live
+  on `gpt-5.6-terra`: accepted at every effort, duplication drops to zero, and a
+  genuinely reasoning call streams real summaries (752 reasoning tokens) instead
+  of an echo of its own answer. `_map_stream_event` additionally refuses to
+  forward a `reasoning_content` equal to the event's `content` — the seam's
+  standing rule that the visible answer is never reasoning.
 - **Tiers unchanged.** `model_for_tier` still maps `cheap`/`mid`/`premium` →
   `Settings.{cheap,mid,premium}_model`; the prefix lives inside those ids.
 - **Dependency note.** agno 2.6.x's Gemini import needs `google-genai`'s
