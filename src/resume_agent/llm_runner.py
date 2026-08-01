@@ -1142,10 +1142,20 @@ def build_model(
     if provider == "deepseek":
         from agno.models.deepseek import DeepSeek
 
+        # Third provider with the "unset means provider decides" trap, after
+        # Gemini and Anthropic: agno reads use_thinking=None as the provider
+        # default, and that default is ON for every deepseek-v4-* id. Leaving it
+        # unset therefore bought thinking on every non-reasoning agent -- a live
+        # coach turn spent 7,779 characters of reasoning it was never asked for,
+        # streamed as 1,846 one-word deltas.
+        #
+        # Unlike Gemini 3, which rejects thinking_budget outright, an explicit
+        # disabled flag is accepted by deepseek-chat, -v4-flash and -v4-pro
+        # alike (verified live), so this needs no generation gate.
         return DeepSeek(
             id=model,
             api_key=key,
-            use_thinking=True if reasoning else None,
+            use_thinking=bool(reasoning),
             reasoning_effort=reasoning_effort,
         )
     from agno.models.anthropic import Claude

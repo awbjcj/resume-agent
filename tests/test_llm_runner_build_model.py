@@ -42,6 +42,22 @@ def test_non_reasoning_claude_disables_thinking_rather_than_omitting_it():
     assert sonnet.output_config is None
 
 
+def test_non_reasoning_deepseek_disables_thinking_rather_than_omitting_it():
+    # Third instance of the "unset means provider decides" trap, after Gemini and
+    # Anthropic. agno 2.8.2 reads use_thinking=None as the provider default, and
+    # that default is ON for every deepseek-v4-* id -- so leaving it unset bought
+    # thinking on every non-reasoning agent. Measured on the live coach turn: 7,779
+    # characters of reasoning, streamed as 1,846 one-word deltas.
+    #
+    # Unlike Gemini 3 (which 400s on thinking_budget), an explicit disabled flag is
+    # verified accepted on deepseek-chat, -v4-flash and -v4-pro alike, so one
+    # uniform rule is safe -- no generation gate needed.
+    for model_id in ("deepseek:deepseek-v4-pro", "deepseek:deepseek-v4-flash", "deepseek:deepseek-chat"):
+        model = build_model(model_id, api_key="k")
+        assert model.use_thinking is False, model_id
+        assert model.get_request_params()["extra_body"]["thinking"] == {"type": "disabled"}
+
+
 def test_pre_4_6_claude_omits_thinking_instead_of_disabling_it():
     # On that generation an unset config already means no thinking, and agno
     # rejects a thinking config outright on the Haiku 3/3.5 families.
