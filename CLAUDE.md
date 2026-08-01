@@ -752,6 +752,12 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   Both the coach and interview stores are adapters of the Session substrate
   (`sessions/store.py`); custody bugs are fixed there, once. `TurnRejected` and
   `format_with_retry` live in `sessions/turns.py`, shared by both stacks.
+  `RunStreamSink` (`sessions/stream.py`) batches **text and reasoning alike** —
+  each on its own budget, a kind change flushing the other — because every
+  unbatched delta costs a file open/write/flush, an SSE frame, and a React
+  re-render that re-parses the thread's markdown. A reasoning model streams
+  thinking one word at a time, so bypassing the batch cost 1,846 rows on a
+  single turn where 33 suffice.
 - **Email identity is authoritative in multi-user auth.** Verified email is the
   login identifier; the legacy username fallback is accepted only while a user
   has no email. Registration, reset, and email-adoption codes are single-use,

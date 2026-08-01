@@ -145,7 +145,17 @@ class ConsoleStreamSink:
 
 
 class RunStreamSink:
-    """Batch text deltas and append ordered events to a run-owned NDJSON file."""
+    """Batch prose deltas and append ordered events to a run-owned NDJSON file.
+
+    Text and reasoning are both token streams and are batched on the same
+    budget. Reasoning used to bypass batching, which cost one file
+    open/write/flush and one SSE frame per token: a live DeepSeek coach turn
+    emitted 1,846 reasoning deltas against 14 batched text rows, and every one
+    of those frames drove a React re-render that re-parsed the thread's
+    markdown. The two streams are batched *separately* -- reasoning hides
+    behind a disclosure while text is the reply -- so a kind change flushes
+    whatever is pending before it starts a new batch.
+    """
 
     def __init__(
         self,
@@ -161,6 +171,7 @@ class RunStreamSink:
         self._index = 0
         self._pending: list[str] = []
         self._pending_len = 0
+        self._pending_kind: type[TextDelta | ReasoningDelta] = TextDelta
         self._last_flush = time.monotonic()
         self._terminal = False
         self._closed = False
@@ -168,26 +179,29 @@ class RunStreamSink:
     def emit(self, event: StreamEvent) -> None:
         if self._closed or self._terminal:
             return
-        if isinstance(event, TextDelta):
+        if isinstance(event, (TextDelta, ReasoningDelta)):
+            if type(event) is not self._pending_kind:
+                self._flush_pending()
+                self._pending_kind = type(event)
             self._pending.append(event.text)
             self._pending_len += len(event.text)
             flush_due = time.monotonic() - self._last_flush >= self._flush_interval
             if self._pending_len >= self._flush_chars or flush_due:
-                self._flush_text()
+                self._flush_pending()
             return
-        self._flush_text()
+        self._flush_pending()
         self._append(event)
         if event.tag in TERMINAL_TAGS:
             self._terminal = True
 
-    def _flush_text(self) -> None:
+    def _flush_pending(self) -> None:
         if not self._pending:
             return
         text = "".join(self._pending)
         self._pending.clear()
         self._pending_len = 0
         self._last_flush = time.monotonic()
-        self._append(TextDelta(text))
+        self._append(self._pending_kind(text))
 
     def _append(self, event: StreamEvent) -> None:
         line = encode_event(self._index, event)
@@ -200,7 +214,7 @@ class RunStreamSink:
         if self._closed:
             return
         if not self._terminal:
-            self._flush_text()
+            self._flush_pending()
         self._closed = True
 
 

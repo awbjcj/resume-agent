@@ -101,6 +101,54 @@ def test_run_sink_coalesces_consecutive_text_deltas(tmp_path):
     ]
 
 
+def test_run_sink_coalesces_consecutive_reasoning_deltas(tmp_path):
+    # A reasoning model streams thinking one word at a time -- a live DeepSeek
+    # coach turn produced 1,846 reasoning deltas against 14 batched text rows.
+    # Unbatched, each one costs a file open/write/flush, an SSE frame, and a
+    # React re-render that re-parses every markdown block in the thread.
+    path = tmp_path / "run.stream.ndjson"
+    sink = RunStreamSink(path, flush_chars=1000, flush_interval=1000)
+
+    sink.emit(ReasoningDelta("Let "))
+    sink.emit(ReasoningDelta("me "))
+    sink.emit(ReasoningDelta("think."))
+    sink.close()
+
+    assert [(tag, payload) for _, tag, payload in read_stream(path)] == [
+        ("reasoning", {"text": "Let me think."})
+    ]
+
+
+def test_run_sink_keeps_text_and_reasoning_batches_separate_and_ordered(tmp_path):
+    # Batching must never merge the two streams: reasoning is hidden behind a
+    # disclosure and text is the reply, so a swapped or fused row is a leak.
+    path = tmp_path / "run.stream.ndjson"
+    sink = RunStreamSink(path, flush_chars=1000, flush_interval=1000)
+
+    sink.emit(TextDelta("Let me check"))
+    sink.emit(ReasoningDelta("the corpus "))
+    sink.emit(ReasoningDelta("has a dossier."))
+    sink.emit(TextDelta(" your docs."))
+    sink.close()
+
+    assert [(tag, payload) for _, tag, payload in read_stream(path)] == [
+        ("text", {"text": "Let me check"}),
+        ("reasoning", {"text": "the corpus has a dossier."}),
+        ("text", {"text": " your docs."}),
+    ]
+
+
+def test_non_text_event_flushes_pending_reasoning_first(tmp_path):
+    path = tmp_path / "run.stream.ndjson"
+    sink = RunStreamSink(path, flush_chars=1000, flush_interval=1000)
+
+    sink.emit(ReasoningDelta("weighing options"))
+    sink.emit(ToolStarted("call-1", "read_document", "dossier"))
+    sink.close()
+
+    assert [tag for _, tag, _ in read_stream(path)] == ["reasoning", "tool_started"]
+
+
 def test_non_text_event_flushes_pending_text_first(tmp_path):
     path = tmp_path / "run.stream.ndjson"
     sink = RunStreamSink(path, flush_chars=1000, flush_interval=1000)
