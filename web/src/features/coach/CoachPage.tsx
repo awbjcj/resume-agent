@@ -210,6 +210,7 @@ export function CoachPage() {
     stream.stop();
     setStreamRunId(null);
     setStarting(false);
+    setEnding(false);
     setRunState("idle");
     setRunError("");
   };
@@ -225,6 +226,7 @@ export function CoachPage() {
         sessionId: session.data.sessionId,
         build,
         onDone: (completed: RunRecord) => {
+          if (ignoredRuns.current.delete(completed.runId)) return;
           setEnding(false);
           if (completed.status === "succeeded") {
             const result = completed.result as { session?: { sessionId?: string } } | null;

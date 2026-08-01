@@ -55,6 +55,10 @@ class ProseEmitter:
         self._prose.append(text)
         self._sink.emit(TextDelta(text))
 
+    @property
+    def marker_found(self) -> bool:
+        return self._marker_found
+
     def finish(self) -> tuple[str, str]:
         if not self._finished:
             if not self._marker_found:
@@ -98,6 +102,11 @@ def persona_output(
     if final_response is None:
         raise StreamFailed("The model stream ended without a final response.", "STREAM_ERROR")
     prose, streamed_output = emitter.finish()
+    if streamed_output and not emitter.marker_found:
+        raise StreamFailed(
+            f"The {source} response did not include the required {DELIMITER} delimiter.",
+            "MISSING_DELIMITER",
+        )
     full_output = streamed_output or expect_text(final_response, source=source)
     return prose, full_output
 

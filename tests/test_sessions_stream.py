@@ -8,6 +8,7 @@ from resume_agent.sessions.stream import (
     NullSink,
     ReasoningDelta,
     RunStreamSink,
+    StreamTail,
     TextDelta,
     ToolCompleted,
     ToolStarted,
@@ -155,6 +156,48 @@ def test_read_stream_skips_torn_or_malformed_rows(tmp_path):
     )
 
     assert list(read_stream(path)) == [(0, "text", {"text": "a"})]
+
+
+def test_stream_tail_only_reads_bytes_appended_since_last_call(tmp_path):
+    path = tmp_path / "run.stream.ndjson"
+    sink = RunStreamSink(path, flush_chars=1)
+    sink.emit(TextDelta("a"))
+    sink.emit(TextDelta("b"))
+
+    tail = StreamTail(path)
+    first = tail.read()
+    assert [index for index, _, _ in first] == [0, 1]
+
+    sink.emit(TextDelta("c"))
+    sink.emit(Completed())
+    sink.close()
+
+    second = tail.read()
+    assert [index for index, _, _ in second] == [2, 3]
+
+
+def test_stream_tail_withholds_a_line_not_yet_newline_terminated(tmp_path):
+    path = tmp_path / "run.stream.ndjson"
+    path.write_bytes(encode_event(0, TextDelta("a")).encode("utf-8") + b"\n")
+    tail = StreamTail(path)
+
+    assert [index for index, _, _ in tail.read()] == [0]
+
+    # A torn write: bytes appended without a trailing newline yet.
+    with path.open("ab") as handle:
+        handle.write(b'{"i": 1, "t": "text"')
+
+    assert tail.read() == []
+
+    with path.open("ab") as handle:
+        handle.write(b', "v": {"text": "b"}}\n')
+
+    assert [index for index, _, _ in tail.read()] == [1]
+
+
+def test_stream_tail_missing_file_is_empty_not_an_error(tmp_path):
+    tail = StreamTail(tmp_path / "absent.ndjson")
+    assert tail.read() == []
 
 
 def test_failed_and_reasoning_events_encode_their_payloads():

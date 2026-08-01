@@ -189,6 +189,21 @@ def test_ignored_lifecycle_event_does_not_prevent_pre_output_retry(monkeypatch):
     assert TextDelta("ok") in events
 
 
+def test_stream_terminal_error_status_yields_failed_not_completed(_no_budget):
+    output = _Output("provider rejected the request")
+    output.status = "ERROR"
+    agent = _FakeAgent([[_Event(RunEvent.run_content, content="partial"), output]])
+
+    events = list(AgentRunner(agent).stream("p"))
+
+    assert TextDelta("partial") in events
+    assert isinstance(events[-1], Failed)
+    assert events[-1].message == "provider rejected the request"
+    assert events[-1].code == "RUN_ERROR"
+    assert not any(isinstance(event, Completed) for event in events)
+    assert _no_budget == [output]
+
+
 def test_stream_without_terminal_run_output_fails_closed():
     agent = _FakeAgent([[_Event(RunEvent.run_completed)]])
 

@@ -208,6 +208,30 @@ def test_partial_stream_failure_leaves_session_byte_equivalent(tmp_path):
     assert load_session(tmp_path, sid) == before
 
 
+def test_missing_delimiter_fails_the_turn_instead_of_leaking_formatter_input(tmp_path):
+    sid = _open(tmp_path)["sessionId"]
+    before = load_session(tmp_path, sid)
+
+    class NoDelimiterStream(StreamingAgent):
+        def __init__(self):
+            self.full = "Strong answer with no delimiter at all."
+
+    with pytest.raises(RuntimeError, match="delimiter"):
+        run_message_turn(
+            FakeReporter(),
+            profile_dir=tmp_path,
+            session_id=sid,
+            message="I improved deploys.",
+            coach_agent=NoDelimiterStream(),
+            formatter_agent=FakeAgent(
+                CoachTurn(message="must not persist", action="ask", topic_id="t1")
+            ),
+            sink=RecordingSink(),
+        )
+
+    assert load_session(tmp_path, sid) == before
+
+
 def test_stream_checks_cancellation_before_each_visible_event(tmp_path):
     sid = _open(tmp_path)["sessionId"]
     before = load_session(tmp_path, sid)

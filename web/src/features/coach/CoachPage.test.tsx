@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,6 +22,7 @@ class FakeEventSource {
 vi.stubGlobal("EventSource", FakeEventSource);
 
 const sendMessage = vi.fn();
+const endSession = vi.fn();
 const saveNote = vi.fn();
 const discardNote = vi.fn();
 const archiveSession = vi.fn();
@@ -101,7 +102,7 @@ vi.mock("./use-coach", () => ({
   }),
   useStartCoachSession: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useSendCoachMessage: () => ({ mutateAsync: sendMessage, isPending: false }),
-  useEndCoachSession: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useEndCoachSession: () => ({ mutateAsync: endSession, isPending: false }),
   useSaveCoachNote: () => ({ mutateAsync: saveNote, isPending: false }),
   useDiscardCoachNote: () => ({ mutateAsync: discardNote, isPending: false }),
   useArchiveCoachSession: () => ({ mutate: archiveSession }),
@@ -164,6 +165,33 @@ describe("CoachPage", () => {
     await user.click(screen.getByRole("button", { name: "Stop generating" }));
     expect(cancelRun).toHaveBeenCalledWith("run-stream");
     expect(screen.queryByText("Strong answer.")).not.toBeInTheDocument();
+  });
+
+  it("stopping the end-session stream suppresses its late completion", async () => {
+    let capturedOnDone: ((completed: { runId: string; status: string; error?: string }) => void) | undefined;
+    endSession.mockImplementation(async ({ onDone }) => {
+      capturedOnDone = onDone;
+      return { runId: "run-end" };
+    });
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: "End session" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "End session" }));
+    expect(endSession).toHaveBeenCalled();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    act(() =>
+      FakeEventSource.last!.send({ i: 0, t: "text", v: { text: "Preparing your recap..." } }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Stop generating" }));
+    expect(capturedOnDone).toBeDefined();
+    act(() => capturedOnDone!({ runId: "run-end", status: "failed", error: "Could not end session" }));
+
+    expect(screen.queryByText("Could not end session")).not.toBeInTheDocument();
   });
 
   it("renders a completed session read-only", () => {

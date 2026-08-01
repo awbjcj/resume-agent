@@ -204,16 +204,8 @@ class RunStreamSink:
         self._closed = True
 
 
-def read_stream(path: Path | str, offset: int = 0) -> Iterator[tuple[int, str, dict]]:
-    """Read complete, well-shaped rows with indexes at or beyond ``offset``."""
-    file_path = Path(path)
-    if not file_path.is_file():
-        return
-    try:
-        raw = file_path.read_text(encoding="utf-8")
-    except OSError:
-        return
-    for line in raw.splitlines():
+def _parse_rows(text: str, offset: int) -> Iterator[tuple[int, str, dict]]:
+    for line in text.splitlines():
         if not line.strip():
             continue
         try:
@@ -235,3 +227,46 @@ def read_stream(path: Path | str, offset: int = 0) -> Iterator[tuple[int, str, d
         ):
             continue
         yield index, tag, payload
+
+
+def read_stream(path: Path | str, offset: int = 0) -> Iterator[tuple[int, str, dict]]:
+    """Read complete, well-shaped rows with indexes at or beyond ``offset``."""
+    file_path = Path(path)
+    if not file_path.is_file():
+        return
+    try:
+        raw = file_path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    yield from _parse_rows(raw, offset)
+
+
+class StreamTail:
+    """Poll-friendly cursor that only re-reads bytes appended since its last read.
+
+    ``read_stream`` re-reads and re-parses the whole file every call, which is
+    wasteful on a hot poll loop (``stream_events`` calls it every
+    ``poll_interval`` for a run's full duration). This tracks the raw byte
+    position already consumed and seeks there instead, so each poll only pays
+    for the newly appended tail. It always stops at the last complete
+    newline, so a line still mid-``flush()`` is left for the next read rather
+    than parsed as a truncated row.
+    """
+
+    def __init__(self, path: Path | str, byte_pos: int = 0) -> None:
+        self._path = Path(path)
+        self._byte_pos = byte_pos
+
+    def read(self, offset: int = 0) -> list[tuple[int, str, dict]]:
+        try:
+            with self._path.open("rb") as handle:
+                handle.seek(self._byte_pos)
+                chunk = handle.read()
+        except OSError:
+            return []
+        last_newline = chunk.rfind(b"\n")
+        if last_newline < 0:
+            return []
+        complete = chunk[: last_newline + 1]
+        self._byte_pos += len(complete)
+        return list(_parse_rows(complete.decode("utf-8"), offset))

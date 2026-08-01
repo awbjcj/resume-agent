@@ -6,7 +6,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 
-from resume_agent.sessions.stream import TERMINAL_TAGS, read_stream
+from resume_agent.sessions.stream import TERMINAL_TAGS, StreamTail
 
 _GRACE_POLLS = 4
 
@@ -23,8 +23,9 @@ async def stream_events(
     path = mgr.stream_path(run_id)
     cursor = offset
     terminal_polls = 0
+    tail = StreamTail(path)
     while True:
-        for index, tag, payload in read_stream(path, cursor):
+        for index, tag, payload in tail.read(cursor):
             cursor = index + 1
             yield {
                 "data": json.dumps(

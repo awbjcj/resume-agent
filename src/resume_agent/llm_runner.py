@@ -153,6 +153,13 @@ class AgentRunner:
                 from resume_agent.tenancy.usage import record_call
 
                 record_call(self._agent, terminal_output)
+                if _run_failed(terminal_output):
+                    message = (
+                        getattr(terminal_output, "content", None)
+                        or "The model reported an error."
+                    )
+                    yield Failed(str(message), "RUN_ERROR")
+                    return
                 yield Completed(terminal_output)
                 return
             except Exception as exc:
