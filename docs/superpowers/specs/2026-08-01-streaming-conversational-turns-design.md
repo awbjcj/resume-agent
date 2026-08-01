@@ -11,6 +11,65 @@
 that refines search keywords and source companies across multiple turns) depends
 on the substrate built here and is deliberately not designed in this document.
 
+## Correctness clarifications (implementation-authoritative)
+
+The implementation review found several lifecycle details that the original
+design left implicit. These rules are authoritative for this spec:
+
+1. **The service owns the terminal event.** `AgentRunner.stream()` reports the
+   provider/Agno terminal result to its caller, but the API sink does not emit
+   `completed` until formatting, validation, and the durable session mutation
+   have all succeeded. Any exception or cancellation emits exactly one `failed`
+   terminal event instead. This prevents the SSE reader from closing before a
+   durable notice or turn exists and makes the bubble/refetch hand-off reliable.
+2. **A failed or cancelled stream never persists a partial turn.** A failure at
+   any point after the first visible delta is surfaced in place and the service
+   raises before `apply_turn_delta`, `apply_answer_delta`, `create_session`, or
+   `end_session`. Retries remain pre-visible-output only.
+3. **Every streamed event is a cancellation checkpoint.** The turn service calls
+   the run reporter's public `checkpoint()` while consuming the provider stream.
+   This is what makes Stop cooperative at token/tool-event granularity. It cannot
+   interrupt a provider while no event is arriving, but it stops before the next
+   event is shown or any session mutation is committed.
+4. **Agno events are matched by their enum value, not `str(event)`.** In pinned
+   Agno 2.8.2, `str(RunEvent.run_content)` is `RunEvent.run_content`, while
+   `.value` is `RunContent`. Tests use real Agno event enums or faithful enum
+   doubles so a string-only fake cannot conceal this mismatch. The terminal
+   `RunOutput` is carried by the internal `Completed` event; mutable
+   `AgentRunner.last_output` state is unnecessary.
+5. **Tool events carry `call_id`.** A name is not an identity when tools can run
+   more than once or in parallel. Started/completed events and the TypeScript
+   reducer match on Agno's `tool_call_id`, with the name retained for display.
+6. **Stream terminals mirror run terminals.** If the stream file cannot record
+   its terminal event, the SSE grace fallback maps `done` to `completed` and
+   maps `error`/`cancelled` to `failed` with the run's error code. It must never
+   turn a failed worker into a successful conversation. Run cleanup and sweeping
+   remove both the JSON record and its `.stream.ndjson` sibling.
+7. **Only draft-integrity failures are droppable.** Missing/incomplete note
+   content, missing quotes, and fabricated quotes raise `DraftRejected`.
+   Unknown/closed topics, duplicate drafts, invalid updates, and agenda overflow
+   remain structural `TurnRejected` failures even in the lenient retry.
+8. **The browser validates the hand-written SSE payload at the boundary.**
+   Malformed or unknown events are ignored without mutating the cursor or
+   throwing from React. Hook state resets whenever `runId` changes, transport
+   reconnects use `offset=lastIndex+1`, and pending reconnect timers are cleared
+   on cleanup.
+9. **Refresh recovery uses the existing run registry.** Conversation runs carry
+   `meta.sessionId` (where a session already exists), and pages select the active
+   run by kind plus session id after `useRehydrateRuns()` restores the run store.
+   Replaying from offset zero after a full page refresh is valid reconstruction;
+   transport reconnects within the mounted page resume from the next offset.
+10. **Stop and retry discard synthetic state immediately.** Stop requests run
+    cancellation, clears the partial assistant bubble, and leaves the durable
+    transcript unchanged. Retry starts with a fresh run/cursor and reuses the
+    same user input. A synthetic bubble is hidden synchronously as soon as the
+    durable turn count advances, then cleaned up in an effect, so it is never
+    rendered beside its durable replacement.
+11. **Existing transcript affordances remain.** Coach research-action cards,
+    draft cards, recap/impact panels, rails, setup dialogs, and the interview
+    debrief are preserved. Shared chat primitives replace only message rendering
+    and composition; durable research actions remain adjacent to their turn.
+
 ---
 
 ## Problem
@@ -63,7 +122,7 @@ tool-using phase and stream only the final second.
 - Streaming the Source/Search Scouts (spec 2).
 - Streaming tailor, cover-letter, pull, or discover runs.
 - Persisting tool/reasoning parts into the durable transcript. They are progress
-  affordances, not history. (Validation notices are the exception and *are*
+  affordances, not history. (Validation notices are the exception and _are_
   persisted — see the validation split.)
 - Multi-process stream fanout. Railway is single-service, single-volume.
 - Replacing `GET /api/runs/{id}/events`. It is the `RunOut` projection every run
@@ -84,7 +143,7 @@ def stream(self, prompt: str) -> Iterator[StreamEvent]: ...
 It keeps the identical envelope as `run`: `refresh_agent_api_key`,
 `enforce_agent_budget`, and `record_call` against the final `RunOutput` (agno's
 `yield_run_output` makes the terminal `RunOutput` the last yielded item). Budget
-enforcement stays *before* the first provider call, so quota and shared-key
+enforcement stays _before_ the first provider call, so quota and shared-key
 gating are unaffected.
 
 It yields **our own** dataclasses, never agno types — the same reason
@@ -117,18 +176,18 @@ class StreamSink(Protocol):
     def emit(self, event: StreamEvent) -> None: ...
 ```
 
-| Implementation | Used by | Behavior |
-| --- | --- | --- |
-| `RunStreamSink` | API run workers | Appends ndjson to `data/runs/{run_id}.stream.ndjson` |
-| `ConsoleStreamSink` | `resume-agent profile coach` | Prints text deltas and tool chips to stdout |
-| `NullSink` | tests, non-conversational callers | Discards |
+| Implementation      | Used by                           | Behavior                                             |
+| ------------------- | --------------------------------- | ---------------------------------------------------- |
+| `RunStreamSink`     | API run workers                   | Appends ndjson to `data/runs/{run_id}.stream.ndjson` |
+| `ConsoleStreamSink` | `resume-agent profile coach`      | Prints text deltas and tool chips to stdout          |
+| `NullSink`          | tests, non-conversational callers | Discards                                             |
 
 `RunStreamSink` resolves its path through `RunManager`'s registered root for the
 run (the same mechanism `_root_for` uses), so the stream file lands under the
 **same tenant root** as the run record and inherits tenant confinement. It is
 never addressed by a client-supplied path.
 
-Appends use `open(..., 'a')` + flush — deliberately *not* `progress.py`'s
+Appends use `open(..., 'a')` + flush — deliberately _not_ `progress.py`'s
 atomic-replace path, which would be both slow and unreadable if applied per
 chunk. Events batch on a ~80ms / N-character boundary so a fast model does not
 produce one syscall per token.
@@ -195,10 +254,10 @@ a redeploy.
 `normalize_turn` (both the coach's and the interviewer's) stops being
 all-or-nothing. Rejections are classified:
 
-| Class | Causes | Handling |
-| --- | --- | --- |
-| **Structural** | unknown `topic_id`, invalid topic update, agenda cap exceeded, empty message, reserved `recap` action | Retry the **formatter only** (cheap tier, ~1s, no re-stream). On a second failure, store the turn with the streamed prose, fall back to the session's current open topic, and attach a notice. |
-| **Draft** | missing quotes, fabricated quote, incomplete draft note | One formatter retry (the notes may have carried a verbatim quote the formatter paraphrased), then **drop the draft**, attach `notice: "note not attached — quote check failed"`, and keep the turn. |
+| Class          | Causes                                                                                                | Handling                                                                                                                                                                                            |
+| -------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Structural** | unknown `topic_id`, invalid topic update, agenda cap exceeded, empty message, reserved `recap` action | Retry the **formatter only** (cheap tier, ~1s, no re-stream). On a second failure, store the turn with the streamed prose, fall back to the session's current open topic, and attach a notice.      |
+| **Draft**      | missing quotes, fabricated quote, incomplete draft note                                               | One formatter retry (the notes may have carried a verbatim quote the formatter paraphrased), then **drop the draft**, attach `notice: "note not attached — quote check failed"`, and keep the turn. |
 
 `format_with_retry` in `sessions/turns.py` remains the single seam; it grows the
 classification and the degradation return rather than being duplicated per stack.
@@ -210,7 +269,7 @@ degradation stores the **formatter's** `message` instead. Everything else about
 the split is identical in both modes — the degradation behavior is not tied to
 streaming, only its text source is.
 
-**Notices are durable.** A notice explains a *missing* draft note, so it must
+**Notices are durable.** A notice explains a _missing_ draft note, so it must
 survive a page refresh; it is stored on the turn record (`CoachTurnRecord.notice`,
 `InterviewTurnRecord.notice`) and projected through the session view, not merely
 emitted as a stream part. This is the one exception to the non-goal above: tool
@@ -345,11 +404,11 @@ The suite stays offline: no API key, no network, no browser.
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| Model ignores the metadata delimiter | Whole output becomes the message; formatter extracts structure as today |
-| Streamed prose quality differs from the formatter's copy | The formatter was already instructed to copy verbatim; `stream_enabled=false` reverts |
-| Per-chunk file IO cost | Batched on an ~80ms / N-char boundary |
-| Mid-turn refresh loses the answer | Offset resume replays from the client's last index |
-| A provider streams poorly | `stream_enabled=false` kill switch, per-deploy |
-| Windows file sharing during append + tail | Reader opens read-only and tolerates a short read; `progress.py` already carries the bounded-retry precedent |
+| Risk                                                     | Mitigation                                                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Model ignores the metadata delimiter                     | Whole output becomes the message; formatter extracts structure as today                                      |
+| Streamed prose quality differs from the formatter's copy | The formatter was already instructed to copy verbatim; `stream_enabled=false` reverts                        |
+| Per-chunk file IO cost                                   | Batched on an ~80ms / N-char boundary                                                                        |
+| Mid-turn refresh loses the answer                        | Offset resume replays from the client's last index                                                           |
+| A provider streams poorly                                | `stream_enabled=false` kill switch, per-deploy                                                               |
+| Windows file sharing during append + tail                | Reader opens read-only and tolerates a short read; `progress.py` already carries the bounded-retry precedent |

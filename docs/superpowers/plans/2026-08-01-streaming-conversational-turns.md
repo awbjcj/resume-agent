@@ -21,62 +21,123 @@
 - **Delimiter:** the literal string `---METADATA---`. Holdback window: 32 characters.
 - Regenerate contracts with `bash scripts/gen_ts_client.sh` whenever a route or schema changes; `tests/api/test_openapi_contract.py` is the drift gate.
 
+## Correctness Amendments (authoritative over task snippets)
+
+The plan was reviewed against the design, the current branch, and pinned Agno
+2.8.2 before implementation. The following amendments fix lifecycle and contract
+bugs in the draft snippets; implementation and tests must follow these rules even
+where a later task says to apply a snippet "verbatim":
+
+- Normalize Agno event tags with `event.value` (falling back to a raw string),
+  never `str(event)`. Use faithful enum-shaped tests. Carry the final `RunOutput`
+  on the internal `Completed(response)` event instead of mutable
+  `AgentRunner.last_output` state.
+- Add `call_id` to `ToolStarted` and `ToolCompleted`, encode it as `callId`, and
+  match tool completion in the web reducer by id rather than by display name.
+- `AgentRunner.stream()` may yield an internal `Completed`/`Failed`, but
+  `persona_output` consumes rather than forwards that terminal. The router's
+  stream-work wrapper emits exactly one wire terminal: `Completed` only after
+  the service has formatted, validated, and durably stored the turn; `Failed`
+  for every exception or cancellation. Notices are emitted before `Completed`.
+- A provider failure after partial prose raises before any durable mutation.
+  Partial turns are never formatted or stored. The in-place retry owns recovery.
+- Pass the run reporter into `persona_output` and call `reporter.checkpoint()`
+  for every provider event before showing it. Stop therefore discards the
+  synthetic parts and the worker raises `RunCancelled` before session mutation.
+- Make sink close idempotent and terminal-aware. Validate decoded NDJSON shapes,
+  reject malformed indexes/payloads, and ignore writes after a terminal. Remove
+  stream siblings from `RunManager.clear()` and `sweep()`.
+- The SSE grace fallback preserves truth: `done -> completed`;
+  `error/cancelled -> failed` with the run error/error code. Validate `offset`
+  as a non-negative query parameter. Replace the hanging "empty live stream"
+  route test with a generator test that observes an empty poll and then an event.
+- Only note-content/quote integrity checks raise `DraftRejected`. Topic state,
+  duplicate draft, update, agenda, and action errors remain structural and may
+  not be silently converted into a dropped draft.
+- The interview stack has no draft subtype. Its lenient validator parameter is
+  accepted for the shared formatter contract but structural failures still
+  raise; after two failures its service stores streamed prose against the
+  currently asked question with a durable notice and does not advance the plan.
+- Parse SSE JSON into a validated `StreamEvent` at the browser boundary. Unknown
+  or malformed payloads do not advance the offset. Reset parts, cursor, errors,
+  and reconnect timers on every `runId` change.
+- Conversation launches include run metadata (`sessionId` when available).
+  Pages combine the just-launched id with the existing rehydrated run store, so
+  refresh can reconstruct a live stream and interview pages cannot attach to a
+  different session's run.
+- Stop clears partial parts/run state immediately after requesting cooperative
+  cancellation. Retry clears the failed partial before launching a fresh run.
+  Busy state covers both POST launch and streaming, preventing duplicate sends.
+- Capture the durable turn count when a run is attached. Hide the synthetic
+  bubble synchronously once that count advances; reset it afterward. Do not use
+  the unused `pendingRun` state from Task 11's draft snippet.
+- Preserve each coach turn's existing `ResearchActionCard` content adjacent to
+  that message, and leave draft/recap/impact/debrief surfaces intact. The shared
+  chat components use the repository's established visual tokens, add an
+  `aria-live` transcript status, accessible tool states, keyboard operation, and
+  responsive widths rather than introducing a new visual language.
+- Intermediate verification stays focused as requested. Contract regeneration
+  happens once after backend/schema/route work is coherent, followed by the
+  final whole-repository verification matrix.
+
 ---
 
 ## File Structure
 
 **Create:**
 
-| Path | Responsibility |
-| --- | --- |
-| `src/resume_agent/sessions/stream.py` | `StreamEvent` types, ndjson codec, `StreamSink` protocol + three sinks, reader |
-| `src/resume_agent/api/runs/stream_sse.py` | Async generator tailing a run's ndjson from an offset |
-| `tests/test_sessions_stream.py` | Codec, sinks, reader, offset resume |
-| `tests/test_llm_runner_stream.py` | `AgentRunner.stream` event mapping + retry policy |
-| `tests/test_turn_prose.py` | `ProseEmitter` delimiter handling |
-| `tests/api/test_run_stream_route.py` | SSE route auth, offset, terminal close |
-| `web/src/lib/chat/events.ts` | TS `StreamEvent` union (hand-written; SSE bodies are not in OpenAPI) |
-| `web/src/lib/chat/useChatStream.ts` | EventSource + offset resume → `parts[]` |
-| `web/src/lib/chat/events.test.ts` | Python↔TS tag parity |
-| `web/src/lib/chat/useChatStream.test.ts` | Reducer + resume behavior |
-| `web/src/components/chat/ChatThread.tsx` | Scroll anchoring + jump-to-latest |
-| `web/src/components/chat/ChatMessage.tsx` | Role bubble, renders parts in arrival order |
-| `web/src/components/chat/parts/TextPart.tsx` | Streaming markdown + caret |
-| `web/src/components/chat/parts/ToolPart.tsx` | Collapsible activity chip |
-| `web/src/components/chat/parts/ReasoningPart.tsx` | Collapsed disclosure |
-| `web/src/components/chat/parts/NoticePart.tsx` | Degradation notice |
-| `web/src/components/chat/ChatComposer.tsx` | Textarea, send/stop, transcribe |
-| `web/src/components/chat/ChatThread.test.tsx` | Anchoring, pill, part order |
+| Path                                              | Responsibility                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `src/resume_agent/sessions/stream.py`             | `StreamEvent` types, ndjson codec, `StreamSink` protocol + three sinks, reader |
+| `src/resume_agent/api/runs/stream_sse.py`         | Async generator tailing a run's ndjson from an offset                          |
+| `tests/test_sessions_stream.py`                   | Codec, sinks, reader, offset resume                                            |
+| `tests/test_llm_runner_stream.py`                 | `AgentRunner.stream` event mapping + retry policy                              |
+| `tests/test_turn_prose.py`                        | `ProseEmitter` delimiter handling                                              |
+| `tests/api/test_run_stream_route.py`              | SSE route auth, offset, terminal close                                         |
+| `web/src/lib/chat/events.ts`                      | TS `StreamEvent` union (hand-written; SSE bodies are not in OpenAPI)           |
+| `web/src/lib/chat/useChatStream.ts`               | EventSource + offset resume → `parts[]`                                        |
+| `web/src/lib/chat/events.test.ts`                 | Python↔TS tag parity                                                           |
+| `web/src/lib/chat/useChatStream.test.ts`          | Reducer + resume behavior                                                      |
+| `web/src/components/chat/ChatThread.tsx`          | Scroll anchoring + jump-to-latest                                              |
+| `web/src/components/chat/ChatMessage.tsx`         | Role bubble, renders parts in arrival order                                    |
+| `web/src/components/chat/parts/TextPart.tsx`      | Streaming markdown + caret                                                     |
+| `web/src/components/chat/parts/ToolPart.tsx`      | Collapsible activity chip                                                      |
+| `web/src/components/chat/parts/ReasoningPart.tsx` | Collapsed disclosure                                                           |
+| `web/src/components/chat/parts/NoticePart.tsx`    | Degradation notice                                                             |
+| `web/src/components/chat/ChatComposer.tsx`        | Textarea, send/stop, transcribe                                                |
+| `web/src/components/chat/ChatThread.test.tsx`     | Anchoring, pill, part order                                                    |
 
 **Modify:**
 
-| Path | Change |
-| --- | --- |
-| `src/resume_agent/llm_runner.py` | `StreamEvent` re-export, `AgentRunner.stream()` |
-| `src/resume_agent/sessions/turns.py` | `DraftRejected`, `ProseEmitter`, `format_with_retry` strict/lenient |
-| `src/resume_agent/profile/coach.py` | Metadata contract in instructions; `normalize_*` strict flag; `ValidatedTurn.notice` |
-| `src/resume_agent/profile/coach_store.py` | `CoachTurnRecord.notice` |
-| `src/resume_agent/services/profile_coach.py` | `sink=` parameter; stream the coach agent |
-| `src/resume_agent/interview/agent.py` | Same treatment as coach |
-| `src/resume_agent/interview/store.py` | `InterviewTurnRecord.notice` |
-| `src/resume_agent/services/mock_interview.py` | `sink=` parameter; stream the interviewer |
-| `src/resume_agent/api/runs/manager.py` | `stream_path(run_id)` accessor |
-| `src/resume_agent/api/routers/runs.py` | `GET /runs/{run_id}/stream` |
-| `src/resume_agent/api/routers/coach.py`, `interview.py` | Pass `RunStreamSink` into the worker |
-| `src/resume_agent/api/schemas/coach.py`, `interview.py` | `notice` on turn schemas |
-| `src/resume_agent/config.py` | `stream_enabled: bool = True` |
-| `src/resume_agent/cli.py` | `ConsoleStreamSink` for `profile coach` |
-| `web/src/features/coach/*`, `web/src/features/interview/*` | Refactor onto `<ChatThread>` |
+| Path                                                       | Change                                                                               |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `src/resume_agent/llm_runner.py`                           | `StreamEvent` re-export, `AgentRunner.stream()`                                      |
+| `src/resume_agent/sessions/turns.py`                       | `DraftRejected`, `ProseEmitter`, `format_with_retry` strict/lenient                  |
+| `src/resume_agent/profile/coach.py`                        | Metadata contract in instructions; `normalize_*` strict flag; `ValidatedTurn.notice` |
+| `src/resume_agent/profile/coach_store.py`                  | `CoachTurnRecord.notice`                                                             |
+| `src/resume_agent/services/profile_coach.py`               | `sink=` parameter; stream the coach agent                                            |
+| `src/resume_agent/interview/agent.py`                      | Same treatment as coach                                                              |
+| `src/resume_agent/interview/store.py`                      | `InterviewTurnRecord.notice`                                                         |
+| `src/resume_agent/services/mock_interview.py`              | `sink=` parameter; stream the interviewer                                            |
+| `src/resume_agent/api/runs/manager.py`                     | `stream_path(run_id)` accessor                                                       |
+| `src/resume_agent/api/routers/runs.py`                     | `GET /runs/{run_id}/stream`                                                          |
+| `src/resume_agent/api/routers/coach.py`, `interview.py`    | Pass `RunStreamSink` into the worker                                                 |
+| `src/resume_agent/api/schemas/coach.py`, `interview.py`    | `notice` on turn schemas                                                             |
+| `src/resume_agent/config.py`                               | `stream_enabled: bool = True`                                                        |
+| `src/resume_agent/cli.py`                                  | `ConsoleStreamSink` for `profile coach`                                              |
+| `web/src/features/coach/*`, `web/src/features/interview/*` | Refactor onto `<ChatThread>`                                                         |
 
 ---
 
 ## Task 1: Stream events, codec, and sinks
 
 **Files:**
+
 - Create: `src/resume_agent/sessions/stream.py`
 - Test: `tests/test_sessions_stream.py`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `TextDelta(text)`, `ReasoningDelta(text)`, `ToolStarted(name, args_preview)`, `ToolCompleted(name, result_preview, ok)`, `Notice(message)`, `Completed()`, `Failed(message, code)`; `StreamSink` protocol with `emit(event)` and `close()`; `NullSink()`, `ConsoleStreamSink(write)`, `RunStreamSink(path, flush_interval=0.08, flush_chars=240)`; `encode_event(index, event) -> str`; `read_stream(path, offset=0) -> Iterator[tuple[int, str, dict]]`.
 
@@ -462,10 +523,12 @@ git commit -m "feat(sessions): add stream events, ndjson codec, and sinks"
 ## Task 2: `AgentRunner.stream()`
 
 **Files:**
+
 - Modify: `src/resume_agent/llm_runner.py` (add to `AgentRunner`, after `arun`)
 - Test: `tests/test_llm_runner_stream.py`
 
 **Interfaces:**
+
 - Consumes: Task 1's event types.
 - Produces: `AgentRunner.stream(prompt) -> Iterator[StreamEvent]`, whose final yielded item is always `Completed()` or `Failed(...)`; and `AgentRunner.last_output` holding the terminal agno `RunOutput` after a successful stream (so callers can reach `.content` for the formatter).
 
@@ -786,10 +849,12 @@ git commit -m "feat(llm): stream agent events with retry only before first token
 ## Task 3: `ProseEmitter` — delimiter splitting with holdback
 
 **Files:**
+
 - Modify: `src/resume_agent/sessions/turns.py`
 - Test: `tests/test_turn_prose.py`
 
 **Interfaces:**
+
 - Consumes: Task 1's `StreamSink`, `TextDelta`.
 - Produces: `DELIMITER = "---METADATA---"`; `ProseEmitter(sink, holdback=32)` with `feed(text)`, `finish() -> tuple[str, str]` returning `(prose, full_output)`.
 
@@ -974,10 +1039,12 @@ git commit -m "feat(sessions): split streamed prose from buffered turn metadata"
 ## Task 4: Validation split — `DraftRejected`, strict/lenient, durable notices
 
 **Files:**
+
 - Modify: `src/resume_agent/sessions/turns.py`, `src/resume_agent/profile/coach.py`, `src/resume_agent/profile/coach_store.py`, `src/resume_agent/interview/agent.py`, `src/resume_agent/interview/store.py`, `src/resume_agent/api/schemas/coach.py`, `src/resume_agent/api/schemas/interview.py`, `src/resume_agent/services/profile_coach.py` (view projection only)
 - Test: `tests/test_profile_coach.py` (extend), `tests/test_interview_agent.py` (extend)
 
 **Interfaces:**
+
 - Consumes: `TurnRejected` (existing).
 - Produces: `DraftRejected(TurnRejected)`; `format_with_retry(formatter, notes, schema, validate, *, label)` where `validate` now takes `(formatted, strict: bool)`; `ValidatedTurn.notice: str`; `CoachTurnRecord.notice: str`; `InterviewTurnRecord.notice: str`; `CoachTurnOut.notice`, `InterviewTurnOut.notice`.
 
@@ -1141,6 +1208,7 @@ def format_with_retry(formatter, notes: object, schema, validate, *, label: str)
 ```
 
 In `profile/coach.py`:
+
 - Add `notice: str = ""` to `ValidatedTurn`.
 - Change `normalize_turn(turn, session)` to `normalize_turn(turn, session, *, strict: bool = True)`.
 - Wrap the draft block so its failures raise `DraftRejected` when `strict`, and set `notice` + `draft = None` otherwise:
@@ -1213,10 +1281,12 @@ git commit -m "feat(sessions): scope the draft integrity gate so a bad quote spa
 ## Task 5: Stream the coach turn
 
 **Files:**
+
 - Modify: `src/resume_agent/services/profile_coach.py`, `src/resume_agent/profile/coach.py` (instructions), `src/resume_agent/config.py`
 - Test: `tests/test_profile_coach_service.py` (extend)
 
 **Interfaces:**
+
 - Consumes: `AgentRunner.stream`, `ProseEmitter`, `StreamSink`, `NullSink`, `Settings.stream_enabled`.
 - Produces: `run_opening_turn(..., sink: StreamSink | None = None)`, `run_message_turn(..., sink: StreamSink | None = None)`, `run_recap_turn(..., sink: StreamSink | None = None)`.
 
@@ -1459,10 +1529,12 @@ git commit -m "feat(coach): stream persona prose and store it as the turn text"
 ## Task 6: Stream the interview turn
 
 **Files:**
+
 - Modify: `src/resume_agent/services/mock_interview.py`, `src/resume_agent/interview/agent.py`
 - Test: `tests/test_mock_interview_service.py` (extend)
 
 **Interfaces:**
+
 - Consumes: everything from Task 5.
 - Produces: `run_opening_turn(..., sink=None)`, `run_answer_turn(..., sink=None)` in `services/mock_interview.py`. `run_debrief_turn` is **unchanged** — the debrief is a structured scorecard, not prose.
 
@@ -1531,10 +1603,12 @@ git commit -m "feat(interview): stream interviewer prose; leave the debrief stru
 ## Task 7: Run stream path, SSE route, and router wiring
 
 **Files:**
+
 - Create: `src/resume_agent/api/runs/stream_sse.py`, `tests/api/test_run_stream_route.py`
 - Modify: `src/resume_agent/api/runs/manager.py`, `src/resume_agent/api/routers/runs.py`, `src/resume_agent/api/routers/coach.py`, `src/resume_agent/api/routers/interview.py`
 
 **Interfaces:**
+
 - Consumes: `read_stream`, `TERMINAL_TAGS`, `RunStreamSink`.
 - Produces: `RunManager.stream_path(run_id) -> Path`; `stream_events(mgr, run_id, offset, poll_interval=0.25) -> AsyncIterator[dict]`; route `GET /api/runs/{run_id}/stream?offset=N`.
 
@@ -1701,10 +1775,12 @@ git commit -m "feat(api): tail conversational run events over SSE with offset re
 ## Task 8: CLI console streaming
 
 **Files:**
+
 - Modify: `src/resume_agent/cli.py` (`profile_coach_cmd`, around lines 317-460)
 - Test: `tests/test_cli_profile_coach.py` (extend)
 
 **Interfaces:**
+
 - Consumes: `ConsoleStreamSink`.
 - Produces: no new public API — the CLI passes `sink=ConsoleStreamSink(...)` into `run_opening_turn`, `run_message_turn`, and `run_recap_turn`.
 
@@ -1766,10 +1842,12 @@ git commit -m "feat(cli): stream coach replies to the terminal"
 ## Task 9: Web stream types and `useChatStream`
 
 **Files:**
+
 - Create: `web/src/lib/chat/events.ts`, `web/src/lib/chat/useChatStream.ts`, `web/src/lib/chat/events.test.ts`, `web/src/lib/chat/useChatStream.test.ts`
 - Create: `tests/api/test_stream_event_parity.py`
 
 **Interfaces:**
+
 - Consumes: the SSE route from Task 7.
 - Produces: TS types `StreamEventTag`, `ChatPart` (`{ kind: "text" | "reasoning" | "tool" | "notice"; ... }`), `reduceEvent(parts, event) -> ChatPart[]`, and `useChatStream(runId, options) -> { parts, status, error, stop, reset }`.
 
@@ -1799,17 +1877,36 @@ describe("reduceEvent", () => {
   it("starts a new text part after a tool part so order is preserved", () => {
     let parts: ChatPart[] = [];
     parts = reduceEvent(parts, { i: 0, t: "text", v: { text: "a" } });
-    parts = reduceEvent(parts, { i: 1, t: "tool_started", v: { name: "search", argsPreview: "x" } });
+    parts = reduceEvent(parts, {
+      i: 1,
+      t: "tool_started",
+      v: { name: "search", argsPreview: "x" },
+    });
     parts = reduceEvent(parts, { i: 2, t: "text", v: { text: "b" } });
     expect(parts.map((p) => p.kind)).toEqual(["text", "tool", "text"]);
   });
 
   it("resolves a tool part in place when it completes", () => {
     let parts: ChatPart[] = [];
-    parts = reduceEvent(parts, { i: 0, t: "tool_started", v: { name: "search", argsPreview: "x" } });
-    parts = reduceEvent(parts, { i: 1, t: "tool_completed", v: { name: "search", resultPreview: "3 hits", ok: true } });
+    parts = reduceEvent(parts, {
+      i: 0,
+      t: "tool_started",
+      v: { name: "search", argsPreview: "x" },
+    });
+    parts = reduceEvent(parts, {
+      i: 1,
+      t: "tool_completed",
+      v: { name: "search", resultPreview: "3 hits", ok: true },
+    });
     expect(parts).toEqual([
-      { kind: "tool", name: "search", argsPreview: "x", resultPreview: "3 hits", ok: true, done: true },
+      {
+        kind: "tool",
+        name: "search",
+        argsPreview: "x",
+        resultPreview: "3 hits",
+        ok: true,
+        done: true,
+      },
     ]);
   });
 
@@ -1819,17 +1916,29 @@ describe("reduceEvent", () => {
   });
 
   it("appends a notice part", () => {
-    const parts = reduceEvent([], { i: 0, t: "notice", v: { message: "not attached" } });
+    const parts = reduceEvent([], {
+      i: 0,
+      t: "notice",
+      v: { message: "not attached" },
+    });
     expect(parts).toEqual([{ kind: "notice", message: "not attached" }]);
   });
 
   it("ignores an unknown tag rather than throwing", () => {
-    expect(reduceEvent([], { i: 0, t: "future_tag", v: {} } as never)).toEqual([]);
+    expect(reduceEvent([], { i: 0, t: "future_tag", v: {} } as never)).toEqual(
+      [],
+    );
   });
 
   it("exports every tag the backend can emit", () => {
     expect([...STREAM_EVENT_TAGS].sort()).toEqual([
-      "completed", "failed", "notice", "reasoning", "text", "tool_completed", "tool_started",
+      "completed",
+      "failed",
+      "notice",
+      "reasoning",
+      "text",
+      "tool_completed",
+      "tool_started",
     ]);
   });
 });
@@ -1862,7 +1971,9 @@ vi.stubGlobal("EventSource", FakeEventSource);
 describe("useChatStream", () => {
   it("accumulates parts from events", async () => {
     const { result } = renderHook(() => useChatStream("run-1"));
-    act(() => FakeEventSource.last!.send({ i: 0, t: "text", v: { text: "hi" } }));
+    act(() =>
+      FakeEventSource.last!.send({ i: 0, t: "text", v: { text: "hi" } }),
+    );
     await waitFor(() => expect(result.current.parts).toHaveLength(1));
   });
 
@@ -1875,14 +1986,24 @@ describe("useChatStream", () => {
 
   it("reconnects at the next index after a transport error", async () => {
     renderHook(() => useChatStream("run-1"));
-    act(() => FakeEventSource.last!.send({ i: 4, t: "text", v: { text: "a" } }));
+    act(() =>
+      FakeEventSource.last!.send({ i: 4, t: "text", v: { text: "a" } }),
+    );
     act(() => FakeEventSource.last!.onerror?.());
-    await waitFor(() => expect(FakeEventSource.last!.url).toContain("offset=5"));
+    await waitFor(() =>
+      expect(FakeEventSource.last!.url).toContain("offset=5"),
+    );
   });
 
   it("surfaces a failed event as an error", async () => {
     const { result } = renderHook(() => useChatStream("run-1"));
-    act(() => FakeEventSource.last!.send({ i: 0, t: "failed", v: { message: "boom", code: "X" } }));
+    act(() =>
+      FakeEventSource.last!.send({
+        i: 0,
+        t: "failed",
+        v: { message: "boom", code: "X" },
+      }),
+    );
     await waitFor(() => expect(result.current.error).toBe("boom"));
     expect(result.current.status).toBe("error");
   });
@@ -1949,7 +2070,11 @@ export type StreamEvent =
   | { i: number; t: "text"; v: { text: string } }
   | { i: number; t: "reasoning"; v: { text: string } }
   | { i: number; t: "tool_started"; v: { name: string; argsPreview: string } }
-  | { i: number; t: "tool_completed"; v: { name: string; resultPreview: string; ok: boolean } }
+  | {
+      i: number;
+      t: "tool_completed";
+      v: { name: string; resultPreview: string; ok: boolean };
+    }
   | { i: number; t: "notice"; v: { message: string } }
   | { i: number; t: "completed"; v: Record<string, never> }
   | { i: number; t: "failed"; v: { message: string; code: string } };
@@ -1957,7 +2082,14 @@ export type StreamEvent =
 export type ChatPart =
   | { kind: "text"; text: string }
   | { kind: "reasoning"; text: string }
-  | { kind: "tool"; name: string; argsPreview: string; resultPreview: string; ok: boolean; done: boolean }
+  | {
+      kind: "tool";
+      name: string;
+      argsPreview: string;
+      resultPreview: string;
+      ok: boolean;
+      done: boolean;
+    }
   | { kind: "notice"; message: string };
 
 /**
@@ -1974,17 +2106,29 @@ export function reduceEvent(parts: ChatPart[], event: StreamEvent): ChatPart[] {
     case "reasoning": {
       const kind = event.t === "text" ? "text" : "reasoning";
       if (last && last.kind === kind) {
-        return [...parts.slice(0, -1), { kind, text: last.text + event.v.text }];
+        return [
+          ...parts.slice(0, -1),
+          { kind, text: last.text + event.v.text },
+        ];
       }
       return [...parts, { kind, text: event.v.text }];
     }
     case "tool_started":
       return [
         ...parts,
-        { kind: "tool", name: event.v.name, argsPreview: event.v.argsPreview, resultPreview: "", ok: true, done: false },
+        {
+          kind: "tool",
+          name: event.v.name,
+          argsPreview: event.v.argsPreview,
+          resultPreview: "",
+          ok: true,
+          done: false,
+        },
       ];
     case "tool_completed": {
-      const index = parts.findLastIndex((p) => p.kind === "tool" && !p.done && p.name === event.v.name);
+      const index = parts.findLastIndex(
+        (p) => p.kind === "tool" && !p.done && p.name === event.v.name,
+      );
       if (index === -1) return parts;
       const next = [...parts];
       next[index] = {
@@ -2038,7 +2182,12 @@ export function useChatStream(runId: string | null) {
   const stop = useCallback(() => {
     source.current?.close();
     source.current = null;
-    if (runId) void unwrap(api.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: runId } } }));
+    if (runId)
+      void unwrap(
+        api.POST("/api/runs/{run_id}/cancel", {
+          params: { path: { run_id: runId } },
+        }),
+      );
     setStatus("done");
   }, [runId]);
 
@@ -2049,7 +2198,9 @@ export function useChatStream(runId: string | null) {
     const connect = (token?: string) => {
       if (closed) return;
       const base = `/api/runs/${runId}/stream?offset=${cursor.current}`;
-      const url = token ? `${base}&token=${encodeURIComponent(token)}` : withTokenParam(base);
+      const url = token
+        ? `${base}&token=${encodeURIComponent(token)}`
+        : withTokenParam(base);
       const es = new EventSource(url);
       source.current = es;
       setStatus("streaming");
@@ -2084,7 +2235,9 @@ export function useChatStream(runId: string | null) {
 
     if (getToken()) connect();
     else {
-      void unwrap(api.POST("/api/auth/link-token", { body: { purpose: "sse" } }))
+      void unwrap(
+        api.POST("/api/auth/link-token", { body: { purpose: "sse" } }),
+      )
         .then((link) => connect(link.token))
         .catch(() => connect());
     }
@@ -2118,9 +2271,11 @@ git commit -m "feat(web): add chat stream types, reducer, and useChatStream"
 ## Task 10: Chat primitives
 
 **Files:**
+
 - Create: `web/src/components/chat/ChatThread.tsx`, `ChatMessage.tsx`, `ChatComposer.tsx`, `parts/TextPart.tsx`, `parts/ToolPart.tsx`, `parts/ReasoningPart.tsx`, `parts/NoticePart.tsx`, `ChatThread.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `ChatPart` from Task 9.
 - Produces: `<ChatThread messages={ChatThreadMessage[]} streaming={ChatPart[] | null} showReasoning?: boolean />`; `ChatThreadMessage = { id: string; role: "user" | "assistant"; parts: ChatPart[] }`; `<ChatComposer value onChange onSend onStop busy placeholder />`.
 
@@ -2135,12 +2290,22 @@ import { describe, expect, it, vi } from "vitest";
 import { ChatThread } from "./ChatThread";
 
 const message = (id: string, role: "user" | "assistant", text: string) => ({
-  id, role, parts: [{ kind: "text" as const, text }],
+  id,
+  role,
+  parts: [{ kind: "text" as const, text }],
 });
 
 describe("ChatThread", () => {
   it("renders messages in order", () => {
-    render(<ChatThread messages={[message("1", "user", "hi"), message("2", "assistant", "hello")]} streaming={null} />);
+    render(
+      <ChatThread
+        messages={[
+          message("1", "user", "hi"),
+          message("2", "assistant", "hello"),
+        ]}
+        streaming={null}
+      />,
+    );
     const bubbles = screen.getAllByTestId("chat-message");
     expect(bubbles).toHaveLength(2);
     expect(bubbles[0]).toHaveTextContent("hi");
@@ -2152,50 +2317,112 @@ describe("ChatThread", () => {
         messages={[]}
         streaming={[
           { kind: "text", text: "a" },
-          { kind: "tool", name: "search", argsPreview: "x", resultPreview: "", ok: true, done: false },
+          {
+            kind: "tool",
+            name: "search",
+            argsPreview: "x",
+            resultPreview: "",
+            ok: true,
+            done: false,
+          },
           { kind: "text", text: "b" },
         ]}
       />,
     );
     const parts = screen.getAllByTestId(/chat-part-/);
-    expect(parts.map((p) => p.dataset.testid)).toEqual(["chat-part-text", "chat-part-tool", "chat-part-text"]);
+    expect(parts.map((p) => p.dataset.testid)).toEqual([
+      "chat-part-text",
+      "chat-part-tool",
+      "chat-part-text",
+    ]);
   });
 
   it("hides reasoning parts when showReasoning is false", () => {
-    render(<ChatThread messages={[]} streaming={[{ kind: "reasoning", text: "secret" }]} showReasoning={false} />);
+    render(
+      <ChatThread
+        messages={[]}
+        streaming={[{ kind: "reasoning", text: "secret" }]}
+        showReasoning={false}
+      />,
+    );
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
   });
 
   it("shows reasoning parts when showReasoning is true", () => {
-    render(<ChatThread messages={[]} streaming={[{ kind: "reasoning", text: "shown" }]} showReasoning />);
+    render(
+      <ChatThread
+        messages={[]}
+        streaming={[{ kind: "reasoning", text: "shown" }]}
+        showReasoning
+      />,
+    );
     expect(screen.getByTestId("chat-part-reasoning")).toBeInTheDocument();
   });
 
   it("renders a notice part", () => {
-    render(<ChatThread messages={[]} streaming={[{ kind: "notice", message: "not attached" }]} />);
+    render(
+      <ChatThread
+        messages={[]}
+        streaming={[{ kind: "notice", message: "not attached" }]}
+      />,
+    );
     expect(screen.getByText(/not attached/)).toBeInTheDocument();
   });
 
   it("shows the jump-to-latest pill after the user scrolls up", () => {
-    render(<ChatThread messages={[message("1", "assistant", "hi")]} streaming={null} />);
+    render(
+      <ChatThread
+        messages={[message("1", "assistant", "hi")]}
+        streaming={null}
+      />,
+    );
     const viewport = screen.getByTestId("chat-viewport");
-    Object.defineProperty(viewport, "scrollHeight", { value: 1000, configurable: true });
-    Object.defineProperty(viewport, "clientHeight", { value: 200, configurable: true });
-    Object.defineProperty(viewport, "scrollTop", { value: 100, configurable: true, writable: true });
+    Object.defineProperty(viewport, "scrollHeight", {
+      value: 1000,
+      configurable: true,
+    });
+    Object.defineProperty(viewport, "clientHeight", {
+      value: 200,
+      configurable: true,
+    });
+    Object.defineProperty(viewport, "scrollTop", {
+      value: 100,
+      configurable: true,
+      writable: true,
+    });
     fireEvent.scroll(viewport);
-    expect(screen.getByRole("button", { name: /jump to latest/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /jump to latest/i }),
+    ).toBeInTheDocument();
   });
 
   it("hides the pill once the user is back at the bottom", () => {
-    render(<ChatThread messages={[message("1", "assistant", "hi")]} streaming={null} />);
+    render(
+      <ChatThread
+        messages={[message("1", "assistant", "hi")]}
+        streaming={null}
+      />,
+    );
     const viewport = screen.getByTestId("chat-viewport");
-    Object.defineProperty(viewport, "scrollHeight", { value: 1000, configurable: true });
-    Object.defineProperty(viewport, "clientHeight", { value: 200, configurable: true });
-    Object.defineProperty(viewport, "scrollTop", { value: 100, configurable: true, writable: true });
+    Object.defineProperty(viewport, "scrollHeight", {
+      value: 1000,
+      configurable: true,
+    });
+    Object.defineProperty(viewport, "clientHeight", {
+      value: 200,
+      configurable: true,
+    });
+    Object.defineProperty(viewport, "scrollTop", {
+      value: 100,
+      configurable: true,
+      writable: true,
+    });
     fireEvent.scroll(viewport);
     (viewport as HTMLElement).scrollTop = 800;
     fireEvent.scroll(viewport);
-    expect(screen.queryByRole("button", { name: /jump to latest/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /jump to latest/i }),
+    ).not.toBeInTheDocument();
   });
 });
 ```
@@ -2280,7 +2507,11 @@ export function ChatThread({
       >
         <div className="space-y-4 py-2">
           {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} showReasoning={showReasoning} />
+            <ChatMessage
+              key={message.id}
+              message={message}
+              showReasoning={showReasoning}
+            />
           ))}
           {streaming && streaming.length > 0 ? (
             <ChatMessage
@@ -2330,11 +2561,20 @@ export function ChatMessage({
   streaming?: boolean;
 }) {
   const assistant = message.role === "assistant";
-  const visible = showReasoning ? message.parts : message.parts.filter((p) => p.kind !== "reasoning");
+  const visible = showReasoning
+    ? message.parts
+    : message.parts.filter((p) => p.kind !== "reasoning");
   return (
-    <div data-testid="chat-message" className={cn("flex gap-3", assistant ? "" : "flex-row-reverse")}>
+    <div
+      data-testid="chat-message"
+      className={cn("flex gap-3", assistant ? "" : "flex-row-reverse")}
+    >
       <div className="mt-1 shrink-0 rounded-full bg-muted p-1.5">
-        {assistant ? <Bot className="size-4" /> : <UserRound className="size-4" />}
+        {assistant ? (
+          <Bot className="size-4" />
+        ) : (
+          <UserRound className="size-4" />
+        )}
       </div>
       <div
         className={cn(
@@ -2345,10 +2585,17 @@ export function ChatMessage({
         {visible.map((part, index) => {
           const key = `${message.id}-${index}`;
           if (part.kind === "text") {
-            return <TextPart key={key} text={part.text} caret={streaming && index === visible.length - 1} />;
+            return (
+              <TextPart
+                key={key}
+                text={part.text}
+                caret={streaming && index === visible.length - 1}
+              />
+            );
           }
           if (part.kind === "tool") return <ToolPart key={key} part={part} />;
-          if (part.kind === "reasoning") return <ReasoningPart key={key} text={part.text} />;
+          if (part.kind === "reasoning")
+            return <ReasoningPart key={key} text={part.text} />;
           return <NoticePart key={key} message={part.message} />;
         })}
       </div>
@@ -2364,11 +2611,27 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
 /** Prose. The caret marks the live tail of a streaming reply. */
-export function TextPart({ text, caret = false }: { text: string; caret?: boolean }) {
+export function TextPart({
+  text,
+  caret = false,
+}: {
+  text: string;
+  caret?: boolean;
+}) {
   return (
-    <div data-testid="chat-part-text" className="prose prose-sm dark:prose-invert max-w-none">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{text}</ReactMarkdown>
-      {caret ? <span aria-hidden className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-foreground align-text-bottom" /> : null}
+    <div
+      data-testid="chat-part-text"
+      className="prose prose-sm dark:prose-invert max-w-none"
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+        {text}
+      </ReactMarkdown>
+      {caret ? (
+        <span
+          aria-hidden
+          className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-foreground align-text-bottom"
+        />
+      ) : null}
     </div>
   );
 }
@@ -2378,7 +2641,11 @@ export function TextPart({ text, caret = false }: { text: string; caret?: boolea
 // web/src/components/chat/parts/ToolPart.tsx
 import { Check, Loader2, X } from "lucide-react";
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { ChatPart } from "@/lib/chat/events";
 
 type ToolChatPart = Extract<ChatPart, { kind: "tool" }>;
@@ -2393,9 +2660,17 @@ export function ToolPart({ part }: { part: ToolChatPart }) {
             type="button"
             className="flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs text-muted-foreground"
           >
-            {!part.done ? <Loader2 className="size-3 animate-spin" /> : part.ok ? <Check className="size-3" /> : <X className="size-3 text-destructive" />}
+            {!part.done ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : part.ok ? (
+              <Check className="size-3" />
+            ) : (
+              <X className="size-3 text-destructive" />
+            )}
             <span className="font-medium">{part.name}</span>
-            {part.argsPreview ? <span className="truncate max-w-40">{part.argsPreview}</span> : null}
+            {part.argsPreview ? (
+              <span className="truncate max-w-40">{part.argsPreview}</span>
+            ) : null}
           </button>
         }
       />
@@ -2409,14 +2684,25 @@ export function ToolPart({ part }: { part: ToolChatPart }) {
 
 ```tsx
 // web/src/components/chat/parts/ReasoningPart.tsx
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 /** Provider-exposed reasoning, collapsed by default. Never rendered in an interview. */
 export function ReasoningPart({ text }: { text: string }) {
   return (
     <Collapsible data-testid="chat-part-reasoning">
       <CollapsibleTrigger
-        render={<button type="button" className="text-xs text-muted-foreground underline-offset-2 hover:underline">Show reasoning</button>}
+        render={
+          <button
+            type="button"
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Show reasoning
+          </button>
+        }
       />
       <CollapsibleContent className="mt-1 whitespace-pre-wrap rounded-md bg-muted/60 p-2 text-xs text-muted-foreground">
         {text}
@@ -2433,7 +2719,10 @@ import { TriangleAlert } from "lucide-react";
 /** A degradation notice, e.g. a draft note dropped by the quote gate. */
 export function NoticePart({ message }: { message: string }) {
   return (
-    <p data-testid="chat-part-notice" className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2 text-xs text-amber-900 dark:text-amber-200">
+    <p
+      data-testid="chat-part-notice"
+      className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2 text-xs text-amber-900 dark:text-amber-200"
+    >
       <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
       <span>{message}</span>
     </p>
@@ -2480,13 +2769,25 @@ export function ChatComposer({
           }
         }}
       />
-      <TranscribeButton onText={(text) => onChange(value ? `${value} ${text}` : text)} />
+      <TranscribeButton
+        onText={(text) => onChange(value ? `${value} ${text}` : text)}
+      />
       {busy ? (
-        <Button size="icon" variant="secondary" onClick={onStop} aria-label="Stop generating">
+        <Button
+          size="icon"
+          variant="secondary"
+          onClick={onStop}
+          aria-label="Stop generating"
+        >
           <Square className="size-4" />
         </Button>
       ) : (
-        <Button size="icon" onClick={onSend} disabled={!value.trim()} aria-label="Send message">
+        <Button
+          size="icon"
+          onClick={onSend}
+          disabled={!value.trim()}
+          aria-label="Send message"
+        >
           <Send className="size-4" />
         </Button>
       )}
@@ -2513,9 +2814,11 @@ git commit -m "feat(web): add shared chat thread primitives with scroll anchorin
 ## Task 11: CoachPage on `<ChatThread>`
 
 **Files:**
+
 - Modify: `web/src/features/coach/CoachPage.tsx`, `web/src/features/coach/use-coach.ts`, `web/src/features/coach/CoachPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `ChatThread`, `ChatComposer`, `useChatStream`.
 - Produces: no new exports; `useSendCoachMessage` additionally returns the `runId` so the page can attach a stream.
 
@@ -2535,7 +2838,10 @@ it("replaces the streamed bubble with the durable turn without a gap", async () 
   await sendMessage("answer");
   emitStreamEvent({ i: 0, t: "text", v: { text: "Streamed." } });
   emitStreamEvent({ i: 1, t: "completed", v: {} });
-  resolveSessionRefetch({ ...activeSession, turns: [...activeSession.turns, coachTurn("Streamed.")] });
+  resolveSessionRefetch({
+    ...activeSession,
+    turns: [...activeSession.turns, coachTurn("Streamed.")],
+  });
   expect(screen.getAllByText("Streamed.")).toHaveLength(1);
 });
 
@@ -2544,25 +2850,47 @@ it("shows a stop button while streaming and cancels the run", async () => {
   await sendMessage("answer");
   const stop = await screen.findByRole("button", { name: /stop generating/i });
   fireEvent.click(stop);
-  expect(cancelSpy).toHaveBeenCalledWith(expect.objectContaining({ run_id: "run-1" }));
+  expect(cancelSpy).toHaveBeenCalledWith(
+    expect.objectContaining({ run_id: "run-1" }),
+  );
 });
 
 it("renders a tool chip inline", async () => {
   renderCoachPage({ session: activeSession });
   await sendMessage("answer");
-  emitStreamEvent({ i: 0, t: "tool_started", v: { name: "search_corpus", argsPreview: "Kafka" } });
+  emitStreamEvent({
+    i: 0,
+    t: "tool_started",
+    v: { name: "search_corpus", argsPreview: "Kafka" },
+  });
   expect(await screen.findByText("search_corpus")).toBeInTheDocument();
 });
 
 it("offers retry on the message when the stream fails", async () => {
   renderCoachPage({ session: activeSession });
   await sendMessage("answer");
-  emitStreamEvent({ i: 0, t: "failed", v: { message: "provider error", code: "X" } });
-  expect(await screen.findByRole("button", { name: /retry/i })).toBeInTheDocument();
+  emitStreamEvent({
+    i: 0,
+    t: "failed",
+    v: { message: "provider error", code: "X" },
+  });
+  expect(
+    await screen.findByRole("button", { name: /retry/i }),
+  ).toBeInTheDocument();
 });
 
 it("renders a persisted notice on a reloaded turn", async () => {
-  renderCoachPage({ session: { ...activeSession, turns: [coachTurnWithNotice("Drafted.", "Note not attached — quote check failed.")] } });
+  renderCoachPage({
+    session: {
+      ...activeSession,
+      turns: [
+        coachTurnWithNotice(
+          "Drafted.",
+          "Note not attached — quote check failed.",
+        ),
+      ],
+    },
+  });
   expect(await screen.findByText(/quote check failed/i)).toBeInTheDocument();
 });
 ```
@@ -2579,7 +2907,9 @@ In `use-coach.ts`, have `useSendCoachMessage` expose the started run id:
 ```typescript
 export function useSendCoachMessage() {
   const [runId, setRunId] = useState<string | null>(null);
-  const mutation = useMutation({ /* existing body */ });
+  const mutation = useMutation({
+    /* existing body */
+  });
   // in the existing onSuccess, before seedRun:
   //   setRunId(run.runId);
   return { ...mutation, runId, clearRun: () => setRunId(null) };
@@ -2587,17 +2917,22 @@ export function useSendCoachMessage() {
 ```
 
 In `CoachPage.tsx`:
+
 - Replace the hand-rolled transcript block with `<ChatThread>`, mapping each persisted turn to `ChatThreadMessage`:
 
 ```tsx
-const messages: ChatThreadMessage[] = (session.data?.turns ?? []).map((turn, index) => ({
-  id: `${turn.at}-${index}`,
-  role: turn.role === "coach" ? "assistant" : "user",
-  parts: [
-    { kind: "text", text: turn.text },
-    ...(turn.notice ? [{ kind: "notice" as const, message: turn.notice }] : []),
-  ],
-}));
+const messages: ChatThreadMessage[] = (session.data?.turns ?? []).map(
+  (turn, index) => ({
+    id: `${turn.at}-${index}`,
+    role: turn.role === "coach" ? "assistant" : "user",
+    parts: [
+      { kind: "text", text: turn.text },
+      ...(turn.notice
+        ? [{ kind: "notice" as const, message: turn.notice }]
+        : []),
+    ],
+  }),
+);
 ```
 
 - Attach the stream and hold the synthetic bubble until the refetch lands:
@@ -2623,7 +2958,7 @@ useEffect(() => {
   messages={messages}
   streaming={send.runId ? stream.parts : null}
   showReasoning
-/>
+/>;
 ```
 
 - Replace the send row with `<ChatComposer ... busy={stream.status === "streaming"} onStop={stream.stop} />`.
@@ -2647,9 +2982,11 @@ git commit -m "feat(web): stream the coach transcript with stop and in-place ret
 ## Task 12: InterviewPage on `<ChatThread>`
 
 **Files:**
+
 - Modify: `web/src/features/interview/InterviewPage.tsx`, `web/src/features/interview/use-interview.ts`, `web/src/features/interview/InterviewPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: everything from Tasks 9-11.
 - Produces: no new exports.
 
@@ -2662,14 +2999,22 @@ git commit -m "feat(web): stream the coach transcript with stop and in-place ret
 it("streams the interviewer's question", async () => {
   renderInterviewPage({ session: activeInterview });
   await sendAnswer("I owned the migration.");
-  emitStreamEvent({ i: 0, t: "text", v: { text: "Walk me through the rollback." } });
+  emitStreamEvent({
+    i: 0,
+    t: "text",
+    v: { text: "Walk me through the rollback." },
+  });
   expect(await screen.findByText(/rollback/)).toBeInTheDocument();
 });
 
 it("never renders the interviewer's reasoning", async () => {
   renderInterviewPage({ session: activeInterview });
   await sendAnswer("answer");
-  emitStreamEvent({ i: 0, t: "reasoning", v: { text: "probing for ownership" } });
+  emitStreamEvent({
+    i: 0,
+    t: "reasoning",
+    v: { text: "probing for ownership" },
+  });
   expect(screen.queryByText(/probing for ownership/)).not.toBeInTheDocument();
   expect(screen.queryByTestId("chat-part-reasoning")).not.toBeInTheDocument();
 });
@@ -2677,14 +3022,20 @@ it("never renders the interviewer's reasoning", async () => {
 it("still renders tool chips in an interview", async () => {
   renderInterviewPage({ session: activeInterview });
   await sendAnswer("answer");
-  emitStreamEvent({ i: 0, t: "tool_started", v: { name: "read_jd", argsPreview: "" } });
+  emitStreamEvent({
+    i: 0,
+    t: "tool_started",
+    v: { name: "read_jd", argsPreview: "" },
+  });
   expect(await screen.findByText("read_jd")).toBeInTheDocument();
 });
 
 it("shows a stop button during an interview turn", async () => {
   renderInterviewPage({ session: activeInterview });
   await sendAnswer("answer");
-  expect(await screen.findByRole("button", { name: /stop generating/i })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("button", { name: /stop generating/i }),
+  ).toBeInTheDocument();
 });
 ```
 
@@ -2696,6 +3047,7 @@ Expected: FAIL — streamed text never rendered
 - [ ] **Step 3: Write the implementation**
 
 Apply the Task 11 changes to `InterviewPage.tsx` and `use-interview.ts` verbatim, with two differences:
+
 - `<ChatThread ... showReasoning={false} />`
 - Map turns with `turn.role === "interviewer" ? "assistant" : "user"`, and include `turn.notice` as a notice part exactly as the coach does.
 
@@ -2726,22 +3078,22 @@ Start the API with `resume-agent serve`, open the Coach page, send a message, an
 
 **Spec coverage:**
 
-| Spec section | Task |
-| --- | --- |
-| §1 streaming seam in `llm_runner` | 2 |
-| §2 sink protocol, three sinks | 1 |
-| §3 SSE reader with offset | 7 |
-| §4 delimiter, holdback, prose authoritative | 3, 5 |
-| §5 `stream_enabled` kill switch | 5 |
-| Validation split, `DraftRejected`, durable notices | 4 |
-| Coach streams (opening/message/recap) | 5 |
-| Interview streams; debrief does not | 6 |
-| CLI console sink | 8 |
-| Chat primitives, parts model, anchoring | 10 |
+| Spec section                                                    | Task   |
+| --------------------------------------------------------------- | ------ |
+| §1 streaming seam in `llm_runner`                               | 2      |
+| §2 sink protocol, three sinks                                   | 1      |
+| §3 SSE reader with offset                                       | 7      |
+| §4 delimiter, holdback, prose authoritative                     | 3, 5   |
+| §5 `stream_enabled` kill switch                                 | 5      |
+| Validation split, `DraftRejected`, durable notices              | 4      |
+| Coach streams (opening/message/recap)                           | 5      |
+| Interview streams; debrief does not                             | 6      |
+| CLI console sink                                                | 8      |
+| Chat primitives, parts model, anchoring                         | 10     |
 | Stop, jump-to-latest, tool/reasoning disclosure, in-place retry | 10, 11 |
-| Interviewer reasoning suppressed | 12 |
-| Contracts + parity test | 9 |
-| Bubble lifecycle without flicker | 11 |
+| Interviewer reasoning suppressed                                | 12     |
+| Contracts + parity test                                         | 9      |
+| Bubble lifecycle without flicker                                | 11     |
 
 No gaps.
 
