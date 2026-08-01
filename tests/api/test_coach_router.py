@@ -1,4 +1,5 @@
 import io
+import json
 import time
 
 from fastapi.testclient import TestClient
@@ -108,7 +109,15 @@ def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
         monkeypatch.setattr(coach_router, "run_message_turn", lambda reporter, **kwargs: _view())
         sent = client.post("/api/profile/coach/sessions/s1/messages", json={"message": "hi"})
         assert sent.status_code == 202
-        assert _wait(client, sent.json()["runId"])["state"] == "done"
+        run_id = sent.json()["runId"]
+        assert _wait(client, run_id)["state"] == "done"
+        rows = [
+            json.loads(line)
+            for line in (client.app.state.run_manager.stream_path(run_id)).read_text(
+                encoding="utf-8"
+            ).splitlines()
+        ]
+        assert rows[-1]["t"] == "completed"
 
 
 def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):

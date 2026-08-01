@@ -2179,6 +2179,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Run Events
+         * @description Tail a conversational run's event stream from an event offset.
+         */
+        get: operations["stream_run_events_api_runs__run_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/search/discover": {
         parameters: {
             query?: never;
@@ -3232,6 +3252,11 @@ export interface components {
              * @default
              */
             kind: string;
+            /**
+             * Notice
+             * @default
+             */
+            notice: string;
             /** Researchactions */
             researchActions?: components["schemas"]["CoachResearchActionOut"][];
             /** Role */
@@ -3740,6 +3765,11 @@ export interface components {
              * @default false
              */
             isFollowup: boolean;
+            /**
+             * Notice
+             * @default
+             */
+            notice: string;
             /**
              * Questionid
              * @default
@@ -10960,6 +10990,41 @@ export interface operations {
     stream_run_api_runs__run_id__events_get: {
         parameters: {
             query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_run_events_api_runs__run_id__stream_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+            };
             header?: {
                 authorization?: string | null;
             };

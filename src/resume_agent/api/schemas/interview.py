@@ -31,6 +31,7 @@ class InterviewTurnOut(CamelModel):
     question_id: str = ""
     is_followup: bool = False
     at: str = ""
+    notice: str = ""
 
 
 class PlanItemOut(CamelModel):

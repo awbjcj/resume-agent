@@ -20,6 +20,7 @@ from resume_agent.api.mappers import to_page
 from resume_agent.api.runs.launch import launch, session_work
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.runs.sse import record_to_run, run_events
+from resume_agent.api.runs.stream_sse import stream_events
 from resume_agent.api.schemas.base import Page
 from resume_agent.api.schemas.jobs import ReviseRequest
 from resume_agent.api.schemas.runs import (
@@ -482,3 +483,15 @@ async def stream_run(
 ):
     _owned_record(mgr, run_id)
     return EventSourceResponse(run_events(mgr, run_id))
+
+
+@link_router.get("/runs/{run_id}/stream")
+async def stream_run_events(
+    run_id: str,
+    offset: int = Query(0, ge=0),
+    mgr: RunManager = Depends(get_run_manager),
+    _context=Depends(get_sse_user_context),
+):
+    """Tail a conversational run's event stream from an event offset."""
+    _owned_record(mgr, run_id)
+    return EventSourceResponse(stream_events(mgr, run_id, offset))

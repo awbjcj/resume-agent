@@ -14,6 +14,7 @@ from resume_agent.api.deps import (
 )
 from resume_agent.api.errors import ApiException
 from resume_agent.api.runs.launch import launch
+from resume_agent.api.runs.conversation import with_conversation_stream
 from resume_agent.api.runs.manager import (
     RunManager,
     RunQuotaError,
@@ -74,15 +75,22 @@ def _guard_setup(request: Request, settings: Settings):
     return profile_dir
 
 
-def _submit(manager: RunManager, kind: str, work) -> RunOut:
+def _submit(
+    manager: RunManager,
+    kind: str,
+    work,
+    *,
+    meta: dict[str, object] | None = None,
+) -> RunOut:
     return launch(
         manager,
         kind,
-        work,
+        with_conversation_stream(manager, work),
         singleton_key=_SINGLETON,
         singleton_conflict="raise",
         busy_code="COACH_BUSY",
         busy_message="A coach turn is already running",
+        meta=meta,
     )
 
 
@@ -117,11 +125,13 @@ def start_session(
     return _submit(
         manager,
         "profile-coach-open",
-        lambda reporter: run_opening_turn(
+        lambda reporter, sink: run_opening_turn(
             reporter,
             profile_dir=profile_dir,
             engine=engine,
+            sink=sink,
         ),
+        meta={"stream": True},
     )
 
 
@@ -148,13 +158,19 @@ def send_message(
     return _submit(
         manager,
         "profile-coach-turn",
-        lambda reporter: run_message_turn(
+        lambda reporter, sink: run_message_turn(
             reporter,
             profile_dir=profile_dir,
             session_id=session_id,
             message=payload.message,
             engine=engine,
+            sink=sink,
         ),
+        meta={
+            "stream": True,
+            "sessionId": session_id,
+            "turnCount": len(view["turns"]),
+        },
     )
 
 
@@ -217,8 +233,10 @@ def end_coach_session(
     profile_config = cast(ProfileConfigDoc, get_config_store(request).get("profile"))
     facts_out = profile_dir / "facts.json"
 
-    def work(reporter):
-        ended = run_recap_turn(reporter, profile_dir=profile_dir, session_id=session_id)
+    def work(reporter, sink):
+        ended = run_recap_turn(
+            reporter, profile_dir=profile_dir, session_id=session_id, sink=sink
+        )
         saved_count = sum(
             draft["status"] == "saved" for draft in ended["draftNotes"]
         )
@@ -253,7 +271,16 @@ def end_coach_session(
             "buildSkippedReason": skipped_reason,
         }
 
-    return _submit(manager, "profile-coach-end", work)
+    return _submit(
+        manager,
+        "profile-coach-end",
+        work,
+        meta={
+            "stream": True,
+            "sessionId": session_id,
+            "turnCount": len(current["turns"]),
+        },
+    )
 
 
 @router.get("/profile/coach/sessions", response_model=CoachSessionsOut)

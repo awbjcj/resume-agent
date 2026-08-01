@@ -1738,6 +1738,11 @@
             "title": "Kind",
             "type": "string"
           },
+          "notice": {
+            "default": "",
+            "title": "Notice",
+            "type": "string"
+          },
           "researchActions": {
             "items": {
               "$ref": "#/components/schemas/CoachResearchActionOut"
@@ -2869,6 +2874,11 @@
             "default": false,
             "title": "Isfollowup",
             "type": "boolean"
+          },
+          "notice": {
+            "default": "",
+            "title": "Notice",
+            "type": "string"
           },
           "questionId": {
             "default": "",
@@ -17827,6 +17837,71 @@
           }
         },
         "summary": "Stream Run"
+      }
+    },
+    "/api/runs/{run_id}/stream": {
+      "get": {
+        "description": "Tail a conversational run's event stream from an event offset.",
+        "operationId": "stream_run_events_api_runs__run_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Run Events"
       }
     },
     "/api/search/discover": {

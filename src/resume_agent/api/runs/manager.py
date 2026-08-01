@@ -451,6 +451,10 @@ class RunManager:
     def _read_record(self, run_id: str) -> dict | None:
         return read_progress(run_id, root=self._root_for(run_id))
 
+    def stream_path(self, run_id: str) -> Path:
+        """Return the event-log path beside this run's progress record."""
+        return self._root_for(run_id) / f"{run_id}.stream.ndjson"
+
     def get(self, run_id: str) -> RunSnapshot | None:
         return parse_run_snapshot(run_id, self._read_record(run_id))
 
@@ -540,7 +544,9 @@ class RunManager:
         return recovered
 
     def clear(self, run_id: str) -> None:
-        clear_progress(run_id, root=self._root_for(run_id))
+        root = self._root_for(run_id)
+        clear_progress(run_id, root=root)
+        (root / f"{run_id}.stream.ndjson").unlink(missing_ok=True)
         with self._singleton_lock:
             self._run_roots.pop(run_id, None)
 
@@ -562,6 +568,7 @@ class RunManager:
                 try:
                     if path.stat().st_mtime < cutoff:
                         path.unlink(missing_ok=True)
+                        (root / f"{path.stem}.stream.ndjson").unlink(missing_ok=True)
                         with self._singleton_lock:
                             self._run_roots.pop(path.stem, None)
                         removed += 1

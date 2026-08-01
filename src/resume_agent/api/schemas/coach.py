@@ -19,6 +19,7 @@ class CoachTurnOut(CamelModel):
     text: str
     topic_id: str = ""
     at: str = ""
+    notice: str = ""
     research_actions: list[CoachResearchActionOut] = Field(default_factory=list)
 
 

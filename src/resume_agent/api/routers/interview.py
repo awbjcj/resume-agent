@@ -14,6 +14,7 @@ from resume_agent.api.deps import (
     get_settings_dep,
 )
 from resume_agent.api.errors import ApiException
+from resume_agent.api.runs.conversation import with_conversation_stream
 from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.interview import (
@@ -52,16 +53,23 @@ def _guard_keys(settings: Settings) -> None:
 
 
 def _submit(
-    manager: RunManager, kind: str, work, *, singleton: str
+    manager: RunManager,
+    kind: str,
+    work,
+    *,
+    singleton: str,
+    streaming: bool = True,
+    meta: dict[str, object] | None = None,
 ) -> RunOut:
     return launch(
         manager,
         kind,
-        work,
+        with_conversation_stream(manager, work) if streaming else work,
         singleton_key=singleton,
         singleton_conflict="raise",
         busy_code="INTERVIEW_BUSY",
         busy_message="An interview turn is already running",
+        meta=meta,
     )
 
 
@@ -116,15 +124,17 @@ def start_interview(
     return _submit(
         manager,
         "mock-interview-open",
-        lambda reporter: run_opening_turn(
+        lambda reporter, sink: run_opening_turn(
             reporter,
             interview_dir=interview_dir,
             engine=engine,
             job_id=payload.job_id,
             resume_version_id=payload.resume_version_id,
             style=style,
+            sink=sink,
         ),
         singleton=f"mock-interview-open:{payload.job_id}",
+        meta={"stream": True, "jobId": payload.job_id},
     )
 
 
@@ -151,13 +161,19 @@ def send_answer(
     return _submit(
         manager,
         "mock-interview-turn",
-        lambda reporter: run_answer_turn(
+        lambda reporter, sink: run_answer_turn(
             reporter,
             interview_dir=interview_dir,
             session_id=session_id,
             message=payload.message,
+            sink=sink,
         ),
         singleton=f"mock-interview:{session_id}",
+        meta={
+            "stream": True,
+            "sessionId": session_id,
+            "turnCount": len(view["turns"]),
+        },
     )
 
 
@@ -185,6 +201,8 @@ def end_interview(
             reporter, interview_dir=interview_dir, session_id=session_id
         ),
         singleton=f"mock-interview:{session_id}",
+        streaming=False,
+        meta={"stream": False, "sessionId": session_id},
     )
 
 

@@ -223,10 +223,13 @@ def test_sweep_removes_stale_run_files(tmp_path):
     mgr = RunManager(root=tmp_path, executor=InlineExecutor())
     run_id = mgr.create("discover")
     path = tmp_path / f"{run_id}.json"
+    stream_path = mgr.stream_path(run_id)
+    stream_path.write_text("event\n", encoding="utf-8")
     old = time.time() - 100_000  # older than the 1-day default
     os.utime(path, (old, old))
     assert mgr.sweep() == 1
     assert not path.exists()
+    assert not stream_path.exists()
 
 
 def test_sweep_keeps_fresh_run_files(tmp_path):
@@ -234,6 +237,18 @@ def test_sweep_keeps_fresh_run_files(tmp_path):
     run_id = mgr.create("discover")
     assert mgr.sweep() == 0
     assert (tmp_path / f"{run_id}.json").exists()
+
+
+def test_clear_removes_run_record_and_stream(tmp_path):
+    mgr = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = mgr.create("profileCoachMessage")
+    stream_path = mgr.stream_path(run_id)
+    stream_path.write_text("event\n", encoding="utf-8")
+
+    mgr.clear(run_id)
+
+    assert not (tmp_path / f"{run_id}.json").exists()
+    assert not stream_path.exists()
 
 
 def test_suggestion_lane_is_bounded_without_blocking_default_runs(tmp_path):
