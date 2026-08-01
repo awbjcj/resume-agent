@@ -26,6 +26,7 @@ from resume_agent.tenancy.quotas import (
     reset_current_period,
 )
 from resume_agent.tenancy.system_db import (
+    LlmRate,
     QuotaTier,
     UsageEvent,
     User,
@@ -83,9 +84,9 @@ def test_seeded_model_prices_use_current_openai_and_deepseek_rates(tmp_path):
     current = datetime(2026, 8, 2, tzinfo=UTC)
 
     expected_openai = {
-        "gpt-5.6-sol": (2_500_000, 250_000, 3_125_000, 15_000_000),
-        "gpt-5.6-terra": (1_000_000, 100_000, 1_250_000, 6_000_000),
-        "gpt-5.6-luna": (100_000, 10_000, 125_000, 600_000),
+        "gpt-5.6-sol": (5_000_000, 500_000, 6_250_000, 30_000_000),
+        "gpt-5.6-terra": (2_000_000, 200_000, 2_500_000, 12_000_000),
+        "gpt-5.6-luna": (200_000, 20_000, 250_000, 1_200_000),
     }
     for model, expected in expected_openai.items():
         rate = find_rate(engine, "openai", model, now=current)
@@ -126,8 +127,34 @@ def test_openai_price_version_preserves_previous_gpt_5_6_rate(tmp_path):
     )
 
     assert before_update.total_micros == 17_500_000
-    assert after_update.total_micros == 7_000_000
+    assert after_update.total_micros == 14_000_000
     assert before_update.rate_id != after_update.rate_id
+
+
+def test_seed_corrects_previously_written_batch_rate(tmp_path):
+    engine = _engine(tmp_path)
+    current = datetime(2026, 8, 2, tzinfo=UTC)
+    rate = find_rate(engine, "openai", "gpt-5.6-terra", now=current)
+    assert rate is not None
+    with Session(engine) as session:
+        stored_rate = session.get(LlmRate, rate.id)
+        assert stored_rate is not None
+        stored_rate.input_micros_per_million = 1_000_000
+        stored_rate.cache_read_micros_per_million = 100_000
+        stored_rate.cache_write_micros_per_million = 1_250_000
+        stored_rate.output_micros_per_million = 6_000_000
+        session.commit()
+
+    seed_llm_rates(engine)
+
+    corrected = find_rate(engine, "openai", "gpt-5.6-terra", now=current)
+    assert corrected is not None
+    assert (
+        corrected.input_micros_per_million,
+        corrected.cache_read_micros_per_million,
+        corrected.cache_write_micros_per_million,
+        corrected.output_micros_per_million,
+    ) == (2_000_000, 200_000, 2_500_000, 12_000_000)
 
 
 def test_unknown_rate_is_explicit(tmp_path):

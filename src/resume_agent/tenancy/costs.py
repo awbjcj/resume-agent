@@ -325,31 +325,43 @@ def seed_llm_rates(engine: Engine) -> None:
             if legacy_rate is not None:
                 legacy_rate.effective_to = openai_price_update
 
-        # Standard OpenAI pricing, verified against the official pricing page
+        # Standard (not Batch) OpenAI pricing, verified against the official pricing page
         # on 2026-08-01.  Cache writes use OpenAI's published 1.25x input
         # multiplier for GPT-5.6.
         for model, input_rate, cache_read, cache_write, output_rate in (
-            ("gpt-5.6-sol", 2.5, 0.25, 3.125, 15),
-            ("gpt-5.6-terra", 1, 0.1, 1.25, 6),
-            ("gpt-5.6-luna", 0.1, 0.01, 0.125, 0.6),
+            ("gpt-5.6-sol", 5, 0.5, 6.25, 30),
+            ("gpt-5.6-terra", 2, 0.2, 2.5, 12),
+            ("gpt-5.6-luna", 0.2, 0.02, 0.25, 1.2),
         ):
             key = ("openai", model, 0, stamp(openai_price_update))
+            current_rate = None
             if key in existing:
-                continue
-            session.add(
-                LlmRate(
+                current_rate = (
+                    session.execute(
+                        select(LlmRate).where(
+                            LlmRate.provider == "openai",
+                            LlmRate.model == model,
+                            LlmRate.context_min_tokens == 0,
+                            LlmRate.effective_from == openai_price_update,
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
+            if current_rate is None:
+                current_rate = LlmRate(
                     id=uuid.uuid4().hex,
                     provider="openai",
                     model=model,
-                    input_micros_per_million=_micros_per_million(input_rate),
-                    cache_read_micros_per_million=_micros_per_million(cache_read),
-                    cache_write_micros_per_million=_micros_per_million(cache_write),
-                    output_micros_per_million=_micros_per_million(output_rate),
-                    tool_micros_per_unit=10_000,
                     effective_from=openai_price_update,
-                    source_url=openai,
                 )
-            )
+                session.add(current_rate)
+            current_rate.input_micros_per_million = _micros_per_million(input_rate)
+            current_rate.cache_read_micros_per_million = _micros_per_million(cache_read)
+            current_rate.cache_write_micros_per_million = _micros_per_million(cache_write)
+            current_rate.output_micros_per_million = _micros_per_million(output_rate)
+            current_rate.tool_micros_per_unit = 10_000
+            current_rate.source_url = openai
         sonnet_intro = (
             session.execute(
                 select(LlmRate).where(
