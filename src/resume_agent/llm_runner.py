@@ -12,7 +12,7 @@ from typing import Any, Literal, Protocol, TypeVar, cast
 
 from pydantic import BaseModel
 
-from resume_agent.config import get_settings
+from resume_agent.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -558,7 +558,16 @@ def supports_native_search(model_id: str) -> bool:
     return provider in _NATIVE_SEARCH_STRATEGIES
 
 
-def resolve_api_key(model_id: str) -> str:
+def _settings_provider_key(settings: Settings, provider: str) -> str:
+    return {
+        "anthropic": settings.anthropic_api_key,
+        "openai": settings.openai_api_key,
+        "gemini": settings.gemini_api_key,
+        "deepseek": settings.deepseek_api_key,
+    }.get(provider, "")
+
+
+def resolve_api_key(model_id: str, *, settings: Settings | None = None) -> str:
     """Select the shared provider key first, then fall back to the user's key."""
     provider, _ = split_provider(model_id)
     from resume_agent.tenancy.context import current_context
@@ -577,18 +586,40 @@ def resolve_api_key(model_id: str) -> str:
         if user_key:
             context.selected_own_key_providers[provider] = True
             return user_key
-    s = get_settings()
-    key = {
-        "anthropic": s.anthropic_api_key,
-        "openai": s.openai_api_key,
-        "gemini": s.gemini_api_key,
-        "deepseek": s.deepseek_api_key,
-    }.get(provider, "")
+    key = _settings_provider_key(settings or get_settings(), provider)
     if context is not None:
         context.selected_own_key_providers[provider] = (
             provider in context.own_key_providers
         )
     return key
+
+
+def model_access_available(model_id: str, *, settings: Settings | None = None) -> bool:
+    """Whether the active user can fund a call to ``model_id`` right now."""
+
+    provider, model = split_provider(model_id)
+    from resume_agent.tenancy.context import current_context
+
+    context = current_context()
+    if context is not None:
+        if context.user_provider_keys.get(provider):
+            return True
+        if context.platform_provider_keys.get(provider):
+            from resume_agent.tenancy.limits import shared_key_available
+
+            return shared_key_available(provider, model)
+    return bool(_settings_provider_key(settings or get_settings(), provider))
+
+
+def provider_access_available(
+    provider: str, *, settings: Settings | None = None
+) -> bool:
+    """Whether any catalogued model for ``provider`` is currently usable."""
+
+    return any(
+        model_access_available(entry.id, settings=settings)
+        for entry in MODEL_CATALOG.get(provider, ())
+    )
 
 
 def refresh_agent_api_key(agent: object) -> None:
