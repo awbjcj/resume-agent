@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Bot, Clock3, MessagesSquare, Send, SquareCheckBig, UserRound } from "lucide-react";
+import { useRef, useState } from "react";
+import { Bot, Clock3, MessagesSquare, SquareCheckBig } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import { TranscribeButton } from "@/components/TranscribeButton";
+import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -19,13 +20,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
+import { useChatStream } from "@/lib/chat/useChatStream";
 import type { RunRecord } from "@/lib/runs/store";
-import { cn } from "@/lib/utils";
+import { useRunStore } from "@/lib/runs/store";
 
 import { DebriefCard } from "./DebriefCard";
 import { SessionsRail } from "./SessionsRail";
@@ -49,20 +48,51 @@ export function InterviewPage() {
   const [composer, setComposer] = useState("");
   const [lastMessage, setLastMessage] = useState("");
   const [runError, setRunError] = useState("");
+  const [streamRunId, setStreamRunId] = useState<string | null>(null);
+  const [streamBaseline, setStreamBaseline] = useState(0);
+  const [suppressedRunId, setSuppressedRunId] = useState<string | null>(null);
+  const ignoredRuns = useRef(new Set<string>());
+  const recoveredRunId = useRunStore((state) => {
+    const run = Object.values(state.runs).find(
+      (candidate) =>
+        candidate.kind === "mock-interview-turn" &&
+        ["queued", "running", "cancelling"].includes(candidate.status) &&
+        candidate.meta?.sessionId === displayedSessionId,
+    );
+    return run?.runId ?? null;
+  });
+  const recoveredBaseline = useRunStore((state) => {
+    const run = Object.values(state.runs).find(
+      (candidate) =>
+        candidate.kind === "mock-interview-turn" &&
+        ["queued", "running", "cancelling"].includes(candidate.status) &&
+        candidate.meta?.sessionId === displayedSessionId,
+    );
+    return typeof run?.meta?.turnCount === "number" ? run.meta.turnCount : 0;
+  });
+  const attachedRunId =
+    streamRunId ??
+    (recoveredRunId && recoveredRunId !== suppressedRunId ? recoveredRunId : null);
+  const attachedBaseline = streamRunId ? streamBaseline : recoveredBaseline;
+  const stream = useChatStream(attachedRunId);
 
   const active = session.data;
-  const sending = send.isPending;
+  const sending = send.isPending || stream.status === "streaming";
   const ending = end.isPending;
 
   const sendMessage = async (message = composer.trim()) => {
     if (!active || !message || sending) return;
     setLastMessage(message);
     setRunError("");
+    setStreamBaseline(active.turns?.length ?? 0);
+    setSuppressedRunId(null);
+    stream.reset();
     try {
-      await send.mutateAsync({
+      const launched = await send.mutateAsync({
         sessionId: active.sessionId,
         message,
         onDone: (completed: RunRecord) => {
+          if (ignoredRuns.current.delete(completed.runId)) return;
           if (completed.status === "succeeded") {
             setComposer((current) => (current.trim() === message ? "" : current));
           } else {
@@ -70,9 +100,18 @@ export function InterviewPage() {
           }
         },
       });
+      setStreamRunId(launched.runId);
     } catch (error) {
       setRunError(error instanceof Error ? error.message : "Answer failed");
     }
+  };
+
+  const stopAnswer = () => {
+    if (attachedRunId) ignoredRuns.current.add(attachedRunId);
+    setSuppressedRunId(attachedRunId);
+    stream.stop();
+    setStreamRunId(null);
+    setRunError("");
   };
 
   const endInterview = async () => {
@@ -119,6 +158,20 @@ export function InterviewPage() {
 
   const ended = active.status === "ended";
   const canAnswer = active.status === "active" && !active.concluded;
+  const chatMessages: ChatThreadMessage[] = (active.turns ?? []).map((turn, index) => {
+    const notice = (turn as typeof turn & { notice?: string }).notice;
+    return {
+      id: `${turn.at}-${index}`,
+      role: turn.role === "interviewer" ? "assistant" : "user",
+      parts: [
+        { kind: "text" as const, text: turn.text },
+        ...(notice ? [{ kind: "notice" as const, message: notice }] : []),
+      ],
+    };
+  });
+  const durableAdvanced = (active.turns?.length ?? 0) > attachedBaseline;
+  const streamingParts = attachedRunId && !durableAdvanced ? stream.parts : null;
+  const visibleError = stream.error || runError;
 
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
@@ -157,13 +210,13 @@ export function InterviewPage() {
         ) : null}
       </header>
 
-      {runError ? (
+      {visibleError ? (
         <Alert variant="destructive">
           <AlertTitle>Interview error</AlertTitle>
           <AlertDescription className="flex flex-wrap items-center gap-3">
-            <span className="flex-1">{runError}</span>
+            <span className="flex-1">{visibleError}</span>
             {canAnswer && lastMessage ? (
-              <Button size="sm" variant="outline" onClick={() => void sendMessage(lastMessage)}>Retry</Button>
+              <Button size="sm" variant="outline" onClick={() => { stream.reset(); void sendMessage(lastMessage); }}>Retry</Button>
             ) : null}
           </AlertDescription>
         </Alert>
@@ -179,57 +232,31 @@ export function InterviewPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[min(64vh,48rem)] min-h-[32rem]">
-            <div className="flex flex-col gap-6 p-5 sm:p-8">
-              {(active.turns ?? []).map((turn, index) => (
-                <div key={`${turn.at}-${index}`} className={cn("flex items-start gap-3", turn.role === "candidate" && "flex-row-reverse")}>
-                  <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", turn.role === "interviewer" ? "bg-primary/10 text-primary" : "bg-primary text-primary-foreground")}>
-                    {turn.role === "interviewer" ? <Bot className="size-5" aria-hidden="true" /> : <UserRound className="size-5" aria-hidden="true" />}
-                  </div>
-                  <div className={cn("max-w-[88%] rounded-2xl px-5 py-4 text-base leading-7 sm:max-w-[82%]", turn.role === "interviewer" ? "rounded-tl-sm bg-muted" : "rounded-tr-sm bg-primary text-primary-foreground")}>
-                    {turn.text}
-                  </div>
-                </div>
-              ))}
-              {sending ? (
-                <div className="flex items-center gap-3 text-base text-muted-foreground"><Spinner /><span>The interviewer is thinking…</span></div>
-              ) : null}
-            </div>
-          </ScrollArea>
+          <div className="flex h-[min(64vh,48rem)] min-h-[32rem] flex-col gap-4 p-5 sm:p-8">
+            <ChatThread
+              messages={chatMessages}
+              streaming={streamingParts}
+              showReasoning={false}
+            />
+            {sending && !stream.parts.length ? (
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <Spinner />
+                <span>The interviewer is thinking…</span>
+              </div>
+            ) : null}
+          </div>
 
           {canAnswer ? (
             <div className="border-t bg-card p-5 sm:p-6">
-              <Field>
-                <FieldLabel htmlFor="interview-composer">Your answer</FieldLabel>
-                <Textarea
-                  id="interview-composer"
-                  aria-label="Your answer"
-                  rows={4}
-                  className="text-base leading-7"
-                  value={composer}
-                  disabled={sending}
-                  placeholder="Answer as you would in a real interview…"
-                  onChange={(event) => setComposer(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void sendMessage();
-                    }
-                  }}
-                />
-                <FieldDescription className="flex items-center justify-between gap-3">
-                  <span>Press Enter to send, Shift + Enter for a new line.</span>
-                  <span className="flex items-center gap-2">
-                    <TranscribeButton
-                      disabled={sending}
-                      onText={(text) => setComposer((prev) => (prev ? `${prev} ${text}` : text))}
-                    />
-                    <Button aria-label="Send answer" disabled={!composer.trim() || sending} onClick={() => void sendMessage()}>
-                      {sending ? <Spinner data-icon="inline-start" /> : <Send aria-hidden="true" />}Send
-                    </Button>
-                  </span>
-                </FieldDescription>
-              </Field>
+              <ChatComposer
+                value={composer}
+                onChange={setComposer}
+                onSend={() => void sendMessage()}
+                onStop={stopAnswer}
+                busy={sending}
+                ariaLabel="Your answer"
+                placeholder="Answer as you would in a real interview…"
+              />
             </div>
           ) : active.concluded && !ended ? (
             <div className="flex flex-col items-center gap-3 border-t bg-card p-6 text-center">

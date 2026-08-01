@@ -26,6 +26,7 @@ function seedRun(run: RunOut, onDone?: RunDone): void {
     current: run.current,
     total: run.total,
     etaText: run.etaText ?? null,
+    meta: run.meta ?? null,
   });
   trackRun({ runId: run.runId, kind: run.kind }, onDone);
 }

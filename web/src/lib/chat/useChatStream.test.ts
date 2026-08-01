@@ -1,0 +1,66 @@
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useChatStream } from "./useChatStream";
+
+class FakeEventSource {
+  static last: FakeEventSource | null = null;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+  closed = false;
+  url: string;
+  constructor(url: string) {
+    this.url = url;
+    FakeEventSource.last = this;
+  }
+  close() {
+    this.closed = true;
+  }
+  send(payload: unknown) {
+    this.onmessage?.({ data: JSON.stringify(payload) });
+  }
+}
+
+vi.stubGlobal("EventSource", FakeEventSource);
+vi.mock("@/features/runs/use-launch-run", () => ({ cancelRun: vi.fn() }));
+
+describe("useChatStream", () => {
+  beforeEach(() => {
+    FakeEventSource.last = null;
+    localStorage.setItem("resume-agent-token", "token");
+  });
+
+  it("accumulates valid events and ignores malformed rows without advancing", async () => {
+    const { result } = renderHook(() => useChatStream("run-1"));
+    await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    act(() => FakeEventSource.last!.send({ i: "4", t: "text", v: { text: "bad" } }));
+    act(() => FakeEventSource.last!.send({ i: 4, t: "text", v: { text: "gap" } }));
+    act(() => FakeEventSource.last!.send({ i: 0, t: "text", v: { text: "hi" } }));
+    await waitFor(() => expect(result.current.parts).toHaveLength(1));
+    act(() => FakeEventSource.last!.onerror?.());
+    await waitFor(() => expect(FakeEventSource.last!.url).toContain("offset=1"));
+  });
+
+  it("resets all state when run id changes", async () => {
+    const { result, rerender } = renderHook(({ id }) => useChatStream(id), {
+      initialProps: { id: "run-1" as string | null },
+    });
+    await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    act(() => FakeEventSource.last!.send({ i: 0, t: "text", v: { text: "old" } }));
+    await waitFor(() => expect(result.current.parts).toHaveLength(1));
+    rerender({ id: "run-2" });
+    await waitFor(() => expect(result.current.parts).toEqual([]));
+    expect(FakeEventSource.last!.url).toContain("run-2");
+    expect(FakeEventSource.last!.url).toContain("offset=0");
+  });
+
+  it("discards partial output when stopped", async () => {
+    const { result } = renderHook(() => useChatStream("run-1"));
+    await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    act(() => FakeEventSource.last!.send({ i: 0, t: "text", v: { text: "partial" } }));
+    await waitFor(() => expect(result.current.parts).toHaveLength(1));
+    act(() => result.current.stop());
+    expect(result.current.parts).toEqual([]);
+    expect(result.current.status).toBe("idle");
+  });
+});

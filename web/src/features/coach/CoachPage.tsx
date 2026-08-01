@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
-import { Archive, ArchiveRestore, Bot, ChevronDown, Clock3, EllipsisVertical, History, Send, Sparkles, SquareCheckBig, Trash2, UserRound } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Archive, ArchiveRestore, Bot, ChevronDown, Clock3, EllipsisVertical, History, Sparkles, SquareCheckBig, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
-import { TranscribeButton } from "@/components/TranscribeButton";
+import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -23,15 +24,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { useChatStream } from "@/lib/chat/useChatStream";
 import type { RunRecord } from "@/lib/runs/store";
-import { cn } from "@/lib/utils";
+import { useRunStore } from "@/lib/runs/store";
 
 import { AgendaRail } from "./AgendaRail";
 import { DraftNoteCard } from "./DraftNoteCard";
@@ -110,9 +110,36 @@ export function CoachPage() {
   const [lastMessage, setLastMessage] = useState("");
   const [runState, setRunState] = useState<"idle" | "running" | "error">("idle");
   const [runError, setRunError] = useState("");
+  const [streamRunId, setStreamRunId] = useState<string | null>(null);
+  const [streamBaseline, setStreamBaseline] = useState(0);
+  const [suppressedRunId, setSuppressedRunId] = useState<string | null>(null);
+  const ignoredRuns = useRef(new Set<string>());
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
   const [build, setBuild] = useState(true);
+  const recoveredRunId = useRunStore((state) => {
+    const run = Object.values(state.runs).find(
+      (candidate) =>
+        ["profile-coach-turn", "profile-coach-end"].includes(candidate.kind) &&
+        ["queued", "running", "cancelling"].includes(candidate.status) &&
+        candidate.meta?.sessionId === displayedSessionId,
+    );
+    return run?.runId ?? null;
+  });
+  const recoveredBaseline = useRunStore((state) => {
+    const run = Object.values(state.runs).find(
+      (candidate) =>
+        ["profile-coach-turn", "profile-coach-end"].includes(candidate.kind) &&
+        ["queued", "running", "cancelling"].includes(candidate.status) &&
+        candidate.meta?.sessionId === displayedSessionId,
+    );
+    return typeof run?.meta?.turnCount === "number" ? run.meta.turnCount : 0;
+  });
+  const attachedRunId =
+    streamRunId ??
+    (recoveredRunId && recoveredRunId !== suppressedRunId ? recoveredRunId : null);
+  const attachedBaseline = streamRunId ? streamBaseline : recoveredBaseline;
+  const stream = useChatStream(attachedRunId);
 
   const pastSessions = useMemo(
     () =>
@@ -125,9 +152,13 @@ export function CoachPage() {
   const startSession = async () => {
     setStarting(true);
     setRunError("");
+    setStreamBaseline(0);
+    setSuppressedRunId(null);
+    stream.reset();
     try {
-      await start.mutateAsync({
+      const launched = await start.mutateAsync({
         onDone: (completed: RunRecord) => {
+          if (ignoredRuns.current.delete(completed.runId)) return;
           setStarting(false);
           if (completed.status === "succeeded") {
             const result = completed.result as { sessionId?: string } | null;
@@ -137,6 +168,7 @@ export function CoachPage() {
           }
         },
       });
+      setStreamRunId(launched.runId);
     } catch {
       setStarting(false);
     }
@@ -147,11 +179,15 @@ export function CoachPage() {
     setLastMessage(message);
     setRunState("running");
     setRunError("");
+    setStreamBaseline(session.data.turns?.length ?? 0);
+    setSuppressedRunId(null);
+    stream.reset();
     try {
-      await send.mutateAsync({
+      const launched = await send.mutateAsync({
         sessionId: session.data.sessionId,
         message,
         onDone: (completed: RunRecord) => {
+          if (ignoredRuns.current.delete(completed.runId)) return;
           if (completed.status === "succeeded") {
             setComposer((current) => current.trim() === message ? "" : current);
             setRunState("idle");
@@ -161,17 +197,31 @@ export function CoachPage() {
           }
         },
       });
+      setStreamRunId(launched.runId);
     } catch (error) {
       setRunState("error");
       setRunError(error instanceof Error ? error.message : "Message failed");
     }
   };
 
+  const stopMessage = () => {
+    if (attachedRunId) ignoredRuns.current.add(attachedRunId);
+    setSuppressedRunId(attachedRunId);
+    stream.stop();
+    setStreamRunId(null);
+    setStarting(false);
+    setRunState("idle");
+    setRunError("");
+  };
+
   const endSession = async () => {
     if (!session.data) return;
     setEnding(true);
+    setStreamBaseline(session.data.turns?.length ?? 0);
+    setSuppressedRunId(null);
+    stream.reset();
     try {
-      await end.mutateAsync({
+      const launched = await end.mutateAsync({
         sessionId: session.data.sessionId,
         build,
         onDone: (completed: RunRecord) => {
@@ -184,6 +234,7 @@ export function CoachPage() {
           }
         },
       });
+      setStreamRunId(launched.runId);
     } catch {
       setEnding(false);
     }
@@ -199,6 +250,21 @@ export function CoachPage() {
 
   const active = session.data;
   const pendingDrafts = active?.draftNotes?.filter((note) => note.status === "pending") ?? [];
+  const chatMessages: ChatThreadMessage[] = (active?.turns ?? []).map((turn, index) => {
+    const notice = (turn as typeof turn & { notice?: string }).notice;
+    return {
+      id: `${turn.at}-${index}`,
+      role: turn.role === "coach" ? "assistant" : "user",
+      parts: [
+        { kind: "text" as const, text: turn.text },
+        ...(notice ? [{ kind: "notice" as const, message: notice }] : []),
+      ],
+    };
+  });
+  const durableAdvanced = (active?.turns?.length ?? 0) > attachedBaseline;
+  const streamingParts = attachedRunId && !durableAdvanced ? stream.parts : null;
+  const busy = send.isPending || runState === "running" || stream.status === "streaming";
+  const visibleError = stream.error || runError;
 
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8">
@@ -239,14 +305,28 @@ export function CoachPage() {
       {!active ? (
         <Card className="min-h-[34rem] border-dashed bg-gradient-to-br from-card via-card to-primary/[0.05]">
           <CardContent className="flex min-h-[34rem] items-center justify-center py-14">
-            <Empty>
+            {starting && attachedRunId ? (
+              <div className="flex h-[28rem] w-full max-w-3xl flex-col gap-4">
+                <ChatThread messages={[]} streaming={stream.parts} />
+                {!stream.parts.length ? (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Spinner /> Preparing your first coaching question…
+                  </div>
+                ) : null}
+                <Button className="self-center" variant="outline" onClick={stopMessage}>
+                  Stop generating
+                </Button>
+              </div>
+            ) : (
+              <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon"><Bot aria-hidden="true" /></EmptyMedia>
                 <EmptyTitle>Find the evidence your profile is missing</EmptyTitle>
                 <EmptyDescription>The coach reviews your current facts, asks one focused question at a time, and drafts only claims grounded in your answers.</EmptyDescription>
               </EmptyHeader>
               <EmptyContent><Button disabled={starting || start.isPending} onClick={() => void startSession()}>{starting || start.isPending ? <Spinner data-icon="inline-start" /> : <Sparkles aria-hidden="true" />}Start coaching session</Button></EmptyContent>
-            </Empty>
+              </Empty>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -257,23 +337,42 @@ export function CoachPage() {
               <CardDescription className="flex items-center gap-2 text-sm"><Clock3 className="size-4" aria-hidden="true" />Started {new Date(active.startedAt).toLocaleString()}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[min(70vh,52rem)] min-h-[38rem]">
-                <div className="flex flex-col gap-6 p-5 sm:p-8">
-                  {(active.turns ?? []).map((turn, index) => (
-                    <div key={`${turn.at}-${index}`} className="space-y-3">
-                      <div className={cn("flex items-start gap-3", turn.role === "user" && "flex-row-reverse")}>
-                        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", turn.role === "coach" ? "bg-primary/10 text-primary" : "bg-primary text-primary-foreground")}>
-                          {turn.role === "coach" ? <Bot className="size-5" aria-hidden="true" /> : <UserRound className="size-5" aria-hidden="true" />}
-                        </div>
-                        <div className={cn("max-w-[88%] rounded-2xl px-5 py-4 text-base leading-7 sm:max-w-[82%]", turn.role === "coach" ? "rounded-tl-sm bg-muted" : "rounded-tr-sm bg-primary text-primary-foreground")}>
-                          {turn.role === "coach" ? <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{turn.text}</ReactMarkdown> : turn.text}
-                        </div>
+              <div className="flex h-[min(70vh,52rem)] min-h-[38rem] flex-col gap-4 p-5 sm:p-8">
+                <ChatThread
+                  messages={chatMessages}
+                  streaming={streamingParts}
+                  renderAfter={(message) => {
+                    const index = chatMessages.indexOf(message);
+                    const turn = active.turns?.[index];
+                    if (!turn?.researchActions?.length) return null;
+                    return (
+                      <div className="mt-3 space-y-2">
+                        {turn.researchActions.map((action, actionIndex) => (
+                          <ResearchActionCard
+                            key={`${action.kind}-${action.target}-${actionIndex}`}
+                            action={action}
+                          />
+                        ))}
                       </div>
-                      {(turn.researchActions ?? []).map((action, actionIndex) => <ResearchActionCard key={`${action.kind}-${action.target}-${actionIndex}`} action={action} />)}
-                    </div>
-                  ))}
-                  {runState === "running" ? <div className="flex items-center gap-3 text-base text-muted-foreground"><Spinner /><span>The coach is reviewing your evidence…</span></div> : null}
-                  {runState === "error" ? <RunError message={runError} onRetry={() => void sendMessage(lastMessage)} /> : null}
+                    );
+                  }}
+                />
+                {busy && !stream.parts.length ? (
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <Spinner />
+                    <span>The coach is reviewing your evidence…</span>
+                  </div>
+                ) : null}
+                {(stream.status === "error" || runState === "error") && visibleError ? (
+                  <RunError
+                    message={visibleError}
+                    onRetry={() => {
+                      stream.reset();
+                      void sendMessage(lastMessage);
+                    }}
+                  />
+                ) : null}
+                <div className="space-y-4">
                   {(active.draftNotes ?? []).map((note) => (
                     <DraftNoteCard
                       key={`${note.topicId}-${note.status}`}
@@ -287,14 +386,18 @@ export function CoachPage() {
                   {active.recap ? <Card className="bg-muted/30"><CardHeader><CardTitle className="text-lg">Session recap</CardTitle></CardHeader><CardContent className="text-base leading-7"><ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{active.recap}</ReactMarkdown></CardContent></Card> : null}
                   {active.impact ? <ImpactCard impact={active.impact} /> : null}
                 </div>
-              </ScrollArea>
+              </div>
               {active.status === "active" ? (
                 <div className="border-t bg-card p-5 sm:p-6">
-                  <Field>
-                    <FieldLabel htmlFor="coach-composer">Message your profile coach</FieldLabel>
-                    <Textarea id="coach-composer" rows={4} className="text-base leading-7" value={composer} placeholder="Share the situation, what you did, and what changed…" onChange={(event) => setComposer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void sendMessage(); } }} />
-                    <FieldDescription className="flex items-center justify-between gap-3"><span>Press Ctrl/⌘ + Enter to send.</span><span className="flex items-center gap-2"><TranscribeButton disabled={runState === "running" || send.isPending} onText={(text) => setComposer((prev) => (prev ? `${prev} ${text}` : text))} /><Button aria-label="Send message" disabled={!composer.trim() || runState === "running" || send.isPending} onClick={() => void sendMessage()}>{runState === "running" ? <Spinner data-icon="inline-start" /> : <Send aria-hidden="true" />}Send</Button></span></FieldDescription>
-                  </Field>
+                  <ChatComposer
+                    value={composer}
+                    onChange={setComposer}
+                    onSend={() => void sendMessage()}
+                    onStop={stopMessage}
+                    busy={busy}
+                    ariaLabel="Message your profile coach"
+                    placeholder="Share the situation, what you did, and what changed…"
+                  />
                 </div>
               ) : null}
             </CardContent>

@@ -1,8 +1,25 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CoachPage } from "./CoachPage";
+
+const cancelRun = vi.hoisted(() => vi.fn());
+vi.mock("@/features/runs/use-launch-run", () => ({ cancelRun }));
+
+class FakeEventSource {
+  static last: FakeEventSource | null = null;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+  constructor() {
+    FakeEventSource.last = this;
+  }
+  close() {}
+  send(payload: unknown) {
+    this.onmessage?.({ data: JSON.stringify(payload) });
+  }
+}
+vi.stubGlobal("EventSource", FakeEventSource);
 
 const sendMessage = vi.fn();
 const saveNote = vi.fn();
@@ -99,6 +116,8 @@ describe("CoachPage", () => {
     coachState.recap = null;
     coachState.includeArchived = false;
     coachState.sessions = [];
+    FakeEventSource.last = null;
+    localStorage.setItem("resume-agent-token", "token");
     sendMessage.mockImplementation(async ({ onDone }) => {
       onDone?.({ status: "succeeded" });
       return { runId: "run-1" };
@@ -129,6 +148,22 @@ describe("CoachPage", () => {
       }),
     );
     expect(composer).toHaveValue("");
+  });
+
+  it("renders streamed text and can stop the active turn", async () => {
+    sendMessage.mockResolvedValue({ runId: "run-stream" });
+    const user = userEvent.setup();
+    render(<CoachPage />);
+    await user.type(screen.getByLabelText("Message your profile coach"), "Evidence");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    act(() =>
+      FakeEventSource.last!.send({ i: 0, t: "text", v: { text: "Strong answer." } }),
+    );
+    expect(await screen.findByText("Strong answer.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Stop generating" }));
+    expect(cancelRun).toHaveBeenCalledWith("run-stream");
+    expect(screen.queryByText("Strong answer.")).not.toBeInTheDocument();
   });
 
   it("renders a completed session read-only", () => {
