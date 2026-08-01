@@ -332,6 +332,7 @@ def profile_coach_cmd(
     from resume_agent.profile.coach_store import active_session
     from resume_agent.profile.corpus import load_manifest
     from resume_agent.services import profile_coach as coach_service
+    from resume_agent.sessions.stream import ConsoleStreamSink, NullSink
 
     profile_dir = _tenant_cli_path(facts).parent
     if not any(
@@ -359,9 +360,23 @@ def profile_coach_cmd(
 
     reporter = EchoReporter()
     engine = _engine(db_url)
+    stream_enabled = getattr(settings, "stream_enabled", True)
+
+    def run_streamed(call, *, label: str = "COACH"):
+        sink = (
+            ConsoleStreamSink(lambda text: typer.echo(text, nl=False))
+            if stream_enabled
+            else NullSink()
+        )
+        if stream_enabled:
+            typer.echo(f"\n{label}: ", nl=False)
+        try:
+            return call(sink)
+        finally:
+            sink.close()
 
     def show_latest(view: dict) -> None:
-        if view["turns"]:
+        if not stream_enabled and view["turns"]:
             typer.echo(f"\nCOACH: {view['turns'][-1]['text']}")
 
     def resolve_pending(view: dict) -> None:
@@ -408,10 +423,13 @@ def profile_coach_cmd(
 
     active = active_session(profile_dir)
     if active is None:
-        view = coach_service.run_opening_turn(
-            reporter,
-            profile_dir=profile_dir,
-            engine=engine,
+        view = run_streamed(
+            lambda sink: coach_service.run_opening_turn(
+                reporter,
+                profile_dir=profile_dir,
+                engine=engine,
+                sink=sink,
+            )
         )
     else:
         view = coach_service.session_view(profile_dir, active["session_id"])
@@ -423,24 +441,32 @@ def profile_coach_cmd(
         message = typer.prompt("You")
         if message.strip() == "/end":
             break
-        view = coach_service.run_message_turn(
-            reporter,
-            profile_dir=profile_dir,
-            session_id=session_id,
-            message=message,
-            engine=engine,
+        view = run_streamed(
+            lambda sink: coach_service.run_message_turn(
+                reporter,
+                profile_dir=profile_dir,
+                session_id=session_id,
+                message=message,
+                engine=engine,
+                sink=sink,
+            )
         )
         show_latest(view)
         resolve_pending(view)
 
     resolve_pending(view)
     saved_any = any(draft["status"] == "saved" for draft in view["draftNotes"])
-    recap = coach_service.run_recap_turn(
-        reporter,
-        profile_dir=profile_dir,
-        session_id=session_id,
+    recap = run_streamed(
+        lambda sink: coach_service.run_recap_turn(
+            reporter,
+            profile_dir=profile_dir,
+            session_id=session_id,
+            sink=sink,
+        ),
+        label="RECAP",
     )
-    typer.echo(f"\nRECAP: {recap['recap']}")
+    if not stream_enabled:
+        typer.echo(f"\nRECAP: {recap['recap']}")
     if no_build or not saved_any:
         typer.echo("Session saved without rebuilding.")
         return
