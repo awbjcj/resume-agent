@@ -19,7 +19,7 @@ def _tier_default(field: str) -> str:
     return cast(str, Settings.model_fields[field].default)
 
 
-# schema field name -> .env variable. One place; GET, PUT, and setup-status use it.
+# schema field name -> .env variable. One place for the write-only secrets API.
 SECRET_FIELDS: dict[str, str] = {
     "anthropic_api_key": "ANTHROPIC_API_KEY",
     "openai_api_key": "OPENAI_API_KEY",
@@ -33,17 +33,6 @@ SECRET_FIELDS: dict[str, str] = {
     "google_oauth_client_id": "GOOGLE_OAUTH_CLIENT_ID",
     "google_oauth_client_secret": "GOOGLE_OAUTH_CLIENT_SECRET",
 }
-
-# Any one of these satisfies "an LLM key is configured" — profile build and
-# tailoring pick a provider via Settings.mid_model (see llm_runner.split_provider),
-# so the gate isn't specific to Anthropic.
-LLM_KEY_ENV_VARS: tuple[str, ...] = (
-    "ANTHROPIC_API_KEY",
-    "OPENAI_API_KEY",
-    "GEMINI_API_KEY",
-    "DEEPSEEK_API_KEY",
-)
-
 
 class SecretStatus(CamelModel):
     key: str  # camelCase field name, e.g. "anthropicApiKey"
