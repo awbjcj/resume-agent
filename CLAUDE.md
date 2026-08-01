@@ -124,6 +124,27 @@ INVALID_ARGUMENT` before generating anything, and agno then hands back the
   `thinking_budget=0` only for pre-3 ids. Verified live against
   `gemini-3.6-flash`: `thinking_level="low"` reports no thought tokens;
   `thinking_budget=0` is a hard 400.
+- **DeepSeek is the third instance of the same trap, and the only one without a
+  generation gate.** agno reads `use_thinking=None` as the provider default, and
+  that default is **on** for every `deepseek-v4-*` id — so a bare `None` bought
+  thinking on every non-reasoning agent. Measured on a live coach turn: 7,779
+  characters of unrequested reasoning, streamed as 1,846 one-word deltas.
+  `build_model` therefore sends `use_thinking=bool(reasoning)`. Unlike Gemini 3,
+  an explicit `thinking: {"type": "disabled"}` is verified accepted by
+  `deepseek-chat`, `-v4-flash` and `-v4-pro` alike, so no version parsing is
+  needed here.
+- **A persona model may simply ignore the `---METADATA---` sentinel, and that is
+  not a failure.** `sessions/turns.py::persona_output` splits prose from
+  formatter input on that marker. Claude emits it; **DeepSeek v4 never does** —
+  verified against the live coach prompt with thinking both on and off, the run
+  completing normally (no truncation), so there is nothing to retry. Because the
+  formatter is an LLM that extracts a turn from raw notes either way, a missing
+  marker **degrades** (the whole response becomes both the visible reply and the
+  formatter's notes) and logs a warning; it must never raise. Marker matching
+  tolerates surrounding emphasis and padding but *requires* the `METADATA`
+  token — DeepSeek writes a bare `---` rule as a section break, so matching the
+  rules alone would truncate a reply mid-turn. `ProseEmitter`'s holdback floor is
+  derived from the longest matchable marker (`MARKER_MAX_LEN`), never a literal.
 - **Anthropic has the same "unset means provider decides" trap, and it is
   generation-specific.** Omitting `thinking` runs **adaptive** on Sonnet 5 and
   Opus 5, and runs **without** thinking on Opus 4.8/4.7 and older — so leaving
