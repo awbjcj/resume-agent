@@ -52,6 +52,47 @@ def test_normalize_opening_rejects_empty_plan():
         normalize_opening(OpeningInterview(message="Hi"), question_count=8)
 
 
+def test_unknown_opening_question_names_the_valid_ids_so_the_retry_can_recover():
+    # Opening plan ids are generated positionally by the validator IN THIS SAME
+    # TURN, so the formatter cannot know them ahead of time -- the interviewer's
+    # own PLAN block is a bare numbered list, so it reports question id "1".
+    # format_with_retry feeds the rejection reason back for exactly one retry, so
+    # that reason has to say what a valid id *is*; otherwise the retry carries no
+    # more information than the attempt that just failed and the session dies.
+    with pytest.raises(TurnRejected, match="unknown question") as excinfo:
+        normalize_opening(
+            OpeningInterview(
+                message="Welcome! Tell me about yourself.",
+                question_id="1",
+                plan=[
+                    NewPlanItem(competency="ownership", question_type="behavioral"),
+                    NewPlanItem(competency="systems", question_type="technical"),
+                ],
+            ),
+            question_count=4,
+        )
+    message = str(excinfo.value)
+    assert "q1" in message and "q2" in message
+
+
+def test_opening_format_instruction_states_the_positional_id_convention():
+    # The formatter is the only thing that fills question_id, and it is told to
+    # invent nothing -- so if the prompt does not name the q1/q2 convention it
+    # copies the interviewer's bare "1", which can never match a generated id.
+    from resume_agent.interview.agent import _formatter_instructions
+
+    text = " ".join(_formatter_instructions(OpeningInterview))
+    assert "q1" in text
+
+
+def test_answer_turn_formatter_omits_the_opening_only_instruction():
+    # Answer turns read real ids off the rendered plan; repeating the positional
+    # convention there would invite the formatter to renumber an existing plan.
+    from resume_agent.interview.agent import _formatter_instructions
+
+    assert "q1" not in " ".join(_formatter_instructions(InterviewTurn))
+
+
 def test_normalize_turn_rejects_unknown_question():
     with pytest.raises(TurnRejected, match="unknown question"):
         normalize_turn(

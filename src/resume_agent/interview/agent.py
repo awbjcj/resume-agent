@@ -24,8 +24,8 @@ from resume_agent.llm_runner import (
     retry_kwargs,
     use_json_mode_for,
 )
-from resume_agent.prompts.guidance import with_guidance
 from resume_agent.models.base import ExtensibleModel
+from resume_agent.prompts.guidance import with_guidance
 from resume_agent.sessions.turns import TurnRejected
 
 FOLLOWUP_CAP = 2
@@ -95,7 +95,14 @@ def normalize_opening(
     ]
     question_id = turn.question_id.strip() or plan[0].id
     if question_id not in {item.id for item in plan}:
-        raise TurnRejected(f"unknown question: {question_id!r}")
+        # Opening ids are generated positionally right here, so the formatter is
+        # answering about an id space that did not exist yet -- and the
+        # interviewer's own PLAN block is a bare numbered list, so it reports
+        # "1". Naming the valid ids is what lets `format_with_retry`'s single
+        # retry recover; a bare "unknown question" gives the retry nothing the
+        # first attempt lacked.
+        valid = ", ".join(item.id for item in plan)
+        raise TurnRejected(f"unknown question: {question_id!r} (valid ids: {valid})")
     return plan, InterviewTurnRecord(
         role="interviewer", text=message, question_id=question_id
     )
@@ -320,6 +327,25 @@ _FORMAT_INSTRUCTIONS = [
     "Invent nothing.",
 ]
 
+_OPENING_FORMAT_INSTRUCTION = (
+    "This is the opening turn: copy every question the interviewer planned into "
+    "`plan`, in order, each with its competency and question type. An opening "
+    "turn with no plan is invalid. "
+    "Question ids are assigned positionally from the order you list them -- the "
+    "first plan item is `q1`, the second `q2`, and so on. The interviewer's own "
+    "notes number the plan without that prefix, so translate: its question 1 is "
+    "`q1`. Set `question_id` to the id of the question the interviewer actually "
+    "asked (`q1` unless the greeting clearly opens with a later one), or leave "
+    "it empty. Never copy a bare number or invent an id of your own; neither can "
+    "match a positional id and both fail the turn."
+)
+
+
+def _formatter_instructions(schema: type[ExtensibleModel]) -> list[str]:
+    if issubclass(schema, OpeningInterview):
+        return [*_FORMAT_INSTRUCTIONS, _OPENING_FORMAT_INSTRUCTION]
+    return _FORMAT_INSTRUCTIONS
+
 
 def build_interviewer_agent(style: InterviewStyle) -> Runner:
     settings = get_settings()
@@ -352,7 +378,9 @@ def build_interview_formatter_agent(schema: type[ExtensibleModel]) -> Runner:
         Agent(
             model=model,
             description="Convert interviewer notes into one structured turn.",
-            instructions=with_guidance("interview-format", _FORMAT_INSTRUCTIONS),
+            instructions=with_guidance(
+                "interview-format", _formatter_instructions(schema)
+            ),
             output_schema=schema,
             use_json_mode=use_json_mode_for(model, schema),
             **retry_kwargs(),
