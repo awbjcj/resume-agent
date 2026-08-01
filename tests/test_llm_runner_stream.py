@@ -194,6 +194,7 @@ def test_stream_without_terminal_run_output_fails_closed():
 
     events = list(AgentRunner(agent).stream("p"))
 
+    assert isinstance(events[-1], Failed)
     assert events[-1].code == "MISSING_RUN_OUTPUT"
 
 

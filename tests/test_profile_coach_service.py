@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -6,7 +7,6 @@ import pytest
 
 from resume_agent.profile.coach import CoachTurn, DraftNote, NewTopic, OpeningTurn
 from resume_agent.profile.coach_store import load_session
-from resume_agent.sessions.stream import Completed, Failed, Notice, TextDelta, ToolStarted
 from resume_agent.services.profile_coach import (
     approve_draft,
     discard_draft,
@@ -16,6 +16,14 @@ from resume_agent.services.profile_coach import (
     run_recap_turn,
     session_view,
     sessions_view,
+)
+from resume_agent.sessions.stream import (
+    Completed,
+    Failed,
+    Notice,
+    StreamEvent,
+    TextDelta,
+    ToolStarted,
 )
 
 
@@ -71,7 +79,7 @@ class StreamingAgent:
     def __init__(self, prose: str, metadata: str = "action: ask\ntopic: t1"):
         self.full = f"{prose}\n---METADATA---\n{metadata}"
 
-    def stream(self, prompt):
+    def stream(self, prompt) -> Iterator[StreamEvent]:
         split = max(1, len(self.full) // 2)
         yield TextDelta(self.full[:split])
         yield ToolStarted("call-1", "search_corpus", "Kafka")
@@ -80,6 +88,9 @@ class StreamingAgent:
 
     def run(self, prompt):
         return SimpleNamespace(content=self.full)
+
+    async def arun(self, prompt):
+        return self.run(prompt)
 
 
 def _open(profile_dir):
@@ -177,7 +188,7 @@ def test_partial_stream_failure_leaves_session_byte_equivalent(tmp_path):
     before = load_session(tmp_path, sid)
 
     class BrokenStream(StreamingAgent):
-        def stream(self, prompt):
+        def stream(self, prompt) -> Iterator[StreamEvent]:
             yield TextDelta("Partial answer")
             yield Failed("provider lost", "PROVIDER_ERROR")
 

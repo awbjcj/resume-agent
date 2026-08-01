@@ -99,7 +99,16 @@ def test_start_guards_and_opening_run(monkeypatch, tmp_path):
 
 
 def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
-    client = _client(tmp_path)
+    env = tmp_path / "empty.env"
+    env.write_text("", encoding="utf-8")
+    app = create_app(
+        db_url="sqlite://",
+        data_dir=tmp_path / "data",
+        config_dir=tmp_path / "config",
+        env_path=env,
+        api_token="",
+    )
+    client = TestClient(app)
     monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
     with client:
         _seed_primary(client)
@@ -113,9 +122,9 @@ def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
         assert _wait(client, run_id)["state"] == "done"
         rows = [
             json.loads(line)
-            for line in (client.app.state.run_manager.stream_path(run_id)).read_text(
-                encoding="utf-8"
-            ).splitlines()
+            for line in app.state.run_manager.stream_path(run_id)
+            .read_text(encoding="utf-8")
+            .splitlines()
         ]
         assert rows[-1]["t"] == "completed"
 
