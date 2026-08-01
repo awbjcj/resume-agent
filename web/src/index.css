@@ -53,6 +53,19 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    /* Motion house style. The built-in CSS curves are too weak to read as
+       intentional: `ease-out-strong` starts fast so a press or an entrance
+       feels immediate, `ease-in-out-strong` accelerates and decelerates for
+       elements moving on screen. Never use `ease-in` for UI — it delays the
+       first frames, which is exactly when the user is watching. */
+    --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+
+    /* One card elevation, themed. Every dashboard surface reads as the same
+       material instead of three copy-pasted shadow literals. */
+    --shadow-card: var(--card-shadow);
+    --shadow-card-raised: var(--card-shadow-raised);
+
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -87,6 +100,10 @@
     --border: rgba(24, 32, 38, 0.12);
     --input: rgba(24, 32, 38, 0.14);
     --ring: #0a94a8;
+    /* Two-part shadow: a tight contact edge plus a softer ambient spread, so a
+       card sits on the page rather than floating over a single blurred smudge. */
+    --card-shadow: 0 1px 2px rgba(24, 32, 38, 0.05), 0 2px 6px -2px rgba(24, 32, 38, 0.06);
+    --card-shadow-raised: 0 1px 2px rgba(24, 32, 38, 0.06), 0 8px 20px -6px rgba(24, 32, 38, 0.12);
     --chart-1: #08708a;
     --chart-2: #16a085;
     --chart-3: #3867d6;
@@ -126,6 +143,10 @@
     --border: rgba(238, 244, 247, 0.12);
     --input: rgba(238, 244, 247, 0.16);
     --ring: #5bd8e7;
+    /* On a dark ground a light-tinted shadow is invisible; depth has to come
+       from a darker-than-background cast plus a faint top highlight edge. */
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px -2px rgba(0, 0, 0, 0.35);
+    --card-shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 20px -6px rgba(0, 0, 0, 0.55);
     --chart-1: #5bd8e7;
     --chart-2: #43d19e;
     --chart-3: #86a9ff;
@@ -223,10 +244,44 @@
   animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--rise-i, 0) * 70ms);
 }
+
+/* Column-level cascade for dashboard sections. The delay is deliberately
+   capped: a dashboard has seven or more panels, and 70ms × 7 would hold the
+   last card back by half a second, which reads as the page being slow rather
+   than as a cascade. Five steps at 45ms tops out at 225ms. */
+.stagger-children > * {
+  animation: rise-in 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 45ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 90ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 135ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(n + 6) { animation-delay: 225ms; }
 @media (prefers-reduced-motion: reduce) {
   .dial-ring,
-  .rise-in {
+  .rise-in,
+  .stagger-children > * {
     animation: none;
+  }
+}
+
+/* Translucent chrome (the sticky app header, popovers) is a material, not a
+   decoration — when the user has opted out of transparency it must become an
+   opaque surface rather than a washed-out one, or text loses its ground. */
+@media (prefers-reduced-transparency: reduce) {
+  .app-chrome {
+    background-color: var(--background);
+    backdrop-filter: none;
+  }
+}
+
+/* High-contrast mode wants a defined edge, not a hairline at 12% alpha. */
+@media (prefers-contrast: more) {
+  .app-chrome {
+    background-color: var(--background);
+    backdrop-filter: none;
+    border-color: var(--foreground);
   }
 }
 

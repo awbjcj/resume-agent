@@ -29,23 +29,47 @@ export function StageRail({ summary }: { summary: DashboardSummary }) {
   return (
     <ol
       aria-label="Pipeline stages"
-      className="flex flex-wrap items-center gap-y-3 rounded-lg border bg-card px-4 py-4 shadow-sm"
+      className="flex flex-wrap items-center gap-x-1 gap-y-4 rounded-lg border bg-card px-4 py-4 shadow-card"
     >
       {RAIL_STAGES.map((stage, index) => {
         const count = stage.count(summary);
+        const empty = count === 0;
         return (
-          <li key={stage.key} className="flex min-w-0 flex-1 items-center">
+          // Stages size to their own label; only the ones carrying a connector
+          // grow, so the row's slack lands in the connector and never squeezes
+          // the label. Equal `flex-1` slots looked tidy in code but were
+          // narrower than the tracked uppercase text, ellipsizing five of seven
+          // labels to "SHORT…" — a stage name is wayfinding, never truncatable.
+          <li
+            key={stage.key}
+            className={cn("flex items-center", index > 0 && "grow")}
+          >
             {index > 0 && (
+              // Fades along the flow direction so the rail reads left-to-right
+              // as a funnel rather than as seven equally-weighted chips.
+              //
+              // The basis is deliberately tiny and the width comes entirely
+              // from `grow`: a wrapping flex container decides line breaks from
+              // each item's basis *before* it shrinks anything, so a connector
+              // with a real width (w-10) pushed the last stage onto its own row
+              // instead of compressing.
               <span
                 aria-hidden="true"
-                className="mx-2 h-px w-full max-w-8 shrink bg-border"
+                className="mx-2 h-px w-2 grow bg-gradient-to-r from-transparent to-border"
               />
             )}
-            <div className={cn("min-w-0", count === 0 && "opacity-45")}>
-              <div className="text-2xl font-semibold tabular-nums leading-none">
+            <div className="shrink-0">
+              <div
+                className={cn(
+                  "text-2xl font-semibold tabular-nums leading-none tracking-[-0.02em]",
+                  // Only the count recedes when a stage is empty; the label is
+                  // wayfinding and has to stay readable at every state.
+                  empty && "text-muted-foreground/45",
+                )}
+              >
                 {count}
               </div>
-              <div className="mt-1 truncate text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <div className="mt-1.5 whitespace-nowrap text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {stage.label}
               </div>
             </div>

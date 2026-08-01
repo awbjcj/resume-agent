@@ -80,7 +80,7 @@ export function PipelineStageSection({
         <CollapsibleTrigger
           className={cn(
             buttonVariants({ variant: "ghost" }),
-            "group h-auto min-h-11 w-full justify-between whitespace-normal rounded-lg border bg-card px-4 py-3 text-left shadow-[0_1px_2px_rgba(24,32,38,0.04)] hover:border-primary/25",
+            "group h-auto min-h-11 w-full justify-between whitespace-normal rounded-lg border bg-card px-4 py-3 text-left shadow-card hover:border-primary/25",
           )}
         >
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">

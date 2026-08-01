@@ -26,8 +26,11 @@ function CohortTable({
   rows: Cohort[];
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border bg-card shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
-      <Table>
+    <div className="overflow-x-auto rounded-lg border bg-card shadow-card">
+      {/* `caption-top` overrides the shadcn default: this caption is the table's
+          heading, and rendering it below the rows meant the reader met seven
+          unexplained columns before learning what they were counting. */}
+      <Table className="caption-top">
         <caption className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {caption}
         </caption>

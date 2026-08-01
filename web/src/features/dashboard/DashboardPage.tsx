@@ -50,7 +50,7 @@ export function DashboardPage() {
         <ImportJobsButton />
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="stagger-children flex min-w-0 flex-col gap-6">
           <JourneyRail />
           {/* When the funnel has no active jobs the JourneyRail already carries
               the right next step (add sources, or pull), so no separate empty
@@ -63,11 +63,24 @@ export function DashboardPage() {
           )}
           <InProgressCard summary={summary} />
           <AttentionCard />
-          <RecentRuns />
         </div>
-        <div className="flex min-w-0 flex-col gap-6">
+        {/* Standing "is the desk working?" column: setup readiness plus live run
+            activity. It is a landmark rather than a bare <div> so the grouping
+            is nameable without a third uppercase heading competing with the two
+            card titles already inside it.
+
+            `self-start` is what makes `sticky` do anything here — a grid item
+            defaults to `stretch`, so it would already be as tall as the row and
+            have nothing to stick within. Status stays on screen while the work
+            column scrolls; below xl the columns stack and status follows the
+            work, which is the right priority order. */}
+        <aside
+          aria-label="System status"
+          className="stagger-children flex min-w-0 flex-col gap-6 xl:sticky xl:top-20 xl:self-start"
+        >
           <DeskHealth />
-        </div>
+          <RecentRuns />
+        </aside>
       </div>
     </div>
   );

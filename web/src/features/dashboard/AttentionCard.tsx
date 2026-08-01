@@ -4,7 +4,13 @@ import { CircleAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import {
   useDismissAllErrors,
@@ -72,22 +78,28 @@ export function AttentionCard() {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between gap-3">
+      {/* CardHeader is `display: grid`, so the `flex-row items-center
+          justify-between` this used to carry was inert and dropped "Clear all"
+          onto its own row. CardAction is the primitive's own affordance for a
+          trailing control — it opts the header into `grid-cols-[1fr_auto]`. */}
+      <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <CircleAlert className="text-destructive" aria-hidden="true" />
           Attention needed
           {rows.length ? <Badge variant="destructive">{rows.length}</Badge> : null}
         </CardTitle>
         {rows.length ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={clearAll.isPending}
-            onClick={() => clearAll.mutate()}
-          >
-            {clearAll.isPending ? <Spinner data-icon="inline-start" /> : null}
-            Clear all
-          </Button>
+          <CardAction>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={clearAll.isPending}
+              onClick={() => clearAll.mutate()}
+            >
+              {clearAll.isPending ? <Spinner data-icon="inline-start" /> : null}
+              Clear all
+            </Button>
+          </CardAction>
         ) : null}
       </CardHeader>
 

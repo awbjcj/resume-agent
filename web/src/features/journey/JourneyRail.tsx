@@ -78,7 +78,7 @@ export function JourneyRail() {
     return (
       <div
         aria-label="Job-search journey"
-        className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm"
+        className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground shadow-card"
       >
         <span className="flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
           <Check className="size-3" aria-hidden="true" />
@@ -92,7 +92,7 @@ export function JourneyRail() {
   const current = journey.stages.find((s) => s.state === "current");
 
   return (
-    <section aria-label="Job-search journey" className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+    <section aria-label="Job-search journey" className="rounded-lg border bg-card p-4 shadow-card sm:p-5">
       <ol className="flex items-start">
         {journey.stages.map((stage, i) => (
           <Node

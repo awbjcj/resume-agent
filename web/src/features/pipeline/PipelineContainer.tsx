@@ -147,7 +147,7 @@ export function PipelineContainer() {
         title="Pipeline / Board"
         sub="Every job by pipeline stage, with its tailored PDF, review critiques, and your application status."
       />
-      <div className="mb-5 flex flex-wrap gap-2 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(24,32,38,0.04)]">
+      <div className="mb-5 flex flex-wrap gap-2 rounded-lg border bg-card p-3 shadow-card">
         <Button variant="outline" size="sm" onClick={() => setLaunchMode("tailor")}>
           Tailor approved…
         </Button>

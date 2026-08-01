@@ -32,20 +32,38 @@ export function ActionQueue({ summary }: { summary: DashboardSummary }) {
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {QUEUE_CARDS.map((card) => {
         const count = summary.queues[card.key] ?? 0;
+        const empty = count === 0;
         return (
           <Link
             key={card.key}
             to={card.to}
             aria-label={`${card.verb} ${count} ${card.sub}`}
-            className="group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            data-empty={empty}
           >
             <Card
               className={cn(
-                "gap-1 p-4 transition-colors group-hover:border-primary/40",
-                count === 0 && "opacity-55",
+                // Only box-shadow and transform animate — never `all`, which
+                // would also transition colour and layout properties. Tailwind
+                // draws `ring-1` as a box-shadow layer, so this one property
+                // covers both the elevation lift and the ring colour change.
+                "h-full gap-1 p-4 transition-[box-shadow,transform] duration-200 ease-out-strong",
+                // The hover affordance has to ride the ring: Card draws its
+                // edge with `ring-1`, so a border-colour change renders nothing.
+                "group-hover:shadow-card-raised group-hover:ring-primary/40",
+                // Press feedback: instant, subtle, and on the whole tile so the
+                // card reads as the thing being pushed.
+                "group-active:scale-[0.985] group-active:duration-100",
               )}
             >
-              <div className="text-3xl font-semibold tabular-nums leading-none">
+              <div
+                className={cn(
+                  "text-3xl font-semibold tabular-nums leading-none tracking-[-0.02em]",
+                  // Dim the numeral, never the label — an idle queue should read
+                  // quiet, but "Triage / new jobs to sort" must stay legible.
+                  empty && "text-muted-foreground/45",
+                )}
+              >
                 {count}
               </div>
               <CardTitle className="text-sm">{card.verb}</CardTitle>
