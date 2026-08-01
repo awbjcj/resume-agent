@@ -352,9 +352,7 @@ def post_profile_skill(payload: AddSkillIn, request: Request):
 )
 def post_profile_skill_alias(skill_id: str, payload: AddAliasIn, request: Request):
     try:
-        entry = profile_skills.add_alias(
-            _profile_dir(request), skill_id, payload.alias
-        )
+        entry = profile_skills.add_alias(_profile_dir(request), skill_id, payload.alias)
     except profile_skills.ProfileNotBuiltError as exc:
         raise ApiException(400, "SETUP_INCOMPLETE", str(exc)) from exc
     except profile_skills.SkillNotFoundError as exc:
