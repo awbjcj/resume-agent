@@ -116,6 +116,15 @@ describe("InterviewPage", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
+  it("offers a call to action when the hub is opened with no sessions", async () => {
+    mocks.session.mockReturnValue({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() });
+    mocks.sessions.mockReturnValue({ data: { sessions: [] }, isPending: false, isError: false, refetch: vi.fn() });
+    renderPage("/interview");
+    expect(screen.getByText("No mock interviews yet")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /start a mock interview/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
   it("disables the composer while an answer run is pending", () => {
     mocks.send.mockReturnValue({ mutateAsync: vi.fn(), isPending: true });
     renderPage();

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Bot, Clock3, MessagesSquare, SquareCheckBig } from "lucide-react";
+import { Bot, Clock3, MessagesSquare, Plus, SquareCheckBig } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
@@ -19,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useChatStream } from "@/lib/chat/useChatStream";
@@ -27,6 +27,7 @@ import type { RunRecord } from "@/lib/runs/store";
 import { useRunStore } from "@/lib/runs/store";
 
 import { DebriefCard } from "./DebriefCard";
+import { NewInterviewDialog } from "./NewInterviewDialog";
 import { SessionsRail } from "./SessionsRail";
 import {
   useEndInterview,
@@ -45,6 +46,7 @@ export function InterviewPage() {
   const send = useSendInterviewAnswer();
   const end = useEndInterview();
 
+  const [newOpen, setNewOpen] = useState(false);
   const [composer, setComposer] = useState("");
   const [lastMessage, setLastMessage] = useState("");
   const [runError, setRunError] = useState("");
@@ -144,14 +146,31 @@ export function InterviewPage() {
   }
 
   if (!active) {
+    // The hub is now a top-level destination, so first-time arrivals land here
+    // with nothing selected — the empty state has to be able to start a run.
+    const noSessions = !sessions.isPending && (sessions.data?.sessions?.length ?? 0) === 0;
     return (
       <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
         <SessionsRail selectedId={displayedSessionId} />
         <Card className="min-h-[28rem] min-w-0 flex-1 border-dashed">
           <CardContent className="flex min-h-[28rem] items-center justify-center py-14">
-            <Empty><EmptyHeader><EmptyMedia variant="icon"><MessagesSquare aria-hidden="true" /></EmptyMedia><EmptyTitle>No interview selected</EmptyTitle><EmptyDescription>Select a session or start a new interview.</EmptyDescription></EmptyHeader></Empty>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon"><MessagesSquare aria-hidden="true" /></EmptyMedia>
+                <EmptyTitle>{noSessions ? "No mock interviews yet" : "No interview selected"}</EmptyTitle>
+                <EmptyDescription>
+                  {noSessions
+                    ? "Practise against a job you have already tailored a resume for, then get a scored debrief."
+                    : "Select a session or start a new interview."}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button onClick={() => setNewOpen(true)}><Plus aria-hidden="true" />Start a mock interview</Button>
+              </EmptyContent>
+            </Empty>
           </CardContent>
         </Card>
+        <NewInterviewDialog open={newOpen} onOpenChange={setNewOpen} />
       </div>
     );
   }
