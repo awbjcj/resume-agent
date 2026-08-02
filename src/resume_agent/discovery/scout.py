@@ -25,7 +25,7 @@ from resume_agent.llm_runner import (
 )
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.prompts.guidance import with_guidance
-from resume_agent.services.sources import preview_source
+from resume_agent.services.sources import SourcePreview, preview_source
 from resume_agent.sessions.turns import TurnRejected
 
 PROPOSAL_CAP = 8
@@ -235,13 +235,17 @@ def normalize_recap(
     return message
 
 
-def make_check_source_tool(search_path: str) -> Callable[[str], str]:
+def make_check_source_tool(
+    search_path: str, *, cache: dict[str, SourcePreview] | None = None
+) -> Callable[[str], str]:
     def check_source(url: str) -> str:
         """Probe a careers URL without writing configuration."""
         try:
             preview = preview_source(
                 url, search_path=search_path, limit=_PROBE_LIMIT, browser=False
             )
+            if cache is not None:
+                cache[url.strip()] = preview
             payload = {
                 "ok": preview.ok,
                 "ats": preview.kind,

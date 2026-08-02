@@ -4,6 +4,7 @@ from typing import Literal, cast
 import pytest
 
 from resume_agent.api.schemas.config import SearchConfigDoc
+from resume_agent.discovery import scout as scout_agent
 from resume_agent.discovery.scout import ScoutTurnDraft
 from resume_agent.discovery.scout_store import (
     ScoutProposal,
@@ -85,6 +86,61 @@ def source_proposal(company: str = "Modal", check: CheckStatus = "validated") ->
 
 def term_proposal(value="inference serving"):
     return ScoutProposal(kind="search_term", term=TermPayload(value=value), check="new")
+
+
+def test_post_process_reuses_the_models_source_probe(monkeypatch, tmp_path):
+    calls = 0
+
+    def probe(url, **kwargs):
+        nonlocal calls
+        calls += 1
+        return SourcePreview(
+            ok=True,
+            url=url,
+            kind="lever",
+            token="modal",
+            role_count=4,
+        )
+
+    monkeypatch.setattr(scout_agent, "preview_source", probe)
+    cache: dict[str, SourcePreview] = {}
+    scout_agent.make_check_source_tool(str(tmp_path / "search.yaml"), cache=cache)(
+        "https://jobs.lever.co/modal"
+    )
+    monkeypatch.setattr(
+        service,
+        "preview_source",
+        lambda *args, **kwargs: pytest.fail("source was probed twice"),
+    )
+
+    proposals = service._post_process(
+        Reporter(),
+        [
+            ScoutTurnDraft.model_validate(
+                {
+                    "message": "Found Modal.",
+                    "proposals": [
+                        {
+                            "kind": "source",
+                            "source": {
+                                "company": "Modal",
+                                "url": "https://jobs.lever.co/modal",
+                            },
+                        }
+                    ],
+                }
+            ).proposals[0]
+        ],
+        session={"proposals": []},
+        connectors_path=str(tmp_path / "connectors.yaml"),
+        search_path=str(tmp_path / "search.yaml"),
+        probe_cache=cache,
+    )
+
+    assert calls == 1
+    assert proposals[0].check == "validated"
+    assert proposals[0].source is not None
+    assert proposals[0].source.token == "modal"
 
 
 def test_streamed_prose_is_stored_and_source_is_authoritatively_probed(monkeypatch, tmp_path):

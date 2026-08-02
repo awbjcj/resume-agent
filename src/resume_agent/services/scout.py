@@ -119,6 +119,7 @@ def _post_process(
     session: dict,
     connectors_path: str,
     search_path: str,
+    probe_cache: dict[str, SourcePreview] | None = None,
 ) -> list[ScoutProposal]:
     existing_sources = _existing_keys(_load_connectors(connectors_path))
     prior_sources = session_source_keys(session)
@@ -155,6 +156,17 @@ def _post_process(
                 seen_terms.add(key)
         proposals.append(proposal)
 
+    cached: dict[int, SourcePreview] = {}
+    uncached: list[tuple[int, ScoutProposal]] = []
+    for item in fresh:
+        source = item[1].source
+        assert source is not None
+        preview = (probe_cache or {}).get(source.url.strip())
+        if preview is None:
+            uncached.append(item)
+        else:
+            cached[item[0]] = preview
+
     async def probe_all():
         async def probe(item: tuple[int, ScoutProposal]) -> SourcePreview:
             source = item[1].source
@@ -167,7 +179,7 @@ def _post_process(
             )
 
         return await gather_isolated(
-            fresh,
+            uncached,
             probe,
             on_complete=reporter.step,
             checkpoint=reporter.checkpoint,
@@ -176,12 +188,16 @@ def _post_process(
     # Its own segment: `reporter.step` reports an absolute count, so fanning
     # out N probes under the research phase's total of 1 pinned the bar at 100%
     # and displayed "8 of 1".
-    if fresh:
-        reporter.begin(len(fresh), "Discovery Scout is checking sources")
-    results = asyncio.run(probe_all()) if fresh else []
-    for (index, proposal), result in zip(fresh, results, strict=True):
+    if uncached:
+        reporter.begin(len(uncached), "Discovery Scout is checking sources")
+    probed = asyncio.run(probe_all()) if uncached else []
+    results = {item[0]: result for item, result in zip(uncached, probed, strict=True)}
+    for index, proposal in fresh:
         assert proposal.source is not None
-        preview = result.value if result.ok else None
+        result = results.get(index)
+        preview = cached.get(index)
+        if preview is None and result is not None:
+            preview = result.value if result.ok else None
         if preview is not None and preview.ok:
             check = "validated"
         elif preview is not None and preview.error_code == "ATS_NOT_DETECTED":
@@ -189,6 +205,7 @@ def _post_process(
         else:
             check = "failed"
             if preview is None:
+                assert result is not None
                 preview = SourcePreview(
                     ok=False,
                     url=proposal.source.url,
@@ -238,7 +255,10 @@ def _run_turn(
     if session["status"] != "active":
         raise ValueError("session ended")
     reporter.begin(1, "Discovery Scout is researching")
-    researcher = scout_agent or build_scout_agent(make_check_source_tool(search_path))
+    probe_cache: dict[str, SourcePreview] = {}
+    researcher = scout_agent or build_scout_agent(
+        make_check_source_tool(search_path, cache=probe_cache)
+    )
     formatter = formatter_agent or build_scout_formatter_agent()
     prompt = "\n\n".join(
         [
@@ -290,6 +310,7 @@ def _run_turn(
         session=session,
         connectors_path=connectors_path,
         search_path=search_path,
+        probe_cache=probe_cache,
     )
     reporter.checkpoint()
     turn = ScoutTurnRecord(
