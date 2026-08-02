@@ -1,5 +1,6 @@
 import pytest
 from typing import Any, cast
+from pathlib import Path
 
 from resume_agent.config import Settings, load_yaml
 
@@ -24,6 +25,8 @@ def test_settings_have_safe_defaults():
     assert settings.anthropic_api_key == ""
     assert settings.linkedin_user_data_dir == ".linkedin_profile"
     assert settings.db_url.startswith("sqlite:///")
+    assert settings.career_skill_root == Path("skills")
+    assert settings.career_skill_manifest == Path("skills-lock.json")
 
 
 def test_settings_have_provider_key_defaults(monkeypatch):

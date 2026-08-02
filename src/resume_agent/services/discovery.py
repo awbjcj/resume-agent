@@ -11,11 +11,14 @@ from dataclasses import dataclass
 from typing import TypedDict
 
 import httpx
+import asyncio
+import inspect
 from playwright.sync_api import Error as PlaywrightError
 from sqlalchemy import func, select, text
-from sqlmodel import Session, col
+from sqlmodel import Session, col, select as model_select
 
 from resume_agent.config import get_settings
+from resume_agent.career_skills.models import JobAnalysisMeta, read_job_analysis_meta
 from resume_agent.discovery.connectors.config import load_connectors_config
 from resume_agent.discovery.connectors.registry import build_source_connectors
 from resume_agent.discovery.connectors.runner import PullReport, run_pull
@@ -44,6 +47,7 @@ from resume_agent.services.agents import (
     build_url_extract_agent,
 )
 from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
+from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.tenancy.limits import (
     DEFAULT_MAX_ACTIVE_JOBS,
     active_limit,
@@ -65,6 +69,88 @@ from resume_agent.tenancy.paths import (
     resolve_tenant_path,
 )
 from resume_agent.tracking.tables import Job
+from resume_agent.h1b.models import H1BEnrichmentReport, H1BSponsorshipEvidence
+from resume_agent.tracking.tables import H1BCompanyEvidence, JobStatus
+
+
+class H1BEnricher:
+    async def enrich(self, engine, companies: list[str]) -> H1BEnrichmentReport:
+        from resume_agent.h1b.service import DefaultSponsorshipAgentFactory, enrich_companies
+
+        settings = get_settings()
+        return await enrich_companies(
+            engine,
+            companies,
+            settings=settings,
+            agent_factory=DefaultSponsorshipAgentFactory(settings),
+        )
+
+
+def run_h1b_enrichment(
+    session: Session,
+    config,
+    *,
+    enricher: H1BEnricher | None,
+    scope: StageScope = StageScope(),
+    reporter: ProgressReporter | None = None,
+) -> dict[int, H1BSponsorshipEvidence]:
+    """Research only sponsorship-required, JD-silent jobs after filtering."""
+    jobs = [
+        job
+        for job in session.exec(
+            model_select(Job).where(Job.status == JobStatus.filtered.value)
+        ).all()
+        if scope.job_ids is None or job.id in scope.job_ids
+    ]
+    eligible: list[Job] = []
+    companies: dict[str, str] = {}
+    for job in jobs:
+        criteria = job.criteria_json or {}
+        if not config.sponsorship_required or criteria.get("sponsorship_signal") != "silent":
+            continue
+        normalized = normalize_company(job.company)
+        if normalized:
+            eligible.append(job)
+            companies.setdefault(normalized, job.company or normalized)
+    if reporter:
+        reporter.begin(
+            len(eligible),
+            "Checking historical sponsorship",
+            phase_index=3,
+            phase_count=4,
+        )
+    if not eligible or enricher is None:
+        if reporter:
+            reporter.step(len(eligible))
+        return {}
+    outcome = enricher.enrich(session.get_bind(), list(companies.values()))
+    if inspect.isawaitable(outcome):
+        outcome = asyncio.run(outcome)
+    report = H1BEnrichmentReport.model_validate(outcome)
+    evidence_by_job: dict[int, H1BSponsorshipEvidence] = {}
+    for job in eligible:
+        normalized = normalize_company(job.company)
+        if not normalized:
+            continue
+        evidence = report.by_company.get(normalized)
+        if evidence is None:
+            continue
+        meta = read_job_analysis_meta(job.analysis_meta_json) or JobAnalysisMeta()
+        row = session.exec(
+            model_select(H1BCompanyEvidence).where(
+                H1BCompanyEvidence.normalized_company == normalized
+            )
+        ).first()
+        meta.h1b_evidence_id = row.id if row is not None else None
+        meta.h1b_evidence_snapshot = evidence.model_dump(mode="json")
+        job.analysis_meta_json = meta.model_dump(mode="json")
+        session.add(job)
+        if job.id is not None:
+            evidence_by_job[job.id] = evidence
+    session.commit()
+    if reporter:
+        reporter.step(len(eligible))
+    return evidence_by_job
 
 
 @dataclass(frozen=True)
@@ -181,6 +267,7 @@ def discover_jobs(
     bundle: DiscoveryBundle | None = None,
     reporter: ProgressReporter | None = None,
     job_ids: set[int] | None = None,
+    h1b_enricher: H1BEnricher | None = None,
 ) -> dict[str, int]:
     """Run the full discovery funnel; return final status counts."""
     enforce_active_budget()
@@ -188,6 +275,18 @@ def discover_jobs(
     facts = load_facts(facts_path)
     matrix, cluster_map = _skill_artifacts(facts_path, facts)
     bundle = bundle or build_discovery_bundle()
+    if h1b_enricher is None and get_settings().h1b_mcp_enabled:
+        h1b_enricher = H1BEnricher()
+    discover_kwargs = {
+        "canonicalizer": bundle.canonicalizer,
+        "industry_classifier": bundle.industry_classifier,
+        "reporter": reporter,
+        "scope": StageScope(job_ids=frozenset(job_ids)) if job_ids is not None else StageScope(),
+        "matrix": matrix,
+        "cluster_map": cluster_map,
+    }
+    if h1b_enricher is not None:
+        discover_kwargs["h1b_enricher"] = h1b_enricher
     return discover(
         session,
         config,
@@ -195,12 +294,7 @@ def discover_jobs(
         bundle.extract,
         bundle.fit,
         bundle.relevance,
-        canonicalizer=bundle.canonicalizer,
-        industry_classifier=bundle.industry_classifier,
-        reporter=reporter,
-        scope=StageScope(job_ids=frozenset(job_ids)) if job_ids is not None else StageScope(),
-        matrix=matrix,
-        cluster_map=cluster_map,
+        **discover_kwargs,
     )
 
 
@@ -283,6 +377,7 @@ def reprocess_jobs(
     facts_path: str = DEFAULT_FACTS,
     bundle: DiscoveryBundle | None = None,
     reporter: ProgressReporter | None = None,
+    h1b_enricher: H1BEnricher | None = None,
 ) -> dict[str, int]:
     """Re-run the full funnel over the chosen scopes; returns final status counts."""
     enforce_active_budget()
@@ -290,6 +385,8 @@ def reprocess_jobs(
     facts = load_facts(facts_path)
     matrix, cluster_map = _skill_artifacts(facts_path, facts)
     bundle = bundle or build_discovery_bundle()
+    if h1b_enricher is None and get_settings().h1b_mcp_enabled:
+        h1b_enricher = H1BEnricher()
     return reprocess(
         session,
         config,
@@ -303,6 +400,7 @@ def reprocess_jobs(
         reporter=reporter,
         matrix=matrix,
         cluster_map=cluster_map,
+        h1b_enricher=h1b_enricher,
     )
 
 

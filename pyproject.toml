@@ -5,7 +5,7 @@ description = "Personal AI job-hunt, resume-tailoring, and application-tracking 
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "agno>=2.6.12",
+    "agno[mcp]>=2.8.6,<2.9",
     "anthropic>=0.107.1",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",

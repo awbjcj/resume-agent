@@ -16,9 +16,14 @@ from resume_agent.api.schemas.jobs import (
     ApplicationUpsert,
     JobDetail,
     JobPatch,
+    H1BSponsorshipOut,
+    H1BSponsorshipEvidenceOut,
     JobsImportError,
     JobsImportReportOut,
 )
+from resume_agent.career_skills.models import read_job_analysis_meta
+from resume_agent.config import get_settings
+from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.api.schemas.runs import AddJobTextRequest
 from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.services import board
@@ -67,6 +72,24 @@ def _job_detail_response(session: Session, job_id: int, request: Request) -> Job
     if row is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     detail = JobDetail.model_validate(row)
+    if not get_settings().h1b_mcp_enabled:
+        detail.h1b_sponsorship = H1BSponsorshipOut(capability="disabled")
+    else:
+        job = get_job(session, job_id)
+        evidence = None
+        if job is not None:
+            try:
+                meta = read_job_analysis_meta(job.analysis_meta_json)
+                if meta is not None and meta.h1b_evidence_snapshot is not None:
+                    evidence = H1BSponsorshipEvidence.model_validate(
+                        meta.h1b_evidence_snapshot
+                    )
+            except ValueError:
+                evidence = None
+        detail.h1b_sponsorship = H1BSponsorshipOut(
+            capability="available" if evidence is not None else "unavailable",
+            evidence=(H1BSponsorshipEvidenceOut.from_evidence(evidence) if evidence else None),
+        )
     review_doc = cast(ReviewConfigDoc, get_config_store(request).get("review"))
     gate_names = {r.name for r in review_doc.reviewers if r.gate}
     for version in detail.resume_versions:

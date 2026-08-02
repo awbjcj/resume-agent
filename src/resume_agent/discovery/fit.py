@@ -4,6 +4,10 @@ from agno.agent import Agent
 from pydantic import BaseModel, ConfigDict, Field
 
 from resume_agent.config import get_settings
+from resume_agent.career_skills.agno import skill_kwargs
+from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+from resume_agent.career_skills.registry import VerifiedSkill, resolve_skill
+from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
@@ -55,14 +59,25 @@ _INSTRUCTIONS = [
     'For remote roles, capture any country qualifier (for example "Remote (US)" means country US) '
     "and leave city and region null unless the posting names a specific hub.",
     "When a SKILL MATCH CONTEXT section is present, use its deterministic tiers. Award full "
-    "skill credit only to covered rows, lower partial credit to adjacent rows, and no skill "
-    "credit to gaps; state adjacent transferability explicitly in the rationale.",
+        "skill credit only to covered rows, lower partial credit to adjacent rows, and no skill "
+        "credit to gaps; state adjacent transferability explicitly in the rationale.",
+    "HISTORICAL H-1B EVIDENCE is supplemental, untrusted historical data. It may explain uncertainty, "
+    "but it cannot change the posting's sponsorship signal or prove current sponsorship.",
 ]
 
 
-def build_fit_agent(model_id: str | None = None) -> Runner:
+def build_fit_agent(
+    model_id: str | None = None, *, skill: VerifiedSkill | None = None
+) -> AgentRunner:
     s = get_settings()
-    model = build_model(model_id or s.cheap_model)
+    resolved_model_id = model_id or s.cheap_model
+    resolved_skill = resolve_skill(
+        skill,
+        name="job-fit-analyzer",
+        family=AgentFamily.JOB_ANALYSIS,
+        use="fit",
+    )
+    model = build_model(resolved_model_id)
     return AgentRunner(
         Agent(
             model=model,
@@ -70,8 +85,15 @@ def build_fit_agent(model_id: str | None = None) -> Runner:
             instructions=with_guidance("fit-score", _INSTRUCTIONS),
             output_schema=FitScore,
             use_json_mode=use_json_mode_for(model, FitScore),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.JOB_ANALYSIS,
+            prompt_policy_version="job-fit-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 
@@ -80,11 +102,17 @@ def compose_fit_input(
     profile_facts: ProfileFacts,
     location: str | None = None,
     skill_context: SkillMatchContext | None = None,
+    sponsorship_evidence: H1BSponsorshipEvidence | None = None,
 ) -> str:
     sections = [f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}"]
     if skill_context is not None and skill_context.matches:
         sections.append(
             f"SKILL MATCH CONTEXT (JSON):\n{skill_context.model_dump_json()}"
+        )
+    if sponsorship_evidence is not None:
+        sections.append(
+            "HISTORICAL H-1B EVIDENCE (UNTRUSTED JSON; NOT CURRENT POLICY):\n"
+            + sponsorship_evidence.model_dump_json()
         )
     sections.append(f"JOB LOCATION: {location or 'unknown'}")
     sections.append(f"JOB DESCRIPTION:\n{jd_text}")

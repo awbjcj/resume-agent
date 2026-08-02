@@ -9,6 +9,8 @@ from sqlmodel import Session, select
 
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
+from resume_agent.career_skills.models import AgentRunMeta, JobAnalysisMeta, read_job_analysis_meta
+from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.discovery.extract import (  # noqa: F401
     Runner,
     aextract_job_criteria,
@@ -58,7 +60,7 @@ logger = logging.getLogger(__name__)
 # The LLM-bound discover phases surfaced to progress consumers; the cheap,
 # instant run_filter step is not surfaced. relevance may be skipped (no agent),
 # in which case the strip simply opens at phase 2.
-_DISCOVER_PHASES = 3
+_DISCOVER_PHASES = 4
 
 
 @dataclass(frozen=True)
@@ -89,6 +91,16 @@ def _stage_jobs(session: Session, status: str, scope: StageScope) -> list[Job]:
     if scope.job_ids is None:
         return jobs
     return [job for job in jobs if job.id in scope.job_ids]
+
+
+def _record_job_agent_meta(job: Job, field: str, runner: Runner) -> None:
+    """Persist metadata only after the corresponding output validated."""
+    run_meta = getattr(runner, "run_meta", None)
+    if not isinstance(run_meta, AgentRunMeta):
+        return
+    existing = read_job_analysis_meta(job.analysis_meta_json) or JobAnalysisMeta()
+    setattr(existing, field, run_meta)
+    job.analysis_meta_json = existing.model_dump(mode="json")
 
 
 def run_extract(
@@ -128,6 +140,7 @@ def run_extract(
                 continue
             criteria = res.value
             job.criteria_json = criteria.model_dump(mode="json")
+            _record_job_agent_meta(job, "criteria", agent)
             advance(job, JobStatus.extracted.value, never_regress=scope.never_regress)
             session.add(job)
     _normalize_job_industries(
@@ -276,11 +289,12 @@ def run_score(
     scope: StageScope = _DEFAULT_SCOPE,
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
+    sponsorship_evidence: dict[int, H1BSponsorshipEvidence] | None = None,
 ) -> dict[int, StageFailure]:
     jobs = _stage_jobs(session, JobStatus.filtered.value, scope)
     failures: dict[int, StageFailure] = {}
     if reporter:
-        reporter.begin(len(jobs), "Scoring fit", phase_index=3, phase_count=_DISCOVER_PHASES)
+        reporter.begin(len(jobs), "Scoring fit", phase_index=4, phase_count=_DISCOVER_PHASES)
     if jobs:
         locations = [_job_location_text(job) for job in jobs]
         pairs = list(zip(jobs, locations))
@@ -303,6 +317,9 @@ def run_score(
                             profile_facts,
                             pair[1],
                             skill_context=_skill_context(pair[0]),
+                            sponsorship_evidence=(
+                                sponsorship_evidence or {}
+                            ).get(pair[0].id or -1),
                         ),
                         agent,
                         sem=sem,
@@ -323,6 +340,7 @@ def run_score(
             fit = res.value
             job.fit_score = fit.score
             job.fit_rationale = fit.rationale
+            _record_job_agent_meta(job, "fit", agent)
             _write_taxonomy_fields(job, fit, location_text)
             advance(job, JobStatus.shortlisted.value, never_regress=scope.never_regress)
             session.add(job)
@@ -446,6 +464,7 @@ def discover(
     scope: StageScope = _DEFAULT_SCOPE,
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
+    h1b_enricher=None,
 ) -> dict[str, int]:
     """Run the full funnel over current rows (optionally scoped)."""
     run_relevance(session, config, relevance_agent, reporter=reporter, scope=scope)
@@ -458,10 +477,20 @@ def discover(
         industry_taxonomy_path=industry_taxonomy_path,
     )
     run_filter(session, config, scope=scope)
+    from resume_agent.services.discovery import run_h1b_enrichment
+
+    sponsorship_evidence = run_h1b_enrichment(
+        session,
+        config,
+        enricher=h1b_enricher,
+        scope=scope,
+        reporter=reporter,
+    )
     run_score(
         session, profile_facts, fit_agent, canonicalizer=canonicalizer,
         reporter=reporter, scope=scope,
         matrix=matrix, cluster_map=cluster_map,
+        sponsorship_evidence=sponsorship_evidence,
     )
     if reporter:
         reporter.done()
@@ -512,6 +541,7 @@ def reprocess(
     reporter: ProgressReporter | None = None,
     matrix: SkillMatrix | None = None,
     cluster_map: ClusterMap | None = None,
+    h1b_enricher=None,
 ) -> dict[str, int]:
     """Reset in-scope, non-progressed jobs to a clean raw state and re-run the funnel."""
     selected: dict[int, Job] = {}
@@ -540,4 +570,5 @@ def reprocess(
         scope=StageScope(job_ids=frozenset(selected)),
         matrix=matrix,
         cluster_map=cluster_map,
+        h1b_enricher=h1b_enricher,
     )

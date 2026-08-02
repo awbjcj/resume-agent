@@ -548,7 +548,7 @@ def test_discover_reports_progress_done(tmp_path):
     assert rec is not None and rec["state"] == "done"
 
 
-def test_run_score_reports_phase_three(tmp_path):
+def test_run_score_reports_phase_four_after_h1b_stage(tmp_path):
     from resume_agent.progress import ProgressReporter, read_progress
 
     facts = ProfileFacts(contact=Contact(name="Ada"))
@@ -572,7 +572,7 @@ def test_run_score_reports_phase_three(tmp_path):
         )
     rec = read_progress("discover", tmp_path)
     assert rec is not None
-    assert rec["phase_index"] == 3 and rec["phase_count"] == 3
+    assert rec["phase_index"] == 4 and rec["phase_count"] == 4
     assert rec["current"] == 1 and rec["total"] == 1
 
 

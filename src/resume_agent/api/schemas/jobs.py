@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.verdict import failing_gate_names
 
@@ -159,6 +160,31 @@ class CoverLetterOut(CamelModel):
     created_at: datetime
 
 
+class H1BSponsorshipEvidenceOut(CamelModel):
+    status: Literal["matched", "no_match", "unavailable"]
+    normalized_company: str
+    display_company: str | None
+    fiscal_periods: list[str]
+    filing_count: int | None
+    certified_count: int | None
+    wage_summary: dict[str, float] | None
+    source_url: str | None
+    data_version: str | None
+    retrieved_at: datetime
+    expires_at: datetime
+    confidence: float
+    caveat: str
+
+    @classmethod
+    def from_evidence(cls, evidence: H1BSponsorshipEvidence) -> H1BSponsorshipEvidenceOut:
+        return cls.model_validate(evidence.model_dump())
+
+
+class H1BSponsorshipOut(CamelModel):
+    capability: Literal["disabled", "available", "unavailable"]
+    evidence: H1BSponsorshipEvidenceOut | None = None
+
+
 class ApplicationOut(CamelModel):
     id: int
     job_id: int
@@ -209,6 +235,7 @@ class JobDetail(CamelModel):
     regressed: bool = False
     reject_reason: str | None = None
     reject_category: str | None = None
+    h1b_sponsorship: H1BSponsorshipOut | None = None
 
 
 class JobPatch(CamelModel):

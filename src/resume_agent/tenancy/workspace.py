@@ -17,6 +17,13 @@ _PLATFORM_FIELDS = frozenset(
         "cors_origins",
         "db_url",
         "session_secret",
+        "h1b_mcp_enabled",
+        "h1b_mcp_transport",
+        "h1b_mcp_command",
+        "h1b_mcp_url",
+        "h1b_mcp_timeout_seconds",
+        "h1b_mcp_max_result_chars",
+        "h1b_cache_ttl_days",
     }
 )
 _PROVIDER_FIELDS = {
@@ -80,6 +87,10 @@ class WorkspacePaths:
     def workday_facets_dir(self) -> Path:
         return self.root / "workday_facets"
 
+    @property
+    def career_lab_dir(self) -> Path:
+        return self.root / "career-lab"
+
 
 @dataclass(frozen=True)
 class SettingsOverlay:
@@ -106,6 +117,7 @@ def provision_workspace(
         paths.runs_root,
         paths.scraper_recipes_dir,
         paths.workday_facets_dir,
+        paths.career_lab_dir,
         paths.root / "taxonomy",
     ):
         directory.mkdir(parents=True, exist_ok=True)
