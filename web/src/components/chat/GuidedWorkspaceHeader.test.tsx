@@ -23,4 +23,20 @@ describe("GuidedWorkspaceHeader", () => {
     expect(container.querySelector("header")).toHaveAttribute("data-tone", "scout");
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
+
+  it("supports the Career Lab tone", () => {
+    render(
+      <GuidedWorkspaceHeader
+        tone="career-lab"
+        icon={<Compass />}
+        eyebrow="Drafting studio"
+        title="Career Lab"
+        description="Draft with a focused skill."
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Career Lab" }).closest("header")).toHaveAttribute(
+      "data-tone",
+      "career-lab",
+    );
+  });
 });

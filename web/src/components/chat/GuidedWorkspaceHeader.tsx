@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-export type GuidedWorkspaceTone = "coach" | "interview" | "scout";
+export type GuidedWorkspaceTone = "coach" | "interview" | "scout" | "career-lab";
 
 export function GuidedWorkspaceHeader({
   tone,

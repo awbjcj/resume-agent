@@ -60,6 +60,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { to: "/profile", label: "Profile", icon: UserRound },
       { to: "/coach", label: "Profile coach", icon: MessageCircleMore },
       { to: "/interview", label: "Mock interviews", icon: MessagesSquare },
+      { to: "/career-lab", label: "Career Lab", icon: Sparkles },
     ],
   },
   {

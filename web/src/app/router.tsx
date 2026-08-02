@@ -35,6 +35,9 @@ const ScoutPage = lazy(() =>
 const InterviewPage = lazy(() =>
   import("@/features/interview/InterviewPage").then((m) => ({ default: m.InterviewPage })),
 );
+const CareerLabPage = lazy(() =>
+  import("@/features/career-lab/CareerLabPage").then((m) => ({ default: m.CareerLabPage })),
+);
 const SourcesPage = lazy(() =>
   import("@/features/sources/SourcesPage").then((m) => ({ default: m.SourcesPage })),
 );
@@ -150,6 +153,7 @@ export const router = createBrowserRouter([
       { path: "coach", element: <SetupGate>{page(<CoachPage />)}</SetupGate> },
       { path: "scout", element: <SetupGate>{page(<ScoutPage />)}</SetupGate> },
       { path: "interview", element: <SetupGate>{page(<InterviewPage />)}</SetupGate> },
+      { path: "career-lab", element: <SetupGate>{page(<CareerLabPage />)}</SetupGate> },
       { path: "account", element: page(<AccountPage />) },
       { path: "admin", element: page(<AdminPage />) },
       { path: "admin/quotas", element: page(<AdminQuotasPage />) },

@@ -12,6 +12,7 @@ export function ChatComposer({
   busy,
   settling = false,
   ariaLabel = "Message",
+  sendLabel = "Send message",
   placeholder = "Type your reply…",
 }: {
   value: string;
@@ -21,6 +22,7 @@ export function ChatComposer({
   busy: boolean;
   settling?: boolean;
   ariaLabel?: string;
+  sendLabel?: string;
   placeholder?: string;
 }) {
   return (
@@ -54,7 +56,7 @@ export function ChatComposer({
           <Square className="size-4" aria-hidden="true" />
         </Button>
       ) : (
-        <Button size="icon-sm" onClick={onSend} disabled={!value.trim()} aria-label="Send message">
+        <Button size="icon-sm" onClick={onSend} disabled={!value.trim()} aria-label={sendLabel}>
           <Send className="size-4" aria-hidden="true" />
         </Button>
       )}

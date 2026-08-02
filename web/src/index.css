@@ -86,6 +86,7 @@
 .guided-workspace-hero { --workspace-tone: var(--primary); }
 .guided-workspace-hero[data-tone="interview"] { --workspace-tone: var(--chart-3); }
 .guided-workspace-hero[data-tone="scout"] { --workspace-tone: var(--chart-2); }
+.guided-workspace-hero[data-tone="career-lab"] { --workspace-tone: var(--chart-1); }
 .guided-workspace-hero {
   background-color: var(--card);
   background-image: radial-gradient(
