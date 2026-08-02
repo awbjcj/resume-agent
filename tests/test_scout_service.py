@@ -255,3 +255,38 @@ def test_server_rejects_non_approvable_source_and_allows_resolution_after_end(tm
     )
     assert dismissed["proposals"][0]["status"] == "dismissed"
     assert load_session(tmp_path, "s1")["status"] == "ended"
+
+
+class UnparsableFormatter:
+    """A formatter whose provider returned prose instead of the schema."""
+
+    def run(self, prompt: str) -> Result:
+        return Result("Sure! Here is the JSON you asked for:")
+
+    async def arun(self, prompt: str) -> Result:
+        return self.run(prompt)
+
+
+def test_unparsable_formatter_keeps_the_reply_the_user_already_watched(tmp_path, caplog):
+    # agno reports "could not coerce into output_schema" by handing back a raw
+    # str, which expect_schema raises as UnparsedAgentOutput -- a TypeError, so
+    # the TurnRejected fallback never saw it. The researcher's answer has
+    # already streamed into the chat by then, so failing the run deletes a reply
+    # the user just read. Degrade like every other formatter failure, but log
+    # the diagnostic so the provider fault stays visible.
+    view = service.run_start_turn(
+        Reporter(),
+        workspace_root=tmp_path,
+        session_id="s1",
+        message="AI infra",
+        connectors_path=str(tmp_path / "connectors.yaml"),
+        search_path=str(tmp_path / "search.yaml"),
+        profile_dir=tmp_path,
+        browser_enabled=False,
+        scout_agent=StreamingScout("Found one option."),
+        formatter_agent=UnparsableFormatter(),
+    )
+    assert view["turns"][-1]["text"] == "Found one option."
+    assert view["turns"][-1]["notice"] == service._TURN_OMITTED_NOTICE
+    assert view["proposals"] == []
+    assert any("Expected ScoutTurnDraft" in record.getMessage() for record in caplog.records)

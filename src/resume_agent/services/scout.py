@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import cast
 
@@ -34,7 +35,7 @@ from resume_agent.discovery.scout_store import (
     scout_lock,
     set_proposal_status,
 )
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, UnparsedAgentOutput
 from resume_agent.services.config_store import ConfigStore
 from resume_agent.services.scout_context import (
     _EXISTING_FIELD,
@@ -53,6 +54,8 @@ from resume_agent.services.scout_context import (
 from resume_agent.services.sources import SourcePreview, add_source, preview_source
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
 from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
+
+logger = logging.getLogger(__name__)
 
 _TURN_OMITTED_NOTICE = "Some turn details could not be read, so no proposals were attached."
 _RECAP_OMITTED_NOTICE = "Some recap details could not be read."
@@ -260,10 +263,19 @@ def _run_turn(
             lambda turn, strict: normalize_turn(turn, preview, strict=strict),
             label="SCOUT NOTES",
         )
-    except TurnRejected as exc:
-        fallback = prose or exc.fallback_text
+    except (TurnRejected, UnparsedAgentOutput) as exc:
+        # UnparsedAgentOutput is how agno reports "the provider did not return
+        # the schema" -- a truncated body, a refusal, or an error body dressed
+        # as content. It is a TypeError, so it used to escape this fallback and
+        # fail the run, deleting a reply the user had already watched stream in.
+        # A formatter that cannot be parsed is a formatter that failed; degrade
+        # the same way, and log the diagnostic so the provider fault stays
+        # visible instead of being flattened into the notice.
+        fallback = prose or getattr(exc, "fallback_text", "")
         if not fallback:
             raise
+        if isinstance(exc, UnparsedAgentOutput):
+            logger.warning("Scout formatter returned unusable output: %s", exc)
         validated = ValidatedScoutTurn(message=fallback, notice=_TURN_OMITTED_NOTICE)
     if prose:
         validated.message = prose
