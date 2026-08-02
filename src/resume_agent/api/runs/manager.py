@@ -577,8 +577,11 @@ class RunManager:
         return removed
 
     def shutdown(self) -> None:
+        # Lifespan shutdown disposes the application's database engines next.
+        # Wait for owned workers first so a run cannot keep using a SQLite
+        # connection after its engine has been torn down.
         for executor in self._owned_executors:
-            executor.shutdown(wait=False)
+            executor.shutdown(wait=True)
 
     def _write(self, run_id: str, record: dict) -> None:
         atomic_write_text(

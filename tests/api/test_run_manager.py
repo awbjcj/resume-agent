@@ -1,6 +1,6 @@
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from datetime import datetime, timezone
-from threading import Barrier, Event, Lock
+from threading import Barrier, Event, Lock, Thread
 
 import pytest
 
@@ -482,3 +482,27 @@ def test_submit_failure_leaves_a_terminal_record_not_a_ghost_active_run(tmp_path
     snapshots = [mgr.get(path.stem) for path in tmp_path.glob("*.json")]
     assert len(snapshots) == 1
     assert snapshots[0] is not None and snapshots[0].state is RunState.error
+
+
+def test_shutdown_waits_for_owned_workers(tmp_path):
+    started = Event()
+    release = Event()
+    stopped = Event()
+    manager = RunManager(root=tmp_path)
+
+    def work(_reporter):
+        started.set()
+        assert release.wait(timeout=2)
+        return {}
+
+    manager.submit("refreshClusters", work)
+    assert started.wait(timeout=1)
+
+    shutdown_thread = Thread(
+        target=lambda: (manager.shutdown(), stopped.set()), daemon=True
+    )
+    shutdown_thread.start()
+    assert not stopped.wait(timeout=0.05)
+    release.set()
+    assert stopped.wait(timeout=1)
+    shutdown_thread.join(timeout=1)
