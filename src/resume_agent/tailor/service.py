@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from resume_agent.concurrency import gather_isolated
 from resume_agent.config import get_settings
+from resume_agent.career_skills.provenance import append_skill_use
 from resume_agent.llm_runner import Runner, run_with_cleanup
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
@@ -52,6 +53,9 @@ def _persist_rounds(
     config: ReviewConfig,
     *,
     model: str | None = None,
+    tailor_agent: Runner | None = None,
+    reviser_agent: Runner | None = None,
+    reviewer_agents: Mapping[str, Runner] | None = None,
 ) -> list[ResumeVersion]:
     """Persist each review round as a ResumeVersion and mark the job tailored.
 
@@ -79,6 +83,24 @@ def _persist_rounds(
             critique_json=[c.model_dump(mode="json") for c in r.verdict.critiques],
             gate_reviewers_json=gate_reviewers,
         )
+        raw_uses: object = None
+        if (
+            tailor_agent is not None
+            and "draft" in r.stage_seconds
+            and getattr(tailor_agent, "run_meta", None) is not None
+        ):
+            raw_uses = append_skill_use(raw_uses, tailor_agent, "generated")
+        if (
+            reviser_agent is not None
+            and "revise" in r.stage_seconds
+            and getattr(reviser_agent, "run_meta", None) is not None
+        ):
+            raw_uses = append_skill_use(raw_uses, reviser_agent, "revised")
+        for reviewer in (reviewer_agents or {}).values():
+            if getattr(reviewer, "run_meta", None) is not None:
+                raw_uses = append_skill_use(raw_uses, reviewer, "reviewed")
+        if raw_uses:
+            version.skill_uses_json = raw_uses
         versions.append(save_resume_version(session, version))
     advance(job, JobStatus.tailored.value, never_regress=True)
     save_job(session, job)
@@ -129,7 +151,15 @@ def tailor_job(
             *runners,
         )
     )
-    return _persist_rounds(session, job, rounds, config)
+    return _persist_rounds(
+        session,
+        job,
+        rounds,
+        config,
+        tailor_agent=tailor_agent,
+        reviser_agent=reviser_agent,
+        reviewer_agents=reviewer_agents,
+    )
 
 
 def tailor_jobs(
@@ -208,7 +238,14 @@ def tailor_jobs(
                 failures[job_id] = StageFailure.from_exception(error)
                 continue
             results[job_id] = _persist_rounds(
-                session, job, res.value, config, model=model
+                session,
+                job,
+                res.value,
+                config,
+                model=model,
+                tailor_agent=tailor_agent,
+                reviser_agent=reviser_agent,
+                reviewer_agents=reviewer_agents,
             )
     if reporter:
         reporter.done()

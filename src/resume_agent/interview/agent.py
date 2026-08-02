@@ -10,6 +10,9 @@ from agno.agent import Agent
 from pydantic import Field
 
 from resume_agent.config import get_settings
+from resume_agent.career_skills.agno import skill_kwargs
+from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+from resume_agent.career_skills.registry import VerifiedSkill, resolve_skill
 from resume_agent.interview.store import (
     InterviewDebrief,
     InterviewStyle,
@@ -348,8 +351,21 @@ def _formatter_instructions(schema: type[ExtensibleModel]) -> list[str]:
     return _FORMAT_INSTRUCTIONS
 
 
-def build_interviewer_agent(style: InterviewStyle) -> Runner:
+def build_interviewer_agent(
+    style: InterviewStyle, *, skill: VerifiedSkill | None = None
+) -> Runner:
     settings = get_settings()
+    resolved_skill = resolve_skill(
+        skill,
+        name="interview-prep-generator" if skill is None else skill.ref.name,
+        family=AgentFamily.INTERVIEW,
+        use=(
+            "interview_prep"
+            if skill is None or skill.ref.name == "interview-prep-generator"
+            else "interview_turn"
+        ),
+    )
+    use = "interview_prep" if resolved_skill.ref.name == "interview-prep-generator" else "interview_turn"
     model = build_model(
         settings.mid_model,
         cache_system_prompt=provider_capabilities(
@@ -361,13 +377,28 @@ def build_interviewer_agent(style: InterviewStyle) -> Runner:
             model=model,
             description="Conduct one mock interview turn in character.",
             instructions=with_guidance("interviewer", persona_instructions(style)),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.INTERVIEW,
+            prompt_policy_version=(
+                "interview-prep-v1" if use == "interview_prep" else "mock-interview-coach-v1"
+            ),
+            model_id=settings.mid_model,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 
-def build_debrief_agent() -> Runner:
+def build_debrief_agent(*, skill: VerifiedSkill | None = None) -> Runner:
     settings = get_settings()
+    resolved_skill = resolve_skill(
+        skill,
+        name="mock-interview-coach" if skill is None else skill.ref.name,
+        family=AgentFamily.INTERVIEW,
+        use="debrief",
+    )
     model = build_model(
         settings.mid_model,
         cache_system_prompt=provider_capabilities(
@@ -379,8 +410,15 @@ def build_debrief_agent() -> Runner:
             model=model,
             description="Write a structured mock interview debrief.",
             instructions=with_guidance("interview-debrief", _DEBRIEF_INSTRUCTIONS),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.INTERVIEW,
+            prompt_policy_version="mock-interview-debrief-v1",
+            model_id=settings.mid_model,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 
@@ -402,5 +440,11 @@ def build_interview_formatter_agent(schema: type[ExtensibleModel]) -> Runner:
             output_schema=schema,
             use_json_mode=use_json_mode_for(model, schema),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.INTERVIEW,
+            prompt_policy_version="interview-format-v1",
+            model_id=settings.cheap_model,
+            skill_ref=None,
+        ),
     )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlmodel import Session
 
 from resume_agent.models.resume import ResumeContent
+from resume_agent.career_skills.provenance import append_skill_use
 from resume_agent.profile.store import load_facts
 from resume_agent.render.export import export_job_artifacts
 from resume_agent.services.agents import TailorBundle, build_tailor_bundle
@@ -67,6 +68,9 @@ def revise_resume_version(
         fact_check_passed = verdict.gate_passed
         gate_reviewers = sorted(r.name for r in config.reviewers if r.gate)
 
+    skill_uses = parent.skill_uses_json
+    if getattr(bundle.revision, "run_meta", None) is not None:
+        skill_uses = append_skill_use(skill_uses, bundle.revision, "revised")
     child = save_resume_version(
         session,
         ResumeVersion(
@@ -80,6 +84,7 @@ def revise_resume_version(
             origin="revision",
             instruction=instruction,
             parent_version_id=parent.id,
+            skill_uses_json=skill_uses,
         ),
     )
     export_job_artifacts(session, child.job_id)

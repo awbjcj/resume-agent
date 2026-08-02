@@ -284,6 +284,7 @@ def launch_tailor(
             review_path=DEFAULT_REVIEW_DEEP if params.deep else DEFAULT_REVIEW,
             reporter=reporter,
             fail_on_partial=True,
+            authoring_skill=params.authoring_skill,
         )
         return {
             "jobs": [
@@ -347,7 +348,11 @@ def launch_cover_letters(
 
     def do_write(session, reporter):
         results = write_cover_letters(
-            session, job_ids=params.job_ids, approved=params.approved, reporter=reporter
+            session,
+            job_ids=params.job_ids,
+            approved=params.approved,
+            reporter=reporter,
+            skill=params.skill,
         )
         return {
             "coverLetters": [

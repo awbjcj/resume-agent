@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlmodel import Session
 
+from resume_agent.career_skills.provenance import append_skill_use
 from resume_agent.cover_letter.provenance import collect_fact_ids, unsupported_provenance
 from resume_agent.cover_letter.render import render_cover_letter
 from resume_agent.cover_letter.revision import apply_revision, compose_user_revision_input
@@ -36,6 +37,9 @@ def revise_cover_letter_version(
     )
 
     bad = unsupported_provenance(revised, collect_fact_ids(facts))
+    skill_uses = parent.skill_uses_json
+    if getattr(bundle.revision, "run_meta", None) is not None:
+        skill_uses = append_skill_use(skill_uses, bundle.revision, "revised")
     child = save_cover_letter(
         session,
         CoverLetter(
@@ -46,6 +50,7 @@ def revise_cover_letter_version(
             origin="revision",
             instruction=instruction,
             parent_id=parent.id,
+            skill_uses_json=skill_uses,
         ),
     )
     if child.id is None:

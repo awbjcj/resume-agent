@@ -1,5 +1,6 @@
 from sqlmodel import Session
 
+from resume_agent.career_skills.provenance import append_skill_use
 from resume_agent.cover_letter.drafting import (
     compose_cover_letter_input,
     compose_revise_input,
@@ -31,6 +32,9 @@ def generate_cover_letter(
     content = draft_cover_letter(
         compose_cover_letter_input(job.jd_text, criteria, profile_facts), draft_agent
     )
+    skill_uses: object = None
+    if getattr(draft_agent, "run_meta", None) is not None:
+        skill_uses = append_skill_use(skill_uses, draft_agent, "generated")
     for _ in range(max_rounds - 1):
         bad = unsupported_provenance(content, fact_ids)
         if not bad:
@@ -38,11 +42,14 @@ def generate_cover_letter(
         content = revise_cover_letter(
             compose_revise_input(content, bad, profile_facts, job.jd_text), reviser_agent
         )
+        if getattr(reviser_agent, "run_meta", None) is not None:
+            skill_uses = append_skill_use(skill_uses, reviser_agent, "revised")
 
     passed = not unsupported_provenance(content, fact_ids)
     cover = CoverLetter(
         job_id=job.id,
         content_json=content.model_dump(mode="json"),
         fact_check_passed=passed,
+        skill_uses_json=skill_uses if isinstance(skill_uses, list) else None,
     )
     return save_cover_letter(session, cover)

@@ -5,6 +5,9 @@ from agno.agent import Agent
 from resume_agent.prompts.guidance import with_guidance
 
 from resume_agent.config import get_settings
+from resume_agent.career_skills.agno import skill_kwargs
+from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+from resume_agent.career_skills.registry import VerifiedSkill, resolve_skill
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
@@ -54,9 +57,18 @@ _INSTRUCTIONS = [
 ]
 
 
-def build_extract_agent(model_id: str | None = None) -> AgentRunner:
+def build_extract_agent(
+    model_id: str | None = None, *, skill: VerifiedSkill | None = None
+) -> AgentRunner:
     s = get_settings()
-    model = build_model(model_id or s.cheap_model)
+    resolved_model_id = model_id or s.cheap_model
+    resolved_skill = resolve_skill(
+        skill,
+        name="job-description-analyzer",
+        family=AgentFamily.JOB_ANALYSIS,
+        use="extract",
+    )
+    model = build_model(resolved_model_id)
     return AgentRunner(
         Agent(
             model=model,
@@ -64,8 +76,15 @@ def build_extract_agent(model_id: str | None = None) -> AgentRunner:
             instructions=with_guidance("extract-criteria", _INSTRUCTIONS),
             output_schema=JobCriteriaExtract,
             use_json_mode=use_json_mode_for(model, JobCriteriaExtract),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.JOB_ANALYSIS,
+            prompt_policy_version="job-extract-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 

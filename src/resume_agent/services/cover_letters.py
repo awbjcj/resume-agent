@@ -8,6 +8,7 @@ from sqlmodel import Session
 
 from resume_agent.cover_letter.render import render_cover_letter
 from resume_agent.cover_letter.service import generate_cover_letter
+from resume_agent.career_skills.models import CoverLetterSkillName
 from resume_agent.profile.store import load_facts
 from resume_agent.progress import ProgressReporter
 from resume_agent.render.export import export_job_artifacts
@@ -32,13 +33,14 @@ def write_cover_letters(
     approved: bool = False,
     facts_path: str = DEFAULT_FACTS,
     reporter: ProgressReporter | None = None,
+    skill: CoverLetterSkillName | str | None = None,
 ) -> list[CoverLetterResult]:
     targets = resolve_targets(session, job_ids=job_ids, approved=approved)
     if not targets:
         return []
     enforce_active_budget()
     facts = load_facts(facts_path)
-    bundle = build_cover_letter_bundle()
+    bundle = build_cover_letter_bundle(skill=skill) if skill is not None else build_cover_letter_bundle()
     results: list[CoverLetterResult] = []
     if reporter:
         reporter.begin(len(targets), "Starting")

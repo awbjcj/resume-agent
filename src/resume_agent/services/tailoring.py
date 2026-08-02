@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from sqlmodel import Session
 
+from resume_agent.career_skills.models import ResumeAuthoringSkillName
+from resume_agent.career_skills.registry import CareerSkillRegistry
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import (
     effective_cluster_map,
@@ -51,6 +53,8 @@ def tailor(
     facts_path: str = DEFAULT_FACTS,
     reporter: ProgressReporter | None = None,
     fail_on_partial: bool = False,
+    authoring_skill: ResumeAuthoringSkillName | str | None = None,
+    registry: CareerSkillRegistry | None = None,
 ) -> TailorOutcome:
     targets = resolve_targets(session, job_ids=job_ids, approved=approved)
     if not targets:
@@ -68,7 +72,15 @@ def tailor(
         profile_dir / "matrix.json", facts=matrix_facts, cluster_map=cluster_map
     )
     style_guide = load_style_guide(config.style_guide_path)
-    bundle = build_tailor_bundle(config, style_guide=style_guide)
+    if authoring_skill is None and registry is None:
+        bundle = build_tailor_bundle(config, style_guide=style_guide)
+    else:
+        bundle = build_tailor_bundle(
+            config,
+            style_guide=style_guide,
+            authoring_skill=authoring_skill,
+            registry=registry,
+        )
     # Mirrors build_tailor_bundle's own tier lookup, so `model` records the
     # model that actually ran.
     model = model_for_tier(getattr(config, "tailor_tier", "premium"))

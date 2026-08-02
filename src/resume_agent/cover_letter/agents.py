@@ -1,6 +1,9 @@
 from agno.agent import Agent
 
 from resume_agent.prompts.guidance import with_guidance
+from resume_agent.career_skills.agno import skill_kwargs
+from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+from resume_agent.career_skills.registry import VerifiedSkill, resolve_skill
 
 from resume_agent.llm_runner import (
     AgentRunner,
@@ -58,8 +61,17 @@ _REVISION_INSTRUCTIONS = [
 ]
 
 
-def build_cover_letter_agent(model_id: str | None = None) -> Runner:
-    model = build_model(model_id or model_for_tier("premium"))
+def build_cover_letter_agent(
+    model_id: str | None = None, *, skill: VerifiedSkill | None = None
+) -> Runner:
+    resolved_model_id = model_id or model_for_tier("premium")
+    resolved_skill = resolve_skill(
+        skill,
+        name="cover-letter-generator" if skill is None else skill.ref.name,
+        family=AgentFamily.COVER_LETTER,
+        use="draft",
+    )
+    model = build_model(resolved_model_id)
     return AgentRunner(
         Agent(
             model=model,
@@ -67,13 +79,29 @@ def build_cover_letter_agent(model_id: str | None = None) -> Runner:
             instructions=with_guidance("cover-letter-draft", _DRAFT_INSTRUCTIONS),
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model, CoverLetterContent),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.COVER_LETTER,
+            prompt_policy_version="cover-letter-draft-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 
-def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
-    model = build_model(model_id or model_for_tier("mid"))
+def build_cover_letter_reviser_agent(
+    model_id: str | None = None, *, skill: VerifiedSkill | None = None
+) -> Runner:
+    resolved_model_id = model_id or model_for_tier("mid")
+    resolved_skill = resolve_skill(
+        skill,
+        name="cover-letter-writer",
+        family=AgentFamily.COVER_LETTER,
+        use="revise",
+    )
+    model = build_model(resolved_model_id)
     return AgentRunner(
         Agent(
             model=model,
@@ -81,13 +109,29 @@ def build_cover_letter_reviser_agent(model_id: str | None = None) -> Runner:
             instructions=with_guidance("cover-letter-revise", _REVISE_INSTRUCTIONS),
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model, CoverLetterContent),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.COVER_LETTER,
+            prompt_policy_version="cover-letter-reviser-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 
-def build_cover_letter_revision_agent(model_id: str | None = None) -> Runner:
-    model = build_model(model_id or model_for_tier("premium"))
+def build_cover_letter_revision_agent(
+    model_id: str | None = None, *, skill: VerifiedSkill | None = None
+) -> Runner:
+    resolved_model_id = model_id or model_for_tier("premium")
+    resolved_skill = resolve_skill(
+        skill,
+        name="cover-letter-writer",
+        family=AgentFamily.COVER_LETTER,
+        use="revision",
+    )
+    model = build_model(resolved_model_id)
     return AgentRunner(
         Agent(
             model=model,
@@ -95,6 +139,13 @@ def build_cover_letter_revision_agent(model_id: str | None = None) -> Runner:
             instructions=with_guidance("cover-letter-revision", _REVISION_INSTRUCTIONS),
             output_schema=CoverLetterContent,
             use_json_mode=use_json_mode_for(model, CoverLetterContent),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.COVER_LETTER,
+            prompt_policy_version="cover-letter-revision-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )

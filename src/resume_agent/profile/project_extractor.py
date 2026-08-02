@@ -8,6 +8,9 @@ from resume_agent.prompts.guidance import with_guidance
 from pydantic import ConfigDict, Field
 
 from resume_agent.config import get_settings
+from resume_agent.career_skills.agno import skill_kwargs
+from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+from resume_agent.career_skills.registry import VerifiedSkill, resolve_skill
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
@@ -40,9 +43,18 @@ _INSTRUCTIONS = [
 ]
 
 
-def build_project_extractor_agent(model_id: str | None = None) -> Runner:
+def build_project_extractor_agent(
+    model_id: str | None = None, *, skill: VerifiedSkill | None = None
+) -> AgentRunner:
     settings = get_settings()
-    model = build_model(model_id or settings.mid_model)
+    resolved_model_id = model_id or settings.mid_model
+    resolved_skill = resolve_skill(
+        skill,
+        name="project-dossier",
+        family=AgentFamily.INTERNAL_PROFILE,
+        use="profile_project",
+    )
+    model = build_model(resolved_model_id)
     return AgentRunner(
         Agent(
             model=model,
@@ -50,8 +62,15 @@ def build_project_extractor_agent(model_id: str | None = None) -> Runner:
             instructions=with_guidance("project-extractor", _INSTRUCTIONS),
             output_schema=ProjectDocFacts,
             use_json_mode=use_json_mode_for(model, ProjectDocFacts),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.INTERNAL_PROFILE,
+            prompt_policy_version="project-dossier-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 

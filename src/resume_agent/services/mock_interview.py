@@ -6,6 +6,10 @@ import logging
 import uuid
 from pathlib import Path
 
+from resume_agent.career_skills.models import AgentFamily, SkillUse
+from resume_agent.career_skills.provenance import append_skill_use
+from resume_agent.career_skills.registry import CareerSkillRegistry
+from resume_agent.config import get_settings
 from resume_agent.interview.agent import (
     JD_CHAR_CAP,
     DebriefTurn,
@@ -42,6 +46,29 @@ _EMPTY_DEBRIEF_SUMMARY = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _interview_skill(name: str, use: str):
+    registry = CareerSkillRegistry.from_settings(get_settings())
+    return registry.require(name, family=AgentFamily.INTERVIEW, use=use)
+
+
+def _build_interviewer(style, skill):
+    try:
+        return build_interviewer_agent(style, skill=skill)
+    except TypeError as exc:
+        if "unexpected keyword argument 'skill'" not in str(exc):
+            raise
+        return build_interviewer_agent(style)
+
+
+def _build_debrief(skill):
+    try:
+        return build_debrief_agent(skill=skill)
+    except TypeError as exc:
+        if "unexpected keyword argument 'skill'" not in str(exc):
+            raise
+        return build_debrief_agent()
 
 # The interviewer writes free-form notes that a cheap formatter then projects into
 # the OpeningInterview schema. The formatter is told to invent nothing, so the plan
@@ -223,7 +250,10 @@ def run_opening_turn(
     parsed_style = InterviewStyle.model_validate(style)
     reporter.begin(1, "Preparing your interviewer")
     context = load_context(engine, job_id, resume_version_id)
-    interviewer = interviewer_agent or build_interviewer_agent(parsed_style)
+    interviewer = interviewer_agent or _build_interviewer(
+        parsed_style,
+        _interview_skill("interview-prep-generator", "interview_prep"),
+    )
     formatter = formatter_agent or build_interview_formatter_agent(OpeningInterview)
     preview = {
         "style": parsed_style.model_dump(mode="json"),
@@ -252,6 +282,12 @@ def run_opening_turn(
     )
     if prose:
         opening_turn = opening_turn.model_copy(update={"text": prose})
+    skill_uses = []
+    if getattr(interviewer, "run_meta", None) is not None:
+        skill_uses = [
+            SkillUse.model_validate(use)
+            for use in append_skill_use(None, interviewer, "opening")
+        ]
     reporter.step(1)
     session_id = uuid.uuid4().hex
     create_session(
@@ -263,6 +299,7 @@ def run_opening_turn(
         context=context,
         plan=plan,
         opening_turn=opening_turn,
+        skill_uses=skill_uses,
     )
     return session_view(root, session_id)
 
@@ -290,7 +327,10 @@ def run_answer_turn(
         raise ValueError("interview concluded; end the session for your debrief")
     reporter.begin(1, "Interviewer is thinking")
     style = InterviewStyle.model_validate(session["style"])
-    interviewer = interviewer_agent or build_interviewer_agent(style)
+    interviewer = interviewer_agent or _build_interviewer(
+        style,
+        _interview_skill("mock-interview-coach", "interview_turn"),
+    )
     formatter = formatter_agent or build_interview_formatter_agent(InterviewTurn)
     prompt = "\n\n".join(
         [
@@ -328,6 +368,12 @@ def run_answer_turn(
         validated = _degraded_turn(session, fallback_text)
     if prose:
         validated.turn = validated.turn.model_copy(update={"text": prose})
+    skill_uses = []
+    if getattr(interviewer, "run_meta", None) is not None:
+        skill_uses = [
+            SkillUse.model_validate(use)
+            for use in append_skill_use(None, interviewer, "turn")
+        ]
     reporter.step(1)
     apply_answer_delta(
         root,
@@ -335,6 +381,7 @@ def run_answer_turn(
         answer_text=text,
         interviewer_turn=validated.turn,
         concluded=validated.concluded,
+        skill_uses=skill_uses,
     )
     if validated.notice:
         output_sink.emit(Notice(validated.notice))
@@ -383,7 +430,9 @@ def run_debrief_turn(
         reporter.step(1)
         return session_view(root, session_id)
     reporter.begin(1, "Writing your debrief")
-    coach = interviewer_agent or build_debrief_agent()
+    coach = interviewer_agent or _build_debrief(
+        _interview_skill("mock-interview-coach", "debrief")
+    )
     formatter = formatter_agent or build_interview_formatter_agent(DebriefTurn)
     prompt = "\n\n".join(
         [
@@ -402,5 +451,11 @@ def run_debrief_turn(
         label="INTERVIEWER NOTES",
     )
     reporter.step(1)
-    end_with_debrief(root, session_id, debrief)
+    skill_uses = []
+    if getattr(coach, "run_meta", None) is not None:
+        skill_uses = [
+            SkillUse.model_validate(use)
+            for use in append_skill_use(None, coach, "debrief")
+        ]
+    end_with_debrief(root, session_id, debrief, skill_uses=skill_uses)
     return session_view(root, session_id)

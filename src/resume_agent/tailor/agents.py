@@ -3,6 +3,9 @@ from collections.abc import Mapping
 from agno.agent import Agent
 
 from resume_agent.config import get_settings
+from resume_agent.career_skills.agno import skill_kwargs
+from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+from resume_agent.career_skills.registry import VerifiedSkill, resolve_skill
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
@@ -188,10 +191,20 @@ def _reviewer_instructions(name: str, *, score_bands: bool = False) -> list[str]
 
 
 def build_tailor_agent(
-    model_id: str | None = None, style_guide: str | None = None
+    model_id: str | None = None,
+    style_guide: str | None = None,
+    *,
+    skill: VerifiedSkill | None = None,
 ) -> Runner:
+    resolved_model_id = model_id or model_for_tier("premium")
+    resolved_skill = resolve_skill(
+        skill,
+        name="resume-customizer" if skill is None else skill.ref.name,
+        family=AgentFamily.RESUME_AUTHORING,
+        use="tailor",
+    )
     model = build_model(
-        model_id or model_for_tier("premium"),
+        resolved_model_id,
         cache_system_prompt=_prompt_cache(),
     )
     return AgentRunner(
@@ -206,16 +219,33 @@ def build_tailor_agent(
             ),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model, ResumeContent),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.RESUME_AUTHORING,
+            prompt_policy_version="resume-tailor-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 
 def build_reviser_agent(
-    model_id: str | None = None, style_guide: str | None = None
+    model_id: str | None = None,
+    style_guide: str | None = None,
+    *,
+    skill: VerifiedSkill | None = None,
 ) -> Runner:
+    resolved_model_id = model_id or model_for_tier("premium")
+    resolved_skill = resolve_skill(
+        skill,
+        name="resume-customizer" if skill is None else skill.ref.name,
+        family=AgentFamily.RESUME_AUTHORING,
+        use="revision",
+    )
     model = build_model(
-        model_id or model_for_tier("premium"),
+        resolved_model_id,
         cache_system_prompt=_prompt_cache(),
     )
     return AgentRunner(
@@ -230,16 +260,33 @@ def build_reviser_agent(
             ),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model, ResumeContent),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.RESUME_AUTHORING,
+            prompt_policy_version="resume-reviser-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 
 def build_revision_agent(
-    model_id: str | None = None, style_guide: str | None = None
+    model_id: str | None = None,
+    style_guide: str | None = None,
+    *,
+    skill: VerifiedSkill | None = None,
 ) -> Runner:
+    resolved_model_id = model_id or model_for_tier("premium")
+    resolved_skill = resolve_skill(
+        skill,
+        name="resume-version-manager",
+        family=AgentFamily.RESUME_REVIEW,
+        use="revision",
+    )
     model = build_model(
-        model_id or model_for_tier("premium"),
+        resolved_model_id,
         cache_system_prompt=_prompt_cache(),
     )
     return AgentRunner(
@@ -252,8 +299,15 @@ def build_revision_agent(
             ),
             output_schema=ResumeContent,
             use_json_mode=use_json_mode_for(model, ResumeContent),
+            **skill_kwargs(resolved_skill),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.RESUME_REVIEW,
+            prompt_policy_version="resume-version-manager-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref,
+        ),
     )
 
 
@@ -263,9 +317,26 @@ def build_reviewer_agent(
     style_guide: str | None = None,
     *,
     score_bands: bool = False,
+    skill: VerifiedSkill | None = None,
 ) -> Runner:
+    resolved_model_id = model_id or model_for_tier("mid")
+    mapped = {
+        "ats-keyword": "ats-resume-checker",
+        "recruiter": "resume-ats-optimizer",
+        "concision": "resume-formatter",
+    }.get(name)
+    resolved_skill = (
+        resolve_skill(
+            skill,
+            name=mapped or "",
+            family=AgentFamily.RESUME_REVIEW,
+            use="review",
+        )
+        if mapped or skill is not None
+        else None
+    )
     model = build_model(
-        model_id or model_for_tier("mid"),
+        resolved_model_id,
         cache_system_prompt=_prompt_cache(),
     )
     return AgentRunner(
@@ -280,8 +351,15 @@ def build_reviewer_agent(
             ),
             output_schema=ReviewCritique,
             use_json_mode=use_json_mode_for(model, ReviewCritique),
+            **(skill_kwargs(resolved_skill) if resolved_skill is not None else {}),
             **retry_kwargs(),
-        )
+        ),
+        run_meta=AgentRunMeta(
+            agent_family=AgentFamily.RESUME_REVIEW,
+            prompt_policy_version=f"resume-review-{name}-v1",
+            model_id=resolved_model_id,
+            skill_ref=resolved_skill.ref if resolved_skill is not None else None,
+        ),
     )
 
 

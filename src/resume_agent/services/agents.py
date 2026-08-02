@@ -8,11 +8,18 @@ concrete `build_*_agent` functions are module-level so tests can monkeypatch the
 from dataclasses import dataclass
 from typing import Mapping
 
+from resume_agent.config import get_settings
 from resume_agent.cover_letter.agents import (
     build_cover_letter_agent,
     build_cover_letter_revision_agent,
     build_cover_letter_reviser_agent,
 )
+from resume_agent.career_skills.models import (
+    AgentFamily,
+    CoverLetterSkillName,
+    ResumeAuthoringSkillName,
+)
+from resume_agent.career_skills.registry import CareerSkillRegistry, VerifiedSkill
 from resume_agent.discovery.extract import build_extract_agent
 from resume_agent.discovery.fit import build_fit_agent
 from resume_agent.discovery.industry import build_industry_classifier
@@ -58,27 +65,75 @@ class CoverLetterBundle:
     revision: Runner
 
 
-def build_discovery_bundle() -> DiscoveryBundle:
+def build_discovery_bundle(
+    *, registry: CareerSkillRegistry | None = None
+) -> DiscoveryBundle:
+    if registry is None:
+        extract = build_extract_agent()
+        fit = build_fit_agent()
+    else:
+        extract = build_extract_agent(
+            skill=registry.require(
+                "job-description-analyzer", family=AgentFamily.JOB_ANALYSIS, use="extract"
+            )
+        )
+        fit = build_fit_agent(
+            skill=registry.require(
+                "job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit"
+            )
+        )
     return DiscoveryBundle(
-        extract=build_extract_agent(),
-        fit=build_fit_agent(),
+        extract=extract,
+        fit=fit,
         relevance=build_relevance_agent(),
         canonicalizer=build_skill_canonicalizer(),
         industry_classifier=build_industry_classifier(),
     )
 
 
-def build_tailor_bundle(config, style_guide: str | None = None) -> TailorBundle:
+def build_tailor_bundle(
+    config,
+    style_guide: str | None = None,
+    *,
+    authoring_skill: ResumeAuthoringSkillName | str | None = None,
+    registry: CareerSkillRegistry | None = None,
+) -> TailorBundle:
+    selected_authoring: VerifiedSkill | None = None
+    selected_revision: VerifiedSkill | None = None
+    if authoring_skill is not None or registry is not None:
+        registry = registry or CareerSkillRegistry.from_settings(get_settings())
+        selected_name = (
+            authoring_skill.value
+            if isinstance(authoring_skill, ResumeAuthoringSkillName)
+            else authoring_skill or "resume-customizer"
+        )
+        selected_authoring = registry.require(
+            selected_name, family=AgentFamily.RESUME_AUTHORING, use="tailor"
+        )
+        selected_revision = registry.require(
+            "resume-version-manager", family=AgentFamily.RESUME_REVIEW, use="revision"
+        )
     reviewers = {}
     merged = bool(getattr(config, "merged_advisory", False))
     for spec in config.reviewers:
         if merged and not spec.gate:
             continue
+        kwargs = {
+            "style_guide": style_guide,
+            "score_bands": bool(getattr(spec, "score_bands", False)),
+        }
+        if registry is not None:
+            mapped = {
+                "ats-keyword": "ats-resume-checker",
+                "recruiter": "resume-ats-optimizer",
+                "concision": "resume-formatter",
+            }.get(spec.name)
+            if mapped:
+                kwargs["skill"] = registry.require(
+                    mapped, family=AgentFamily.RESUME_REVIEW, use="review"
+                )
         reviewers[spec.name] = build_reviewer_agent(
-            spec.name,
-            model_for_tier(spec.model_tier),
-            style_guide=style_guide,
-            score_bands=bool(getattr(spec, "score_bands", False)),
+            spec.name, model_for_tier(spec.model_tier), **kwargs
         )
     if merged:
         advisory_specs = [spec for spec in config.reviewers if not spec.gate]
@@ -92,17 +147,42 @@ def build_tailor_bundle(config, style_guide: str | None = None) -> TailorBundle:
                     for spec in advisory_specs
                 },
             )
+    tailor_model_id = model_for_tier(getattr(config, "tailor_tier", "premium"))
+    reviser_model_id = model_for_tier(getattr(config, "reviser_tier", "premium"))
+    if selected_authoring is None:
+        tailor = build_tailor_agent(
+            model_id=tailor_model_id,
+            style_guide=style_guide,
+        )
+        reviser = build_reviser_agent(
+            model_id=reviser_model_id,
+            style_guide=style_guide,
+        )
+    else:
+        tailor = build_tailor_agent(
+            model_id=tailor_model_id,
+            style_guide=style_guide,
+            skill=selected_authoring,
+        )
+        reviser = build_reviser_agent(
+            model_id=reviser_model_id,
+            style_guide=style_guide,
+            skill=selected_authoring,
+        )
+
+    if selected_revision is None:
+        revision = build_revision_agent(style_guide=style_guide)
+    else:
+        revision = build_revision_agent(
+            style_guide=style_guide,
+            skill=selected_revision,
+        )
+
     return TailorBundle(
-        tailor=build_tailor_agent(
-            model_id=model_for_tier(getattr(config, "tailor_tier", "premium")),
-            style_guide=style_guide,
-        ),
-        reviser=build_reviser_agent(
-            model_id=model_for_tier(getattr(config, "reviser_tier", "premium")),
-            style_guide=style_guide,
-        ),
+        tailor=tailor,
+        reviser=reviser,
         reviewers=reviewers,
-        revision=build_revision_agent(style_guide=style_guide),
+        revision=revision,
         match_plan=(
             build_match_plan_agent(style_guide=style_guide)
             if getattr(config, "match_plan_enabled", False)
@@ -111,9 +191,24 @@ def build_tailor_bundle(config, style_guide: str | None = None) -> TailorBundle:
     )
 
 
-def build_cover_letter_bundle() -> CoverLetterBundle:
+def build_cover_letter_bundle(
+    *,
+    skill: CoverLetterSkillName | str | None = None,
+    registry: CareerSkillRegistry | None = None,
+) -> CoverLetterBundle:
+    if skill is None and registry is None:
+        return CoverLetterBundle(
+            draft=build_cover_letter_agent(),
+            reviser=build_cover_letter_reviser_agent(),
+            revision=build_cover_letter_revision_agent(),
+        )
+    registry = registry or CareerSkillRegistry.from_settings(get_settings())
+    selected_name = skill.value if isinstance(skill, CoverLetterSkillName) else skill or "cover-letter-generator"
+    selected = registry.require(
+        selected_name, family=AgentFamily.COVER_LETTER, use="draft"
+    )
     return CoverLetterBundle(
-        draft=build_cover_letter_agent(),
+        draft=build_cover_letter_agent(skill=selected),
         reviser=build_cover_letter_reviser_agent(),
         revision=build_cover_letter_revision_agent(),
     )
