@@ -1,17 +1,17 @@
 import pytest
 from pydantic import ValidationError
 
+from resume_agent.discovery.scout import ScoutProposalDraft, SourceDraft
 from resume_agent.discovery.scout_models import Citation
-from resume_agent.discovery.search_scout import SearchSuggestion
-from resume_agent.discovery.source_scout import ScoutCandidate
+from resume_agent.discovery.scout_store import ScoutProposal, SourcePayload, TermPayload
 
 
 def test_scout_enrichment_defaults_are_backward_compatible():
-    source = ScoutCandidate()
-    search = SearchSuggestion()
+    source = ScoutProposalDraft(kind="source")
+    search = ScoutProposalDraft(kind="search_term")
 
     assert source.fit_score is None
-    assert source.signal == "positive"
+    assert source.disposition == "propose"
     assert source.citations == []
     assert search.fit_score is None
     assert search.citations == []
@@ -19,20 +19,21 @@ def test_scout_enrichment_defaults_are_backward_compatible():
 
 def test_scout_enrichment_accepts_shared_citations_and_new_kinds():
     citation = Citation(url="https://example.test/evidence", title="Evidence")
-    source = ScoutCandidate(
-        company="Acme",
-        signal="avoid",
+    source = ScoutProposalDraft(
+        kind="source",
+        source=SourceDraft(company="Acme"),
+        disposition="avoid",
         fit_score=10,
         citations=[citation],
     )
     suggestions = [
-        SearchSuggestion(value="Berlin", kind="location", fit_score=80),
-        SearchSuggestion(value="mid-senior", kind="seniority", fit_score=70),
-        SearchSuggestion(value="Platform Architect", kind="adjacent_role"),
+        ScoutProposal(kind="search_term", term=TermPayload(value="Berlin", term_kind="location"), fit_score=80),
+        ScoutProposal(kind="search_term", term=TermPayload(value="mid-senior", term_kind="seniority"), fit_score=70),
+        ScoutProposal(kind="search_term", term=TermPayload(value="Platform Architect", term_kind="adjacent_role")),
     ]
 
     assert source.citations[0] == citation
-    assert {row.kind for row in suggestions} == {
+    assert {row.term.term_kind for row in suggestions if row.term is not None} == {
         "location",
         "seniority",
         "adjacent_role",
@@ -42,11 +43,11 @@ def test_scout_enrichment_accepts_shared_citations_and_new_kinds():
 @pytest.mark.parametrize("score", [-1, 101])
 def test_fit_scores_are_bounded(score):
     with pytest.raises(ValidationError):
-        ScoutCandidate(fit_score=score)
+        ScoutProposal(kind="source", source=SourcePayload(company="Acme"), fit_score=score)
     with pytest.raises(ValidationError):
-        SearchSuggestion(fit_score=score)
+        ScoutProposal(kind="search_term", term=TermPayload(value="python"), fit_score=score)
 
 
 def test_seniority_uses_existing_search_config_vocabulary():
     with pytest.raises(ValidationError):
-        SearchSuggestion(value="Staff", kind="seniority")
+        TermPayload(value="Staff", term_kind="seniority")
