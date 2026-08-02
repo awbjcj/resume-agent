@@ -79,6 +79,8 @@ describe("SourcesPage", () => {
     expect(screen.getByText("ashby")).toBeInTheDocument();
     expect(screen.getByText("workday")).toBeInTheDocument();
     expect(screen.getByText("bamboohr")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ask the Scout" })).toHaveAttribute("href", "/scout");
+    expect(screen.queryByRole("button", { name: /discover companies/i })).not.toBeInTheDocument();
   });
 
   it("disables pull controls for non-pullable sources", async () => {

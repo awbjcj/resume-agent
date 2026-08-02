@@ -29,6 +29,9 @@ const MatchGapPage = lazy(() =>
 const CoachPage = lazy(() =>
   import("@/features/coach/CoachPage").then((m) => ({ default: m.CoachPage })),
 );
+const ScoutPage = lazy(() =>
+  import("@/features/scout/ScoutPage").then((m) => ({ default: m.ScoutPage })),
+);
 const InterviewPage = lazy(() =>
   import("@/features/interview/InterviewPage").then((m) => ({ default: m.InterviewPage })),
 );
@@ -145,6 +148,7 @@ export const router = createBrowserRouter([
       { path: "match-gap", element: <SetupGate>{page(<MatchGapPage />)}</SetupGate> },
       { path: "profile", element: <SetupGate>{page(<ProfileWorkspace />)}</SetupGate> },
       { path: "coach", element: <SetupGate>{page(<CoachPage />)}</SetupGate> },
+      { path: "scout", element: <SetupGate>{page(<ScoutPage />)}</SetupGate> },
       { path: "interview", element: <SetupGate>{page(<InterviewPage />)}</SetupGate> },
       { path: "account", element: page(<AccountPage />) },
       { path: "admin", element: page(<AdminPage />) },

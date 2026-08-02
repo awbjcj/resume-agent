@@ -11,6 +11,7 @@ import {
   CircleUserRound,
   ShieldCheck,
   Banknote,
+  Compass,
   Sparkles,
   Target,
   UserRound,
@@ -64,6 +65,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Find & tailor",
     items: [
+      { to: "/scout", label: "Discovery Scout", icon: Compass },
       { to: "/triage", label: "Triage", icon: Inbox },
       { to: "/shortlist", label: "Shortlist", icon: Briefcase },
       { to: "/pipeline", label: "Pipeline", icon: Kanban },

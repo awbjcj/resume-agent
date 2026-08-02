@@ -2199,7 +2199,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/search/discover": {
+    "/api/scout/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Scout Sessions */
+        get: operations["list_scout_sessions_api_scout_sessions_get"];
+        put?: never;
+        /** Start Session */
+        post: operations["start_session_api_scout_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scout/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Scout Session */
+        get: operations["get_scout_session_api_scout_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Scout Session */
+        delete: operations["delete_scout_session_api_scout_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scout/sessions/{session_id}/archive": {
         parameters: {
             query?: never;
             header?: never;
@@ -2208,8 +2244,93 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Discover Search Route */
-        post: operations["discover_search_route_api_search_discover_post"];
+        /** Archive Scout Session */
+        post: operations["archive_scout_session_api_scout_sessions__session_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scout/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End Scout Session */
+        post: operations["end_scout_session_api_scout_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scout/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_api_scout_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scout/sessions/{session_id}/proposals/{proposal_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Scout Proposal */
+        post: operations["approve_scout_proposal_api_scout_sessions__session_id__proposals__proposal_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scout/sessions/{session_id}/proposals/{proposal_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Scout Proposal */
+        post: operations["dismiss_scout_proposal_api_scout_sessions__session_id__proposals__proposal_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scout/sessions/{session_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Scout Session */
+        post: operations["unarchive_scout_session_api_scout_sessions__session_id__unarchive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2349,23 +2470,6 @@ export interface paths {
         put?: never;
         /** Add Source Route */
         post: operations["add_source_route_api_sources_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sources/discover": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Discover Sources Route */
-        post: operations["discover_sources_route_api_sources_discover_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3394,16 +3498,6 @@ export interface components {
         };
         /** DiscoverParams */
         DiscoverParams: Record<string, never>;
-        /** DiscoverSearchIn */
-        DiscoverSearchIn: {
-            /** Prompt */
-            prompt: string;
-        };
-        /** DiscoverSourcesIn */
-        DiscoverSourcesIn: {
-            /** Prompt */
-            prompt: string;
-        };
         /** DismissAllOut */
         DismissAllOut: {
             /**
@@ -5099,6 +5193,199 @@ export interface components {
          * @enum {string}
          */
         RunState: "pending" | "running" | "cancelling" | "done" | "error" | "cancelled";
+        /** ScoutCitationOut */
+        ScoutCitationOut: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Url */
+            url: string;
+        };
+        /** ScoutDismissIn */
+        ScoutDismissIn: {
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** ScoutMessageIn */
+        ScoutMessageIn: {
+            /** Message */
+            message: string;
+        };
+        /** ScoutProposalOut */
+        ScoutProposalOut: {
+            /**
+             * Check
+             * @enum {string}
+             */
+            check: "validated" | "unverified" | "failed" | "duplicate" | "avoid" | "new";
+            /**
+             * Checkerror
+             * @default
+             */
+            checkError: string;
+            /** Citations */
+            citations?: components["schemas"]["ScoutCitationOut"][];
+            /**
+             * Dismissreason
+             * @default
+             */
+            dismissReason: string;
+            /** Fitscore */
+            fitScore?: number | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "source" | "search_term";
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Resolvedat */
+            resolvedAt?: string | null;
+            source?: components["schemas"]["ScoutSourceOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "added" | "dismissed";
+            term?: components["schemas"]["ScoutTermOut"] | null;
+        };
+        /** ScoutSessionOut */
+        ScoutSessionOut: {
+            /** Archivedat */
+            archivedAt?: string | null;
+            /** Endedat */
+            endedAt?: string | null;
+            /** Goal */
+            goal: string;
+            /** Proposals */
+            proposals?: components["schemas"]["ScoutProposalOut"][];
+            /** Recap */
+            recap?: string | null;
+            /** Scrapeavailable */
+            scrapeAvailable: boolean;
+            /** Scrapeunavailablereason */
+            scrapeUnavailableReason?: string | null;
+            /** Sessionid */
+            sessionId: string;
+            /** Startedat */
+            startedAt: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "ended";
+            /** Turns */
+            turns?: components["schemas"]["ScoutTurnOut"][];
+        };
+        /** ScoutSessionSummaryOut */
+        ScoutSessionSummaryOut: {
+            /**
+             * Addedcount
+             * @default 0
+             */
+            addedCount: number;
+            /** Archivedat */
+            archivedAt?: string | null;
+            /**
+             * Dismissedcount
+             * @default 0
+             */
+            dismissedCount: number;
+            /** Endedat */
+            endedAt?: string | null;
+            /** Goal */
+            goal: string;
+            /**
+             * Pendingcount
+             * @default 0
+             */
+            pendingCount: number;
+            /**
+             * Proposalcount
+             * @default 0
+             */
+            proposalCount: number;
+            /** Sessionid */
+            sessionId: string;
+            /** Startedat */
+            startedAt: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "ended";
+        };
+        /** ScoutSessionsOut */
+        ScoutSessionsOut: {
+            /** Sessions */
+            sessions?: components["schemas"]["ScoutSessionSummaryOut"][];
+        };
+        /** ScoutSourceOut */
+        ScoutSourceOut: {
+            /** Ats */
+            ats?: string | null;
+            /** Company */
+            company: string;
+            /** Errorcode */
+            errorCode?: string | null;
+            /** Rolecount */
+            roleCount?: number | null;
+            /** Token */
+            token?: string | null;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+        };
+        /** ScoutTermOut */
+        ScoutTermOut: {
+            /**
+             * Termkind
+             * @enum {string}
+             */
+            termKind: "keyword" | "title" | "role_anchor" | "exclude_term" | "location" | "seniority" | "adjacent_role";
+            /** Value */
+            value: string;
+        };
+        /** ScoutTurnOut */
+        ScoutTurnOut: {
+            /**
+             * At
+             * @default
+             */
+            at: string;
+            /**
+             * Kind
+             * @default
+             * @enum {string}
+             */
+            kind: "reply" | "recap" | "";
+            /**
+             * Notice
+             * @default
+             */
+            notice: string;
+            /** Proposalids */
+            proposalIds?: string[];
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "scout" | "user";
+            /** Text */
+            text: string;
+        };
         /** SearchConfigDoc */
         SearchConfigDoc: {
             /** Distance */
@@ -11055,7 +11342,41 @@ export interface operations {
             };
         };
     };
-    discover_search_route_api_search_discover_post: {
+    list_scout_sessions_api_scout_sessions_get: {
+        parameters: {
+            query?: {
+                includeArchived?: boolean;
+                status?: ("active" | "ended") | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoutSessionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_session_api_scout_sessions_post: {
         parameters: {
             query?: never;
             header?: {
@@ -11066,7 +11387,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DiscoverSearchIn"];
+                "application/json": components["schemas"]["ScoutMessageIn"];
             };
         };
         responses: {
@@ -11077,6 +11398,278 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scout_session_api_scout_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoutSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_scout_session_api_scout_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_scout_session_api_scout_sessions__session_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoutSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_scout_session_api_scout_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_api_scout_sessions__session_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScoutMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_scout_proposal_api_scout_sessions__session_id__proposals__proposal_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoutSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_scout_proposal_api_scout_sessions__session_id__proposals__proposal_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScoutDismissIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoutSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_scout_session_api_scout_sessions__session_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoutSessionOut"];
                 };
             };
             /** @description Validation Error */
@@ -11462,41 +12055,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["resume_agent__api__schemas__sources__SourceOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    discover_sources_route_api_sources_discover_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DiscoverSourcesIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

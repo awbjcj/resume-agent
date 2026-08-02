@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Play, Trash2 } from "lucide-react";
+import { Play, Sparkles, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { launchers, useLaunchRun } from "@/features/runs/use-launch-run";
 import { ResetSectionButton } from "@/features/settings/ResetSectionButton";
 import { useRunStore, type PullRunResult } from "@/lib/runs/store";
 import { AddSourceDialog } from "./AddSourceDialog";
-import { DiscoverCompaniesDialog } from "./DiscoverCompaniesDialog";
 import {
   useRemoveSource,
   useSetEnabled,
@@ -237,7 +236,10 @@ export function SourcesManager() {
     <div>
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <AddSourceDialog />
-        <DiscoverCompaniesDialog />
+        <Button variant="outline" size="sm" render={<a href="/scout" />}>
+          <Sparkles data-icon="inline-start" aria-hidden="true" />
+          Ask the Scout
+        </Button>
         <Button
           variant="outline"
           size="sm"

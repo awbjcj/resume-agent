@@ -1,13 +1,11 @@
+import { Sparkles } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SuggestSearchTermsDialog } from "@/features/search-scout/SuggestSearchTermsDialog";
+import { Button } from "@/components/ui/button";
 import { SearchConfigForm } from "../forms/SearchConfigForm";
 import { ResetSectionButton } from "../ResetSectionButton";
 import { SaveBar } from "../SaveBar";
 import { useConfig, useSaveConfig } from "../use-config";
 import { useDraft } from "../use-draft";
-
-const dedupe = (existing: string[] | undefined, added: string[]) =>
-  Array.from(new Set([...(existing ?? []), ...added]));
 
 export function SearchSettingsPage() {
   const { data } = useConfig("/api/config/search");
@@ -26,22 +24,10 @@ export function SearchSettingsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SuggestSearchTermsDialog
-            onApply={(added) =>
-              setDraft({
-                ...draft,
-                keywords: dedupe(draft.keywords, added.keywords),
-                titles: dedupe(draft.titles, added.titles),
-                locations: dedupe(draft.locations, added.locations),
-                experienceLevels: dedupe(
-                  draft.experienceLevels,
-                  added.experienceLevels,
-                ),
-                roleAnchors: dedupe(draft.roleAnchors, added.roleAnchors),
-                excludeTerms: dedupe(draft.excludeTerms, added.excludeTerms),
-              })
-            }
-          />
+          <Button variant="outline" size="sm" render={<a href="/scout" />}>
+            <Sparkles data-icon="inline-start" aria-hidden="true" />
+            Ask the Scout
+          </Button>
           <ResetSectionButton sectionId="search" label="Search" />
         </div>
       </header>

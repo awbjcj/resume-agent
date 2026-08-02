@@ -75,6 +75,23 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+.scout-proposal-card {
+  transition:
+    border-color 160ms var(--ease-out-strong),
+    background-color 160ms var(--ease-out-strong),
+    opacity 160ms var(--ease-out-strong),
+    transform 160ms var(--ease-out-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .scout-proposal-card[data-pending="true"]:hover { transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scout-proposal-card { transition-property: border-color, background-color, opacity; }
+  .scout-proposal-card[data-pending="true"]:hover { transform: none; }
+}
+
 :root {
     color-scheme: light;
     --radius: 0.5rem;
