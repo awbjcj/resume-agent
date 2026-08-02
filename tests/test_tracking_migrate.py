@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import text
 
 from resume_agent.db import init_db, make_engine
@@ -8,6 +9,7 @@ from resume_agent.tracking.migrate import (
     ensure_resume_version_gate_reviewers_column,
     ensure_resume_version_revision_columns,
 )
+from resume_agent.career_skills.models import read_job_analysis_meta, read_skill_uses
 
 
 def test_revision_migrations_backfill_origins():
@@ -134,3 +136,32 @@ def test_init_db_creates_gate_reviewers_column():
         resume_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
 
     assert "gate_reviewers_json" in resume_cols
+
+
+def test_agent_metadata_migration_is_additive_and_idempotent():
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    init_db(engine)
+    with engine.begin() as conn:
+        jobs = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+        resumes = [row[1] for row in conn.execute(text("PRAGMA table_info(resume_versions)"))]
+        covers = [row[1] for row in conn.execute(text("PRAGMA table_info(cover_letters)"))]
+        table = conn.execute(
+            text(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name='h1b_company_evidence'"
+            )
+        ).scalar()
+    assert "analysis_meta_json" in jobs
+    assert "skill_uses_json" in resumes
+    assert "skill_uses_json" in covers
+    assert table == "h1b_company_evidence"
+
+
+def test_metadata_readers_preserve_legacy_none_and_reject_corruption():
+    assert read_skill_uses(None) == []
+    assert read_job_analysis_meta(None) is None
+    with pytest.raises(ValueError):
+        read_skill_uses({"not": "a list"})
+    with pytest.raises(ValueError):
+        read_job_analysis_meta([])

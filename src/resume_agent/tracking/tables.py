@@ -46,6 +46,7 @@ class Job(SQLModel, table=True):
     dedup_key: str | None = Field(default=None, index=True)
     jd_text: str = ""
     criteria_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    analysis_meta_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     fit_score: int | None = None
     fit_rationale: str | None = None
     status: str = Field(default=JobStatus.raw.value, index=True)
@@ -70,6 +71,7 @@ class ResumeVersion(SQLModel, table=True):
     review_score: int | None = None
     fact_check_passed: bool = False
     critique_json: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
+    skill_uses_json: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
     # The configured gate reviewer names active for THIS round (provenance is
     # always a gate and is never included here). None means "unknown" - a row
     # written before this column existed - and read-side callers fall back to
@@ -107,6 +109,7 @@ class CoverLetter(SQLModel, table=True):
     job_id: int = Field(foreign_key="jobs.id", index=True)
     resume_version_id: int | None = Field(default=None, foreign_key="resume_versions.id")
     content_json: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    skill_uses_json: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
     pdf_path: str | None = None
     fact_check_passed: bool = False
     origin: str = Field(default="draft", index=True)
@@ -159,6 +162,25 @@ class SkillSuggestion(SQLModel, table=True):
     )
     fingerprint: str = ""
     generated_at: datetime = Field(default_factory=utcnow)
+    schema_version: int = 1
+
+
+class H1BCompanyEvidence(SQLModel, table=True):
+    __tablename__ = cast(Any, "h1b_company_evidence")
+    __table_args__ = (UniqueConstraint("normalized_company"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    normalized_company: str = Field(index=True)
+    display_company: str | None = None
+    status: str = Field(index=True)
+    evidence_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    source_url: str | None = None
+    data_version: str | None = None
+    retrieved_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime = Field(index=True)
     schema_version: int = 1
 
 

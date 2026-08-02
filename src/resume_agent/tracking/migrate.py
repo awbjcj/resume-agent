@@ -200,3 +200,17 @@ def ensure_resume_version_gate_reviewers_column(engine: Engine) -> None:
             conn.execute(
                 text("ALTER TABLE resume_versions ADD COLUMN gate_reviewers_json JSON")
             )
+
+
+def ensure_agent_metadata_columns(engine: Engine) -> None:
+    """Idempotently add nullable skill and agent-run provenance columns."""
+    jobs = _table_columns(engine, "jobs")
+    resumes = _table_columns(engine, "resume_versions")
+    covers = _table_columns(engine, "cover_letters")
+    with engine.begin() as conn:
+        if jobs and "analysis_meta_json" not in jobs:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN analysis_meta_json JSON"))
+        if resumes and "skill_uses_json" not in resumes:
+            conn.execute(text("ALTER TABLE resume_versions ADD COLUMN skill_uses_json JSON"))
+        if covers and "skill_uses_json" not in covers:
+            conn.execute(text("ALTER TABLE cover_letters ADD COLUMN skill_uses_json JSON"))

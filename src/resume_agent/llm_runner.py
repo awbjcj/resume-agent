@@ -13,6 +13,7 @@ from typing import Any, Literal, Protocol, TypeVar, cast
 from pydantic import BaseModel
 
 from resume_agent.config import Settings, get_settings
+from resume_agent.career_skills.models import AgentRunMeta
 from resume_agent.sessions.stream import (
     Completed,
     Failed,
@@ -75,8 +76,13 @@ def is_transient(exc: BaseException) -> bool:
 class AgentRunner:
     """Adapter that narrows third-party agent APIs to ``run`` / ``arun``."""
 
-    def __init__(self, agent: Any) -> None:
+    def __init__(self, agent: Any, *, run_meta: AgentRunMeta | None = None) -> None:
         self._agent = agent
+        self._run_meta = run_meta
+
+    @property
+    def run_meta(self) -> AgentRunMeta | None:
+        return self._run_meta
 
     def run(self, prompt: str) -> Any:
         settings = get_settings()
