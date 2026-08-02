@@ -1,7 +1,7 @@
 # Conversational Discovery Scout
 
 **Date:** 2026-08-01
-**Status:** Approved, pending implementation plan
+**Status:** Approved; implementation plan reviewed
 **Scope:** `discovery/scout.py` (new), `discovery/scout_store.py` (new),
 `services/scout.py` (new), `services/scout_context.py` (new),
 `api/routers/scout.py` (new), `api/schemas/scout.py` (new), `cli.py`,
@@ -133,6 +133,9 @@ Sessions are durable JSON at `<workspace>/scout/session-<id>.json`, resolved the
 way `get_interview_dir` resolves `root / "interview"`, and carry the full
 `SessionStore` lifecycle: process-wide mutation lock, atomic validated write,
 listing with the archived filter, archive/unarchive/delete.
+
+Turns and proposals are append-only. The standing goal, proposal resolution,
+session lifecycle, and archival fields are the only in-place mutations.
 
 `ScoutProposal` uses a `kind` discriminator with exactly one payload set rather
 than a flat union of all fields, so a source row cannot silently carry a
@@ -333,9 +336,11 @@ on the Sources page and Search settings.
 
 Every chat primitive is the one spec 1 built — `ChatThread`, `ChatMessage`,
 `ChatComposer` (with `TranscribeButton`), the part components, and
-`useChatStream(runId)` — reused unchanged. Reasoning parts are **shown**: unlike
-the interviewer, the Scout has no in-character constraint to protect, and its
-reasoning about company fit is useful to read.
+`useChatStream(runId)` — reused unchanged. Provider-safe reasoning summaries
+and progress parts are **shown**: unlike the interviewer, the Scout has no
+in-character constraint to protect, and a concise rationale about company fit
+is useful to read. Raw hidden chain-of-thought is never requested, persisted,
+or rendered.
 
 `ProposalCard` carries the company or term value, the fit badge, the reason,
 citation links, and `[Add]` / `[Dismiss]`. Its badge reads `status` first and
@@ -381,9 +386,10 @@ Scout: Found 6 boards. Modal and Baseten look strongest because…
 > end
 ```
 
-Commands: `add <n…>`, `skip <n> [reason]`, `end`, `quit`. Because it exercises
-the identical turn, approval, and dismissal path with no browser and no HTTP
-layer, a streaming or approval regression cannot hide in one client.
+Commands: `add <n…>`, `skip <n> [reason]`, `end`, `quit`. One command resolves
+all selected indexes to stable proposal ids before its first mutation. Because
+it exercises the identical turn, approval, and dismissal path with no browser
+and no HTTP layer, a streaming or approval regression cannot hide in one client.
 
 ---
 
@@ -442,7 +448,7 @@ The suite stays offline: no API key, no network, no browser.
   returns `409 SESSION_ACTIVE`; after `end`, a new message returns `409` but
   approving a still-pending proposal succeeds. Refresh recovery selects the
   active run by kind plus session id; archive/unarchive/delete behave as the
-  shared store defines.
+  shared store defines and reject while a matching Scout run is active.
 - **Avoid rows.** An `avoid` proposal skips the probe, is rejected by `approve`,
   and is retained with its evidence citation even without a careers URL.
 - **CLI.** `add`/`skip` drive the same service functions and mutate the session.

@@ -1,6 +1,6 @@
 # Conversational Discovery Scout Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution constraint:** Implement task-by-task in-line on the current branch. Do not use subagents or create a worktree. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the two one-shot discovery dialogs with one durable, streaming Discovery Scout that proposes company sources and search terms, learns from explicit dismissals, and writes configuration only after deterministic human approval.
 
@@ -22,7 +22,7 @@
 - UI motion is restrained: no keyboard-triggered animation; transitions name exact properties, use the existing strong ease-out token, stay at 150–200ms, and remove transform motion under `prefers-reduced-motion`.
 - Regenerate contracts once the backend routes and schemas are coherent. Primary command: `bash scripts/gen_ts_client.sh`; the Windows CRLF fallback is documented in Task 8.
 - Focused verification follows each task. The final task runs the complete Python suite, web suite, linters, build, OpenAPI drift gate, and `git diff --check` before completion is claimed.
-- At execution time, create an isolated feature worktree from the intended base with `superpowers:using-git-worktrees`; do not mix unrelated checkout changes into these commits.
+- Execute on the current branch as requested. Preserve unrelated checkout changes and keep every edit scoped to this feature.
 
 ## Correctness Amendments
 
@@ -40,6 +40,11 @@ These decisions are authoritative over any abbreviated code excerpt later in the
 10. **Expose runtime scrape capability in the view, not persistence.** `ScoutSessionOut.scrapeAvailable` and `scrapeUnavailableReason` are computed from current settings. They are not stored in session JSON and therefore cannot go stale.
 11. **Batch approval is sequential and honest.** “Add all validated” calls the same approval endpoint once per currently pending validated proposal, continues after individual failures, and renders the error on the affected card. It does not include unverified scrape targets.
 12. **First-run recovery is a distinct UI state.** A rehydrated `scout-start` run may have a session id before a session file exists. The page attaches the stream from run metadata without issuing a detail query until the run completes; subsequent `scout-turn` and `scout-end` recovery requires the matching session id.
+13. **Formatter drafts defer semantic validation to Python.** Draft `kind`, `term_kind`, `disposition`, and `fit_score` fields use permissive scalar types. `normalize_turn` classifies unknown vocabulary, out-of-range scores, and invalid payload combinations as `TurnRejected`/`ProposalRejected`, so `format_with_retry` can perform its required retry and degradation. Strict literals and ranges remain on persisted models and wire schemas.
+14. **Only source proposals can be negative evidence.** `disposition="avoid"` is valid only for a source row with a non-empty company and at least one HTTP(S) citation. Search-term rows are always positive suggestions. Positive sources require a non-empty company and HTTP(S) careers URL; term rows require a non-empty value.
+15. **Reasoning UI means provider-safe summaries.** The stream may render provider-supplied reasoning summaries or progress events, but never raw hidden chain-of-thought. The service does not persist reasoning parts in Scout session JSON.
+16. **Lifecycle cannot race a turn.** Archive, unarchive, and delete reject with `409 SCOUT_BUSY` while a matching `scout-start`, `scout-turn`, or `scout-end` run is active. Approval and dismissal remain allowed during a turn because their locked mutation is merged by the turn's final locked reload.
+17. **CLI command indexes are snapshotted per command.** `add <n…>` resolves every number to a proposal id before the first approval. The visible index is rebuilt only after the whole command, preventing earlier approvals from retargeting later numbers.
 
 ---
 
@@ -223,19 +228,19 @@ class SourceDraft(ExtensibleModel):
 
 class TermDraft(ExtensibleModel):
     value: str = ""
-    term_kind: SuggestionKind = "keyword"
+    term_kind: str = "keyword"
 
 class ScoutProposalDraft(ExtensibleModel):
-    kind: Literal["source", "search_term"] = "source"
+    kind: str = "source"
     source: SourceDraft | None = None
     term: TermDraft | None = None
-    disposition: Literal["propose", "avoid"] = "propose"
+    disposition: str = "propose"
     reason: str = ""
-    fit_score: int | None = Field(default=None, ge=0, le=100)
+    fit_score: int | None = None
     citations: list[Citation] = Field(default_factory=list)
 
 class ScoutTurnDraft(ExtensibleModel):
-    kind: Literal["reply", "recap"] = "reply"
+    kind: str = "reply"
     message: str = ""
     goal_update: str | None = None
     proposals: list[ScoutProposalDraft] = Field(default_factory=list)
@@ -251,7 +256,7 @@ class ProposalRejected(TurnRejected):
     """A proposal failed URL, payload, vocabulary, or evidence integrity."""
 ```
 
-`normalize_turn` must reject empty reply text, recap on a normal turn, more than eight rows, an empty/oversized goal update, or a result that would exceed 40 pending rows as structural `TurnRejected`. It validates every proposal into a cleaned copy; a strict integrity failure raises `ProposalRejected`, while lenient mode returns the reply and goal update with zero proposals and the durable notice above. `normalize_recap` requires `kind="recap"`, non-empty message, and no proposals or goal update.
+`normalize_turn` must reject empty reply text, recap on a normal turn, unknown turn/proposal vocabulary, more than eight rows, an empty/oversized goal update, or a result that would exceed 40 pending rows as structural `TurnRejected`. It validates every proposal into a cleaned copy, including the strict fit-score range and the source-only `avoid` rule; a strict integrity failure raises `ProposalRejected`, while lenient mode returns the reply and goal update with zero proposals and the durable notice above. `normalize_recap` requires `kind="recap"`, non-empty message, and no proposals or goal update.
 
 - [ ] **Step 4: Merge the two instruction sets and build the agents**
 
@@ -518,8 +523,9 @@ def test_streamed_prose_is_stored_and_probe_events_precede_completed(tmp_path):
         formatter_agent=formatter(),
     )
     assert view["turns"][-1]["text"] == "Found two strong options."
-    assert [type(event).__name__ for event in sink.events] == [
-        "TextDelta", "ToolStarted", "ToolCompleted"
+    assert "".join(event.text for event in sink.events if isinstance(event, TextDelta)) == "Found two strong options."
+    assert [type(event).__name__ for event in sink.events if isinstance(event, (ToolStarted, ToolCompleted))] == [
+        "ToolStarted", "ToolCompleted"
     ]
 
 
@@ -534,7 +540,7 @@ def test_repeated_session_source_and_term_become_duplicate(tmp_path):
     assert [row["check"] for row in view["proposals"][-2:]] == ["duplicate", "duplicate"]
 ```
 
-Also assert: eight rows pass; nine degrade structurally to prose+notice; 40 pending pass and 41 degrade; avoid skips `preview_source`; fresh source probes run through `gather_isolated`; an isolated exception becomes `failed`; citation integrity retry drops all proposals and notice survives reload; `stream_enabled=false` uses formatter text; cancellation at every provider/probe event leaves the session byte-equivalent.
+Also assert: eight rows pass; nine degrade structurally to prose+notice; 40 pending pass and 41 degrade; avoid skips `preview_source`; fresh source probes run through `gather_isolated`; an isolated exception becomes `failed`; citation integrity retry drops all proposals and notice survives reload; `stream_enabled=false` uses formatter text; cancellation at every provider/probe event leaves the session byte-equivalent. Do not assert that a short prose delta precedes a tool event: the unchanged `ProseEmitter` may hold short text until it can exclude a split metadata delimiter. Assert reconstructed prose and tool-event ordering independently.
 
 - [ ] **Step 2: Run focused tests and verify failure**
 
@@ -784,7 +790,7 @@ Expected: FAIL because `scout` still runs the one-shot flow.
 
 Keep the positional message optional for compatibility; prompt with `You` when absent. Resolve tenant-specific connectors, search, profile, and workspace roots once. Resume the active session when present; otherwise preallocate an id and call `run_start_turn`.
 
-After every view, print pending proposals with stable display indexes and labels:
+After every view, print all proposals in durable order with stable display indexes and labels. Resolved rows retain their number and show their status, so the sample `add 1 3` followed by `skip 2` cannot silently retarget a different row:
 
 ```text
   [1] Modal          greenhouse · 14 roles   fit 88
@@ -792,7 +798,7 @@ After every view, print pending proposals with stable display indexes and labels
   [3] keyword        "inference serving"     new
 ```
 
-`add <n…>` approves each selected proposal sequentially; `skip <n> [reason]` dismisses one; `end` streams recap and exits; `quit` exits without ending; any other input becomes the next conversational message. Indexes are rebuilt from the current view after each mutation so a stale number cannot target a different proposal silently.
+`add <n…>` snapshots all selected proposal ids, then approves those ids sequentially; `skip <n> [reason]` dismisses one; `end` streams recap and exits; `quit` exits without ending; any other input becomes the next conversational message. Indexes are rebuilt from the current view after the complete command so an earlier approval cannot retarget a later number.
 
 - [ ] **Step 4: Run CLI tests and commit**
 
@@ -825,7 +831,7 @@ git commit -m "feat: make scout cli conversational"
 
 - [ ] **Step 1: Add retirement assertions before deleting code**
 
-In `tests/api/test_scout_router.py`, assert both legacy POSTs return 404. In `tests/api/test_openapi_contract.py`, assert the two paths and two schemas are absent while all ten Scout operations across seven paths are present.
+In `tests/api/test_scout_router.py`, assert both legacy POSTs return 405: each literal path is still matched by a retained parameterized route for another method, but POST is no longer allowed. In `tests/api/test_openapi_contract.py`, assert the two legacy operations and schemas are absent while all ten Scout operations across nine paths are present.
 
 - [ ] **Step 2: Remove legacy routes, schemas, modules, and superseded tests**
 
