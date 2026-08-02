@@ -160,7 +160,18 @@ INVALID_ARGUMENT` before generating anything, and agno then hands back the
   tolerates surrounding emphasis and padding but *requires* the `METADATA`
   token — DeepSeek writes a bare `---` rule as a section break, so matching the
   rules alone would truncate a reply mid-turn. `ProseEmitter`'s holdback floor is
-  derived from the longest matchable marker (`MARKER_MAX_LEN`), never a literal.
+  derived from the longest matchable boundary (`MARKER_MAX_LEN`), never a literal.
+- **Formatter payload is never displayable, sentinel or not.** Degrading on a
+  missing sentinel is only safe when there is nothing to hide — true of DeepSeek
+  (it emits no metadata at all), false for a model that writes the block and
+  forgets the marker, which dumps `action:` / `topic_updates:` / `draft:` into
+  the chat window. `_BOUNDARY` therefore cuts at the sentinel **or** at the
+  metadata block's own opening key, and the degradation branch fires only when
+  neither exists. The block guard is deliberately narrow — a bare lowercase
+  schema key at the start of a line, preceded by a blank line and followed by a
+  colon — because truncating a reply is worse than the leak it prevents: a coach
+  writes `**Action:** …` and `the draft: …` mid-sentence and neither may cut the
+  turn.
 - **Anthropic has the same "unset means provider decides" trap, and it is
   generation-specific.** Omitting `thinking` runs **adaptive** on Sonnet 5 and
   Opus 5, and runs **without** thinking on Opus 4.8/4.7 and older — so leaving

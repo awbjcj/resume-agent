@@ -27,10 +27,39 @@ _MARKER = re.compile(
     r"[*_`~ \t]{0,4}-{3,6}[ \t]{0,2}METADATA[ \t]{0,2}-{3,6}[*_`~ \t]{0,4}",
     re.IGNORECASE,
 )
-# The longest string _MARKER can match. The emitter must hold back at least
-# this much, or a marker split across deltas gets flushed as prose before the
-# rest of it arrives.
-MARKER_MAX_LEN = 4 + 6 + 2 + len("METADATA") + 2 + 6 + 4
+# When the sentinel never arrives, the metadata block is its own boundary: it
+# opens with one of the schemas' keys alone on a line. Without this the
+# degradation rule below would dump `action:`/`topic_updates:`/`draft:` into
+# the chat window, which is what it looked like on Gemini.
+#
+# The guard is deliberately narrow, because cutting a reply short is worse than
+# the leak it prevents: the key must be bare, lowercase, at the start of a line,
+# preceded by a blank line, and followed by a colon. A coach writes
+# "**Action:** ..." or "the draft: ..." mid-sentence; it does not open a line
+# with `research_actions:`.
+_BLOCK_KEYS = (
+    "action",
+    "topic_id",
+    "topic_updates",
+    "draft",
+    "draft_fields",
+    "research_actions",
+    "question_id",
+    "follow_up",
+    "plan",
+)
+_BLOCK_START = rf"\n[ \t]*\n(?=(?:{'|'.join(_BLOCK_KEYS)})[ \t]*:)"
+
+_BOUNDARY = re.compile(f"{_MARKER.pattern}|{_BLOCK_START}", re.IGNORECASE)
+
+# The longest string the boundary can match. The emitter must hold back at
+# least this much, or a boundary split across deltas gets flushed as prose
+# before the rest of it arrives -- the lookahead counts, because the key has to
+# be in the buffer for the blank line before it to match.
+MARKER_MAX_LEN = max(
+    4 + 6 + 2 + len("METADATA") + 2 + 6 + 4,
+    2 + max(len(key) for key in _BLOCK_KEYS) + 1,
+)
 
 
 class ProseEmitter:
@@ -52,7 +81,7 @@ class ProseEmitter:
         if self._marker_found:
             return
         self._pending += text
-        marker = _MARKER.search(self._pending)
+        marker = _BOUNDARY.search(self._pending)
         if marker is not None:
             visible = self._pending[: marker.start()]
             if visible.endswith("\r\n"):
@@ -131,8 +160,9 @@ def persona_output(
         # nothing. Degrade: the entire response becomes both the visible reply
         # and the formatter's input.
         logger.warning(
-            "%s omitted the %s delimiter (%d chars); treating the whole "
-            "response as both prose and formatter notes",
+            "%s emitted neither the %s delimiter nor a metadata block (%d "
+            "chars); treating the whole response as both prose and formatter "
+            "notes",
             source,
             DELIMITER,
             len(streamed_output),

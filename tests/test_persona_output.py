@@ -104,6 +104,49 @@ def test_marker_wrapped_in_markdown_emphasis_is_still_the_marker():
     assert "action" not in sink.text
 
 
+def test_metadata_block_without_a_sentinel_is_still_hidden_from_the_user():
+    # The degradation rule (missing sentinel -> show everything) is only safe
+    # when there is nothing to hide. A model that emits the block but forgets
+    # the sentinel would otherwise dump `action:`/`topic_updates:`/`draft:`
+    # straight into the chat. The block announces itself with the schema's own
+    # keys, so that is the boundary when the sentinel is absent.
+    sink, reporter = _Sink(), _Reporter()
+    chunks = [
+        "Which project moved a number?\n",
+        "\naction: ask_question\n",
+        "topic_id: aptiv_triage\n",
+        "topic_updates:\n  - id: aptiv_triage\n    status: active\n",
+        "research_actions: []",
+    ]
+    agent = _Agent([*_deltas(*chunks), Completed(object())])
+
+    prose, full = persona_output(agent, "p", sink, reporter, source="coach notes")
+
+    assert prose == "Which project moved a number?"
+    assert sink.text == prose
+    # The formatter still receives the block verbatim -- this hides it, it does
+    # not discard it.
+    assert "topic_id: aptiv_triage" in full
+    assert "research_actions" in full
+
+
+def test_prose_mentioning_a_schema_word_inline_is_not_truncated():
+    # The cut requires a bare key alone at the start of a line after a blank
+    # one. Coaches write "**Action:** ..." and "the draft: ..." mid-sentence,
+    # and truncating a reply there would be far worse than the leak it guards.
+    sink, reporter = _Sink(), _Reporter()
+    body = (
+        "Here is the plan: quantify the triage work.\n\n"
+        "**Action:** name the baseline. Your draft: still needs a metric.\n\n"
+        "What was the before number?"
+    )
+    agent = _Agent([*_deltas(body), Completed(object())])
+
+    prose, _ = persona_output(agent, "p", sink, reporter, source="coach notes")
+
+    assert prose == body
+
+
 def test_bare_horizontal_rule_is_never_mistaken_for_the_marker():
     # DeepSeek's real coach output uses `---` as a section break between the
     # agenda and the question. Matching the rules alone would truncate the
