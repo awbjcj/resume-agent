@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 
-from resume_agent.llm_runner import Runner
+from resume_agent.llm_runner import Runner, UnparsedAgentOutput
 from resume_agent.profile.coach import (
     CoachTurn,
     OpeningTurn,
@@ -43,6 +44,8 @@ _EMPTY_SESSION_RECAP = (
     "You ended this session before discussing any topics, so there was nothing to "
     "recap. Start a new session whenever you're ready to add evidence."
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _camel_action(action: dict) -> dict:
@@ -221,10 +224,12 @@ def run_message_turn(
             lambda turn, strict: normalize_turn(turn, preview, strict=strict),
             label="COACH NOTES",
         )
-    except TurnRejected as exc:
-        fallback_text = prose or exc.fallback_text
+    except (TurnRejected, UnparsedAgentOutput) as exc:
+        fallback_text = prose or getattr(exc, "fallback_text", "")
         if not fallback_text:
             raise
+        if isinstance(exc, UnparsedAgentOutput):
+            logger.warning("Coach formatter returned unusable output: %s", exc)
         validated = _degraded_turn(session, fallback_text)
     if prose:
         validated.coach_turn = validated.coach_turn.model_copy(

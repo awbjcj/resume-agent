@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 
@@ -30,7 +31,7 @@ from resume_agent.interview.store import (
     list_sessions,
     load_session,
 )
-from resume_agent.llm_runner import Runner, expect_text
+from resume_agent.llm_runner import Runner, UnparsedAgentOutput, expect_text
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
 from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
 
@@ -39,6 +40,8 @@ _EMPTY_DEBRIEF_SUMMARY = (
     "You ended this interview before answering any questions, so there was nothing "
     "to score. Start a new session whenever you're ready to practice."
 )
+
+logger = logging.getLogger(__name__)
 
 # The interviewer writes free-form notes that a cheap formatter then projects into
 # the OpeningInterview schema. The formatter is told to invent nothing, so the plan
@@ -316,10 +319,12 @@ def run_answer_turn(
             lambda turn, strict: normalize_turn(turn, preview, strict=strict),
             label="INTERVIEWER NOTES",
         )
-    except TurnRejected as exc:
-        fallback_text = prose or exc.fallback_text
+    except (TurnRejected, UnparsedAgentOutput) as exc:
+        fallback_text = prose or getattr(exc, "fallback_text", "")
         if not fallback_text:
             raise
+        if isinstance(exc, UnparsedAgentOutput):
+            logger.warning("Interview formatter returned unusable output: %s", exc)
         validated = _degraded_turn(session, fallback_text)
     if prose:
         validated.turn = validated.turn.model_copy(update={"text": prose})

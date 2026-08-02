@@ -274,6 +274,25 @@ def test_streamed_question_survives_structural_formatter_failure(tmp_path, engin
     assert any(isinstance(event, Notice) for event in sink.events)
 
 
+def test_streamed_question_survives_unparsable_formatter_output(
+    tmp_path, engine, caplog
+):
+    sid = _open(tmp_path, engine)["sessionId"]
+
+    view = run_answer_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        session_id=sid,
+        message="I shipped a FastAPI service.",
+        interviewer_agent=StreamingRunner("Tell me about ownership."),
+        formatter_agent=FakeRunner(["not structured output"]),
+    )
+
+    assert view["turns"][-1]["text"] == "Tell me about ownership."
+    assert "plan was unchanged" in view["turns"][-1]["notice"]
+    assert "Interview formatter returned unusable output" in caplog.text
+
+
 def test_blocking_formatter_question_survives_structural_failure(tmp_path, engine):
     sid = _open(tmp_path, engine)["sessionId"]
     bad = InterviewTurn(

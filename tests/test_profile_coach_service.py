@@ -344,6 +344,23 @@ def test_streamed_prose_survives_structural_formatter_failure(tmp_path):
     assert any(isinstance(event, Notice) for event in sink.events)
 
 
+def test_streamed_prose_survives_unparsable_formatter_output(tmp_path, caplog):
+    sid = _open(tmp_path)["sessionId"]
+
+    view = run_message_turn(
+        FakeReporter(),
+        profile_dir=tmp_path,
+        session_id=sid,
+        message="I improved deploys.",
+        coach_agent=StreamingAgent("Could you quantify that?"),
+        formatter_agent=FakeAgent("not structured output"),
+    )
+
+    assert view["turns"][-1]["text"] == "Could you quantify that?"
+    assert "details could not be read" in view["turns"][-1]["notice"]
+    assert "Coach formatter returned unusable output" in caplog.text
+
+
 def test_blocking_formatter_message_survives_structural_failure(tmp_path):
     sid = _open(tmp_path)["sessionId"]
     bad = CoachTurn(message="Could you quantify that?", action="ask", topic_id="missing")
