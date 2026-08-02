@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, model_validator
 import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -64,6 +67,38 @@ class Settings(BaseSettings):
     domains_per_category_cap: int = Field(default=12, ge=3, le=15)
     search_mode: Literal["auto", "native", "tool", "off"] = "auto"
     advisor_model: str = ""
+    career_skill_root: Path = Path("skills")
+    career_skill_manifest: Path = Path("skills-lock.json")
+    h1b_mcp_enabled: bool = False
+    h1b_mcp_transport: Literal["stdio", "streamable-http"] = "stdio"
+    h1b_mcp_command: str = ""
+    h1b_mcp_url: str = ""
+    h1b_mcp_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    h1b_mcp_max_result_chars: int = Field(default=200_000, ge=1_000, le=1_000_000)
+    h1b_cache_ttl_days: int = Field(default=30, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def validate_h1b_transport(self) -> Settings:
+        if not self.h1b_mcp_enabled:
+            return self
+        command = self.h1b_mcp_command.strip()
+        url = self.h1b_mcp_url.strip()
+        if self.h1b_mcp_transport == "stdio":
+            if not command or url:
+                raise ValueError(
+                    "enabled H1B stdio transport requires command and no URL"
+                )
+            return self
+        if command or not url:
+            raise ValueError(
+                "enabled H1B streamable-http transport requires URL and no command"
+            )
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("H1B MCP URL must be an absolute HTTP(S) URL with a host")
+        if parsed.username or parsed.password:
+            raise ValueError("H1B MCP URL must not contain credentials")
+        return self
 
     # Gmail integration (platform OAuth client; users may override the client
     # via their workspace secrets.env — str fields join the overlay for free).

@@ -18,6 +18,8 @@ ENV PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+COPY skills ./skills
+COPY skills-lock.json ./skills-lock.json
 # Install the locked dependency set, then the package itself without deps.
 # `uv pip install -e .` alone ignores uv.lock and re-resolves pyproject's
 # ranges at build time, so the image could silently pick up a different agno
