@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import { MessagesSquare, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -75,35 +76,51 @@ export function InterviewSetupDialog({
   const [resumeVersionId, setResumeVersionId] = useState(newestVersionId);
   const [extra, setExtra] = useState("");
 
-  const submit = async () => {
-    await start.mutateAsync({
-      jobId,
-      resumeVersionId: resumeVersionId || newestVersionId,
-      style: { stage, demeanor, difficulty, questionCount, extra },
-      onDone: (completed: RunRecord) => {
-        if (completed.status === "succeeded") {
-          const result = completed.result as { sessionId?: string } | null;
-          if (result?.sessionId) {
-            onOpenChange(false);
-            navigate(`/interview?session=${result.sessionId}`);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      await start.mutateAsync({
+        jobId,
+        resumeVersionId: resumeVersionId || newestVersionId,
+        style: { stage, demeanor, difficulty, questionCount, extra: extra.trim() },
+        onDone: (completed: RunRecord) => {
+          if (completed.status === "succeeded") {
+            const result = completed.result as { sessionId?: string } | null;
+            if (result?.sessionId) {
+              navigate(`/interview?session=${result.sessionId}`);
+            }
           }
-        }
-      },
-    });
+        },
+      });
+      // The run has been accepted. Let the global run surface carry progress
+      // instead of trapping the user in a settings dialog until generation ends.
+      onOpenChange(false);
+    } catch {
+      // useStartInterview owns the error toast; keeping the dialog open lets the
+      // user adjust the settings or retry without losing their input.
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Set up your mock interview</DialogTitle>
-          <DialogDescription>
-            Choose the interviewer's style. Questions are grounded in this job and your selected resume.
-          </DialogDescription>
+      <DialogContent className="gap-0 p-0 sm:max-w-xl">
+        <DialogHeader className="border-b bg-muted/35 p-5 pr-14 sm:p-6 sm:pr-16">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+              <MessagesSquare className="size-5" aria-hidden="true" />
+            </span>
+            <div className="space-y-1.5">
+              <DialogTitle className="text-lg leading-tight">Set up your mock interview</DialogTitle>
+              <DialogDescription className="leading-6">
+                Tune the interview style. Every question stays grounded in this job and your selected resume.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        {/* Every control is a `compact` (h-9) Select or a Textarea, so the two
-            columns stay on a single baseline grid. */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={(event) => void submit(event)}>
+          {/* Every control is a `compact` (h-9) Select or a Textarea, so the two
+              columns stay on a single baseline grid. */}
+          <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
           <Field>
             <FieldLabel htmlFor="interview-stage">Stage</FieldLabel>
             <Select items={STAGES} value={stage} onValueChange={(v) => setStage(v ?? "hiring_manager")}>
@@ -174,18 +191,24 @@ export function InterviewSetupDialog({
               rows={3}
               maxLength={2000}
               value={extra}
-              placeholder="e.g. Ask about system design and Kubernetes."
+              placeholder="For example: focus on system design and Kubernetes tradeoffs."
               onChange={(event) => setExtra(event.target.value)}
             />
+            <p className="text-xs leading-5 text-muted-foreground">Optional guidance for this rehearsal only.</p>
           </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button disabled={start.isPending || !newestVersionId} onClick={() => void submit()}>
-            {start.isPending ? <Spinner data-icon="inline-start" /> : null}
-            Start interview
-          </Button>
-        </DialogFooter>
+          </div>
+          <DialogFooter className="mx-0 mb-0 rounded-none px-5 py-4 sm:px-6">
+            <span className="mr-auto hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+              <ShieldCheck className="size-3.5" aria-hidden="true" />
+              Your answers stay in this workspace
+            </span>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={start.isPending || !newestVersionId}>
+              {start.isPending ? <Spinner data-icon="inline-start" /> : null}
+              {start.isPending ? "Starting…" : "Start interview"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
