@@ -486,6 +486,145 @@ def profile_coach_cmd(
     typer.echo("Rebuilt profile with the new coach evidence.")
 
 
+@app.command("career-lab")
+def career_lab_cmd(
+    goal: str | None = typer.Argument(None, help="The goal for this Career Lab session."),
+    skill: str | None = typer.Option(None, "--skill", help="One approved Career Lab skill."),
+    job_id: int | None = typer.Option(None, "--job-id", min=1),
+    resume_version_id: int | None = typer.Option(None, "--resume-version-id", min=1),
+    offer_application_id: list[int] = typer.Option(
+        [], "--offer-application-id", min=1, help="Offer application id (repeatable)."
+    ),
+    db_url: str | None = typer.Option(None, "--db-url"),
+) -> None:
+    """Draft career guidance in an interactive, resumable Career Lab session."""
+    from resume_agent.career_lab.store import active_session
+    from resume_agent.career_skills.models import AgentFamily
+    from resume_agent.career_skills.registry import CareerSkillRegistry, SkillUnavailable
+    from resume_agent.services import career_lab as career_service
+    from resume_agent.sessions.stream import ConsoleStreamSink, NullSink
+    from resume_agent.tenancy.context import current_context
+
+    settings = get_settings()
+    missing = missing_model_keys(settings)
+    if missing:
+        typer.echo(f"Missing API key for configured model(s): {', '.join(missing)}")
+        raise typer.Exit(code=1)
+    if goal and len(goal) > 2_000:
+        typer.echo("Goal is too large (maximum 2,000 characters).")
+        raise typer.Exit(code=1)
+    try:
+        if skill is not None:
+            CareerSkillRegistry.from_settings(settings).require(
+                skill, family=AgentFamily.CAREER_LAB, use="career_lab"
+            )
+    except SkillUnavailable as error:
+        typer.echo(f"Skill unavailable: {error.reason}")
+        raise typer.Exit(code=1) from error
+
+    context = current_context()
+    root = (
+        context.paths.career_lab_dir
+        if context is not None
+        else _tenant_cli_path("data/career-lab")
+    )
+    engine = _engine(db_url)
+    context_refs = career_service.CareerLabContextRefs(
+        job_id=job_id,
+        resume_version_id=resume_version_id,
+        offer_application_ids=offer_application_id,
+    )
+
+    class EchoReporter:
+        process = "cli-career-lab"
+
+        def begin(self, _total, label, **_extra):
+            typer.echo(f"{label}…")
+
+        def step(self, *_args, **_kwargs):
+            return None
+
+        def checkpoint(self):
+            return None
+
+    reporter = EchoReporter()
+    stream_enabled = getattr(settings, "stream_enabled", True)
+
+    def run_streamed(call):
+        sink = (
+            ConsoleStreamSink(lambda text: typer.echo(text, nl=False))
+            if stream_enabled
+            else NullSink()
+        )
+        try:
+            return call(sink)
+        finally:
+            sink.close()
+
+    def show_latest(view: dict) -> None:
+        if not stream_enabled and view.get("turns"):
+            typer.echo(f"\nCareer Lab: {view['turns'][-1]['text']}")
+
+    active = active_session(root)
+    if active is None:
+        initial = typer.prompt("You")
+        if initial.strip().casefold() in {"end", "quit"}:
+            typer.echo("No active Career Lab session.")
+            return
+        view = run_streamed(
+            lambda sink: career_service.run_start_turn(
+                reporter,
+                root=root,
+                engine=engine,
+                message=initial,
+                goal=goal or "",
+                skill=skill,
+                context_refs=context_refs,
+                sink=sink,
+            )
+        )
+        if view.get("needsSelection"):
+            typer.echo(f"Choose a Career Lab skill: {view['route'].get('reason', '')}")
+            raise typer.Exit(code=1)
+    else:
+        view = career_service.session_view(root, active["session_id"])
+        typer.echo("Resuming your active Career Lab session.")
+    session_id = view["sessionId"]
+    show_latest(view)
+
+    while True:
+        message = typer.prompt("You")
+        command = message.strip().casefold()
+        if command == "quit":
+            typer.echo("Session left active.")
+            return
+        if command == "end":
+            ended = career_service.run_end_turn(
+                reporter, root=root, session_id=session_id
+            )
+            typer.echo("Career Lab session ended.")
+            show_latest(ended)
+            return
+        if not message.strip():
+            continue
+        view = run_streamed(
+            lambda sink: career_service.run_message_turn(
+                reporter,
+                root=root,
+                engine=engine,
+                session_id=session_id,
+                message=message,
+                skill=skill,
+                context_refs=context_refs,
+                sink=sink,
+            )
+        )
+        if view.get("needsSelection"):
+            typer.echo(f"Choose a Career Lab skill: {view['route'].get('reason', '')}")
+            continue
+        show_latest(view)
+
+
 
 def _engine(db_url: str | None):
     engine = make_engine(db_url or get_settings().db_url)
@@ -1079,6 +1218,7 @@ def tailor_cmd(
         help="Use the full multi-round review roster.",
     ),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    skill: str | None = typer.Option(None, "--skill", help="Resume authoring skill."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Run the tailor + review loop over approved job(s)."""
@@ -1094,13 +1234,18 @@ def tailor_cmd(
         review_path = (
             DEFAULT_REVIEW_DEEP if deep and review == DEFAULT_REVIEW else review
         )
+        tailor_kwargs = {
+            "job_ids": [job_id] if job_id is not None else None,
+            "approved": approved,
+            "review_path": review_path,
+            "facts_path": facts,
+            "reporter": ProgressReporter("tailor"),
+        }
+        if skill is not None:
+            tailor_kwargs["authoring_skill"] = skill
         outcome = tailor(
             session,
-            job_ids=[job_id] if job_id is not None else None,
-            approved=approved,
-            review_path=review_path,
-            facts_path=facts,
-            reporter=ProgressReporter("tailor"),
+            **tailor_kwargs,
         )
         for jid, versions in outcome.versions.items():
             typer.echo(
@@ -1119,6 +1264,7 @@ def cover_letter_cmd(
         False, "--approved", help="Write cover letters for all approved jobs."
     ),
     facts: str = typer.Option(DEFAULT_FACTS, help="Path to facts.json."),
+    skill: str | None = typer.Option(None, "--skill", help="Cover-letter skill."),
     db_url: str | None = typer.Option(None, help="Override the database URL."),
 ) -> None:
     """Draft a fact-locked cover letter per job and render it to PDF."""
@@ -1131,11 +1277,16 @@ def cover_letter_cmd(
             typer.echo(f"Job #{job_id} not found.")
             raise typer.Exit(code=1)
 
+        cover_kwargs = {
+            "job_ids": [job_id] if job_id is not None else None,
+            "approved": approved,
+            "facts_path": facts,
+        }
+        if skill is not None:
+            cover_kwargs["skill"] = skill
         results = write_cover_letters(
             session,
-            job_ids=[job_id] if job_id is not None else None,
-            approved=approved,
-            facts_path=facts,
+            **cover_kwargs,
         )
         for r in results:
             typer.echo(

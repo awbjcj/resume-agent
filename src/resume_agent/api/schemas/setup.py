@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from resume_agent.api.schemas.base import CamelModel
 
 
@@ -25,9 +27,24 @@ class SourcesStatus(CamelModel):
     enabled_count: int
 
 
+class CareerSkillsCapabilityStatus(CamelModel):
+    available: int
+    unavailable: int
+
+
+class H1BCapabilityStatus(CamelModel):
+    capability: Literal["disabled", "available", "unavailable"]
+
+
+class SetupCapabilities(CamelModel):
+    career_skills: CareerSkillsCapabilityStatus
+    h1b: H1BCapabilityStatus | None = None
+
+
 class SetupStatusOut(CamelModel):
     secrets: SecretsStatus
     profile: ProfileStatus
     search: SearchStatus
     sources: SourcesStatus
+    capabilities: SetupCapabilities | None = None
     complete: bool

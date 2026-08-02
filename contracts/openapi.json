@@ -1281,6 +1281,566 @@
         "title": "BundlePreview",
         "type": "object"
       },
+      "CareerLabAgentMetaOut": {
+        "properties": {
+          "agentFamily": {
+            "title": "Agentfamily",
+            "type": "string"
+          },
+          "modelId": {
+            "title": "Modelid",
+            "type": "string"
+          },
+          "promptPolicyVersion": {
+            "title": "Promptpolicyversion",
+            "type": "string"
+          },
+          "skillRef": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabSkillRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "agentFamily",
+          "promptPolicyVersion",
+          "modelId"
+        ],
+        "title": "CareerLabAgentMetaOut",
+        "type": "object"
+      },
+      "CareerLabArtifactOut": {
+        "properties": {
+          "artifactType": {
+            "enum": [
+              "application_answer",
+              "email",
+              "linkedin_profile",
+              "offer_comparison",
+              "case_study",
+              "reference_list",
+              "career_plan",
+              "negotiation_plan"
+            ],
+            "title": "Artifacttype",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactType",
+          "title",
+          "summary"
+        ],
+        "title": "CareerLabArtifactOut",
+        "type": "object"
+      },
+      "CareerLabArtifactRefIn": {
+        "properties": {
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "turnId": {
+            "title": "Turnid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "turnId"
+        ],
+        "title": "CareerLabArtifactRefIn",
+        "type": "object"
+      },
+      "CareerLabContextIn": {
+        "properties": {
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabArtifactRefIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
+          },
+          "offerApplicationIds": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 10,
+            "minItems": 0,
+            "title": "Offerapplicationids",
+            "type": "array"
+          },
+          "profileSnapshot": {
+            "anyOf": [
+              {
+                "const": "current",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profilesnapshot"
+          },
+          "resumeVersionId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumeversionid"
+          }
+        },
+        "title": "CareerLabContextIn",
+        "type": "object"
+      },
+      "CareerLabMessageIn": {
+        "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabContextIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "skill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabSkillName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "CareerLabMessageIn",
+        "type": "object"
+      },
+      "CareerLabSessionOut": {
+        "properties": {
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "goal": {
+            "default": "",
+            "title": "Goal",
+            "type": "string"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "startedAt": {
+            "title": "Startedat",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "ended"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/CareerLabTurnOut"
+            },
+            "title": "Turns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessionId",
+          "startedAt",
+          "status"
+        ],
+        "title": "CareerLabSessionOut",
+        "type": "object"
+      },
+      "CareerLabSessionSummaryOut": {
+        "properties": {
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "goal": {
+            "default": "",
+            "title": "Goal",
+            "type": "string"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "startedAt": {
+            "title": "Startedat",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "ended"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "turnCount": {
+            "default": 0,
+            "title": "Turncount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sessionId",
+          "startedAt",
+          "status"
+        ],
+        "title": "CareerLabSessionSummaryOut",
+        "type": "object"
+      },
+      "CareerLabSessionsOut": {
+        "properties": {
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/CareerLabSessionSummaryOut"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pagination"
+        ],
+        "title": "CareerLabSessionsOut",
+        "type": "object"
+      },
+      "CareerLabSkillName": {
+        "enum": [
+          "application-form-filler",
+          "career-changer-translator",
+          "career-pivot-planner",
+          "cold-email-writer",
+          "compensation-negotiator",
+          "linkedin-profile-booster",
+          "linkedin-profile-optimizer",
+          "offer-comparison-analyzer",
+          "portfolio-case-study",
+          "portfolio-case-study-writer",
+          "reference-list-builder",
+          "salary-negotiation-prep"
+        ],
+        "title": "CareerLabSkillName",
+        "type": "string"
+      },
+      "CareerLabSkillOut": {
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "isAvailable": {
+            "title": "Isavailable",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "unavailableReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailablereason"
+          },
+          "uses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "family",
+          "isAvailable"
+        ],
+        "title": "CareerLabSkillOut",
+        "type": "object"
+      },
+      "CareerLabSkillRefOut": {
+        "properties": {
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "sha256",
+          "family"
+        ],
+        "title": "CareerLabSkillRefOut",
+        "type": "object"
+      },
+      "CareerLabSkillsOut": {
+        "properties": {
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/CareerLabSkillOut"
+            },
+            "title": "Skills",
+            "type": "array"
+          }
+        },
+        "title": "CareerLabSkillsOut",
+        "type": "object"
+      },
+      "CareerLabStartIn": {
+        "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabContextIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goal": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Goal",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "skill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabSkillName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "CareerLabStartIn",
+        "type": "object"
+      },
+      "CareerLabTurnOut": {
+        "properties": {
+          "agentMeta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabAgentMetaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabArtifactOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "contextRefs": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabContextIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notice": {
+            "default": "",
+            "title": "Notice",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "skillRef": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerLabSkillRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "turnId": {
+            "title": "Turnid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turnId",
+          "role",
+          "text",
+          "at"
+        ],
+        "title": "CareerLabTurnOut",
+        "type": "object"
+      },
+      "CareerSkillsCapabilityStatus": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "integer"
+          },
+          "unavailable": {
+            "title": "Unavailable",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "available",
+          "unavailable"
+        ],
+        "title": "CareerSkillsCapabilityStatus",
+        "type": "object"
+      },
       "CategoryOut": {
         "properties": {
           "kind": {
@@ -1956,10 +2516,28 @@
               }
             ],
             "title": "Jobids"
+          },
+          "skill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoverLetterSkillName"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "title": "CoverLetterParams",
         "type": "object"
+      },
+      "CoverLetterSkillName": {
+        "enum": [
+          "cover-letter-generator",
+          "cover-letter-writer"
+        ],
+        "title": "CoverLetterSkillName",
+        "type": "string"
       },
       "DashboardSummaryOut": {
         "properties": {
@@ -2469,6 +3047,180 @@
           "guidance"
         ],
         "title": "GuidanceUpdate",
+        "type": "object"
+      },
+      "H1BCapabilityStatus": {
+        "properties": {
+          "capability": {
+            "enum": [
+              "disabled",
+              "available",
+              "unavailable"
+            ],
+            "title": "Capability",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability"
+        ],
+        "title": "H1BCapabilityStatus",
+        "type": "object"
+      },
+      "H1BSponsorshipEvidenceOut": {
+        "properties": {
+          "caveat": {
+            "title": "Caveat",
+            "type": "string"
+          },
+          "certifiedCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certifiedcount"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "dataVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataversion"
+          },
+          "displayCompany": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displaycompany"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+          },
+          "filingCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filingcount"
+          },
+          "fiscalPeriods": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fiscalperiods",
+            "type": "array"
+          },
+          "normalizedCompany": {
+            "title": "Normalizedcompany",
+            "type": "string"
+          },
+          "retrievedAt": {
+            "format": "date-time",
+            "title": "Retrievedat",
+            "type": "string"
+          },
+          "sourceUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceurl"
+          },
+          "status": {
+            "enum": [
+              "matched",
+              "no_match",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "wageSummary": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wagesummary"
+          }
+        },
+        "required": [
+          "status",
+          "normalizedCompany",
+          "displayCompany",
+          "fiscalPeriods",
+          "filingCount",
+          "certifiedCount",
+          "wageSummary",
+          "sourceUrl",
+          "dataVersion",
+          "retrievedAt",
+          "expiresAt",
+          "confidence",
+          "caveat"
+        ],
+        "title": "H1BSponsorshipEvidenceOut",
+        "type": "object"
+      },
+      "H1BSponsorshipOut": {
+        "properties": {
+          "capability": {
+            "enum": [
+              "disabled",
+              "available",
+              "unavailable"
+            ],
+            "title": "Capability",
+            "type": "string"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/H1BSponsorshipEvidenceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "capability"
+        ],
+        "title": "H1BSponsorshipOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -3103,6 +3855,16 @@
               }
             ],
             "title": "Fitscore"
+          },
+          "h1BSponsorship": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/H1BSponsorshipOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "hasProgress": {
             "title": "Hasprogress",
@@ -6299,6 +7061,24 @@
         "title": "ResourceOut",
         "type": "object"
       },
+      "ResumeAuthoringSkillName": {
+        "enum": [
+          "academic-cv-builder",
+          "academic-research-cv",
+          "creative-portfolio-resume",
+          "executive-leadership-resume",
+          "executive-resume-writer",
+          "resume-bullet-writer",
+          "resume-customizer",
+          "resume-quantifier",
+          "resume-section-builder",
+          "resume-tailor",
+          "software-engineer-resume",
+          "tech-resume-optimizer"
+        ],
+        "title": "ResumeAuthoringSkillName",
+        "type": "string"
+      },
       "ResumeVersionOut": {
         "properties": {
           "createdAt": {
@@ -7497,8 +8277,40 @@
         "title": "SettingsSectionOut",
         "type": "object"
       },
+      "SetupCapabilities": {
+        "properties": {
+          "careerSkills": {
+            "$ref": "#/components/schemas/CareerSkillsCapabilityStatus"
+          },
+          "h1B": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/H1BCapabilityStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "careerSkills"
+        ],
+        "title": "SetupCapabilities",
+        "type": "object"
+      },
       "SetupStatusOut": {
         "properties": {
+          "capabilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetupCapabilities"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "complete": {
             "title": "Complete",
             "type": "boolean"
@@ -8578,6 +9390,16 @@
             "default": false,
             "title": "Approved",
             "type": "boolean"
+          },
+          "authoringSkill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResumeAuthoringSkillName"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "deep": {
             "default": false,
@@ -12250,6 +13072,516 @@
         "tags": [
           "auth"
         ]
+      }
+    },
+    "/api/career-lab/sessions": {
+      "get": {
+        "operationId": "list_career_lab_sessions_api_career_lab_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Pagesize",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeArchived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Includearchived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareerLabSessionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Career Lab Sessions"
+      },
+      "post": {
+        "operationId": "start_career_lab_api_career_lab_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CareerLabStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Career Lab"
+      }
+    },
+    "/api/career-lab/sessions/{session_id}": {
+      "delete": {
+        "operationId": "delete_career_lab_api_career_lab_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Career Lab"
+      },
+      "get": {
+        "operationId": "get_career_lab_session_api_career_lab_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareerLabSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Career Lab Session"
+      }
+    },
+    "/api/career-lab/sessions/{session_id}/archive": {
+      "post": {
+        "operationId": "archive_career_lab_api_career_lab_sessions__session_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareerLabSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Career Lab"
+      }
+    },
+    "/api/career-lab/sessions/{session_id}/end": {
+      "post": {
+        "operationId": "end_career_lab_api_career_lab_sessions__session_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Career Lab"
+      }
+    },
+    "/api/career-lab/sessions/{session_id}/messages": {
+      "post": {
+        "operationId": "message_career_lab_api_career_lab_sessions__session_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CareerLabMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Message Career Lab"
+      }
+    },
+    "/api/career-lab/sessions/{session_id}/unarchive": {
+      "post": {
+        "operationId": "unarchive_career_lab_api_career_lab_sessions__session_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareerLabSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Career Lab"
+      }
+    },
+    "/api/career-lab/skills": {
+      "get": {
+        "operationId": "list_career_lab_skills_api_career_lab_skills_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareerLabSkillsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Career Lab Skills"
       }
     },
     "/api/config/models": {

@@ -49,3 +49,19 @@ def test_areas_flip_as_setup_progresses(make_client, tmp_path):
         # no sources enabled yet -> still incomplete
         assert body["sources"]["enabledCount"] == 0
         assert body["complete"] is False
+
+
+def test_broken_skill_manifest_is_reported_additively(make_client, tmp_path):
+    root = tmp_path / "skills"
+    manifest = tmp_path / "skills-lock.json"
+    root.mkdir()
+    manifest.write_text("{not-json", encoding="utf-8")
+
+    with make_client(
+        f"CAREER_SKILL_ROOT={root}\nCAREER_SKILL_MANIFEST={manifest}\n"
+    ) as client:
+        body = client.get("/api/setup/status").json()
+
+    assert body["complete"] is False
+    assert body["capabilities"]["careerSkills"]["available"] == 0
+    assert body["capabilities"]["careerSkills"]["unavailable"] >= 1

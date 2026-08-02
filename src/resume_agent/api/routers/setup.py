@@ -9,14 +9,18 @@ from fastapi import APIRouter, Request
 
 from resume_agent.api.schemas.config import ProfileConfigDoc, SearchConfigDoc
 from resume_agent.api.schemas.setup import (
+    CareerSkillsCapabilityStatus,
+    H1BCapabilityStatus,
     ProfileStatus,
     SearchStatus,
     SecretsStatus,
+    SetupCapabilities,
     SetupStatusOut,
     SourcesStatus,
 )
 from resume_agent.llm_runner import MODEL_CATALOG, provider_access_available
 from resume_agent.services.sources import list_sources
+from resume_agent.career_skills.registry import CareerSkillRegistry
 from resume_agent.api.deps import (
     get_config_store,
     get_document_store,
@@ -77,6 +81,18 @@ def get_setup_status(request: Request):
         enabled = 0
     sources = SourcesStatus(enabled_count=enabled)
 
+    try:
+        skill_capabilities = CareerSkillRegistry.from_settings(settings).public_capabilities()
+    except Exception as exc:  # a readiness defect must not break the setup gate
+        skill_capabilities = []
+        skill_error = str(exc)
+    else:
+        skill_error = None
+    available = sum(1 for row in skill_capabilities if row.is_available)
+    unavailable = len(skill_capabilities) - available
+    if skill_error:
+        unavailable += 1
+
     complete = (
         secrets.any_llm_key
         and profile.has_resume
@@ -89,5 +105,14 @@ def get_setup_status(request: Request):
         profile=profile,
         search=search,
         sources=sources,
+        capabilities=SetupCapabilities(
+            career_skills=CareerSkillsCapabilityStatus(
+                available=available,
+                unavailable=unavailable,
+            ),
+            h1b=H1BCapabilityStatus(
+                capability="available" if settings.h1b_mcp_enabled else "disabled"
+            ),
+        ),
         complete=complete,
     )

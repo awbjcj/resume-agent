@@ -34,6 +34,7 @@ from resume_agent.api.routers import auth_password as auth_password_router
 from resume_agent.api.routers import auth_register as auth_register_router
 from resume_agent.api.routers import boards, health, resumes
 from resume_agent.api.routers import coach as coach_router
+from resume_agent.api.routers import career_lab as career_lab_router
 from resume_agent.api.routers import config as config_router
 from resume_agent.api.routers import cover_letters as cover_letters_router
 from resume_agent.api.routers import dashboard as dashboard_router
@@ -356,6 +357,7 @@ def create_app(
     app.include_router(secrets_router.router, prefix="/api", dependencies=guarded)
     app.include_router(profile_router.router, prefix="/api", dependencies=guarded)
     app.include_router(coach_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(career_lab_router.router, prefix="/api", dependencies=guarded)
     app.include_router(interview_router.router, prefix="/api", dependencies=guarded)
     app.include_router(transcribe_router.router, prefix="/api", dependencies=guarded)
     app.include_router(setup_router.router, prefix="/api", dependencies=guarded)

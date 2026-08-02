@@ -727,6 +727,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/career-lab/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Career Lab Sessions */
+        get: operations["list_career_lab_sessions_api_career_lab_sessions_get"];
+        put?: never;
+        /** Start Career Lab */
+        post: operations["start_career_lab_api_career_lab_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/career-lab/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Career Lab Session */
+        get: operations["get_career_lab_session_api_career_lab_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Career Lab */
+        delete: operations["delete_career_lab_api_career_lab_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/career-lab/sessions/{session_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Career Lab */
+        post: operations["archive_career_lab_api_career_lab_sessions__session_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/career-lab/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End Career Lab */
+        post: operations["end_career_lab_api_career_lab_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/career-lab/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Message Career Lab */
+        post: operations["message_career_lab_api_career_lab_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/career-lab/sessions/{session_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Career Lab */
+        post: operations["unarchive_career_lab_api_career_lab_sessions__session_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/career-lab/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Career Lab Skills */
+        get: operations["list_career_lab_skills_api_career_lab_skills_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config/models": {
         parameters: {
             query?: never;
@@ -3160,6 +3281,190 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** CareerLabAgentMetaOut */
+        CareerLabAgentMetaOut: {
+            /** Agentfamily */
+            agentFamily: string;
+            /** Modelid */
+            modelId: string;
+            /** Promptpolicyversion */
+            promptPolicyVersion: string;
+            skillRef?: components["schemas"]["CareerLabSkillRefOut"] | null;
+        };
+        /** CareerLabArtifactOut */
+        CareerLabArtifactOut: {
+            /**
+             * Artifacttype
+             * @enum {string}
+             */
+            artifactType: "application_answer" | "email" | "linkedin_profile" | "offer_comparison" | "case_study" | "reference_list" | "career_plan" | "negotiation_plan";
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
+        /** CareerLabArtifactRefIn */
+        CareerLabArtifactRefIn: {
+            /** Sessionid */
+            sessionId: string;
+            /** Turnid */
+            turnId: string;
+        };
+        /** CareerLabContextIn */
+        CareerLabContextIn: {
+            artifact?: components["schemas"]["CareerLabArtifactRefIn"] | null;
+            /** Jobid */
+            jobId?: number | null;
+            /** Offerapplicationids */
+            offerApplicationIds?: number[];
+            /** Profilesnapshot */
+            profileSnapshot?: "current" | null;
+            /** Resumeversionid */
+            resumeVersionId?: number | null;
+        };
+        /** CareerLabMessageIn */
+        CareerLabMessageIn: {
+            context?: components["schemas"]["CareerLabContextIn"] | null;
+            /** Message */
+            message: string;
+            skill?: components["schemas"]["CareerLabSkillName"] | null;
+        };
+        /** CareerLabSessionOut */
+        CareerLabSessionOut: {
+            /** Archivedat */
+            archivedAt?: string | null;
+            /** Endedat */
+            endedAt?: string | null;
+            /**
+             * Goal
+             * @default
+             */
+            goal: string;
+            /** Sessionid */
+            sessionId: string;
+            /** Startedat */
+            startedAt: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "ended";
+            /** Turns */
+            turns?: components["schemas"]["CareerLabTurnOut"][];
+        };
+        /** CareerLabSessionSummaryOut */
+        CareerLabSessionSummaryOut: {
+            /** Archivedat */
+            archivedAt?: string | null;
+            /** Endedat */
+            endedAt?: string | null;
+            /**
+             * Goal
+             * @default
+             */
+            goal: string;
+            /** Sessionid */
+            sessionId: string;
+            /** Startedat */
+            startedAt: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "ended";
+            /**
+             * Turncount
+             * @default 0
+             */
+            turnCount: number;
+        };
+        /** CareerLabSessionsOut */
+        CareerLabSessionsOut: {
+            pagination: components["schemas"]["Pagination"];
+            /** Sessions */
+            sessions?: components["schemas"]["CareerLabSessionSummaryOut"][];
+        };
+        /**
+         * CareerLabSkillName
+         * @enum {string}
+         */
+        CareerLabSkillName: "application-form-filler" | "career-changer-translator" | "career-pivot-planner" | "cold-email-writer" | "compensation-negotiator" | "linkedin-profile-booster" | "linkedin-profile-optimizer" | "offer-comparison-analyzer" | "portfolio-case-study" | "portfolio-case-study-writer" | "reference-list-builder" | "salary-negotiation-prep";
+        /** CareerLabSkillOut */
+        CareerLabSkillOut: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Family */
+            family: string;
+            /** Isavailable */
+            isAvailable: boolean;
+            /** Name */
+            name: string;
+            /** Unavailablereason */
+            unavailableReason?: string | null;
+            /** Uses */
+            uses?: string[];
+        };
+        /** CareerLabSkillRefOut */
+        CareerLabSkillRefOut: {
+            /** Family */
+            family: string;
+            /** Name */
+            name: string;
+            /** Sha256 */
+            sha256: string;
+            /** Version */
+            version: string;
+        };
+        /** CareerLabSkillsOut */
+        CareerLabSkillsOut: {
+            /** Skills */
+            skills?: components["schemas"]["CareerLabSkillOut"][];
+        };
+        /** CareerLabStartIn */
+        CareerLabStartIn: {
+            context?: components["schemas"]["CareerLabContextIn"] | null;
+            /**
+             * Goal
+             * @default
+             */
+            goal: string;
+            /** Message */
+            message: string;
+            skill?: components["schemas"]["CareerLabSkillName"] | null;
+        };
+        /** CareerLabTurnOut */
+        CareerLabTurnOut: {
+            agentMeta?: components["schemas"]["CareerLabAgentMetaOut"] | null;
+            artifact?: components["schemas"]["CareerLabArtifactOut"] | null;
+            /** At */
+            at: string;
+            contextRefs?: components["schemas"]["CareerLabContextIn"] | null;
+            /**
+             * Notice
+             * @default
+             */
+            notice: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            skillRef?: components["schemas"]["CareerLabSkillRefOut"] | null;
+            /** Text */
+            text: string;
+            /** Turnid */
+            turnId: string;
+        };
+        /** CareerSkillsCapabilityStatus */
+        CareerSkillsCapabilityStatus: {
+            /** Available */
+            available: number;
+            /** Unavailable */
+            unavailable: number;
+        };
         /** CategoryOut */
         CategoryOut: {
             /**
@@ -3460,7 +3765,13 @@ export interface components {
             approved: boolean;
             /** Jobids */
             jobIds?: number[] | null;
+            skill?: components["schemas"]["CoverLetterSkillName"] | null;
         };
+        /**
+         * CoverLetterSkillName
+         * @enum {string}
+         */
+        CoverLetterSkillName: "cover-letter-generator" | "cover-letter-writer";
         /** DashboardSummaryOut */
         DashboardSummaryOut: {
             activeCoachSession?: components["schemas"]["CoachSessionSummaryOut"] | null;
@@ -3675,6 +3986,63 @@ export interface components {
         GuidanceUpdate: {
             /** Guidance */
             guidance: string;
+        };
+        /** H1BCapabilityStatus */
+        H1BCapabilityStatus: {
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "disabled" | "available" | "unavailable";
+        };
+        /** H1BSponsorshipEvidenceOut */
+        H1BSponsorshipEvidenceOut: {
+            /** Caveat */
+            caveat: string;
+            /** Certifiedcount */
+            certifiedCount: number | null;
+            /** Confidence */
+            confidence: number;
+            /** Dataversion */
+            dataVersion: string | null;
+            /** Displaycompany */
+            displayCompany: string | null;
+            /**
+             * Expiresat
+             * Format: date-time
+             */
+            expiresAt: string;
+            /** Filingcount */
+            filingCount: number | null;
+            /** Fiscalperiods */
+            fiscalPeriods: string[];
+            /** Normalizedcompany */
+            normalizedCompany: string;
+            /**
+             * Retrievedat
+             * Format: date-time
+             */
+            retrievedAt: string;
+            /** Sourceurl */
+            sourceUrl: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matched" | "no_match" | "unavailable";
+            /** Wagesummary */
+            wageSummary: {
+                [key: string]: number;
+            } | null;
+        };
+        /** H1BSponsorshipOut */
+        H1BSponsorshipOut: {
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "disabled" | "available" | "unavailable";
+            evidence?: components["schemas"]["H1BSponsorshipEvidenceOut"] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3953,6 +4321,7 @@ export interface components {
             fitRationale: string | null;
             /** Fitscore */
             fitScore: number | null;
+            h1BSponsorship?: components["schemas"]["H1BSponsorshipOut"] | null;
             /** Hasprogress */
             hasProgress: boolean;
             /** Id */
@@ -5052,6 +5421,11 @@ export interface components {
              */
             url: string;
         };
+        /**
+         * ResumeAuthoringSkillName
+         * @enum {string}
+         */
+        ResumeAuthoringSkillName: "academic-cv-builder" | "academic-research-cv" | "creative-portfolio-resume" | "executive-leadership-resume" | "executive-resume-writer" | "resume-bullet-writer" | "resume-customizer" | "resume-quantifier" | "resume-section-builder" | "resume-tailor" | "software-engineer-resume" | "tech-resume-optimizer";
         /** ResumeVersionOut */
         ResumeVersionOut: {
             /**
@@ -5499,8 +5873,14 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** SetupCapabilities */
+        SetupCapabilities: {
+            careerSkills: components["schemas"]["CareerSkillsCapabilityStatus"];
+            h1B?: components["schemas"]["H1BCapabilityStatus"] | null;
+        };
         /** SetupStatusOut */
         SetupStatusOut: {
+            capabilities?: components["schemas"]["SetupCapabilities"] | null;
             /** Complete */
             complete: boolean;
             profile: components["schemas"]["ProfileStatus"];
@@ -5832,6 +6212,7 @@ export interface components {
              * @default false
              */
             approved: boolean;
+            authoringSkill?: components["schemas"]["ResumeAuthoringSkillName"] | null;
             /**
              * Deep
              * @default false
@@ -7813,6 +8194,307 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_career_lab_sessions_api_career_lab_sessions_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                includeArchived?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareerLabSessionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_career_lab_api_career_lab_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CareerLabStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_career_lab_session_api_career_lab_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareerLabSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_career_lab_api_career_lab_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_career_lab_api_career_lab_sessions__session_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareerLabSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_career_lab_api_career_lab_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    message_career_lab_api_career_lab_sessions__session_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CareerLabMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_career_lab_api_career_lab_sessions__session_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareerLabSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_career_lab_skills_api_career_lab_skills_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareerLabSkillsOut"];
                 };
             };
             /** @description Validation Error */
