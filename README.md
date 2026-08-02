@@ -95,6 +95,29 @@ cp config/connectors.yaml.example      config/connectors.yaml   # only if you'll
 Everything else (the SQLite database, the `output/` and `data/` folders) is
 created automatically on first run.
 
+### Career Lab and historical sponsorship research
+
+Career Lab is a draft-only workspace available at `/career-lab` in the web
+app, through the `career-lab` CLI command, and through the `/api/career-lab`
+REST resources. It routes each turn to one verified local career skill, keeps
+one active session per workspace, streams recoverable runs, and supports end,
+archive, unarchive, and delete lifecycle actions. Its outputs are drafts: it
+cannot apply, upload, send, or update a profile.
+
+```bash
+uv run resume-agent career-lab "Prepare negotiation points" \
+  --skill salary-negotiation-prep --offer-application-id 7
+```
+
+H-1B enrichment is an optional historical signal for jobs whose search config
+requires sponsorship research and whose posting signal is silent. Set
+`H1B_MCP_ENABLED=true` and configure either the local `stdio` command or a
+credential-free Streamable HTTP URL in `.env.example`; never configure both.
+Only these read-only MCP tools are exposed: `h1b_get_company_stats`,
+`h1b_search_h1b_jobs`, and `h1b_get_available_data`. Historical filings are
+never treated as confirmation of current sponsorship or current employer
+policy, never flip the posting signal, and never hard-reject a job.
+
 ### Multi-user server
 
 Every file-backed API server uses isolated per-user workspaces. Seed the first
