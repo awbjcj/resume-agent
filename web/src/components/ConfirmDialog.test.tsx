@@ -23,5 +23,6 @@ describe("ConfirmDialog", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /confirm delete/i }));
     expect(onConfirm).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });

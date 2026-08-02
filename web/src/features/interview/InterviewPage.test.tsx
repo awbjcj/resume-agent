@@ -197,5 +197,6 @@ describe("InterviewPage", () => {
     const dialog = await screen.findByRole("alertdialog");
     await userEvent.click(within(dialog).getByRole("button", { name: /end interview/i }));
     expect(endMutate).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "s1" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 });
