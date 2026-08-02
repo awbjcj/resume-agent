@@ -173,6 +173,11 @@ def _post_process(
             checkpoint=reporter.checkpoint,
         )
 
+    # Its own segment: `reporter.step` reports an absolute count, so fanning
+    # out N probes under the research phase's total of 1 pinned the bar at 100%
+    # and displayed "8 of 1".
+    if fresh:
+        reporter.begin(len(fresh), "Discovery Scout is checking sources")
     results = asyncio.run(probe_all()) if fresh else []
     for (index, proposal), result in zip(fresh, results, strict=True):
         assert proposal.source is not None
