@@ -22,6 +22,8 @@ export function ChatThread({
   showReasoning = true,
   renderAfter,
   className,
+  assistantName = "Assistant",
+  assistantIcon,
 }: {
   messages: ChatThreadMessage[];
   streaming: ChatPart[] | null;
@@ -29,6 +31,8 @@ export function ChatThread({
   showReasoning?: boolean;
   renderAfter?: (message: ChatThreadMessage) => ReactNode;
   className?: string;
+  assistantName?: string;
+  assistantIcon?: ReactNode;
 }) {
   const viewport = useRef<HTMLDivElement | null>(null);
   const [stuck, setStuck] = useState(true);
@@ -62,7 +66,12 @@ export function ChatThread({
         <div className="space-y-4 py-2">
           {messages.map((message) => (
             <div key={message.id}>
-              <ChatMessage message={message} showReasoning={showReasoning} />
+              <ChatMessage
+                message={message}
+                showReasoning={showReasoning}
+                assistantName={assistantName}
+                assistantIcon={assistantIcon}
+              />
               {renderAfter?.(message)}
             </div>
           ))}
@@ -72,6 +81,8 @@ export function ChatThread({
                 message={{ id: "streaming", role: "assistant", parts: streaming }}
                 showReasoning={showReasoning}
                 streaming={streamingActive}
+                assistantName={assistantName}
+                assistantIcon={assistantIcon}
               />
             </div>
           ) : null}

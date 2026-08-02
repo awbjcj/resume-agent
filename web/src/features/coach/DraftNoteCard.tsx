@@ -8,6 +8,7 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 import type { CoachDraftNote } from "./use-coach";
 
@@ -27,11 +28,12 @@ export function DraftNoteCard({ note, saving, discarding, onSave, onDiscard }: D
   const pending = note.status === "pending";
 
   return (
-    <Card className="border-primary/25 bg-primary/[0.035] shadow-sm">
-      <CardHeader>
+    <Card className={cn("rounded-2xl border-primary/25 bg-primary/[0.035] shadow-card", pending && "agent-artifact-enter")}>
+      <CardHeader className="border-b border-primary/10 bg-primary/[0.04]">
         <CardTitle className="flex items-center gap-2 text-base">
-          <FileCheck2 className="size-4 text-primary" aria-hidden="true" />
-          {editing ? "Edit profile note" : title}
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileCheck2 className="size-4" aria-hidden="true" /></span>
+          <span>{editing ? "Edit profile note" : title}</span>
+          {pending ? <Badge variant="secondary" className="ml-auto">Needs approval</Badge> : null}
         </CardTitle>
         <CardDescription>
           {pending ? "Review this grounded note before adding it to your profile." : `Note ${note.status}.`}
@@ -53,10 +55,10 @@ export function DraftNoteCard({ note, saving, discarding, onSave, onDiscard }: D
         ) : (
           <p className="text-base leading-7">{summary}</p>
         )}
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-xl border border-primary/10 bg-background/70 p-4">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your evidence</div>
           {(note.quotes ?? []).map((quote) => (
-            <blockquote key={quote} className="border-l-2 border-primary/35 pl-4 text-base italic leading-7 text-muted-foreground">
+            <blockquote key={quote} className="border-l-2 border-primary/35 pl-4 text-sm italic leading-6 text-muted-foreground">
               “{quote}”
             </blockquote>
           ))}

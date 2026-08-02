@@ -1,6 +1,6 @@
 # 005 — Make Discovery Scout an approval-first research workspace
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: c07f67b3
 - **Severity**: MEDIUM
 - **Category**: Human-in-the-loop clarity, interruptibility, hierarchy

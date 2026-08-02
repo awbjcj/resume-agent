@@ -89,13 +89,13 @@ export function SessionsRail({ selectedId }: { selectedId: string | null }) {
   const remove = useDeleteInterviewSession();
   const rows = sessions.data?.sessions ?? [];
 
-  return <aside className="flex w-full flex-col gap-5 rounded-2xl bg-card p-4 shadow-card ring-1 ring-foreground/10 lg:sticky lg:top-24 lg:w-80 lg:shrink-0">
-    <div className="flex items-center justify-between gap-3">
+  return <aside className="flex w-full flex-col gap-5 rounded-2xl bg-card p-4 shadow-card ring-1 ring-foreground/10 lg:sticky lg:top-24 lg:w-72 lg:shrink-0 xl:w-80" aria-label="Interview sessions">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Practice history</p>
         <h2 className="mt-0.5 text-lg font-semibold tracking-tight">Sessions</h2>
       </div>
-      <Button size="sm" onClick={() => setNewOpen(true)}><Plus />New interview</Button>
+      <Button className="max-sm:w-full" size="sm" onClick={() => setNewOpen(true)}><Plus />New interview</Button>
     </div>
     {sessions.isPending ? <div className="flex flex-col gap-2" aria-label="Loading sessions"><Skeleton className="h-14" /><Skeleton className="h-14" /></div> : null}
     {sessions.isError ? <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm"><p>Could not load sessions.</p><Button size="sm" variant="outline" onClick={() => void sessions.refetch()}>Try again</Button></div> : null}

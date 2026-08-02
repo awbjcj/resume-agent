@@ -30,7 +30,7 @@ export function DebriefCard({
   plan: PlanItem[];
 }) {
   return (
-    <Card className="rounded-2xl">
+    <Card className="agent-artifact-enter rounded-2xl">
       <CardHeader className="border-b bg-accent/45 p-5 sm:p-6">
         <CardTitle className="flex items-center gap-3 text-lg">
           <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">

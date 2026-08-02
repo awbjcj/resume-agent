@@ -3,6 +3,7 @@ import { ChevronRight, ExternalLink, Plus, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -42,22 +43,23 @@ export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, loca
   const expanded = open || editingReason || Boolean(error);
 
   return (
-    <li className={cn("scout-proposal-card border-b border-border/60 last:border-b-0", !pending && "bg-muted/30")} data-pending={pending}>
+    <Collapsible
+      open={expanded}
+      onOpenChange={setOpen}
+      render={<li className={cn("scout-proposal-card border-b border-border/60 last:border-b-0", !pending && "bg-muted/30")} data-pending={pending} />}
+    >
       {/* The disclosure button holds the chevron and the label and nothing else,
           so its accessible name is exactly the proposal's name. Folding the
           badges and reason into it instead made every row announce as one long
           run-on string and collide with the "Add {label}" control beside it. */}
       <div className="flex items-start gap-1.5 px-3 pt-2.5">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={expanded}
+        <CollapsibleTrigger
           aria-controls={detailId}
           className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm py-0.5 text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
         >
-          <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")} aria-hidden="true" />
+          <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-[160ms] ease-out-strong motion-reduce:transition-none", expanded && "rotate-90")} aria-hidden="true" />
           <span className={cn("truncate text-sm font-medium leading-tight", !pending && "text-muted-foreground")}>{label}</span>
-        </button>
+        </CollapsibleTrigger>
         {pending ? (
           <div className="flex shrink-0 items-center gap-0.5">
             <Button ref={dismissButton} size="icon-sm" variant="ghost" aria-label={`Dismiss ${label}`} onClick={() => { setEditingReason(true); setOpen(true); }}><X /></Button>
@@ -74,7 +76,7 @@ export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, loca
         {detail ? <span className="truncate text-[11px] capitalize text-muted-foreground">{detail}</span> : null}
         {proposal.fitScore != null ? <span className="text-[11px] tabular-nums text-muted-foreground">{proposal.fitScore}% fit</span> : null}
       </div>
-      <div id={detailId} hidden={!expanded} className="space-y-2 px-3 pb-3 pl-8 text-xs [&[hidden]]:hidden">
+      <CollapsibleContent keepMounted id={detailId} className="translate-y-0 space-y-2 overflow-hidden px-3 pb-3 pl-8 text-xs opacity-100 transition-[opacity,transform] duration-[160ms] ease-out-strong data-starting-style:-translate-y-1 data-starting-style:opacity-0 data-ending-style:-translate-y-1 data-ending-style:opacity-0 motion-reduce:translate-y-0 motion-reduce:transition-opacity">
         {proposal.reason ? <p className="leading-relaxed text-muted-foreground">{proposal.reason}</p> : null}
         {proposal.source?.url ? <a href={proposal.source.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"><span className="truncate">{proposal.source.url}</span><ExternalLink className="size-3 shrink-0" aria-hidden="true" /></a> : null}
         {citations.length ? <div className="flex flex-wrap gap-2">{citations.map((item) => <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline">{item.title || "Evidence"}<ExternalLink className="size-3" aria-hidden="true" /></a>)}</div> : null}
@@ -89,7 +91,7 @@ export function ProposalCard({ sessionId, proposal, scrapeAvailable, error, loca
             <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => setEditingReason(false)}>Cancel</Button><Button size="sm" variant="secondary" disabled={dismiss.isPending} onClick={() => { void dismiss.mutateAsync({ sessionId, proposalId: proposal.id, reason: reason.trim() }).then(() => setEditingReason(false)).catch(() => undefined); }}>Confirm dismiss</Button></div>
           </div>
         ) : null}
-      </div>
-    </li>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

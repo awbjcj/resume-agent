@@ -1,6 +1,6 @@
 # 003 — Turn Profile Coach into an evidence workshop
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: c07f67b3
 - **Severity**: MEDIUM
 - **Category**: Hierarchy, structured artifacts, rare-state delight

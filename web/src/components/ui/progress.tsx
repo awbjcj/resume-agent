@@ -19,7 +19,7 @@ function Progress({
     >
       {children}
       <ProgressTrack>
-        <ProgressIndicator />
+        <ProgressIndicator value={value} />
       </ProgressTrack>
     </ProgressPrimitive.Root>
   )
@@ -40,12 +40,19 @@ function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
 
 function ProgressIndicator({
   className,
+  value = 0,
+  style,
   ...props
-}: ProgressPrimitive.Indicator.Props) {
+}: React.ComponentProps<"div"> & { value?: number | null }) {
+  const scale = Math.max(0, Math.min(100, value ?? 0)) / 100
   return (
-    <ProgressPrimitive.Indicator
+    <div
       data-slot="progress-indicator"
-      className={cn("h-full bg-primary transition-all", className)}
+      className={cn(
+        "h-full w-full origin-left bg-primary transition-transform duration-200 ease-in-out-strong motion-reduce:transition-none",
+        className
+      )}
+      style={{ ...style, transform: `scaleX(${scale})` }}
       {...props}
     />
   )

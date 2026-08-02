@@ -92,6 +92,19 @@ describe("ChatThread", () => {
 
   it("does not mount reasoning text while its disclosure is collapsed", () => {
     render(<ChatThread messages={[]} streaming={[{ kind: "reasoning", text: "private chain" }]} />);
-    expect(screen.queryByText("private chain")).not.toBeInTheDocument();
+    expect(screen.getByText("private chain")).not.toBeVisible();
+  });
+
+  it("forwards the page-specific assistant identity", () => {
+    render(
+      <ChatThread
+        messages={[{ id: "a", role: "assistant", parts: [{ kind: "text", text: "hello" }] }]}
+        streaming={null}
+        assistantName="Profile coach"
+        assistantIcon={<span data-testid="coach-icon" />}
+      />,
+    );
+    expect(screen.getByText("Profile coach")).toBeInTheDocument();
+    expect(screen.getByTestId("coach-icon")).toBeInTheDocument();
   });
 });

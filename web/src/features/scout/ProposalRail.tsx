@@ -4,7 +4,8 @@ import { Building2, ChevronRight, Layers3, Tags } from "lucide-react";
 import { CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { ProposalCard } from "./ProposalCard";
@@ -15,22 +16,19 @@ function Section({ title, icon, rows, defaultOpen, children }: { title: string; 
   const [open, setOpen] = useState(defaultOpen);
   if (!rows) return null;
   return (
-    <section>
+    <Collapsible open={open} onOpenChange={setOpen} render={<section />}>
       <h3>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
+        <CollapsibleTrigger
           className="sticky top-0 z-10 flex w-full items-center gap-2 border-b bg-background/95 px-3 py-2 text-left backdrop-blur focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
         >
-          <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} aria-hidden="true" />
+          <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-[160ms] ease-out-strong motion-reduce:transition-none", open && "rotate-90")} aria-hidden="true" />
           {icon}
           <span className="flex-1 text-xs font-semibold tracking-wide uppercase">{title}</span>
           <Badge variant="secondary" className="px-1.5 py-0 text-[10px] leading-4 tabular-nums">{rows}</Badge>
-        </button>
+        </CollapsibleTrigger>
       </h3>
-      {open ? <ul>{children}</ul> : null}
-    </section>
+      <CollapsibleContent keepMounted className="translate-y-0 overflow-hidden opacity-100 transition-[opacity,transform] duration-[160ms] ease-out-strong data-starting-style:-translate-y-1 data-starting-style:opacity-0 data-ending-style:-translate-y-1 data-ending-style:opacity-0 motion-reduce:translate-y-0 motion-reduce:transition-opacity"><ul>{children}</ul></CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -83,9 +81,10 @@ export function ProposalRail({ sessionId, proposals, scrapeAvailable, className 
       <CardHeader className="gap-2 border-b bg-primary/5 px-3 py-3">
         <div className="flex items-center gap-2">
           <Layers3 className="size-4 shrink-0 text-primary" aria-hidden="true" />
-          <CardTitle className="flex-1 text-sm">Proposal ledger</CardTitle>
+          <CardTitle className="flex-1 text-sm">Review proposals</CardTitle>
           <span className="text-xs tabular-nums text-muted-foreground">{pendingCount} pending</span>
         </div>
+        <CardDescription className="text-xs leading-relaxed">Nothing is added until you approve it.</CardDescription>
         <Button className="w-full" size="sm" variant="secondary" disabled={!ready.length || batching} onClick={addAll} aria-label="Add all ready proposals">
           {ready.length ? `Add all ready (${ready.length})` : "Nothing ready to add"}
         </Button>

@@ -1,6 +1,6 @@
 # 002 — Establish the guided workspace shell
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: c07f67b3
 - **Severity**: MEDIUM
 - **Category**: Visual cohesion and hierarchy

@@ -83,6 +83,33 @@
     transform 160ms var(--ease-out-strong);
 }
 
+.guided-workspace-hero { --workspace-tone: var(--primary); }
+.guided-workspace-hero[data-tone="interview"] { --workspace-tone: var(--chart-3); }
+.guided-workspace-hero[data-tone="scout"] { --workspace-tone: var(--chart-2); }
+.guided-workspace-hero {
+  background-color: var(--card);
+  background-image: radial-gradient(
+    80% 140% at 100% 0%,
+    color-mix(in oklab, var(--workspace-tone), transparent 87%),
+    transparent 62%
+  );
+}
+
+.agent-artifact-enter {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 180ms var(--ease-out-strong),
+    transform 180ms var(--ease-out-strong);
+}
+
+@starting-style {
+  .agent-artifact-enter {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .scout-proposal-card[data-pending="true"]:hover { transform: translateY(-2px); }
 }
@@ -90,6 +117,13 @@
 @media (prefers-reduced-motion: reduce) {
   .scout-proposal-card { transition-property: border-color, background-color, opacity; }
   .scout-proposal-card[data-pending="true"]:hover { transform: none; }
+  .agent-artifact-enter {
+    transform: none;
+    transition: opacity 160ms var(--ease-out-strong);
+  }
+  @starting-style {
+    .agent-artifact-enter { opacity: 0; }
+  }
 }
 
 :root {

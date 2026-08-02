@@ -8,11 +8,11 @@ distinct visual roles.
 
 | Plan | Title | Severity | Status | Depends on |
 | --- | --- | --- | --- | --- |
-| 001 | Make agent activity legible | HIGH | TODO | None |
-| 002 | Establish the guided workspace shell | MEDIUM | TODO | None |
-| 003 | Turn Profile Coach into an evidence workshop | MEDIUM | TODO | 001, 002 |
-| 004 | Give Mock Interviews a focused rehearsal layout | HIGH | TODO | 001, 002 |
-| 005 | Make Discovery Scout an approval-first research workspace | MEDIUM | TODO | 001, 002 |
+| 001 | Make agent activity legible | HIGH | DONE | None |
+| 002 | Establish the guided workspace shell | MEDIUM | DONE | None |
+| 003 | Turn Profile Coach into an evidence workshop | MEDIUM | DONE | 001, 002 |
+| 004 | Give Mock Interviews a focused rehearsal layout | HIGH | DONE | 001, 002 |
+| 005 | Make Discovery Scout an approval-first research workspace | MEDIUM | DONE | 001, 002 |
 
 ## Recommended execution order
 

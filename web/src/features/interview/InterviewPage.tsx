@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
+import { GuidedWorkspaceHeader } from "@/components/chat/GuidedWorkspaceHeader";
 import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -20,7 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Progress, ProgressLabel } from "@/components/ui/progress";
@@ -140,11 +141,14 @@ export function InterviewPage() {
 
   if (session.isLoading && displayedSessionId) {
     return (
-      <div className={cn("flex flex-col gap-6 lg:flex-row lg:items-start", CHAT_PAGE_WIDTH)}>
-        <SessionsRail selectedId={displayedSessionId} />
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-[32rem] w-full" />
+      <div className={cn("space-y-6", CHAT_PAGE_WIDTH)}>
+        <GuidedWorkspaceHeader tone="interview" icon={<MessagesSquare />} eyebrow="Focused rehearsal" title="Mock interviews" description="Practise realistic questions, stay in the moment, and turn the conversation into a scored debrief." />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="flex min-w-0 flex-col gap-4">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-[32rem] w-full" />
+          </div>
+          <SessionsRail selectedId={displayedSessionId} />
         </div>
       </div>
     );
@@ -155,11 +159,21 @@ export function InterviewPage() {
     // with nothing selected — the empty state has to be able to start a run.
     const noSessions = !sessions.isPending && (sessions.data?.sessions?.length ?? 0) === 0;
     return (
-      <div className={cn("flex flex-col gap-6 lg:flex-row lg:items-start", CHAT_PAGE_WIDTH)}>
-        <SessionsRail selectedId={displayedSessionId} />
-        <Card className="min-h-[28rem] min-w-0 flex-1 bg-card/90">
-          <CardContent className="flex min-h-[28rem] items-center justify-center py-14">
-            <Empty>
+      <div className={cn("space-y-6", CHAT_PAGE_WIDTH)}>
+        <GuidedWorkspaceHeader
+          tone="interview"
+          icon={<MessagesSquare />}
+          eyebrow="Focused rehearsal"
+          title="Mock interviews"
+          description="Practise realistic questions, stay in the moment, and turn the conversation into a scored debrief."
+          meta={<Badge variant="outline">{noSessions ? "No sessions yet" : "Choose a session"}</Badge>}
+          actions={<Button onClick={() => setNewOpen(true)}><Plus aria-hidden="true" />Start a mock interview</Button>}
+        />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <main>
+            <Card className="min-h-[28rem] min-w-0 bg-card/90">
+              <CardContent className="flex min-h-[28rem] items-center justify-center py-14">
+                <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon"><MessagesSquare aria-hidden="true" /></EmptyMedia>
                 <EmptyTitle>{noSessions ? "No mock interviews yet" : "No interview selected"}</EmptyTitle>
@@ -169,12 +183,12 @@ export function InterviewPage() {
                     : "Select a session or start a new interview."}
                 </EmptyDescription>
               </EmptyHeader>
-              <EmptyContent>
-                <Button onClick={() => setNewOpen(true)}><Plus aria-hidden="true" />Start a mock interview</Button>
-              </EmptyContent>
-            </Empty>
-          </CardContent>
-        </Card>
+                </Empty>
+              </CardContent>
+            </Card>
+          </main>
+          <SessionsRail selectedId={displayedSessionId} />
+        </div>
         <NewInterviewDialog open={newOpen} onOpenChange={setNewOpen} />
       </div>
     );
@@ -198,23 +212,24 @@ export function InterviewPage() {
   const visibleError = stream.error || runError;
 
   return (
-    <div className={cn("flex flex-col gap-6 lg:flex-row lg:items-start", CHAT_PAGE_WIDTH)}>
-      <SessionsRail selectedId={displayedSessionId} />
-      <main className="flex min-w-0 flex-1 flex-col gap-6">
-        <header className="rounded-2xl bg-card/90 p-5 shadow-card ring-1 ring-foreground/10 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Mock interview</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
-                {active.company || "Mock interview"} — {active.title}
-              </h1>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <Badge variant="secondary" className="capitalize">{active.style.stage.replace("_", " ")}</Badge>
-                <Badge variant="outline" className="capitalize">{active.style.demeanor}</Badge>
-                <Badge variant="outline" className="capitalize">{active.style.difficulty}</Badge>
-              </div>
-            </div>
-            {active.status === "active" ? (
+    <div className={cn("space-y-6", CHAT_PAGE_WIDTH)}>
+      <GuidedWorkspaceHeader
+        tone="interview"
+        icon={<MessagesSquare />}
+        eyebrow="Mock interview"
+        title={<>{active.company || "Mock interview"} — {active.title}</>}
+        description="Answer as you would in the real room. The interviewer adapts, then turns the completed rehearsal into practical coaching."
+        meta={<>
+          <Badge variant={ended ? "outline" : "secondary"}>{ended ? "Rehearsal complete" : "Interview live"}</Badge>
+          <Badge variant="outline" className="capitalize">{active.style.stage.replace("_", " ")}</Badge>
+          <Badge variant="outline" className="capitalize">{active.style.demeanor}</Badge>
+          <Badge variant="outline" className="capitalize">{active.style.difficulty}</Badge>
+          <Progress className="mt-2 w-full basis-full gap-2" value={active.progress.total ? Math.round((active.progress.asked / active.progress.total) * 100) : 0}>
+            <ProgressLabel>Interview progress</ProgressLabel>
+            <span className="ml-auto text-sm tabular-nums text-muted-foreground">Question {active.progress.asked} of {active.progress.total}</span>
+          </Progress>
+        </>}
+        actions={active.status === "active" ? (
               <AlertDialog>
                 <AlertDialogTrigger render={<Button variant="outline"><SquareCheckBig aria-hidden="true" />End interview</Button>} />
                 <AlertDialogContent>
@@ -232,18 +247,11 @@ export function InterviewPage() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            ) : null}
-          </div>
-          <Progress
-            className="mt-5 gap-2"
-            value={active.progress.total ? Math.round((active.progress.asked / active.progress.total) * 100) : 0}
-          >
-            <ProgressLabel>Interview progress</ProgressLabel>
-            <span className="ml-auto text-sm tabular-nums text-muted-foreground">
-              Question {active.progress.asked} of {active.progress.total}
-            </span>
-          </Progress>
-        </header>
+            ) : undefined}
+      />
+
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <main className="flex min-w-0 flex-col gap-6">
 
       {visibleError ? (
         <Alert variant="destructive">
@@ -274,6 +282,8 @@ export function InterviewPage() {
               streaming={streamingParts}
               streamingActive={stream.status === "streaming"}
               showReasoning={false}
+              assistantName="Interviewer"
+              assistantIcon={<MessagesSquare className="size-4" aria-hidden="true" />}
             />
             {sending && !stream.parts.length ? (
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -309,6 +319,8 @@ export function InterviewPage() {
 
       {ended && active.debrief ? <DebriefCard debrief={active.debrief} plan={active.plan ?? []} /> : null}
       </main>
+      <SessionsRail selectedId={displayedSessionId} />
+      </div>
     </div>
   );
 }

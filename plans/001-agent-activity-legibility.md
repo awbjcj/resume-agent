@@ -1,6 +1,6 @@
 # 001 — Make agent activity legible
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: c07f67b3
 - **Severity**: HIGH
 - **Category**: Cohesion, state indication, accessibility

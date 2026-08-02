@@ -1,6 +1,6 @@
 # 004 — Give Mock Interviews a focused rehearsal layout
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: c07f67b3
 - **Severity**: HIGH
 - **Category**: Performance, state indication, hierarchy

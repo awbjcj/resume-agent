@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from "react";
-import { Archive, ArchiveRestore, Bot, ChevronDown, Clock3, EllipsisVertical, History, Sparkles, SquareCheckBig, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Bot, ChevronDown, Clock3, EllipsisVertical, FileCheck2, History, MessageCircleQuestion, SearchCheck, Sparkles, SquareCheckBig, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
+import { GuidedWorkspaceHeader } from "@/components/chat/GuidedWorkspaceHeader";
 import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -254,6 +255,7 @@ export function CoachPage() {
 
   const active = session.data;
   const pendingDrafts = active?.draftNotes?.filter((note) => note.status === "pending") ?? [];
+  const savedDrafts = active?.draftNotes?.filter((note) => note.status === "saved") ?? [];
   const chatMessages: ChatThreadMessage[] = (active?.turns ?? []).map((turn, index) => {
     const notice = (turn as typeof turn & { notice?: string }).notice;
     return {
@@ -272,13 +274,19 @@ export function CoachPage() {
 
   return (
     <div className={cn("flex flex-col gap-8", CHAT_PAGE_WIDTH)}>
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary"><Sparkles className="size-4" aria-hidden="true" />Guided evidence discovery</div>
-          <h1 className="text-3xl font-semibold tracking-tight">Profile coach</h1>
-          <p className="mt-2 max-w-3xl text-base leading-relaxed text-muted-foreground">Turn overlooked outcomes, scope, and project evidence into grounded profile notes.</p>
-        </div>
-        <div className="flex items-center gap-2">{active?.status === "active" ? (
+      <GuidedWorkspaceHeader
+        tone="coach"
+        icon={<Sparkles />}
+        eyebrow="Guided evidence discovery"
+        title="Profile coach"
+        description="Turn overlooked outcomes, scope, and project evidence into grounded profile notes."
+        meta={<>
+          <Badge variant={active?.status === "active" ? "secondary" : "outline"}>{active?.status === "active" ? "Session live" : active?.status === "ended" ? "Session complete" : "Ready when you are"}</Badge>
+          {active ? <Badge variant="outline">{active.topics?.length ?? 0} topics</Badge> : null}
+          {active ? <Badge variant="outline">{pendingDrafts.length} awaiting approval</Badge> : null}
+          {active ? <Badge variant="outline">{savedDrafts.length} saved</Badge> : null}
+        </>}
+        actions={<>{active?.status === "active" ? (
           <AlertDialog>
             <AlertDialogTrigger render={<Button variant="outline"><SquareCheckBig aria-hidden="true" />End session</Button>} />
             <AlertDialogContent>
@@ -301,8 +309,8 @@ export function CoachPage() {
             {starting || start.isPending ? <Spinner data-icon="inline-start" /> : <Sparkles aria-hidden="true" />}
             Start another session
           </Button>
-        ) : null}{active ? <CoachSessionActions current row={{ sessionId: active.sessionId, status: active.status, startedAt: active.startedAt, endedAt: active.endedAt, topicCount: active.topics?.length ?? 0, savedNoteCount: active.draftNotes?.filter((note) => note.status === "saved").length ?? 0, archivedAt: active.archivedAt }} onArchived={() => setCurrentSessionId(null)} onDelete={setPendingDelete} /> : null}</div>
-      </header>
+        ) : null}{active ? <CoachSessionActions current row={{ sessionId: active.sessionId, status: active.status, startedAt: active.startedAt, endedAt: active.endedAt, topicCount: active.topics?.length ?? 0, savedNoteCount: savedDrafts.length, archivedAt: active.archivedAt }} onArchived={() => setCurrentSessionId(null)} onDelete={setPendingDelete} /> : null}</>}
+      />
 
       {runError && runState !== "error" ? <Alert variant="destructive"><AlertTitle>Profile coach error</AlertTitle><AlertDescription>{runError}</AlertDescription></Alert> : null}
 
@@ -322,13 +330,25 @@ export function CoachPage() {
                 </Button>
               </div>
             ) : (
-              <Empty>
+              <Empty className="gap-7">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><Bot aria-hidden="true" /></EmptyMedia>
                 <EmptyTitle>Find the evidence your profile is missing</EmptyTitle>
                 <EmptyDescription>The coach reviews your current facts, asks one focused question at a time, and drafts only claims grounded in your answers.</EmptyDescription>
               </EmptyHeader>
-              <EmptyContent><Button disabled={starting || start.isPending} onClick={() => void startSession()}>{starting || start.isPending ? <Spinner data-icon="inline-start" /> : <Sparkles aria-hidden="true" />}Start coaching session</Button></EmptyContent>
+              <EmptyContent className="max-w-3xl">
+                <div className="grid w-full gap-3 text-left sm:grid-cols-3">
+                  {[{ icon: SearchCheck, title: "Review gaps", copy: "Start with evidence your current profile does not yet show." }, { icon: MessageCircleQuestion, title: "Answer one question", copy: "Stay focused while the coach follows the strongest thread." }, { icon: FileCheck2, title: "Approve grounded notes", copy: "Review every claim and its supporting words before saving." }].map((step, index) => {
+                    const StepIcon = step.icon;
+                    return <div key={step.title} className="rounded-xl border bg-background/70 p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold"><span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><StepIcon className="size-4" aria-hidden="true" /></span><span className="text-xs text-muted-foreground">0{index + 1}</span></div>
+                      <p className="mt-3 text-sm font-semibold">{step.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{step.copy}</p>
+                    </div>;
+                  })}
+                </div>
+                <Button disabled={starting || start.isPending} onClick={() => void startSession()}>{starting || start.isPending ? <Spinner data-icon="inline-start" /> : <Sparkles aria-hidden="true" />}Start coaching session</Button>
+              </EmptyContent>
               </Empty>
             )}
           </CardContent>
@@ -346,6 +366,8 @@ export function CoachPage() {
                   messages={chatMessages}
                   streaming={streamingParts}
                   streamingActive={stream.status === "streaming"}
+                  assistantName="Profile coach"
+                  assistantIcon={<Sparkles className="size-4" aria-hidden="true" />}
                   renderAfter={(message) => {
                     const index = chatMessages.indexOf(message);
                     const turn = active.turns?.[index];
@@ -411,8 +433,8 @@ export function CoachPage() {
           <aside className="space-y-4 lg:sticky lg:top-4">
             <div className="xl:hidden">
               <Collapsible>
-                <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border bg-card px-4 py-3 text-sm font-medium">View coaching agenda<ChevronDown className="size-4" aria-hidden="true" /></CollapsibleTrigger>
-                <CollapsibleContent className="pt-3"><AgendaRail topics={active.topics ?? []} /></CollapsibleContent>
+                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border bg-card px-4 py-3 text-sm font-medium">View evidence path<ChevronDown className="size-4 transition-transform duration-[160ms] ease-out-strong group-data-panel-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" /></CollapsibleTrigger>
+                <CollapsibleContent className="translate-y-0 overflow-hidden pt-3 opacity-100 transition-[opacity,transform] duration-[160ms] ease-out-strong data-starting-style:-translate-y-1 data-starting-style:opacity-0 data-ending-style:-translate-y-1 data-ending-style:opacity-0 motion-reduce:translate-y-0 motion-reduce:transition-opacity"><AgendaRail topics={active.topics ?? []} /></CollapsibleContent>
               </Collapsible>
             </div>
             <div className="hidden xl:block"><AgendaRail topics={active.topics ?? []} /></div>
@@ -425,8 +447,8 @@ export function CoachPage() {
           <div className="flex items-center gap-2"><History className="size-4 text-muted-foreground" aria-hidden="true" /><h2 className="text-base font-semibold">Past sessions</h2><Badge variant="secondary">{pastSessions.length}</Badge></div>
           {pastSessions.map((past) => (
             <Collapsible key={past.sessionId} className="rounded-xl border bg-card px-4">
-              <div className="flex items-center gap-2"><CollapsibleTrigger className="flex min-w-0 flex-1 items-center justify-between gap-4 py-4 text-left"><span><span className="block text-sm font-medium">{new Date(past.startedAt).toLocaleDateString()}</span><span className="text-xs text-muted-foreground">{past.topicCount} topics · {past.savedNoteCount} saved notes</span></span><span className="flex items-center gap-2">{past.archivedAt ? <Badge variant="outline">Archived</Badge> : null}<ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" /></span></CollapsibleTrigger><CoachSessionActions row={past} onDelete={setPendingDelete} /></div>
-              <CollapsibleContent className="border-t pb-4"><PastSession sessionId={past.sessionId} /></CollapsibleContent>
+              <div className="flex items-center gap-2"><CollapsibleTrigger className="group/past flex min-w-0 flex-1 items-center justify-between gap-4 py-4 text-left"><span><span className="block text-sm font-medium">{new Date(past.startedAt).toLocaleDateString()}</span><span className="text-xs text-muted-foreground">{past.topicCount} topics · {past.savedNoteCount} saved notes</span></span><span className="flex items-center gap-2">{past.archivedAt ? <Badge variant="outline">Archived</Badge> : null}<ChevronDown className="size-4 text-muted-foreground transition-transform duration-[160ms] ease-out-strong group-data-panel-open/past:rotate-180 motion-reduce:transition-none" aria-hidden="true" /></span></CollapsibleTrigger><CoachSessionActions row={past} onDelete={setPendingDelete} /></div>
+              <CollapsibleContent className="translate-y-0 overflow-hidden border-t pb-4 opacity-100 transition-[opacity,transform] duration-[160ms] ease-out-strong data-starting-style:-translate-y-1 data-starting-style:opacity-0 data-ending-style:-translate-y-1 data-ending-style:opacity-0 motion-reduce:translate-y-0 motion-reduce:transition-opacity"><PastSession sessionId={past.sessionId} /></CollapsibleContent>
             </Collapsible>
           ))}
         </> : <p className="text-sm text-muted-foreground">No past coaching sessions.</p>}

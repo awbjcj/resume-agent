@@ -90,7 +90,7 @@ it("groups companies, terms, and resolved rows into collapsible sections", async
   const resolved = screen.getByRole("button", { name: /resolved/i });
   expect(resolved).toHaveAttribute("aria-expanded", "false");
   expect(within(resolved).getByText("1")).toBeInTheDocument();
-  expect(screen.queryByText("gone")).not.toBeInTheDocument();
+  expect(screen.getByText("gone")).not.toBeVisible();
   await userEvent.click(resolved);
   expect(screen.getByText("gone")).toBeInTheDocument();
 });
