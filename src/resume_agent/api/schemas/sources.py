@@ -47,6 +47,7 @@ class SourceConnectionIn(CamelModel):
     country: Literal["com", "de"] = "com"
     label: str | None = None
 
+
 class SourcePreviewIn(SourceConnectionIn):
     pass
 
@@ -69,11 +70,3 @@ class AddSourceIn(SourceConnectionIn):
 class SourcePatchIn(CamelModel):
     enabled: bool | None = None
     limit: int | None = Field(default=None, ge=1)
-
-
-class DiscoverSourcesIn(CamelModel):
-    prompt: str = Field(min_length=3, max_length=2_000)
-
-
-class DiscoverSearchIn(CamelModel):
-    prompt: str = Field(min_length=3, max_length=2_000)

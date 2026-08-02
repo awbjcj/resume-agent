@@ -49,6 +49,7 @@ from resume_agent.api.routers import prompts as prompts_router
 from resume_agent.api.routers import prune as prune_router
 from resume_agent.api.routers import render_templates as render_templates_router
 from resume_agent.api.routers import runs as runs_router
+from resume_agent.api.routers import scout as scout_router
 from resume_agent.api.routers import secrets as secrets_router
 from resume_agent.api.routers import settings as settings_router
 from resume_agent.api.routers import setup as setup_router
@@ -337,6 +338,7 @@ def create_app(
     )
     app.include_router(runs_router.router, prefix="/api", dependencies=guarded)
     app.include_router(sources_router.router, prefix="/api", dependencies=guarded)
+    app.include_router(scout_router.router, prefix="/api", dependencies=guarded)
     app.include_router(analytics_router.router, prefix="/api", dependencies=guarded)
     app.include_router(match_gap_router.router, prefix="/api", dependencies=guarded)
     app.include_router(taxonomy_router.router, prefix="/api", dependencies=guarded)

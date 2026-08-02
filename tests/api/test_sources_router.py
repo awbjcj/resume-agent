@@ -118,9 +118,7 @@ def test_native_provider_requires_its_connection_parameters(monkeypatch):
     )
     client = _client()
     with client:
-        response = client.post(
-            "/api/sources/preview", json={"provider": "greenhouse"}
-        )
+        response = client.post("/api/sources/preview", json={"provider": "greenhouse"})
 
     assert response.status_code == 200
     assert response.json()["ok"] is False
@@ -186,61 +184,3 @@ def test_patch_source_rejects_empty_or_non_positive_changes():
 
     assert empty.status_code == 400
     assert invalid.status_code == 422
-
-
-def test_discover_launches_run_with_runtime_capability(monkeypatch, tmp_path):
-    import time
-
-    monkeypatch.setattr(sources_router, "resolve_api_key", lambda model_id: "key")
-    monkeypatch.setattr(
-        sources_router,
-        "run_source_discovery",
-        lambda reporter, **kwargs: {
-            "prompt": kwargs["prompt"],
-            "candidates": [],
-            "scrapeAvailable": kwargs["browser_enabled"],
-            "scrapeUnavailableReason": None,
-        },
-    )
-    client = _client(tmp_path / "data")
-    with client:
-        launched = client.post(
-            "/api/sources/discover", json={"prompt": "AI infrastructure startups"}
-        )
-        assert launched.status_code == 202
-        run_id = launched.json()["runId"]
-        run = None
-        for _ in range(50):
-            run = client.get(f"/api/runs/{run_id}").json()
-            if run["state"] in {"done", "error"}:
-                break
-            time.sleep(0.05)
-
-    assert run is not None
-    assert run["state"] == "done"
-    assert run["result"]["prompt"] == "AI infrastructure startups"
-    assert isinstance(run["result"]["scrapeAvailable"], bool)
-
-
-def test_discover_preflights_both_models_and_search(monkeypatch, tmp_path):
-    seen = []
-
-    def key(model_id):
-        seen.append(model_id)
-        return "key" if len(seen) == 1 else ""
-
-    monkeypatch.setattr(sources_router, "resolve_api_key", key)
-    client = _client(tmp_path / "data")
-    with client:
-        response = client.post("/api/sources/discover", json={"prompt": "find acme"})
-
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == "SETUP_INCOMPLETE"
-    assert len(set(seen)) == 2
-
-
-def test_discover_rejects_short_prompt(tmp_path):
-    client = _client(tmp_path / "data")
-    with client:
-        response = client.post("/api/sources/discover", json={"prompt": "x"})
-    assert response.status_code == 422

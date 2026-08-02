@@ -11,8 +11,7 @@ from resume_agent.discovery import (
     fit,
     industry,
     relevance,
-    search_scout,
-    source_scout,
+    scout,
 )
 from resume_agent.discovery.scraper import learn
 from resume_agent.discovery.url_ingest import llm as url_ingest_llm
@@ -211,32 +210,18 @@ PROMPT_SPECS = (
         learn._INSTRUCTIONS,
     ),
     _spec(
-        "source-scout-research",
-        "Source scout (research)",
+        "discovery-scout",
+        "Discovery Scout",
         "discovery",
-        "Researches new job sources.",
-        source_scout._RESEARCH_INSTRUCTIONS,
+        "Researches company sources and search conditions in a conversational session.",
+        scout._SCOUT_INSTRUCTIONS,
     ),
     _spec(
-        "source-scout-format",
-        "Source scout (formatter)",
+        "discovery-scout-format",
+        "Discovery Scout formatter",
         "discovery",
-        "Formats grounded source proposals.",
-        source_scout._FORMAT_INSTRUCTIONS,
-    ),
-    _spec(
-        "search-scout-research",
-        "Search scout (research)",
-        "discovery",
-        "Researches new search conditions.",
-        search_scout._RESEARCH_INSTRUCTIONS,
-    ),
-    _spec(
-        "search-scout-format",
-        "Search scout (formatter)",
-        "discovery",
-        "Formats grounded search-term proposals.",
-        search_scout._FORMAT_INSTRUCTIONS,
+        "Formats grounded Scout notes into a validated conversational turn.",
+        scout._FORMAT_INSTRUCTIONS,
     ),
     _spec(
         "profile-extractor",

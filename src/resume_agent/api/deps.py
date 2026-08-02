@@ -63,6 +63,12 @@ def get_interview_dir(request: Request):
     return root / "interview"
 
 
+def get_scout_dir(request: Request):
+    paths = get_workspace_paths(request)
+    root = paths.root if paths is not None else request.app.state.data_dir
+    return root / "scout"
+
+
 def get_env_path(request: Request):
     paths = get_workspace_paths(request)
     return paths.secrets_env if paths is not None else request.app.state.env_path
