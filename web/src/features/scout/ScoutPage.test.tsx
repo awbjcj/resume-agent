@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { withQueryClient } from "@/test/utils";
@@ -27,6 +27,21 @@ it("starts discovery from a concrete empty-state composer", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Send message" }));
   expect(mocks.start).toHaveBeenCalledWith(expect.objectContaining({ message: "Find healthcare platform roles" }));
   expect(screen.getByText("Proposal ledger")).toBeInTheDocument();
+});
+
+it("echoes the sent message into the thread before the turn finishes", async () => {
+  mocks.session = { sessionId: "s1", goal: "Climate", status: "active", startedAt: "now", endedAt: null, archivedAt: null, recap: null, scrapeAvailable: true, scrapeUnavailableReason: null, proposals: [], turns: [{ role: "user", kind: "", text: "Find climate roles", at: "t0", notice: "", proposalIds: [] }, { role: "scout", kind: "reply", text: "Here are some leads.", at: "t1", notice: "", proposalIds: [] }] };
+  mocks.send.mockResolvedValue({ runId: "r2" });
+  render(<ScoutPage />, { wrapper: withQueryClient });
+  await userEvent.type(screen.getByLabelText("Discovery request"), "Smaller teams please");
+  await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+  expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ message: "Smaller teams please" }));
+  // Scoped to the thread: the composer is a controlled <textarea>, and jsdom
+  // exposes its value as text content, so an unscoped query passes on the
+  // input the user just typed into and never sees the missing echo.
+  const thread = within(screen.getByTestId("chat-viewport"));
+  expect(thread.getByText("Smaller teams please")).toBeInTheDocument();
+  expect(thread.getByText("Here are some leads.")).toBeInTheDocument();
 });
 
 it("keeps pending proposals actionable after a session ends", () => {

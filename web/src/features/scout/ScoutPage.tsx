@@ -39,7 +39,12 @@ export function ScoutPage() {
   const end = useEndScoutSession();
   const [composer, setComposer] = useState("");
   const [lastMessage, setLastMessage] = useState("");
-  const [localFirstMessage, setLocalFirstMessage] = useState("");
+  // The turn only reaches the durable transcript when the run finishes, so
+  // without a local echo the user's own message is invisible for the whole
+  // research round -- it just sits in the composer. `baseline` is the turn
+  // count at launch: the echo retires the moment the persisted thread passes
+  // it, which is also what stops it double-rendering after the refetch.
+  const [pending, setPending] = useState<{ text: string; baseline: number } | null>(null);
   const [runError, setRunError] = useState("");
   const [streamRunId, setStreamRunId] = useState<string | null>(null);
   const [streamBaseline, setStreamBaseline] = useState(0);
@@ -61,32 +66,33 @@ export function ScoutPage() {
 
   const messages: ChatThreadMessage[] = useMemo(() => {
     const durable = (active?.turns ?? []).map((turn, index): ChatThreadMessage => ({ id: `${turn.at}-${index}`, role: turn.role === "scout" ? "assistant" : "user", parts: [{ kind: "text", text: turn.text }, ...(turn.notice ? [{ kind: "notice" as const, message: turn.notice }] : [])] }));
-    if (!active && localFirstMessage) return [{ id: "local-first", role: "user", parts: [{ kind: "text", text: localFirstMessage }] }];
-    return durable;
-  }, [active, localFirstMessage]);
+    if (!pending || durableTurns > pending.baseline) return durable;
+    return [...durable, { id: "pending-user", role: "user", parts: [{ kind: "text", text: pending.text }] }];
+  }, [active, durableTurns, pending]);
 
   const launchMessage = async (message = composer.trim()) => {
     if (!message || busy) return;
     setLastMessage(message); setRunError(""); setSuppressedRunId(null); stream.reset();
+    setPending({ text: message, baseline: durableTurns });
     try {
       if (!active) {
-        setLocalFirstMessage(message); setStreamBaseline(0);
+        setStreamBaseline(0);
         const run = await start.mutateAsync({ message, onDone: (done: RunRecord) => {
           if (ignoredRuns.current.delete(done.runId)) return;
-          setStreamRunId(null);
-          if (done.status === "succeeded") { const result = done.result as { sessionId?: string } | null; if (result?.sessionId) setSelectedId(result.sessionId); setLocalFirstMessage(""); setComposer(""); }
+          setStreamRunId(null); setPending(null);
+          if (done.status === "succeeded") { const result = done.result as { sessionId?: string } | null; if (result?.sessionId) setSelectedId(result.sessionId); setComposer(""); }
           else setRunError(done.error ?? "Scout could not start");
         } });
         setStreamRunId(run.runId);
       } else {
         setStreamBaseline(durableTurns);
-        const run = await send.mutateAsync({ sessionId: active.sessionId, message, onDone: (done: RunRecord) => { if (ignoredRuns.current.delete(done.runId)) return; setStreamRunId(null); if (done.status === "succeeded") setComposer(""); else setRunError(done.error ?? "Scout could not reply"); } });
+        const run = await send.mutateAsync({ sessionId: active.sessionId, message, onDone: (done: RunRecord) => { if (ignoredRuns.current.delete(done.runId)) return; setStreamRunId(null); setPending(null); if (done.status === "succeeded") setComposer(""); else setRunError(done.error ?? "Scout could not reply"); } });
         setStreamRunId(run.runId);
       }
-    } catch (caught) { setRunError(caught instanceof Error ? caught.message : "Scout request failed"); }
+    } catch (caught) { setPending(null); setRunError(caught instanceof Error ? caught.message : "Scout request failed"); }
   };
 
-  const stop = () => { if (attachedRunId) ignoredRuns.current.add(attachedRunId); setSuppressedRunId(attachedRunId); setStreamRunId(null); stream.stop(); setLocalFirstMessage(""); setRunError(""); };
+  const stop = () => { if (attachedRunId) ignoredRuns.current.add(attachedRunId); setSuppressedRunId(attachedRunId); setStreamRunId(null); stream.stop(); setPending(null); setRunError(""); };
   const endSession = async () => {
     if (!active || busy) return;
     setStreamBaseline(durableTurns); setRunError(""); stream.reset();
