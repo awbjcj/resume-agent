@@ -91,3 +91,11 @@ def patch_source_route(request: Request, source_id: str, body: SourcePatchIn):
 def remove_source_route(request: Request, source_id: str):
     connectors_path, _ = _config_paths(request)
     _guard(lambda: remove_source(source_id, connectors_path=connectors_path))
+
+
+@router.post("/search/discover", include_in_schema=False)
+def discover_search_route_retired():
+    # Replaced by the Discovery Scout session API (POST /api/scout/sessions).
+    # Kept as an explicit 405 rather than a bare 404 so a stale client gets a
+    # clear "this method is gone" signal instead of "this path never existed".
+    raise ApiException(405, "GONE", "Search Scout has moved to the Discovery Scout session API.")
