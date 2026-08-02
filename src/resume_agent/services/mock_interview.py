@@ -43,15 +43,19 @@ _EMPTY_DEBRIEF_SUMMARY = (
 # The interviewer writes free-form notes that a cheap formatter then projects into
 # the OpeningInterview schema. The formatter is told to invent nothing, so the plan
 # only survives if these notes spell it out explicitly — otherwise normalize_opening
-# rejects the turn with "opening turn proposed no plan". Force an enumerable plan block.
+# rejects the turn with "opening turn proposed no plan". Keep that block below the
+# persona boundary so it can never become candidate-facing chat.
 _OPENING_INSTRUCTION = (
     "First design an interview PLAN of up to {count} questions mapping the job's key "
     "competencies to question types (behavioral, role_specific, system_design, and the "
-    "like). Write the plan as an explicit numbered list, one item per line, formatted as "
-    "`competency | question_type`. Then greet the candidate in character and ask only the "
-    "first question. Format your notes exactly as:\n"
-    "PLAN:\n1. <competency> | <question_type>\n2. ...\n\n"
-    "OPENING:\n<your in-character greeting and first question>"
+    "like). Greet the candidate in character and ask only the first question before "
+    "revealing any plan details. Then write the metadata boundary and the complete plan "
+    "as an explicit numbered list, one item per line, formatted as "
+    "`competency | question_type`. Format your response exactly as:\n"
+    "<your in-character greeting and first question>\n"
+    "---METADATA---\n"
+    "action: ask\nquestion_id: q1\nfollow_up: false\n"
+    "plan:\n1. <competency> | <question_type>\n2. ..."
 )
 
 

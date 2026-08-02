@@ -80,6 +80,33 @@ class StreamingRunner(FakeRunner):
         return SimpleNamespace(content=self.full)
 
 
+class PromptFollowingOpeningRunner(FakeRunner):
+    """Small deterministic model double that follows the requested wire format."""
+
+    def stream(self, prompt):
+        if "---METADATA---" in prompt:
+            full = (
+                "Welcome. Tell me about your Python background.\n"
+                "---METADATA---\n"
+                "action: ask\n"
+                "question_id: q1\n"
+                "follow_up: false\n"
+                "plan:\n"
+                "1. Python | role_specific\n"
+                "2. Ownership | behavioral"
+            )
+        else:
+            full = (
+                "PLAN:\n"
+                "1. Python | role_specific\n"
+                "2. Ownership | behavioral\n\n"
+                "OPENING:\n"
+                "Welcome. Tell me about your Python background."
+            )
+        yield TextDelta(full)
+        yield Completed(SimpleNamespace(content=full))
+
+
 @pytest.fixture()
 def engine(tmp_path):
     engine = make_engine("sqlite://")
@@ -131,6 +158,35 @@ def test_opening_creates_session_and_hides_plan(tmp_path, engine):
     assert view["plan"] is None  # hidden while active
     assert view["progress"] == {"asked": 1, "total": 2}
     assert view["turns"][0]["role"] == "interviewer"
+
+
+def test_opening_instruction_keeps_plan_out_of_candidate_chat(tmp_path, engine):
+    job_id, version_id = _ids
+    sink = RecordingSink()
+    opening = OpeningInterview(
+        message="ignored",
+        plan=[
+            NewPlanItem(competency="Python", question_type="role_specific"),
+            NewPlanItem(competency="Ownership", question_type="behavioral"),
+        ],
+    )
+
+    view = run_opening_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        engine=engine,
+        job_id=job_id,
+        resume_version_id=version_id,
+        style=_style(),
+        interviewer_agent=PromptFollowingOpeningRunner([]),
+        formatter_agent=FakeRunner([opening]),
+        sink=sink,
+    )
+
+    expected = "Welcome. Tell me about your Python background."
+    assert sink.text == expected
+    assert view["turns"][0]["text"] == expected
+    assert view["plan"] is None
 
 
 def test_full_interview_flow(tmp_path, engine):
@@ -310,7 +366,8 @@ def test_opening_prompt_forces_extractable_plan(tmp_path, engine):
         formatter_agent=FakeRunner([opening]),
     )
     interviewer_prompt = seen[0]
-    assert "PLAN:" in interviewer_prompt
+    assert "---METADATA---" in interviewer_prompt
+    assert "plan:" in interviewer_prompt
     assert "competency | question_type" in interviewer_prompt
 
 
