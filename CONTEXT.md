@@ -28,6 +28,43 @@ approval. Anything a tool "verified" is re-verified outside the loop before it
 is presented as validated.
 _Avoid_: agentic mode, autonomous agent (the loop is bounded and read-only)
 
+**Career skill registry**:
+The root-confined, hash-verified index of approved local `SKILL.md` procedures.
+It resolves a closed skill name to one `SkillRef`; models never choose a path.
+An invalid entry disables that capability rather than loading altered text.
+_Avoid_: skill folder, prompt library (the registry owns identity and trust)
+
+**SkillRef**:
+The immutable name, version, SHA-256, and Agent family identity of one approved
+career skill. Persisted with every analysis, artifact, or turn the skill
+influences.
+_Avoid_: skill name (name alone cannot identify approved bytes), prompt version
+
+**Agent family**:
+A reusable purpose-specific Agno agent boundary (Job Analysis, Resume Authoring,
+Resume Review, Cover Letter, Interview, or Career Lab). Stable application
+policy plus exactly one SkillRef defines a skilled task agent.
+_Avoid_: super-agent, skill agent (skills configure a family; they do not each
+create a separate architecture)
+
+**Sponsorship Research Agent**:
+The only agent that owns H-1B MCP tools. It batches sponsorship-required,
+JD-silent jobs by company and projects read-only tool results into validated
+Historical sponsorship evidence.
+_Avoid_: H-1B fit agent (it researches evidence; Fit consumes the result)
+
+**Historical sponsorship evidence**:
+Attributed, time-bounded employer evidence from public LCA disclosures. It may
+explain sponsorship uncertainty but can never change a current job's
+`sponsorship_signal` to `offered` or prove present employer policy.
+_Avoid_: sponsorship status, current sponsor signal
+
+**Career Lab session**:
+A durable, streamed, turn-per-run workspace for approved career procedures that
+do not belong to Tailor, Cover Letter, Interview, Coach, or Scout. Each assistant
+turn records exactly one SkillRef and remains draft-only.
+_Avoid_: general agent chat, super-agent session
+
 ## Discovery & connectors
 
 **Connector**:
