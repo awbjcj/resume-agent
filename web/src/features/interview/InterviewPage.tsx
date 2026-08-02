@@ -53,6 +53,12 @@ export function InterviewPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [composer, setComposer] = useState("");
   const [lastMessage, setLastMessage] = useState("");
+  // The turn only reaches the durable transcript when the run finishes, so
+  // without a local echo the user's own answer is invisible for the whole
+  // reply. `baseline` is the turn count at launch: the echo retires the
+  // moment the persisted thread passes it, which also stops it
+  // double-rendering after the refetch.
+  const [pending, setPending] = useState<{ text: string; baseline: number } | null>(null);
   const [runError, setRunError] = useState("");
   const [streamRunId, setStreamRunId] = useState<string | null>(null);
   const [streamBaseline, setStreamBaseline] = useState(0);
@@ -95,12 +101,14 @@ export function InterviewPage() {
     setStreamBaseline(active.turns?.length ?? 0);
     setSuppressedRunId(null);
     stream.reset();
+    setPending({ text: message, baseline: active.turns?.length ?? 0 });
     try {
       const launched = await send.mutateAsync({
         sessionId: active.sessionId,
         message,
         onDone: (completed: RunRecord) => {
           if (ignoredRuns.current.delete(completed.runId)) return;
+          setPending(null);
           if (completed.status === "succeeded") {
             setComposer((current) => (current.trim() === message ? "" : current));
           } else {
@@ -110,6 +118,7 @@ export function InterviewPage() {
       });
       setStreamRunId(launched.runId);
     } catch (error) {
+      setPending(null);
       setRunError(error instanceof Error ? error.message : "Answer failed");
     }
   };
@@ -120,6 +129,7 @@ export function InterviewPage() {
     stream.stop();
     setStreamRunId(null);
     setRunError("");
+    setPending(null);
   };
 
   const endInterview = async () => {
@@ -196,18 +206,24 @@ export function InterviewPage() {
 
   const ended = active.status === "ended";
   const canAnswer = active.status === "active" && !active.concluded;
-  const chatMessages: ChatThreadMessage[] = (active.turns ?? []).map((turn, index) => {
-    const notice = (turn as typeof turn & { notice?: string }).notice;
-    return {
-      id: `${turn.at}-${index}`,
-      role: turn.role === "interviewer" ? "assistant" : "user",
-      parts: [
-        { kind: "text" as const, text: turn.text },
-        ...(notice ? [{ kind: "notice" as const, message: notice }] : []),
-      ],
-    };
-  });
-  const durableAdvanced = (active.turns?.length ?? 0) > attachedBaseline;
+  const durableTurns = active.turns?.length ?? 0;
+  const chatMessages: ChatThreadMessage[] = (() => {
+    const durable = (active.turns ?? []).map((turn, index) => {
+      const notice = (turn as typeof turn & { notice?: string }).notice;
+      const role: "assistant" | "user" = turn.role === "interviewer" ? "assistant" : "user";
+      return {
+        id: `${turn.at}-${index}`,
+        role,
+        parts: [
+          { kind: "text" as const, text: turn.text },
+          ...(notice ? [{ kind: "notice" as const, message: notice }] : []),
+        ],
+      };
+    });
+    if (!pending || durableTurns > pending.baseline) return durable;
+    return [...durable, { id: "pending-user", role: "user" as const, parts: [{ kind: "text" as const, text: pending.text }] }];
+  })();
+  const durableAdvanced = durableTurns > attachedBaseline;
   const streamingParts = attachedRunId && !durableAdvanced ? stream.parts : null;
   const visibleError = stream.error || runError;
 

@@ -111,6 +111,12 @@ export function CoachPage() {
   const remove = useDeleteCoachSession();
   const [composer, setComposer] = useState("");
   const [lastMessage, setLastMessage] = useState("");
+  // The turn only reaches the durable transcript when the run finishes, so
+  // without a local echo the user's own message is invisible for the whole
+  // reply. `baseline` is the turn count at launch: the echo retires the
+  // moment the persisted thread passes it, which also stops it
+  // double-rendering after the refetch.
+  const [pending, setPending] = useState<{ text: string; baseline: number } | null>(null);
   const [runState, setRunState] = useState<"idle" | "running" | "error">("idle");
   const [runError, setRunError] = useState("");
   const [streamRunId, setStreamRunId] = useState<string | null>(null);
@@ -185,12 +191,14 @@ export function CoachPage() {
     setStreamBaseline(session.data.turns?.length ?? 0);
     setSuppressedRunId(null);
     stream.reset();
+    setPending({ text: message, baseline: session.data.turns?.length ?? 0 });
     try {
       const launched = await send.mutateAsync({
         sessionId: session.data.sessionId,
         message,
         onDone: (completed: RunRecord) => {
           if (ignoredRuns.current.delete(completed.runId)) return;
+          setPending(null);
           if (completed.status === "succeeded") {
             setComposer((current) => current.trim() === message ? "" : current);
             setRunState("idle");
@@ -202,6 +210,7 @@ export function CoachPage() {
       });
       setStreamRunId(launched.runId);
     } catch (error) {
+      setPending(null);
       setRunState("error");
       setRunError(error instanceof Error ? error.message : "Message failed");
     }
@@ -216,6 +225,7 @@ export function CoachPage() {
     setEnding(false);
     setRunState("idle");
     setRunError("");
+    setPending(null);
   };
 
   const endSession = async () => {
@@ -256,18 +266,24 @@ export function CoachPage() {
   const active = session.data;
   const pendingDrafts = active?.draftNotes?.filter((note) => note.status === "pending") ?? [];
   const savedDrafts = active?.draftNotes?.filter((note) => note.status === "saved") ?? [];
-  const chatMessages: ChatThreadMessage[] = (active?.turns ?? []).map((turn, index) => {
-    const notice = (turn as typeof turn & { notice?: string }).notice;
-    return {
-      id: `${turn.at}-${index}`,
-      role: turn.role === "coach" ? "assistant" : "user",
-      parts: [
-        { kind: "text" as const, text: turn.text },
-        ...(notice ? [{ kind: "notice" as const, message: notice }] : []),
-      ],
-    };
-  });
-  const durableAdvanced = (active?.turns?.length ?? 0) > attachedBaseline;
+  const durableTurns = active?.turns?.length ?? 0;
+  const chatMessages: ChatThreadMessage[] = (() => {
+    const durable = (active?.turns ?? []).map((turn, index) => {
+      const notice = (turn as typeof turn & { notice?: string }).notice;
+      const role: "assistant" | "user" = turn.role === "coach" ? "assistant" : "user";
+      return {
+        id: `${turn.at}-${index}`,
+        role,
+        parts: [
+          { kind: "text" as const, text: turn.text },
+          ...(notice ? [{ kind: "notice" as const, message: notice }] : []),
+        ],
+      };
+    });
+    if (!pending || durableTurns > pending.baseline) return durable;
+    return [...durable, { id: "pending-user", role: "user" as const, parts: [{ kind: "text" as const, text: pending.text }] }];
+  })();
+  const durableAdvanced = durableTurns > attachedBaseline;
   const streamingParts = attachedRunId && !durableAdvanced ? stream.parts : null;
   const busy = send.isPending || runState === "running" || stream.status === "streaming";
   const visibleError = stream.error || runError;

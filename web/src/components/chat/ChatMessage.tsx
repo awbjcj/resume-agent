@@ -47,8 +47,8 @@ export const ChatMessage = memo(function ChatMessage({
   return (
     <div data-testid="chat-message" className={cn("flex items-start gap-2 sm:gap-3", !assistant && "flex-row-reverse")}>
       <div className={cn(
-        "mt-5 flex size-8 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm",
-        assistant && "border-primary/20 bg-primary/[0.07] text-primary",
+        "flex size-8 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm",
+        assistant ? "mt-5 border-primary/20 bg-primary/[0.07] text-primary" : "mt-1",
       )}>
         {assistant ? assistantIcon ?? <Bot className="size-4" aria-hidden="true" /> : <UserRound className="size-4" aria-hidden="true" />}
       </div>
