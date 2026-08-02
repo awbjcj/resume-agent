@@ -10,6 +10,7 @@ from resume_agent.llm_runner import expect_schema, expect_text
 from resume_agent.sessions.stream import (
     Completed,
     Failed,
+    Settled,
     StreamSink,
     TextDelta,
 )
@@ -76,13 +77,60 @@ MARKER_MAX_LEN = max(
     2 + max(len(verb) for verb in _ROW_VERBS) + 1,
 )
 
+_MARKER_DECORATION = r"[*_`~ \t]"
+_MARKER_PREFIX = re.compile(
+    rf"(?:{_MARKER_DECORATION}{{0,4}}|"
+    rf"{_MARKER_DECORATION}{{0,4}}-{{1,6}}|"
+    rf"{_MARKER_DECORATION}{{0,4}}-{{3,6}}[ \t]{{0,2}}(?:M|ME|MET|META|METAD|METADA|METADAT|METADATA)?|"
+    rf"{_MARKER_DECORATION}{{0,4}}-{{3,6}}[ \t]{{0,2}}METADATA[ \t]{{0,2}}-{{0,6}}{_MARKER_DECORATION}{{0,4}})\Z",
+    re.IGNORECASE,
+)
+
+
+def _could_complete_block_boundary(value: str) -> bool:
+    if not value.startswith("\n"):
+        return False
+    rest = value[1:].lstrip(" \t")
+    if not rest:
+        return True
+    if not rest.startswith("\n"):
+        return False
+    rest = rest[1:].lstrip(" \t")
+    if not rest:
+        return True
+    folded = rest.casefold()
+    for key in _BLOCK_KEYS:
+        if key.startswith(folded) or (
+            folded.startswith(key) and not folded[len(key) :].strip(" \t")
+        ):
+            return True
+    for verb in _ROW_VERBS:
+        if verb.startswith(rest) or (
+            rest.startswith(verb) and not rest[len(verb) :].strip(" \t")
+        ):
+            return True
+    return False
+
+
+def _safe_prefix_len(pending: str) -> int:
+    """Return the prose prefix that cannot still grow into a boundary."""
+    start = max(0, len(pending) - MARKER_MAX_LEN)
+    for index in range(start, len(pending)):
+        suffix = pending[index:]
+        if _MARKER_PREFIX.fullmatch(suffix):
+            while index > start and pending[index - 1] in "\r\n":
+                index -= 1
+            return index
+        if _could_complete_block_boundary(suffix):
+            return index
+    return len(pending)
+
 
 class ProseEmitter:
     """Expose prose while retaining the complete persona output for formatting."""
 
-    def __init__(self, sink: StreamSink, holdback: int = 32) -> None:
+    def __init__(self, sink: StreamSink) -> None:
         self._sink = sink
-        self._holdback = max(holdback, MARKER_MAX_LEN + 2)
         self._raw: list[str] = []
         self._prose: list[str] = []
         self._pending = ""
@@ -99,15 +147,12 @@ class ProseEmitter:
         marker = _BOUNDARY.search(self._pending)
         if marker is not None:
             visible = self._pending[: marker.start()]
-            if visible.endswith("\r\n"):
-                visible = visible[:-2]
-            elif visible.endswith("\n"):
-                visible = visible[:-1]
+            visible = visible.rstrip("\r\n")
             self._flush(visible)
             self._pending = ""
             self._marker_found = True
             return
-        safe_length = len(self._pending) - self._holdback
+        safe_length = _safe_prefix_len(self._pending)
         if safe_length > 0:
             self._flush(self._pending[:safe_length])
             self._pending = self._pending[safe_length:]
@@ -163,8 +208,12 @@ def persona_output(
         else:
             sink.emit(event)
     if final_response is None:
-        raise StreamFailed("The model stream ended without a final response.", "STREAM_ERROR")
+        raise StreamFailed(
+            "The model stream ended without a final response.", "STREAM_ERROR"
+        )
     prose, streamed_output = emitter.finish()
+    if prose:
+        sink.emit(Settled())
     if streamed_output and not emitter.marker_found:
         # Emitting the sentinel is a model behaviour, not an invariant we
         # control. DeepSeek v4 omits it on every coach turn -- verified against

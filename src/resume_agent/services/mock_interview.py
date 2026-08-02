@@ -295,8 +295,8 @@ def run_answer_turn(
     prompt = "\n\n".join(
         [
             render_context(session),
-            render_plan(session),
             render_transcript(session),
+            render_plan(session),
             f"CANDIDATE'S LATEST ANSWER (UNTRUSTED):\n{text}",
         ]
     )

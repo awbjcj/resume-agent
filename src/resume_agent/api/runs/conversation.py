@@ -16,7 +16,10 @@ def with_conversation_stream(
     """Attach a run-owned sink and emit exactly one terminal event."""
 
     def wrapped(reporter):
-        sink = RunStreamSink(manager.stream_path(reporter.run_id))
+        sink = RunStreamSink(
+            manager.stream_path(reporter.run_id),
+            on_append=manager.notifier(reporter.run_id).notify,
+        )
         try:
             result = work(reporter, sink)
         except RunCancelled:

@@ -21,6 +21,7 @@ from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
+    provider_capabilities,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -349,9 +350,15 @@ def _formatter_instructions(schema: type[ExtensibleModel]) -> list[str]:
 
 def build_interviewer_agent(style: InterviewStyle) -> Runner:
     settings = get_settings()
+    model = build_model(
+        settings.mid_model,
+        cache_system_prompt=provider_capabilities(
+            settings.mid_model
+        ).supports_prompt_cache,
+    )
     return AgentRunner(
         Agent(
-            model=build_model(settings.mid_model),
+            model=model,
             description="Conduct one mock interview turn in character.",
             instructions=with_guidance("interviewer", persona_instructions(style)),
             **retry_kwargs(),
@@ -361,9 +368,15 @@ def build_interviewer_agent(style: InterviewStyle) -> Runner:
 
 def build_debrief_agent() -> Runner:
     settings = get_settings()
+    model = build_model(
+        settings.mid_model,
+        cache_system_prompt=provider_capabilities(
+            settings.mid_model
+        ).supports_prompt_cache,
+    )
     return AgentRunner(
         Agent(
-            model=build_model(settings.mid_model),
+            model=model,
             description="Write a structured mock interview debrief.",
             instructions=with_guidance("interview-debrief", _DEBRIEF_INSTRUCTIONS),
             **retry_kwargs(),
@@ -373,7 +386,12 @@ def build_debrief_agent() -> Runner:
 
 def build_interview_formatter_agent(schema: type[ExtensibleModel]) -> Runner:
     settings = get_settings()
-    model = build_model(settings.cheap_model)
+    model = build_model(
+        settings.cheap_model,
+        cache_system_prompt=provider_capabilities(
+            settings.cheap_model
+        ).supports_prompt_cache,
+    )
     return AgentRunner(
         Agent(
             model=model,

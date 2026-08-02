@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar, Protocol
+from typing import Any, ClassVar, Protocol, TextIO
 
 
 @dataclass(frozen=True)
@@ -70,6 +70,16 @@ class Notice:
 
 
 @dataclass(frozen=True)
+class Settled:
+    """The visible reply is complete while post-processing may continue."""
+
+    tag: ClassVar[str] = "settled"
+
+    def payload(self) -> dict[str, object]:
+        return {}
+
+
+@dataclass(frozen=True)
 class Completed:
     """Internal success terminal; ``response`` is never serialized to clients."""
 
@@ -91,7 +101,14 @@ class Failed:
 
 
 StreamEvent = (
-    TextDelta | ReasoningDelta | ToolStarted | ToolCompleted | Notice | Completed | Failed
+    TextDelta
+    | ReasoningDelta
+    | ToolStarted
+    | ToolCompleted
+    | Notice
+    | Settled
+    | Completed
+    | Failed
 )
 TERMINAL_TAGS = frozenset({Completed.tag, Failed.tag})
 
@@ -154,27 +171,35 @@ class RunStreamSink:
     of those frames drove a React re-render that re-parsed the thread's
     markdown. The two streams are batched *separately* -- reasoning hides
     behind a disclosure while text is the reply -- so a kind change flushes
-    whatever is pending before it starts a new batch.
+    whatever is pending before it starts a new batch. A deterministic 120-delta
+    run (15 chars every 10 ms) produced 15 rows at 80 ms / 240 chars, 30 at
+    40 ms / 120 chars, and 58 at 20 ms / 60 chars; 40/120 halves median batch
+    latency (40 ms to 20 ms) while capping event growth at 2x.
     """
 
     def __init__(
         self,
         path: Path | str,
         *,
-        flush_interval: float = 0.08,
-        flush_chars: int = 240,
+        flush_interval: float = 0.04,
+        flush_chars: int = 120,
+        on_append: Callable[[], None] | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._flush_interval = flush_interval
         self._flush_chars = flush_chars
+        self._on_append = on_append
+        self._clock = clock
         self._index = 0
         self._pending: list[str] = []
         self._pending_len = 0
         self._pending_kind: type[TextDelta | ReasoningDelta] = TextDelta
-        self._last_flush = time.monotonic()
+        self._last_flush = self._clock()
         self._terminal = False
         self._closed = False
+        self._handle: TextIO | None = None
 
     def emit(self, event: StreamEvent) -> None:
         if self._closed or self._terminal:
@@ -185,7 +210,7 @@ class RunStreamSink:
                 self._pending_kind = type(event)
             self._pending.append(event.text)
             self._pending_len += len(event.text)
-            flush_due = time.monotonic() - self._last_flush >= self._flush_interval
+            flush_due = self._clock() - self._last_flush >= self._flush_interval
             if self._pending_len >= self._flush_chars or flush_due:
                 self._flush_pending()
             return
@@ -200,21 +225,27 @@ class RunStreamSink:
         text = "".join(self._pending)
         self._pending.clear()
         self._pending_len = 0
-        self._last_flush = time.monotonic()
+        self._last_flush = self._clock()
         self._append(self._pending_kind(text))
 
     def _append(self, event: StreamEvent) -> None:
         line = encode_event(self._index, event)
         self._index += 1
-        with self._path.open("a", encoding="utf-8") as handle:
-            handle.write(line + "\n")
-            handle.flush()
+        if self._handle is None:
+            self._handle = self._path.open("a", encoding="utf-8")
+        self._handle.write(line + "\n")
+        self._handle.flush()
+        if self._on_append is not None:
+            self._on_append()
 
     def close(self) -> None:
         if self._closed:
             return
         if not self._terminal:
             self._flush_pending()
+        if self._handle is not None:
+            self._handle.close()
+            self._handle = None
         self._closed = True
 
 

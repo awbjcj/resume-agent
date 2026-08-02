@@ -2,10 +2,10 @@
 
 ## Branching
 
-`dev` is the integration branch — all feature work branches off `dev` and PRs back
-into it; `main` is protected (PR + passing checks required, no direct
-pushes/force-pushes) and is the only branch Railway deploys from. Promote `dev`
-→ `main` via PR when a batch of work is ready to ship.
+`main` is currently the only branch on `origin`; feature work branches from it
+and returns by PR. `main` is protected (PR + passing checks required, no direct
+pushes/force-pushes) and is the only branch Railway deploys from. If an integration
+branch is reintroduced, update this section and the CI branch triggers together.
 
 CI is split by branch so `dev` gets fast feedback and `main` gets the full
 gate before a deploy-triggering merge: `.github/workflows/_reusable-ci.yml`
@@ -159,8 +159,10 @@ INVALID_ARGUMENT` before generating anything, and agno then hands back the
   formatter's notes) and logs a warning; it must never raise. Marker matching
   tolerates surrounding emphasis and padding but *requires* the `METADATA`
   token — DeepSeek writes a bare `---` rule as a section break, so matching the
-  rules alone would truncate a reply mid-turn. `ProseEmitter`'s holdback floor is
-  derived from the longest matchable boundary (`MARKER_MAX_LEN`), never a literal.
+  rules alone would truncate a reply mid-turn. `ProseEmitter` withholds only a
+  trailing prefix that can still complete into one of these boundaries; ordinary
+  prose flushes with zero fixed character lag. The candidate scan is capped by
+  `MARKER_MAX_LEN`.
 - **Formatter payload is never displayable, sentinel or not.** Degrading on a
   missing sentinel is only safe when there is nothing to hide — true of DeepSeek
   (it emits no metadata at all), false for a model that writes the block and
@@ -172,6 +174,27 @@ INVALID_ARGUMENT` before generating anything, and agno then hands back the
   colon — because truncating a reply is worse than the leak it prevents: a coach
   writes `**Action:** …` and `the draft: …` mid-sentence and neither may cut the
   turn.
+- **The NDJSON log is durability; a notifier is only the low-latency wakeup.**
+  `RunStreamSink` keeps one append handle open, flushes every complete row, and
+  wakes process-local SSE subscribers after the flush. Readers clear their event
+  before draining the log, then await it with the existing poll timeout as a
+  dropped-notification fallback. Reconnects still replay from their durable event
+  offset; the notifier never owns stream truth.
+- **`settled` means visible prose is complete, not that the run is terminal.** It
+  is emitted only after streamed prose finishes and never belongs in
+  `TERMINAL_TAGS`. The browser removes the caret and enables typing while keeping
+  Send disabled until formatter validation and session persistence complete.
+  The EventSource remains open for notices and exactly one `completed`/`failed`.
+- **Conversational stream batching is 40 ms / 120 characters.** A deterministic
+  120-delta harness (15 characters every 10 ms) produced 15 rows at 80/240, 30
+  rows at 40/120, and 58 rows at 20/60. The middle setting halves median batch
+  latency while holding event count to exactly 2x the legacy baseline; text and
+  reasoning retain separate budgets.
+- **Agno's `cache_system_prompt` caches the system block, not turn messages.**
+  Persona and formatter builders enable it for providers that advertise prompt
+  caching. Session overview/transcript/agenda remain user-message content; Agno
+  does not expose user-message cache breakpoints through this flag. Do not move
+  per-profile context into a global system prompt or assume it is cached.
 - **Anthropic has the same "unset means provider decides" trap, and it is
   generation-specific.** Omitting `thinking` runs **adaptive** on Sonnet 5 and
   Opus 5, and runs **without** thinking on Opus 4.8/4.7 and older — so leaving

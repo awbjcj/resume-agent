@@ -69,8 +69,10 @@ class RecordingSink:
 class StreamingRunner(FakeRunner):
     def __init__(self, prose: str):
         self.full = f"{prose}\n---METADATA---\naction: ask\nquestion: q2"
+        self.prompts: list[str] = []
 
     def stream(self, prompt):
+        self.prompts.append(prompt)
         yield TextDelta(self.full[:8])
         yield ToolStarted("call-1", "read_jd", "")
         yield TextDelta(self.full[8:])
@@ -236,13 +238,14 @@ def test_full_interview_flow(tmp_path, engine):
 def test_answer_streams_and_stores_interviewer_prose(tmp_path, engine):
     sid = _open(tmp_path, engine)["sessionId"]
     sink = RecordingSink()
+    interviewer = StreamingRunner("Tell me about ownership.")
 
     run_answer_turn(
         FakeReporter(),
         interview_dir=tmp_path,
         session_id=sid,
         message="I shipped a FastAPI service.",
-        interviewer_agent=StreamingRunner("Tell me about ownership."),
+        interviewer_agent=interviewer,
         formatter_agent=FakeRunner(
             [InterviewTurn(message="ignored", action="ask", question_id="q2")]
         ),
@@ -252,6 +255,9 @@ def test_answer_streams_and_stores_interviewer_prose(tmp_path, engine):
     assert sink.text == "Tell me about ownership."
     assert session_view(tmp_path, sid)["turns"][-1]["text"] == sink.text
     assert any(isinstance(event, ToolStarted) for event in sink.events)
+    assert interviewer.prompts[0].index("TRANSCRIPT:") < interviewer.prompts[0].index(
+        "QUESTION PLAN"
+    )
 
 
 def test_streamed_question_survives_structural_formatter_failure(tmp_path, engine):

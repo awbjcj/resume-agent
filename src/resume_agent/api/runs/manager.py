@@ -30,6 +30,7 @@ from resume_agent.api.runs.models import (
     RunSnapshot,
     parse_run_snapshot,
 )
+from resume_agent.api.runs.notify import StreamNotifier
 from resume_agent.progress import (
     RUNS_ROOT,
     ProgressReporter,
@@ -187,6 +188,7 @@ class RunManager:
         self._active_singletons: dict[str, str] = {}
         self._roots: set[Path] = {self.root}
         self._run_roots: dict[str, Path] = {}
+        self._stream_notifiers: dict[str, StreamNotifier] = {}
         self.on_error = on_error
 
     def _emit_error(
@@ -379,6 +381,7 @@ class RunManager:
                     raise
                 finally:
                     self._cancel_requested.discard(run_id)
+                    self._release_terminal_notifier(run_id)
 
             submission_context = contextvars.copy_context()
             executor = self._kind_executors.get(kind, self.executor)
@@ -455,6 +458,29 @@ class RunManager:
         """Return the event-log path beside this run's progress record."""
         return self._root_for(run_id) / f"{run_id}.stream.ndjson"
 
+    def notifier(self, run_id: str) -> StreamNotifier:
+        """Return the process-local wakeup fanout for a run stream."""
+        with self._singleton_lock:
+            return self._stream_notifiers.setdefault(run_id, StreamNotifier())
+
+    def release_notifier(self, run_id: str, notifier: StreamNotifier) -> None:
+        """Drop an idle terminal-run notifier without racing active sinks."""
+        snapshot = self.get(run_id)
+        if snapshot is None or snapshot.state not in TERMINAL_RUN_STATES:
+            return
+        with self._singleton_lock:
+            if (
+                self._stream_notifiers.get(run_id) is notifier
+                and notifier.subscriber_count == 0
+            ):
+                self._stream_notifiers.pop(run_id, None)
+
+    def _release_terminal_notifier(self, run_id: str) -> None:
+        with self._singleton_lock:
+            notifier = self._stream_notifiers.get(run_id)
+            if notifier is not None and notifier.subscriber_count == 0:
+                self._stream_notifiers.pop(run_id, None)
+
     def get(self, run_id: str) -> RunSnapshot | None:
         return parse_run_snapshot(run_id, self._read_record(run_id))
 
@@ -498,7 +524,9 @@ class RunManager:
                 if snapshot.kind == "coverLetterRevise"
                 else None
             )
-            artifact_id = snapshot.meta.get(meta_key) if snapshot.meta and meta_key else None
+            artifact_id = (
+                snapshot.meta.get(meta_key) if snapshot.meta and meta_key else None
+            )
             if meta_key is None or artifact_id is None:
                 continue
             key = (snapshot.kind, artifact_id)

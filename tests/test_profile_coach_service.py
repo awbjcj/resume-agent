@@ -78,8 +78,10 @@ class RecordingSink:
 class StreamingAgent:
     def __init__(self, prose: str, metadata: str = "action: ask\ntopic: t1"):
         self.full = f"{prose}\n---METADATA---\n{metadata}"
+        self.prompts: list[str] = []
 
     def stream(self, prompt) -> Iterator[StreamEvent]:
+        self.prompts.append(prompt)
         split = max(1, len(self.full) // 2)
         yield TextDelta(self.full[:split])
         yield ToolStarted("call-1", "search_corpus", "Kafka")
@@ -164,13 +166,14 @@ def test_opening_and_message_turn_create_durable_views(tmp_path):
 def test_message_streams_prose_and_stores_the_same_text(tmp_path):
     sid = _open(tmp_path)["sessionId"]
     sink = RecordingSink()
+    coach = StreamingAgent("Strong answer.")
 
     run_message_turn(
         FakeReporter(),
         profile_dir=tmp_path,
         session_id=sid,
         message="I improved deploys.",
-        coach_agent=StreamingAgent("Strong answer."),
+        coach_agent=coach,
         formatter_agent=FakeAgent(
             CoachTurn(message="Formatter drift.", action="ask", topic_id="t1")
         ),
@@ -181,6 +184,7 @@ def test_message_streams_prose_and_stores_the_same_text(tmp_path):
     assert session_view(tmp_path, sid)["turns"][-1]["text"] == sink.text
     assert any(isinstance(event, ToolStarted) for event in sink.events)
     assert not any(isinstance(event, Completed) for event in sink.events)
+    assert coach.prompts[0].index("TRANSCRIPT:") < coach.prompts[0].index("AGENDA:")
 
 
 def test_partial_stream_failure_leaves_session_byte_equivalent(tmp_path):
@@ -220,6 +224,7 @@ def test_missing_delimiter_degrades_instead_of_losing_the_turn(tmp_path):
     class NoDelimiterStream(StreamingAgent):
         def __init__(self):
             self.full = reply
+            self.prompts = []
 
     formatter = FakeAgent(
         CoachTurn(message="formatted", action="ask", topic_id="t1")

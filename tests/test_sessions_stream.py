@@ -8,6 +8,7 @@ from resume_agent.sessions.stream import (
     NullSink,
     ReasoningDelta,
     RunStreamSink,
+    Settled,
     StreamTail,
     TextDelta,
     ToolCompleted,
@@ -84,6 +85,22 @@ def test_run_sink_round_trips_events_in_order(tmp_path):
         (1, "tool_started"),
         (2, "text"),
         (3, "completed"),
+    ]
+
+
+def test_settled_is_non_terminal(tmp_path):
+    path = tmp_path / "run.stream.ndjson"
+    sink = RunStreamSink(path, flush_chars=1)
+    sink.emit(TextDelta("reply"))
+    sink.emit(Settled())
+    sink.emit(Notice("saved"))
+    sink.emit(Completed())
+    sink.close()
+    assert [tag for _, tag, _ in read_stream(path)] == [
+        "text",
+        "settled",
+        "notice",
+        "completed",
     ]
 
 
@@ -222,6 +239,15 @@ def test_stream_tail_only_reads_bytes_appended_since_last_call(tmp_path):
 
     second = tail.read()
     assert [index for index, _, _ in second] == [2, 3]
+
+
+def test_stream_tail_reads_while_sink_handle_is_open(tmp_path):
+    path = tmp_path / "run.stream.ndjson"
+    sink = RunStreamSink(path, flush_chars=1)
+    tail = StreamTail(path)
+    sink.emit(TextDelta("visible"))
+    assert tail.read() == [(0, "text", {"text": "visible"})]
+    sink.close()
 
 
 def test_stream_tail_withholds_a_line_not_yet_newline_terminated(tmp_path):
