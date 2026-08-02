@@ -175,7 +175,6 @@ def send_message(
     manager: RunManager = Depends(get_run_manager),
     settings: Settings = Depends(get_settings_dep),
 ):
-    _guard_setup(settings)
     workspace_root = _workspace_root(request)
     try:
         current = session_view(
@@ -185,6 +184,7 @@ def send_message(
         raise _value_error(exc) from exc
     if current["status"] != "active":
         raise ApiException(409, "CONFLICT", "session ended")
+    _guard_setup(settings)
     connectors_path, search_path = _config_paths(request)
     return _submit(
         manager,
