@@ -1,85 +1,83 @@
+from pathlib import Path
+from types import SimpleNamespace
+
 from typer.testing import CliRunner
 
 from resume_agent import cli
+from resume_agent.discovery import scout_store
+from resume_agent.services import scout as scout_service
 
 
-def test_scout_command_prints_and_adds_only_validated(monkeypatch):
-    added = []
-    monkeypatch.setattr(cli, "resolve_api_key", lambda model_id: "key")
-    monkeypatch.setattr(
-        "resume_agent.services.source_discovery.run_source_discovery",
-        lambda reporter, **kwargs: {
-            "prompt": kwargs["prompt"],
-            "scrapeAvailable": True,
-            "scrapeUnavailableReason": None,
-            "candidates": [
-                {
-                    "company": "Acme",
-                    "url": "https://job-boards.greenhouse.io/acme",
-                    "reason": "matches",
-                    "confidence": "high",
-                    "status": "validated",
-                    "ats": "greenhouse",
-                    "token": "acme",
-                    "roleCount": 4,
-                    "error": None,
-                    "errorCode": None,
-                },
-                {
-                    "company": "Plain",
-                    "url": "https://plain.example/careers",
-                    "reason": "plain",
-                    "confidence": "low",
-                    "status": "unverified",
-                    "ats": None,
-                    "token": None,
-                    "roleCount": None,
-                    "error": None,
-                    "errorCode": "ATS_NOT_DETECTED",
-                },
-            ],
-        },
+def _proposal(pid, label, *, kind="source"):
+    return {
+        "id": pid,
+        "kind": kind,
+        "source": {"company": label, "url": f"https://{label}.example/jobs", "ats": "greenhouse", "roleCount": 4} if kind == "source" else None,
+        "term": {"value": label, "termKind": "keyword"} if kind == "search_term" else None,
+        "fitScore": 80,
+        "check": "validated" if kind == "source" else "new",
+        "status": "pending",
+    }
+
+
+def test_scout_command_snapshots_indexes_and_uses_shared_services(monkeypatch, tmp_path):
+    view = {
+        "sessionId": "s1",
+        "status": "active",
+        "turns": [{"role": "scout", "text": "Found three."}],
+        "proposals": [_proposal("p1", "Modal"), _proposal("p2", "Baseten"), _proposal("p3", "inference serving", kind="search_term")],
+        "recap": None,
+    }
+    approved = []
+    dismissed = []
+    monkeypatch.setattr(cli, "get_settings", lambda: SimpleNamespace(mid_model="x", cheap_model="y", search_mode="auto", stream_enabled=False, browser_enabled=False))
+    monkeypatch.setattr(cli, "missing_model_keys", lambda settings: [])
+    monkeypatch.setattr(cli, "plan_search", lambda *args: SimpleNamespace(strategy="tool"))
+    monkeypatch.setattr(cli, "_tenant_cli_path", lambda value: Path(tmp_path) / Path(value).name)
+    monkeypatch.setattr(scout_store, "active_session", lambda root: None)
+    monkeypatch.setattr(scout_service, "run_start_turn", lambda *args, **kwargs: view)
+
+    def approve(_root, _sid, pid, **kwargs):
+        approved.append(pid)
+        next(row for row in view["proposals"] if row["id"] == pid)["status"] = "added"
+        return view
+
+    def dismiss(_root, _sid, pid, **kwargs):
+        dismissed.append((pid, kwargs["reason"]))
+        next(row for row in view["proposals"] if row["id"] == pid)["status"] = "dismissed"
+        return view
+
+    monkeypatch.setattr(scout_service, "approve_proposal", approve)
+    monkeypatch.setattr(scout_service, "dismiss_proposal", dismiss)
+    monkeypatch.setattr(scout_service, "run_recap_turn", lambda *args, **kwargs: view | {"status": "ended", "recap": "Done"})
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["scout", "AI infrastructure"],
+        input="add 1 3\nskip 2 too early stage\nend\n",
     )
-    monkeypatch.setattr(
-        "resume_agent.services.sources.add_source",
-        lambda **kwargs: added.append(kwargs["url"]),
-    )
-
-    result = CliRunner().invoke(cli.app, ["scout", "AI infrastructure", "--add"])
 
     assert result.exit_code == 0, result.output
-    assert "Acme" in result.output and "validated" in result.output
-    assert added == ["https://job-boards.greenhouse.io/acme"]
+    assert approved == ["p1", "p3"]
+    assert dismissed == [("p2", "too early stage")]
+    assert "Modal" in result.output and "inference serving" in result.output
 
 
-def test_scout_command_preflights_all_models(monkeypatch):
-    seen = []
+def test_scout_resumes_active_session_and_quit_leaves_it_open(monkeypatch, tmp_path):
+    view = {"sessionId": "s1", "status": "active", "turns": [], "proposals": [], "recap": None}
+    monkeypatch.setattr(cli, "get_settings", lambda: SimpleNamespace(mid_model="x", cheap_model="y", search_mode="auto", stream_enabled=False, browser_enabled=False))
+    monkeypatch.setattr(cli, "missing_model_keys", lambda settings: [])
+    monkeypatch.setattr(cli, "plan_search", lambda *args: SimpleNamespace(strategy="tool"))
+    monkeypatch.setattr(cli, "_tenant_cli_path", lambda value: Path(tmp_path) / Path(value).name)
+    monkeypatch.setattr(scout_store, "active_session", lambda root: {"session_id": "s1"})
+    monkeypatch.setattr(scout_service, "session_view", lambda *args, **kwargs: view)
+    monkeypatch.setattr(scout_service, "run_recap_turn", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not end")))
 
-    def key(model_id):
-        seen.append(model_id)
-        return "key" if len(seen) == 1 else ""
-
-    monkeypatch.setattr(cli, "resolve_api_key", key)
-    result = CliRunner().invoke(cli.app, ["scout", "AI infrastructure"])
-
-    assert result.exit_code == 1
-    assert "Missing API key" in result.output
-    assert len(set(seen)) == 2
+    result = CliRunner().invoke(cli.app, ["scout"], input="quit\n")
+    assert result.exit_code == 0, result.output
+    assert "Resuming" in result.output
 
 
-def test_scout_search_cmd_prints_suggestions(monkeypatch):
-    from resume_agent import cli
-
-    monkeypatch.setattr(cli, "resolve_api_key", lambda model_id: "key")
-    monkeypatch.setattr(
-        "resume_agent.services.search_discovery.run_search_discovery",
-        lambda *a, **k: {
-            "prompt": "x",
-            "suggestions": [
-                {"value": "Rust", "kind": "keyword", "reason": "fits", "status": "new"}
-            ],
-        },
-    )
+def test_scout_search_command_is_retired():
     result = CliRunner().invoke(cli.app, ["scout-search", "platform roles"])
-    assert result.exit_code == 0
-    assert "Rust" in result.stdout
+    assert result.exit_code != 0

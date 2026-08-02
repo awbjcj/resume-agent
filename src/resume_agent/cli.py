@@ -495,8 +495,9 @@ def _engine(db_url: str | None):
 
 @app.command("scout")
 def scout_cmd(
-    prompt: str = typer.Argument(..., help="Companies or kinds of companies you want."),
-    add: bool = typer.Option(False, "--add", help="Add every validated candidate."),
+    initial_message: str | None = typer.Argument(
+        None, help="Initial company and search-condition discovery goal."
+    ),
     connectors_path: str = typer.Option(
         DEFAULT_CONNECTORS, "--connectors", help="Path to connectors.yaml."
     ),
@@ -504,13 +505,16 @@ def scout_cmd(
         DEFAULT_SEARCH, "--search", help="Path to search.yaml."
     ),
 ) -> None:
-    """Discover and validate new company sources from a free-text prompt."""
-    from resume_agent.services.source_discovery import run_source_discovery
-    from resume_agent.services.sources import SourceError, add_source
+    """Research sources and search terms in an interactive Scout session."""
+    import uuid
+
+    from resume_agent.discovery.scout_store import active_session
+    from resume_agent.services import scout as scout_service
+    from resume_agent.services.config_store import YamlConfigStore
+    from resume_agent.sessions.stream import ConsoleStreamSink, NullSink
 
     settings = get_settings()
-    required_models = tuple(dict.fromkeys((settings.mid_model, settings.cheap_model)))
-    missing = [model for model in required_models if not resolve_api_key(model)]
+    missing = missing_model_keys(settings)
     if missing:
         typer.echo(f"Missing API key for configured model(s): {', '.join(missing)}")
         raise typer.Exit(code=1)
@@ -520,7 +524,7 @@ def scout_cmd(
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
     if search_plan.strategy == "none":
-        typer.echo("Source Scout needs web search; change search_mode from off.")
+        typer.echo("Discovery Scout needs web search; change search_mode from off.")
         raise typer.Exit(code=1)
 
     class EchoReporter:
@@ -533,74 +537,165 @@ def scout_cmd(
         def checkpoint(self):
             pass
 
+    reporter = EchoReporter()
     connectors = str(_tenant_cli_path(connectors_path))
     search = str(_tenant_cli_path(search_path))
-    result = run_source_discovery(
-        EchoReporter(),
-        prompt=prompt,
-        connectors_path=connectors,
-        search_path=search,
-        profile_dir=_tenant_cli_path(DEFAULT_PROFILE_DIR),
-        browser_enabled=settings.browser_enabled,
-    )
-    for row in result["candidates"]:
-        roles = f" ({row['roleCount']} roles)" if row["roleCount"] is not None else ""
-        detail = row["error"] or row["reason"]
-        typer.echo(f"  {row['company']:<24} {row['status']:<10}{roles} {detail}")
-    if not add:
-        return
-    for row in result["candidates"]:
-        if row["status"] != "validated":
-            continue
+    profile_dir = _tenant_cli_path(DEFAULT_PROFILE_DIR)
+    workspace_root = profile_dir.parent
+    config_store = YamlConfigStore(Path(connectors).parent)
+    stream_enabled = getattr(settings, "stream_enabled", True)
+
+    def run_streamed(call, *, label="SCOUT"):
+        sink = (
+            ConsoleStreamSink(lambda text: typer.echo(text, nl=False))
+            if stream_enabled
+            else NullSink()
+        )
+        if stream_enabled:
+            typer.echo(f"\n{label}: ", nl=False)
         try:
-            add_source(
-                url=row["url"],
-                label=row["company"],
+            return call(sink)
+        finally:
+            sink.close()
+
+    def show_latest(view: dict, *, label="SCOUT") -> None:
+        if not stream_enabled and view.get("turns"):
+            typer.echo(f"\n{label}: {view['turns'][-1]['text']}")
+
+    def display_rows(view: dict) -> list[dict]:
+        return list(view.get("proposals", []))
+
+    def show_proposals(view: dict) -> list[dict]:
+        rows = display_rows(view)
+        for index, row in enumerate(rows, 1):
+            if row["kind"] == "source":
+                source = row["source"]
+                label = source["company"]
+                secondary = source.get("ats") or row["check"]
+                if source.get("roleCount") is not None:
+                    secondary += f" · {source['roleCount']} roles"
+            else:
+                term = row["term"]
+                label = f'{term["termKind"]} "{term["value"]}"'
+                secondary = row["check"]
+            if row["status"] != "pending":
+                secondary = row["status"]
+            fit = f" · fit {row['fitScore']}" if row.get("fitScore") is not None else ""
+            typer.echo(f"  [{index}] {label:<24} {secondary}{fit}")
+        return rows
+
+    active = active_session(workspace_root)
+    if active is None:
+        first = initial_message or typer.prompt("You")
+        if first.strip().casefold() == "quit":
+            return
+        session_id = uuid.uuid4().hex
+        view = run_streamed(
+            lambda sink: scout_service.run_start_turn(
+                reporter,
+                workspace_root=workspace_root,
+                session_id=session_id,
+                message=first,
                 connectors_path=connectors,
                 search_path=search,
+                profile_dir=profile_dir,
+                browser_enabled=settings.browser_enabled,
+                sink=sink,
             )
-            typer.echo(f"added: {row['company']}")
-        except SourceError as exc:
-            typer.echo(f"skipped {row['company']}: {exc}")
+        )
+        show_latest(view)
+    else:
+        session_id = active["session_id"]
+        view = scout_service.session_view(
+            workspace_root, session_id, browser_enabled=settings.browser_enabled
+        )
+        typer.echo("Resuming your active Discovery Scout session.")
 
+    show_proposals(view)
+    while True:
+        command = typer.prompt("You").strip()
+        lowered = command.casefold()
+        if lowered == "quit":
+            return
+        if lowered == "end":
+            view = run_streamed(
+                lambda sink: scout_service.run_recap_turn(
+                    reporter,
+                    workspace_root=workspace_root,
+                    session_id=session_id,
+                    connectors_path=connectors,
+                    search_path=search,
+                    profile_dir=profile_dir,
+                    browser_enabled=settings.browser_enabled,
+                    sink=sink,
+                ),
+                label="RECAP",
+            )
+            if not stream_enabled:
+                typer.echo(f"\nRECAP: {view.get('recap') or ''}")
+            return
 
-@app.command("scout-search")
-def scout_search_cmd(
-    prompt: str = typer.Argument(
-        ..., help="What kinds of roles you want to search for."
-    ),
-    search_path: str = typer.Option(DEFAULT_SEARCH, "--search", help="Path to search.yaml."),
-) -> None:
-    """Recommend search conditions (keywords/titles/anchors/excludes) from a prompt."""
-    from resume_agent.services.search_discovery import run_search_discovery
+        rows = display_rows(view)
+        if lowered.startswith("add "):
+            try:
+                indexes = [int(value) for value in command.split()[1:]]
+                proposal_ids = [rows[index - 1]["id"] for index in indexes if index > 0]
+                if len(proposal_ids) != len(indexes):
+                    raise IndexError
+            except (ValueError, IndexError):
+                typer.echo("Use: add <proposal number> [more numbers]")
+                continue
+            for proposal_id in proposal_ids:
+                try:
+                    view = scout_service.approve_proposal(
+                        workspace_root,
+                        session_id,
+                        proposal_id,
+                        config_store=config_store,
+                        connectors_path=connectors,
+                        search_path=search,
+                        browser_enabled=settings.browser_enabled,
+                    )
+                except ValueError as exc:
+                    typer.echo(f"Could not add {proposal_id}: {exc}")
+            show_proposals(view)
+            continue
 
-    settings = get_settings()
-    required_models = tuple(dict.fromkeys((settings.mid_model, settings.cheap_model)))
-    missing = [model for model in required_models if not resolve_api_key(model)]
-    if missing:
-        typer.echo(f"Missing API key for configured model(s): {', '.join(missing)}")
-        raise typer.Exit(code=1)
+        if lowered.startswith("skip "):
+            parts = command.split(maxsplit=2)
+            try:
+                index = int(parts[1])
+                proposal_id = rows[index - 1]["id"] if index > 0 else ""
+                if not proposal_id:
+                    raise IndexError
+            except (ValueError, IndexError):
+                typer.echo("Use: skip <proposal number> [reason]")
+                continue
+            view = scout_service.dismiss_proposal(
+                workspace_root,
+                session_id,
+                proposal_id,
+                reason=parts[2] if len(parts) > 2 else "",
+                browser_enabled=settings.browser_enabled,
+            )
+            show_proposals(view)
+            continue
 
-    class EchoReporter:
-        def begin(self, total, label, **extra):
-            typer.echo(f"{label}…")
-
-        def step(self, current, *, label=None, **extra):
-            pass
-
-        def checkpoint(self):
-            pass
-
-    search = str(_tenant_cli_path(search_path))
-    result = run_search_discovery(
-        EchoReporter(),
-        prompt=prompt,
-        search_path=search,
-        profile_dir=_tenant_cli_path(DEFAULT_PROFILE_DIR),
-    )
-    for row in result["suggestions"]:
-        mark = "=" if row["status"] == "duplicate" else "+"
-        typer.echo(f"  {mark} [{row['kind']}] {row['value']} — {row['reason']}")
+        view = run_streamed(
+            lambda sink: scout_service.run_message_turn(
+                reporter,
+                workspace_root=workspace_root,
+                session_id=session_id,
+                message=command,
+                connectors_path=connectors,
+                search_path=search,
+                profile_dir=profile_dir,
+                browser_enabled=settings.browser_enabled,
+                sink=sink,
+            )
+        )
+        show_latest(view)
+        show_proposals(view)
 
 
 def _read_piped_stdin() -> str | None:
