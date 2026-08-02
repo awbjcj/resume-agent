@@ -94,3 +94,33 @@ def test_full_output_preserves_delimiter_and_metadata_for_formatter():
 
     assert DELIMITER in full
     assert "we cut p99" in full
+
+
+def test_scout_metadata_rows_are_a_boundary_without_the_sentinel():
+    # The Scout's metadata block is a `PROPOSE | ... | ...` table, not the
+    # `key: value` lines the block guard was written for, so a model that omits
+    # the sentinel -- DeepSeek does, on every turn -- dumped the whole proposal
+    # table into the chat window.
+    sink = _Recorder()
+    emitter = ProseEmitter(sink)
+
+    emitter.feed(
+        "I found two leads.\n\n"
+        "PROPOSE | Anduril | greenhouse | https://boards.example/anduril | fit\n"
+        "AVOID | Glean | ashby | https://jobs.example/glean | 404\n"
+    )
+    prose, full = emitter.finish()
+
+    assert prose == "I found two leads."
+    assert "PROPOSE" not in sink.text
+    assert "PROPOSE | Anduril" in full
+
+
+def test_pipe_prose_is_not_mistaken_for_a_metadata_row():
+    sink = _Recorder()
+    emitter = ProseEmitter(sink)
+
+    emitter.feed("I would PROPOSE | as a separator, and AVOID | commas.\nStill talking.")
+    prose, _full = emitter.finish()
+
+    assert prose == "I would PROPOSE | as a separator, and AVOID | commas.\nStill talking."

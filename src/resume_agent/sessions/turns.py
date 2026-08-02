@@ -50,7 +50,21 @@ _BLOCK_KEYS = (
 )
 _BLOCK_START = rf"\n[ \t]*\n(?=(?:{'|'.join(_BLOCK_KEYS)})[ \t]*:)"
 
-_BOUNDARY = re.compile(f"{_MARKER.pattern}|{_BLOCK_START}", re.IGNORECASE)
+# The Scout's metadata block is not `key: value` lines at all -- it is a table
+# of `PROPOSE | company | ats | url | reason` rows -- so the key guard above
+# never matched it and a model that skipped the sentinel printed the whole
+# proposal table into the chat window. Same narrowness rule as the key guard:
+# the verb must be uppercase, alone at the start of a line after a blank line,
+# and immediately followed by the row's first pipe, so prose that merely
+# contains "propose" or a pipe is untouched.
+_ROW_VERBS = ("PROPOSE", "AVOID")
+_ROW_START = rf"\n[ \t]*\n(?=(?:{'|'.join(_ROW_VERBS)})[ \t]*\|)"
+
+# Case-sensitive on its own: the row verbs are a deliberate uppercase shape,
+# and folding them would cut a reply at a sentence starting with "Avoid ...".
+_BOUNDARY = re.compile(
+    f"(?i:{_MARKER.pattern}|{_BLOCK_START})|{_ROW_START}",
+)
 
 # The longest string the boundary can match. The emitter must hold back at
 # least this much, or a boundary split across deltas gets flushed as prose
@@ -59,6 +73,7 @@ _BOUNDARY = re.compile(f"{_MARKER.pattern}|{_BLOCK_START}", re.IGNORECASE)
 MARKER_MAX_LEN = max(
     4 + 6 + 2 + len("METADATA") + 2 + 6 + 4,
     2 + max(len(key) for key in _BLOCK_KEYS) + 1,
+    2 + max(len(verb) for verb in _ROW_VERBS) + 1,
 )
 
 
