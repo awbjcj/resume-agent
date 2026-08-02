@@ -30,17 +30,22 @@ export function DebriefCard({
   plan: PlanItem[];
 }) {
   return (
-    <Card>
-      <CardHeader className="border-b bg-muted/20">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <ClipboardCheck className="size-5 text-primary" aria-hidden="true" />
-          Interview debrief
+    <Card className="rounded-2xl">
+      <CardHeader className="border-b bg-accent/45 p-5 sm:p-6">
+        <CardTitle className="flex items-center gap-3 text-lg">
+          <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <ClipboardCheck className="size-5" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-primary">Rehearsal complete</span>
+            <span className="mt-0.5 block text-xl tracking-tight">Interview debrief</span>
+          </span>
         </CardTitle>
-        <CardDescription className="text-base leading-7 text-foreground">
+        <CardDescription className="mt-2 max-w-3xl text-base leading-7 text-foreground">
           {debrief.summary}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6 pt-6">
+      <CardContent className="space-y-7 pt-6 sm:px-6">
         {debrief.questionReviews?.length ? (
           <Accordion className="w-full">
             {debrief.questionReviews.map((review) => (

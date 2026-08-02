@@ -33,17 +33,27 @@ function SessionRow({ row, selected, onArchive, onDelete }: {
   const unarchive = useUnarchiveInterviewSession();
   const label = [row.company, row.title].filter(Boolean).join(" · ") || "Mock interview";
   return (
-    <li className={cn("flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors", selected && "border-primary bg-primary/5")}>
-      <Link to={`/interview?session=${row.sessionId}`} className="min-w-0 flex-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="block truncate text-sm font-medium">{label}</span>
-        <span className="text-xs text-muted-foreground">
+    <li className={cn(
+      "group/session flex items-center gap-2 rounded-xl border border-transparent bg-muted/35 px-3 py-2.5 transition-[background-color,border-color,box-shadow] duration-150 ease-out-strong hover:border-border hover:bg-muted/60",
+      selected && "border-primary/30 bg-accent shadow-[inset_3px_0_0_var(--primary)] hover:border-primary/40 hover:bg-accent",
+    )}>
+      <Link
+        to={`/interview?session=${row.sessionId}`}
+        aria-current={selected ? "page" : undefined}
+        className="min-w-0 flex-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="flex items-center gap-2 truncate text-sm font-medium">
+          {row.status === "active" ? <span className="size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklab,var(--primary),transparent_82%)]" aria-hidden="true" /> : null}
+          <span className="truncate">{label}</span>
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
           {row.status === "active" ? `Question ${row.askedCount} of ${row.questionCount}` : row.overallScore != null ? `Scored ${row.overallScore}/5` : "Completed"}
           {" · "}{new Date(row.startedAt).toLocaleDateString()}
         </span>
       </Link>
       {row.archivedAt ? <Badge variant="outline">Archived</Badge> : null}
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button size="icon" variant="ghost" aria-label={`Actions for ${label}`}><EllipsisVertical /></Button>} />
+        <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label={`Actions for ${label}`}><EllipsisVertical /></Button>} />
         <DropdownMenuContent align="end">
           <DropdownMenuGroup>
             {row.status === "ended" && !row.archivedAt ? <DropdownMenuItem onClick={() => archive.mutate({ sessionId: row.sessionId }, { onSuccess: () => onArchive(row) })}><Archive />Archive</DropdownMenuItem> : null}
@@ -79,9 +89,12 @@ export function SessionsRail({ selectedId }: { selectedId: string | null }) {
   const remove = useDeleteInterviewSession();
   const rows = sessions.data?.sessions ?? [];
 
-  return <aside className="flex w-full flex-col gap-4 rounded-2xl border bg-card p-4 shadow-sm lg:sticky lg:top-6 lg:w-80 lg:shrink-0">
+  return <aside className="flex w-full flex-col gap-5 rounded-2xl bg-card p-4 shadow-card ring-1 ring-foreground/10 lg:sticky lg:top-24 lg:w-80 lg:shrink-0">
     <div className="flex items-center justify-between gap-3">
-      <h2 className="text-base font-semibold">Sessions</h2>
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Practice history</p>
+        <h2 className="mt-0.5 text-lg font-semibold tracking-tight">Sessions</h2>
+      </div>
       <Button size="sm" onClick={() => setNewOpen(true)}><Plus />New interview</Button>
     </div>
     {sessions.isPending ? <div className="flex flex-col gap-2" aria-label="Loading sessions"><Skeleton className="h-14" /><Skeleton className="h-14" /></div> : null}
@@ -89,7 +102,7 @@ export function SessionsRail({ selectedId }: { selectedId: string | null }) {
     {!sessions.isPending && !sessions.isError && rows.length === 0 ? <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No interview sessions yet.</p> : null}
     <SessionGroup title="In progress" rows={rows.filter((row) => row.status === "active")} selectedId={selectedId} onArchive={() => undefined} onDelete={setPendingDelete} />
     <SessionGroup title="Completed" rows={rows.filter((row) => row.status === "ended")} selectedId={selectedId} onArchive={(row) => { if (row.sessionId === selectedId) navigate("/interview", { replace: true }); }} onDelete={setPendingDelete} />
-    <Field orientation="horizontal">
+    <Field orientation="horizontal" className="border-t pt-4">
       <Switch id="show-archived-interviews" checked={showArchived} onCheckedChange={setShowArchived} />
       <FieldLabel htmlFor="show-archived-interviews">Show archived</FieldLabel>
     </Field>

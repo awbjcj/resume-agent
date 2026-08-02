@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Progress, ProgressLabel } from "@/components/ui/progress";
 import { useChatStream } from "@/lib/chat/useChatStream";
 import type { RunRecord } from "@/lib/runs/store";
 import { useRunStore } from "@/lib/runs/store";
@@ -152,7 +153,7 @@ export function InterviewPage() {
     return (
       <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
         <SessionsRail selectedId={displayedSessionId} />
-        <Card className="min-h-[28rem] min-w-0 flex-1 border-dashed">
+        <Card className="min-h-[28rem] min-w-0 flex-1 bg-card/90">
           <CardContent className="flex min-h-[28rem] items-center justify-center py-14">
             <Empty>
               <EmptyHeader>
@@ -195,39 +196,50 @@ export function InterviewPage() {
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
       <SessionsRail selectedId={displayedSessionId} />
-      <main className="flex min-w-0 flex-1 flex-col gap-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            {active.company || "Mock interview"} — {active.title}
-          </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="outline">{active.style.stage.replace("_", " ")}</Badge>
-            <Badge variant="outline">{active.style.demeanor}</Badge>
-            <Badge variant="outline">{active.style.difficulty}</Badge>
-            <span>Question {active.progress.asked} of {active.progress.total}</span>
+      <main className="flex min-w-0 flex-1 flex-col gap-6">
+        <header className="rounded-2xl bg-card/90 p-5 shadow-card ring-1 ring-foreground/10 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Mock interview</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
+                {active.company || "Mock interview"} — {active.title}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <Badge variant="secondary" className="capitalize">{active.style.stage.replace("_", " ")}</Badge>
+                <Badge variant="outline" className="capitalize">{active.style.demeanor}</Badge>
+                <Badge variant="outline" className="capitalize">{active.style.difficulty}</Badge>
+              </div>
+            </div>
+            {active.status === "active" ? (
+              <AlertDialog>
+                <AlertDialogTrigger render={<Button variant="outline"><SquareCheckBig aria-hidden="true" />End interview</Button>} />
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>End the interview now?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      The interviewer will stop and your coach will score the questions asked so far.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Keep going</AlertDialogCancel>
+                    <AlertDialogAction disabled={ending} onClick={() => void endInterview()}>
+                      {ending ? <Spinner data-icon="inline-start" /> : null}End interview
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : null}
           </div>
-        </div>
-        {active.status === "active" ? (
-          <AlertDialog>
-            <AlertDialogTrigger render={<Button variant="outline"><SquareCheckBig aria-hidden="true" />End interview</Button>} />
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>End the interview now?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  The interviewer will stop and your coach will score the questions asked so far.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Keep going</AlertDialogCancel>
-                <AlertDialogAction disabled={ending} onClick={() => void endInterview()}>
-                  {ending ? <Spinner data-icon="inline-start" /> : null}End interview
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        ) : null}
-      </header>
+          <Progress
+            className="mt-5 gap-2"
+            value={active.progress.total ? Math.round((active.progress.asked / active.progress.total) * 100) : 0}
+          >
+            <ProgressLabel>Interview progress</ProgressLabel>
+            <span className="ml-auto text-sm tabular-nums text-muted-foreground">
+              Question {active.progress.asked} of {active.progress.total}
+            </span>
+          </Progress>
+        </header>
 
       {visibleError ? (
         <Alert variant="destructive">
@@ -241,17 +253,18 @@ export function InterviewPage() {
         </Alert>
       ) : null}
 
-      <Card className="min-w-0 overflow-hidden">
-        <CardHeader className="border-b bg-muted/20">
+      <Card className="min-w-0 overflow-hidden rounded-2xl">
+        <CardHeader className="border-b bg-muted/25 py-1">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Bot className="size-5 text-primary" aria-hidden="true" />Interview
+            <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Bot className="size-5" aria-hidden="true" /></span>
+            Live interview
           </CardTitle>
           <CardDescription className="flex items-center gap-2 text-sm">
             <Clock3 className="size-4" aria-hidden="true" />Started {new Date(active.startedAt).toLocaleString()}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="flex h-[min(64vh,48rem)] min-h-[32rem] flex-col gap-4 p-5 sm:p-8">
+          <div className="flex h-[min(62vh,46rem)] min-h-[26rem] flex-col gap-4 p-4 sm:min-h-[32rem] sm:p-8">
             <ChatThread
               messages={chatMessages}
               streaming={streamingParts}
@@ -266,7 +279,7 @@ export function InterviewPage() {
           </div>
 
           {canAnswer ? (
-            <div className="border-t bg-card p-5 sm:p-6">
+            <div className="border-t bg-card/95 p-4 sm:p-6">
               <ChatComposer
                 value={composer}
                 onChange={setComposer}
