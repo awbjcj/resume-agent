@@ -28,3 +28,4 @@ dist-ssr
 coverage
 playwright-report
 test-results
+e2e/__screenshots__

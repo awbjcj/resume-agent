@@ -3,6 +3,7 @@ import { Archive, ArchiveRestore, Bot, Clock3, History, Sparkles, Trash2 } from 
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
+import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChatStream } from "@/lib/chat/useChatStream";
+import { cn } from "@/lib/utils";
 import type { RunRecord } from "@/lib/runs/store";
 import { useRunStore } from "@/lib/runs/store";
 import { ProposalRail } from "./ProposalRail";
@@ -104,12 +106,15 @@ export function ScoutPage() {
   if (sessions.isError || (displayedId && session.isError)) return <Alert variant="destructive"><AlertTitle>Discovery Scout is unavailable</AlertTitle><AlertDescription><Button variant="outline" size="sm" onClick={() => { void sessions.refetch(); void session.refetch(); }}>Try again</Button></AlertDescription></Alert>;
   const rows = sessions.data?.sessions ?? [];
 
-  return <div className="mx-auto max-w-[1480px] space-y-6">
+  return <div className={cn("space-y-6", CHAT_PAGE_WIDTH)}>
     <header className="flex flex-wrap items-start justify-between gap-4"><div><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary"><Sparkles className="size-4" aria-hidden="true" />Guided discovery</div><h1 className="text-2xl font-semibold tracking-tight">Discovery Scout</h1><p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">Talk through the companies, roles, locations, and boundaries that should shape your search. Nothing is added until you approve it.</p></div><div className="flex items-center gap-2">{active?.status === "active" ? <Button variant="outline" disabled={busy} onClick={endSession}>End session</Button> : active ? <Button variant="outline" onClick={() => setSelectedId(null)}>New session</Button> : null}</div></header>
     {runError || stream.error ? <Alert variant="destructive"><AlertTitle>The Scout could not finish that step</AlertTitle><AlertDescription className="flex flex-wrap items-center gap-3"><span className="flex-1">{runError || stream.error}</span><Button size="sm" variant="outline" onClick={() => launchMessage(lastMessage)}>Retry</Button></AlertDescription></Alert> : null}
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <Card className="min-w-0 overflow-hidden"><CardHeader className="border-b"><div className="flex items-center gap-2"><Bot className="size-5 text-primary" aria-hidden="true" /><CardTitle>{active?.goal || "Plan your next search"}</CardTitle></div><CardDescription>{active ? <><Clock3 className="mr-1 inline size-3.5" />{active.status === "active" ? "Conversation active" : "Session ended"}</> : "Try: Find remote healthcare platform roles at growing mid-size companies."}</CardDescription></CardHeader><CardContent className="flex h-[36rem] flex-col gap-4 p-4"><ChatThread messages={messages} streaming={streaming?.length ? streaming : null} streamingActive={stream.status === "streaming"} showReasoning />{active?.recap ? <div className="rounded-xl border bg-muted/35 p-3 text-sm"><span className="font-medium">Recap: </span>{active.recap}</div> : null}{active?.status !== "ended" ? <ChatComposer value={composer} onChange={setComposer} onSend={() => launchMessage()} onStop={stop} busy={busy} settling={stream.status === "settled"} ariaLabel="Discovery request" placeholder={active ? "Ask for a change…" : "Find remote healthcare platform roles at growing mid-size companies…"} /> : <p className="rounded-xl bg-muted/50 p-3 text-center text-sm text-muted-foreground">This conversation has ended. Pending proposals remain available to review.</p>}</CardContent></Card>
-      <ProposalRail className="min-w-0 xl:sticky xl:top-24" sessionId={active?.sessionId ?? ""} proposals={active?.proposals ?? []} scrapeAvailable={active?.scrapeAvailable ?? false} />
+    {/* items-stretch (the default) rather than items-start: the ledger sizes
+        itself to the conversation and scrolls internally, so the page length no
+        longer grows with the proposal count. */}
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <Card className="min-w-0 overflow-hidden"><CardHeader className="border-b"><div className="flex items-center gap-2"><Bot className="size-5 text-primary" aria-hidden="true" /><CardTitle>{active?.goal || "Plan your next search"}</CardTitle></div><CardDescription>{active ? <><Clock3 className="mr-1 inline size-3.5" />{active.status === "active" ? "Conversation active" : "Session ended"}</> : "Try: Find remote healthcare platform roles at growing mid-size companies."}</CardDescription></CardHeader><CardContent className={cn("flex flex-col gap-4 p-4", CHAT_SURFACE_HEIGHT)}><ChatThread messages={messages} streaming={streaming?.length ? streaming : null} streamingActive={stream.status === "streaming"} showReasoning />{active?.recap ? <div className="rounded-xl border bg-muted/35 p-3 text-sm"><span className="font-medium">Recap: </span>{active.recap}</div> : null}{active?.status !== "ended" ? <ChatComposer value={composer} onChange={setComposer} onSend={() => launchMessage()} onStop={stop} busy={busy} settling={stream.status === "settled"} ariaLabel="Discovery request" placeholder={active ? "Ask for a change…" : "Find remote healthcare platform roles at growing mid-size companies…"} /> : <p className="rounded-xl bg-muted/50 p-3 text-center text-sm text-muted-foreground">This conversation has ended. Pending proposals remain available to review.</p>}</CardContent></Card>
+      <ProposalRail className="min-w-0" sessionId={active?.sessionId ?? ""} proposals={active?.proposals ?? []} scrapeAvailable={active?.scrapeAvailable ?? false} />
     </div>
     <div className="flex items-center gap-2"><Checkbox id="scout-archived" checked={showArchived} onCheckedChange={(checked) => setShowArchived(Boolean(checked))} /><label htmlFor="scout-archived" className="text-sm">Show archived sessions</label></div>
     <SessionHistory rows={rows.filter((row) => row.sessionId !== active?.sessionId)} selected={displayedId} onSelect={setSelectedId} />

@@ -23,7 +23,12 @@ from resume_agent.discovery.connectors.config import (
     ScrapeTarget as ScrapeTarget,
     load_connectors_config,
 )
-from resume_agent.discovery.connectors.detect import AtsTarget, detect_ats, inspect_ats
+from resume_agent.discovery.connectors.detect import (
+    AtsTarget,
+    detect_ats,
+    identify_host,
+    inspect_ats,
+)
 from resume_agent.discovery.connectors.greenhouse import GreenhouseConnector
 from resume_agent.discovery.connectors.lever import LeverConnector
 from resume_agent.discovery.connectors.registry import (
@@ -163,6 +168,86 @@ def _scrape_url(url: str | None) -> str:
     )
     path = parsed.path.rstrip("/") or "/"
     return urlunsplit((parsed.scheme, netloc, path, parsed.query, ""))
+
+
+_TRACKING_PARAMS = frozenset(
+    {
+        "fbclid",
+        "gclid",
+        "msclkid",
+        "ref",
+        "referrer",
+        "trk",
+        "trackingid",
+    }
+)
+
+
+def _strip_tracking(url: str) -> str:
+    """Drop analytics query parameters an agent copied along with a search result."""
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return url
+    if not parsed.query:
+        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+    kept = [
+        pair
+        for pair in parsed.query.split("&")
+        if pair
+        and not (
+            (key := pair.split("=", 1)[0].casefold()).startswith("utm_")
+            or key in _TRACKING_PARAMS
+        )
+    ]
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "&".join(kept), ""))
+
+
+def board_root_url(url: str) -> str:
+    """Reduce a posting URL to the durable board root its ATS is addressed by.
+
+    A single posting expires; the board root keeps returning new roles, so a
+    stored source must never be a job-detail URL. This is deterministic rather
+    than prompt-enforced because a proposal that slips through gets written into
+    ``connectors.yaml`` and 404s on every later pull.
+
+    ``identify_host`` is pure (no network) and already discards the parts that
+    make a posting URL specific -- the Workday ``/job/...`` tail and its
+    ``/en-US/`` locale segment, the Greenhouse ``/jobs/{id}`` tail, the Lever
+    and Ashby posting ids. Rebuilding from the identity it returns therefore
+    yields the same canonical URL the Source Manager's provider-native path
+    produces. A URL behind no recognized ATS is returned unchanged apart from
+    tracking parameters, because there is no board shape to reduce it to.
+    """
+    raw = _strip_tracking((url or "").strip())
+    target = identify_host(raw)
+    if target is None:
+        return raw
+    try:
+        if target.ats == "workday":
+            if not (target.tenant and target.datacenter and target.site):
+                return raw
+            return _connection_url(
+                provider="workday",
+                tenant=target.tenant,
+                datacenter=target.datacenter,
+                site=target.site,
+            )
+        if not target.token:
+            # Singleton portals (Tesla, Google Careers) are identified by host
+            # alone, so there is no token to rebuild a root from.
+            return raw
+        if target.ats == "personio":
+            return _connection_url(
+                provider="personio", token=target.token, country=target.country
+            )
+        if target.ats in _TOKEN_URLS:
+            return _connection_url(provider=target.ats, token=target.token)
+    except SourceError:
+        # A slug the templates would reject is not a reason to lose the
+        # proposal; the probe still gets the URL the agent actually found.
+        return raw
+    return raw
 
 
 def _connection_url(

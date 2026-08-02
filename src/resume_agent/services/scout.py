@@ -51,7 +51,12 @@ from resume_agent.services.scout_context import (
     session_source_keys,
     session_term_keys,
 )
-from resume_agent.services.sources import SourcePreview, add_source, preview_source
+from resume_agent.services.sources import (
+    SourcePreview,
+    add_source,
+    board_root_url,
+    preview_source,
+)
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
 from resume_agent.sessions.turns import TurnRejected, format_with_retry, persona_output
 
@@ -81,7 +86,11 @@ def _clean_message(message: str) -> str:
 
 def _source_payload(row: ScoutProposalDraft) -> SourcePayload:
     assert row.source is not None
-    return SourcePayload(company=row.source.company, url=row.source.url)
+    # A stored source outlives the posting the agent found it through, so the
+    # proposal carries the board root rather than a job-detail URL. Deterministic
+    # rather than prompt-enforced: one URL that slips through is written into
+    # connectors.yaml and 404s on every later pull.
+    return SourcePayload(company=row.source.company, url=board_root_url(row.source.url))
 
 
 def _term_payload(row: ScoutProposalDraft) -> TermPayload:

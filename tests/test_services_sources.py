@@ -402,3 +402,75 @@ def test_add_scrape_target_duplicate_refused(tmp_path, monkeypatch):
             provider="scrape",
             connectors_path=path,
         )
+
+
+@pytest.mark.parametrize(
+    ("posting", "root"),
+    [
+        # The reported case: a Workday posting carrying both a locale segment
+        # and a tracking parameter copied out of a web-search result.
+        (
+            "https://phinia.wd5.myworkdayjobs.com/en-US/PHINIA_Careers/job/"
+            "Potting-and-Dispense-System-Expert_R2026-0020?utm_source=openai",
+            "https://phinia.wd5.myworkdayjobs.com/PHINIA_Careers",
+        ),
+        (
+            "https://job-boards.greenhouse.io/acme/jobs/4012345",
+            "https://job-boards.greenhouse.io/acme",
+        ),
+        (
+            "https://boards.greenhouse.io/acme/jobs/4012345?gh_src=abc",
+            "https://job-boards.greenhouse.io/acme",
+        ),
+        ("https://jobs.lever.co/acme/6f1a2b3c-1111", "https://jobs.lever.co/acme"),
+        ("https://jobs.ashbyhq.com/acme/abcd-1234", "https://jobs.ashbyhq.com/acme"),
+        (
+            "https://jobs.smartrecruiters.com/Acme/744000012345-senior-engineer",
+            "https://jobs.smartrecruiters.com/Acme",
+        ),
+        ("https://apply.workable.com/acme/j/ABC123/", "https://apply.workable.com/acme"),
+        ("https://acme.recruitee.com/o/senior-engineer", "https://acme.recruitee.com"),
+        ("https://acme.jobs.personio.de/job/12345", "https://acme.jobs.personio.de"),
+    ],
+)
+def test_board_root_url_reduces_a_posting_to_its_board(posting, root):
+    assert svc.board_root_url(posting) == root
+
+
+def test_board_root_url_is_idempotent_over_an_already_canonical_root():
+    root = "https://phinia.wd5.myworkdayjobs.com/PHINIA_Careers"
+    assert svc.board_root_url(root) == root
+    assert svc.board_root_url(svc.board_root_url(root)) == root
+
+
+def test_board_root_url_keeps_an_unrecognized_host_but_drops_tracking():
+    # No known ATS shape means there is no root to reduce to; only the analytics
+    # parameters an agent copied along with the link are safe to remove.
+    assert (
+        svc.board_root_url("https://acme.example/careers/openings/12?utm_campaign=x&team=eng")
+        == "https://acme.example/careers/openings/12?team=eng"
+    )
+    assert svc.board_root_url("") == ""
+
+
+def test_board_root_url_leaves_host_identified_singleton_portals_alone():
+    # Tesla and Google Careers are identified by host with no token, so there is
+    # nothing to rebuild a root from.
+    url = "https://www.tesla.com/careers/search/job/senior-engineer-12345"
+    assert svc.board_root_url(url) == url
+
+
+def test_board_root_url_strips_tracking_without_losing_a_meaningful_parameter():
+    # A Greenhouse embed carries its board slug in ?for=, so tracking-stripping
+    # must be an allowlist of analytics keys rather than "drop the query".
+    assert (
+        svc.board_root_url("https://boards.greenhouse.io/embed/job_board?for=acme&utm_source=x")
+        == "https://job-boards.greenhouse.io/acme"
+    )
+
+
+def test_board_root_url_survives_a_value_that_is_not_a_url():
+    # `_clean_proposal` already rejects non-HTTP source URLs, but this runs on
+    # untrusted model output and must degrade rather than raise.
+    assert svc.board_root_url("not a url at all") == "not a url at all"
+    assert svc.board_root_url("https://acme.example/careers#openings") == "https://acme.example/careers"

@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
+import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -30,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { useChatStream } from "@/lib/chat/useChatStream";
+import { cn } from "@/lib/utils";
 import type { RunRecord } from "@/lib/runs/store";
 import { useRunStore } from "@/lib/runs/store";
 
@@ -269,7 +271,7 @@ export function CoachPage() {
   const visibleError = stream.error || runError;
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8">
+    <div className={cn("flex flex-col gap-8", CHAT_PAGE_WIDTH)}>
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary"><Sparkles className="size-4" aria-hidden="true" />Guided evidence discovery</div>
@@ -339,7 +341,7 @@ export function CoachPage() {
               <CardDescription className="flex items-center gap-2 text-sm"><Clock3 className="size-4" aria-hidden="true" />Started {new Date(active.startedAt).toLocaleString()}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="flex h-[min(70vh,52rem)] min-h-[38rem] flex-col gap-4 p-5 sm:p-8">
+              <div className={cn("flex flex-col gap-4 p-5 sm:p-8", CHAT_SURFACE_HEIGHT)}>
                 <ChatThread
                   messages={chatMessages}
                   streaming={streamingParts}

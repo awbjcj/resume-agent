@@ -346,3 +346,56 @@ def test_unparsable_formatter_keeps_the_reply_the_user_already_watched(tmp_path,
     assert view["turns"][-1]["notice"] == service._TURN_OMITTED_NOTICE
     assert view["proposals"] == []
     assert any("Expected ScoutTurnDraft" in record.getMessage() for record in caplog.records)
+
+
+def test_a_posting_url_is_stored_as_its_board_root_and_probed_only_once(
+    monkeypatch, tmp_path
+):
+    """The agent finds a posting; the workspace must end up with the board.
+
+    This also pins the cache alignment: `check_source` and `_post_process` have
+    to normalize identically, or the post-process lookup misses and the source
+    is probed a second time.
+    """
+    posting = (
+        "https://phinia.wd5.myworkdayjobs.com/en-US/PHINIA_Careers/job/"
+        "Potting-and-Dispense-System-Expert_R2026-0020?utm_source=openai"
+    )
+    root = "https://phinia.wd5.myworkdayjobs.com/PHINIA_Careers"
+    probed: list[str] = []
+
+    def probe(url, **kwargs):
+        probed.append(url)
+        return SourcePreview(ok=True, url=url, kind="workday", role_count=7)
+
+    monkeypatch.setattr(scout_agent, "preview_source", probe)
+    cache: dict[str, SourcePreview] = {}
+    scout_agent.make_check_source_tool(str(tmp_path / "search.yaml"), cache=cache)(posting)
+    monkeypatch.setattr(
+        service,
+        "preview_source",
+        lambda *args, **kwargs: pytest.fail("source was probed twice"),
+    )
+
+    proposals = service._post_process(
+        Reporter(),
+        [
+            ScoutTurnDraft.model_validate(
+                {
+                    "message": "Found PHINIA.",
+                    "proposals": [
+                        {"kind": "source", "source": {"company": "PHINIA", "url": posting}}
+                    ],
+                }
+            ).proposals[0]
+        ],
+        session={"proposals": []},
+        connectors_path=str(tmp_path / "connectors.yaml"),
+        search_path=str(tmp_path / "search.yaml"),
+        probe_cache=cache,
+    )
+
+    assert probed == [root], "the tool must probe the board root, not the posting"
+    assert proposals[0].source is not None
+    assert proposals[0].source.url == root
+    assert proposals[0].check == "validated"

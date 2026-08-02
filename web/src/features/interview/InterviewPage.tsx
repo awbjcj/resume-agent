@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
+import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -24,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Progress, ProgressLabel } from "@/components/ui/progress";
 import { useChatStream } from "@/lib/chat/useChatStream";
+import { cn } from "@/lib/utils";
 import type { RunRecord } from "@/lib/runs/store";
 import { useRunStore } from "@/lib/runs/store";
 
@@ -138,7 +140,7 @@ export function InterviewPage() {
 
   if (session.isLoading && displayedSessionId) {
     return (
-      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
+      <div className={cn("flex flex-col gap-6 lg:flex-row lg:items-start", CHAT_PAGE_WIDTH)}>
         <SessionsRail selectedId={displayedSessionId} />
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <Skeleton className="h-16 w-full" />
@@ -153,7 +155,7 @@ export function InterviewPage() {
     // with nothing selected — the empty state has to be able to start a run.
     const noSessions = !sessions.isPending && (sessions.data?.sessions?.length ?? 0) === 0;
     return (
-      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
+      <div className={cn("flex flex-col gap-6 lg:flex-row lg:items-start", CHAT_PAGE_WIDTH)}>
         <SessionsRail selectedId={displayedSessionId} />
         <Card className="min-h-[28rem] min-w-0 flex-1 bg-card/90">
           <CardContent className="flex min-h-[28rem] items-center justify-center py-14">
@@ -196,7 +198,7 @@ export function InterviewPage() {
   const visibleError = stream.error || runError;
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 lg:flex-row lg:items-start">
+    <div className={cn("flex flex-col gap-6 lg:flex-row lg:items-start", CHAT_PAGE_WIDTH)}>
       <SessionsRail selectedId={displayedSessionId} />
       <main className="flex min-w-0 flex-1 flex-col gap-6">
         <header className="rounded-2xl bg-card/90 p-5 shadow-card ring-1 ring-foreground/10 sm:p-6">
@@ -266,7 +268,7 @@ export function InterviewPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="flex h-[min(62vh,46rem)] min-h-[26rem] flex-col gap-4 p-4 sm:min-h-[32rem] sm:p-8">
+          <div className={cn("flex flex-col gap-4 p-4 sm:p-8", CHAT_SURFACE_HEIGHT)}>
             <ChatThread
               messages={chatMessages}
               streaming={streamingParts}
