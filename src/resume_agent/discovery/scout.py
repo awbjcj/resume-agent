@@ -314,7 +314,12 @@ def build_scout_agent(check_source: Callable[[str], str]) -> Runner:
 
 def build_scout_formatter_agent() -> Runner:
     settings = get_settings()
-    model = build_model(settings.cheap_model)
+    model = build_model(
+        settings.cheap_model,
+        cache_system_prompt=provider_capabilities(
+            settings.cheap_model
+        ).supports_prompt_cache,
+    )
     return AgentRunner(
         Agent(
             model=model,

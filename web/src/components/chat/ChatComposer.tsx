@@ -10,6 +10,7 @@ export function ChatComposer({
   onSend,
   onStop,
   busy,
+  settling = false,
   ariaLabel = "Message",
   placeholder = "Type your reply…",
 }: {
@@ -18,6 +19,7 @@ export function ChatComposer({
   onSend: () => void;
   onStop: () => void;
   busy: boolean;
+  settling?: boolean;
   ariaLabel?: string;
   placeholder?: string;
 }) {
@@ -41,11 +43,13 @@ export function ChatComposer({
         }}
         placeholder={placeholder}
         rows={1}
-        disabled={busy}
+        disabled={busy && !settling}
         className="max-h-56 min-h-9 flex-1 resize-none overflow-y-auto border-0 bg-transparent shadow-none focus-visible:ring-0"
       />
-      <TranscribeButton onText={(text) => onChange(value ? `${value} ${text}` : text)} disabled={busy} />
-      {busy ? (
+      <TranscribeButton onText={(text) => onChange(value ? `${value} ${text}` : text)} disabled={busy && !settling} />
+      {settling ? (
+        <span className="px-2 text-xs text-muted-foreground" role="status">Saving…</span>
+      ) : busy ? (
         <Button size="icon-sm" variant="secondary" onClick={onStop} aria-label="Stop generating">
           <Square className="size-4" aria-hidden="true" />
         </Button>

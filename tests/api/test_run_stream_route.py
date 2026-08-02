@@ -4,8 +4,11 @@ from concurrent.futures import Executor, Future
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+import pytest
 
 from resume_agent.api.app import create_app
+from resume_agent.api.runs.conversation import with_conversation_stream
+from resume_agent.api.runs.manager import RunManager
 from resume_agent.sessions.stream import Completed, RunStreamSink, TextDelta
 
 
@@ -90,3 +93,17 @@ def test_terminal_run_fallback_preserves_error_truth(tmp_path):
         "t": "failed",
         "v": {"message": "provider failed", "code": "PROVIDER_ERROR"},
     }
+
+
+def test_conversation_wrapper_closes_stream_handle_when_work_raises(tmp_path):
+    manager = RunManager(root=tmp_path, executor=InlineExecutor())
+    run_id = manager.create("profileCoachMessage")
+
+    def fail(_reporter, sink):
+        sink.emit(TextDelta("partial"))
+        raise RuntimeError("formatter failed")
+
+    wrapped = with_conversation_stream(manager, fail)
+    with pytest.raises(RuntimeError, match="formatter failed"):
+        wrapped(SimpleNamespace(run_id=run_id))
+    manager.stream_path(run_id).unlink()

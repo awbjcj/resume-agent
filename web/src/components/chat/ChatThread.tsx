@@ -18,12 +18,14 @@ const STICK_THRESHOLD_PX = 64;
 export function ChatThread({
   messages,
   streaming,
+  streamingActive = true,
   showReasoning = true,
   renderAfter,
   className,
 }: {
   messages: ChatThreadMessage[];
   streaming: ChatPart[] | null;
+  streamingActive?: boolean;
   showReasoning?: boolean;
   renderAfter?: (message: ChatThreadMessage) => ReactNode;
   className?: string;
@@ -42,7 +44,11 @@ export function ChatThread({
     setStuck(true);
   }, []);
   useEffect(() => {
-    if (stuck && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight;
+    if (!stuck) return;
+    const frame = requestAnimationFrame(() => {
+      if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
   }, [messages, streaming, stuck]);
 
   return (
@@ -65,7 +71,7 @@ export function ChatThread({
               <ChatMessage
                 message={{ id: "streaming", role: "assistant", parts: streaming }}
                 showReasoning={showReasoning}
-                streaming
+                streaming={streamingActive}
               />
             </div>
           ) : null}

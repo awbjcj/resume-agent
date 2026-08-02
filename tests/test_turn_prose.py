@@ -1,5 +1,5 @@
 from resume_agent.sessions.stream import TextDelta
-from resume_agent.sessions.turns import DELIMITER, MARKER_MAX_LEN, ProseEmitter
+from resume_agent.sessions.turns import DELIMITER, ProseEmitter
 
 
 class _Recorder:
@@ -56,11 +56,11 @@ def test_missing_delimiter_treats_everything_as_verbatim_prose():
     assert sink.text == prose
 
 
-def test_holdback_flushes_on_finish_and_finish_is_idempotent():
+def test_finish_is_idempotent():
     sink = _Recorder()
-    emitter = ProseEmitter(sink, holdback=32)
+    emitter = ProseEmitter(sink)
     emitter.feed("short")
-    assert sink.text == ""
+    assert sink.text == "short"
 
     first = emitter.finish()
     second = emitter.finish()
@@ -69,26 +69,41 @@ def test_holdback_flushes_on_finish_and_finish_is_idempotent():
     assert sink.text == "short"
 
 
-def test_long_prose_streams_before_finish():
-    # The holdback floor is whatever the longest possible marker needs, so a
-    # marker arriving one delta at a time can never be flushed as prose. A
-    # caller asking for less gets the floor, not their number.
+def test_boundary_free_prose_flushes_without_a_fixed_holdback():
     sink = _Recorder()
-    emitter = ProseEmitter(sink, holdback=8)
-    floor = MARKER_MAX_LEN + 2
-    body = "x" * (floor + 10)
+    emitter = ProseEmitter(sink)
+    body = "a complete boundary-free sentence"
 
     emitter.feed(body)
 
-    assert sink.text == "x" * 10
+    assert sink.text == body
     emitter.finish()
     assert sink.text == body
+
+
+def test_blank_line_candidate_is_withheld_until_disambiguated():
+    sink = _Recorder()
+    emitter = ProseEmitter(sink)
+    emitter.feed("Visible prose.\n\n--")
+    assert sink.text == "Visible prose."
+    emitter.feed("ordinary continuation")
+    assert sink.text == "Visible prose.\n\n--ordinary continuation"
+
+
+def test_boundary_split_across_three_deltas_never_leaks():
+    sink = _Recorder()
+    emitter = ProseEmitter(sink)
+    for chunk in ["Visible prose.\n\n", "PRO", "POSE | company | ats"]:
+        emitter.feed(chunk)
+    prose, _ = emitter.finish()
+    assert prose == "Visible prose."
+    assert "PRO" not in sink.text
 
 
 def test_full_output_preserves_delimiter_and_metadata_for_formatter():
     sink = _Recorder()
     emitter = ProseEmitter(sink)
-    emitter.feed('Prose.\n' + DELIMITER + '\naction: draft\nquote: "we cut p99"')
+    emitter.feed("Prose.\n" + DELIMITER + '\naction: draft\nquote: "we cut p99"')
 
     _, full = emitter.finish()
 
@@ -120,7 +135,11 @@ def test_pipe_prose_is_not_mistaken_for_a_metadata_row():
     sink = _Recorder()
     emitter = ProseEmitter(sink)
 
-    emitter.feed("I would PROPOSE | as a separator, and AVOID | commas.\nStill talking.")
+    emitter.feed(
+        "I would PROPOSE | as a separator, and AVOID | commas.\nStill talking."
+    )
     prose, _full = emitter.finish()
 
-    assert prose == "I would PROPOSE | as a separator, and AVOID | commas.\nStill talking."
+    assert (
+        prose == "I would PROPOSE | as a separator, and AVOID | commas.\nStill talking."
+    )

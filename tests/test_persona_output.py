@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_agent.sessions.stream import Completed, Failed, TextDelta
+from resume_agent.sessions.stream import Completed, Failed, Settled, TextDelta
 from resume_agent.sessions.turns import DELIMITER, StreamFailed, persona_output
 
 
@@ -68,7 +68,9 @@ def test_missing_delimiter_degrades_to_the_whole_output_instead_of_failing():
     # from raw notes regardless, so losing the turn costs the user their whole
     # answer to buy nothing.
     sink, reporter = _Sink(), _Reporter()
-    agent = _Agent([*_deltas("Good context. ", "What did it move?"), Completed(object())])
+    agent = _Agent(
+        [*_deltas("Good context. ", "What did it move?"), Completed(object())]
+    )
 
     prose, full = persona_output(agent, "p", sink, reporter, source="coach notes")
 
@@ -88,6 +90,7 @@ def test_delimiter_present_still_hides_metadata_from_the_user():
     assert prose == "Nice work."
     assert sink.text == "Nice work."
     assert "action: ask" in full
+    assert isinstance(sink.events[-1], Settled)
 
 
 def test_marker_wrapped_in_markdown_emphasis_is_still_the_marker():
@@ -95,7 +98,10 @@ def test_marker_wrapped_in_markdown_emphasis_is_still_the_marker():
     # dumps the formatter payload into the chat window.
     sink, reporter = _Sink(), _Reporter()
     agent = _Agent(
-        [*_deltas("Nice work.\n", "**--- METADATA ---**", "\naction: ask"), Completed(object())]
+        [
+            *_deltas("Nice work.\n", "**--- METADATA ---**", "\naction: ask"),
+            Completed(object()),
+        ]
     )
 
     prose, _ = persona_output(agent, "p", sink, reporter, source="coach notes")
@@ -188,3 +194,4 @@ def test_a_silent_stream_falls_back_to_the_terminal_response():
 
     assert prose == ""
     assert full == "from the run output"
+    assert not any(isinstance(event, Settled) for event in sink.events)

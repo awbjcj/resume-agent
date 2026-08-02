@@ -17,6 +17,7 @@ from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
+    provider_capabilities,
     retry_kwargs,
     tool_kwargs,
     use_json_mode_for,
@@ -437,7 +438,12 @@ def _formatter_instructions(schema: type[CoachTurn]) -> list[str]:
 
 def build_coach_agent(tools) -> Runner:
     settings = get_settings()
-    model = build_model(settings.mid_model)
+    model = build_model(
+        settings.mid_model,
+        cache_system_prompt=provider_capabilities(
+            settings.mid_model
+        ).supports_prompt_cache,
+    )
     return AgentRunner(
         Agent(
             model=model,
@@ -452,7 +458,12 @@ def build_coach_agent(tools) -> Runner:
 
 def build_coach_formatter_agent(schema: type[CoachTurn]) -> Runner:
     settings = get_settings()
-    model = build_model(settings.cheap_model)
+    model = build_model(
+        settings.cheap_model,
+        cache_system_prompt=provider_capabilities(
+            settings.cheap_model
+        ).supports_prompt_cache,
+    )
     return AgentRunner(
         Agent(
             model=model,

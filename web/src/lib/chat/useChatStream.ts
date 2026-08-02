@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cancelRun } from "@/features/runs/use-launch-run";
-import { api, getToken, unwrap, withTokenParam } from "@/lib/api/client";
+import { getToken, withTokenParam } from "@/lib/api/client";
+import { getSseLinkToken, invalidateSseLinkToken } from "@/lib/runs/linkToken";
 
 import { parseStreamEvent, reduceEvent, type ChatPart } from "./events";
 
-export type ChatStreamStatus = "idle" | "streaming" | "done" | "error";
+export type ChatStreamStatus = "idle" | "streaming" | "settled" | "done" | "error";
 
 export function useChatStream(runId: string | null) {
   const [parts, setParts] = useState<ChatPart[]>([]);
@@ -37,7 +38,7 @@ export function useChatStream(runId: string | null) {
     let disposed = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const connect = (token?: string) => {
+    const connect = (token?: string, refreshed = false) => {
       if (disposed || typeof EventSource === "undefined") return;
       const base = `/api/runs/${runId}/stream?offset=${cursor.current}`;
       const url = token ? `${base}&token=${encodeURIComponent(token)}` : withTokenParam(base);
@@ -60,6 +61,10 @@ export function useChatStream(runId: string | null) {
           setStatus("done");
           return;
         }
+        if (event.t === "settled") {
+          setStatus("settled");
+          return;
+        }
         if (event.t === "failed") {
           eventSource.close();
           setError(event.v.message);
@@ -71,7 +76,15 @@ export function useChatStream(runId: string | null) {
 
       eventSource.onerror = () => {
         eventSource.close();
-        if (!disposed) reconnectTimer = setTimeout(() => connect(token), 500);
+        if (disposed) return;
+        if (token && !getToken() && !refreshed) {
+          invalidateSseLinkToken(token);
+          void getSseLinkToken()
+            .then((fresh) => connect(fresh, true))
+            .catch(() => connect(undefined, true));
+          return;
+        }
+        reconnectTimer = setTimeout(() => connect(token, refreshed), 500);
       };
     };
 
@@ -81,8 +94,8 @@ export function useChatStream(runId: string | null) {
       if (!runId) return;
       if (getToken()) connect();
       else {
-        void unwrap(api.POST("/api/auth/link-token", { body: { purpose: "sse" } }))
-          .then((link) => connect(link.token))
+        void getSseLinkToken()
+          .then((token) => connect(token))
           .catch(() => connect());
       }
     });

@@ -206,8 +206,8 @@ def run_message_turn(
     prompt = "\n\n".join(
         [
             _overview(root, engine),
-            render_agenda(session),
             render_transcript(session),
+            render_agenda(session),
             f"USER'S LATEST MESSAGE (UNTRUSTED):\n{text}",
         ]
     )

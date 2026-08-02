@@ -309,7 +309,7 @@ export function CoachPage() {
           <CardContent className="flex min-h-[34rem] items-center justify-center py-14">
             {starting && attachedRunId ? (
               <div className="flex h-[28rem] w-full max-w-3xl flex-col gap-4">
-                <ChatThread messages={[]} streaming={stream.parts} />
+                <ChatThread messages={[]} streaming={stream.parts} streamingActive={stream.status === "streaming"} />
                 {!stream.parts.length ? (
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Spinner /> Preparing your first coaching question…
@@ -343,6 +343,7 @@ export function CoachPage() {
                 <ChatThread
                   messages={chatMessages}
                   streaming={streamingParts}
+                  streamingActive={stream.status === "streaming"}
                   renderAfter={(message) => {
                     const index = chatMessages.indexOf(message);
                     const turn = active.turns?.[index];
@@ -397,6 +398,7 @@ export function CoachPage() {
                     onSend={() => void sendMessage()}
                     onStop={stopMessage}
                     busy={busy}
+                    settling={stream.status === "settled"}
                     ariaLabel="Message your profile coach"
                     placeholder="Share the situation, what you did, and what changed…"
                   />

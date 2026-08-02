@@ -80,7 +80,9 @@ export function InterviewPage() {
   const stream = useChatStream(attachedRunId);
 
   const active = session.data;
-  const sending = send.isPending || stream.status === "streaming";
+  const sending = send.isPending || Boolean(
+    attachedRunId && stream.status !== "done" && stream.status !== "error",
+  );
   const ending = end.isPending;
 
   const sendMessage = async (message = composer.trim()) => {
@@ -268,6 +270,7 @@ export function InterviewPage() {
             <ChatThread
               messages={chatMessages}
               streaming={streamingParts}
+              streamingActive={stream.status === "streaming"}
               showReasoning={false}
             />
             {sending && !stream.parts.length ? (
@@ -286,6 +289,7 @@ export function InterviewPage() {
                 onSend={() => void sendMessage()}
                 onStop={stopAnswer}
                 busy={sending}
+                settling={stream.status === "settled"}
                 ariaLabel="Your answer"
                 placeholder="Answer as you would in a real interview…"
               />

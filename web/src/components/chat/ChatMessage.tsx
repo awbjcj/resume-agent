@@ -1,5 +1,7 @@
+import { memo } from "react";
 import { Bot, UserRound } from "lucide-react";
 
+import type { ChatPart } from "@/lib/chat/events";
 import { cn } from "@/lib/utils";
 
 import type { ChatThreadMessage } from "./ChatThread";
@@ -8,7 +10,24 @@ import { ReasoningPart } from "./parts/ReasoningPart";
 import { TextPart } from "./parts/TextPart";
 import { ToolPart } from "./parts/ToolPart";
 
-export function ChatMessage({
+function samePart(left: ChatPart, right: ChatPart): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === "text" || left.kind === "reasoning") {
+    return right.kind === left.kind && left.text === right.text;
+  }
+  if (left.kind === "notice") {
+    return right.kind === "notice" && left.message === right.message;
+  }
+  return right.kind === "tool" &&
+    left.callId === right.callId &&
+    left.name === right.name &&
+    left.argsPreview === right.argsPreview &&
+    left.resultPreview === right.resultPreview &&
+    left.ok === right.ok &&
+    left.done === right.done;
+}
+
+export const ChatMessage = memo(function ChatMessage({
   message,
   showReasoning,
   streaming = false,
@@ -53,4 +72,11 @@ export function ChatMessage({
       </div>
     </div>
   );
-}
+}, (before, after) =>
+  before.showReasoning === after.showReasoning &&
+  before.streaming === after.streaming &&
+  before.message.id === after.message.id &&
+  before.message.role === after.message.role &&
+  before.message.parts.length === after.message.parts.length &&
+  before.message.parts.every((part, index) => samePart(part, after.message.parts[index]!))
+);

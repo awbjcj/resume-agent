@@ -1,4 +1,5 @@
-import { api, getToken, unwrap, withTokenParam } from "@/lib/api/client";
+import { getToken, withTokenParam } from "@/lib/api/client";
+import { getSseLinkToken } from "./linkToken";
 import { useRunStore, type PullRunResult, type RunRecord } from "./store";
 
 /** Map a backend run state to the store projection. */
@@ -93,8 +94,8 @@ export function watchRun(
   if (getToken()) {
     connect();
   } else {
-    void unwrap(api.POST("/api/auth/link-token", { body: { purpose: "sse" } }))
-      .then((link) => connect(link.token))
+    void getSseLinkToken()
+      .then((token) => connect(token))
       .catch(() => connect());
   }
 

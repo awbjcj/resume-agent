@@ -5,6 +5,7 @@ export const STREAM_EVENT_TAGS = [
   "tool_started",
   "tool_completed",
   "notice",
+  "settled",
   "completed",
   "failed",
 ] as const;
@@ -30,6 +31,7 @@ export type StreamEvent =
       };
     }
   | { i: number; t: "notice"; v: { message: string } }
+  | { i: number; t: "settled"; v: Record<string, never> }
   | { i: number; t: "completed"; v: Record<string, never> }
   | { i: number; t: "failed"; v: { message: string; code: string } };
 
@@ -75,6 +77,7 @@ export function parseStreamEvent(value: unknown): StreamEvent | null {
     case "notice":
       if (typeof v.message === "string") return value as StreamEvent;
       return null;
+    case "settled":
     case "completed":
       return value as StreamEvent;
     case "failed":

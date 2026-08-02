@@ -6,6 +6,7 @@ from resume_agent.sessions.stream import (
     Failed,
     Notice,
     ReasoningDelta,
+    Settled,
     TextDelta,
     ToolCompleted,
     ToolStarted,
@@ -22,6 +23,7 @@ def test_typescript_tags_match_python_events():
         ToolStarted,
         ToolCompleted,
         Notice,
+        Settled,
         Completed,
         Failed,
     )
