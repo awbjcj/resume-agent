@@ -40,7 +40,7 @@ describe("ModelPicker", () => {
     render(<Harness />);
 
     await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByRole("option", { name: "Custom model id…" }));
+    await user.click(await screen.findByRole("option", { name: "Custom model id…" }));
     const input = screen.getByPlaceholderText(/provider:model-id/);
     await user.clear(input);
     await user.type(input, "openai:custom-model");
