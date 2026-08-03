@@ -339,6 +339,7 @@ export function CareerLabPage() {
 
   const durableTurns = active?.turns?.length ?? 0;
   const durableAdvanced = durableTurns > baseline;
+  const showThread = Boolean(active || pending || runId);
   const chatMessages: ChatThreadMessage[] = (active?.turns ?? []).map((turn, index) => ({
     id: `${turn.turnId}-${index}`,
     role: turn.role,
@@ -414,14 +415,14 @@ export function CareerLabPage() {
             </CardHeader>
             <CardContent className={cn("flex flex-col gap-4 p-4 sm:p-6", CHAT_SURFACE_HEIGHT)}>
               {session.isPending && displayedSessionId ? <Skeleton className="h-full w-full" /> : null}
-              {!session.isPending && !active ? (
+              {!session.isPending && !showThread ? (
                 <div className="flex min-h-[22rem] flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 p-8 text-center">
                   <MessageCircleMore className="size-8 text-primary" aria-hidden="true" />
                   <h2 className="text-lg font-semibold">No session selected</h2>
                   <p className="max-w-md text-sm text-muted-foreground">Ask a question below to start a draft-only session. Career Lab will route it or ask you to pick a skill.</p>
                 </div>
               ) : null}
-              {active ? (
+              {showThread ? (
                 <ChatThread
                   messages={chatMessages}
                   streaming={runId && !durableAdvanced ? stream.parts : null}
@@ -430,7 +431,7 @@ export function CareerLabPage() {
                   assistantName="Career Lab draft"
                   assistantIcon={<Sparkles className="size-4" aria-hidden="true" />}
                   renderAfter={(message) => {
-                    const turns = active.turns ?? [];
+                    const turns = active?.turns ?? [];
                     const turn = turns.find((candidate) => `${candidate.turnId}-${turns.indexOf(candidate)}` === message.id);
                     if (!turn?.artifact) return null;
                     return <div className="ml-10 mt-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm"><Badge variant="secondary">Draft</Badge><p className="mt-2 font-medium">{turn.artifact.title}</p><p className="mt-1 text-muted-foreground">{turn.artifact.summary}</p></div>;

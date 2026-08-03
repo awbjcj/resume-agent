@@ -96,6 +96,24 @@ describe("CareerLabPage", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Career skill" })).toHaveFocus());
   });
 
+  it("shows the initial thread while the session is being created", async () => {
+    let resolveLaunch: ((value: { runId: string }) => void) | undefined;
+    const launched = new Promise<{ runId: string }>((resolve) => {
+      resolveLaunch = resolve;
+    });
+    const mutateAsync = vi.fn(() => launched);
+    mocks.start.mockReturnValue({ mutateAsync, isPending: false });
+
+    renderPage();
+    await userEvent.type(screen.getByLabelText("Message Career Lab"), "Show me a draft");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    const viewport = screen.getByTestId("chat-viewport");
+    expect(viewport).toHaveTextContent("Show me a draft");
+
+    resolveLaunch?.({ runId: "run-1" });
+  });
+
   it("labels persisted responses as drafts and keeps the action surface draft-only", () => {
     mocks.sessions.mockReturnValue({
       data: { sessions: [{ sessionId: "s1", goal: "Plan", startedAt: "2026-08-02", endedAt: null, status: "active", archivedAt: null, turnCount: 2 }] },
