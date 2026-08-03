@@ -32,6 +32,7 @@ const coachState = vi.hoisted(() => ({
   status: "active",
   recap: null as string | null,
   includeArchived: false,
+  useDefaultSession: true,
   sessions: [] as Array<Record<string, unknown>>,
 }));
 
@@ -42,7 +43,7 @@ vi.mock("./use-coach", () => ({
     coachState.includeArchived = includeArchived;
     return ({
     data: {
-      sessions: coachState.sessions.length ? coachState.sessions : [
+      sessions: coachState.sessions.length || coachState.useDefaultSession ? coachState.sessions.length ? coachState.sessions : [
         {
           sessionId: "session-1",
           status: coachState.status,
@@ -51,15 +52,15 @@ vi.mock("./use-coach", () => ({
           topicCount: 1,
           savedNoteCount: 0,
         },
-      ],
+      ] : [],
     },
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
   });
   },
-  useCoachSession: () => ({
-    data: {
+  useCoachSession: (sessionId: string | null) => ({
+    data: sessionId ? {
       sessionId: "session-1",
       status: coachState.status,
       startedAt: "2026-07-15T12:00:00Z",
@@ -95,7 +96,7 @@ vi.mock("./use-coach", () => ({
           status: "pending",
         },
       ],
-    },
+    } : undefined,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -117,6 +118,7 @@ describe("CoachPage", () => {
     coachState.status = "active";
     coachState.recap = null;
     coachState.includeArchived = false;
+    coachState.useDefaultSession = true;
     coachState.sessions = [];
     FakeEventSource.last = null;
     localStorage.setItem("resume-agent-token", "token");
@@ -133,6 +135,15 @@ describe("CoachPage", () => {
     expect(screen.getByText("What changed after you shipped it?")).toBeInTheDocument();
     expect(screen.getByText("Missing outcome")).toBeInTheDocument();
     expect(screen.getByText("Improved delivery")).toBeInTheDocument();
+  });
+
+  it("uses the shared guided starting state when there is no active session", () => {
+    coachState.useDefaultSession = false;
+    render(<CoachPage />);
+
+    expect(screen.getByText("Profile coach workspace")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start coaching session" })).toBeInTheDocument();
+    expect(screen.queryByText("What changed after you shipped it?")).not.toBeInTheDocument();
   });
 
   it("preserves a message until its run succeeds", async () => {
@@ -195,11 +206,14 @@ describe("CoachPage", () => {
     expect(screen.queryByText("Could not end session")).not.toBeInTheDocument();
   });
 
-  it("renders a completed session read-only", () => {
+  it("renders a completed session read-only after it is selected from history", async () => {
     coachState.status = "ended";
     coachState.recap = "You documented a measurable delivery outcome.";
+    coachState.sessions = [{ sessionId: "session-1", status: "ended", startedAt: "2026-07-15T12:00:00Z", endedAt: "2026-07-15T13:00:00Z", topicCount: 1, savedNoteCount: 0, archivedAt: null }];
+    const user = userEvent.setup();
 
     render(<CoachPage />);
+    await user.click(screen.getByRole("button", { name: /Coaching · 7\/15\/2026/i }));
 
     expect(screen.queryByLabelText("Message your profile coach")).not.toBeInTheDocument();
     expect(screen.getByText(coachState.recap)).toBeInTheDocument();
@@ -213,9 +227,9 @@ describe("CoachPage", () => {
     ];
     const user = userEvent.setup();
     render(<CoachPage />);
-    await user.click(screen.getByRole("button", { name: /actions for coaching session/i }));
+    await user.click(screen.getByRole("button", { name: "Actions for coaching session c1" }));
     await user.click(await screen.findByRole("menuitem", { name: "Archive" }));
-    expect(archiveSession).toHaveBeenCalledWith({ sessionId: "c1" });
+    expect(archiveSession).toHaveBeenCalledWith({ sessionId: "c1" }, expect.any(Object));
   });
 
   it("warns that saved notes survive deletion", async () => {
@@ -225,7 +239,7 @@ describe("CoachPage", () => {
     ];
     const user = userEvent.setup();
     render(<CoachPage />);
-    await user.click(screen.getByRole("button", { name: /actions for coaching session/i }));
+    await user.click(screen.getByRole("button", { name: "Actions for coaching session c1" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     expect(await screen.findByText(/Saved notes are kept in your profile/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete" }));
@@ -235,7 +249,7 @@ describe("CoachPage", () => {
   it("includes archived sessions when toggled", async () => {
     const user = userEvent.setup();
     render(<CoachPage />);
-    await user.click(screen.getByRole("switch", { name: "Show archived" }));
+    await user.click(screen.getByRole("checkbox", { name: "Show archived" }));
     expect(coachState.includeArchived).toBe(true);
   });
 });

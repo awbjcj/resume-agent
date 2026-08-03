@@ -44,15 +44,18 @@ export const ChatMessage = memo(function ChatMessage({
   const visible = showReasoning
     ? message.parts
     : message.parts.filter((part) => part.kind !== "reasoning");
+  const avatar = (
+    <div className={cn(
+      "flex size-8 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm",
+      assistant ? "mt-5 border-primary/20 bg-primary/[0.07] text-primary" : "mt-1",
+    )}>
+      {assistant ? assistantIcon ?? <Bot className="size-4" aria-hidden="true" /> : <UserRound className="size-4" aria-hidden="true" />}
+    </div>
+  );
   return (
-    <article data-testid="chat-message" className={cn("flex items-start gap-2.5 sm:gap-3", !assistant && "flex-row-reverse")}>
-      <div className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm",
-        assistant ? "mt-5 border-primary/20 bg-primary/[0.07] text-primary" : "mt-1",
-      )}>
-        {assistant ? assistantIcon ?? <Bot className="size-4" aria-hidden="true" /> : <UserRound className="size-4" aria-hidden="true" />}
-      </div>
-      <div className={cn("min-w-0 max-w-[min(46rem,calc(100%-2.5rem))]", !assistant && "flex flex-col items-end")}>
+    <article data-testid="chat-message" className={cn("flex w-full items-start gap-2.5 sm:gap-3", assistant ? "justify-start" : "justify-end")}>
+      {assistant ? avatar : null}
+      <div className={cn("min-w-0 max-w-[min(52rem,calc(100%-2.75rem))] lg:max-w-[min(58rem,72%)]", !assistant && "flex flex-col items-end")}>
         {assistant ? <div className="mb-1 px-1 text-[11px] font-semibold tracking-wide text-muted-foreground">{assistantName}</div> : null}
         <div className={cn(
           "space-y-3 rounded-2xl px-4 py-3 text-[0.9375rem] leading-7 shadow-sm",
@@ -75,6 +78,7 @@ export const ChatMessage = memo(function ChatMessage({
           })}
         </div>
       </div>
+      {!assistant ? avatar : null}
     </article>
   );
 }, (before, after) =>

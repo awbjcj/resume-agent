@@ -57,4 +57,24 @@ describe("ChatMessage", () => {
     expect(screen.getByText("My answer")).toBeInTheDocument();
     expect(screen.queryByText("Interviewer")).not.toBeInTheDocument();
   });
+
+  it("anchors assistant turns left and user turns right", () => {
+    const { rerender } = render(
+      <ChatMessage
+        showReasoning
+        message={{ id: "a3", role: "assistant", parts: [{ kind: "text", text: "A clear follow-up." }] }}
+      />,
+    );
+    expect(screen.getByTestId("chat-message")).toHaveClass("justify-start");
+
+    rerender(
+      <ChatMessage
+        showReasoning
+        message={{ id: "u2", role: "user", parts: [{ kind: "text", text: "My answer." }] }}
+      />,
+    );
+    const message = screen.getByTestId("chat-message");
+    expect(message).toHaveClass("justify-end");
+    expect(message.firstElementChild).toHaveTextContent("My answer.");
+  });
 });

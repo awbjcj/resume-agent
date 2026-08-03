@@ -86,6 +86,13 @@ beforeEach(() => {
 });
 
 describe("CareerLabPage", () => {
+  it("keeps the starter visible while the disabled session query reports pending", () => {
+    mocks.session.mockReturnValue({ data: undefined, isPending: true });
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "Create Career Lab session" })).toBeInTheDocument();
+  });
+
   it("requires an explicit choice when routing is ambiguous", async () => {
     const mutateAsync = vi.fn().mockImplementation(async (input) => {
       input.onDone?.({
@@ -153,14 +160,15 @@ describe("CareerLabPage", () => {
     expect(await screen.findByText("Career Lab is thinking…")).toBeInTheDocument();
   });
 
-  it("renders one responsive rail instead of duplicate desktop and mobile histories", () => {
+  it("separates the starter controls from one responsive session history", () => {
     renderPage();
 
-    expect(screen.getAllByText("Sessions")).toHaveLength(1);
-    expect(screen.getByText("Context & skill")).toBeInTheDocument();
+    expect(screen.getAllByText("Session history")).toHaveLength(1);
+    expect(screen.getByText("Session setup")).toBeInTheDocument();
+    expect(screen.getByText("Reference context")).toBeInTheDocument();
   });
 
-  it("renames a saved thread inline and has no icon-only archive toggle", async () => {
+  it("renames a saved thread from its session menu and has no archive toggle", async () => {
     mocks.sessions.mockReturnValue({
       data: { sessions: [{ sessionId: "s1", title: "Negotiation notes", goal: "Plan", startedAt: "2026-08-02", endedAt: null, status: "active", archivedAt: null, turnCount: 2 }] },
       isPending: false,
@@ -170,7 +178,8 @@ describe("CareerLabPage", () => {
     renderPage();
 
     expect(screen.queryByRole("button", { name: "Toggle archived sessions" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Rename Negotiation notes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Negotiation notes" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Rename" }));
     const input = screen.getByRole("textbox", { name: "Session title" });
     await userEvent.clear(input);
     await userEvent.type(input, "Offer strategy");
@@ -190,7 +199,7 @@ describe("CareerLabPage", () => {
     });
     renderPage();
 
-    await userEvent.click(screen.getByText("Add job & resume context"));
+    await userEvent.click(screen.getByText("Job and resume context"));
     await userEvent.selectOptions(screen.getByLabelText("Job status"), "tailored");
     await userEvent.selectOptions(screen.getByLabelText("Job source"), "linkedin");
     expect(screen.getByRole("option", { name: /Acme · Staff Engineer/ })).toBeInTheDocument();

@@ -27,6 +27,9 @@ test.beforeEach(async ({ page }) => { await mockCareerLab(page); });
 test("Career Lab is reachable and keeps skill selection keyboard-operable", async ({ page }) => {
   await page.goto("/career-lab");
   await expect(page.getByRole("heading", { name: "Career Lab" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create Career Lab session" })).toBeVisible();
+  await expect(page.getByText("Session setup")).toBeVisible();
+  await expect(page.getByText("Reference context")).toBeVisible();
   const skill = page.getByRole("combobox", { name: "Career skill" });
   await skill.focus();
   await expect(skill).toBeFocused();
@@ -44,7 +47,7 @@ test("Career Lab does not overflow a narrow viewport", async ({ page }) => {
 
 test("Career Lab filters readable job options without exposing job ids", async ({ page }) => {
   await page.goto("/career-lab");
-  await page.getByText("Add job & resume context").click();
+  await page.getByText("Job and resume context").click();
   await page.getByRole("combobox", { name: "Job status" }).selectOption("tailored");
   await page.getByRole("combobox", { name: "Job source" }).selectOption("linkedin");
 

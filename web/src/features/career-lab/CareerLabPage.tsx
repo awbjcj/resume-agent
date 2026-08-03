@@ -4,11 +4,14 @@ import {
   Archive,
   ArchiveRestore,
   Bot,
+  BriefcaseBusiness,
+  Clock3,
+  EllipsisVertical,
   FileText,
   ListChecks,
   MessageCircleMore,
-  PanelRight,
   Pencil,
+  SlidersHorizontal,
   Sparkles,
   SquareCheckBig,
   Trash2,
@@ -36,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,6 +64,7 @@ import {
   useStartCareerLab,
   useUnarchiveCareerLabSession,
   type CareerLabContext,
+  type CareerLabSessionSummary,
 } from "./use-career-lab";
 
 function ContextRail({
@@ -108,124 +113,130 @@ function ContextRail({
     setContext({ ...context, offerApplicationIds });
   };
   return (
-    <Card className="bg-card/90">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <PanelRight className="size-4 text-primary" aria-hidden="true" />
-          Context &amp; skill
-        </CardTitle>
-        <CardDescription>Typed references guide the draft; nothing is changed.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="career-skill">Career skill</Label>
-          <select
-            id="career-skill"
-            aria-label="Career skill"
-            ref={skillRef}
-            value={skill}
-            onChange={(event) => setSkill(event.target.value)}
-            className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <option value="">Let Career Lab route it</option>
-            {rows.map((row) => (
-              <option key={row.name} value={row.name} disabled={!row.isAvailable}>
-                {row.name}{row.isAvailable ? "" : " — unavailable"}
-              </option>
-            ))}
-          </select>
-          {!skill && rows.length > 0 ? (
-            <p className="text-xs text-muted-foreground">Ambiguous requests will ask you to choose.</p>
-          ) : null}
-          {rows.some((row) => row.name === skill && !row.isAvailable) ? (
-            <p className="text-xs text-destructive">
-              {rows.find((row) => row.name === skill)?.unavailableReason ?? "This skill is unavailable."}
-            </p>
-          ) : null}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="career-goal">Session goal</Label>
-          <Textarea
-            id="career-goal"
-            value={goal}
-            onChange={(event) => setGoal(event.target.value)}
-            placeholder="What would a useful draft help you decide?"
-            maxLength={2_000}
-            rows={3}
-            className="resize-none"
-          />
-        </div>
-        <label className="flex items-start gap-2 text-sm">
-          <Checkbox
-            checked={context.profileSnapshot === "current"}
-            onCheckedChange={(checked) =>
-              setContext({ ...context, profileSnapshot: checked ? "current" : undefined })
-            }
-            aria-label="Include current profile snapshot"
-          />
-          <span>
-            <span className="block font-medium">Include current profile</span>
-            <span className="block text-xs text-muted-foreground">Use the current profile as a bounded draft reference.</span>
-          </span>
-        </label>
-        <details className="rounded-lg border bg-muted/20 p-3">
-          <summary className="cursor-pointer text-sm font-medium">Add job &amp; resume context</summary>
-          <div className="mt-3 space-y-3">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1 xl:col-span-2">
-                <Label htmlFor="career-job-search">Find a job</Label>
-                <Input id="career-job-search" value={jobSearch} onChange={(event) => setJobSearch(event.target.value)} placeholder="Company, role, or location" className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="career-job-status">Job status</Label>
-                <select id="career-job-status" value={jobStatus} onChange={(event) => setJobStatus(event.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm">
-                  <option value="">All statuses</option>
-                  {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="career-job-source">Job source</Label>
-                <select id="career-job-source" value={jobSource} onChange={(event) => setJobSource(event.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm">
-                  <option value="">All sources</option>
-                  {sources.map((source) => <option key={source} value={source}>{source}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="career-job">Job</Label>
-              <select
-                id="career-job"
-                value={context.jobId ?? ""}
-                onChange={(event) => setContext({ ...context, jobId: event.target.value ? Number(event.target.value) : undefined, resumeVersionId: undefined })}
-                className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm"
-              >
-                <option value="">No job selected</option>
-                {filteredJobs.map((row) => <option key={row.jobId} value={row.jobId}>{[row.company, row.title].filter(Boolean).join(" · ") || `Job ${row.jobId}`} — {row.status}</option>)}
-              </select>
-              {jobs.isPending ? <p className="text-xs text-muted-foreground">Loading jobs…</p> : null}
-              {jobs.isError ? <p className="text-xs text-destructive">Jobs could not be loaded.</p> : null}
-              {!jobs.isPending && !jobs.isError && filteredJobs.length === 0 ? <p className="text-xs text-muted-foreground">No jobs match these filters.</p> : null}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="career-resume-version">Resume version</Label>
-              <select
-                id="career-resume-version"
-                disabled={!context.jobId || jobDetail.isPending}
-                value={context.resumeVersionId ?? ""}
-                onChange={(event) => setContext({ ...context, resumeVersionId: event.target.value ? Number(event.target.value) : undefined })}
-                className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <option value="">{context.jobId ? "No resume version" : "Choose a job first"}</option>
-                {(jobDetail.data?.resumeVersions ?? []).map((version) => <option key={version.id} value={version.id}>Round {version.round} · {version.origin}</option>)}
-              </select>
-              {context.jobId && jobDetail.data?.resumeVersions.length === 0 ? <p className="text-xs text-muted-foreground">This job has no tailored resume versions yet.</p> : null}
-            </div>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <SlidersHorizontal className="size-4 text-primary" aria-hidden="true" />
+            Session setup
+          </CardTitle>
+          <CardDescription>Choose the drafting mode and the outcome you want from this conversation.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="career-skill">Career skill</Label>
+            <select
+              id="career-skill"
+              aria-label="Career skill"
+              ref={skillRef}
+              value={skill}
+              onChange={(event) => setSkill(event.target.value)}
+              className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <option value="">Let Career Lab route it</option>
+              {rows.map((row) => (
+                <option key={row.name} value={row.name} disabled={!row.isAvailable}>
+                  {row.name}{row.isAvailable ? "" : " — unavailable"}
+                </option>
+              ))}
+            </select>
+            {!skill && rows.length > 0 ? <p className="text-xs leading-5 text-muted-foreground">Ambiguous requests will ask you to choose a skill.</p> : null}
+            {rows.some((row) => row.name === skill && !row.isAvailable) ? <p className="text-xs leading-5 text-destructive">{rows.find((row) => row.name === skill)?.unavailableReason ?? "This skill is unavailable."}</p> : null}
           </div>
-        </details>
-        <details className="rounded-lg border bg-muted/20 p-3">
-          <summary className="cursor-pointer text-sm font-medium">Add offer comparison references</summary>
-          <div className="mt-3">
-            <div className="space-y-1.5">
+          <div className="space-y-2 border-t pt-4">
+            <Label htmlFor="career-goal">Session goal</Label>
+            <Textarea
+              id="career-goal"
+              value={goal}
+              onChange={(event) => setGoal(event.target.value)}
+              placeholder="What would a useful draft help you decide?"
+              maxLength={2_000}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BriefcaseBusiness className="size-4 text-primary" aria-hidden="true" />
+            Reference context
+          </CardTitle>
+          <CardDescription>Add only the material that should shape the draft.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+            <Checkbox
+              checked={context.profileSnapshot === "current"}
+              onCheckedChange={(checked) => setContext({ ...context, profileSnapshot: checked ? "current" : undefined })}
+              aria-label="Include current profile snapshot"
+            />
+            <span>
+              <span className="block font-medium">Include current profile</span>
+              <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">Use the current profile as a bounded draft reference.</span>
+            </span>
+          </label>
+          <details className="rounded-lg border bg-muted/20 p-3">
+            <summary className="cursor-pointer text-sm font-medium">Job and resume context</summary>
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="career-job-search">Find a job</Label>
+                  <Input id="career-job-search" value={jobSearch} onChange={(event) => setJobSearch(event.target.value)} placeholder="Company, role, or location" className="h-9" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="career-job-status">Job status</Label>
+                    <select id="career-job-status" value={jobStatus} onChange={(event) => setJobStatus(event.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm">
+                      <option value="">All statuses</option>
+                      {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="career-job-source">Job source</Label>
+                    <select id="career-job-source" value={jobSource} onChange={(event) => setJobSource(event.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm">
+                      <option value="">All sources</option>
+                      {sources.map((source) => <option key={source} value={source}>{source}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="career-job">Job</Label>
+                <select
+                  id="career-job"
+                  value={context.jobId ?? ""}
+                  onChange={(event) => setContext({ ...context, jobId: event.target.value ? Number(event.target.value) : undefined, resumeVersionId: undefined })}
+                  className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm"
+                >
+                  <option value="">No job selected</option>
+                  {filteredJobs.map((row) => <option key={row.jobId} value={row.jobId}>{[row.company, row.title].filter(Boolean).join(" · ") || `Job ${row.jobId}`} — {row.status}</option>)}
+                </select>
+                {jobs.isPending ? <p className="text-xs text-muted-foreground">Loading jobs…</p> : null}
+                {jobs.isError ? <p className="text-xs text-destructive">Jobs could not be loaded.</p> : null}
+                {!jobs.isPending && !jobs.isError && filteredJobs.length === 0 ? <p className="text-xs text-muted-foreground">No jobs match these filters.</p> : null}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="career-resume-version">Resume version</Label>
+                <select
+                  id="career-resume-version"
+                  disabled={!context.jobId || jobDetail.isPending}
+                  value={context.resumeVersionId ?? ""}
+                  onChange={(event) => setContext({ ...context, resumeVersionId: event.target.value ? Number(event.target.value) : undefined })}
+                  className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">{context.jobId ? "No resume version" : "Choose a job first"}</option>
+                  {(jobDetail.data?.resumeVersions ?? []).map((version) => <option key={version.id} value={version.id}>Round {version.round} · {version.origin}</option>)}
+                </select>
+                {context.jobId && jobDetail.data?.resumeVersions.length === 0 ? <p className="text-xs text-muted-foreground">This job has no tailored resume versions yet.</p> : null}
+              </div>
+            </div>
+          </details>
+          <details className="rounded-lg border bg-muted/20 p-3">
+            <summary className="cursor-pointer text-sm font-medium">Offer comparison references</summary>
+            <div className="mt-4 space-y-1.5">
               <Label htmlFor="career-offer-ids">Offer application ids</Label>
               <input
                 id="career-offer-ids"
@@ -236,12 +247,41 @@ function ContextRail({
                 onChange={(event) => updateOfferIds(event.target.value)}
                 className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm"
               />
-              <p className="text-xs text-muted-foreground">Up to 10 offer-status application ids.</p>
+              <p className="text-xs leading-5 text-muted-foreground">Up to 10 offer-status application ids.</p>
             </div>
-          </div>
-        </details>
-      </CardContent>
-    </Card>
+          </details>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function CareerLabSessionActions({
+  row,
+  onRename,
+  onArchive,
+  onUnarchive,
+  onDelete,
+}: {
+  row: CareerLabSessionSummary;
+  onRename: (row: CareerLabSessionSummary) => void;
+  onArchive: (sessionId: string) => void;
+  onUnarchive: (sessionId: string) => void;
+  onDelete: (sessionId: string) => void;
+}) {
+  const title = row.title || row.goal || "Untitled Career Lab";
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label={`Actions for ${title}`}><EllipsisVertical /></Button>} />
+      <DropdownMenuContent align="end">
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => onRename(row)}><Pencil />Rename</DropdownMenuItem>
+          {row.status === "ended" && !row.archivedAt ? <DropdownMenuItem onClick={() => onArchive(row.sessionId)}><Archive />Archive</DropdownMenuItem> : null}
+          {row.archivedAt ? <DropdownMenuItem onClick={() => onUnarchive(row.sessionId)}><ArchiveRestore />Unarchive</DropdownMenuItem> : null}
+          <DropdownMenuItem variant="destructive" onClick={() => onDelete(row.sessionId)}><Trash2 />Delete</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -269,60 +309,69 @@ function SessionRail({
   onDelete: (sessionId: string) => void;
 }) {
   const rows = sessions.data?.sessions ?? [];
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState("");
+  const [pendingRename, setPendingRename] = useState<CareerLabSessionSummary | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
   return (
-    <Card className="bg-card/90">
-      <CardHeader className="pb-3">
-        <div>
-          <CardTitle className="text-base">Sessions</CardTitle>
-          <CardDescription>One active draft room at a time.</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {sessions.isPending ? <Skeleton className="h-16 w-full" /> : null}
-        {!sessions.isPending && rows.length === 0 ? <p className="text-sm text-muted-foreground">No saved sessions yet.</p> : null}
-        {rows.map((row) => {
-          const title = row.title || row.goal || "Untitled Career Lab";
-          return (
-          <div
-            key={row.sessionId}
-            className={cn(
-              "rounded-xl border p-2 transition-colors",
-              row.sessionId === selectedId && "border-primary bg-primary/5",
-            )}
-          >
-            {editingId === row.sessionId ? (
-              <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); void onRename(row.sessionId, draftTitle).then(() => setEditingId(null)); }}>
-                <Label htmlFor={`career-session-title-${row.sessionId}`} className="sr-only">Session title</Label>
-                <Input id={`career-session-title-${row.sessionId}`} aria-label="Session title" autoFocus maxLength={120} value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} className="h-8" />
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
-                  <Button type="submit" size="sm" disabled={!draftTitle.trim() || renamePending}>Save title</Button>
-                </div>
-              </form>
-            ) : (
-              <div className="flex items-start gap-1">
-                <button type="button" onClick={() => onSelect(row.sessionId)} className="min-w-0 flex-1 rounded-lg p-1 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-                  <span className="block truncate text-sm font-medium">{title}</span>
-                  <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant={row.status === "active" ? "secondary" : "outline"}>{row.status}</Badge>
-                    <span>{row.turnCount} turns</span>
-                  </span>
-                </button>
-                <Button variant="ghost" size="icon-sm" aria-label={`Rename ${title}`} onClick={() => { setEditingId(row.sessionId); setDraftTitle(title); }}><Pencil aria-hidden="true" /></Button>
-                {row.status === "ended" && !row.archivedAt ? <Button variant="ghost" size="icon-sm" aria-label={`Archive ${title}`} onClick={() => onArchive(row.sessionId)}><Archive aria-hidden="true" /></Button> : null}
-                {row.archivedAt ? <Button variant="ghost" size="icon-sm" aria-label={`Unarchive ${title}`} onClick={() => onUnarchive(row.sessionId)}><ArchiveRestore aria-hidden="true" /></Button> : null}
-                <Button variant="ghost" size="icon-sm" aria-label={`Delete ${title}`} onClick={() => onDelete(row.sessionId)}><Trash2 aria-hidden="true" /></Button>
-              </div>
-            )}
+    <Card className="rounded-2xl shadow-none">
+      <CardHeader className="gap-3 border-b">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Clock3 className="size-4 text-primary" aria-hidden="true" />
+            <CardTitle className="text-base">Session history</CardTitle>
           </div>
-        )})}
-        <label className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
-          <Checkbox checked={showArchived} onCheckedChange={(checked) => setShowArchived(checked === true)} />
-          Show archived sessions
-        </label>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox checked={showArchived} onCheckedChange={(checked) => setShowArchived(checked === true)} />
+            Show archived
+          </label>
+        </div>
+        <CardDescription>Open a saved draft room or manage it without leaving the workspace.</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-1">
+        {sessions.isPending ? <div className="space-y-2 py-3" aria-label="Loading sessions"><Skeleton className="h-14 w-full" /><Skeleton className="h-14 w-full" /></div> : null}
+        {sessions.isError ? <p className="py-4 text-sm text-destructive">Career Lab sessions could not be loaded.</p> : null}
+        {!sessions.isPending && !sessions.isError && rows.length === 0 ? <p className="py-4 text-sm text-muted-foreground">No saved Career Lab sessions yet.</p> : null}
+        {!sessions.isPending && !sessions.isError && rows.length ? (
+          <ul className="divide-y">
+            {rows.map((row) => {
+              const title = row.title || row.goal || "Untitled Career Lab";
+              return (
+                <li key={row.sessionId} className="flex items-center gap-3 py-3">
+                  <button
+                    type="button"
+                    onClick={() => onSelect(row.sessionId)}
+                    className="min-w-0 flex-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-current={selectedId === row.sessionId ? "page" : undefined}
+                  >
+                    <span className="flex items-center gap-2 truncate text-sm font-medium">
+                      {row.status === "active" ? <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" /> : null}
+                      <span className="truncate">{title}</span>
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      {row.status === "active" ? "Drafting now" : "Completed"} · {row.turnCount} turns · {new Date(row.startedAt).toLocaleDateString()}
+                    </span>
+                  </button>
+                  {selectedId === row.sessionId ? <Badge variant="outline">Viewing</Badge> : null}
+                  {row.archivedAt ? <Badge variant="outline">Archived</Badge> : null}
+                  <CareerLabSessionActions row={row} onRename={(session) => { setPendingRename(session); setRenameTitle(session.title || session.goal || "Untitled Career Lab"); }} onArchive={onArchive} onUnarchive={onUnarchive} onDelete={onDelete} />
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
       </CardContent>
+      <Dialog open={pendingRename != null} onOpenChange={(open) => { if (!open) setPendingRename(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Career Lab session</DialogTitle>
+            <DialogDescription>Choose a short name that will be easy to recognize in your history.</DialogDescription>
+          </DialogHeader>
+          <Input aria-label="Session title" autoFocus maxLength={120} value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingRename(null)}>Cancel</Button>
+            <Button disabled={!renameTitle.trim() || renamePending} onClick={() => { if (!pendingRename) return; void onRename(pendingRename.sessionId, renameTitle.trim()).then(() => setPendingRename(null)); }}>Save title</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -335,7 +384,7 @@ export function CareerLabPage() {
   const skills = useCareerLabSkills();
   const activeSummary = sessions.data?.sessions?.find((row) => row.status === "active");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const displayedSessionId = activeSummary?.sessionId ?? selectedSessionId;
+  const displayedSessionId = selectedSessionId ?? activeSummary?.sessionId ?? null;
   const session = useCareerLabSession(displayedSessionId);
   const start = useStartCareerLab();
   const send = useSendCareerLabMessage();
@@ -385,6 +434,7 @@ export function CareerLabPage() {
   }, [selectionNotice]);
 
   const active = session.data;
+  const sessionLoading = Boolean(displayedSessionId && session.isPending);
   const baseline = pending?.baseline ?? active?.turns?.length ?? 0;
   const busy = start.isPending || send.isPending || Boolean(runId && ["streaming", "settled"].includes(stream.status));
 
@@ -475,6 +525,7 @@ export function CareerLabPage() {
   const durableTurns = active?.turns?.length ?? 0;
   const durableAdvanced = durableTurns > baseline;
   const showThread = Boolean(active || pending || selectionExchange || runId);
+  const canCompose = active?.status === "active" || (!active && (Boolean(pending) || Boolean(selectionExchange) || Boolean(runId)));
   const chatMessages: ChatThreadMessage[] = (active?.turns ?? []).map((turn, index) => ({
     id: `${turn.turnId}-${index}`,
     role: turn.role,
@@ -523,6 +574,10 @@ export function CareerLabPage() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+        ) : active ? (
+          <Button variant="outline" onClick={() => setSelectedSessionId(null)}>
+            {activeSummary ? "Return to live session" : "New session"}
+          </Button>
         ) : undefined}
       />
 
@@ -542,16 +597,16 @@ export function CareerLabPage() {
         </Alert>
       ) : null}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <main className="flex min-w-0 flex-col gap-4">
           <Card className="min-w-0 overflow-hidden rounded-2xl">
             <CardHeader className="border-b bg-muted/25 py-4">
-              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />{active?.title || "Career Lab workspace"}</CardTitle>
-              <CardDescription>{active ? active.goal || "A focused Career Lab session" : "Create a session when you are ready to work through a career question."}</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />{active?.title || (showThread ? "Career Lab workspace" : "Start a Career Lab session")}</CardTitle>
+              <CardDescription>{active ? active.goal || "A focused Career Lab session" : "Use the setup panel to shape the draft, then create a session when you are ready to work through a career question."}</CardDescription>
             </CardHeader>
             <CardContent className={cn("flex flex-col gap-4 p-4 sm:p-6", CHAT_SURFACE_HEIGHT)}>
-              {session.isPending && displayedSessionId ? <Skeleton className="h-full w-full" /> : null}
-              {!session.isPending && !showThread ? <WorkspaceEmptyState icon={MessageCircleMore} title="Turn a career question into a useful draft" description="Choose a skill or let Career Lab route the request. It uses only the context you select and never takes an external action." actionLabel="Create Career Lab session" onAction={() => setNewOpen(true)} steps={[{ icon: MessageCircleMore, title: "Ask one focused question", description: "Start with the decision, draft, comparison, or next step you need." }, { icon: ListChecks, title: "Choose bounded context", description: "Optionally include your profile, a job, a resume version, or offer references." }, { icon: FileText, title: "Review the draft", description: "Keep every output as a draft until you decide how to use it." }]} /> : null}
+              {sessionLoading ? <Skeleton className="h-full w-full" /> : null}
+              {!sessionLoading && !showThread ? <WorkspaceEmptyState icon={MessageCircleMore} title="Turn a career question into a useful draft" description="Choose a skill or let Career Lab route the request. It uses only the context you select and never takes an external action." actionLabel="Create Career Lab session" onAction={() => setNewOpen(true)} steps={[{ icon: MessageCircleMore, title: "Ask one focused question", description: "Start with the decision, draft, comparison, or next step you need." }, { icon: ListChecks, title: "Choose bounded context", description: "Optionally include your profile, a job, a resume version, or offer references." }, { icon: FileText, title: "Review the draft", description: "Keep every output as a draft until you decide how to use it." }]} /> : null}
               {showThread ? (
                 <ChatThread
                   messages={chatMessages}
@@ -575,7 +630,7 @@ export function CareerLabPage() {
                 </div>
               ) : null}
             </CardContent>
-            {showThread ? <div className="border-t bg-card/95 p-4 sm:p-6">
+            {canCompose ? <div className="border-t bg-card/95 p-4 sm:p-6">
               <ChatComposer
                 value={composer}
                 onChange={setComposer}
@@ -587,12 +642,12 @@ export function CareerLabPage() {
                 sendLabel="Send"
                 placeholder="Ask for a draft, plan, comparison, or next step…"
               />
-            </div> : null}
+            </div> : active?.status === "ended" ? <div className="border-t bg-muted/20 p-4 text-center text-sm text-muted-foreground">This draft session has ended. Start a new session when you are ready to explore another question.</div> : null}
           </Card>
 
         </main>
 
-        <aside className="min-w-0 space-y-4" aria-label="Career Lab controls">
+        <aside className="min-w-0 space-y-4 xl:sticky xl:top-4" aria-label="Career Lab controls">
           <ContextRail skill={skill} setSkill={setSkill} skills={skills} goal={goal} setGoal={setGoal} context={context} setContext={setContext} skillRef={skillRef} />
         </aside>
       </div>

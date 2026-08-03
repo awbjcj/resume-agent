@@ -63,8 +63,8 @@ test("session management remains aligned at mobile width", async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
   await page.goto("/coach");
-  await expect(page.getByRole("heading", { name: "Past sessions" })).toBeVisible();
-  await expect(page.getByRole("switch", { name: "Show archived" })).toBeVisible();
+  await expect(page.getByText("Session history")).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Show archived" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Actions for coaching session c1/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
