@@ -83,11 +83,33 @@ def test_missing_model_keys_labels(monkeypatch):
     from resume_agent.config import Settings
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
-    monkeypatch.setattr(llm_runner, "resolve_api_key", lambda model: None)
+    monkeypatch.setattr(llm_runner, "resolve_api_key", lambda model, **_kwargs: None)
     labels = llm_runner.missing_model_keys(settings)
     assert labels == [
         f"mid ({settings.mid_model})",
         f"cheap ({settings.cheap_model})",
     ]
-    monkeypatch.setattr(llm_runner, "resolve_api_key", lambda model: "key")
+    monkeypatch.setattr(llm_runner, "resolve_api_key", lambda model, **_kwargs: "key")
     assert llm_runner.missing_model_keys(settings) == []
+
+
+def test_missing_model_keys_uses_the_supplied_settings(monkeypatch):
+    from resume_agent import llm_runner
+    from resume_agent.config import Settings
+
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        mid_model="openai:app-mid",
+        cheap_model="openai:app-cheap",
+        openai_api_key="app-key",
+    )
+    seen = []
+
+    def resolve(_model, *, settings=None):
+        seen.append(settings)
+        return settings.openai_api_key if settings is not None else ""
+
+    monkeypatch.setattr(llm_runner, "resolve_api_key", resolve)
+
+    assert llm_runner.missing_model_keys(settings) == []
+    assert seen == [settings, settings]

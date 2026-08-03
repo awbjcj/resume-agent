@@ -88,7 +88,7 @@ def _view(sid="s1", status="active"):
 
 def test_start_guards_and_opening_run(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
     with client:
         assert client.post("/api/profile/coach/sessions").status_code == 400
         _seed_primary(client)
@@ -109,7 +109,7 @@ def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
         api_token="",
     )
     client = TestClient(app)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
     with client:
         _seed_primary(client)
         _seed_draft(tmp_path)
@@ -131,7 +131,7 @@ def test_session_fetch_message_and_unknown_mapping(monkeypatch, tmp_path):
 
 def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
     with client:
         _seed_primary(client)
         _seed_draft(tmp_path)
@@ -170,7 +170,7 @@ def test_note_save_discard_and_conflicts(monkeypatch, tmp_path):
 
 def test_end_run_returns_nested_build_id(monkeypatch, tmp_path):
     client = _client(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
     with client:
         _seed_primary(client)
         _seed_draft(tmp_path)

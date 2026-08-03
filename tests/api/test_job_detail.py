@@ -46,6 +46,30 @@ def test_job_detail_404():
     assert resp.json()["error"]["code"] == "NOT_FOUND"
 
 
+def test_job_detail_h1b_capability_uses_app_settings(tmp_path):
+    env = tmp_path / "app.env"
+    env.write_text(
+        "H1B_MCP_ENABLED=true\n"
+        "H1B_MCP_TRANSPORT=stdio\n"
+        "H1B_MCP_COMMAND=python -c pass\n",
+        encoding="utf-8",
+    )
+    client = TestClient(create_app(db_url="sqlite://", env_path=env))
+    with client:
+        with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
+            job = Job(source="manual", jd_text="x")
+            s.add(job)
+            s.commit()
+            s.refresh(job)
+            assert job.id is not None
+            job_id = job.id
+
+        response = client.get(f"/api/jobs/{job_id}")
+
+    assert response.status_code == 200
+    assert response.json()["h1BSponsorship"]["capability"] == "unavailable"
+
+
 def test_pdf_download_404_when_no_file(tmp_path):
     client = _client()
     with client:

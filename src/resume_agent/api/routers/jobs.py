@@ -7,7 +7,12 @@ from typing import cast
 from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from sqlmodel import Session
 
-from resume_agent.api.deps import get_config_store, get_interview_dir, get_session
+from resume_agent.api.deps import (
+    get_config_store,
+    get_interview_dir,
+    get_session,
+    get_settings_dep,
+)
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.bulk import BulkRequest, BulkResultOut
 from resume_agent.api.schemas.config import ReviewConfigDoc
@@ -22,7 +27,7 @@ from resume_agent.api.schemas.jobs import (
     JobsImportReportOut,
 )
 from resume_agent.career_skills.models import read_job_analysis_meta
-from resume_agent.config import get_settings
+from resume_agent.config import Settings
 from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.api.schemas.runs import AddJobTextRequest
 from resume_agent.api.uploads import UploadTooLargeError, read_upload
@@ -67,12 +72,14 @@ def import_jobs_endpoint(
     )
 
 
-def _job_detail_response(session: Session, job_id: int, request: Request) -> JobDetail:
+def _job_detail_response(
+    session: Session, job_id: int, request: Request, settings: Settings
+) -> JobDetail:
     row = board.get_job_detail(session, job_id)
     if row is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     detail = JobDetail.model_validate(row)
-    if not get_settings().h1b_mcp_enabled:
+    if not settings.h1b_mcp_enabled:
         detail.h1b_sponsorship = H1BSponsorshipOut(capability="disabled")
     else:
         job = get_job(session, job_id)
@@ -98,13 +105,22 @@ def _job_detail_response(session: Session, job_id: int, request: Request) -> Job
 
 
 @router.get("/jobs/{job_id}", response_model=JobDetail)
-def get_job_detail(job_id: int, request: Request, session: Session = Depends(get_session)):
-    return _job_detail_response(session, job_id, request)
+def get_job_detail(
+    job_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
+):
+    return _job_detail_response(session, job_id, request, settings)
 
 
 @router.patch("/jobs/{job_id}", response_model=JobDetail)
 def patch_job(
-    job_id: int, patch: JobPatch, request: Request, session: Session = Depends(get_session)
+    job_id: int,
+    patch: JobPatch,
+    request: Request,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
 ):
     if patch.status is not None:
         valid = {s.value for s in JobStatus}
@@ -117,7 +133,7 @@ def patch_job(
     if patch.archived is not None:
         if board.set_archived(session, job_id, patch.archived) is None:
             raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
-    return _job_detail_response(session, job_id, request)
+    return _job_detail_response(session, job_id, request, settings)
 
 
 @router.delete("/jobs/{job_id}", status_code=204)
@@ -197,7 +213,10 @@ def upsert_application(
 
 @router.post("/jobs", response_model=JobDetail, status_code=201)
 def create_manual_job(
-    body: AddJobTextRequest, request: Request, session: Session = Depends(get_session)
+    body: AddJobTextRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
 ):
     try:
         job = add_job_from_text(
@@ -215,4 +234,4 @@ def create_manual_job(
             409, "CONFLICT", "Duplicate job (same URL or JD already present)"
         )
     assert job.id is not None
-    return _job_detail_response(session, job.id, request)
+    return _job_detail_response(session, job.id, request, settings)

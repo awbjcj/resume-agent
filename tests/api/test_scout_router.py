@@ -58,7 +58,7 @@ def seed(tmp_path, *, ended=False):
 
 def test_start_preallocates_session_metadata_and_launches_stream(monkeypatch, tmp_path):
     client = client_for(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
     monkeypatch.setattr(scout_router, "run_start_turn", lambda reporter, **kwargs: {})
     with client:
         response = client.post("/api/scout/sessions", json={"message": "AI infra"})
@@ -75,7 +75,7 @@ def test_start_preallocates_session_metadata_and_launches_stream(monkeypatch, tm
 
 def test_detail_list_message_and_end_metadata(monkeypatch, tmp_path):
     client = client_for(tmp_path)
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
     monkeypatch.setattr(scout_router, "run_message_turn", lambda reporter, **kwargs: {})
     monkeypatch.setattr(scout_router, "run_recap_turn", lambda reporter, **kwargs: {})
     with client:

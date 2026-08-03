@@ -91,9 +91,12 @@ def test_skill_capability_contract(tmp_path):
 
 
 def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda _model: "key")
-    monkeypatch.setattr(service, "build_persona_agent", lambda _skill: _Persona())
-    monkeypatch.setattr(service, "build_formatter_agent", lambda: _Formatter())
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key",
+        lambda _model, **_kwargs: "key",
+    )
+    monkeypatch.setattr(service, "build_persona_agent", lambda _skill, **_kwargs: _Persona())
+    monkeypatch.setattr(service, "build_formatter_agent", lambda **_kwargs: _Formatter())
     client = _client(tmp_path)
     with client:
         started = client.post(
@@ -139,9 +142,51 @@ def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
         assert client.delete(f"/api/career-lab/sessions/{session_id}").status_code == 204
 
 
+def test_start_uses_keys_from_the_effective_app_settings(monkeypatch, tmp_path):
+    from resume_agent.config import Settings
+
+    env = tmp_path / "app.env"
+    env.write_text(
+        "MID_MODEL=openai:app-mid\n"
+        "CHEAP_MODEL=openai:app-cheap\n"
+        "OPENAI_API_KEY=app-key\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "resume_agent.config.env_settings",
+        lambda: Settings(_env_file=None),  # type: ignore[call-arg]
+    )
+    monkeypatch.setattr(service, "build_persona_agent", lambda _skill, **_kwargs: _Persona())
+    monkeypatch.setattr(service, "build_formatter_agent", lambda **_kwargs: _Formatter())
+    client = TestClient(
+        create_app(
+            db_url="sqlite://",
+            data_dir=tmp_path / "data",
+            config_dir=tmp_path / "config",
+            env_path=env,
+            api_token="",
+        )
+    )
+
+    with client:
+        response = client.post(
+            "/api/career-lab/sessions",
+            json={
+                "goal": "Prepare negotiation points",
+                "message": "Compare base and equity.",
+                "skill": "salary-negotiation-prep",
+            },
+        )
+
+    assert response.status_code == 202, response.text
+
+
 def test_ambiguous_route_returns_selection_without_persisting(monkeypatch, tmp_path):
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda _model: "key")
-    monkeypatch.setattr(service, "build_router_agent", lambda: _Router())
+    monkeypatch.setattr(
+        "resume_agent.llm_runner.resolve_api_key",
+        lambda _model, **_kwargs: "key",
+    )
+    monkeypatch.setattr(service, "build_router_agent", lambda **_kwargs: _Router())
     client = _client(tmp_path)
     with client:
         response = client.post(

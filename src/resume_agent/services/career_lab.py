@@ -33,7 +33,7 @@ from resume_agent.career_skills.registry import (
     SkillUnavailable,
     VerifiedSkill,
 )
-from resume_agent.config import get_settings
+from resume_agent.config import Settings, get_settings
 from resume_agent.llm_runner import Runner, UnparsedAgentOutput, expect_schema
 from resume_agent.profile.snapshot import profile_snapshot
 from resume_agent.sessions.stream import Notice, NullSink, StreamSink
@@ -284,11 +284,12 @@ def _complete_turn(
     sink: StreamSink,
     persona_agent: Runner | None,
     formatter_agent: Runner | None,
+    settings: Settings | None,
 ) -> tuple[str, CareerLabArtifactMeta | None, str, AgentRunMeta]:
     reporter.begin(2, "Drafting your Career Lab response")
     context = _resolve_context(engine, root, refs)
-    persona = persona_agent or build_persona_agent(skill)
-    formatter = formatter_agent or build_formatter_agent()
+    persona = persona_agent or build_persona_agent(skill, settings=settings)
+    formatter = formatter_agent or build_formatter_agent(settings=settings)
     prose, notes = persona_output(
         persona,
         _prompt(session, message=message, goal=goal, context=context),
@@ -362,12 +363,13 @@ def _prepare_turn(
     router_agent: Runner | None,
     persona_agent: Runner | None,
     formatter_agent: Runner | None,
+    settings: Settings | None,
 ) -> tuple[VerifiedSkill, str, CareerLabArtifactMeta | None, str, AgentRunMeta] | dict:
     text = _clean_message(message)
     registry = _registry(registry)
     if skill is None:
         route, resolved = _route(
-            router_agent or build_router_agent(),
+            router_agent or build_router_agent(settings=settings),
             text,
             goal=goal,
             registry=registry,
@@ -400,6 +402,7 @@ def _prepare_turn(
         sink=sink,
         persona_agent=persona_agent,
         formatter_agent=formatter_agent,
+        settings=settings,
     )
     return resolved, assistant_text, artifact, notice, meta
 
@@ -419,6 +422,7 @@ def _start_or_message(
     router_agent: Runner | None,
     persona_agent: Runner | None,
     formatter_agent: Runner | None,
+    settings: Settings | None,
 ) -> dict:
     text = _clean_message(message)
     prepared = _prepare_turn(
@@ -435,6 +439,7 @@ def _start_or_message(
         router_agent=router_agent,
         persona_agent=persona_agent,
         formatter_agent=formatter_agent,
+        settings=settings,
     )
     if isinstance(prepared, dict):
         return prepared
@@ -468,6 +473,7 @@ def run_start_turn(
     router_agent: Runner | None = None,
     persona_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
+    settings: Settings | None = None,
 ) -> dict:
     root = _career_lab_root(root)
     if active_session(root) is not None:
@@ -496,6 +502,7 @@ def run_start_turn(
         router_agent=router_agent,
         persona_agent=persona_agent,
         formatter_agent=formatter_agent,
+        settings=settings,
     )
     if isinstance(prepared, dict):
         return prepared
@@ -530,6 +537,7 @@ def run_message_turn(
     router_agent: Runner | None = None,
     persona_agent: Runner | None = None,
     formatter_agent: Runner | None = None,
+    settings: Settings | None = None,
 ) -> dict:
     root = _career_lab_root(root)
     session = load_session(root, session_id)
@@ -549,6 +557,7 @@ def run_message_turn(
         router_agent=router_agent,
         persona_agent=persona_agent,
         formatter_agent=formatter_agent,
+        settings=settings,
     )
 
 

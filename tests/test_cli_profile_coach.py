@@ -27,7 +27,7 @@ def _setup(monkeypatch, tmp_path, *, resume=False):
     source.write_text("Acme experience", encoding="utf-8")
     add_source(profile_dir, source, primary=True, mode="literal")
     calls = {"opened": 0, "messages": [], "approved": [], "discarded": [], "built": []}
-    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model: "key")
+    monkeypatch.setattr("resume_agent.llm_runner.resolve_api_key", lambda model, **_kwargs: "key")
     monkeypatch.setattr(
         cli,
         "get_settings",

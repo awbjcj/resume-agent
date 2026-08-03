@@ -76,19 +76,32 @@ def is_transient(exc: BaseException) -> bool:
 class AgentRunner:
     """Adapter that narrows third-party agent APIs to ``run`` / ``arun``."""
 
-    def __init__(self, agent: Any, *, run_meta: AgentRunMeta | None = None) -> None:
+    def __init__(
+        self,
+        agent: Any,
+        *,
+        run_meta: AgentRunMeta | None = None,
+        settings: Settings | None = None,
+    ) -> None:
         self._agent = agent
         self._run_meta = run_meta
+        self._settings = settings
+
+    def _refresh_api_key(self, settings: Settings) -> None:
+        if self._settings is None:
+            refresh_agent_api_key(self._agent)
+        else:
+            refresh_agent_api_key(self._agent, settings=settings)
 
     @property
     def run_meta(self) -> AgentRunMeta | None:
         return self._run_meta
 
     def run(self, prompt: str) -> Any:
-        settings = get_settings()
+        settings = self._settings or get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
-                refresh_agent_api_key(self._agent)
+                self._refresh_api_key(settings)
                 from resume_agent.tenancy.limits import enforce_agent_budget
 
                 enforce_agent_budget(self._agent)
@@ -104,10 +117,10 @@ class AgentRunner:
         raise AssertionError("unreachable")
 
     async def arun(self, prompt: str) -> Any:
-        settings = get_settings()
+        settings = self._settings or get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
-                refresh_agent_api_key(self._agent)
+                self._refresh_api_key(settings)
                 from resume_agent.tenancy.limits import enforce_agent_budget
 
                 enforce_agent_budget(self._agent)
@@ -124,11 +137,11 @@ class AgentRunner:
 
     def stream(self, prompt: str) -> Iterator[StreamEvent]:
         """Yield provider-neutral events, retrying only before visible output."""
-        settings = get_settings()
+        settings = self._settings or get_settings()
         for attempt in range(settings.llm_retries + 1):
             emitted = False
             try:
-                refresh_agent_api_key(self._agent)
+                self._refresh_api_key(settings)
                 from resume_agent.tenancy.limits import enforce_agent_budget
 
                 enforce_agent_budget(self._agent)
@@ -760,7 +773,7 @@ def provider_access_available(
     )
 
 
-def refresh_agent_api_key(agent: object) -> None:
+def refresh_agent_api_key(agent: object, *, settings: Settings | None = None) -> None:
     """Refresh a reusable agent when its shared allowance changes key source."""
 
     from resume_agent.tenancy.context import current_context
@@ -784,7 +797,7 @@ def refresh_agent_api_key(agent: object) -> None:
     if not provider or not model_name:
         return
     model_id = model_name if provider == "anthropic" else f"{provider}:{model_name}"
-    selected = resolve_api_key(model_id) or None
+    selected = resolve_api_key(model_id, settings=settings) or None
     context.selected_model_own_keys[id(model)] = context.selected_own_key_providers[
         provider
     ]
@@ -799,7 +812,7 @@ def refresh_agent_api_key(agent: object) -> None:
         model.async_client = None
 
 
-def missing_model_keys(settings) -> list[str]:
+def missing_model_keys(settings: Settings) -> list[str]:
     """Configured mid/cheap tier models whose provider key is absent.
 
     Returns ``"tier (model)"`` labels for surfaces that gate LLM features on
@@ -807,7 +820,9 @@ def missing_model_keys(settings) -> list[str]:
     """
     configured = (("mid", settings.mid_model), ("cheap", settings.cheap_model))
     return [
-        f"{tier} ({model})" for tier, model in configured if not resolve_api_key(model)
+        f"{tier} ({model})"
+        for tier, model in configured
+        if not resolve_api_key(model, settings=settings)
     ]
 
 

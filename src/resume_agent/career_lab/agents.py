@@ -8,12 +8,13 @@ from resume_agent.career_lab.models import CareerLabArtifactMeta, CareerLabRoute
 from resume_agent.career_skills.agno import skill_kwargs
 from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
 from resume_agent.career_skills.registry import VerifiedSkill
-from resume_agent.config import get_settings
+from resume_agent.config import Settings, get_settings
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
     provider_capabilities,
+    resolve_api_key,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -38,18 +39,19 @@ _FORMATTER_INSTRUCTIONS = [
 ]
 
 
-def _model(model_id: str):
+def _model(model_id: str, settings: Settings):
     return build_model(
         model_id,
+        api_key=resolve_api_key(model_id, settings=settings) or None,
         cache_system_prompt=provider_capabilities(
             model_id
         ).supports_prompt_cache,
     )
 
 
-def build_router_agent() -> Runner:
-    settings = get_settings()
-    model = _model(settings.cheap_model)
+def build_router_agent(settings: Settings | None = None) -> Runner:
+    settings = settings or get_settings()
+    model = _model(settings.cheap_model, settings)
     return AgentRunner(
         Agent(
             model=model,
@@ -65,12 +67,15 @@ def build_router_agent() -> Runner:
             model_id=settings.cheap_model,
             skill_ref=None,
         ),
+        settings=settings,
     )
 
 
-def build_persona_agent(skill: VerifiedSkill) -> Runner:
-    settings = get_settings()
-    model = _model(settings.mid_model)
+def build_persona_agent(
+    skill: VerifiedSkill, settings: Settings | None = None
+) -> Runner:
+    settings = settings or get_settings()
+    model = _model(settings.mid_model, settings)
     return AgentRunner(
         Agent(
             model=model,
@@ -85,12 +90,13 @@ def build_persona_agent(skill: VerifiedSkill) -> Runner:
             model_id=settings.mid_model,
             skill_ref=skill.ref,
         ),
+        settings=settings,
     )
 
 
-def build_formatter_agent() -> Runner:
-    settings = get_settings()
-    model = _model(settings.cheap_model)
+def build_formatter_agent(settings: Settings | None = None) -> Runner:
+    settings = settings or get_settings()
+    model = _model(settings.cheap_model, settings)
     return AgentRunner(
         Agent(
             model=model,
@@ -106,4 +112,5 @@ def build_formatter_agent() -> Runner:
             model_id=settings.cheap_model,
             skill_ref=None,
         ),
+        settings=settings,
     )
