@@ -15,6 +15,7 @@ INDUSTRY_TAXONOMY_PATH = Path("data/industry_taxonomy.json")
 _NON_ALNUM = re.compile(r"[^\w]+", flags=re.UNICODE)
 _WHITESPACE = re.compile(r"\s+")
 _LEGAL_SUFFIXES = {
+    "ag",
     "co",
     "company",
     "corp",
@@ -22,11 +23,45 @@ _LEGAL_SUFFIXES = {
     "gmbh",
     "inc",
     "incorporated",
+    "lp",
+    "llp",
     "limited",
     "llc",
     "ltd",
+    "na",
+    "nv",
+    "pa",
+    "pbc",
+    "pc",
     "plc",
+    "pllc",
+    "sa",
 }
+_COMPANY_ABBREVIATIONS = (
+    (("p", "l", "l", "c"), "pllc"),
+    (("g", "m", "b", "h"), "gmbh"),
+    (("l", "l", "c"), "llc"),
+    (("l", "l", "p"), "llp"),
+    (("p", "l", "c"), "plc"),
+    (("u", "s", "a"), "usa"),
+    (("u", "s"), "us"),
+    (("n", "a"), "na"),
+    (("p", "b", "c"), "pbc"),
+    (("p", "a"), "pa"),
+    (("p", "c"), "pc"),
+    (("l", "p"), "lp"),
+    (("s", "a"), "sa"),
+    (("a", "g"), "ag"),
+    (("b", "v"), "bv"),
+    (("n", "v"), "nv"),
+)
+_LEGAL_SUFFIX_PHRASES = (
+    ("professional", "limited", "liability", "company"),
+    ("limited", "liability", "partnership"),
+    ("limited", "liability", "company"),
+    ("public", "benefit", "corporation"),
+    ("professional", "corporation"),
+)
 _SAVE_LOCK = Lock()
 
 
@@ -55,9 +90,40 @@ def normalize_company(value: object | None) -> str | None:
     """Normalize company identity without merging named brands or subsidiaries."""
     if value is None:
         return None
-    words = _normalize_text(value).split()
-    while words and words[-1] in _LEGAL_SUFFIXES:
-        words.pop()
+    words = _normalize_text(str(value).replace("&", " and ")).split()
+    canonical_words: list[str] = []
+    index = 0
+    while index < len(words):
+        for source, replacement in _COMPANY_ABBREVIATIONS:
+            end = index + len(source)
+            if tuple(words[index:end]) == source:
+                canonical_words.append(replacement)
+                index = end
+                break
+        else:
+            canonical_words.append(words[index])
+            index += 1
+
+    words = canonical_words
+    if len(words) > 1 and words[0] == "the":
+        words.pop(0)
+    while words:
+        if any(
+            len(words) >= len(phrase) and tuple(words[-len(phrase) :]) == phrase
+            for phrase in _LEGAL_SUFFIX_PHRASES
+        ):
+            phrase_length = next(
+                len(phrase)
+                for phrase in _LEGAL_SUFFIX_PHRASES
+                if len(words) >= len(phrase)
+                and tuple(words[-len(phrase) :]) == phrase
+            )
+            del words[-phrase_length:]
+            continue
+        if words[-1] in _LEGAL_SUFFIXES:
+            words.pop()
+            continue
+        break
     return " ".join(words) or None
 
 

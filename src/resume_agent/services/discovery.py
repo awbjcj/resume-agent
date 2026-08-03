@@ -75,7 +75,11 @@ from resume_agent.tracking.tables import H1BCompanyEvidence, JobStatus
 
 class H1BEnricher:
     async def enrich(self, engine, companies: list[str]) -> H1BEnrichmentReport:
-        from resume_agent.h1b.service import DefaultSponsorshipAgentFactory, enrich_companies
+        from resume_agent.h1b.service import (
+            DefaultCompanyNameResolverFactory,
+            DefaultSponsorshipAgentFactory,
+            enrich_companies,
+        )
 
         settings = get_settings()
         return await enrich_companies(
@@ -83,6 +87,7 @@ class H1BEnricher:
             companies,
             settings=settings,
             agent_factory=DefaultSponsorshipAgentFactory(settings),
+            company_resolver_factory=DefaultCompanyNameResolverFactory(settings),
         )
 
 

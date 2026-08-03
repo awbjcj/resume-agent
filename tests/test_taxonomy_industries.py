@@ -25,6 +25,15 @@ def test_company_normalization_removes_only_identity_noise():
     assert normalize_company("Acme Health") != normalize_company("Acme")
 
 
+def test_company_normalization_canonicalizes_dotted_abbreviations_and_legal_phrases():
+    assert normalize_company("Woven by Toyota, U.S., Inc.") == "woven by toyota us"
+    assert normalize_company("WOVEN BY TOYOTA US INC") == "woven by toyota us"
+    assert normalize_company("Example, L.L.C.") == "example"
+    assert normalize_company("Example Limited Liability Company") == "example"
+    assert normalize_company("The Example, P.L.C.") == "example"
+    assert normalize_company("Example Professional Corporation") == "example"
+
+
 def test_company_mapping_wins_before_alias_lookup():
     taxonomy = IndustryTaxonomy(
         aliases={"financial technology": "Fintech"},

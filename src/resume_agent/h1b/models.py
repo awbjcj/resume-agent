@@ -25,6 +25,14 @@ H1B_AGENT_UNAVAILABLE_REASON = (
 )
 
 
+class H1BCompanyResolution(BaseModel):
+    """Validated company-name rewrite used before historical H-1B lookup."""
+
+    status: Literal["resolved", "unchanged", "uncertain"]
+    legal_name: str = Field(min_length=1, max_length=300)
+    confidence: float = Field(ge=0, le=1)
+
+
 class H1BSponsorshipEvidence(BaseModel):
     status: Literal["matched", "no_match", "unavailable"]
     normalized_company: str = Field(min_length=1)

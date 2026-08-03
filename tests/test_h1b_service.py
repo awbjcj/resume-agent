@@ -8,6 +8,7 @@ from sqlmodel import Session
 from resume_agent.config import Settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.h1b.models import (
+    H1BCompanyResolution,
     H1B_MCP_UNAVAILABLE_REASON,
     HISTORICAL_ONLY_CAVEAT,
     H1BSponsorshipEvidence,
@@ -67,6 +68,27 @@ class NamedCompanyRunner(FakeRunner):
     async def arun(self, prompt: str) -> SimpleNamespace:
         self.calls.append(prompt)
         return SimpleNamespace(content=_evidence(self.company))
+
+
+class ResolutionRunner:
+    def __init__(self, resolution: H1BCompanyResolution):
+        self.resolution = resolution
+        self.calls: list[str] = []
+
+    def run(self, prompt: str) -> SimpleNamespace:
+        raise NotImplementedError
+
+    async def arun(self, prompt: str) -> SimpleNamespace:
+        self.calls.append(prompt)
+        return SimpleNamespace(content=self.resolution)
+
+
+class NameResolverFactory:
+    def __init__(self, runner: ResolutionRunner):
+        self.runner = runner
+
+    def build(self) -> ResolutionRunner:
+        return self.runner
 
 
 class Factory:
@@ -175,6 +197,65 @@ def test_equivalent_legal_company_name_is_canonicalized_to_the_cache_key(monkeyp
 
     assert report.by_company["google"].status == "matched"
     assert report.by_company["google"].normalized_company == "google"
+
+
+def test_company_name_resolver_rewrites_the_query_before_h1b_research(monkeypatch):
+    import resume_agent.h1b.service as service
+
+    @asynccontextmanager
+    async def fake_tools(_settings):
+        yield object()
+
+    monkeypatch.setattr(service, "h1b_tools", fake_tools)
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+        cheap_model="cheap-company-resolver",
+    )
+    resolver = ResolutionRunner(
+        H1BCompanyResolution(
+            status="resolved",
+            legal_name="Acme, Inc.",
+            confidence=0.98,
+        )
+    )
+    sponsor = FakeRunner()
+
+    report = asyncio.run(
+        enrich_companies(
+            engine,
+            ["ACME"],
+            settings=settings,
+            agent_factory=Factory(sponsor),
+            company_resolver_factory=NameResolverFactory(resolver),
+        )
+    )
+
+    assert report.by_company["acme"].status == "matched"
+    assert resolver.calls
+    assert "H-1B/LCA/green-card sponsorship records" in resolver.calls[0]
+    assert sponsor.calls
+    assert "Acme, Inc." in sponsor.calls[0]
+
+
+def test_company_name_resolver_rejects_a_different_company_identity():
+    import resume_agent.h1b.service as service
+
+    runner = ResolutionRunner(
+        H1BCompanyResolution(
+            status="resolved",
+            legal_name="Toyota Motor Corporation",
+            confidence=0.99,
+        )
+    )
+
+    resolved = asyncio.run(service._resolve_company_name(runner, "ACME"))
+
+    assert resolved == "ACME"
 
 
 def test_manual_job_check_persists_the_evidence_snapshot(monkeypatch):
