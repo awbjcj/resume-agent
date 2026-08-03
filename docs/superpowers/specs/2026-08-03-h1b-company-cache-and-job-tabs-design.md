@@ -212,21 +212,27 @@ restricted to `silent` jobs. A job whose JD explicitly states no sponsorship is
 available must not have its fit score lifted by the employer's filing history —
 the JD is authoritative for *this* role, the filings are historical.
 
-`run_h1b_enrichment`'s return type therefore changes from
-`dict[int, H1BSponsorshipEvidence]` to a small frozen dataclass carrying **two**
-maps:
+**`run_h1b_enrichment`'s signature and return type do not change.** It keeps
+returning `dict[int, H1BSponsorshipEvidence]` containing **only** `silent` jobs.
+Cards read the cache through `load_company_evidence`, not through this return
+value, so a second `by_company` map would be dead weight — the widened research
+reaches the cards purely as a side effect of populating
+`h1b_company_evidence`.
 
-1. `by_company: dict[str, H1BSponsorshipEvidence]` — every researched company,
-   written to the cache, consumed by the cards.
-2. `evidence_by_job: dict[int, H1BSponsorshipEvidence]` — **only** jobs with
-   `sponsorship_signal == "silent"`, passed to `run_score` exactly as today.
+What changes inside the function:
 
-Its one caller, `discovery/pipeline.py:482`, passes
-`result.evidence_by_job` into `run_score`'s existing `sponsorship_evidence`
-parameter. `run_score`'s signature is unchanged.
+- **Research set widens** to every in-scope `filtered` job with a normalizable
+  company (still gated on `config.sponsorship_required`).
+- **Returned map stays narrow** — built only for jobs whose
+  `sponsorship_signal == "silent"`.
 
-Existing scoring behaviour is byte-identical. Only card coverage grows. A test
+`discovery/pipeline.py:482` and `run_score` therefore need **no change at all**.
+Existing scoring behaviour is byte-identical; only card coverage grows. A test
 pins this (see Testing).
+
+A company dropped by the per-run cap simply yields no scoring evidence that run,
+exactly as an unreachable provider already does — `run_score` reads
+`(sponsorship_evidence or {}).get(job.id, None)` and tolerates a miss.
 
 ### Per-run spend cap
 
@@ -359,7 +365,9 @@ Behaviour:
   `denied_count` is `None` on such rows.
 - **Stale rows** replace `Checked 3 days ago` with
   `⚠ Checked 47 days ago — may be out of date`, still render every tile, and
-  switch the button label to `Refresh`. Nothing auto-fires.
+  switch the button label to `Refresh`. Nothing auto-fires. The button's
+  disabled/spinner state continues to come from the run store, not from the
+  mutation.
 - The refresh button's helper line states that refreshing updates every job at
   this company — a consequence of D1 the user must not discover by surprise.
 
@@ -372,10 +380,18 @@ opened once. A test pins the label rendering before any interaction.
 
 ## Error handling
 
+> **Baseline note.** The manual check is a **background run**, not a synchronous
+> call: `POST /api/jobs/{id}/h1b-sponsorship` returns `202 RunOut` through the
+> launch seam with `singleton_key=f"h1b-sponsorship:{job_id}"`, and the panel
+> derives its checking/failed state from the run store via
+> `latestArtifactRun(runs, "h1bSponsorship", "jobId", jobId)`. Evidence reaches
+> the panel only through the invalidated `["job"]` query, never from the
+> mutation response. This design keeps that contract untouched.
+
 | Condition | Behaviour |
 |---|---|
 | MCP unreachable | `_unavailable(reason=H1B_MCP_UNAVAILABLE_REASON)` with the 5-minute TTL — **unchanged**. Card shows "Research unavailable" plus a retry affordance; never rendered as `no_match`. |
-| `h1b_mcp_enabled = false` | `capability: "disabled"`. The Sponsorship tab is still present and explains how to enable it. Unchanged. |
+| `h1b_mcp_enabled = false` | `GET /api/jobs/{id}` reports `capability: "disabled"`; `POST …/h1b-sponsorship` raises `409 H1B_DISABLED`. The Sponsorship tab is still present and explains how to enable it. Unchanged. |
 | No cache row for the company | `capability: "unavailable"`, "Not checked", button reads `Check H-1B`. |
 | Corrupt `evidence_json` | Row skipped by `load_company_evidence`; card reads as unchecked. Fail closed. |
 | Agent returns >8 periods, duplicate labels, or an oversized label | Whole evidence object rejects → `_unavailable`. |
