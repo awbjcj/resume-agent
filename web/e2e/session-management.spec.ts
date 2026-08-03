@@ -31,7 +31,7 @@ test("dashboard attention and in-progress cards lead into the interview hub", as
   await page.getByRole("button", { name: "Resolve" }).click();
   await page.getByRole("link", { name: "Resume Acme · Engineer" }).click();
   await expect(page).toHaveURL(/\/interview\?session=s1/);
-  await expect(page.getByRole("heading", { name: "Sessions" })).toBeVisible();
+  await expect(page.getByText("Session history")).toBeVisible();
   await expect(page.getByText("Tell me about a difficult project.")).toBeVisible();
 });
 
@@ -51,7 +51,7 @@ test("the sidebar is a direct entry point to the interview hub", async ({ page }
   expect(Math.abs(centres.label - centres.badge)).toBeLessThanOrEqual(1);
   await navLink.click();
   await expect(page).toHaveURL(/\/interview$/);
-  await expect(page.getByRole("heading", { name: "Sessions" })).toBeVisible();
+  await expect(page.getByText("Session history")).toBeVisible();
   await expect(page.getByText("Tell me about a difficult project.")).toBeVisible();
 });
 
@@ -65,6 +65,6 @@ test("session management remains aligned at mobile width", async ({ page }) => {
   await page.goto("/coach");
   await expect(page.getByText("Session history")).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "Show archived" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Actions for coaching session c1/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Actions for Coaching · 7/17/2026" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

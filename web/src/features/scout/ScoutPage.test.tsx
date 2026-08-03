@@ -61,9 +61,10 @@ it("groups archived filtering with history and confirms deletion in-app", async 
 
   await user.click(screen.getByRole("checkbox", { name: "Show archived" }));
   expect(mocks.includeArchived).toBe(true);
-  await user.click(screen.getByRole("button", { name: "Delete Older search" }));
+  await user.click(screen.getByRole("button", { name: "Actions for Older search" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
   const dialog = await screen.findByRole("alertdialog");
   expect(within(dialog).getByText(/permanently removed/i)).toBeInTheDocument();
   await user.click(within(dialog).getByRole("button", { name: "Delete" }));
-  expect(mocks.remove).toHaveBeenCalledWith({ sessionId: "old" });
+  expect(mocks.remove).toHaveBeenCalledWith({ sessionId: "old" }, expect.any(Object));
 });

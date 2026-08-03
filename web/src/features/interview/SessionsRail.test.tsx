@@ -64,11 +64,11 @@ describe("SessionsRail", () => {
     });
   });
 
-  it("groups sessions into in-progress and completed", () => {
+  it("uses the shared session history surface", () => {
     render(<MemoryRouter><SessionsRail selectedId={null} /></MemoryRouter>);
 
-    expect(screen.getByRole("heading", { name: "In progress" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Completed" })).toBeInTheDocument();
+    expect(screen.getByText("Session history")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New interview" })).toBeInTheDocument();
     expect(screen.getByText("Acme · Engineer")).toBeInTheDocument();
     expect(screen.getByText("Beta · Lead")).toBeInTheDocument();
   });
@@ -91,7 +91,7 @@ describe("SessionsRail", () => {
     const user = userEvent.setup();
     render(<MemoryRouter><SessionsRail selectedId={null} /></MemoryRouter>);
 
-    await user.click(screen.getByRole("switch", { name: "Show archived" }));
+    await user.click(screen.getByRole("checkbox", { name: "Show archived" }));
     expect(mocks.sessions).toHaveBeenLastCalledWith(undefined, true);
   });
 });

@@ -213,7 +213,7 @@ describe("CoachPage", () => {
     const user = userEvent.setup();
 
     render(<CoachPage />);
-    await user.click(screen.getByRole("button", { name: /Coaching · 7\/15\/2026/i }));
+    await user.click(screen.getByRole("button", { name: /^Coaching · 7\/15\/2026/i }));
 
     expect(screen.queryByLabelText("Message your profile coach")).not.toBeInTheDocument();
     expect(screen.getByText(coachState.recap)).toBeInTheDocument();
@@ -227,7 +227,7 @@ describe("CoachPage", () => {
     ];
     const user = userEvent.setup();
     render(<CoachPage />);
-    await user.click(screen.getByRole("button", { name: "Actions for coaching session c1" }));
+    await user.click(screen.getByRole("button", { name: "Actions for Coaching · 7/15/2026" }));
     await user.click(await screen.findByRole("menuitem", { name: "Archive" }));
     expect(archiveSession).toHaveBeenCalledWith({ sessionId: "c1" }, expect.any(Object));
   });
@@ -239,7 +239,7 @@ describe("CoachPage", () => {
     ];
     const user = userEvent.setup();
     render(<CoachPage />);
-    await user.click(screen.getByRole("button", { name: "Actions for coaching session c1" }));
+    await user.click(screen.getByRole("button", { name: "Actions for Coaching · 7/15/2026" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     expect(await screen.findByText(/Saved notes are kept in your profile/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete" }));

@@ -107,7 +107,7 @@ describe("InterviewPage", () => {
       refetch: vi.fn(),
     });
     renderPage("/interview");
-    expect(screen.getByRole("heading", { name: "Sessions" })).toBeInTheDocument();
+    expect(screen.getByText("Session history")).toBeInTheDocument();
     expect(screen.getAllByText(/Question 2 of 4/)).toHaveLength(2);
   });
 

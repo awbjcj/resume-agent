@@ -180,8 +180,8 @@ export function InterviewPage() {
         />
         <div className="flex flex-col gap-6">
           <main>
-            <Card className="min-h-[28rem] min-w-0 bg-card/90">
-              <CardContent className="flex min-h-[28rem] p-0">
+            <Card className="min-w-0 overflow-hidden rounded-2xl bg-card/90">
+              <CardContent className={cn("flex p-0", CHAT_SURFACE_HEIGHT)}>
                 <WorkspaceEmptyState
                   icon={MessagesSquare}
                   title={noSessions ? "Start a focused rehearsal" : "Choose a rehearsal to continue"}
