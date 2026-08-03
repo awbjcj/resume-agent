@@ -12,6 +12,17 @@ HISTORICAL_ONLY_CAVEAT = (
     "Historical H-1B filings do not confirm current sponsorship for this role "
     "or current employer policy."
 )
+H1B_DISABLED_MESSAGE = (
+    "H-1B research is disabled for this workspace. Enable H1B_MCP_ENABLED and "
+    "configure an MCP command or URL."
+)
+H1B_NO_EVIDENCE_MESSAGE = "No H-1B evidence has been checked for this job yet."
+H1B_MCP_UNAVAILABLE_REASON = (
+    "The H-1B MCP service could not be reached. Check the configured command or URL."
+)
+H1B_AGENT_UNAVAILABLE_REASON = (
+    "The H-1B research agent did not return valid evidence for this company."
+)
 
 
 class H1BSponsorshipEvidence(BaseModel):
@@ -28,6 +39,7 @@ class H1BSponsorshipEvidence(BaseModel):
     expires_at: datetime
     confidence: float = Field(ge=0, le=1)
     caveat: str
+    unavailable_reason: str | None = None
 
     @field_validator("retrieved_at", "expires_at")
     @classmethod

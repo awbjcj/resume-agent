@@ -7,7 +7,11 @@ from sqlmodel import Session
 
 from resume_agent.config import Settings
 from resume_agent.db import init_db, make_engine
-from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
+from resume_agent.h1b.models import (
+    H1B_MCP_UNAVAILABLE_REASON,
+    HISTORICAL_ONLY_CAVEAT,
+    H1BSponsorshipEvidence,
+)
 from resume_agent.h1b.service import check_job_sponsorship, enrich_companies
 from resume_agent.tracking.tables import Job
 
@@ -203,6 +207,7 @@ def test_unavailable_results_use_the_short_retry_expiry(monkeypatch):
 
     evidence = report.by_company["acme"]
     assert evidence.status == "unavailable"
+    assert evidence.unavailable_reason == H1B_MCP_UNAVAILABLE_REASON
     assert evidence.expires_at <= evidence.retrieved_at + timedelta(minutes=5)
 
 

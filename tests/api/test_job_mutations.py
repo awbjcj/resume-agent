@@ -4,7 +4,11 @@ from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
-from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
+from resume_agent.h1b.models import (
+    H1B_AGENT_UNAVAILABLE_REASON,
+    HISTORICAL_ONLY_CAVEAT,
+    H1BSponsorshipEvidence,
+)
 from resume_agent.api.routers import jobs as jobs_router
 from resume_agent.tracking.tables import Job, JobStatus
 
@@ -80,7 +84,11 @@ def test_manual_h1b_check_reports_disabled():
         response = client.post(f"/api/jobs/{jid}/h1b-sponsorship")
 
     assert response.status_code == 200
-    assert response.json() == {"capability": "disabled", "evidence": None}
+    assert response.json() == {
+        "capability": "disabled",
+        "evidence": None,
+        "message": "H-1B research is disabled for this workspace. Enable H1B_MCP_ENABLED and configure an MCP command or URL.",
+    }
 
 
 def test_manual_h1b_check_requires_a_company(tmp_path):
@@ -98,6 +106,42 @@ def test_manual_h1b_check_requires_a_company(tmp_path):
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_manual_h1b_check_reports_unavailable_evidence(monkeypatch, tmp_path):
+    now = datetime.now(timezone.utc)
+    evidence = H1BSponsorshipEvidence(
+        status="unavailable",
+        normalized_company="acme",
+        display_company="Acme",
+        retrieved_at=now,
+        expires_at=now + timedelta(minutes=5),
+        confidence=0.0,
+        caveat=HISTORICAL_ONLY_CAVEAT,
+        unavailable_reason=H1B_AGENT_UNAVAILABLE_REASON,
+    )
+
+    async def fake_check(session, job, *, settings):
+        return evidence
+
+    monkeypatch.setattr(jobs_router, "check_job_sponsorship", fake_check)
+    env = tmp_path / "h1b.env"
+    env.write_text(
+        "H1B_MCP_ENABLED=true\n"
+        "H1B_MCP_TRANSPORT=stdio\n"
+        "H1B_MCP_COMMAND=server\n",
+        encoding="utf-8",
+    )
+    client = TestClient(create_app(db_url="sqlite://", env_path=env))
+    with client:
+        jid = _seed(client.app, company="Acme")
+        response = client.post(f"/api/jobs/{jid}/h1b-sponsorship")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["capability"] == "unavailable"
+    assert body["message"] == H1B_AGENT_UNAVAILABLE_REASON
+    assert body["evidence"]["unavailableReason"] == H1B_AGENT_UNAVAILABLE_REASON
 
 
 def test_patch_archived_then_restore():

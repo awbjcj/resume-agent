@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
@@ -19,6 +20,9 @@ from resume_agent.career_skills.models import (
 from resume_agent.config import Settings
 from resume_agent.h1b.mcp import bounded_h1b_result, h1b_tools
 from resume_agent.h1b.models import (
+    H1B_AGENT_UNAVAILABLE_REASON,
+    H1B_DISABLED_MESSAGE,
+    H1B_MCP_UNAVAILABLE_REASON,
     HISTORICAL_ONLY_CAVEAT,
     H1BEnrichmentReport,
     H1BSponsorshipEvidence,
@@ -38,6 +42,7 @@ from resume_agent.tracking.tables import H1BCompanyEvidence, Job
 
 
 _UNAVAILABLE_CACHE_TTL = timedelta(minutes=5)
+logger = logging.getLogger(__name__)
 
 
 class SponsorshipAgentFactory(Protocol):
@@ -84,7 +89,12 @@ class DefaultSponsorshipAgentFactory:
         )
 
 
-def _unavailable(company: str, *, now: datetime | None = None) -> H1BSponsorshipEvidence:
+def _unavailable(
+    company: str,
+    *,
+    now: datetime | None = None,
+    reason: str = H1B_AGENT_UNAVAILABLE_REASON,
+) -> H1BSponsorshipEvidence:
     retrieved = now or datetime.now(timezone.utc)
     return H1BSponsorshipEvidence(
         status="unavailable",
@@ -100,6 +110,7 @@ def _unavailable(company: str, *, now: datetime | None = None) -> H1BSponsorship
         expires_at=retrieved + _UNAVAILABLE_CACHE_TTL,
         confidence=0.0,
         caveat=HISTORICAL_ONLY_CAVEAT,
+        unavailable_reason=reason,
     )
 
 
@@ -121,6 +132,10 @@ def _agent_output(result: Any, company: str) -> H1BSponsorshipEvidence:
         evidence = H1BSponsorshipEvidence.model_validate(content)
     if evidence.normalized_company != company:
         raise ValueError("H1B agent returned evidence for a different company")
+    if evidence.status == "unavailable" and not evidence.unavailable_reason:
+        evidence = evidence.model_copy(
+            update={"unavailable_reason": H1B_AGENT_UNAVAILABLE_REASON}
+        )
     return evidence
 
 
@@ -167,7 +182,9 @@ async def enrich_companies(
 
     if not settings.h1b_mcp_enabled:
         for normalized in missing:
-            by_company[normalized] = _unavailable(normalized, now=now)
+            by_company[normalized] = _unavailable(
+                normalized, now=now, reason=H1B_DISABLED_MESSAGE
+            )
         return H1BEnrichmentReport(
             by_company=by_company,
             cache_hits=cache_hits,
@@ -193,6 +210,11 @@ async def enrich_companies(
                         )
                         return normalized, _agent_output(result, normalized)
                     except Exception:
+                        logger.warning(
+                            "H-1B research failed for normalized company %s",
+                            normalized,
+                            exc_info=True,
+                        )
                         return normalized, _unavailable(normalized)
 
             results = await run_with_cleanup(
@@ -202,7 +224,18 @@ async def enrich_companies(
                 runner,
             )
     except Exception:
-        results = [(normalized, _unavailable(normalized, now=now)) for normalized in missing]
+        logger.exception("H-1B MCP enrichment failed before evidence was returned")
+        results = [
+            (
+                normalized,
+                _unavailable(
+                    normalized,
+                    now=now,
+                    reason=H1B_MCP_UNAVAILABLE_REASON,
+                ),
+            )
+            for normalized in missing
+        ]
 
     with Session(engine) as session:
         for normalized, evidence in results:

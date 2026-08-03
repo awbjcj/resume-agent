@@ -180,6 +180,7 @@ class H1BSponsorshipEvidenceOut(CamelModel):
     expires_at: datetime
     confidence: float
     caveat: str
+    unavailable_reason: str | None = None
 
     @classmethod
     def from_evidence(cls, evidence: H1BSponsorshipEvidence) -> H1BSponsorshipEvidenceOut:
@@ -189,6 +190,7 @@ class H1BSponsorshipEvidenceOut(CamelModel):
 class H1BSponsorshipOut(CamelModel):
     capability: Literal["disabled", "available", "unavailable"]
     evidence: H1BSponsorshipEvidenceOut | None = None
+    message: str | None = None
 
 
 class ApplicationOut(CamelModel):

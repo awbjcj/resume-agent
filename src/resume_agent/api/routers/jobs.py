@@ -29,7 +29,11 @@ from resume_agent.api.schemas.jobs import (
 )
 from resume_agent.career_skills.models import read_job_analysis_meta
 from resume_agent.config import Settings
-from resume_agent.h1b.models import H1BSponsorshipEvidence
+from resume_agent.h1b.models import (
+    H1B_DISABLED_MESSAGE,
+    H1B_NO_EVIDENCE_MESSAGE,
+    H1BSponsorshipEvidence,
+)
 from resume_agent.h1b.service import check_job_sponsorship
 from resume_agent.api.schemas.runs import AddJobTextRequest
 from resume_agent.api.uploads import UploadTooLargeError, read_upload
@@ -83,7 +87,10 @@ def _job_detail_response(
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     detail = JobDetail.model_validate(row)
     if not settings.h1b_mcp_enabled:
-        detail.h1b_sponsorship = H1BSponsorshipOut(capability="disabled")
+        detail.h1b_sponsorship = H1BSponsorshipOut(
+            capability="disabled",
+            message=H1B_DISABLED_MESSAGE,
+        )
     else:
         job = get_job(session, job_id)
         evidence = None
@@ -96,15 +103,32 @@ def _job_detail_response(
                     )
             except ValueError:
                 evidence = None
-        detail.h1b_sponsorship = H1BSponsorshipOut(
-            capability="available" if evidence is not None else "unavailable",
-            evidence=(H1BSponsorshipEvidenceOut.from_evidence(evidence) if evidence else None),
-        )
+        detail.h1b_sponsorship = _h1b_sponsorship_response(evidence)
     review_doc = cast(ReviewConfigDoc, get_config_store(request).get("review"))
     gate_names = {r.name for r in review_doc.reviewers if r.gate}
     for version in detail.resume_versions:
         version.apply_gate_names(gate_names)
     return detail
+
+
+def _h1b_sponsorship_response(
+    evidence: H1BSponsorshipEvidence | None,
+) -> H1BSponsorshipOut:
+    if evidence is None:
+        return H1BSponsorshipOut(
+            capability="unavailable",
+            message=H1B_NO_EVIDENCE_MESSAGE,
+        )
+    if evidence.status == "unavailable":
+        return H1BSponsorshipOut(
+            capability="unavailable",
+            evidence=H1BSponsorshipEvidenceOut.from_evidence(evidence),
+            message=evidence.unavailable_reason,
+        )
+    return H1BSponsorshipOut(
+        capability="available",
+        evidence=H1BSponsorshipEvidenceOut.from_evidence(evidence),
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=JobDetail)
@@ -130,7 +154,10 @@ def check_h1b_sponsorship(
     if job is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     if not settings.h1b_mcp_enabled:
-        return H1BSponsorshipOut(capability="disabled")
+        return H1BSponsorshipOut(
+            capability="disabled",
+            message=H1B_DISABLED_MESSAGE,
+        )
     if not normalize_company(job.company):
         raise ApiException(
             422,
@@ -139,10 +166,7 @@ def check_h1b_sponsorship(
         )
 
     evidence = asyncio.run(check_job_sponsorship(session, job, settings=settings))
-    return H1BSponsorshipOut(
-        capability="available" if evidence is not None else "unavailable",
-        evidence=(H1BSponsorshipEvidenceOut.from_evidence(evidence) if evidence else None),
-    )
+    return _h1b_sponsorship_response(evidence)
 
 
 @router.patch("/jobs/{job_id}", response_model=JobDetail)
