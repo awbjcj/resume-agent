@@ -1332,7 +1332,8 @@ export interface paths {
         delete: operations["delete_interview_session_api_interview_sessions__session_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Rename Interview Session */
+        patch: operations["rename_interview_session_api_interview_sessions__session_id__patch"];
         trace?: never;
     };
     "/api/interview/sessions/{session_id}/archive": {
@@ -1761,7 +1762,8 @@ export interface paths {
         delete: operations["delete_coach_session_api_profile_coach_sessions__session_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Rename Coach Session */
+        patch: operations["rename_coach_session_api_profile_coach_sessions__session_id__patch"];
         trace?: never;
     };
     "/api/profile/coach/sessions/{session_id}/archive": {
@@ -2371,7 +2373,8 @@ export interface paths {
         delete: operations["delete_scout_session_api_scout_sessions__session_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Rename Scout Session */
+        patch: operations["rename_scout_session_api_scout_sessions__session_id__patch"];
         trace?: never;
     };
     "/api/scout/sessions/{session_id}/archive": {
@@ -3609,6 +3612,8 @@ export interface components {
             recap?: string | null;
             /** Sessionid */
             sessionId: string;
+            /** Sessiontitle */
+            sessionTitle?: string | null;
             /** Startedat */
             startedAt: string;
             /** Status */
@@ -3617,6 +3622,11 @@ export interface components {
             topics?: components["schemas"]["CoachTopicOut"][];
             /** Turns */
             turns?: components["schemas"]["CoachTurnOut"][];
+        };
+        /** CoachSessionPatchIn */
+        CoachSessionPatchIn: {
+            /** Title */
+            title: string;
         };
         /** CoachSessionSummaryOut */
         CoachSessionSummaryOut: {
@@ -3631,6 +3641,8 @@ export interface components {
             savedNoteCount: number;
             /** Sessionid */
             sessionId: string;
+            /** Sessiontitle */
+            sessionTitle?: string | null;
             /** Startedat */
             startedAt: string;
             /** Status */
@@ -4161,6 +4173,8 @@ export interface components {
             resumeVersionId: number;
             /** Sessionid */
             sessionId: string;
+            /** Sessiontitle */
+            sessionTitle?: string | null;
             /** Startedat */
             startedAt: string;
             /** Status */
@@ -4173,6 +4187,11 @@ export interface components {
             title: string;
             /** Turns */
             turns?: components["schemas"]["InterviewTurnOut"][];
+        };
+        /** InterviewSessionPatchIn */
+        InterviewSessionPatchIn: {
+            /** Title */
+            title: string;
         };
         /** InterviewSessionSummaryOut */
         InterviewSessionSummaryOut: {
@@ -4201,6 +4220,8 @@ export interface components {
             questionCount: number;
             /** Sessionid */
             sessionId: string;
+            /** Sessiontitle */
+            sessionTitle?: string | null;
             /** Startedat */
             startedAt: string;
             /** Status */
@@ -5690,6 +5711,8 @@ export interface components {
             scrapeUnavailableReason?: string | null;
             /** Sessionid */
             sessionId: string;
+            /** Sessiontitle */
+            sessionTitle?: string | null;
             /** Startedat */
             startedAt: string;
             /**
@@ -5699,6 +5722,11 @@ export interface components {
             status: "active" | "ended";
             /** Turns */
             turns?: components["schemas"]["ScoutTurnOut"][];
+        };
+        /** ScoutSessionPatchIn */
+        ScoutSessionPatchIn: {
+            /** Title */
+            title: string;
         };
         /** ScoutSessionSummaryOut */
         ScoutSessionSummaryOut: {
@@ -5730,6 +5758,8 @@ export interface components {
             proposalCount: number;
             /** Sessionid */
             sessionId: string;
+            /** Sessiontitle */
+            sessionTitle?: string | null;
             /** Startedat */
             startedAt: string;
             /**
@@ -9825,6 +9855,43 @@ export interface operations {
             };
         };
     };
+    rename_interview_session_api_interview_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewSessionPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     archive_interview_session_api_interview_sessions__session_id__archive_post: {
         parameters: {
             query?: never;
@@ -10807,6 +10874,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_coach_session_api_profile_coach_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachSessionPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -12258,6 +12362,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_scout_session_api_scout_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScoutSessionPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoutSessionOut"];
+                };
             };
             /** @description Validation Error */
             422: {

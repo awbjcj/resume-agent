@@ -2145,6 +2145,17 @@
             "title": "Sessionid",
             "type": "string"
           },
+          "sessionTitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessiontitle"
+          },
           "startedAt": {
             "title": "Startedat",
             "type": "string"
@@ -2174,6 +2185,21 @@
           "status"
         ],
         "title": "CoachSessionOut",
+        "type": "object"
+      },
+      "CoachSessionPatchIn": {
+        "properties": {
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "CoachSessionPatchIn",
         "type": "object"
       },
       "CoachSessionSummaryOut": {
@@ -2208,6 +2234,17 @@
           "sessionId": {
             "title": "Sessionid",
             "type": "string"
+          },
+          "sessionTitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessiontitle"
           },
           "startedAt": {
             "title": "Startedat",
@@ -3447,6 +3484,17 @@
             "title": "Sessionid",
             "type": "string"
           },
+          "sessionTitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessiontitle"
+          },
           "startedAt": {
             "title": "Startedat",
             "type": "string"
@@ -3481,6 +3529,21 @@
           "progress"
         ],
         "title": "InterviewSessionOut",
+        "type": "object"
+      },
+      "InterviewSessionPatchIn": {
+        "properties": {
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "InterviewSessionPatchIn",
         "type": "object"
       },
       "InterviewSessionSummaryOut": {
@@ -3540,6 +3603,17 @@
           "sessionId": {
             "title": "Sessionid",
             "type": "string"
+          },
+          "sessionTitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessiontitle"
           },
           "startedAt": {
             "title": "Startedat",
@@ -7692,6 +7766,17 @@
             "title": "Sessionid",
             "type": "string"
           },
+          "sessionTitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessiontitle"
+          },
           "startedAt": {
             "title": "Startedat",
             "type": "string"
@@ -7720,6 +7805,21 @@
           "scrapeAvailable"
         ],
         "title": "ScoutSessionOut",
+        "type": "object"
+      },
+      "ScoutSessionPatchIn": {
+        "properties": {
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "ScoutSessionPatchIn",
         "type": "object"
       },
       "ScoutSessionSummaryOut": {
@@ -7773,6 +7873,17 @@
           "sessionId": {
             "title": "Sessionid",
             "type": "string"
+          },
+          "sessionTitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessiontitle"
           },
           "startedAt": {
             "title": "Startedat",
@@ -15722,6 +15833,69 @@
           }
         },
         "summary": "Get Interview Session"
+      },
+      "patch": {
+        "operationId": "rename_interview_session_api_interview_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewSessionPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Interview Session"
       }
     },
     "/api/interview/sessions/{session_id}/archive": {
@@ -17693,6 +17867,69 @@
           }
         },
         "summary": "Get Coach Session"
+      },
+      "patch": {
+        "operationId": "rename_coach_session_api_profile_coach_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachSessionPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Coach Session"
       }
     },
     "/api/profile/coach/sessions/{session_id}/archive": {
@@ -20122,6 +20359,69 @@
           }
         },
         "summary": "Get Scout Session"
+      },
+      "patch": {
+        "operationId": "rename_scout_session_api_scout_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoutSessionPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoutSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Scout Session"
       }
     },
     "/api/scout/sessions/{session_id}/archive": {
