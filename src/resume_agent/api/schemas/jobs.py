@@ -166,6 +166,14 @@ class CoverLetterOut(CamelModel):
     created_at: datetime
 
 
+class H1BPeriodStatOut(CamelModel):
+    period: str
+    filing_count: int | None = None
+    certified_count: int | None = None
+    denied_count: int | None = None
+    wage_summary: dict[str, float] | None = None
+
+
 class H1BSponsorshipEvidenceOut(CamelModel):
     status: H1BSponsorshipStatus
     normalized_company: str
@@ -173,6 +181,8 @@ class H1BSponsorshipEvidenceOut(CamelModel):
     fiscal_periods: list[str]
     filing_count: int | None
     certified_count: int | None
+    denied_count: int | None = None
+    periods: list[H1BPeriodStatOut] = Field(default_factory=list)
     wage_summary: dict[str, float] | None
     source_url: str | None
     data_version: str | None
@@ -189,6 +199,7 @@ class H1BSponsorshipEvidenceOut(CamelModel):
 
 class H1BSponsorshipOut(CamelModel):
     capability: Literal["disabled", "available", "unavailable"]
+    stale: bool = False
     evidence: H1BSponsorshipEvidenceOut | None = None
     message: str | None = None
 

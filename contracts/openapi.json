@@ -3129,6 +3129,66 @@
         "title": "H1BCapabilityStatus",
         "type": "object"
       },
+      "H1BPeriodStatOut": {
+        "properties": {
+          "certifiedCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certifiedcount"
+          },
+          "deniedCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deniedcount"
+          },
+          "filingCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filingcount"
+          },
+          "period": {
+            "title": "Period",
+            "type": "string"
+          },
+          "wageSummary": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wagesummary"
+          }
+        },
+        "required": [
+          "period"
+        ],
+        "title": "H1BPeriodStatOut",
+        "type": "object"
+      },
       "H1BSponsorshipEvidenceOut": {
         "properties": {
           "caveat": {
@@ -3160,6 +3220,17 @@
               }
             ],
             "title": "Dataversion"
+          },
+          "deniedCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deniedcount"
           },
           "displayCompany": {
             "anyOf": [
@@ -3198,6 +3269,13 @@
           "normalizedCompany": {
             "title": "Normalizedcompany",
             "type": "string"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/H1BPeriodStatOut"
+            },
+            "title": "Periods",
+            "type": "array"
           },
           "retrievedAt": {
             "format": "date-time",
@@ -3299,6 +3377,11 @@
               }
             ],
             "title": "Message"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
           }
         },
         "required": [
@@ -16792,11 +16875,11 @@
           }
         ],
         "responses": {
-          "200": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/H1BSponsorshipOut"
+                  "$ref": "#/components/schemas/RunOut"
                 }
               }
             },
