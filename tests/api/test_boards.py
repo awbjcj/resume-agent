@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
 from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.tracking.tables import H1BCompanyEvidence, Job, JobStatus
 
 
 def _client():
@@ -79,10 +79,19 @@ def test_pipeline_exposes_persisted_h1b_sponsorship_status():
             client.app,
             status=JobStatus.filtered.value,
             company="Acme",
-            analysis_meta_json={
-                "h1b_evidence_snapshot": evidence.model_dump(mode="json")
-            },
         )
+        with get_session(client.app.state.engine) as session:
+            session.add(
+                H1BCompanyEvidence(
+                    normalized_company="acme",
+                    display_company=evidence.display_company,
+                    status=evidence.status,
+                    evidence_json=evidence.model_dump(mode="json"),
+                    expires_at=evidence.expires_at,
+                    retrieved_at=evidence.retrieved_at,
+                )
+            )
+            session.commit()
         body = client.get("/api/pipeline").json()
 
     assert body["data"][0]["h1BSponsorshipStatus"] == "matched"
