@@ -6,6 +6,7 @@ from resume_agent.config import Settings
 from resume_agent.h1b.mcp import (
     H1B_INCLUDE_TOOLS,
     H1BResultTooLarge,
+    build_h1b_tools,
     bounded_h1b_result,
     h1b_tools,
 )
@@ -75,3 +76,14 @@ def test_result_hook_rejects_oversized_provider_payload():
             await hook(lambda **_: "12345", {})
 
     asyncio.run(run())
+
+
+def test_real_agno_mcp_toolkit_accepts_the_h1b_configuration():
+    from agno.tools.mcp import MCPTools
+
+    settings = _settings().model_copy(update={"h1b_mcp_command": "python -c pass"})
+    tools = build_h1b_tools(settings)
+
+    assert isinstance(tools, MCPTools)
+    assert tools.include_tools == H1B_INCLUDE_TOOLS
+    assert tools.tool_name_prefix == "h1b"

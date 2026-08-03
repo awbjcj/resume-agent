@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -67,8 +69,6 @@ def test_disabled_enrichment_is_unavailable_without_building_agent():
 
 
 def test_duplicate_company_spellings_are_researched_once_and_then_cached(monkeypatch):
-    from contextlib import asynccontextmanager
-    import asyncio
     import resume_agent.h1b.service as service
 
     @asynccontextmanager
@@ -105,3 +105,36 @@ def test_duplicate_company_spellings_are_researched_once_and_then_cached(monkeyp
     assert len(runner.calls) == 1
     assert second.cache_hits == 1
     assert second.researched == 0
+
+
+def test_unavailable_results_use_the_short_retry_expiry(monkeypatch):
+    import resume_agent.h1b.service as service
+
+    @asynccontextmanager
+    async def failing_tools(_settings):
+        raise RuntimeError("MCP is down")
+        yield
+
+    monkeypatch.setattr(service, "h1b_tools", failing_tools)
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+        h1b_cache_ttl_days=30,
+    )
+
+    report = asyncio.run(
+        enrich_companies(
+            engine,
+            ["Acme"],
+            settings=settings,
+            agent_factory=Factory(FakeRunner()),
+        )
+    )
+
+    evidence = report.by_company["acme"]
+    assert evidence.status == "unavailable"
+    assert evidence.expires_at <= evidence.retrieved_at + timedelta(minutes=5)

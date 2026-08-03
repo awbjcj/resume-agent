@@ -12,16 +12,26 @@ from sqlmodel import Session, select
 
 from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
 from resume_agent.config import Settings
-from resume_agent.h1b.mcp import h1b_tools
+from resume_agent.h1b.mcp import bounded_h1b_result, h1b_tools
 from resume_agent.h1b.models import (
     HISTORICAL_ONLY_CAVEAT,
     H1BEnrichmentReport,
     H1BSponsorshipEvidence,
 )
-from resume_agent.llm_runner import AgentRunner, Runner, build_model, retry_kwargs, use_json_mode_for
+from resume_agent.llm_runner import (
+    AgentRunner,
+    Runner,
+    build_model,
+    resolve_api_key,
+    retry_kwargs,
+    use_json_mode_for,
+)
 from resume_agent.prompts.guidance import with_guidance
 from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.tracking.tables import H1BCompanyEvidence
+
+
+_UNAVAILABLE_CACHE_TTL = timedelta(minutes=5)
 
 
 class SponsorshipAgentFactory(Protocol):
@@ -34,10 +44,14 @@ class DefaultSponsorshipAgentFactory:
 
     def build(self, tools: Any) -> AgentRunner:
         model_id = self.settings.mid_model
-        model = build_model(model_id)
+        model = build_model(
+            model_id,
+            api_key=resolve_api_key(model_id, settings=self.settings) or None,
+        )
         agent = Agent(
             model=model,
             tools=[tools],
+            tool_hooks=[bounded_h1b_result(self.settings.h1b_mcp_max_result_chars)],
             description="Research historical H-1B filing evidence without making current sponsorship claims.",
             instructions=with_guidance(
                 "h1b-sponsorship-research",
@@ -60,6 +74,7 @@ class DefaultSponsorshipAgentFactory:
                 model_id=model_id,
                 skill_ref=None,
             ),
+            settings=self.settings,
         )
 
 
@@ -76,7 +91,7 @@ def _unavailable(company: str, *, now: datetime | None = None) -> H1BSponsorship
         source_url=None,
         data_version=None,
         retrieved_at=retrieved,
-        expires_at=retrieved + timedelta(minutes=5),
+        expires_at=retrieved + _UNAVAILABLE_CACHE_TTL,
         confidence=0.0,
         caveat=HISTORICAL_ONLY_CAVEAT,
     )
@@ -185,7 +200,11 @@ async def enrich_companies(
                 update={
                     "display_company": evidence.display_company or missing[normalized],
                     "retrieved_at": now,
-                    "expires_at": now + timedelta(days=settings.h1b_cache_ttl_days),
+                    "expires_at": (
+                        now + _UNAVAILABLE_CACHE_TTL
+                        if evidence.status == "unavailable"
+                        else now + timedelta(days=settings.h1b_cache_ttl_days)
+                    ),
                 }
             )
             by_company[normalized] = evidence

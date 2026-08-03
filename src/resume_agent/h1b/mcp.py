@@ -52,7 +52,6 @@ def build_h1b_tools(settings: Any, *, mcp_type: Any | None = None) -> Any:
         "include_tools": list(H1B_INCLUDE_TOOLS),
         "tool_name_prefix": "h1b",
         "timeout_seconds": settings.h1b_mcp_timeout_seconds,
-        "tool_hooks": [bounded_h1b_result(settings.h1b_mcp_max_result_chars)],
     }
     if settings.h1b_mcp_transport == "stdio":
         kwargs = {"command": settings.h1b_mcp_command, "transport": "stdio", **common}
