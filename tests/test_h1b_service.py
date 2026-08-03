@@ -413,6 +413,7 @@ def test_enrichment_closes_runner_before_mcp_context(monkeypatch):
 def test_sponsorship_agent_is_instructed_to_collect_four_quarters():
     settings = Settings(  # type: ignore[call-arg]
         _env_file=None,
+        anthropic_api_key="test-key",
         h1b_mcp_enabled=True,
         h1b_mcp_transport="stdio",
         h1b_mcp_command="server",
