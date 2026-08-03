@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Archive, ArchiveRestore, Bot, ChevronDown, Clock3, EllipsisVertical, FileCheck2, History, MessageCircleQuestion, SearchCheck, Sparkles, SquareCheckBig, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Bot, ChevronDown, Clock3, EllipsisVertical, FileCheck2, History, MessageCircleQuestion, Pencil, SearchCheck, Sparkles, SquareCheckBig, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -28,6 +28,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +49,7 @@ import {
   useDeleteCoachSession,
   useDiscardCoachNote,
   useEndCoachSession,
+  useRenameCoachSession,
   useSaveCoachNote,
   useSendCoachMessage,
   useStartCoachSession,
@@ -54,10 +57,11 @@ import {
   type CoachSessionSummary,
 } from "./use-coach";
 
-function CoachSessionActions({ row, current = false, onArchived, onDelete }: { row: CoachSessionSummary; current?: boolean; onArchived?: () => void; onDelete: (row: CoachSessionSummary) => void }) {
+function CoachSessionActions({ row, current = false, onArchived, onDelete, onRename }: { row: CoachSessionSummary; current?: boolean; onArchived?: () => void; onDelete: (row: CoachSessionSummary) => void; onRename: (row: CoachSessionSummary) => void }) {
   const archive = useArchiveCoachSession();
   const unarchive = useUnarchiveCoachSession();
   return <DropdownMenu><DropdownMenuTrigger render={<Button size="icon" variant="ghost" aria-label={current ? "Actions for current coaching session" : `Actions for coaching session ${row.sessionId}`}><EllipsisVertical /></Button>} /><DropdownMenuContent align="end"><DropdownMenuGroup>
+    <DropdownMenuItem onClick={() => onRename(row)}><Pencil />Rename</DropdownMenuItem>
     {row.status === "ended" && !row.archivedAt ? <DropdownMenuItem onClick={() => { const input = { sessionId: row.sessionId }; if (onArchived) archive.mutate(input, { onSuccess: onArchived }); else archive.mutate(input); }}><Archive />Archive</DropdownMenuItem> : null}
     {row.archivedAt ? <DropdownMenuItem onClick={() => unarchive.mutate({ sessionId: row.sessionId })}><ArchiveRestore />Unarchive</DropdownMenuItem> : null}
     <DropdownMenuItem variant="destructive" onClick={() => onDelete(row)}><Trash2 />Delete</DropdownMenuItem>
@@ -98,6 +102,8 @@ function PastSession({ sessionId }: { sessionId: string }) {
 export function CoachPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<CoachSessionSummary | null>(null);
+  const [pendingRename, setPendingRename] = useState<CoachSessionSummary | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
   const sessions = useCoachSessions(showArchived);
   const activeSummary = sessions.data?.sessions?.find((session) => session.status === "active");
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -109,6 +115,7 @@ export function CoachPage() {
   const saveNote = useSaveCoachNote();
   const discardNote = useDiscardCoachNote();
   const remove = useDeleteCoachSession();
+  const rename = useRenameCoachSession();
   const [composer, setComposer] = useState("");
   const [lastMessage, setLastMessage] = useState("");
   // The turn only reaches the durable transcript when the run finishes, so
@@ -325,7 +332,7 @@ export function CoachPage() {
             {starting || start.isPending ? <Spinner data-icon="inline-start" /> : <Sparkles aria-hidden="true" />}
             Start another session
           </Button>
-        ) : null}{active ? <CoachSessionActions current row={{ sessionId: active.sessionId, status: active.status, startedAt: active.startedAt, endedAt: active.endedAt, topicCount: active.topics?.length ?? 0, savedNoteCount: savedDrafts.length, archivedAt: active.archivedAt }} onArchived={() => setCurrentSessionId(null)} onDelete={setPendingDelete} /> : null}</>}
+        ) : null}{active ? <CoachSessionActions current row={{ sessionId: active.sessionId, sessionTitle: active.sessionTitle, status: active.status, startedAt: active.startedAt, endedAt: active.endedAt, topicCount: active.topics?.length ?? 0, savedNoteCount: savedDrafts.length, archivedAt: active.archivedAt }} onArchived={() => setCurrentSessionId(null)} onDelete={setPendingDelete} onRename={(row) => { setPendingRename(row); setRenameTitle(row.sessionTitle || `Coaching · ${new Date(row.startedAt).toLocaleDateString()}`); }} /> : null}</>}
       />
 
       {runError && runState !== "error" ? <Alert variant="destructive"><AlertTitle>Profile coach error</AlertTitle><AlertDescription>{runError}</AlertDescription></Alert> : null}
@@ -373,7 +380,7 @@ export function CoachPage() {
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <Card className="min-w-0 overflow-hidden">
             <CardHeader className="border-b bg-muted/20">
-              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />Coaching thread</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />{active.sessionTitle || "Coaching thread"}</CardTitle>
               <CardDescription className="flex items-center gap-2 text-sm"><Clock3 className="size-4" aria-hidden="true" />Started {new Date(active.startedAt).toLocaleString()}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -463,13 +470,15 @@ export function CoachPage() {
           <div className="flex items-center gap-2"><History className="size-4 text-muted-foreground" aria-hidden="true" /><h2 className="text-base font-semibold">Past sessions</h2><Badge variant="secondary">{pastSessions.length}</Badge></div>
           {pastSessions.map((past) => (
             <Collapsible key={past.sessionId} className="rounded-xl border bg-card px-4">
-              <div className="flex items-center gap-2"><CollapsibleTrigger className="group/past flex min-w-0 flex-1 items-center justify-between gap-4 py-4 text-left"><span><span className="block text-sm font-medium">{new Date(past.startedAt).toLocaleDateString()}</span><span className="text-xs text-muted-foreground">{past.topicCount} topics · {past.savedNoteCount} saved notes</span></span><span className="flex items-center gap-2">{past.archivedAt ? <Badge variant="outline">Archived</Badge> : null}<ChevronDown className="size-4 text-muted-foreground transition-transform duration-[160ms] ease-out-strong group-data-panel-open/past:rotate-180 motion-reduce:transition-none" aria-hidden="true" /></span></CollapsibleTrigger><CoachSessionActions row={past} onDelete={setPendingDelete} /></div>
+              <div className="flex items-center gap-2"><CollapsibleTrigger className="group/past flex min-w-0 flex-1 items-center justify-between gap-4 py-4 text-left"><span><span className="block text-sm font-medium">{past.sessionTitle || new Date(past.startedAt).toLocaleDateString()}</span><span className="text-xs text-muted-foreground">{past.topicCount} topics · {past.savedNoteCount} saved notes</span></span><span className="flex items-center gap-2">{past.archivedAt ? <Badge variant="outline">Archived</Badge> : null}<ChevronDown className="size-4 text-muted-foreground transition-transform duration-[160ms] ease-out-strong group-data-panel-open/past:rotate-180 motion-reduce:transition-none" aria-hidden="true" /></span></CollapsibleTrigger><CoachSessionActions row={past} onDelete={setPendingDelete} onRename={(row) => { setPendingRename(row); setRenameTitle(row.sessionTitle || `Coaching · ${new Date(row.startedAt).toLocaleDateString()}`); }} /></div>
               <CollapsibleContent className="translate-y-0 overflow-hidden border-t pb-4 opacity-100 transition-[opacity,transform] duration-[160ms] ease-out-strong data-starting-style:-translate-y-1 data-starting-style:opacity-0 data-ending-style:-translate-y-1 data-ending-style:opacity-0 motion-reduce:translate-y-0 motion-reduce:transition-opacity"><PastSession sessionId={past.sessionId} /></CollapsibleContent>
             </Collapsible>
           ))}
         </> : <p className="text-sm text-muted-foreground">No past coaching sessions.</p>}
         <Field orientation="horizontal"><Switch id="show-archived-coach" checked={showArchived} onCheckedChange={setShowArchived} /><FieldLabel htmlFor="show-archived-coach">Show archived</FieldLabel></Field>
       </section>
+
+      <Dialog open={pendingRename != null} onOpenChange={(open) => { if (!open) setPendingRename(null); }}><DialogContent><DialogHeader><DialogTitle>Rename coaching session</DialogTitle><DialogDescription>Use a short title that will be easy to recognize in your history.</DialogDescription></DialogHeader><Input aria-label="Session title" autoFocus maxLength={120} value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} /><DialogFooter><Button variant="ghost" onClick={() => setPendingRename(null)}>Cancel</Button><Button disabled={!renameTitle.trim() || rename.isPending} onClick={() => { if (!pendingRename) return; rename.mutate({ sessionId: pendingRename.sessionId, title: renameTitle.trim() }, { onSuccess: () => setPendingRename(null) }); }}>Save title</Button></DialogFooter></DialogContent></Dialog>
 
       <AlertDialog open={pendingDelete != null} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this coaching session?</AlertDialogTitle><AlertDialogDescription>The conversation transcript and recap will be permanently removed. Saved notes are kept in your profile.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep it</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={remove.isPending} onClick={() => { if (!pendingDelete) return; const deletingDisplayed = pendingDelete.sessionId === displayedSessionId; remove.mutate({ sessionId: pendingDelete.sessionId }, { onSuccess: () => { if (deletingDisplayed) setCurrentSessionId(null); } }); setPendingDelete(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>

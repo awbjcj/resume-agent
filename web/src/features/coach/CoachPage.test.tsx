@@ -108,6 +108,7 @@ vi.mock("./use-coach", () => ({
   useArchiveCoachSession: () => ({ mutate: archiveSession }),
   useUnarchiveCoachSession: () => ({ mutate: unarchiveSession }),
   useDeleteCoachSession: () => ({ mutate: deleteSession, isPending: false }),
+  useRenameCoachSession: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 describe("CoachPage", () => {

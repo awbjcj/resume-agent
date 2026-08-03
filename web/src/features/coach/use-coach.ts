@@ -93,6 +93,19 @@ export function useDeleteCoachSession() {
   return useCoachSessionMutation("delete");
 }
 
+export function useRenameCoachSession() {
+  const invalidate = useCoachSessionInvalidation();
+  return useMutation({
+    mutationFn: ({ sessionId, title }: { sessionId: string; title: string }) =>
+      unwrap(api.PATCH("/api/profile/coach/sessions/{session_id}", {
+        params: { path: { session_id: sessionId } },
+        body: { title },
+      })),
+    onSuccess: invalidate,
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
 export function useCoachSession(sessionId: string | null) {
   return useQuery({
     queryKey: ["coach-session", sessionId],
