@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
-import { Bot, Clock3, MessagesSquare, Plus, SquareCheckBig } from "lucide-react";
+import { Bot, BriefcaseBusiness, ChartNoAxesColumnIncreasing, Clock3, MessageCircleQuestion, MessagesSquare, SquareCheckBig } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
 import { GuidedWorkspaceHeader } from "@/components/chat/GuidedWorkspaceHeader";
 import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
+import { WorkspaceEmptyState } from "@/components/chat/WorkspaceEmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -21,7 +22,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Progress, ProgressLabel } from "@/components/ui/progress";
@@ -153,7 +153,7 @@ export function InterviewPage() {
     return (
       <div className={cn("space-y-6", CHAT_PAGE_WIDTH)}>
         <GuidedWorkspaceHeader tone="interview" icon={<MessagesSquare />} eyebrow="Focused rehearsal" title="Mock interviews" description="Practise realistic questions, stay in the moment, and turn the conversation into a scored debrief." />
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="flex flex-col gap-6">
           <div className="flex min-w-0 flex-col gap-4">
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-[32rem] w-full" />
@@ -177,23 +177,23 @@ export function InterviewPage() {
           title="Mock interviews"
           description="Practise realistic questions, stay in the moment, and turn the conversation into a scored debrief."
           meta={<Badge variant="outline">{noSessions ? "No sessions yet" : "Choose a session"}</Badge>}
-          actions={<Button onClick={() => setNewOpen(true)}><Plus aria-hidden="true" />Start a mock interview</Button>}
         />
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="flex flex-col gap-6">
           <main>
             <Card className="min-h-[28rem] min-w-0 bg-card/90">
-              <CardContent className="flex min-h-[28rem] items-center justify-center py-14">
-                <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon"><MessagesSquare aria-hidden="true" /></EmptyMedia>
-                <EmptyTitle>{noSessions ? "No mock interviews yet" : "No interview selected"}</EmptyTitle>
-                <EmptyDescription>
-                  {noSessions
-                    ? "Practise against a job you have already tailored a resume for, then get a scored debrief."
-                    : "Select a session or start a new interview."}
-                </EmptyDescription>
-              </EmptyHeader>
-                </Empty>
+              <CardContent className="flex min-h-[28rem] p-0">
+                <WorkspaceEmptyState
+                  icon={MessagesSquare}
+                  title={noSessions ? "Start a focused rehearsal" : "Choose a rehearsal to continue"}
+                  description="Practice against a tailored role, answer naturally, and finish with a scored debrief you can act on."
+                  actionLabel="Start a mock interview"
+                  onAction={() => setNewOpen(true)}
+                  steps={[
+                    { icon: BriefcaseBusiness, title: "Choose a role", description: "Select a job with a tailored resume so the questions match the real opportunity." },
+                    { icon: MessageCircleQuestion, title: "Answer one at a time", description: "Stay in the conversation while the interviewer adapts its follow-ups." },
+                    { icon: ChartNoAxesColumnIncreasing, title: "Review the debrief", description: "See strengths, gaps, and stronger answer patterns after the rehearsal." },
+                  ]}
+                />
               </CardContent>
             </Card>
           </main>
@@ -266,7 +266,7 @@ export function InterviewPage() {
             ) : undefined}
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="flex flex-col gap-6">
       <main className="flex min-w-0 flex-col gap-6">
 
       {visibleError ? (

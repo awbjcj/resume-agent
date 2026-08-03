@@ -41,6 +41,7 @@ vi.mock("./use-interview", () => ({
   useArchiveInterviewSession: () => ({ mutate: mocks.archive }),
   useUnarchiveInterviewSession: () => ({ mutate: mocks.unarchive }),
   useDeleteInterviewSession: () => ({ mutate: mocks.remove, isPending: false }),
+  useRenameInterviewSession: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/components/TranscribeButton", () => ({ TranscribeButton: () => null }));
@@ -120,7 +121,7 @@ describe("InterviewPage", () => {
     mocks.session.mockReturnValue({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() });
     mocks.sessions.mockReturnValue({ data: { sessions: [] }, isPending: false, isError: false, refetch: vi.fn() });
     renderPage("/interview");
-    expect(screen.getByText("No mock interviews yet")).toBeInTheDocument();
+    expect(screen.getByText("Start a focused rehearsal")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /start a mock interview/i }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Archive, ArchiveRestore, EllipsisVertical, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import {
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { NewInterviewDialog } from "./NewInterviewDialog";
 import {
   type InterviewSessionSummary, useArchiveInterviewSession,
-  useDeleteInterviewSession, useInterviewSessions, useUnarchiveInterviewSession,
+  useDeleteInterviewSession, useInterviewSessions, useRenameInterviewSession, useUnarchiveInterviewSession,
 } from "./use-interview";
 
 function SessionRow({ row, selected, onArchive, onDelete }: {
@@ -29,15 +30,22 @@ function SessionRow({ row, selected, onArchive, onDelete }: {
   onArchive: (row: InterviewSessionSummary) => void;
   onDelete: (row: InterviewSessionSummary) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
   const archive = useArchiveInterviewSession();
   const unarchive = useUnarchiveInterviewSession();
-  const label = [row.company, row.title].filter(Boolean).join(" · ") || "Mock interview";
+  const rename = useRenameInterviewSession();
+  const fallbackLabel = [row.company, row.title].filter(Boolean).join(" · ") || "Mock interview";
+  const label = row.sessionTitle || fallbackLabel;
   return (
     <li className={cn(
       "group/session flex items-center gap-2 rounded-xl border border-transparent bg-muted/35 px-3 py-2.5 transition-[background-color,border-color,box-shadow] duration-150 ease-out-strong hover:border-border hover:bg-muted/60",
       selected && "border-primary/30 bg-accent shadow-[inset_3px_0_0_var(--primary)] hover:border-primary/40 hover:bg-accent",
     )}>
-      <Link
+      {editing ? <form className="flex min-w-0 flex-1 items-center gap-2" onSubmit={(event) => { event.preventDefault(); if (!draft.trim()) return; rename.mutate({ sessionId: row.sessionId, title: draft.trim() }, { onSuccess: () => setEditing(false) }); }}>
+        <Input autoFocus aria-label="Session title" value={draft} maxLength={120} onChange={(event) => setDraft(event.target.value)} className="h-8" />
+        <Button type="submit" size="sm" disabled={!draft.trim() || rename.isPending}>Save</Button>
+      </form> : <Link
         to={`/interview?session=${row.sessionId}`}
         aria-current={selected ? "page" : undefined}
         className="min-w-0 flex-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -47,15 +55,17 @@ function SessionRow({ row, selected, onArchive, onDelete }: {
           <span className="truncate">{label}</span>
         </span>
         <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+          {row.sessionTitle ? `${fallbackLabel} · ` : ""}
           {row.status === "active" ? `Question ${row.askedCount} of ${row.questionCount}` : row.overallScore != null ? `Scored ${row.overallScore}/5` : "Completed"}
           {" · "}{new Date(row.startedAt).toLocaleDateString()}
         </span>
-      </Link>
+      </Link>}
       {row.archivedAt ? <Badge variant="outline">Archived</Badge> : null}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label={`Actions for ${label}`}><EllipsisVertical /></Button>} />
         <DropdownMenuContent align="end">
           <DropdownMenuGroup>
+            <DropdownMenuItem onClick={() => { setDraft(label); setEditing(true); }}><Pencil />Rename</DropdownMenuItem>
             {row.status === "ended" && !row.archivedAt ? <DropdownMenuItem onClick={() => archive.mutate({ sessionId: row.sessionId }, { onSuccess: () => onArchive(row) })}><Archive />Archive</DropdownMenuItem> : null}
             {row.archivedAt ? <DropdownMenuItem onClick={() => unarchive.mutate({ sessionId: row.sessionId })}><ArchiveRestore />Unarchive</DropdownMenuItem> : null}
             <DropdownMenuItem variant="destructive" onClick={() => onDelete(row)}><Trash2 />Delete</DropdownMenuItem>
@@ -89,7 +99,7 @@ export function SessionsRail({ selectedId }: { selectedId: string | null }) {
   const remove = useDeleteInterviewSession();
   const rows = sessions.data?.sessions ?? [];
 
-  return <aside className="flex w-full flex-col gap-5 rounded-2xl bg-card p-4 shadow-card ring-1 ring-foreground/10 lg:sticky lg:top-24 lg:w-72 lg:shrink-0 xl:w-80" aria-label="Interview sessions">
+  return <aside className="flex w-full flex-col gap-5 rounded-2xl bg-card p-4 shadow-card ring-1 ring-foreground/10" aria-label="Interview sessions">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Practice history</p>

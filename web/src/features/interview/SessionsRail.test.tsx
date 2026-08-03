@@ -17,6 +17,7 @@ vi.mock("./use-interview", () => ({
   useArchiveInterviewSession: () => ({ mutate: mocks.archive }),
   useUnarchiveInterviewSession: () => ({ mutate: mocks.unarchive }),
   useDeleteInterviewSession: () => ({ mutate: mocks.remove, isPending: false }),
+  useRenameInterviewSession: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock("./NewInterviewDialog", () => ({
   NewInterviewDialog: ({ open }: { open: boolean }) =>

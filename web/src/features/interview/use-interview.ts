@@ -93,6 +93,19 @@ export function useDeleteInterviewSession() {
   return useInterviewSessionMutation("delete");
 }
 
+export function useRenameInterviewSession() {
+  const invalidate = useInterviewSessionInvalidation();
+  return useMutation({
+    mutationFn: ({ sessionId, title }: { sessionId: string; title: string }) =>
+      unwrap(api.PATCH("/api/interview/sessions/{session_id}", {
+        params: { path: { session_id: sessionId } },
+        body: { title },
+      })),
+    onSuccess: invalidate,
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
 export function useInterviewSession(sessionId: string | null) {
   return useQuery({
     queryKey: ["interview-session", sessionId],
