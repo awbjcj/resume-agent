@@ -137,7 +137,7 @@ def run_h1b_enrichment(
             phase_index=3,
             phase_count=4,
         )
-    if not research_jobs or enricher is None:
+    if not research_jobs:
         if reporter:
             reporter.step(len(research_jobs))
         return {}
@@ -159,7 +159,7 @@ def run_h1b_enrichment(
     selected = uncached if cap == 0 else uncached[:cap]
 
     report = H1BEnrichmentReport(by_company={})
-    if selected:
+    if selected and enricher is not None:
         outcome = enricher.enrich(session.get_bind(), [companies[key] for key in selected])
         if inspect.isawaitable(outcome):
             outcome = asyncio.run(outcome)

@@ -157,6 +157,35 @@ def test_fresh_cache_hits_still_reach_the_scorer():
     assert explicit_no_id not in result, "an explicit-no JD must not reach the scorer"
 
 
+def test_fresh_cache_hits_still_reach_the_scorer_without_enricher(monkeypatch):
+    """Disabling the enricher must not discard usable fresh cache evidence."""
+    monkeypatch.setattr(
+        "resume_agent.services.discovery.get_settings",
+        lambda: Settings(  # type: ignore[call-arg]
+            _env_file=None, h1b_enrich_max_companies_per_run=50
+        ),
+    )
+    engine = _engine()
+    config = SearchConfig(sponsorship_required=True)
+    with Session(engine) as session:
+        silent = _add(session, "Acme, Inc.", "silent")
+        explicit_no = _add(session, "Globex LLC", "explicit_no")
+        _persist_cache(session, "acme", _evidence("acme"))
+        _persist_cache(session, "globex", _evidence("globex"))
+        session.commit()
+        session.refresh(silent)
+        session.refresh(explicit_no)
+        silent_id, explicit_no_id = silent.id, explicit_no.id
+        result = run_h1b_enrichment(session, config, enricher=None)
+        for job in (silent, explicit_no):
+            meta = job.analysis_meta_json or {}
+            assert meta.get("h1b_evidence_id") is not None
+            assert meta.get("h1b_evidence_snapshot") is None
+
+    assert silent_id in result
+    assert explicit_no_id not in result
+
+
 def test_per_run_cap_takes_the_companies_with_the_most_jobs(monkeypatch):
     engine = _engine()
     config = SearchConfig(sponsorship_required=True)
