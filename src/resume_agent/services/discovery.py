@@ -147,7 +147,6 @@ def run_h1b_enrichment(
             )
         ).first()
         meta.h1b_evidence_id = row.id if row is not None else None
-        meta.h1b_evidence_snapshot = evidence.model_dump(mode="json")
         job.analysis_meta_json = meta.model_dump(mode="json")
         session.add(job)
         if job.id is not None:

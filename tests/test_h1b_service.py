@@ -258,7 +258,7 @@ def test_company_name_resolver_rejects_a_different_company_identity():
     assert resolved == "ACME"
 
 
-def test_manual_job_check_persists_the_evidence_snapshot(monkeypatch):
+def test_manual_job_check_records_cache_pointer_without_snapshot(monkeypatch):
     import resume_agent.h1b.service as service
 
     @asynccontextmanager
@@ -292,10 +292,50 @@ def test_manual_job_check_persists_the_evidence_snapshot(monkeypatch):
 
         assert evidence is not None
         assert evidence.status == "matched"
-        assert job.analysis_meta_json is not None
-        snapshot = job.analysis_meta_json["h1b_evidence_snapshot"]
-        assert isinstance(snapshot, dict)
-        assert snapshot["status"] == "matched"
+        meta = job.analysis_meta_json or {}
+        assert meta.get("h1b_evidence_id") is not None
+        assert meta.get("h1b_evidence_snapshot") is None
+
+
+def test_manual_check_records_the_cache_pointer_but_no_snapshot():
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+
+    @asynccontextmanager
+    async def fake_tools(_settings, **_kwargs):
+        yield object()
+
+    with Session(engine) as session:
+        job = Job(source="manual", company="Acme, Inc.", title="Engineer", jd_text="x")
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+
+        import resume_agent.h1b.service as service
+
+        original = service.h1b_tools
+        service.h1b_tools = fake_tools
+        try:
+            asyncio.run(
+                check_job_sponsorship(
+                    session,
+                    job,
+                    settings=settings,
+                    agent_factory=Factory(FakeRunner()),
+                )
+            )
+        finally:
+            service.h1b_tools = original
+
+        meta = job.analysis_meta_json or {}
+        assert meta.get("h1b_evidence_id") is not None
+        assert meta.get("h1b_evidence_snapshot") is None
 
 
 def test_unavailable_results_use_the_short_retry_expiry(monkeypatch):

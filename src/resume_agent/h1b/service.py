@@ -406,7 +406,7 @@ async def check_job_sponsorship(
     agent_factory: SponsorshipAgentFactory | None = None,
     company_resolver_factory: CompanyNameResolverFactory | None = None,
 ) -> H1BSponsorshipEvidence | None:
-    """Force-refresh one job's historical H-1B evidence and attach its snapshot."""
+    """Force-refresh one job's historical H-1B evidence and record cache provenance."""
     normalized = normalize_company(job.company)
     if not normalized:
         return None
@@ -435,7 +435,6 @@ async def check_job_sponsorship(
         )
     ).first()
     meta.h1b_evidence_id = row.id if row is not None else None
-    meta.h1b_evidence_snapshot = evidence.model_dump(mode="json")
     job.analysis_meta_json = meta.model_dump(mode="json")
     session.add(job)
     session.commit()
