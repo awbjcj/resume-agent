@@ -10,7 +10,7 @@
  * unreadable column on a very tall monitor. The floor keeps it usable on short
  * laptop screens, where `vh` alone would collapse the thread.
  */
-export const CHAT_SURFACE_HEIGHT = "h-[min(76vh,60rem)] min-h-[30rem]";
+export const CHAT_SURFACE_HEIGHT = "h-[min(78vh,62rem)] min-h-[32rem]";
 
 /** Page container width for the chat surfaces, matching the app shell's own cap. */
 export const CHAT_PAGE_WIDTH = "mx-auto w-full max-w-[1680px]";
