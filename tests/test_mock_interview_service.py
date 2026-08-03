@@ -344,6 +344,43 @@ def test_debrief_without_answers_ends_deterministically_and_skips_llm(tmp_path, 
     assert view["debrief"]["questionReviews"] == []
 
 
+def test_debrief_with_empty_candidate_record_still_skips_llm(tmp_path, engine):
+    sid = _open(tmp_path, engine)["sessionId"]
+
+    from resume_agent.interview.store import mutate_session
+
+    mutate_session(
+        tmp_path,
+        sid,
+        lambda session: session["turns"].append(
+            {
+                "role": "candidate",
+                "text": "   ",
+                "question_id": "q1",
+                "is_followup": False,
+                "at": "",
+            }
+        ),
+    )
+
+    class Boom(FakeRunner):
+        def __init__(self) -> None:
+            super().__init__([])
+
+        def run(self, prompt: str) -> Any:
+            raise AssertionError("LLM must not run for an empty-answer debrief")
+
+    view = run_debrief_turn(
+        FakeReporter(),
+        interview_dir=tmp_path,
+        session_id=sid,
+        interviewer_agent=Boom(),
+        formatter_agent=Boom(),
+    )
+    assert view["status"] == "ended"
+    assert view["debrief"]["questionReviews"] == []
+
+
 def test_formatter_retry_then_fail(tmp_path, engine):
     sid = _open(tmp_path, engine)["sessionId"]
     bad = InterviewTurn(message="", action="ask", question_id="q2")

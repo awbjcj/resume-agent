@@ -207,6 +207,27 @@ def test_full_lifecycle_and_singleton(monkeypatch, tmp_path):
         assert listing["sessions"][0]["sessionId"] == session_id
 
 
+def test_end_without_an_answer_closes_cleanly(monkeypatch, tmp_path):
+    client = _client(tmp_path)
+    _fake_agents(monkeypatch)
+    with client:
+        job_id, version_id = _seed(client)
+        start = client.post(
+            "/api/interview/sessions",
+            json={"jobId": job_id, "resumeVersionId": version_id, "style": {"questionCount": 4}},
+        )
+        assert start.status_code == 202
+        session_id = _wait(client, start.json()["runId"])["result"]["sessionId"]
+
+        end = client.post(f"/api/interview/sessions/{session_id}/end", json={})
+        assert end.status_code == 202
+        completed = _wait(client, end.json()["runId"])
+
+        assert completed["state"] == "done"
+        assert completed["result"]["status"] == "ended"
+        assert completed["result"]["debrief"]["questionReviews"] == []
+
+
 def _write_ended_session(interview_dir: Path, job_id: int, session_id: str = "ended01") -> str:
     create_session(
         interview_dir,

@@ -152,6 +152,21 @@ def _overall_score(session: dict) -> float | None:
     return round(sum(scores) / len(scores), 1)
 
 
+def _has_candidate_answer(session: dict) -> bool:
+    """Return whether the transcript contains a substantive candidate answer.
+
+    A partially written or legacy candidate record must not make the debrief
+    path call the formatter. The formatter has no useful scorecard to produce
+    in that state, and its guessed question ids can turn an otherwise harmless
+    early exit into a ``TurnRejected`` run error.
+    """
+
+    return any(
+        turn["role"] == "candidate" and bool(turn.get("text", "").strip())
+        for turn in session["turns"]
+    )
+
+
 def _view(session: dict) -> dict:
     ended = session["status"] == "ended"
     return {
@@ -426,7 +441,7 @@ def run_debrief_turn(
     # An interview the candidate never answered has nothing to score; asking the
     # LLM to debrief an empty transcript yields an empty summary that
     # normalize_debrief rejects ("empty debrief summary"). Close it deterministically.
-    if not any(turn["role"] == "candidate" for turn in session["turns"]):
+    if not _has_candidate_answer(session):
         reporter.begin(1, "Closing your interview")
         end_with_debrief(root, session_id, InterviewDebrief(summary=_EMPTY_DEBRIEF_SUMMARY))
         reporter.step(1)
