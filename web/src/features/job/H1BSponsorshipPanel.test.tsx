@@ -188,6 +188,10 @@ describe("H1BSponsorshipPanel", () => {
     expect(screen.getByText("Last 2 quarters (total)")).toBeInTheDocument();
     expect(screen.getByText("14")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /period/i })).toHaveClass(
+      "w-full",
+      "sm:w-64",
+    );
   });
 
   it("switches figures to one quarter without changing the status banner", async () => {
@@ -244,6 +248,42 @@ describe("H1BSponsorshipPanel", () => {
       "Last 1 quarter (total)",
     );
     expect(screen.getByText("4")).toBeInTheDocument();
+  });
+
+  it("resets the period when navigating to another job with an overlapping period", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <H1BSponsorshipPanel
+        jobId={42}
+        company="Acme"
+        initialResult={{ capability: "available", stale: false, evidence: quarterlyEvidence }}
+      />,
+      { wrapper },
+    );
+    await user.click(screen.getByRole("combobox", { name: /period/i }));
+    await user.click(await screen.findByRole("option", { name: /FY2026 Q1/i }));
+
+    rerender(
+      <H1BSponsorshipPanel
+        jobId={99}
+        company="Globex"
+        initialResult={{
+          capability: "available",
+          stale: false,
+          evidence: {
+            ...quarterlyEvidence,
+            filingCount: 20,
+            certifiedCount: 17,
+            deniedCount: 3,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: /period/i })).toHaveTextContent(
+      "Last 2 quarters (total)",
+    );
+    expect(screen.getByText("20")).toBeInTheDocument();
   });
 
   it("hides the selector when the provider had no quarterly breakdown", () => {

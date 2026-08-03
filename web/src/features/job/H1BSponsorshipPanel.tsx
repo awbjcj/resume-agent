@@ -210,7 +210,11 @@ export function H1BSponsorshipPanel({
   const evidence = result?.evidence ?? null;
   const status = evidence?.status ?? null;
   const periods = evidence?.periods ?? [];
-  const [selectedPeriod, setSelectedPeriod] = useState<string>(ROLLUP);
+  const [periodSelection, setPeriodSelection] = useState(() => ({
+    jobId,
+    period: ROLLUP,
+  }));
+  const selectedPeriod = periodSelection.jobId === jobId ? periodSelection.period : ROLLUP;
   const effectivePeriod =
     selectedPeriod === ROLLUP || periods.some((entry) => entry.period === selectedPeriod)
       ? selectedPeriod
@@ -331,9 +335,9 @@ export function H1BSponsorshipPanel({
             <Label htmlFor="h1b-period">Period</Label>
             <Select
               value={effectivePeriod}
-              onValueChange={(value) => setSelectedPeriod(value ?? ROLLUP)}
+              onValueChange={(value) => setPeriodSelection({ jobId, period: value ?? ROLLUP })}
             >
-              <SelectTrigger id="h1b-period" className="w-64">
+              <SelectTrigger id="h1b-period" className="w-full sm:w-64">
                 <SelectValue>
                   {(value: string) =>
                     effectivePeriod === ROLLUP
