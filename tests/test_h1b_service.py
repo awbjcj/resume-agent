@@ -408,3 +408,66 @@ def test_enrichment_closes_runner_before_mcp_context(monkeypatch):
     assert report.by_company["acme"].status == "matched"
     assert runner.closed is True
     assert events == ["tools_enter", "runner_close", "tools_close"]
+
+
+def test_sponsorship_agent_is_instructed_to_collect_four_quarters():
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+    from resume_agent.h1b.service import DefaultSponsorshipAgentFactory
+
+    runner = DefaultSponsorshipAgentFactory(settings).build(tools=None)
+    # AgentRunner intentionally narrows the public runner API; tests in this
+    # repository inspect its wrapped agent for prompt-contract assertions.
+    instructions = " ".join(runner._agent.instructions)
+    assert "get_available_data" in instructions
+    assert "four most recent" in instructions
+    assert "periods" in instructions
+    assert runner.run_meta is not None
+    assert runner.run_meta.prompt_policy_version == "h1b-sponsorship-research-v2"
+
+
+def test_persisted_rows_are_written_at_schema_version_two():
+    from resume_agent.tracking.tables import H1BCompanyEvidence
+    from sqlmodel import select as model_select
+
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+
+    @asynccontextmanager
+    async def fake_tools(_settings, **_kwargs):
+        yield object()
+
+    import resume_agent.h1b.service as service
+
+    original = service.h1b_tools
+    service.h1b_tools = fake_tools
+    try:
+        asyncio.run(
+            enrich_companies(
+                engine,
+                ["Acme, Inc."],
+                settings=settings,
+                agent_factory=Factory(FakeRunner()),
+            )
+        )
+    finally:
+        service.h1b_tools = original
+
+    with Session(engine) as session:
+        row = session.exec(
+            model_select(H1BCompanyEvidence).where(
+                H1BCompanyEvidence.normalized_company == "acme"
+            )
+        ).first()
+    assert row is not None
+    assert row.schema_version == 2
