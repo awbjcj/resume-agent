@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { Archive, ArchiveRestore, Bot, Clock3, EllipsisVertical, FileCheck2, MessageCircleQuestion, Pencil, SearchCheck, Sparkles, SquareCheckBig, Trash2 } from "lucide-react";
+import { Bot, Clock3, FileCheck2, MessageCircleQuestion, SearchCheck, Sparkles, SquareCheckBig } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatSessionHistory, type ChatSessionHistoryItem } from "@/components/chat/ChatSessionHistory";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
 import { GuidedWorkspaceHeader } from "@/components/chat/GuidedWorkspaceHeader";
 import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
@@ -25,9 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useChatStream } from "@/lib/chat/useChatStream";
@@ -51,92 +49,7 @@ import {
   useSendCoachMessage,
   useStartCoachSession,
   useUnarchiveCoachSession,
-  type CoachSessionSummary,
 } from "./use-coach";
-
-function CoachSessionActions({ row, current = false, onArchived, onDelete, onRename }: { row: CoachSessionSummary; current?: boolean; onArchived?: () => void; onDelete: (row: CoachSessionSummary) => void; onRename: (row: CoachSessionSummary) => void }) {
-  const archive = useArchiveCoachSession();
-  const unarchive = useUnarchiveCoachSession();
-  return <DropdownMenu><DropdownMenuTrigger render={<Button size="icon" variant="ghost" aria-label={current ? "Actions for current coaching session" : `Actions for coaching session ${row.sessionId}`}><EllipsisVertical /></Button>} /><DropdownMenuContent align="end"><DropdownMenuGroup>
-    <DropdownMenuItem onClick={() => onRename(row)}><Pencil />Rename</DropdownMenuItem>
-    {row.status === "ended" && !row.archivedAt ? <DropdownMenuItem onClick={() => { const input = { sessionId: row.sessionId }; if (onArchived) archive.mutate(input, { onSuccess: onArchived }); else archive.mutate(input); }}><Archive />Archive</DropdownMenuItem> : null}
-    {row.archivedAt ? <DropdownMenuItem onClick={() => unarchive.mutate({ sessionId: row.sessionId })}><ArchiveRestore />Unarchive</DropdownMenuItem> : null}
-    <DropdownMenuItem variant="destructive" onClick={() => onDelete(row)}><Trash2 />Delete</DropdownMenuItem>
-  </DropdownMenuGroup></DropdownMenuContent></DropdownMenu>;
-}
-
-function CoachSessionHistory({
-  rows,
-  selectedId,
-  onSelect,
-  showArchived,
-  onShowArchivedChange,
-  onDelete,
-  onRename,
-}: {
-  rows: CoachSessionSummary[];
-  selectedId: string | null;
-  onSelect: (sessionId: string | null) => void;
-  showArchived: boolean;
-  onShowArchivedChange: (checked: boolean) => void;
-  onDelete: (row: CoachSessionSummary) => void;
-  onRename: (row: CoachSessionSummary) => void;
-}) {
-  return (
-    <Card className="rounded-2xl shadow-none">
-      <CardHeader className="gap-3 border-b">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Clock3 className="size-4 text-primary" aria-hidden="true" />
-            <CardTitle className="text-base">Session history</CardTitle>
-          </div>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Checkbox checked={showArchived} onCheckedChange={(checked) => onShowArchivedChange(Boolean(checked))} />
-            Show archived
-          </label>
-        </div>
-        <CardDescription>Open a saved coaching thread or manage it without leaving the workspace.</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-1">
-        {rows.length ? (
-          <ul className="divide-y">
-            {rows.map((row) => {
-              const label = row.sessionTitle || `Coaching · ${new Date(row.startedAt).toLocaleDateString()}`;
-              return (
-                <li key={row.sessionId} className="flex items-center gap-3 py-3">
-                  <button
-                    type="button"
-                    onClick={() => onSelect(row.sessionId)}
-                    className="min-w-0 flex-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-current={selectedId === row.sessionId ? "page" : undefined}
-                  >
-                    <span className="flex items-center gap-2 truncate text-sm font-medium">
-                      {row.status === "active" ? <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" /> : null}
-                      <span className="truncate">{label}</span>
-                    </span>
-                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                      {row.status === "active" ? "Coaching now" : "Completed"} · {row.topicCount} topics · {row.savedNoteCount} saved notes · {new Date(row.startedAt).toLocaleDateString()}
-                    </span>
-                  </button>
-                  {selectedId === row.sessionId ? <Badge variant="outline">Viewing</Badge> : null}
-                  {row.archivedAt ? <Badge variant="outline">Archived</Badge> : null}
-                  <CoachSessionActions
-                    row={row}
-                    onArchived={() => {
-                      if (selectedId === row.sessionId) onSelect(null);
-                    }}
-                    onDelete={onDelete}
-                    onRename={onRename}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        ) : <p className="py-4 text-sm text-muted-foreground">No coaching sessions yet. Start one when you are ready to uncover stronger evidence.</p>}
-      </CardContent>
-    </Card>
-  );
-}
 
 function RunError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -152,9 +65,6 @@ function RunError({ message, onRetry }: { message: string; onRetry: () => void }
 
 export function CoachPage() {
   const [showArchived, setShowArchived] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<CoachSessionSummary | null>(null);
-  const [pendingRename, setPendingRename] = useState<CoachSessionSummary | null>(null);
-  const [renameTitle, setRenameTitle] = useState("");
   const sessions = useCoachSessions(showArchived);
   const activeSummary = sessions.data?.sessions?.find((session) => session.status === "active");
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -165,6 +75,8 @@ export function CoachPage() {
   const end = useEndCoachSession();
   const saveNote = useSaveCoachNote();
   const discardNote = useDiscardCoachNote();
+  const archive = useArchiveCoachSession();
+  const unarchive = useUnarchiveCoachSession();
   const remove = useDeleteCoachSession();
   const rename = useRenameCoachSession();
   const [composer, setComposer] = useState("");
@@ -209,6 +121,7 @@ export function CoachPage() {
   const stream = useChatStream(attachedRunId);
 
   const startSession = async () => {
+    if (starting || start.isPending) return;
     setStarting(true);
     setRunError("");
     setStreamBaseline(0);
@@ -318,6 +231,16 @@ export function CoachPage() {
   const active = session.data;
   const pendingDrafts = active?.draftNotes?.filter((note) => note.status === "pending") ?? [];
   const savedDrafts = active?.draftNotes?.filter((note) => note.status === "saved") ?? [];
+  const historyItems: ChatSessionHistoryItem[] = (sessions.data?.sessions ?? []).map((row) => {
+    const date = new Date(row.startedAt).toLocaleDateString();
+    return {
+      id: row.sessionId,
+      title: row.sessionTitle || `Coaching · ${date}`,
+      detail: `${row.status === "active" ? "Coaching now" : "Completed"} · ${row.topicCount} topics · ${row.savedNoteCount} saved notes · ${date}`,
+      status: row.status === "active" ? "active" : "ended",
+      archived: Boolean(row.archivedAt),
+    };
+  });
   const durableTurns = active?.turns?.length ?? 0;
   const chatMessages: ChatThreadMessage[] = (() => {
     const durable = (active?.turns ?? []).map((turn, index) => {
@@ -377,7 +300,7 @@ export function CoachPage() {
             {starting || start.isPending ? <Spinner data-icon="inline-start" /> : <Sparkles aria-hidden="true" />}
             Start another session
           </Button>
-        ) : null}{active ? <CoachSessionActions current row={{ sessionId: active.sessionId, sessionTitle: active.sessionTitle, status: active.status, startedAt: active.startedAt, endedAt: active.endedAt, topicCount: active.topics?.length ?? 0, savedNoteCount: savedDrafts.length, archivedAt: active.archivedAt }} onArchived={() => setCurrentSessionId(null)} onDelete={setPendingDelete} onRename={(row) => { setPendingRename(row); setRenameTitle(row.sessionTitle || `Coaching · ${new Date(row.startedAt).toLocaleDateString()}`); }} /> : null}</>}
+        ) : null}</>}
       />
 
       {runError && runState !== "error" ? <Alert variant="destructive"><AlertTitle>Profile coach error</AlertTitle><AlertDescription>{runError}</AlertDescription></Alert> : null}
@@ -511,22 +434,28 @@ export function CoachPage() {
         </div>
       )}
 
-      <CoachSessionHistory
-        rows={sessions.data?.sessions ?? []}
+      <ChatSessionHistory
+        ariaLabel="Profile coach sessions"
+        items={historyItems}
         selectedId={displayedSessionId}
         onSelect={setCurrentSessionId}
         showArchived={showArchived}
         onShowArchivedChange={setShowArchived}
-        onDelete={setPendingDelete}
-        onRename={(row) => {
-          setPendingRename(row);
-          setRenameTitle(row.sessionTitle || `Coaching · ${new Date(row.startedAt).toLocaleDateString()}`);
-        }}
+        isLoading={sessions.isPending}
+        isError={sessions.isError}
+        onRetry={() => void sessions.refetch()}
+        emptyMessage="No coaching sessions yet. Start one when you are ready to uncover stronger evidence."
+        createLabel="New coaching session"
+        createDisabled={starting || start.isPending}
+        onCreate={() => void startSession()}
+        onRename={(sessionId, title) => rename.mutate({ sessionId, title })}
+        onArchive={(sessionId) => archive.mutate({ sessionId }, { onSuccess: () => { if (sessionId === displayedSessionId) setCurrentSessionId(null); } })}
+        onUnarchive={(sessionId) => unarchive.mutate({ sessionId })}
+        onDelete={(sessionId) => remove.mutate({ sessionId }, { onSuccess: () => { if (sessionId === displayedSessionId) setCurrentSessionId(null); } })}
+        renamePending={rename.isPending}
+        deletePending={remove.isPending}
+        deleteDescription="The conversation transcript and recap will be permanently removed. Saved notes are kept in your profile."
       />
-
-      <Dialog open={pendingRename != null} onOpenChange={(open) => { if (!open) setPendingRename(null); }}><DialogContent><DialogHeader><DialogTitle>Rename coaching session</DialogTitle><DialogDescription>Use a short title that will be easy to recognize in your history.</DialogDescription></DialogHeader><Input aria-label="Session title" autoFocus maxLength={120} value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} /><DialogFooter><Button variant="ghost" onClick={() => setPendingRename(null)}>Cancel</Button><Button disabled={!renameTitle.trim() || rename.isPending} onClick={() => { if (!pendingRename) return; rename.mutate({ sessionId: pendingRename.sessionId, title: renameTitle.trim() }, { onSuccess: () => setPendingRename(null) }); }}>Save title</Button></DialogFooter></DialogContent></Dialog>
-
-      <AlertDialog open={pendingDelete != null} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this coaching session?</AlertDialogTitle><AlertDialogDescription>The conversation transcript and recap will be permanently removed. Saved notes are kept in your profile.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep it</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={remove.isPending} onClick={() => { if (!pendingDelete) return; const deletingDisplayed = pendingDelete.sessionId === displayedSessionId; remove.mutate({ sessionId: pendingDelete.sessionId }, { onSuccess: () => { if (deletingDisplayed) setCurrentSessionId(null); } }); setPendingDelete(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
