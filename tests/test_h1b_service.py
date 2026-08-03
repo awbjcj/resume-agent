@@ -300,8 +300,8 @@ def test_manual_job_check_records_cache_pointer_without_snapshot(monkeypatch):
 def test_manual_check_records_the_cache_pointer_but_no_snapshot():
     engine = make_engine("sqlite://")
     init_db(engine)
-    settings = Settings(  # type: ignore[call-arg]
-        _env_file=None,
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
         h1b_mcp_enabled=True,
         h1b_mcp_transport="stdio",
         h1b_mcp_command="server",
@@ -411,8 +411,8 @@ def test_enrichment_closes_runner_before_mcp_context(monkeypatch):
 
 
 def test_sponsorship_agent_is_instructed_to_collect_four_quarters():
-    settings = Settings(  # type: ignore[call-arg]
-        _env_file=None,
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
         anthropic_api_key="test-key",
         h1b_mcp_enabled=True,
         h1b_mcp_transport="stdio",
@@ -437,8 +437,8 @@ def test_persisted_rows_are_written_at_schema_version_two():
 
     engine = make_engine("sqlite://")
     init_db(engine)
-    settings = Settings(  # type: ignore[call-arg]
-        _env_file=None,
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
         h1b_mcp_enabled=True,
         h1b_mcp_transport="stdio",
         h1b_mcp_command="server",

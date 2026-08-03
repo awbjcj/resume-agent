@@ -80,7 +80,8 @@ def test_pipeline_exposes_persisted_h1b_sponsorship_status():
             status=JobStatus.filtered.value,
             company="Acme",
         )
-        with get_session(client.app.state.engine) as session:
+        app = cast(FastAPI, client.app)
+        with get_session(app.state.engine) as session:
             session.add(
                 H1BCompanyEvidence(
                     normalized_company="acme",

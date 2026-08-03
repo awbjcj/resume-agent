@@ -8,7 +8,7 @@ an optional ProgressReporter passed straight through.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import Protocol, TypedDict
 
 import httpx
 import asyncio
@@ -75,7 +75,11 @@ from resume_agent.tracking.tables import Job
 from resume_agent.tracking.tables import H1BCompanyEvidence, JobStatus
 
 
-class H1BEnricher:
+class H1BEnricher(Protocol):
+    async def enrich(self, engine, companies: list[str]) -> H1BEnrichmentReport: ...
+
+
+class DefaultH1BEnricher:
     async def enrich(self, engine, companies: list[str]) -> H1BEnrichmentReport:
         from resume_agent.h1b.service import (
             DefaultCompanyNameResolverFactory,
@@ -173,7 +177,7 @@ def run_h1b_enrichment(
     if available:
         cache_rows = session.exec(
             model_select(H1BCompanyEvidence).where(
-                H1BCompanyEvidence.normalized_company.in_(list(available))
+                col(H1BCompanyEvidence.normalized_company).in_(list(available))
             )
         ).all()
         evidence_ids = {row.normalized_company: row.id for row in cache_rows}
@@ -324,7 +328,7 @@ def discover_jobs(
     matrix, cluster_map = _skill_artifacts(facts_path, facts)
     bundle = bundle or build_discovery_bundle()
     if h1b_enricher is None and get_settings().h1b_mcp_enabled:
-        h1b_enricher = H1BEnricher()
+        h1b_enricher = DefaultH1BEnricher()
     discover_kwargs = {
         "canonicalizer": bundle.canonicalizer,
         "industry_classifier": bundle.industry_classifier,
@@ -434,7 +438,7 @@ def reprocess_jobs(
     matrix, cluster_map = _skill_artifacts(facts_path, facts)
     bundle = bundle or build_discovery_bundle()
     if h1b_enricher is None and get_settings().h1b_mcp_enabled:
-        h1b_enricher = H1BEnricher()
+        h1b_enricher = DefaultH1BEnricher()
     return reprocess(
         session,
         config,

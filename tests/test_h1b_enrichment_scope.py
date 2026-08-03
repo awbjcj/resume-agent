@@ -65,8 +65,9 @@ class RecordingEnricher:
 
         return H1BEnrichmentReport(
             by_company={
-                normalize_company(c): _evidence(normalize_company(c) or "")
+                normalized: _evidence(normalized)
                 for c in companies
+                if (normalized := normalize_company(c))
             }
         )
 
@@ -161,8 +162,9 @@ def test_fresh_cache_hits_still_reach_the_scorer_without_enricher(monkeypatch):
     """Disabling the enricher must not discard usable fresh cache evidence."""
     monkeypatch.setattr(
         "resume_agent.services.discovery.get_settings",
-        lambda: Settings(  # type: ignore[call-arg]
-            _env_file=None, h1b_enrich_max_companies_per_run=50
+        lambda: Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            h1b_enrich_max_companies_per_run=50,
         ),
     )
     engine = _engine()
@@ -193,8 +195,9 @@ def test_per_run_cap_takes_the_companies_with_the_most_jobs(monkeypatch):
 
     monkeypatch.setattr(
         "resume_agent.services.discovery.get_settings",
-        lambda: Settings(  # type: ignore[call-arg]
-            _env_file=None, h1b_enrich_max_companies_per_run=1
+        lambda: Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            h1b_enrich_max_companies_per_run=1,
         ),
     )
 
@@ -216,8 +219,9 @@ def test_per_run_cap_breaks_frequency_ties_by_normalized_name(monkeypatch):
 
     monkeypatch.setattr(
         "resume_agent.services.discovery.get_settings",
-        lambda: Settings(  # type: ignore[call-arg]
-            _env_file=None, h1b_enrich_max_companies_per_run=1
+        lambda: Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            h1b_enrich_max_companies_per_run=1,
         ),
     )
 
@@ -237,8 +241,9 @@ def test_expired_cache_deferred_by_cap_stays_out_of_scorer_map(monkeypatch):
 
     monkeypatch.setattr(
         "resume_agent.services.discovery.get_settings",
-        lambda: Settings(  # type: ignore[call-arg]
-            _env_file=None, h1b_enrich_max_companies_per_run=1
+        lambda: Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            h1b_enrich_max_companies_per_run=1,
         ),
     )
 
@@ -265,8 +270,9 @@ def test_zero_cap_researches_every_uncached_company(monkeypatch):
 
     monkeypatch.setattr(
         "resume_agent.services.discovery.get_settings",
-        lambda: Settings(  # type: ignore[call-arg]
-            _env_file=None, h1b_enrich_max_companies_per_run=0
+        lambda: Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            h1b_enrich_max_companies_per_run=0,
         ),
     )
 
