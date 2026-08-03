@@ -59,6 +59,16 @@ class ClosingRunner(FakeRunner):
         self.closed = True
 
 
+class NamedCompanyRunner(FakeRunner):
+    def __init__(self, company: str):
+        super().__init__()
+        self.company = company
+
+    async def arun(self, prompt: str) -> SimpleNamespace:
+        self.calls.append(prompt)
+        return SimpleNamespace(content=_evidence(self.company))
+
+
 class Factory:
     def __init__(self, runner):
         self.runner = runner
@@ -135,6 +145,36 @@ def test_duplicate_company_spellings_are_researched_once_and_then_cached(monkeyp
     )
     assert refreshed.researched == 1
     assert len(runner.calls) == 2
+
+
+def test_equivalent_legal_company_name_is_canonicalized_to_the_cache_key(monkeypatch):
+    import resume_agent.h1b.service as service
+
+    @asynccontextmanager
+    async def fake_tools(_settings):
+        yield object()
+
+    monkeypatch.setattr(service, "h1b_tools", fake_tools)
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+
+    report = asyncio.run(
+        enrich_companies(
+            engine,
+            ["Google"],
+            settings=settings,
+            agent_factory=Factory(NamedCompanyRunner("Google LLC")),
+        )
+    )
+
+    assert report.by_company["google"].status == "matched"
+    assert report.by_company["google"].normalized_company == "google"
 
 
 def test_manual_job_check_persists_the_evidence_snapshot(monkeypatch):

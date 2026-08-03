@@ -130,8 +130,10 @@ def _agent_output(result: Any, company: str) -> H1BSponsorshipEvidence:
         evidence = content
     else:
         evidence = H1BSponsorshipEvidence.model_validate(content)
-    if evidence.normalized_company != company:
+    if normalize_company(evidence.normalized_company) != company:
         raise ValueError("H1B agent returned evidence for a different company")
+    if evidence.normalized_company != company:
+        evidence = evidence.model_copy(update={"normalized_company": company})
     if evidence.status == "unavailable" and not evidence.unavailable_reason:
         evidence = evidence.model_copy(
             update={"unavailable_reason": H1B_AGENT_UNAVAILABLE_REASON}
