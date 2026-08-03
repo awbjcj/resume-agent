@@ -278,6 +278,13 @@ def test_interview_archive_filters_unarchive_and_delete(tmp_path):
         interview_dir = tmp_path / "data" / "interview"
         session_id = _write_ended_session(interview_dir, 1)
 
+        renamed = client.patch(
+            f"/api/interview/sessions/{session_id}",
+            json={"title": "Platform interview"},
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["sessionTitle"] == "Platform interview"
+
         archived = client.post(f"/api/interview/sessions/{session_id}/archive")
         assert archived.status_code == 200
         assert archived.json()["archivedAt"]
@@ -286,6 +293,7 @@ def test_interview_archive_filters_unarchive_and_delete(tmp_path):
             "/api/interview/sessions", params={"includeArchived": "true"}
         ).json()["sessions"]
         assert [row["sessionId"] for row in included] == [session_id]
+        assert included[0]["sessionTitle"] == "Platform interview"
 
         assert (
             client.post(f"/api/interview/sessions/{session_id}/unarchive").status_code

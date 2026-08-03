@@ -27,6 +27,7 @@ from resume_agent.api.schemas.coach import (
     CoachNoteIn,
     CoachNoteOut,
     CoachSessionOut,
+    CoachSessionPatchIn,
     CoachSessionsOut,
 )
 from resume_agent.api.schemas.config import ProfileConfigDoc
@@ -37,6 +38,7 @@ from resume_agent.profile.coach_store import (
     active_session,
     archive_session,
     delete_session,
+    rename_session,
     unarchive_session,
 )
 from resume_agent.profile.corpus import load_manifest
@@ -306,6 +308,20 @@ def archive_coach_session(session_id: str, request: Request):
     profile_dir = get_profile_dir(request)
     try:
         archive_session(profile_dir, session_id)
+        return CoachSessionOut.model_validate(session_view(profile_dir, session_id))
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.patch(
+    "/profile/coach/sessions/{session_id}", response_model=CoachSessionOut
+)
+def rename_coach_session(
+    session_id: str, payload: CoachSessionPatchIn, request: Request
+):
+    profile_dir = get_profile_dir(request)
+    try:
+        rename_session(profile_dir, session_id, payload.title)
         return CoachSessionOut.model_validate(session_view(profile_dir, session_id))
     except ValueError as exc:
         raise _value_error(exc) from exc

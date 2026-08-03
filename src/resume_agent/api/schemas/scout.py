@@ -70,6 +70,7 @@ class ScoutTurnOut(CamelModel):
 
 class ScoutSessionOut(CamelModel):
     session_id: str
+    session_title: str | None = None
     started_at: str
     ended_at: str | None = None
     status: Literal["active", "ended"]
@@ -84,6 +85,7 @@ class ScoutSessionOut(CamelModel):
 
 class ScoutSessionSummaryOut(CamelModel):
     session_id: str
+    session_title: str | None = None
     started_at: str
     ended_at: str | None = None
     status: Literal["active", "ended"]
@@ -97,3 +99,7 @@ class ScoutSessionSummaryOut(CamelModel):
 
 class ScoutSessionsOut(CamelModel):
     sessions: list[ScoutSessionSummaryOut] = Field(default_factory=list)
+
+
+class ScoutSessionPatchIn(CamelModel):
+    title: str = Field(min_length=1, max_length=120)

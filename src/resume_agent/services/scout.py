@@ -519,6 +519,7 @@ def session_view(
     session = load_session(workspace_root, session_id)
     return {
         "sessionId": session["session_id"],
+        "sessionTitle": session["session_title"],
         "startedAt": session["started_at"],
         "endedAt": session["ended_at"],
         "status": session["status"],
@@ -545,6 +546,7 @@ def sessions_view(
         "sessions": [
             {
                 "sessionId": row["session_id"],
+                "sessionTitle": row["session_title"],
                 "startedAt": row["started_at"],
                 "endedAt": row["ended_at"],
                 "status": row["status"],

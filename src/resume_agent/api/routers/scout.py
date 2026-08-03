@@ -23,6 +23,7 @@ from resume_agent.api.schemas.scout import (
     ScoutDismissIn,
     ScoutMessageIn,
     ScoutSessionOut,
+    ScoutSessionPatchIn,
     ScoutSessionsOut,
 )
 from resume_agent.config import Settings
@@ -30,6 +31,7 @@ from resume_agent.discovery.scout_store import (
     active_session,
     archive_session,
     delete_session,
+    rename_session,
     unarchive_session,
 )
 from resume_agent.llm_runner import missing_model_keys, plan_search
@@ -338,6 +340,26 @@ def archive_scout_session(
     _guard_lifecycle_idle(manager, session_id)
     try:
         archive_session(_workspace_root(request), session_id)
+        return ScoutSessionOut.model_validate(
+            session_view(
+                _workspace_root(request), session_id, browser_enabled=settings.browser_enabled
+            )
+        )
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.patch("/scout/sessions/{session_id}", response_model=ScoutSessionOut)
+def rename_scout_session(
+    session_id: str,
+    payload: ScoutSessionPatchIn,
+    request: Request,
+    manager: RunManager = Depends(get_run_manager),
+    settings: Settings = Depends(get_settings_dep),
+):
+    _guard_lifecycle_idle(manager, session_id)
+    try:
+        rename_session(_workspace_root(request), session_id, payload.title)
         return ScoutSessionOut.model_validate(
             session_view(
                 _workspace_root(request), session_id, browser_enabled=settings.browser_enabled

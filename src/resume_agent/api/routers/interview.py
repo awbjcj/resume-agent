@@ -20,6 +20,7 @@ from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.interview import (
     InterviewMessageIn,
     InterviewSessionOut,
+    InterviewSessionPatchIn,
     InterviewSessionsOut,
     InterviewStartIn,
 )
@@ -29,6 +30,7 @@ from resume_agent.interview.store import (
     active_session_for_job,
     archive_session,
     delete_session,
+    rename_session,
     unarchive_session,
 )
 from resume_agent.llm_runner import missing_model_keys
@@ -234,6 +236,18 @@ def archive_interview_session(session_id: str, request: Request):
         return InterviewSessionOut.model_validate(
             session_view(interview_dir, session_id)
         )
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.patch("/interview/sessions/{session_id}", response_model=InterviewSessionOut)
+def rename_interview_session(
+    session_id: str, payload: InterviewSessionPatchIn, request: Request
+):
+    interview_dir = get_interview_dir(request)
+    try:
+        rename_session(interview_dir, session_id, payload.title)
+        return InterviewSessionOut.model_validate(session_view(interview_dir, session_id))
     except ValueError as exc:
         raise _value_error(exc) from exc
 

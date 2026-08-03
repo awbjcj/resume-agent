@@ -237,3 +237,7 @@ def unarchive_session(workspace_root: Path | str, session_id: str) -> dict:
 
 def delete_session(workspace_root: Path | str, session_id: str) -> None:
     _STORE.delete(scout_dir(workspace_root), session_id)
+
+
+def rename_session(workspace_root: Path | str, session_id: str, title: str) -> dict:
+    return _STORE.rename(scout_dir(workspace_root), session_id, title)

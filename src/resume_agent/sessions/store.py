@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generic, Literal, TypeVar
 
+from pydantic import Field
+
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.progress import atomic_write_text
 
@@ -30,6 +32,7 @@ class SessionModel(ExtensibleModel):
     """Fields every session-store model must define: id, start time, lifecycle, archival."""
 
     session_id: str = ""
+    session_title: str = Field(default="", max_length=120)
     started_at: str = ""
     status: Literal["active", "ended"] = "active"
     archived_at: str | None = None
@@ -137,3 +140,16 @@ class SessionStore(Generic[M]):
             if not path.exists():
                 raise ValueError(f"unknown session: {session_id}")
             path.unlink()
+
+    def rename(self, root: Path | str, session_id: str, title: str) -> dict:
+        cleaned = title.strip()
+        if not cleaned:
+            raise ValueError("session title is empty")
+        if len(cleaned) > 120:
+            raise ValueError("session title is too large")
+
+        return self.mutate(
+            root,
+            session_id,
+            lambda session: session.__setitem__("session_title", cleaned),
+        )

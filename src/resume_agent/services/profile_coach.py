@@ -70,6 +70,7 @@ def session_view(profile_dir: Path | str, session_id: str) -> dict:
     session = load_session(profile_dir, session_id)
     return {
         "sessionId": session["session_id"],
+        "sessionTitle": session["session_title"],
         "startedAt": session["started_at"],
         "endedAt": session["ended_at"],
         "status": session["status"],
@@ -114,6 +115,7 @@ def sessions_view(
         "sessions": [
             {
                 "sessionId": session["session_id"],
+                "sessionTitle": session["session_title"],
                 "startedAt": session["started_at"],
                 "endedAt": session["ended_at"],
                 "status": session["status"],

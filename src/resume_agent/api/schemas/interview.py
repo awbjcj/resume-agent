@@ -65,6 +65,7 @@ class InterviewProgressOut(CamelModel):
 
 class InterviewSessionOut(CamelModel):
     session_id: str
+    session_title: str | None = None
     job_id: int
     resume_version_id: int
     company: str = ""
@@ -83,6 +84,7 @@ class InterviewSessionOut(CamelModel):
 
 class InterviewSessionSummaryOut(CamelModel):
     session_id: str
+    session_title: str | None = None
     job_id: int
     company: str = ""
     title: str = ""
@@ -97,3 +99,7 @@ class InterviewSessionSummaryOut(CamelModel):
 
 class InterviewSessionsOut(CamelModel):
     sessions: list[InterviewSessionSummaryOut] = Field(default_factory=list)
+
+
+class InterviewSessionPatchIn(CamelModel):
+    title: str = Field(min_length=1, max_length=120)

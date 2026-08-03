@@ -113,6 +113,15 @@ def test_delete_removes_file_and_rejects_unknown(store, tmp_path):
         store.delete(tmp_path, "s1")
 
 
+def test_rename_trims_and_validates_title(store, tmp_path):
+    _seed(store, tmp_path, "s1")
+    renamed = store.rename(tmp_path, "s1", "  Interview practice  ")
+    assert renamed["session_title"] == "Interview practice"
+    assert store.load(tmp_path, "s1")["session_title"] == "Interview practice"
+    with pytest.raises(ValueError, match="empty"):
+        store.rename(tmp_path, "s1", "   ")
+
+
 def test_now_iso_is_utc_seconds():
     stamp = now_iso()
     assert stamp.endswith("+00:00")

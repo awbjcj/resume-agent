@@ -226,6 +226,10 @@ def delete_session(profile_dir: Path | str, session_id: str) -> None:
     _STORE.delete(coach_dir(profile_dir), session_id)
 
 
+def rename_session(profile_dir: Path | str, session_id: str, title: str) -> dict:
+    return _STORE.rename(coach_dir(profile_dir), session_id, title)
+
+
 def set_impact(profile_dir: Path | str, session_id: str, impact: dict) -> dict:
     return mutate_session(
         profile_dir,

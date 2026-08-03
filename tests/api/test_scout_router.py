@@ -115,9 +115,17 @@ def test_dismiss_validation_and_lifecycle(tmp_path):
         )
         assert dismissed.status_code == 200
         end_session(tmp_path / "data", "s1", "Done")
+        renamed = client.patch(
+            "/api/scout/sessions/s1", json={"title": "Healthcare search"}
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["sessionTitle"] == "Healthcare search"
         assert client.post("/api/scout/sessions/s1/archive").status_code == 200
         assert client.get("/api/scout/sessions").json()["sessions"] == []
-        assert client.get("/api/scout/sessions", params={"includeArchived": True}).json()["sessions"]
+        included = client.get(
+            "/api/scout/sessions", params={"includeArchived": True}
+        ).json()["sessions"]
+        assert included[0]["sessionTitle"] == "Healthcare search"
         assert client.post("/api/scout/sessions/s1/unarchive").status_code == 200
         deleted = client.delete("/api/scout/sessions/s1")
         assert deleted.status_code == 204 and deleted.content == b""

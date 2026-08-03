@@ -62,6 +62,7 @@ class CoachImpactOut(CamelModel):
 
 class CoachSessionOut(CamelModel):
     session_id: str
+    session_title: str | None = None
     started_at: str
     ended_at: str | None = None
     status: str
@@ -75,6 +76,7 @@ class CoachSessionOut(CamelModel):
 
 class CoachSessionSummaryOut(CamelModel):
     session_id: str
+    session_title: str | None = None
     started_at: str
     ended_at: str | None = None
     status: str
@@ -85,6 +87,10 @@ class CoachSessionSummaryOut(CamelModel):
 
 class CoachSessionsOut(CamelModel):
     sessions: list[CoachSessionSummaryOut] = Field(default_factory=list)
+
+
+class CoachSessionPatchIn(CamelModel):
+    title: str = Field(min_length=1, max_length=120)
 
 
 class CoachMessageIn(CamelModel):

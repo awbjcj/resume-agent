@@ -198,6 +198,12 @@ def test_coach_archive_filters_unarchive_and_delete(tmp_path):
         _seed_draft(tmp_path)
         end_session(tmp_path / "data" / "profile", "s1", "recap")
 
+        renamed = client.patch(
+            "/api/profile/coach/sessions/s1", json={"title": "Leadership evidence"}
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["sessionTitle"] == "Leadership evidence"
+
         archived = client.post("/api/profile/coach/sessions/s1/archive")
         assert archived.status_code == 200
         assert archived.json()["archivedAt"]
@@ -206,6 +212,7 @@ def test_coach_archive_filters_unarchive_and_delete(tmp_path):
             "/api/profile/coach/sessions", params={"includeArchived": "true"}
         ).json()["sessions"]
         assert included[0]["sessionId"] == "s1"
+        assert included[0]["sessionTitle"] == "Leadership evidence"
 
         assert client.post("/api/profile/coach/sessions/s1/unarchive").status_code == 200
         assert client.post("/api/profile/coach/sessions/s1/unarchive").status_code == 409

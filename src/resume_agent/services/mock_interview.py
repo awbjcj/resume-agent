@@ -156,6 +156,7 @@ def _view(session: dict) -> dict:
     ended = session["status"] == "ended"
     return {
         "sessionId": session["session_id"],
+        "sessionTitle": session["session_title"],
         "jobId": session["job_id"],
         "resumeVersionId": session["resume_version_id"],
         "company": session["context"]["company"],
@@ -214,6 +215,7 @@ def sessions_view(
         "sessions": [
             {
                 "sessionId": session["session_id"],
+                "sessionTitle": session["session_title"],
                 "jobId": session["job_id"],
                 "company": session["context"]["company"],
                 "title": session["context"]["title"],

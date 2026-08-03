@@ -268,6 +268,10 @@ def delete_session(interview_dir: Path | str, session_id: str) -> None:
     _STORE.delete(interview_dir, session_id)
 
 
+def rename_session(interview_dir: Path | str, session_id: str, title: str) -> dict:
+    return _STORE.rename(interview_dir, session_id, title)
+
+
 def delete_sessions_for_job(interview_dir: Path | str, job_id: int) -> int:
     """Remove all interview session files for a deleted job. Returns count removed."""
     removed = 0
