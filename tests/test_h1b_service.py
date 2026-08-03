@@ -41,6 +41,17 @@ class FakeRunner:
         return SimpleNamespace(content=_evidence(company))
 
 
+class ClosingRunner(FakeRunner):
+    def __init__(self, events: list[str]):
+        super().__init__()
+        self.events = events
+        self.closed = False
+
+    async def aclose(self) -> None:
+        self.events.append("runner_close")
+        self.closed = True
+
+
 class Factory:
     def __init__(self, runner):
         self.runner = runner
@@ -138,3 +149,41 @@ def test_unavailable_results_use_the_short_retry_expiry(monkeypatch):
     evidence = report.by_company["acme"]
     assert evidence.status == "unavailable"
     assert evidence.expires_at <= evidence.retrieved_at + timedelta(minutes=5)
+
+
+def test_enrichment_closes_runner_before_mcp_context(monkeypatch):
+    import resume_agent.h1b.service as service
+
+    events: list[str] = []
+
+    @asynccontextmanager
+    async def fake_tools(_settings):
+        events.append("tools_enter")
+        try:
+            yield object()
+        finally:
+            events.append("tools_close")
+
+    monkeypatch.setattr(service, "h1b_tools", fake_tools)
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    runner = ClosingRunner(events)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+
+    report = asyncio.run(
+        enrich_companies(
+            engine,
+            ["Acme"],
+            settings=settings,
+            agent_factory=Factory(runner),
+        )
+    )
+
+    assert report.by_company["acme"].status == "matched"
+    assert runner.closed is True
+    assert events == ["tools_enter", "runner_close", "tools_close"]

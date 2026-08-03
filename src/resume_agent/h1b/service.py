@@ -24,6 +24,7 @@ from resume_agent.llm_runner import (
     build_model,
     resolve_api_key,
     retry_kwargs,
+    run_with_cleanup,
     use_json_mode_for,
 )
 from resume_agent.prompts.guidance import with_guidance
@@ -188,8 +189,11 @@ async def enrich_companies(
                     except Exception:
                         return normalized, _unavailable(normalized)
 
-            results = await asyncio.gather(
-                *(research(normalized, display) for normalized, display in missing.items())
+            results = await run_with_cleanup(
+                asyncio.gather(
+                    *(research(normalized, display) for normalized, display in missing.items())
+                ),
+                runner,
             )
     except Exception:
         results = [(normalized, _unavailable(normalized, now=now)) for normalized in missing]

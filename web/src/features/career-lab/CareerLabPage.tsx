@@ -4,7 +4,6 @@ import {
   Archive,
   ArchiveRestore,
   Bot,
-  BriefcaseBusiness,
   MessageCircleMore,
   PanelRight,
   Sparkles,
@@ -34,6 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useChatStream } from "@/lib/chat/useChatStream";
 import type { RunRecord } from "@/lib/runs/store";
@@ -254,8 +254,28 @@ export function CareerLabPage() {
   const [runError, setRunError] = useState("");
   const [retryMessage, setRetryMessage] = useState("");
   const [selectionNotice, setSelectionNotice] = useState("");
+  const [selectionExchange, setSelectionExchange] = useState<{
+    userText: string;
+    assistantText: string;
+  } | null>(null);
   const skillRef = useRef<HTMLSelectElement>(null);
   const ignoredRuns = useRef(new Set<string>());
+  const attachedRuns = useRef(new Set<string>());
+  const completedBeforeAttach = useRef(new Set<string>());
+
+  const attachRun = (nextRunId: string) => {
+    if (completedBeforeAttach.current.delete(nextRunId)) return;
+    attachedRuns.current.add(nextRunId);
+    setStreamRunId(nextRunId);
+  };
+
+  const detachRun = (completedRunId: string) => {
+    if (!attachedRuns.current.delete(completedRunId)) {
+      completedBeforeAttach.current.add(completedRunId);
+      return;
+    }
+    setStreamRunId((current) => (current === completedRunId ? null : current));
+  };
 
   useEffect(() => {
     if (selectionNotice) skillRef.current?.focus();
@@ -267,18 +287,24 @@ export function CareerLabPage() {
 
   const onDone = (completed: RunRecord, message?: string) => {
     if (ignoredRuns.current.delete(completed.runId)) return;
-    setStreamRunId((current) => (current === completed.runId ? null : current));
-    setPending(null);
+    detachRun(completed.runId);
     if (completed.status !== "succeeded") {
+      setPending(null);
       setRunError(completed.error ?? "Career Lab run did not complete");
       return;
     }
     const result = completed.result as { sessionId?: string; needsSelection?: boolean; route?: { reason?: string } } | null;
     if (result?.needsSelection) {
-      setSelectionNotice(result.route?.reason ?? "Choose the Career Lab skill that best fits this request.");
-      setComposer(message ?? "");
-      setRetryMessage(message ?? "");
+      const reason = result.route?.reason ?? "Choose the Career Lab skill that best fits this request.";
+      const userText = message ?? "";
+      setPending(null);
+      setSelectionNotice(reason);
+      setSelectionExchange({ userText, assistantText: reason });
+      setComposer(userText);
+      setRetryMessage(userText);
     } else if (result?.sessionId) {
+      setPending(null);
+      setSelectionExchange(null);
       setSelectedSessionId(result.sessionId);
       setRetryMessage("");
       if (message) setComposer((value) => (value.trim() === message.trim() ? "" : value));
@@ -290,6 +316,7 @@ export function CareerLabPage() {
     if (!message || busy) return;
     setRunError("");
     setSelectionNotice("");
+    setSelectionExchange(null);
     setRetryMessage(message);
     setSuppressedRunId(null);
     stream.reset();
@@ -310,7 +337,7 @@ export function CareerLabPage() {
             context,
             onDone: (completed) => onDone(completed, message),
           });
-      setStreamRunId(launched.runId);
+      attachRun(launched.runId);
     } catch (error) {
       setPending(null);
       setRetryMessage(message);
@@ -321,6 +348,8 @@ export function CareerLabPage() {
   const stop = () => {
     if (!runId) return;
     ignoredRuns.current.add(runId);
+    attachedRuns.current.delete(runId);
+    completedBeforeAttach.current.delete(runId);
     setSuppressedRunId(runId);
     stream.stop();
     setStreamRunId(null);
@@ -330,8 +359,11 @@ export function CareerLabPage() {
   const endSession = async () => {
     if (!active || active.status !== "active") return;
     try {
-      const launched = await end.mutateAsync({ sessionId: active.sessionId });
-      setStreamRunId(launched.runId);
+      const launched = await end.mutateAsync({
+        sessionId: active.sessionId,
+        onDone: (completed) => onDone(completed),
+      });
+      attachRun(launched.runId);
     } catch (error) {
       setRunError(error instanceof Error ? error.message : "Could not end the session");
     }
@@ -339,7 +371,7 @@ export function CareerLabPage() {
 
   const durableTurns = active?.turns?.length ?? 0;
   const durableAdvanced = durableTurns > baseline;
-  const showThread = Boolean(active || pending || runId);
+  const showThread = Boolean(active || pending || selectionExchange || runId);
   const chatMessages: ChatThreadMessage[] = (active?.turns ?? []).map((turn, index) => ({
     id: `${turn.turnId}-${index}`,
     role: turn.role,
@@ -350,6 +382,12 @@ export function CareerLabPage() {
   }));
   if (pending && !durableAdvanced) {
     chatMessages.push({ id: "pending-user", role: "user", parts: [{ kind: "text", text: pending.text }] });
+  }
+  if (selectionExchange) {
+    chatMessages.push(
+      { id: "selection-user", role: "user", parts: [{ kind: "text", text: selectionExchange.userText }] },
+      { id: "selection-assistant", role: "assistant", parts: [{ kind: "notice", message: selectionExchange.assistantText }] },
+    );
   }
 
   const currentSummary = sessions.data?.sessions?.find((row) => row.sessionId === displayedSessionId);
@@ -402,11 +440,7 @@ export function CareerLabPage() {
         </Alert>
       ) : null}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[15rem_minmax(0,1fr)_18rem] xl:grid-cols-[17rem_minmax(0,1fr)_20rem]">
-        <aside className="hidden min-w-0 lg:block" aria-label="Career Lab session history">
-          <SessionRail sessions={sessions} selectedId={displayedSessionId} onSelect={setSelectedSessionId} showArchived={showArchived} setShowArchived={setShowArchived} />
-        </aside>
-
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <main className="flex min-w-0 flex-col gap-4">
           <Card className="min-w-0 overflow-hidden rounded-2xl">
             <CardHeader className="border-b bg-muted/25 py-4">
@@ -438,6 +472,12 @@ export function CareerLabPage() {
                   }}
                 />
               ) : null}
+              {busy && runId && !stream.parts.length && !durableAdvanced && !selectionExchange ? (
+                <div className="flex items-center gap-3 text-sm text-muted-foreground" role="status">
+                  <Spinner />
+                  <span>Career Lab is thinking…</span>
+                </div>
+              ) : null}
             </CardContent>
             <div className="border-t bg-card/95 p-4 sm:p-6">
               <ChatComposer
@@ -454,16 +494,13 @@ export function CareerLabPage() {
             </div>
           </Card>
 
-          <details className="rounded-xl border bg-card/80 p-3 lg:hidden">
-            <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium"><BriefcaseBusiness className="size-4 text-primary" aria-hidden="true" />Session history</summary>
-            <div className="mt-3"><SessionRail sessions={sessions} selectedId={displayedSessionId} onSelect={setSelectedSessionId} showArchived={showArchived} setShowArchived={setShowArchived} /></div>
-          </details>
         </main>
 
-        <aside className="min-w-0">
+        <aside className="min-w-0 space-y-4" aria-label="Career Lab controls and session history">
           <ContextRail skill={skill} setSkill={setSkill} skills={skills} goal={goal} setGoal={setGoal} context={context} setContext={setContext} skillRef={skillRef} />
+          <SessionRail sessions={sessions} selectedId={displayedSessionId} onSelect={setSelectedSessionId} showArchived={showArchived} setShowArchived={setShowArchived} />
           {currentSummary?.status === "ended" ? (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
               {!currentSummary.archivedAt ? <Button variant="outline" size="sm" onClick={() => archive.mutate({ sessionId: currentSummary.sessionId })}><Archive aria-hidden="true" />Archive</Button> : <Button variant="outline" size="sm" onClick={() => unarchive.mutate({ sessionId: currentSummary.sessionId })}><ArchiveRestore aria-hidden="true" />Unarchive</Button>}
               <AlertDialog>
                 <AlertDialogTrigger render={<Button variant="outline" size="sm"><Trash2 aria-hidden="true" />Delete</Button>} />

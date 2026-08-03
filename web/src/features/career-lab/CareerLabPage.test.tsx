@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   unarchive: vi.fn(),
   remove: vi.fn(),
   stream: vi.fn(),
+  streamIds: [] as Array<string | null>,
 }));
 
 vi.mock("./use-career-lab", () => ({
@@ -34,7 +35,10 @@ vi.mock("./use-career-lab", () => ({
 }));
 
 vi.mock("@/lib/chat/useChatStream", () => ({
-  useChatStream: () => mocks.stream(),
+  useChatStream: (runId: string | null) => {
+    mocks.streamIds.push(runId);
+    return mocks.stream();
+  },
 }));
 
 function renderPage() {
@@ -49,6 +53,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.streamIds.length = 0;
   mocks.skills.mockReturnValue({
     data: {
       skills: [
@@ -93,7 +98,10 @@ describe("CareerLabPage", () => {
     await userEvent.type(screen.getByLabelText("Message Career Lab"), "Help with my career");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/choose a skill/i);
+    expect(screen.getByTestId("chat-viewport")).toHaveTextContent("Help with my career");
+    expect(screen.getByTestId("chat-viewport")).toHaveTextContent("Choose a skill");
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Career skill" })).toHaveFocus());
+    await waitFor(() => expect(mocks.streamIds.at(-1)).toBeNull());
   });
 
   it("shows the initial thread while the session is being created", async () => {
@@ -112,6 +120,33 @@ describe("CareerLabPage", () => {
     expect(viewport).toHaveTextContent("Show me a draft");
 
     resolveLaunch?.({ runId: "run-1" });
+  });
+
+  it("shows immediate status while Career Lab waits for its first streamed reply", async () => {
+    mocks.start.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ runId: "run-1" }),
+      isPending: false,
+    });
+    mocks.stream.mockReturnValue({
+      parts: [],
+      status: "streaming",
+      error: null,
+      stop: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    renderPage();
+    await userEvent.type(screen.getByLabelText("Message Career Lab"), "Show me a draft");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Career Lab is thinking…")).toBeInTheDocument();
+  });
+
+  it("renders one responsive rail instead of duplicate desktop and mobile histories", () => {
+    renderPage();
+
+    expect(screen.getAllByText("Sessions")).toHaveLength(1);
+    expect(screen.getByText("Context & skill")).toBeInTheDocument();
   });
 
   it("labels persisted responses as drafts and keeps the action surface draft-only", () => {
