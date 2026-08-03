@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api, unwrap } from "@/lib/api/client";
-import type { components } from "@/lib/api/schema";
 import { useLaunchRun } from "@/features/runs/use-launch-run";
 
 function invalidateBoards(qc: ReturnType<typeof useQueryClient>, jobId: number) {
@@ -12,22 +11,21 @@ function invalidateBoards(qc: ReturnType<typeof useQueryClient>, jobId: number) 
   }
 }
 
-export type H1BSponsorship = components["schemas"]["H1BSponsorshipOut"];
-
 export function useCheckH1BSponsorship(jobId: number) {
-  const qc = useQueryClient();
+  const { launch } = useLaunchRun();
   return useMutation({
     mutationFn: () =>
-      unwrap(
-        api.POST("/api/jobs/{job_id}/h1b-sponsorship", {
-          params: { path: { job_id: jobId } },
-        }),
-      ) as Promise<H1BSponsorship>,
-    onSuccess: () => {
-      invalidateBoards(qc, jobId);
-      toast.success("H-1B history updated");
-    },
-    onError: () => toast.error("H-1B sponsorship check failed"),
+      launch(
+        "h1bSponsorship",
+        () =>
+          unwrap(
+            api.POST("/api/jobs/{job_id}/h1b-sponsorship", {
+              params: { path: { job_id: jobId } },
+            }),
+          ),
+        ["job"],
+        { jobId },
+      ),
   });
 }
 

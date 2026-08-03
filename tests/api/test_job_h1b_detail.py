@@ -44,7 +44,19 @@ def test_fresh_evidence_is_not_stale():
 
 
 def test_expired_evidence_is_stale():
-    assert _h1b_sponsorship_response(_evidence(expires_in_days=-1)).stale is True
+    evidence = _evidence(
+        expires_in_days=-1,
+        periods=[
+            H1BPeriodStat(
+                period="FY2026-Q1", filing_count=10, certified_count=9, denied_count=1
+            )
+        ],
+    )
+    out = _h1b_sponsorship_response(evidence)
+    assert out.stale is True
+    assert out.evidence is not None
+    assert out.evidence.filing_count == 10
+    assert out.evidence.periods[0].filing_count == 10
 
 
 def test_stale_flips_exactly_at_expiry():

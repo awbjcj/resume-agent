@@ -3,10 +3,14 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "@/test/server";
+import { useRunStore } from "@/lib/runs/store";
 import { H1BSponsorshipPanel } from "./H1BSponsorshipPanel";
+
+const mocks = vi.hoisted(() => ({ trackRun: vi.fn() }));
+vi.mock("@/lib/runs/tracker", () => ({ trackRun: mocks.trackRun }));
 
 function wrapper({ children }: { children: ReactNode }) {
   return (
@@ -19,7 +23,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const matchedEvidence = {
-  status: "matched",
+  status: "matched" as const,
   normalizedCompany: "acme",
   displayCompany: "Acme",
   fiscalPeriods: ["2022", "2023"],
@@ -36,10 +40,35 @@ const matchedEvidence = {
 };
 
 describe("H1BSponsorshipPanel", () => {
-  it("runs a manual check and formats the returned evidence", async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useRunStore.setState({ runs: {} });
+  });
+
+  it("formats evidence carried on the persisted job detail", () => {
+    render(
+      <H1BSponsorshipPanel
+        jobId={42}
+        company="Acme"
+        initialResult={{ capability: "available", stale: false, evidence: matchedEvidence }}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText("Historical filings found")).toBeInTheDocument();
+    expect(screen.getByText("2022, 2023")).toBeInTheDocument();
+    expect(screen.getByText("$150,000")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open source record/i })).toHaveAttribute(
+      "href",
+      "https://example.com/acme",
+    );
+    expect(screen.getByText(/historical h-1b filings do not confirm/i)).toBeInTheDocument();
+  });
+
+  it("launches a background check and shows the active state", async () => {
     server.use(
       http.post("/api/jobs/42/h1b-sponsorship", () =>
-        HttpResponse.json({ capability: "available", evidence: matchedEvidence }),
+        HttpResponse.json({ runId: "run-1", kind: "h1bSponsorship" }, { status: 202 }),
       ),
     );
 
@@ -49,6 +78,7 @@ describe("H1BSponsorshipPanel", () => {
         company="Acme"
         initialResult={{
           capability: "unavailable",
+          stale: false,
           message: "No H-1B evidence has been checked for this job yet.",
           evidence: null,
         }}
@@ -61,15 +91,45 @@ describe("H1BSponsorshipPanel", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("Historical filings found")).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: /checking… for h-1b sponsorship/i }),
+      ).toBeDisabled(),
     );
-    expect(screen.getByText("2022, 2023")).toBeInTheDocument();
-    expect(screen.getByText("$150,000")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open source record/i })).toHaveAttribute(
-      "href",
-      "https://example.com/acme",
+    expect(mocks.trackRun).toHaveBeenCalledWith(
+      { runId: "run-1", kind: "h1bSponsorship" },
+      expect.any(Function),
     );
-    expect(screen.getByText(/historical h-1b filings do not confirm/i)).toBeInTheDocument();
+  });
+
+  it("shows a failure banner when the h1bSponsorship run fails", () => {
+    useRunStore.getState().upsert({
+      runId: "run-2",
+      kind: "h1bSponsorship",
+      status: "failed",
+      percent: 0,
+      phase: "Failed",
+      current: 0,
+      total: 0,
+      etaText: null,
+      error: "provider unavailable",
+      meta: { jobId: 42 },
+    });
+
+    render(
+      <H1BSponsorshipPanel
+        jobId={42}
+        company="Acme"
+        initialResult={{
+          capability: "unavailable",
+          stale: false,
+          message: "No H-1B evidence has been checked for this job yet.",
+          evidence: null,
+        }}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText("provider unavailable")).toBeInTheDocument();
   });
 
   it("explains disabled research and keeps the action unavailable", () => {
@@ -79,6 +139,7 @@ describe("H1BSponsorshipPanel", () => {
         company="Acme"
         initialResult={{
           capability: "disabled",
+          stale: false,
           message: "H-1B research is disabled for this workspace.",
           evidence: null,
         }}

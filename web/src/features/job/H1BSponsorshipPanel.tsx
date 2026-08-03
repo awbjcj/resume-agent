@@ -14,7 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { components } from "@/lib/api/schema";
 import { cn } from "@/lib/utils";
+import { useRunStore } from "@/lib/runs/store";
 import { useCheckH1BSponsorship } from "./use-job-mutations";
+import { ACTIVE_RUN_STATUSES, latestArtifactRun } from "./artifact-runs";
 import type { JobDetail } from "./use-job-detail";
 
 type SponsorshipResult = components["schemas"]["H1BSponsorshipOut"];
@@ -161,18 +163,19 @@ export function H1BSponsorshipPanel({
   initialResult?: JobDetail["h1BSponsorship"];
 }) {
   const check = useCheckH1BSponsorship(jobId);
-  const result = check.data ?? initialResult ?? null;
+  const runs = useRunStore((state) => state.runs);
+  const h1bRun = latestArtifactRun(runs, "h1bSponsorship", "jobId", jobId);
+  const checking = h1bRun !== undefined && ACTIVE_RUN_STATUSES.includes(h1bRun.status);
+  const failed = h1bRun?.status === "failed";
+  const result = initialResult ?? null;
   const evidence = result?.evidence ?? null;
   const status = evidence?.status ?? null;
   const meta = status ? STATUS_META[status] : null;
-  const disabled = !company?.trim() || check.isPending || result?.capability === "disabled";
-  const message = check.isError
-    ? check.error instanceof Error
-      ? check.error.message
-      : "The manual H-1B check failed."
-    : result?.message ?? evidence?.unavailableReason ?? null;
+  const disabled = !company?.trim() || checking || result?.capability === "disabled";
+  const errorMessage = h1bRun?.error ?? "The manual H-1B check failed.";
+  const message = result?.message ?? evidence?.unavailableReason ?? null;
   const StatusIcon = meta?.icon ?? (result?.capability === "disabled" ? CircleAlert : ShieldCheck);
-  const buttonLabel = check.isPending
+  const buttonLabel = checking
     ? "Checking…"
     : result?.capability === "disabled"
       ? "H-1B disabled"
@@ -213,7 +216,7 @@ export function H1BSponsorshipPanel({
           disabled={disabled}
           onClick={() => check.mutate()}
         >
-          {check.isPending ? (
+          {checking ? (
             <LoaderCircle className="animate-spin" aria-hidden="true" />
           ) : (
             <StatusIcon aria-hidden="true" />
@@ -261,9 +264,9 @@ export function H1BSponsorshipPanel({
         </p>
       )}
 
-      {check.isError && (
+      {failed && (
         <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-sm leading-6 text-destructive">
-          {message}
+          {errorMessage}
         </p>
       )}
 

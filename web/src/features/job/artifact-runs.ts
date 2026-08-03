@@ -9,7 +9,7 @@ export const ACTIVE_RUN_STATUSES: RunRecord["status"][] = [
 export function latestArtifactRun(
   runs: Record<string, RunRecord>,
   kind: string,
-  metaKey: "versionId" | "coverLetterId",
+  metaKey: "versionId" | "coverLetterId" | "jobId",
   artifactId: number,
 ): RunRecord | undefined {
   return Object.values(runs)
