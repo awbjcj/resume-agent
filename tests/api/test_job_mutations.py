@@ -12,7 +12,7 @@ from resume_agent.h1b.models import (
     H1BEnrichmentReport,
     H1BSponsorshipEvidence,
 )
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.tracking.tables import H1BCompanyEvidence, Job, JobStatus
 
 
 class InlineExecutor(Executor):
@@ -63,6 +63,25 @@ def _seed(app, **kw):
         return job.id
 
 
+def _persist_h1b_cache(engine, report: H1BEnrichmentReport) -> None:
+    """Mirror enrich_companies' durable company-cache write in mocked runs."""
+    with get_session(engine) as session:
+        for normalized, evidence in report.by_company.items():
+            session.add(
+                H1BCompanyEvidence(
+                    normalized_company=normalized,
+                    display_company=evidence.display_company,
+                    status=evidence.status,
+                    evidence_json=evidence.model_dump(mode="json"),
+                    source_url=evidence.source_url,
+                    data_version=evidence.data_version,
+                    retrieved_at=evidence.retrieved_at,
+                    expires_at=evidence.expires_at,
+                )
+            )
+        session.commit()
+
+
 def test_patch_status_approves():
     client = _client()
     with client:
@@ -92,7 +111,9 @@ def test_manual_h1b_check_returns_evidence(monkeypatch, tmp_path):
 
     async def fake_enrich(engine, companies, *, settings, agent_factory, company_resolver_factory=None, force_refresh=False):
         assert settings.h1b_mcp_enabled is True
-        return H1BEnrichmentReport(by_company={"acme": evidence})
+        report = H1BEnrichmentReport(by_company={"acme": evidence})
+        _persist_h1b_cache(engine, report)
+        return report
 
     monkeypatch.setattr(h1b_service, "enrich_companies", fake_enrich)
     client = _h1b_client(tmp_path)
@@ -142,7 +163,9 @@ def test_manual_h1b_check_reports_unavailable_evidence(monkeypatch, tmp_path):
     )
 
     async def fake_enrich(engine, companies, *, settings, agent_factory, company_resolver_factory=None, force_refresh=False):
-        return H1BEnrichmentReport(by_company={"acme": evidence})
+        report = H1BEnrichmentReport(by_company={"acme": evidence})
+        _persist_h1b_cache(engine, report)
+        return report
 
     monkeypatch.setattr(h1b_service, "enrich_companies", fake_enrich)
     client = _h1b_client(tmp_path)
