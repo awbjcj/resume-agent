@@ -11,6 +11,7 @@ vi.mock("@/features/triage/use-triage-mutations", () => ({
 }));
 
 import { TrackingTab } from "./TrackingTab";
+import type { JobDetail } from "./use-job-detail";
 
 function wrapper({ children }: { children: ReactNode }) {
   return (
@@ -27,7 +28,7 @@ const baseJob = {
   status: "shortlisted",
   hasProgress: false,
   application: null,
-} as never;
+} as unknown as JobDetail;
 
 describe("TrackingTab", () => {
   beforeEach(() => mocks.mutate.mockReset());
@@ -43,7 +44,7 @@ describe("TrackingTab", () => {
 
   it("disables delete when the job has progress", () => {
     render(
-      <TrackingTab job={{ ...baseJob, hasProgress: true } as never} onDeleted={vi.fn()} />,
+      <TrackingTab job={{ ...baseJob, hasProgress: true }} onDeleted={vi.fn()} />,
       { wrapper },
     );
 
