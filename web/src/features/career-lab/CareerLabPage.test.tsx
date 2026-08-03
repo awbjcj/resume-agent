@@ -103,8 +103,9 @@ describe("CareerLabPage", () => {
     });
     mocks.start.mockReturnValue({ mutateAsync, isPending: false });
     renderPage();
-    await userEvent.type(screen.getByLabelText("Message Career Lab"), "Help with my career");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create Career Lab session" }));
+    await userEvent.type(screen.getByLabelText("Career Lab request"), "Help with my career");
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/choose a skill/i);
     expect(screen.getByTestId("chat-viewport")).toHaveTextContent("Help with my career");
     expect(screen.getByTestId("chat-viewport")).toHaveTextContent("Choose a skill");
@@ -121,8 +122,9 @@ describe("CareerLabPage", () => {
     mocks.start.mockReturnValue({ mutateAsync, isPending: false });
 
     renderPage();
-    await userEvent.type(screen.getByLabelText("Message Career Lab"), "Show me a draft");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create Career Lab session" }));
+    await userEvent.type(screen.getByLabelText("Career Lab request"), "Show me a draft");
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
 
     const viewport = screen.getByTestId("chat-viewport");
     expect(viewport).toHaveTextContent("Show me a draft");
@@ -144,8 +146,9 @@ describe("CareerLabPage", () => {
     });
 
     renderPage();
-    await userEvent.type(screen.getByLabelText("Message Career Lab"), "Show me a draft");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create Career Lab session" }));
+    await userEvent.type(screen.getByLabelText("Career Lab request"), "Show me a draft");
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
 
     expect(await screen.findByText("Career Lab is thinking…")).toBeInTheDocument();
   });

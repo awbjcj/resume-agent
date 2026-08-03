@@ -4,6 +4,8 @@ import {
   Archive,
   ArchiveRestore,
   Bot,
+  FileText,
+  ListChecks,
   MessageCircleMore,
   PanelRight,
   Pencil,
@@ -16,6 +18,7 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
 import { GuidedWorkspaceHeader } from "@/components/chat/GuidedWorkspaceHeader";
 import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
+import { WorkspaceEmptyState } from "@/components/chat/WorkspaceEmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -32,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -249,6 +253,9 @@ function SessionRail({
   setShowArchived,
   onRename,
   renamePending,
+  onArchive,
+  onUnarchive,
+  onDelete,
 }: {
   sessions: ReturnType<typeof useCareerLabSessions>;
   selectedId: string | null;
@@ -257,6 +264,9 @@ function SessionRail({
   setShowArchived: (value: boolean) => void;
   onRename: (sessionId: string, title: string) => Promise<void>;
   renamePending: boolean;
+  onArchive: (sessionId: string) => void;
+  onUnarchive: (sessionId: string) => void;
+  onDelete: (sessionId: string) => void;
 }) {
   const rows = sessions.data?.sessions ?? [];
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -301,6 +311,9 @@ function SessionRail({
                   </span>
                 </button>
                 <Button variant="ghost" size="icon-sm" aria-label={`Rename ${title}`} onClick={() => { setEditingId(row.sessionId); setDraftTitle(title); }}><Pencil aria-hidden="true" /></Button>
+                {row.status === "ended" && !row.archivedAt ? <Button variant="ghost" size="icon-sm" aria-label={`Archive ${title}`} onClick={() => onArchive(row.sessionId)}><Archive aria-hidden="true" /></Button> : null}
+                {row.archivedAt ? <Button variant="ghost" size="icon-sm" aria-label={`Unarchive ${title}`} onClick={() => onUnarchive(row.sessionId)}><ArchiveRestore aria-hidden="true" /></Button> : null}
+                <Button variant="ghost" size="icon-sm" aria-label={`Delete ${title}`} onClick={() => onDelete(row.sessionId)}><Trash2 aria-hidden="true" /></Button>
               </div>
             )}
           </div>
@@ -315,6 +328,8 @@ function SessionRail({
 }
 
 export function CareerLabPage() {
+  const [newOpen, setNewOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const sessions = useCareerLabSessions(showArchived);
   const skills = useCareerLabSkills();
@@ -478,7 +493,6 @@ export function CareerLabPage() {
     );
   }
 
-  const currentSummary = sessions.data?.sessions?.find((row) => row.sessionId === displayedSessionId);
   const error = stream.error || runError;
 
   return (
@@ -532,18 +546,12 @@ export function CareerLabPage() {
         <main className="flex min-w-0 flex-col gap-4">
           <Card className="min-w-0 overflow-hidden rounded-2xl">
             <CardHeader className="border-b bg-muted/25 py-4">
-              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />{active?.title || "Draft thread"}</CardTitle>
-              <CardDescription>{active ? active.goal || "A focused Career Lab session" : "Start with a question, then choose a skill if routing needs help."}</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />{active?.title || "Career Lab workspace"}</CardTitle>
+              <CardDescription>{active ? active.goal || "A focused Career Lab session" : "Create a session when you are ready to work through a career question."}</CardDescription>
             </CardHeader>
             <CardContent className={cn("flex flex-col gap-4 p-4 sm:p-6", CHAT_SURFACE_HEIGHT)}>
               {session.isPending && displayedSessionId ? <Skeleton className="h-full w-full" /> : null}
-              {!session.isPending && !showThread ? (
-                <div className="flex min-h-[22rem] flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 p-8 text-center">
-                  <MessageCircleMore className="size-8 text-primary" aria-hidden="true" />
-                  <h2 className="text-lg font-semibold">No session selected</h2>
-                  <p className="max-w-md text-sm text-muted-foreground">Ask a question below to start a draft-only session. Career Lab will route it or ask you to pick a skill.</p>
-                </div>
-              ) : null}
+              {!session.isPending && !showThread ? <WorkspaceEmptyState icon={MessageCircleMore} title="Turn a career question into a useful draft" description="Choose a skill or let Career Lab route the request. It uses only the context you select and never takes an external action." actionLabel="Create Career Lab session" onAction={() => setNewOpen(true)} steps={[{ icon: MessageCircleMore, title: "Ask one focused question", description: "Start with the decision, draft, comparison, or next step you need." }, { icon: ListChecks, title: "Choose bounded context", description: "Optionally include your profile, a job, a resume version, or offer references." }, { icon: FileText, title: "Review the draft", description: "Keep every output as a draft until you decide how to use it." }]} /> : null}
               {showThread ? (
                 <ChatThread
                   messages={chatMessages}
@@ -567,7 +575,7 @@ export function CareerLabPage() {
                 </div>
               ) : null}
             </CardContent>
-            <div className="border-t bg-card/95 p-4 sm:p-6">
+            {showThread ? <div className="border-t bg-card/95 p-4 sm:p-6">
               <ChatComposer
                 value={composer}
                 onChange={setComposer}
@@ -579,28 +587,18 @@ export function CareerLabPage() {
                 sendLabel="Send"
                 placeholder="Ask for a draft, plan, comparison, or next step…"
               />
-            </div>
+            </div> : null}
           </Card>
 
         </main>
 
-        <aside className="min-w-0 space-y-4" aria-label="Career Lab controls and session history">
+        <aside className="min-w-0 space-y-4" aria-label="Career Lab controls">
           <ContextRail skill={skill} setSkill={setSkill} skills={skills} goal={goal} setGoal={setGoal} context={context} setContext={setContext} skillRef={skillRef} />
-          <SessionRail sessions={sessions} selectedId={displayedSessionId} onSelect={setSelectedSessionId} showArchived={showArchived} setShowArchived={setShowArchived} renamePending={rename.isPending} onRename={async (sessionId, title) => { await rename.mutateAsync({ sessionId, title }); }} />
-          {currentSummary?.status === "ended" ? (
-            <div className="flex flex-wrap gap-2">
-              {!currentSummary.archivedAt ? <Button variant="outline" size="sm" onClick={() => archive.mutate({ sessionId: currentSummary.sessionId })}><Archive aria-hidden="true" />Archive</Button> : <Button variant="outline" size="sm" onClick={() => unarchive.mutate({ sessionId: currentSummary.sessionId })}><ArchiveRestore aria-hidden="true" />Unarchive</Button>}
-              <AlertDialog>
-                <AlertDialogTrigger render={<Button variant="outline" size="sm"><Trash2 aria-hidden="true" />Delete</Button>} />
-                <AlertDialogContent>
-                  <AlertDialogHeader><AlertDialogTitle>Delete this session?</AlertDialogTitle><AlertDialogDescription>This removes the saved transcript from this workspace.</AlertDialogDescription></AlertDialogHeader>
-                  <AlertDialogFooter><AlertDialogCancel>Keep session</AlertDialogCancel><AlertDialogAction onClick={() => { remove.mutate({ sessionId: currentSummary.sessionId }); setSelectedSessionId(null); }}>Delete session</AlertDialogAction></AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          ) : null}
         </aside>
       </div>
+      <SessionRail sessions={sessions} selectedId={displayedSessionId} onSelect={setSelectedSessionId} showArchived={showArchived} setShowArchived={setShowArchived} renamePending={rename.isPending} onRename={async (sessionId, title) => { await rename.mutateAsync({ sessionId, title }); }} onArchive={(sessionId) => archive.mutate({ sessionId })} onUnarchive={(sessionId) => unarchive.mutate({ sessionId })} onDelete={setPendingDeleteId} />
+      <Dialog open={newOpen} onOpenChange={setNewOpen}><DialogContent><DialogHeader><DialogTitle>Create Career Lab session</DialogTitle><DialogDescription>Ask for a draft, plan, comparison, or next step. The context panel remains available before and during the session.</DialogDescription></DialogHeader><Textarea aria-label="Career Lab request" autoFocus rows={4} value={composer} onChange={(event) => setComposer(event.target.value)} placeholder="Help me compare these offers and draft a decision checklist…" /><DialogFooter><Button variant="ghost" onClick={() => setNewOpen(false)}>Cancel</Button><Button disabled={!composer.trim() || busy} onClick={() => { setNewOpen(false); void sendMessage(); }}><Sparkles aria-hidden="true" />Start session</Button></DialogFooter></DialogContent></Dialog>
+      <AlertDialog open={pendingDeleteId != null} onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this session?</AlertDialogTitle><AlertDialogDescription>This permanently removes the saved transcript from this workspace.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep session</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={remove.isPending} onClick={() => { if (!pendingDeleteId) return; const deletingSelected = pendingDeleteId === displayedSessionId; remove.mutate({ sessionId: pendingDeleteId }, { onSuccess: () => { if (deletingSelected) setSelectedSessionId(null); } }); setPendingDeleteId(null); }}>Delete session</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
