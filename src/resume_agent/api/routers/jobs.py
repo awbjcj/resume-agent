@@ -32,8 +32,8 @@ from resume_agent.api.schemas.jobs import (
     JobsImportError,
     JobsImportReportOut,
 )
-from resume_agent.career_skills.models import read_job_analysis_meta
 from resume_agent.config import Settings
+from resume_agent.h1b.cache import load_company_evidence
 from resume_agent.h1b.models import (
     H1B_DISABLED_MESSAGE,
     H1B_NO_EVIDENCE_MESSAGE,
@@ -100,14 +100,9 @@ def _job_detail_response(
         job = get_job(session, job_id)
         evidence = None
         if job is not None:
-            try:
-                meta = read_job_analysis_meta(job.analysis_meta_json)
-                if meta is not None and meta.h1b_evidence_snapshot is not None:
-                    evidence = H1BSponsorshipEvidence.model_validate(
-                        meta.h1b_evidence_snapshot
-                    )
-            except ValueError:
-                evidence = None
+            key = normalize_company(job.company)
+            if key:
+                evidence = load_company_evidence(session, [job.company]).get(key)
         detail.h1b_sponsorship = _h1b_sponsorship_response(evidence)
     review_doc = cast(ReviewConfigDoc, get_config_store(request).get("review"))
     gate_names = {r.name for r in review_doc.reviewers if r.gate}
