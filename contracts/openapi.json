@@ -3187,6 +3187,17 @@
             "title": "Status",
             "type": "string"
           },
+          "unavailableReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailablereason"
+          },
           "wageSummary": {
             "anyOf": [
               {
@@ -3240,6 +3251,17 @@
                 "type": "null"
               }
             ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
           }
         },
         "required": [

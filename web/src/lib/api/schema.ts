@@ -4063,6 +4063,8 @@ export interface components {
              * @enum {string}
              */
             status: "matched" | "no_match" | "unavailable";
+            /** Unavailablereason */
+            unavailableReason?: string | null;
             /** Wagesummary */
             wageSummary: {
                 [key: string]: number;
@@ -4076,6 +4078,8 @@ export interface components {
              */
             capability: "disabled" | "available" | "unavailable";
             evidence?: components["schemas"]["H1BSponsorshipEvidenceOut"] | null;
+            /** Message */
+            message?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
