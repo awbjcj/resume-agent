@@ -160,12 +160,12 @@ describe("CareerLabPage", () => {
     expect(await screen.findByText("Career Lab is thinking…")).toBeInTheDocument();
   });
 
-  it("separates the starter controls from one responsive session history", () => {
+  it("keeps setup and reference context hidden until a session has started", () => {
     renderPage();
 
     expect(screen.getAllByText("Session history")).toHaveLength(1);
-    expect(screen.getByText("Session setup")).toBeInTheDocument();
-    expect(screen.getByText("Reference context")).toBeInTheDocument();
+    expect(screen.queryByText("Session setup")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reference context")).not.toBeInTheDocument();
   });
 
   it("renames a saved thread from its session menu and has no archive toggle", async () => {
@@ -188,7 +188,17 @@ describe("CareerLabPage", () => {
     expect(mocks.rename).toHaveBeenCalledWith({ sessionId: "s1", title: "Offer strategy" });
   });
 
-  it("selects jobs by name and narrows them by status and source", async () => {
+  it("filters jobs live and updates the status and source options with the current search", async () => {
+    mocks.sessions.mockReturnValue({
+      data: { sessions: [{ sessionId: "s1", title: "Negotiation notes", goal: "Plan", startedAt: "2026-08-02", endedAt: null, status: "active", archivedAt: null, turnCount: 2 }] },
+      isPending: false,
+      isError: false,
+    });
+    mocks.session.mockReturnValue({
+      data: { sessionId: "s1", title: "Negotiation notes", goal: "Plan", startedAt: "2026-08-02", endedAt: null, status: "active", archivedAt: null, turns: [] },
+      isPending: false,
+      isError: false,
+    });
     mocks.jobs.mockReturnValue({
       data: [
         { jobId: 7, company: "Acme", title: "Staff Engineer", status: "tailored", source: "linkedin", location: "New York" },
@@ -200,12 +210,19 @@ describe("CareerLabPage", () => {
     renderPage();
 
     await userEvent.click(screen.getByText("Job and resume context"));
-    await userEvent.selectOptions(screen.getByLabelText("Job status"), "tailored");
     await userEvent.selectOptions(screen.getByLabelText("Job source"), "linkedin");
     expect(screen.getByRole("option", { name: /Acme · Staff Engineer/ })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Globex · Product Lead/ })).not.toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText("Job"), "7");
     expect(screen.getByLabelText("Job")).toHaveValue("7");
+    await userEvent.type(screen.getByLabelText("Find a job"), "Globex");
+    expect(screen.getByLabelText("Job")).toHaveValue("");
+    expect(screen.queryByRole("option", { name: /Acme · Staff Engineer/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Globex · Product Lead/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "applied" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "tailored" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "indeed" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "linkedin" })).not.toBeInTheDocument();
   });
 
   it("labels persisted responses as drafts and keeps the action surface draft-only", () => {
