@@ -222,27 +222,23 @@ describe("JobModal", () => {
     expect(screen.getByRole("button", { name: /re-tailor 1 job/i })).toBeEnabled();
   });
 
-  it("places H-1B research inside the Management tab", async () => {
-    server.use(
-      http.get("/api/jobs/42", () =>
-        HttpResponse.json(
-          jobPayload({
-            h1BSponsorship: {
-              capability: "unavailable",
-              message: "No H-1B evidence has been checked for this job yet.",
-              evidence: null,
-            },
-          }),
-        ),
-      ),
-    );
+  it("exposes tracking and sponsorship tabs and no legacy application or management tab", async () => {
+    server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
+    wrap(<JobModal jobId={42} onClose={() => {}} />);
+
+    expect(await screen.findByRole("tab", { name: "Tracking" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sponsorship" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Application" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Management" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(6);
+  });
+
+  it("places H-1B research inside the Sponsorship tab", async () => {
+    server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
     const user = userEvent.setup();
     wrap(<JobModal jobId={42} onClose={() => {}} />);
 
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole("tab", { name: "Management" }));
+    await user.click(await screen.findByRole("tab", { name: "Sponsorship" }));
 
     expect(
       screen.getByRole("heading", { name: "Historical H-1B sponsorship" }),
