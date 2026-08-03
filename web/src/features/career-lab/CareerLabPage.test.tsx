@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   archive: vi.fn(),
   unarchive: vi.fn(),
   remove: vi.fn(),
+  rename: vi.fn(),
+  jobs: vi.fn(),
+  jobDetail: vi.fn(),
   stream: vi.fn(),
   streamIds: [] as Array<string | null>,
 }));
@@ -31,6 +34,9 @@ vi.mock("./use-career-lab", () => ({
   useArchiveCareerLabSession: () => ({ mutate: mocks.archive }),
   useUnarchiveCareerLabSession: () => ({ mutate: mocks.unarchive }),
   useDeleteCareerLabSession: () => ({ mutate: mocks.remove, isPending: false }),
+  useRenameCareerLabSession: () => ({ mutateAsync: mocks.rename, isPending: false }),
+  useCareerLabJobs: () => mocks.jobs(),
+  useCareerLabJobDetail: () => mocks.jobDetail(),
   useCareerLabRecoveredRun: () => null,
 }));
 
@@ -71,6 +77,8 @@ beforeEach(() => {
   });
   mocks.sessions.mockReturnValue({ data: { sessions: [] }, isPending: false });
   mocks.session.mockReturnValue({ data: undefined, isPending: false });
+  mocks.jobs.mockReturnValue({ data: [], isPending: false, isError: false });
+  mocks.jobDetail.mockReturnValue({ data: undefined, isPending: false, isError: false });
   mocks.start.mockReturnValue({ mutateAsync: vi.fn() });
   mocks.send.mockReturnValue({ mutateAsync: vi.fn() });
   mocks.end.mockReturnValue({ mutateAsync: vi.fn() });
@@ -147,6 +155,45 @@ describe("CareerLabPage", () => {
 
     expect(screen.getAllByText("Sessions")).toHaveLength(1);
     expect(screen.getByText("Context & skill")).toBeInTheDocument();
+  });
+
+  it("renames a saved thread inline and has no icon-only archive toggle", async () => {
+    mocks.sessions.mockReturnValue({
+      data: { sessions: [{ sessionId: "s1", title: "Negotiation notes", goal: "Plan", startedAt: "2026-08-02", endedAt: null, status: "active", archivedAt: null, turnCount: 2 }] },
+      isPending: false,
+    });
+    mocks.session.mockReturnValue({ data: { sessionId: "s1", title: "Negotiation notes", goal: "Plan", startedAt: "2026-08-02", endedAt: null, status: "active", archivedAt: null, turns: [] }, isPending: false });
+    mocks.rename.mockResolvedValue({});
+    renderPage();
+
+    expect(screen.queryByRole("button", { name: "Toggle archived sessions" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Rename Negotiation notes" }));
+    const input = screen.getByRole("textbox", { name: "Session title" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "Offer strategy");
+    await userEvent.click(screen.getByRole("button", { name: "Save title" }));
+
+    expect(mocks.rename).toHaveBeenCalledWith({ sessionId: "s1", title: "Offer strategy" });
+  });
+
+  it("selects jobs by name and narrows them by status and source", async () => {
+    mocks.jobs.mockReturnValue({
+      data: [
+        { jobId: 7, company: "Acme", title: "Staff Engineer", status: "tailored", source: "linkedin", location: "New York" },
+        { jobId: 8, company: "Globex", title: "Product Lead", status: "applied", source: "indeed", location: "Remote" },
+      ],
+      isPending: false,
+      isError: false,
+    });
+    renderPage();
+
+    await userEvent.click(screen.getByText("Add job & resume context"));
+    await userEvent.selectOptions(screen.getByLabelText("Job status"), "tailored");
+    await userEvent.selectOptions(screen.getByLabelText("Job source"), "linkedin");
+    expect(screen.getByRole("option", { name: /Acme · Staff Engineer/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Globex · Product Lead/ })).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Job"), "7");
+    expect(screen.getByLabelText("Job")).toHaveValue("7");
   });
 
   it("labels persisted responses as drafts and keeps the action surface draft-only", () => {

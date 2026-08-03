@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import {
   Archive,
@@ -6,6 +6,7 @@ import {
   Bot,
   MessageCircleMore,
   PanelRight,
+  Pencil,
   Sparkles,
   SquareCheckBig,
   Trash2,
@@ -31,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -42,11 +44,14 @@ import { cn } from "@/lib/utils";
 import {
   useArchiveCareerLabSession,
   useCareerLabRecoveredRun,
+  useCareerLabJobDetail,
+  useCareerLabJobs,
   useCareerLabSession,
   useCareerLabSessions,
   useCareerLabSkills,
   useDeleteCareerLabSession,
   useEndCareerLab,
+  useRenameCareerLabSession,
   useSendCareerLabMessage,
   useStartCareerLab,
   useUnarchiveCareerLabSession,
@@ -73,10 +78,23 @@ function ContextRail({
   skillRef: RefObject<HTMLSelectElement | null>;
 }) {
   const rows = skills.data?.skills ?? [];
-  const updateId = (key: "jobId" | "resumeVersionId", value: string) => {
-    const numeric = value ? Number(value) : undefined;
-    setContext({ ...context, [key]: numeric });
-  };
+  const jobs = useCareerLabJobs();
+  const jobDetail = useCareerLabJobDetail(context.jobId ?? null);
+  const [jobSearch, setJobSearch] = useState("");
+  const [jobStatus, setJobStatus] = useState("");
+  const [jobSource, setJobSource] = useState("");
+  const jobRows = useMemo(() => jobs.data ?? [], [jobs.data]);
+  const statuses = useMemo(() => [...new Set(jobRows.map((row) => row.status))].sort(), [jobRows]);
+  const sources = useMemo(() => [...new Set(jobRows.map((row) => row.source))].sort(), [jobRows]);
+  const filteredJobs = useMemo(() => {
+    const query = jobSearch.trim().toLocaleLowerCase();
+    const matches = jobRows.filter((row) => {
+      const haystack = [row.company, row.title, row.location].filter(Boolean).join(" ").toLocaleLowerCase();
+      return (!query || haystack.includes(query)) && (!jobStatus || row.status === jobStatus) && (!jobSource || row.source === jobSource);
+    });
+    const selected = jobRows.find((row) => row.jobId === context.jobId);
+    return selected && !matches.some((row) => row.jobId === selected.jobId) ? [selected, ...matches] : matches;
+  }, [context.jobId, jobRows, jobSearch, jobSource, jobStatus]);
   const updateOfferIds = (value: string) => {
     const offerApplicationIds = value
       .split(",")
@@ -147,16 +165,62 @@ function ContextRail({
           </span>
         </label>
         <details className="rounded-lg border bg-muted/20 p-3">
-          <summary className="cursor-pointer text-sm font-medium">Add typed references</summary>
+          <summary className="cursor-pointer text-sm font-medium">Add job &amp; resume context</summary>
           <div className="mt-3 space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="career-job-id">Job id</Label>
-              <input id="career-job-id" type="number" min={1} value={context.jobId ?? ""} onChange={(event) => updateId("jobId", event.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm" />
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1 xl:col-span-2">
+                <Label htmlFor="career-job-search">Find a job</Label>
+                <Input id="career-job-search" value={jobSearch} onChange={(event) => setJobSearch(event.target.value)} placeholder="Company, role, or location" className="h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="career-job-status">Job status</Label>
+                <select id="career-job-status" value={jobStatus} onChange={(event) => setJobStatus(event.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm">
+                  <option value="">All statuses</option>
+                  {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="career-job-source">Job source</Label>
+                <select id="career-job-source" value={jobSource} onChange={(event) => setJobSource(event.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm">
+                  <option value="">All sources</option>
+                  {sources.map((source) => <option key={source} value={source}>{source}</option>)}
+                </select>
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="career-resume-id">Resume version id</Label>
-              <input id="career-resume-id" type="number" min={1} value={context.resumeVersionId ?? ""} onChange={(event) => updateId("resumeVersionId", event.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm" />
+              <Label htmlFor="career-job">Job</Label>
+              <select
+                id="career-job"
+                value={context.jobId ?? ""}
+                onChange={(event) => setContext({ ...context, jobId: event.target.value ? Number(event.target.value) : undefined, resumeVersionId: undefined })}
+                className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm"
+              >
+                <option value="">No job selected</option>
+                {filteredJobs.map((row) => <option key={row.jobId} value={row.jobId}>{[row.company, row.title].filter(Boolean).join(" · ") || `Job ${row.jobId}`} — {row.status}</option>)}
+              </select>
+              {jobs.isPending ? <p className="text-xs text-muted-foreground">Loading jobs…</p> : null}
+              {jobs.isError ? <p className="text-xs text-destructive">Jobs could not be loaded.</p> : null}
+              {!jobs.isPending && !jobs.isError && filteredJobs.length === 0 ? <p className="text-xs text-muted-foreground">No jobs match these filters.</p> : null}
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="career-resume-version">Resume version</Label>
+              <select
+                id="career-resume-version"
+                disabled={!context.jobId || jobDetail.isPending}
+                value={context.resumeVersionId ?? ""}
+                onChange={(event) => setContext({ ...context, resumeVersionId: event.target.value ? Number(event.target.value) : undefined })}
+                className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="">{context.jobId ? "No resume version" : "Choose a job first"}</option>
+                {(jobDetail.data?.resumeVersions ?? []).map((version) => <option key={version.id} value={version.id}>Round {version.round} · {version.origin}</option>)}
+              </select>
+              {context.jobId && jobDetail.data?.resumeVersions.length === 0 ? <p className="text-xs text-muted-foreground">This job has no tailored resume versions yet.</p> : null}
+            </div>
+          </div>
+        </details>
+        <details className="rounded-lg border bg-muted/20 p-3">
+          <summary className="cursor-pointer text-sm font-medium">Add offer comparison references</summary>
+          <div className="mt-3">
             <div className="space-y-1.5">
               <Label htmlFor="career-offer-ids">Offer application ids</Label>
               <input
@@ -183,45 +247,68 @@ function SessionRail({
   onSelect,
   showArchived,
   setShowArchived,
+  onRename,
+  renamePending,
 }: {
   sessions: ReturnType<typeof useCareerLabSessions>;
   selectedId: string | null;
   onSelect: (id: string) => void;
   showArchived: boolean;
   setShowArchived: (value: boolean) => void;
+  onRename: (sessionId: string, title: string) => Promise<void>;
+  renamePending: boolean;
 }) {
   const rows = sessions.data?.sessions ?? [];
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
   return (
     <Card className="bg-card/90">
-      <CardHeader className="flex-row items-center justify-between gap-2 pb-3">
+      <CardHeader className="pb-3">
         <div>
           <CardTitle className="text-base">Sessions</CardTitle>
           <CardDescription>One active draft room at a time.</CardDescription>
         </div>
-        <Button variant="ghost" size="icon-sm" aria-label="Toggle archived sessions" onClick={() => setShowArchived(!showArchived)}>
-          {showArchived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
-        </Button>
       </CardHeader>
       <CardContent className="space-y-2">
         {sessions.isPending ? <Skeleton className="h-16 w-full" /> : null}
         {!sessions.isPending && rows.length === 0 ? <p className="text-sm text-muted-foreground">No saved sessions yet.</p> : null}
-        {rows.map((row) => (
-          <button
-            type="button"
+        {rows.map((row) => {
+          const title = row.title || row.goal || "Untitled Career Lab";
+          return (
+          <div
             key={row.sessionId}
-            onClick={() => onSelect(row.sessionId)}
             className={cn(
-              "w-full rounded-xl border p-3 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              "rounded-xl border p-2 transition-colors",
               row.sessionId === selectedId && "border-primary bg-primary/5",
             )}
           >
-            <span className="block truncate text-sm font-medium">{row.goal || "Untitled Career Lab"}</span>
-            <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant={row.status === "active" ? "secondary" : "outline"}>{row.status}</Badge>
-              <span>{row.turnCount} turns</span>
-            </span>
-          </button>
-        ))}
+            {editingId === row.sessionId ? (
+              <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); void onRename(row.sessionId, draftTitle).then(() => setEditingId(null)); }}>
+                <Label htmlFor={`career-session-title-${row.sessionId}`} className="sr-only">Session title</Label>
+                <Input id={`career-session-title-${row.sessionId}`} aria-label="Session title" autoFocus maxLength={120} value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} className="h-8" />
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                  <Button type="submit" size="sm" disabled={!draftTitle.trim() || renamePending}>Save title</Button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex items-start gap-1">
+                <button type="button" onClick={() => onSelect(row.sessionId)} className="min-w-0 flex-1 rounded-lg p-1 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                  <span className="block truncate text-sm font-medium">{title}</span>
+                  <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant={row.status === "active" ? "secondary" : "outline"}>{row.status}</Badge>
+                    <span>{row.turnCount} turns</span>
+                  </span>
+                </button>
+                <Button variant="ghost" size="icon-sm" aria-label={`Rename ${title}`} onClick={() => { setEditingId(row.sessionId); setDraftTitle(title); }}><Pencil aria-hidden="true" /></Button>
+              </div>
+            )}
+          </div>
+        )})}
+        <label className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
+          <Checkbox checked={showArchived} onCheckedChange={(checked) => setShowArchived(checked === true)} />
+          Show archived sessions
+        </label>
       </CardContent>
     </Card>
   );
@@ -241,6 +328,7 @@ export function CareerLabPage() {
   const archive = useArchiveCareerLabSession();
   const unarchive = useUnarchiveCareerLabSession();
   const remove = useDeleteCareerLabSession();
+  const rename = useRenameCareerLabSession();
   const recoveredRun = useCareerLabRecoveredRun(displayedSessionId);
   const [streamRunId, setStreamRunId] = useState<string | null>(null);
   const [suppressedRunId, setSuppressedRunId] = useState<string | null>(null);
@@ -444,7 +532,7 @@ export function CareerLabPage() {
         <main className="flex min-w-0 flex-col gap-4">
           <Card className="min-w-0 overflow-hidden rounded-2xl">
             <CardHeader className="border-b bg-muted/25 py-4">
-              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />Draft thread</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="size-5 text-primary" aria-hidden="true" />{active?.title || "Draft thread"}</CardTitle>
               <CardDescription>{active ? active.goal || "A focused Career Lab session" : "Start with a question, then choose a skill if routing needs help."}</CardDescription>
             </CardHeader>
             <CardContent className={cn("flex flex-col gap-4 p-4 sm:p-6", CHAT_SURFACE_HEIGHT)}>
@@ -498,7 +586,7 @@ export function CareerLabPage() {
 
         <aside className="min-w-0 space-y-4" aria-label="Career Lab controls and session history">
           <ContextRail skill={skill} setSkill={setSkill} skills={skills} goal={goal} setGoal={setGoal} context={context} setContext={setContext} skillRef={skillRef} />
-          <SessionRail sessions={sessions} selectedId={displayedSessionId} onSelect={setSelectedSessionId} showArchived={showArchived} setShowArchived={setShowArchived} />
+          <SessionRail sessions={sessions} selectedId={displayedSessionId} onSelect={setSelectedSessionId} showArchived={showArchived} setShowArchived={setShowArchived} renamePending={rename.isPending} onRename={async (sessionId, title) => { await rename.mutateAsync({ sessionId, title }); }} />
           {currentSummary?.status === "ended" ? (
             <div className="flex flex-wrap gap-2">
               {!currentSummary.archivedAt ? <Button variant="outline" size="sm" onClick={() => archive.mutate({ sessionId: currentSummary.sessionId })}><Archive aria-hidden="true" />Archive</Button> : <Button variant="outline" size="sm" onClick={() => unarchive.mutate({ sessionId: currentSummary.sessionId })}><ArchiveRestore aria-hidden="true" />Unarchive</Button>}

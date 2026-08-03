@@ -123,6 +123,15 @@ def test_start_message_end_and_archive_contract(monkeypatch, tmp_path):
         assert detail.status_code == 200
         assert detail.json()["turns"][1]["skillRef"]["name"] == "salary-negotiation-prep"
 
+        renamed = client.patch(
+            f"/api/career-lab/sessions/{session_id}",
+            json={"title": "Equity trade-offs"},
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["title"] == "Equity trade-offs"
+        assert renamed.json()["goal"] == "Prepare negotiation points"
+        assert client.get("/api/career-lab/sessions").json()["sessions"][0]["title"] == "Equity trade-offs"
+
         message = client.post(
             f"/api/career-lab/sessions/{session_id}/messages",
             json={"message": "Make it concise.", "skill": "salary-negotiation-prep"},

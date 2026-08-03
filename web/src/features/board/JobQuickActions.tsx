@@ -2,18 +2,26 @@ import { Archive, ArchiveRestore, ExternalLink, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
+import type { components } from "@/lib/api/schema";
 import { cn } from "@/lib/utils";
+import { H1BCheckButton } from "./H1BCheckButton";
 import { useArchiveJob } from "./use-archive-job";
 import { useDeleteJob } from "./use-delete-job";
 
+type H1BStatus = components["schemas"]["H1BSponsorshipEvidenceOut"]["status"];
+
 export function JobQuickActions({
   jobId,
+  company,
   url,
+  h1bStatus,
   archived = false,
   allowDelete = false,
 }: {
   jobId: number;
+  company?: string | null;
   url?: string | null;
+  h1bStatus?: H1BStatus | null;
   archived?: boolean;
   allowDelete?: boolean;
 }) {
@@ -21,6 +29,11 @@ export function JobQuickActions({
   const deleteJob = useDeleteJob();
   return (
     <>
+      <H1BCheckButton
+        jobId={jobId}
+        company={company}
+        initialStatus={h1bStatus}
+      />
       {url && (
         <a
           href={url}

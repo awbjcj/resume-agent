@@ -10,7 +10,12 @@ from typing import Any, Protocol
 from agno.agent import Agent
 from sqlmodel import Session, select
 
-from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
+from resume_agent.career_skills.models import (
+    AgentFamily,
+    AgentRunMeta,
+    JobAnalysisMeta,
+    read_job_analysis_meta,
+)
 from resume_agent.config import Settings
 from resume_agent.h1b.mcp import bounded_h1b_result, h1b_tools
 from resume_agent.h1b.models import (
@@ -29,7 +34,7 @@ from resume_agent.llm_runner import (
 )
 from resume_agent.prompts.guidance import with_guidance
 from resume_agent.taxonomy.industries import normalize_company
-from resume_agent.tracking.tables import H1BCompanyEvidence
+from resume_agent.tracking.tables import H1BCompanyEvidence, Job
 
 
 _UNAVAILABLE_CACHE_TTL = timedelta(minutes=5)
@@ -125,6 +130,7 @@ async def enrich_companies(
     *,
     settings: Settings,
     agent_factory: SponsorshipAgentFactory,
+    force_refresh: bool = False,
 ) -> H1BEnrichmentReport:
     unique: dict[str, str] = {}
     for display in companies:
@@ -143,7 +149,7 @@ async def enrich_companies(
                     H1BCompanyEvidence.normalized_company == normalized
                 )
             ).first()
-            cached = _fresh_cached(row, now)
+            cached = None if force_refresh else _fresh_cached(row, now)
             if cached is None:
                 missing[normalized] = display
             else:
@@ -237,3 +243,40 @@ async def enrich_companies(
             evidence.status == "unavailable" for evidence in by_company.values()
         ),
     )
+
+
+async def check_job_sponsorship(
+    session: Session,
+    job: Job,
+    *,
+    settings: Settings,
+    agent_factory: SponsorshipAgentFactory | None = None,
+) -> H1BSponsorshipEvidence | None:
+    """Force-refresh one job's historical H-1B evidence and attach its snapshot."""
+    normalized = normalize_company(job.company)
+    if not normalized:
+        return None
+
+    report = await enrich_companies(
+        session.get_bind(),
+        [job.company or normalized],
+        settings=settings,
+        agent_factory=agent_factory or DefaultSponsorshipAgentFactory(settings),
+        force_refresh=True,
+    )
+    evidence = report.by_company.get(normalized)
+    if evidence is None:
+        return None
+
+    meta = read_job_analysis_meta(job.analysis_meta_json) or JobAnalysisMeta()
+    row = session.exec(
+        select(H1BCompanyEvidence).where(
+            H1BCompanyEvidence.normalized_company == normalized
+        )
+    ).first()
+    meta.h1b_evidence_id = row.id if row is not None else None
+    meta.h1b_evidence_snapshot = evidence.model_dump(mode="json")
+    job.analysis_meta_json = meta.model_dump(mode="json")
+    session.add(job)
+    session.commit()
+    return evidence

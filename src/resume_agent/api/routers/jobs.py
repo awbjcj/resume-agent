@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import cast
 
 from fastapi import APIRouter, Depends, Request, Response, UploadFile
@@ -29,10 +30,12 @@ from resume_agent.api.schemas.jobs import (
 from resume_agent.career_skills.models import read_job_analysis_meta
 from resume_agent.config import Settings
 from resume_agent.h1b.models import H1BSponsorshipEvidence
+from resume_agent.h1b.service import check_job_sponsorship
 from resume_agent.api.schemas.runs import AddJobTextRequest
 from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.services import board
 from resume_agent.services.discovery import ActiveJobQuotaError, add_job_from_text
+from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.tenancy.limits import DEFAULT_MAX_ACTIVE_JOBS, active_limit
 from resume_agent.tracking.repository import get_job
 from resume_agent.tracking.tables import ApplicationStatus, JobStatus
@@ -112,6 +115,34 @@ def get_job_detail(
     settings: Settings = Depends(get_settings_dep),
 ):
     return _job_detail_response(session, job_id, request, settings)
+
+
+@router.post(
+    "/jobs/{job_id}/h1b-sponsorship",
+    response_model=H1BSponsorshipOut,
+)
+def check_h1b_sponsorship(
+    job_id: int,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
+) -> H1BSponsorshipOut:
+    job = get_job(session, job_id)
+    if job is None:
+        raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
+    if not settings.h1b_mcp_enabled:
+        return H1BSponsorshipOut(capability="disabled")
+    if not normalize_company(job.company):
+        raise ApiException(
+            422,
+            "VALIDATION_ERROR",
+            "A company is required before checking H-1B sponsorship",
+        )
+
+    evidence = asyncio.run(check_job_sponsorship(session, job, settings=settings))
+    return H1BSponsorshipOut(
+        capability="available" if evidence is not None else "unavailable",
+        evidence=(H1BSponsorshipEvidenceOut.from_evidence(evidence) if evidence else None),
+    )
 
 
 @router.patch("/jobs/{job_id}", response_model=JobDetail)

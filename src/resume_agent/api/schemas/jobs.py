@@ -14,6 +14,9 @@ from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.verdict import failing_gate_names
 
 
+H1BSponsorshipStatus = Literal["matched", "no_match", "unavailable"]
+
+
 class SkillTagOut(CamelModel):
     name: str
     covered: bool
@@ -43,6 +46,7 @@ class ShortlistItem(CamelModel):
     location_region: str | None = None
     location_city: str | None = None
     url: str | None = None
+    h1b_sponsorship_status: H1BSponsorshipStatus | None = None
 
 
 class PipelineItem(CamelModel):
@@ -76,6 +80,7 @@ class PipelineItem(CamelModel):
     needs_attention: bool = False
     regressed: bool = False
     url: str | None = None
+    h1b_sponsorship_status: H1BSponsorshipStatus | None = None
 
 
 class TriageItem(CamelModel):
@@ -92,6 +97,7 @@ class TriageItem(CamelModel):
     reject_reason: str | None = None
     reject_category: str | None = None
     url: str | None = None
+    h1b_sponsorship_status: H1BSponsorshipStatus | None = None
 
 
 class ResumeVersionOut(CamelModel):
@@ -161,7 +167,7 @@ class CoverLetterOut(CamelModel):
 
 
 class H1BSponsorshipEvidenceOut(CamelModel):
-    status: Literal["matched", "no_match", "unavailable"]
+    status: H1BSponsorshipStatus
     normalized_company: str
     display_company: str | None
     fiscal_periods: list[str]

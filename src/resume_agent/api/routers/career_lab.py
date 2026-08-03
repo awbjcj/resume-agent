@@ -20,6 +20,7 @@ from resume_agent.api.schemas.career_lab import (
     CareerLabContextIn,
     CareerLabMessageIn,
     CareerLabSessionOut,
+    CareerLabSessionPatchIn,
     CareerLabSessionSummaryOut,
     CareerLabSessionsOut,
     CareerLabSkillOut,
@@ -34,6 +35,7 @@ from resume_agent.career_lab.store import (
     archive_session,
     delete_session,
     list_sessions,
+    rename_session,
     unarchive_session,
 )
 from resume_agent.career_skills.models import AgentFamily
@@ -275,6 +277,7 @@ def list_career_lab_sessions(
         sessions=[
             CareerLabSessionSummaryOut(
                 session_id=row["session_id"],
+                title=row.get("title", ""),
                 goal=row["goal"],
                 started_at=row["started_at"],
                 ended_at=row.get("ended_at"),
@@ -296,6 +299,21 @@ def list_career_lab_sessions(
 @router.get("/career-lab/sessions/{session_id}", response_model=CareerLabSessionOut)
 def get_career_lab_session(session_id: str, request: Request):
     try:
+        return CareerLabSessionOut.model_validate(session_view(_root(request), session_id))
+    except ValueError as exc:
+        raise _value_error(exc) from exc
+
+
+@router.patch("/career-lab/sessions/{session_id}", response_model=CareerLabSessionOut)
+def rename_career_lab_session(
+    session_id: str,
+    payload: CareerLabSessionPatchIn,
+    request: Request,
+    manager: RunManager = Depends(get_run_manager),
+):
+    _ensure_no_active_run(manager, session_id)
+    try:
+        rename_session(_root(request), session_id, payload.title)
         return CareerLabSessionOut.model_validate(session_view(_root(request), session_id))
     except ValueError as exc:
         raise _value_error(exc) from exc

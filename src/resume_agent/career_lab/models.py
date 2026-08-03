@@ -93,6 +93,7 @@ class CareerLabTurnRecord(ExtensibleModel):
 
 
 class CareerLabSession(SessionModel):
+    title: str = Field(default="", max_length=120)
     goal: str = Field(default="", max_length=2_000)
     ended_at: str | None = None
     turns: list[CareerLabTurnRecord] = Field(default_factory=list)

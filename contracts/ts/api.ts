@@ -760,7 +760,8 @@ export interface paths {
         delete: operations["delete_career_lab_api_career_lab_sessions__session_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Rename Career Lab Session */
+        patch: operations["rename_career_lab_session_api_career_lab_sessions__session_id__patch"];
         trace?: never;
     };
     "/api/career-lab/sessions/{session_id}/archive": {
@@ -1551,6 +1552,23 @@ export interface paths {
         get: operations["list_email_drafts_api_jobs__job_id__email_drafts_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/h1b-sponsorship": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check H1B Sponsorship */
+        post: operations["check_h1b_sponsorship_api_jobs__job_id__h1b_sponsorship_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3349,8 +3367,18 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "ended";
+            /**
+             * Title
+             * @default
+             */
+            title: string;
             /** Turns */
             turns?: components["schemas"]["CareerLabTurnOut"][];
+        };
+        /** CareerLabSessionPatchIn */
+        CareerLabSessionPatchIn: {
+            /** Title */
+            title: string;
         };
         /** CareerLabSessionSummaryOut */
         CareerLabSessionSummaryOut: {
@@ -3372,6 +3400,11 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "ended";
+            /**
+             * Title
+             * @default
+             */
+            title: string;
             /**
              * Turncount
              * @default 0
@@ -4793,6 +4826,8 @@ export interface components {
             employmentType?: string | null;
             /** Fitscore */
             fitScore: number | null;
+            /** H1Bsponsorshipstatus */
+            h1BSponsorshipStatus?: ("matched" | "no_match" | "unavailable") | null;
             /** Hasprogress */
             hasProgress: boolean;
             /** Industry */
@@ -5900,6 +5935,8 @@ export interface components {
             fitRationale: string | null;
             /** Fitscore */
             fitScore: number | null;
+            /** H1Bsponsorshipstatus */
+            h1BSponsorshipStatus?: ("matched" | "no_match" | "unavailable") | null;
             /** Industry */
             industry: string | null;
             /** Jobid */
@@ -6324,6 +6361,8 @@ export interface components {
             company: string | null;
             /** Fitscore */
             fitScore: number | null;
+            /** H1Bsponsorshipstatus */
+            h1BSponsorshipStatus?: ("matched" | "no_match" | "unavailable") | null;
             /** Hasprogress */
             hasProgress: boolean;
             /** Jobid */
@@ -8341,6 +8380,43 @@ export interface operations {
             };
         };
     };
+    rename_career_lab_session_api_career_lab_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CareerLabSessionPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareerLabSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     archive_career_lab_api_career_lab_sessions__session_id__archive_post: {
         parameters: {
             query?: never;
@@ -10251,6 +10327,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmailDraftOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_h1b_sponsorship_api_jobs__job_id__h1b_sponsorship_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H1BSponsorshipOut"];
                 };
             };
             /** @description Validation Error */

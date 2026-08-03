@@ -1506,6 +1506,11 @@
             "title": "Status",
             "type": "string"
           },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
           "turns": {
             "items": {
               "$ref": "#/components/schemas/CareerLabTurnOut"
@@ -1520,6 +1525,21 @@
           "status"
         ],
         "title": "CareerLabSessionOut",
+        "type": "object"
+      },
+      "CareerLabSessionPatchIn": {
+        "properties": {
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "CareerLabSessionPatchIn",
         "type": "object"
       },
       "CareerLabSessionSummaryOut": {
@@ -1565,6 +1585,11 @@
               "ended"
             ],
             "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
             "type": "string"
           },
           "turnCount": {
@@ -5325,6 +5350,22 @@
             ],
             "title": "Fitscore"
           },
+          "h1BSponsorshipStatus": {
+            "anyOf": [
+              {
+                "enum": [
+                  "matched",
+                  "no_match",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H1Bsponsorshipstatus"
+          },
           "hasProgress": {
             "title": "Hasprogress",
             "type": "boolean"
@@ -8395,6 +8436,22 @@
             ],
             "title": "Fitscore"
           },
+          "h1BSponsorshipStatus": {
+            "anyOf": [
+              {
+                "enum": [
+                  "matched",
+                  "no_match",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H1Bsponsorshipstatus"
+          },
           "industry": {
             "anyOf": [
               {
@@ -9648,6 +9705,22 @@
               }
             ],
             "title": "Fitscore"
+          },
+          "h1BSponsorshipStatus": {
+            "anyOf": [
+              {
+                "enum": [
+                  "matched",
+                  "no_match",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H1Bsponsorshipstatus"
           },
           "hasProgress": {
             "title": "Hasprogress",
@@ -13306,6 +13379,69 @@
           }
         },
         "summary": "Get Career Lab Session"
+      },
+      "patch": {
+        "operationId": "rename_career_lab_session_api_career_lab_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CareerLabSessionPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareerLabSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Career Lab Session"
       }
     },
     "/api/career-lab/sessions/{session_id}/archive": {
@@ -16427,6 +16563,61 @@
           }
         },
         "summary": "List Email Drafts"
+      }
+    },
+    "/api/jobs/{job_id}/h1b-sponsorship": {
+      "post": {
+        "operationId": "check_h1b_sponsorship_api_jobs__job_id__h1b_sponsorship_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H1BSponsorshipOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check H1B Sponsorship"
       }
     },
     "/api/jobs/{job_id}/select-cover-letter/{cover_letter_id}": {

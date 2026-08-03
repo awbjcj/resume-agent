@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   useCareerLabRecoveredRun,
+  useRenameCareerLabSession,
   useCareerLabSessions,
   useSendCareerLabMessage,
   useStartCareerLab,
@@ -14,13 +15,14 @@ import { useRunStore } from "@/lib/runs/store";
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
+  patch: vi.fn(),
   unwrap: vi.fn(),
   trackRun: vi.fn(),
   upsert: vi.fn(),
 }));
 
 vi.mock("@/lib/api/client", () => ({
-  api: { GET: mocks.get, POST: mocks.post },
+  api: { GET: mocks.get, POST: mocks.post, PATCH: mocks.patch },
   unwrap: mocks.unwrap,
 }));
 vi.mock("@/lib/runs/tracker", () => ({ trackRun: mocks.trackRun }));
@@ -115,6 +117,22 @@ describe("Career Lab hooks", () => {
     expect(mocks.get).toHaveBeenCalledWith("/api/career-lab/sessions", {
       params: { query: { includeArchived: true, page: 1, pageSize: 20 } },
     });
+  });
+
+  it("renames a session and refreshes session queries", async () => {
+    mocks.unwrap.mockResolvedValueOnce({ sessionId: "s1", title: "Equity trade-offs" });
+    const { wrapper, invalidate } = wrap();
+    const { result } = renderHook(() => useRenameCareerLabSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionId: "s1", title: "Equity trade-offs" });
+    });
+
+    expect(mocks.patch).toHaveBeenCalledWith("/api/career-lab/sessions/{session_id}", {
+      params: { path: { session_id: "s1" } },
+      body: { title: "Equity trade-offs" },
+    });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["career-lab-sessions"] });
   });
 
   it("rehydrates an active start run before a session id exists", () => {

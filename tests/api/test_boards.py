@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import cast
 
 from fastapi import FastAPI
@@ -5,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
+from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
 from resume_agent.tracking.tables import Job, JobStatus
 
 
@@ -52,6 +54,38 @@ def test_pipeline_status_filter():
         _seed(client.app, status=JobStatus.raw.value, company="Drop")
         body = client.get("/api/pipeline?status=tailored").json()
     assert [r["company"] for r in body["data"]] == ["Keep"]
+
+
+def test_pipeline_exposes_persisted_h1b_sponsorship_status():
+    client = _client()
+    now = datetime.now(timezone.utc)
+    evidence = H1BSponsorshipEvidence(
+        status="matched",
+        normalized_company="acme",
+        display_company="Acme",
+        fiscal_periods=["2024"],
+        filing_count=1,
+        certified_count=1,
+        wage_summary=None,
+        source_url=None,
+        data_version="fixture-v1",
+        retrieved_at=now,
+        expires_at=now + timedelta(days=1),
+        confidence=0.7,
+        caveat=HISTORICAL_ONLY_CAVEAT,
+    )
+    with client:
+        _seed(
+            client.app,
+            status=JobStatus.filtered.value,
+            company="Acme",
+            analysis_meta_json={
+                "h1b_evidence_snapshot": evidence.model_dump(mode="json")
+            },
+        )
+        body = client.get("/api/pipeline").json()
+
+    assert body["data"][0]["h1BSponsorshipStatus"] == "matched"
 
 
 def test_pipeline_sponsorship_and_type_filters_expose_matching_details():

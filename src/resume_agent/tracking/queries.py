@@ -8,6 +8,7 @@ from sqlalchemy.orm import defer
 from sqlmodel import Session, select
 
 from resume_agent.discovery.connectors.text import clean_job_description_text
+from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.taxonomy.company_size import snap as snap_size
 from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_skills
@@ -65,6 +66,7 @@ class ShortlistRow:
     location_city: str | None = None
     is_us: bool = False
     url: str | None = None
+    h1b_sponsorship_status: str | None = None
 
 
 @dataclass(kw_only=True)
@@ -108,6 +110,7 @@ class TriageRow:
     reject_reason: str | None = None
     reject_category: str | None = None
     url: str | None = None
+    h1b_sponsorship_status: str | None = None
 
 
 @dataclass
@@ -143,6 +146,21 @@ class PipelineRow:
     needs_attention: bool = False
     regressed: bool = False
     url: str | None = None
+    h1b_sponsorship_status: str | None = None
+
+
+def _h1b_sponsorship_status(job: Job) -> str | None:
+    """Return the persisted H-1B evidence status, failing closed if corrupt."""
+    metadata = job.analysis_meta_json
+    if not isinstance(metadata, dict):
+        return None
+    snapshot = metadata.get("h1b_evidence_snapshot")
+    if snapshot is None:
+        return None
+    try:
+        return H1BSponsorshipEvidence.model_validate(snapshot).status
+    except Exception:
+        return None
 
 
 def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> list[SkillTag]:
@@ -205,6 +223,7 @@ def _shortlist_row(job: Job, tokens: set[str], aliases: dict[str, str]) -> Short
         location_city=loc.get("city"),
         is_us=bool(loc.get("is_us")),
         url=job.url,
+        h1b_sponsorship_status=_h1b_sponsorship_status(job),
     )
 
 
@@ -368,6 +387,7 @@ def project_pipeline_jobs(
                 needs_attention=best.no_clean_round,
                 regressed=best.regressed,
                 url=job.url,
+                h1b_sponsorship_status=_h1b_sponsorship_status(job),
             )
         )
     return rows
@@ -408,6 +428,7 @@ def _triage_row(job: Job, progressed: set[int]) -> TriageRow:
         reject_reason=job.reject_reason,
         reject_category=job.reject_category,
         url=job.url,
+        h1b_sponsorship_status=_h1b_sponsorship_status(job),
     )
 
 

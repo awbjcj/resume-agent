@@ -12,6 +12,7 @@ from resume_agent.career_lab.store import (
     append_turns,
     create_session,
     load_session,
+    rename_session,
 )
 
 
@@ -94,3 +95,19 @@ def test_append_turns_round_trips_typed_artifact(tmp_path):
 def test_store_model_accepts_legacy_empty_turns():
     session = CareerLabSession(session_id="s1", started_at="2026-08-02T00:00:00+00:00")
     assert session.turns == []
+
+
+def test_rename_session_changes_title_without_changing_goal(tmp_path):
+    create_session(tmp_path, session_id="s1", goal="Prepare negotiation points")
+
+    renamed = rename_session(tmp_path, "s1", "  Equity trade-offs  ")
+
+    assert renamed["title"] == "Equity trade-offs"
+    assert renamed["goal"] == "Prepare negotiation points"
+
+
+def test_rename_session_rejects_an_empty_title(tmp_path):
+    create_session(tmp_path, session_id="s1", goal="Prepare negotiation points")
+
+    with pytest.raises(ValueError, match="title is empty"):
+        rename_session(tmp_path, "s1", "   ")

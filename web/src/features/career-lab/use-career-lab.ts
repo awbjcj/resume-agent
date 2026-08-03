@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { api, unwrap } from "@/lib/api/client";
+import { api, fetchAllPages, unwrap } from "@/lib/api/client";
 import type { RunRecord } from "@/lib/runs/store";
 import { useRunStore } from "@/lib/runs/store";
 import { trackRun } from "@/lib/runs/tracker";
@@ -12,6 +12,8 @@ export type CareerLabSessionSummary = components["schemas"]["CareerLabSessionSum
 export type CareerLabSkill = components["schemas"]["CareerLabSkillOut"];
 export type CareerLabContext = components["schemas"]["CareerLabContextIn"];
 export type CareerLabSkillName = components["schemas"]["CareerLabSkillName"];
+export type CareerLabJob = components["schemas"]["PipelineItem"];
+export type CareerLabJobDetail = components["schemas"]["JobDetail"];
 type RunOut = components["schemas"]["RunOut"];
 type StartInput = {
   message: string;
@@ -88,6 +90,31 @@ export function useCareerLabSession(sessionId: string | null) {
   });
 }
 
+export function useCareerLabJobs() {
+  return useQuery({
+    queryKey: ["career-lab-jobs"],
+    queryFn: () =>
+      fetchAllPages<CareerLabJob>((page) =>
+        api.GET("/api/pipeline", {
+          params: { query: { page, pageSize: 200, sortBy: "recency" } },
+        }),
+      ),
+  });
+}
+
+export function useCareerLabJobDetail(jobId: number | null) {
+  return useQuery({
+    queryKey: ["career-lab-job", jobId],
+    enabled: jobId != null,
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/jobs/{job_id}", {
+          params: { path: { job_id: jobId as number } },
+        }),
+      ) as Promise<CareerLabJobDetail>,
+  });
+}
+
 function useRunMutation<T extends Record<string, unknown>>(
   launch: (input: T) => Promise<RunOut>,
 ) {
@@ -139,6 +166,21 @@ export function useEndCareerLab() {
       }),
     ),
   );
+}
+
+export function useRenameCareerLabSession() {
+  const invalidate = useInvalidation();
+  return useMutation({
+    mutationFn: ({ sessionId, title }: { sessionId: string; title: string }) =>
+      unwrap(
+        api.PATCH("/api/career-lab/sessions/{session_id}", {
+          params: { path: { session_id: sessionId } },
+          body: { title },
+        }),
+      ) as Promise<CareerLabSession>,
+    onSuccess: invalidate,
+    onError: (error: Error) => toast.error(error.message),
+  });
 }
 
 function useLifecycleMutation(action: "archive" | "unarchive" | "delete") {

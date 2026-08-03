@@ -322,6 +322,7 @@ def _complete_turn(
 def _view(session: dict) -> dict:
     return {
         "sessionId": session["session_id"],
+        "title": session.get("title", ""),
         "goal": session["goal"],
         "startedAt": session["started_at"],
         "endedAt": session.get("ended_at"),
@@ -507,7 +508,7 @@ def run_start_turn(
     if isinstance(prepared, dict):
         return prepared
     resolved, assistant_text, artifact, notice, meta = prepared
-    created = create_session(root, goal=goal)
+    created = create_session(root, goal=goal, title=goal or text[:120])
     append_turns(
         root,
         created["session_id"],

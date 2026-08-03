@@ -45,6 +45,18 @@ class CareerLabMessageIn(CamelModel):
     context: CareerLabContextIn | None = None
 
 
+class CareerLabSessionPatchIn(CamelModel):
+    title: str = Field(min_length=1, max_length=120)
+
+    @field_validator("title")
+    @classmethod
+    def require_nonempty_title(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("title must not be empty")
+        return cleaned
+
+
 class CareerLabSkillOut(CamelModel):
     name: str
     description: str = ""
@@ -101,6 +113,7 @@ class CareerLabTurnOut(CamelModel):
 
 class CareerLabSessionOut(CamelModel):
     session_id: str
+    title: str = ""
     goal: str = ""
     started_at: str
     ended_at: str | None = None
@@ -111,6 +124,7 @@ class CareerLabSessionOut(CamelModel):
 
 class CareerLabSessionSummaryOut(CamelModel):
     session_id: str
+    title: str = ""
     goal: str = ""
     started_at: str
     ended_at: str | None = None

@@ -33,6 +33,7 @@ type Row = {
   employmentType?: string | null;
   remotePolicy?: string | null;
   sponsorshipSignal?: string | null;
+  h1BSponsorshipStatus?: "matched" | "no_match" | "unavailable" | null;
   industry?: string | null;
   rejectCategory?: string | null;
   rejectReason?: string | null;
@@ -89,7 +90,7 @@ export function JobTable({
         <col className="w-44" />
         {statusColumn && <col className="w-32" />}
         {extraColumn && <col className={fitColumn ? "w-72" : "w-80"} />}
-        {actions && <col className="w-32" />}
+        {actions && <col className="w-72" />}
       </colgroup>
       <TableHeader>
         <TableRow>

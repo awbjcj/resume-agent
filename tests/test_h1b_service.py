@@ -3,10 +3,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+from sqlmodel import Session
+
 from resume_agent.config import Settings
 from resume_agent.db import init_db, make_engine
 from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
-from resume_agent.h1b.service import enrich_companies
+from resume_agent.h1b.service import check_job_sponsorship, enrich_companies
+from resume_agent.tracking.tables import Job
 
 
 def _evidence(company: str) -> H1BSponsorshipEvidence:
@@ -116,6 +119,58 @@ def test_duplicate_company_spellings_are_researched_once_and_then_cached(monkeyp
     assert len(runner.calls) == 1
     assert second.cache_hits == 1
     assert second.researched == 0
+
+    refreshed = asyncio.run(
+        enrich_companies(
+            engine,
+            ["acme"],
+            settings=settings,
+            agent_factory=Factory(runner),
+            force_refresh=True,
+        )
+    )
+    assert refreshed.researched == 1
+    assert len(runner.calls) == 2
+
+
+def test_manual_job_check_persists_the_evidence_snapshot(monkeypatch):
+    import resume_agent.h1b.service as service
+
+    @asynccontextmanager
+    async def fake_tools(_settings):
+        yield object()
+
+    monkeypatch.setattr(service, "h1b_tools", fake_tools)
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+
+    with Session(engine) as session:
+        job = Job(source="manual", company="Acme", jd_text="x")
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+
+        evidence = asyncio.run(
+            check_job_sponsorship(
+                session,
+                job,
+                settings=settings,
+                agent_factory=Factory(FakeRunner()),
+            )
+        )
+
+        assert evidence is not None
+        assert evidence.status == "matched"
+        assert job.analysis_meta_json is not None
+        snapshot = job.analysis_meta_json["h1b_evidence_snapshot"]
+        assert isinstance(snapshot, dict)
+        assert snapshot["status"] == "matched"
 
 
 def test_unavailable_results_use_the_short_retry_expiry(monkeypatch):

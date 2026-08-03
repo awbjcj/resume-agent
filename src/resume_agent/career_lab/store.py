@@ -22,6 +22,7 @@ def create_session(
     *,
     session_id: str | None = None,
     goal: str = "",
+    title: str = "",
 ) -> dict:
     """Create one active session, rejecting a second active transcript."""
     with store.lock():
@@ -31,6 +32,7 @@ def create_session(
             session_id=session_id or uuid.uuid4().hex,
             started_at=now_iso(),
             goal=goal.strip(),
+            title=(title.strip() or goal.strip())[:120],
         )
         store.write(root, session.model_dump(mode="json"))
         return store.load(root, session.session_id)
@@ -47,6 +49,20 @@ def list_sessions(root: Path | str, *, include_archived: bool = False) -> list[d
 def active_session(root: Path | str) -> dict | None:
     rows = store.active(root)
     return rows[0] if rows else None
+
+
+def rename_session(root: Path | str, session_id: str, title: str) -> dict:
+    """Change only the user-facing thread title, preserving its agent goal."""
+    cleaned = title.strip()
+    if not cleaned:
+        raise ValueError("title is empty")
+    if len(cleaned) > 120:
+        raise ValueError("title is too large")
+
+    def apply(session: dict) -> None:
+        session["title"] = cleaned
+
+    return store.mutate(root, session_id, apply)
 
 
 def append_turns(

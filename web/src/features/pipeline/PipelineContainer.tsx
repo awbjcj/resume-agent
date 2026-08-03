@@ -260,7 +260,7 @@ export function PipelineContainer() {
               onOpen={(row) => openJob(row.jobId)}
               onRowsChange={reportRows}
               view={view}
-              actions={(row) => <JobQuickActions jobId={row.jobId} url={row.url} />}
+              actions={(row) => <JobQuickActions jobId={row.jobId} company={row.company} url={row.url} h1bStatus={row.h1BSponsorshipStatus} />}
             />
           ))}
         </>
