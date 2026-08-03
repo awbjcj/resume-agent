@@ -12,6 +12,7 @@ vi.mock("./use-scout", async (original) => ({
   useSendScoutMessage: () => ({ mutateAsync: mocks.send, isPending: false }),
   useEndScoutSession: () => ({ mutateAsync: mocks.end, isPending: false }),
   useArchiveScoutSession: () => ({ mutate: vi.fn() }), useUnarchiveScoutSession: () => ({ mutate: vi.fn() }), useDeleteScoutSession: () => ({ mutate: mocks.remove, isPending: false }),
+  useRenameScoutSession: () => ({ mutate: vi.fn(), isPending: false }),
   useApproveScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }), useDismissScoutProposal: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock("@/lib/chat/useChatStream", () => ({ useChatStream: () => ({ parts: [], status: "idle", error: null, stop: vi.fn(), reset: vi.fn() }) }));
@@ -20,13 +21,14 @@ import { ScoutPage } from "./ScoutPage";
 
 beforeEach(() => { vi.clearAllMocks(); mocks.session = null; mocks.sessions = []; mocks.includeArchived = false; mocks.start.mockResolvedValue({ runId: "r1" }); });
 
-it("starts discovery from a concrete empty-state composer", async () => {
+it("starts discovery from the guided empty state", async () => {
   render(<ScoutPage />, { wrapper: withQueryClient });
-  const input = screen.getByLabelText("Discovery request");
+  await userEvent.click(screen.getByRole("button", { name: "Create Scout session" }));
+  const input = screen.getByLabelText("Discovery goal");
   await userEvent.type(input, "Find healthcare platform roles");
-  await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+  await userEvent.click(screen.getByRole("button", { name: "Start research" }));
   expect(mocks.start).toHaveBeenCalledWith(expect.objectContaining({ message: "Find healthcare platform roles" }));
-  expect(screen.getByText("Review proposals")).toBeInTheDocument();
+  expect(screen.getByTestId("chat-viewport")).toHaveTextContent("Find healthcare platform roles");
 });
 
 it("echoes the sent message into the thread before the turn finishes", async () => {

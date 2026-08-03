@@ -1,16 +1,19 @@
 import { useMemo, useRef, useState } from "react";
-import { Archive, ArchiveRestore, Bot, Clock3, Compass, History, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Bot, Building2, CheckCircle2, Clock3, Compass, MessageCircleQuestion, Pencil, Search, Trash2 } from "lucide-react";
 
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatThread, type ChatThreadMessage } from "@/components/chat/ChatThread";
 import { GuidedWorkspaceHeader } from "@/components/chat/GuidedWorkspaceHeader";
 import { CHAT_PAGE_WIDTH, CHAT_SURFACE_HEIGHT } from "@/components/chat/layout";
+import { WorkspaceEmptyState } from "@/components/chat/WorkspaceEmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChatStream } from "@/lib/chat/useChatStream";
 import { cn } from "@/lib/utils";
@@ -20,30 +23,35 @@ import { ProposalRail } from "./ProposalRail";
 import {
   useArchiveScoutSession, useDeleteScoutSession, useEndScoutSession,
   useScoutSession, useScoutSessions, useSendScoutMessage, useStartScoutSession,
-  useUnarchiveScoutSession, type ScoutSessionSummary,
+  useRenameScoutSession, useUnarchiveScoutSession, type ScoutSessionSummary,
 } from "./use-scout";
 
 function SessionHistory({ rows, selected, onSelect, showArchived, onShowArchivedChange }: { rows: ScoutSessionSummary[]; selected: string | null; onSelect: (id: string) => void; showArchived: boolean; onShowArchivedChange: (checked: boolean) => void }) {
   const archive = useArchiveScoutSession();
   const unarchive = useUnarchiveScoutSession();
   const remove = useDeleteScoutSession();
+  const rename = useRenameScoutSession();
   const [pendingDelete, setPendingDelete] = useState<ScoutSessionSummary | null>(null);
+  const [pendingRename, setPendingRename] = useState<ScoutSessionSummary | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
   return <Card className="rounded-2xl shadow-none">
     <CardHeader className="gap-3 border-b">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2"><History className="size-4 text-primary" aria-hidden="true" /><CardTitle className="text-base">Session history</CardTitle></div>
+        <div className="flex items-center gap-2"><Clock3 className="size-4 text-primary" aria-hidden="true" /><CardTitle className="text-base">Session history</CardTitle></div>
         <label className="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox checked={showArchived} onCheckedChange={(checked) => onShowArchivedChange(Boolean(checked))} />Show archived</label>
       </div>
     </CardHeader>
     <CardContent>
       {rows.length ? <ul className="divide-y">{rows.map((row) => <li key={row.sessionId} className="flex flex-wrap items-center gap-2 py-3">
-        <button className="min-w-0 flex-1 rounded-sm text-left focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onSelect(row.sessionId)}><span className="block truncate text-sm font-medium">{row.goal}</span><span className="text-xs text-muted-foreground">{row.proposalCount} proposals · {row.addedCount} added</span></button>
+        <button className="min-w-0 flex-1 rounded-sm text-left focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onSelect(row.sessionId)}><span className="block truncate text-sm font-medium">{row.sessionTitle || row.goal}</span><span className="text-xs text-muted-foreground">{row.proposalCount} proposals · {row.addedCount} added</span></button>
         {selected === row.sessionId ? <Badge variant="outline">Viewing</Badge> : null}
+        <Button size="icon-sm" variant="ghost" aria-label={`Rename ${row.sessionTitle || row.goal}`} onClick={() => { setPendingRename(row); setRenameTitle(row.sessionTitle || row.goal); }}><Pencil /></Button>
         {row.status === "ended" && !row.archivedAt ? <Button size="icon-sm" variant="ghost" aria-label={`Archive ${row.goal}`} onClick={() => archive.mutate({ sessionId: row.sessionId })}><Archive /></Button> : null}
         {row.archivedAt ? <Button size="icon-sm" variant="ghost" aria-label={`Unarchive ${row.goal}`} onClick={() => unarchive.mutate({ sessionId: row.sessionId })}><ArchiveRestore /></Button> : null}
         <Button size="icon-sm" variant="ghost" aria-label={`Delete ${row.goal}`} onClick={() => setPendingDelete(row)}><Trash2 /></Button>
       </li>)}</ul> : <p className="py-3 text-sm text-muted-foreground">No previous Scout sessions.</p>}
     </CardContent>
+    <Dialog open={pendingRename != null} onOpenChange={(open) => { if (!open) setPendingRename(null); }}><DialogContent><DialogHeader><DialogTitle>Rename Scout session</DialogTitle><DialogDescription>Choose a short name for this research thread.</DialogDescription></DialogHeader><Input aria-label="Session title" autoFocus maxLength={120} value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} /><DialogFooter><Button variant="ghost" onClick={() => setPendingRename(null)}>Cancel</Button><Button disabled={!renameTitle.trim() || rename.isPending} onClick={() => { if (!pendingRename) return; rename.mutate({ sessionId: pendingRename.sessionId, title: renameTitle.trim() }, { onSuccess: () => setPendingRename(null) }); }}>Save title</Button></DialogFooter></DialogContent></Dialog>
     <AlertDialog open={pendingDelete != null} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
       <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this Scout session?</AlertDialogTitle><AlertDialogDescription>The conversation and its proposal history will be permanently removed. This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep it</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={remove.isPending} onClick={() => { if (!pendingDelete) return; remove.mutate({ sessionId: pendingDelete.sessionId }); setPendingDelete(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
     </AlertDialog>
@@ -51,6 +59,7 @@ function SessionHistory({ rows, selected, onSelect, showArchived, onShowArchived
 }
 
 export function ScoutPage() {
+  const [newOpen, setNewOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const sessions = useScoutSessions(showArchived);
   const activeSummary = sessions.data?.sessions?.find((row) => row.status === "active");
@@ -143,10 +152,18 @@ export function ScoutPage() {
     {/* items-stretch (the default) rather than items-start: the ledger sizes
         itself to the conversation and scrolls internally, so the page length no
         longer grows with the proposal count. */}
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-      <Card className="min-w-0 overflow-hidden rounded-2xl"><CardHeader className="border-b bg-muted/20"><div className="flex items-center gap-2"><Bot className="size-5 text-primary" aria-hidden="true" /><CardTitle>{active?.goal || "Plan your next search"}</CardTitle></div><CardDescription>{active ? <><Clock3 className="mr-1 inline size-3.5" />{active.status === "active" ? "Conversation active" : "Session ended"}</> : "Try: Find remote healthcare platform roles at growing mid-size companies."}</CardDescription></CardHeader><CardContent className={cn("flex flex-col gap-4 p-4", CHAT_SURFACE_HEIGHT)}><ChatThread messages={messages} streaming={streaming?.length ? streaming : null} streamingActive={stream.status === "streaming"} showReasoning assistantName="Discovery Scout" assistantIcon={<Compass className="size-4" aria-hidden="true" />} />{active?.recap ? <div className="rounded-xl border bg-muted/35 p-3 text-sm"><span className="font-medium">Recap: </span>{active.recap}</div> : null}{active?.status !== "ended" ? <ChatComposer value={composer} onChange={setComposer} onSend={() => launchMessage()} onStop={stop} busy={busy} settling={stream.status === "settled"} ariaLabel="Discovery request" placeholder={active ? "Ask for a change…" : "Find remote healthcare platform roles at growing mid-size companies…"} /> : <p className="rounded-xl bg-muted/50 p-3 text-center text-sm text-muted-foreground">This conversation has ended. Pending proposals remain available to review.</p>}</CardContent></Card>
-      <ProposalRail className="min-w-0" sessionId={active?.sessionId ?? ""} proposals={active?.proposals ?? []} scrapeAvailable={active?.scrapeAvailable ?? false} />
+    <div className={cn("grid gap-6", active && "xl:grid-cols-[minmax(0,1fr)_24rem]")}>
+      <Card className="min-w-0 overflow-hidden rounded-2xl">
+        <CardHeader className="border-b bg-muted/20"><div className="flex items-center gap-2"><Bot className="size-5 text-primary" aria-hidden="true" /><CardTitle>{active?.sessionTitle || active?.goal || "Discovery workspace"}</CardTitle></div><CardDescription>{active ? <><Clock3 className="mr-1 inline size-3.5" />{active.status === "active" ? "Conversation active" : "Session ended"}</> : "Create a session when you are ready to shape the next search."}</CardDescription></CardHeader>
+        <CardContent className={cn("flex flex-col gap-4 p-4", CHAT_SURFACE_HEIGHT)}>
+          {!active && !busy ? <WorkspaceEmptyState icon={Compass} title="Shape a smarter search" description="Tell the Scout what you want to find. It will research companies and search terms, then wait for your approval before changing anything." actionLabel="Create Scout session" onAction={() => setNewOpen(true)} steps={[{ icon: MessageCircleQuestion, title: "Describe the search", description: "Share roles, locations, industries, and boundaries in plain language." }, { icon: Search, title: "Review the research", description: "The Scout returns separate, cited proposals instead of changing settings silently." }, { icon: CheckCircle2, title: "Approve what fits", description: "Add or dismiss each company and search term while keeping full control." }]} /> : <ChatThread messages={messages} streaming={streaming?.length ? streaming : null} streamingActive={stream.status === "streaming"} showReasoning assistantName="Discovery Scout" assistantIcon={<Compass className="size-4" aria-hidden="true" />} />}
+          {active?.recap ? <div className="rounded-xl border bg-muted/35 p-3 text-sm"><span className="font-medium">Recap: </span>{active.recap}</div> : null}
+          {active?.status === "active" ? <ChatComposer value={composer} onChange={setComposer} onSend={() => launchMessage()} onStop={stop} busy={busy} settling={stream.status === "settled"} ariaLabel="Discovery request" placeholder="Ask for a change…" /> : active ? <p className="rounded-xl bg-muted/50 p-3 text-center text-sm text-muted-foreground">This conversation has ended. Pending proposals remain available to review.</p> : null}
+        </CardContent>
+      </Card>
+      {active ? <ProposalRail className="min-w-0" sessionId={active.sessionId} proposals={active.proposals ?? []} scrapeAvailable={active.scrapeAvailable ?? false} /> : null}
     </div>
     <SessionHistory rows={rows.filter((row) => row.sessionId !== active?.sessionId)} selected={displayedId} onSelect={setSelectedId} showArchived={showArchived} onShowArchivedChange={setShowArchived} />
+    <Dialog open={newOpen} onOpenChange={setNewOpen}><DialogContent><DialogHeader><DialogTitle>Create Scout session</DialogTitle><DialogDescription>Describe the search you want to explore. You can refine it throughout the conversation.</DialogDescription></DialogHeader><Input aria-label="Discovery goal" autoFocus value={composer} onChange={(event) => setComposer(event.target.value)} placeholder="Find remote healthcare platform roles…" /><DialogFooter><Button variant="ghost" onClick={() => setNewOpen(false)}>Cancel</Button><Button disabled={!composer.trim() || busy} onClick={() => { setNewOpen(false); void launchMessage(); }}><Building2 aria-hidden="true" />Start research</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }

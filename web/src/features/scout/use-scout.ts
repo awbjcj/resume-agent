@@ -116,3 +116,15 @@ function useLifecycle(action: "archive" | "unarchive" | "delete") {
 export const useArchiveScoutSession = () => useLifecycle("archive");
 export const useUnarchiveScoutSession = () => useLifecycle("unarchive");
 export const useDeleteScoutSession = () => useLifecycle("delete");
+
+export function useRenameScoutSession() {
+  const invalidate = useScoutInvalidation();
+  return useMutation({
+    mutationFn: ({ sessionId, title }: { sessionId: string; title: string }) =>
+      unwrap(api.PATCH("/api/scout/sessions/{session_id}", {
+        params: { path: { session_id: sessionId } }, body: { title },
+      })),
+    onSuccess: invalidate,
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
