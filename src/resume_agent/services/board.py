@@ -107,7 +107,7 @@ def list_board(
     if board == "shortlist":
         resolved_facts = resolve_tenant_path(facts_path)
         facts = load_facts(resolved_facts) if resolved_facts.exists() else None
-        rows = project_shortlist_jobs(jobs, facts=facts)
+        rows = project_shortlist_jobs(session, jobs, facts=facts)
     elif board == "pipeline":
         rows = project_pipeline_jobs(session, jobs)
     else:
