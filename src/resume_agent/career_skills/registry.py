@@ -6,7 +6,6 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -264,7 +263,6 @@ def resolve_skill(
     )
 
 
-@lru_cache(maxsize=16)
 def registry_for_paths(root: Path | str, manifest: Path | str) -> CareerSkillRegistry:
     root_path = Path(root).expanduser().resolve(strict=False)
     manifest_path = Path(manifest).expanduser().resolve(strict=False)

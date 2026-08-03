@@ -123,7 +123,7 @@ def test_invalid_manifest_entry_fails_only_its_capability(tmp_path, failure):
     ).ref.name == "job-fit-analyzer"
 
 
-def test_registry_cache_uses_resolved_paths(tmp_path):
+def test_registry_resolves_paths_consistently(tmp_path):
     root = tmp_path / "root"
     manifest = tmp_path / "skills-lock.json"
     entry = _manifest_entry(
@@ -137,4 +137,30 @@ def test_registry_cache_uses_resolved_paths(tmp_path):
 
     first = registry_for_paths(root, manifest)
     second = registry_for_paths(root.resolve(), manifest.resolve())
-    assert first is second
+    assert first.root == second.root
+    assert first.manifest_path == second.manifest_path
+
+
+def test_registry_revalidates_a_skill_after_the_file_changes(tmp_path):
+    root = tmp_path / "root"
+    manifest = tmp_path / "skills-lock.json"
+    entry = _manifest_entry(
+        root,
+        "job-fit-analyzer",
+        content=b"---\nname: job-fit-analyzer\ndescription: good\n---\n",
+        family="job_analysis",
+        uses=["fit"],
+    )
+    _write_manifest(manifest, {"job-fit-analyzer": entry})
+    first = registry_for_paths(root, manifest)
+
+    (root / entry["skillPath"]).write_bytes(
+        b"---\nname: job-fit-analyzer\ndescription: changed\n---\n"
+    )
+    second = registry_for_paths(root, manifest)
+
+    assert first is not second
+    with pytest.raises(SkillUnavailable):
+        second.require(
+            "job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit"
+        )
