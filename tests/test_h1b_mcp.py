@@ -78,6 +78,32 @@ def test_result_hook_rejects_oversized_provider_payload():
     asyncio.run(run())
 
 
+def test_result_hook_runs_through_agno_async_tool_dispatch():
+    from agno.tools.function import Function, FunctionCall
+
+    async def provider(company_name: str):
+        return {"company_name": company_name}
+
+    async def run():
+        function = Function(
+            name="h1b_get_company_stats",
+            entrypoint=provider,
+            tool_hooks=[bounded_h1b_result(1_000)],
+        )
+        call = FunctionCall(
+            function=function,
+            arguments={"company_name": "Torc Robotics"},
+        )
+
+        result = await call.aexecute()
+
+        assert result.status == "success"
+        assert result.error is None
+        assert result.result == {"company_name": "Torc Robotics"}
+
+    asyncio.run(run())
+
+
 def test_real_agno_mcp_toolkit_accepts_the_h1b_configuration():
     from agno.tools.mcp import MCPTools
 

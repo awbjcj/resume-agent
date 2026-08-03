@@ -26,8 +26,8 @@ def _serialized_size(value: object) -> int:
 
 def bounded_h1b_result(max_chars: int) -> Callable[..., Any]:
     """Create an async Agno tool hook that bounds provider output."""
-    async def hook(next_func, args):
-        result = next_func(**args)
+    async def hook(func: Callable[..., Any], args: dict[str, Any]) -> Any:
+        result = func(**args)
         if hasattr(result, "__await__"):
             result = await result
         if _serialized_size(result) > max_chars:
