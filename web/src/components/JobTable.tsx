@@ -90,7 +90,7 @@ export function JobTable({
         <col className="w-44" />
         {statusColumn && <col className="w-32" />}
         {extraColumn && <col className={fitColumn ? "w-72" : "w-80"} />}
-        {actions && <col className="w-72" />}
+        {actions && <col className="w-32" />}
       </colgroup>
       <TableHeader>
         <TableRow>

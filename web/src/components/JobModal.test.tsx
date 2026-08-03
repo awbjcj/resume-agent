@@ -221,4 +221,31 @@ describe("JobModal", () => {
 
     expect(screen.getByRole("button", { name: /re-tailor 1 job/i })).toBeEnabled();
   });
+
+  it("places H-1B research inside the Management tab", async () => {
+    server.use(
+      http.get("/api/jobs/42", () =>
+        HttpResponse.json(
+          jobPayload({
+            h1BSponsorship: {
+              capability: "unavailable",
+              message: "No H-1B evidence has been checked for this job yet.",
+              evidence: null,
+            },
+          }),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    wrap(<JobModal jobId={42} onClose={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /staff engineer/i })).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("tab", { name: "Management" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Historical H-1B sponsorship" }),
+    ).toBeInTheDocument();
+  });
 });

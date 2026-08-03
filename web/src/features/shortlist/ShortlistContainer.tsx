@@ -148,12 +148,7 @@ export function ShortlistContainer() {
                 footer={
                   <div className="flex items-center gap-2">
                     <Button className="flex-1" onClick={() => approve.mutate(row.jobId)}>Approve for tailoring</Button>
-                    <JobQuickActions
-                      jobId={row.jobId}
-                      company={row.company}
-                      url={row.url}
-                      h1bStatus={row.h1BSponsorshipStatus}
-                    />
+                    <JobQuickActions jobId={row.jobId} url={row.url} />
                   </div>
                 }
               />
@@ -166,7 +161,7 @@ export function ShortlistContainer() {
               onOpen={openJob}
               onToggleAll={(checked) => checked ? selection.selectPage(loadedIds) : selection.clear()}
               allChecked={rows.every((row) => selection.isSelected(row.jobId))}
-              actions={(row) => <><Button size="sm" onClick={() => approve.mutate(row.jobId)}>Approve</Button><JobQuickActions jobId={row.jobId} company={row.company} url={row.url} h1bStatus={row.h1BSponsorshipStatus} /></>}
+              actions={(row) => <><Button size="sm" onClick={() => approve.mutate(row.jobId)}>Approve</Button><JobQuickActions jobId={row.jobId} url={row.url} /></>}
               statusColumn={false}
               extraColumn={{
                 header: "Details",

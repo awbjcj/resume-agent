@@ -181,9 +181,7 @@ export function TriageContainer() {
             actions={(row) => (
               <JobQuickActions
                 jobId={row.jobId}
-                company={row.company}
                 url={row.url}
-                h1bStatus={row.h1BSponsorshipStatus}
                 archived={archived}
                 allowDelete
               />

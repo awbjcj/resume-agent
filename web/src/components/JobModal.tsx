@@ -16,6 +16,7 @@ import { SkillMatrix } from "./SkillMatrix";
 import { DrawerSkeleton } from "./skeletons";
 import { ApplicationEditor } from "@/features/job/ApplicationEditor";
 import { CoverLettersTab } from "@/features/job/CoverLettersTab";
+import { H1BSponsorshipPanel } from "@/features/job/H1BSponsorshipPanel";
 import { StageManager } from "@/features/job/StageManager";
 import { InterviewTab } from "@/features/interview/InterviewTab";
 import { VersionRow } from "@/features/job/VersionRow";
@@ -218,7 +219,7 @@ export function JobModal({
                     </TabsTrigger>
                     <TabsTrigger value="application" className={tabTriggerClass}>Application</TabsTrigger>
                     <TabsTrigger value="interview" className={tabTriggerClass}>Interview</TabsTrigger>
-                    <TabsTrigger value="manage" className={tabTriggerClass}>Manage</TabsTrigger>
+                    <TabsTrigger value="manage" className={tabTriggerClass}>Management</TabsTrigger>
                   </TabsList>
 
                   <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
@@ -299,7 +300,14 @@ export function JobModal({
                     </TabsContent>
 
                     <TabsContent value="manage" className="mt-0">
-                      <StageManager job={job} onDeleted={onClose} />
+                      <div className="space-y-6">
+                        <StageManager job={job} onDeleted={onClose} />
+                        <H1BSponsorshipPanel
+                          jobId={jobId}
+                          company={job.company}
+                          initialResult={job.h1BSponsorship}
+                        />
+                      </div>
                     </TabsContent>
                   </div>
                 </Tabs>
