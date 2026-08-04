@@ -50,7 +50,7 @@ def test_extractor_defaults_to_mid_tier(monkeypatch):
 
     import resume_agent.profile.extractor as extractor_mod
 
-    def _fake_build_model(model_id, api_key=None):
+    def _fake_build_model(model_id, api_key=None, **kwargs):
         captured["id"] = model_id
         return object()
 

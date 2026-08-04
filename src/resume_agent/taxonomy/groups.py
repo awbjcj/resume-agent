@@ -15,6 +15,7 @@ from pydantic import Field
 
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     build_model,
@@ -111,7 +112,7 @@ _GROUP_INSTRUCTIONS = [
 
 def build_group_classifier_agent() -> Runner:
     settings = get_settings()
-    model = build_model(settings.cheap_model)
+    model = build_model(settings.cheap_model, cache_system_prompt=prompt_cache_for(settings.cheap_model))
     return AgentRunner(
         Agent(
             model=model,

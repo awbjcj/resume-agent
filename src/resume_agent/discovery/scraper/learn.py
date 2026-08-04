@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup, Comment
 from resume_agent.config import get_settings
 from resume_agent.discovery.scraper.recipe import RECIPE_SCHEMA_VERSION, ScrapeRecipe
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     build_model,
@@ -46,7 +47,7 @@ def prune_html(html: str) -> str:
 
 def build_learn_agent(model_id: str | None = None) -> Runner:
     settings = get_settings()
-    model = build_model(model_id or settings.mid_model)
+    model = build_model(model_id or settings.mid_model, cache_system_prompt=prompt_cache_for(model_id or settings.mid_model))
     return AgentRunner(
         Agent(
             model=model,

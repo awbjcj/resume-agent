@@ -133,6 +133,11 @@ class AgentRunner:
         self._applied_key: str | None = None
 
     @property
+    def agent(self) -> Any:
+        """The wrapped provider agent, for per-run system-block binding."""
+        return self._agent
+
+    @property
     def run_meta(self) -> AgentRunMeta | None:
         return self._run_meta
 
@@ -1197,6 +1202,24 @@ def _gemini_interactions_thinking_level_for(
     if effort == "medium":
         return "medium"
     return "high"
+
+
+def prompt_cache_for(model_id: str, *, settings: Settings | None = None) -> bool:
+    """Whether this agent should ask its provider to cache its system block.
+
+    The one switch (``Settings.prompt_cache_enabled``) crossed with what the
+    provider can actually do. Every agent that runs N times per run should pass
+    this to ``build_model``: the instruction block is identical across those N
+    calls, so paying full price for it N times is pure waste.
+
+    Note this caches the *system* block, not turn messages — see the
+    ``cache_system_prompt`` note in the root CLAUDE.md. Per-job context in a
+    user message is not covered, which is why a run-constant document belongs
+    in the system block rather than in the per-call prompt.
+    """
+    if not (settings or get_settings()).prompt_cache_enabled:
+        return False
+    return provider_capabilities(model_id).supports_prompt_cache
 
 
 def build_model(

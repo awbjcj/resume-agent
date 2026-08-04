@@ -18,6 +18,7 @@ from resume_agent.discovery.filter import apply_filters
 from resume_agent.discovery.fit import (  # noqa: F401
     FitScore,
     ascore_fit,
+    bind_profile,
     compose_fit_input,
     score_fit,
 )
@@ -300,6 +301,11 @@ def run_score(
     if reporter:
         reporter.begin(len(jobs), "Scoring fit", phase_index=4, phase_count=_DISCOVER_PHASES)
     if jobs:
+        # The profile scores every job in this phase identically, so it goes
+        # into the agent's cacheable system block once instead of leading all N
+        # per-job messages. If the agent cannot take it, it stays in the
+        # message and nothing about the result changes.
+        profile_in_prefix = bind_profile(agent, profile_facts)
         locations = [_job_location_text(job) for job in jobs]
         pairs = list(zip(jobs, locations))
         sem = asyncio.Semaphore(get_settings().llm_concurrency)
@@ -318,7 +324,7 @@ def run_score(
                     lambda pair: ascore_fit(
                         compose_fit_input(
                             pair[0].jd_text,
-                            profile_facts,
+                            None if profile_in_prefix else profile_facts,
                             pair[1],
                             skill_context=_skill_context(pair[0]),
                             sponsorship_evidence=(

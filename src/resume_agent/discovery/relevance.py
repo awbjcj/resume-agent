@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     acall,
@@ -44,7 +45,7 @@ def build_relevance_agent(model_id: str | None = None) -> Runner | None:
     resolved = model_id or settings.cheap_model
     if not resolve_api_key(resolved):
         return None
-    model = build_model(resolved)
+    model = build_model(resolved, cache_system_prompt=prompt_cache_for(resolved))
     return AgentRunner(
         Agent(
             model=model,

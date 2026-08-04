@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from resume_agent.config import get_settings
 from resume_agent.discovery.url_ingest.models import ExtractedJob
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     build_model,
@@ -30,7 +31,7 @@ _INSTRUCTIONS = [
 
 def build_url_extract_agent(model_id: str | None = None) -> Runner:
     s = get_settings()
-    model = build_model(model_id or s.cheap_model)
+    model = build_model(model_id or s.cheap_model, cache_system_prompt=prompt_cache_for(model_id or s.cheap_model))
     return AgentRunner(
         Agent(
             model=model,

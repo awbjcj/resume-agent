@@ -20,7 +20,11 @@ import httpx
 import pytest
 
 from resume_agent.config import Settings
-from resume_agent.discovery.fit import build_fit_agent, compose_fit_input
+from resume_agent.discovery.fit import (
+    bind_profile,
+    build_fit_agent,
+    compose_fit_input,
+)
 from resume_agent.llm_runner import AgentRunner, resolve_api_key
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.tenancy.context import UserContext, use_context
@@ -181,18 +185,41 @@ def test_fit_prompt_sends_the_run_constant_profile_once_per_run():
     agent = build_fit_agent()
     blob = profile.model_dump_json()
 
+    # What run_score does: bind once at the start of the phase...
+    bound = bind_profile(agent, profile)
+    assert bound is True
+    assert blob in agent.agent.description
+
+    # ...and then compose per-job messages that carry only what varies.
     prompts = [
-        compose_fit_input(f"job description {index}", profile, location="Remote (US)")
+        compose_fit_input(
+            f"job description {index}",
+            None,
+            location="Remote (US)",
+        )
         for index in range(JOBS)
     ]
 
-    # Zero copies in the per-job messages: the profile now rides the agent's
-    # system block, which is built once per run and is the block agno caches.
     assert sum(blob in prompt for prompt in prompts) == 0
-    description = " ".join(
-        str(part) for part in (agent.run_meta, getattr(agent, "_agent", None))
-    )
-    assert description  # agent constructed; content asserted in test_discovery_fit
+
+
+def test_binding_twice_does_not_duplicate_the_profile():
+    """A rebound agent must not accumulate copies of the same document."""
+    profile = _profile()
+    agent = build_fit_agent()
+
+    bind_profile(agent, profile)
+    bind_profile(agent, profile)
+
+    assert agent.agent.description.count("CANDIDATE PROFILE (JSON):") == 1
+
+
+def test_a_stub_agent_keeps_the_profile_in_the_message():
+    """The optimisation must never change what the model is told."""
+    profile = _profile()
+
+    assert bind_profile(_FakeAgent(), profile) is False
+    assert profile.model_dump_json() in compose_fit_input("jd", profile)
 
 
 @pytest.mark.parametrize("jobs", [JOBS])
@@ -206,7 +233,7 @@ def test_discovery_input_tokens_scale_with_the_job_not_the_profile(tmp_path, job
     with use_context(context), count_prompt_tokens() as tokens:
         for index in range(jobs):
             runner.run(
-                compose_fit_input(f"job description {index}", profile, location="Remote")
+                compose_fit_input(f"job description {index}", None, location="Remote")
             )
 
     profile_tokens = len(profile.model_dump_json()) // 4

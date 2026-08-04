@@ -8,6 +8,7 @@ from pydantic import Field
 
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     build_model,
@@ -176,7 +177,7 @@ def themes_to_pairs(
 
 def _default_agent() -> Runner:
     settings = get_settings()
-    model = build_model(settings.premium_model)
+    model = build_model(settings.premium_model, cache_system_prompt=prompt_cache_for(settings.premium_model))
     return AgentRunner(
         Agent(
             model=model,
@@ -190,7 +191,7 @@ def _default_agent() -> Runner:
 
 def _default_themer_agent() -> Runner:
     settings = get_settings()
-    model = build_model(settings.mid_model)
+    model = build_model(settings.mid_model, cache_system_prompt=prompt_cache_for(settings.mid_model))
     return AgentRunner(
         Agent(
             model=model,
@@ -234,7 +235,7 @@ def build_skill_themer(agent: Runner | None = None) -> Themer:
 
 def build_incremental_canonicalizer_agent() -> Runner:
     settings = get_settings()
-    model = build_model(settings.premium_model)
+    model = build_model(settings.premium_model, cache_system_prompt=prompt_cache_for(settings.premium_model))
     return AgentRunner(
         Agent(
             model=model,
@@ -252,7 +253,7 @@ def build_incremental_canonicalizer_agent() -> Runner:
 def build_incremental_themer_agent() -> Runner:
     """Build the domain classifier; the public name is retained for run wiring."""
     settings = get_settings()
-    model = build_model(settings.mid_model)
+    model = build_model(settings.mid_model, cache_system_prompt=prompt_cache_for(settings.mid_model))
     return AgentRunner(
         Agent(
             model=model,

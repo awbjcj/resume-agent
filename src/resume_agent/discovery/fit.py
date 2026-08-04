@@ -14,6 +14,7 @@ from resume_agent.llm_runner import (
     acall,
     build_model,
     expect_schema,
+    prompt_cache_for,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -66,9 +67,50 @@ _INSTRUCTIONS = [
 ]
 
 
+def _profile_section(profile_facts: ProfileFacts | None) -> str:
+    return f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}" if profile_facts else ""
+
+
+def bind_profile(agent: Runner, profile_facts: ProfileFacts) -> bool:
+    """Move the run-constant profile into an already-built agent's system block.
+
+    ``run_score`` receives its agent from the discovery bundle, which is built
+    before the profile is loaded, so the binding happens once at the start of
+    the scoring phase rather than at construction. Returns whether it took: a
+    caller that gets ``False`` (a stub agent with no description) must keep
+    putting the profile in the per-job message, so behaviour never depends on
+    whether the optimisation applied.
+    """
+    inner = getattr(agent, "agent", None)
+    if inner is None or not hasattr(inner, "description"):
+        return False
+    section = _profile_section(profile_facts)
+    existing = getattr(inner, "description", "") or ""
+    if not section:
+        return False
+    if section not in existing:
+        inner.description = f"{existing}\n\n{section}" if existing else section
+    return True
+
+
 def build_fit_agent(
-    model_id: str | None = None, *, skill: VerifiedSkill | None = None
+    model_id: str | None = None,
+    *,
+    skill: VerifiedSkill | None = None,
+    profile_facts: ProfileFacts | None = None,
 ) -> AgentRunner:
+    """Build the per-run fit agent, with the profile in its cacheable prefix.
+
+    The profile is **run-constant**: the same document scores every job in the
+    run. It used to lead every per-job user message, which is the one message
+    kind agno cannot cache, so a 20-job run paid for 20 identical copies —
+    measured at ~65,000 of the run's 65,420 input tokens. Here it is part of the
+    block built once per run and cached by ``cache_system_prompt``.
+
+    Fact-lock is untouched: the content handed to the agent is identical, only
+    its message position moved. ``renderable_profile()``'s filtering for the
+    tailor and reviser is a different seam and is not in scope.
+    """
     s = get_settings()
     resolved_model_id = model_id or s.cheap_model
     resolved_skill = resolve_skill(
@@ -77,11 +119,17 @@ def build_fit_agent(
         family=AgentFamily.JOB_ANALYSIS,
         use="fit",
     )
-    model = build_model(resolved_model_id)
+    model = build_model(
+        resolved_model_id, cache_system_prompt=prompt_cache_for(resolved_model_id)
+    )
+    description = "Score evidence-based candidate fit and parse the job location."
+    profile_section = _profile_section(profile_facts)
+    if profile_section:
+        description = f"{description}\n\n{profile_section}"
     return AgentRunner(
         Agent(
             model=model,
-            description="Score evidence-based candidate fit and parse the job location.",
+            description=description,
             instructions=with_guidance("fit-score", _INSTRUCTIONS),
             output_schema=FitScore,
             use_json_mode=use_json_mode_for(model, FitScore),
@@ -99,12 +147,21 @@ def build_fit_agent(
 
 def compose_fit_input(
     jd_text: str,
-    profile_facts: ProfileFacts,
+    profile_facts: ProfileFacts | None = None,
     location: str | None = None,
     skill_context: SkillMatchContext | None = None,
     sponsorship_evidence: H1BSponsorshipEvidence | None = None,
 ) -> str:
-    sections = [f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}"]
+    """Compose the per-job message: only what actually varies per job.
+
+    ``profile_facts`` is accepted for callers that build a fit agent without
+    one (a single-job path, or a test), and is otherwise omitted here because
+    ``build_fit_agent`` has already put it in the cacheable prefix. Passing it
+    in both places would restore the duplication this exists to remove.
+    """
+    sections: list[str] = []
+    if profile_facts is not None:
+        sections.append(f"CANDIDATE PROFILE (JSON):\n{profile_facts.model_dump_json()}")
     if skill_context is not None and skill_context.matches:
         sections.append(
             f"SKILL MATCH CONTEXT (JSON):\n{skill_context.model_dump_json()}"
