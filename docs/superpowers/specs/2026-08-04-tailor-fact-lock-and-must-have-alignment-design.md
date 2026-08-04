@@ -117,9 +117,14 @@ same round they were detected.
 
 #### Gate `skill-naming` (targets M1)
 
-For each `TailoredSkill`, the displayed `name` must resolve to its cited fact
-through the alias chain: `Skill.aliases`, then `MatrixRow.aliases`, then
-`cluster_map.aliases` canonicalization, all compared under `normalize_skill`.
+For each `TailoredSkill`, the displayed `name` must resolve to the cited fact's
+own `name` or one of its `aliases`, compared under `normalize_skill`.
+
+The cluster map's alias table is deliberately **not** consulted. It maps a token
+to a canonical *cluster* token, which is precisely the "adjacent skill" relation
+fact-lock forbids a writer from claiming as the job's own term — consulting it
+would legalize exactly the renames this gate exists to catch. Only the cited
+fact speaks for itself.
 
 Two outcomes, deliberately asymmetric:
 
