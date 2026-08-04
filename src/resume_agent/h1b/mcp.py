@@ -14,27 +14,55 @@ H1B_INCLUDE_TOOLS = [
 
 
 class H1BResultTooLarge(ValueError):
+    """Why a tool observation was clipped.
+
+    Kept as an exception type for callers that assert on it, but it is no
+    longer raised through the agent loop: it names the *recorded reason* on a
+    truncated observation rather than acting as control flow. See
+    :func:`bounded_h1b_result`.
+    """
+
     code = "H1B_RESULT_TOO_LARGE"
 
 
-def _serialized_size(value: object) -> int:
+def _serialize(value: object) -> str:
     try:
-        return len(json.dumps(value, ensure_ascii=False, default=str))
+        return json.dumps(value, ensure_ascii=False, default=str)
     except (TypeError, ValueError):
-        return len(str(value))
+        return str(value)
+
+
+def _serialized_size(value: object) -> int:
+    return len(_serialize(value))
 
 
 def bounded_h1b_result(max_chars: int) -> Callable[..., Any]:
-    """Create an async Agno tool hook that bounds provider output."""
+    """Create an async Agno tool hook that bounds provider output.
+
+    An oversized payload is **clipped and returned**, never raised. The agent
+    loop's contract is that every tool call receives an observation the model
+    can act on — including a denial — so raising here aborted the run instead of
+    letting the model narrow its query and try again. The marker is explicit so
+    the model can tell a clipped answer from a complete one.
+    """
+
     async def hook(func: Callable[..., Any], args: dict[str, Any]) -> Any:
         result = func(**args)
         if hasattr(result, "__await__"):
             result = await result
-        if _serialized_size(result) > max_chars:
-            raise H1BResultTooLarge(
-                f"H1B MCP result exceeds the {max_chars}-character limit"
-            )
-        return result
+        size = _serialized_size(result)
+        if size <= max_chars:
+            return result
+        reason = (
+            f"H1B MCP result is {size} characters, over the "
+            f"{max_chars}-character limit; showing a prefix only"
+        )
+        return {
+            "truncated": True,
+            "reason": reason,
+            "code": H1BResultTooLarge.code,
+            "data": _serialize(result)[:max_chars],
+        }
 
     return hook
 
@@ -62,13 +90,21 @@ def build_h1b_tools(settings: Any, *, mcp_type: Any | None = None) -> Any:
 
 @asynccontextmanager
 async def h1b_tools(settings: Any, *, mcp_type: Any | None = None) -> AsyncIterator[Any]:
-    """Connect and close the owned toolkit on the same event loop."""
+    """Connect and close the owned toolkit on the same event loop.
+
+    ``connect()`` deliberately runs *outside* the ``try``. Closing a toolkit that
+    never connected raises its own error from the ``finally``, and that
+    secondary error replaces the connect failure — so the caller saw "close of
+    an unopened stream" instead of the transport error that actually happened.
+    A connect that fails owns its own cleanup; only a connected toolkit is ours
+    to close.
+    """
     if not settings.h1b_mcp_enabled:
         yield None
         return
     tools = build_h1b_tools(settings, mcp_type=mcp_type)
+    await tools.connect()
     try:
-        await tools.connect()
         yield tools
     finally:
         await tools.close()

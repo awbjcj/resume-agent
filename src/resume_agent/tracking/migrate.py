@@ -111,6 +111,43 @@ def ensure_content_fingerprint_column(engine: Engine) -> None:
                 )
 
 
+def ensure_industry_pending_column(engine: Engine) -> None:
+    """Idempotently add ``jobs.industry_pending`` and backfill it once.
+
+    The revisit set used to be found with ``criteria_json LIKE '%"_industry_
+    candidate"%'`` — an unindexed full scan of the jobs table on every extract
+    pass, and one that grew with the table rather than with the work. The
+    backfill runs here, at ``init_db``, so existing rows migrate on first start
+    and the ``LIKE`` never appears on the hot path again.
+    """
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))]
+        if not cols:
+            return
+        fresh = "industry_pending" not in cols
+        if fresh:
+            conn.execute(
+                text(
+                    "ALTER TABLE jobs ADD COLUMN industry_pending BOOLEAN "
+                    "NOT NULL DEFAULT 0"
+                )
+            )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_jobs_industry_pending "
+                "ON jobs (industry_pending)"
+            )
+        )
+        if fresh:
+            conn.execute(
+                text(
+                    "UPDATE jobs SET industry_pending = 1 WHERE "
+                    "CAST(criteria_json AS TEXT) LIKE '%\"_industry_candidate\"%' "
+                    "OR CAST(criteria_json AS TEXT) LIKE '%\"sic_major\"%'"
+                )
+            )
+
+
 def ensure_url_index(engine: Engine) -> None:
     """Idempotently index jobs.url (find_existing's first dedupe probe)."""
     with engine.begin() as conn:

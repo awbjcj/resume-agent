@@ -357,15 +357,19 @@ admin-users API.
   micro-cost. In `enforce` mode, an exact active rate is required before a
   shared-key call, user cost allowance and credit balances are checked, and a
   platform-wide UTC calendar-month shared-key cost is checked against
-  `Settings.global_monthly_cost_quota_micros`. Administrators are fully
-  exempt from both the per-user allowance and the platform-wide cap — an
-  admin's own usage is also excluded from the sum that feeds the cap
-  (`global_monthly_cost` / `global_weekly_usage` both filter out
-  `User.role == "admin"`), so admin traffic can never exhaust shared-key
-  budget on behalf of other accounts. This reverses the original ADR-0009
-  design, which counted admin spend against the platform cap; see the
-  ADR's Consequences section for the superseded rationale. BYOK calls
-  retain token and estimated-cost analytics but have zero quota charge.
+  `Settings.global_monthly_cost_quota_micros`. **Administrators are exempt
+  from the per-user allowance and remain bound by the platform-wide cap.**
+  That asymmetry is the design, not an oversight: the per-user allowance
+  protects the platform's budget *allocation*, the platform cap protects its
+  *absolute* spend, and an operator with unbounded absolute spend is exactly
+  the failure the cap exists to prevent. `global_monthly_cost` and
+  `global_weekly_usage` therefore sum **every** shared-key `UsageEvent`, admin
+  rows included — neither joins `User`. ADR-0009's Amendment 2 and ADR-0010
+  record this; ADR-0009's first amendment describes the superseded exemption
+  and is marked as such. Pinned by
+  `tests/tenancy/test_cost_quotas.py::test_admin_usage_counts_toward_global_cost_quota_for_other_users`.
+  BYOK calls retain token and estimated-cost analytics but have zero quota
+  charge.
 - Open self-registration additionally seeds lower active-job and concurrency
   ceilings (`open_signup_max_active_jobs`,
   `open_signup_max_concurrent_runs`). Its legacy token override is retained

@@ -2,9 +2,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
 
-from sqlalchemy import String
 from sqlmodel import Session, select
 
 from resume_agent.concurrency import gather_isolated
@@ -183,18 +181,24 @@ def _prepare_industry_fields(job: Job, taxonomy: IndustryTaxonomy) -> str | None
         criteria.pop(_INDUSTRY_RETRY_KEY, None)
     if criteria != job.criteria_json:
         job.criteria_json = criteria
+    # The persisted marker is what makes the next pass's revisit query an index
+    # seek. It is written on every visit, in both directions, so a row that
+    # canonicalizes stops being scanned rather than being revisited forever.
+    pending = canonical is None and candidate is not None
+    if job.industry_pending != pending:
+        job.industry_pending = pending
     return candidate
 
 
 def _industry_scope(session: Session, batch: list[Job]) -> list[Job]:
-    """Rows this pass can change: the current batch plus revisitable rows."""
-    criteria_text = cast(Any, Job.criteria_json).cast(String)
-    revisitable = session.exec(
-        select(Job).where(
-            criteria_text.like(f'%"{_INDUSTRY_RETRY_KEY}"%')
-            | criteria_text.like('%"sic_major"%')
-        )
-    ).all()
+    """Rows this pass can change: the current batch plus revisitable rows.
+
+    Indexed on ``industry_pending`` rather than a ``LIKE`` over every row's
+    criteria JSON: the old predicate could not use an index, so a table of
+    5,000 canonicalized jobs was fully scanned to find zero work. Existing rows
+    are marked once by ``ensure_industry_pending_column`` at ``init_db``.
+    """
+    revisitable = session.exec(select(Job).where(Job.industry_pending)).all()
     by_id: dict[int | None, Job] = {job.id: job for job in revisitable}
     for job in batch:
         by_id.setdefault(job.id, job)

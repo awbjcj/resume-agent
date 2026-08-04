@@ -31,7 +31,9 @@ from resume_agent.h1b.models import (
 from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
+    UnparsedAgentOutput,
     build_model,
+    expect_schema,
     resolve_api_key,
     retry_kwargs,
     run_with_cleanup,
@@ -180,11 +182,8 @@ async def _resolve_company_name(runner: Runner | None, display: str) -> str:
             "Resolve this label to the U.S. corporate legal employer used for "
             "H-1B/LCA/green-card sponsorship records."
         )
-        content = getattr(result, "content", result)
-        resolution = (
-            content
-            if isinstance(content, H1BCompanyResolution)
-            else H1BCompanyResolution.model_validate(content)
+        resolution = expect_schema(
+            result, H1BCompanyResolution, source="h1b-company-resolution"
         )
         if (
             resolution.status != "resolved"
@@ -202,6 +201,16 @@ async def _resolve_company_name(runner: Runner | None, display: str) -> str:
             )
             return display
         return resolved
+    except UnparsedAgentOutput as exc:
+        # A provider that truncates, refuses, or 400s returns a raw ``str``.
+        # Naming that separately keeps a systematic provider failure out of the
+        # "this employer is just hard to resolve" bucket.
+        logger.error(
+            "Company-name resolution returned unparsed output for %s: %s",
+            normalize_company(display) or "",
+            exc,
+        )
+        return display
     except Exception:
         logger.warning(
             "Company-name resolution failed for normalized company %s",
@@ -222,11 +231,7 @@ def _fresh_cached(row: H1BCompanyEvidence | None, now: datetime) -> H1BSponsorsh
 
 
 def _agent_output(result: Any, company: str) -> H1BSponsorshipEvidence:
-    content = getattr(result, "content", result)
-    if isinstance(content, H1BSponsorshipEvidence):
-        evidence = content
-    else:
-        evidence = H1BSponsorshipEvidence.model_validate(content)
+    evidence = expect_schema(result, H1BSponsorshipEvidence, source="h1b-sponsorship")
     if normalize_company(evidence.normalized_company) != company:
         raise ValueError("H1B agent returned evidence for a different company")
     if evidence.normalized_company != company:
@@ -331,6 +336,19 @@ async def enrich_companies(
                                 update={"display_company": query_company}
                             )
                         return normalized, evidence
+                    except UnparsedAgentOutput as exc:
+                        # Every failure here degrades to "unavailable", which is
+                        # indistinguishable from "no filings found" in the UI.
+                        # The diagnostic (model, provider, run status, token
+                        # counts, head/tail preview) is the only thing that tells
+                        # a systematic provider failure apart from a quiet miss,
+                        # so it is logged at error rather than swallowed.
+                        logger.error(
+                            "H-1B research returned unparsed output for %s: %s",
+                            normalized,
+                            exc,
+                        )
+                        return normalized, _unavailable(normalized)
                     except Exception:
                         logger.warning(
                             "H-1B research failed for normalized company %s",
