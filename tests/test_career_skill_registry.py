@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -157,6 +158,44 @@ def test_registry_revalidates_a_skill_after_the_file_changes(tmp_path):
     (root / entry["skillPath"]).write_bytes(
         b"---\nname: job-fit-analyzer\ndescription: changed\n---\n"
     )
+    second = registry_for_paths(root, manifest)
+
+    assert first is not second
+    with pytest.raises(SkillUnavailable):
+        second.require(
+            "job-fit-analyzer", family=AgentFamily.JOB_ANALYSIS, use="fit"
+        )
+
+
+def test_registry_revalidates_a_same_size_swap_with_preserved_mtime(tmp_path):
+    """A content swap that keeps byte-length and mtime must still bust the cache.
+
+    Regression test for a fingerprint that trusted (mtime, size): tooling like
+    `shutil.copy2` or a reproducible deploy can replace a file's content while
+    preserving both, which would otherwise hand back a registry verified
+    against the superseded bytes.
+    """
+    root = tmp_path / "root"
+    manifest = tmp_path / "skills-lock.json"
+    entry = _manifest_entry(
+        root,
+        "job-fit-analyzer",
+        content=b"---\nname: job-fit-analyzer\ndescription: good\n---\n",
+        family="job_analysis",
+        uses=["fit"],
+    )
+    _write_manifest(manifest, {"job-fit-analyzer": entry})
+    first = registry_for_paths(root, manifest)
+
+    skill_path = root / entry["skillPath"]
+    original_stat = skill_path.stat()
+    replacement = b"---\nname: job-fit-analyzer\ndescription: evil\n---\n"
+    assert len(replacement) == len(
+        b"---\nname: job-fit-analyzer\ndescription: good\n---\n"
+    )
+    skill_path.write_bytes(replacement)
+    os.utime(skill_path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+
     second = registry_for_paths(root, manifest)
 
     assert first is not second

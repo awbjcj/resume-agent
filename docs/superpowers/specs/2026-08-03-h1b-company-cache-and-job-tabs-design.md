@@ -1,7 +1,7 @@
 # H-1B company cache, quarterly evidence, and job-detail tab refinement
 
 **Date:** 2026-08-03
-**Status:** Approved design, not yet implemented
+**Status:** Implemented (PR #52, 2026-08-04)
 **Supersedes nothing.** Extends `2026-08-02-career-skills-h1b-agent-wiring-design.md`.
 
 ---

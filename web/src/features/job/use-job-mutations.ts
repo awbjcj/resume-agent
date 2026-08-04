@@ -23,7 +23,12 @@ export function useCheckH1BSponsorship(jobId: number) {
               params: { path: { job_id: jobId } },
             }),
           ),
-        ["job"],
+        // The check writes the *company-level* cache, which can change
+        // sponsorship status shown for sibling jobs at the same employer on
+        // every board — not just this job — so the board query keys stay
+        // invalidated too (the launch default), unlike the single-job
+        // scoped revise mutations below.
+        undefined,
         { jobId },
       ),
   });

@@ -264,37 +264,42 @@ def resolve_skill(
     )
 
 
-_Fingerprint = tuple[tuple[str, int, int], ...] | None
+_Fingerprint = tuple[tuple[str, str], ...] | None
 _registry_cache: dict[tuple[Path, Path], tuple[_Fingerprint, CareerSkillRegistry]] = {}
 _registry_cache_lock = Lock()
 
 
 def _fingerprint(root: Path, manifest_path: Path) -> _Fingerprint:
-    """Cheap on-disk signature that changes whenever a load-affecting file does.
+    """On-disk content signature that changes whenever a load-affecting file does.
 
-    Stats only (mtime + size) rather than the read-and-hash `_load` does for
-    every SKILL.md, so a cache hit costs one stat per manifest entry instead of
-    hashing every skill's full contents on every call.
+    Hashes each file's canonical bytes rather than trusting mtime + size: a
+    same-size content swap that preserves mtime (`copy2`, some reproducible
+    deploy tooling) would otherwise leave the fingerprint unchanged and hand
+    back a registry verified against superseded content, defeating this
+    registry's hash-verified integrity guarantee. Still cheaper than `_load`,
+    which additionally parses YAML frontmatter and builds `VerifiedSkill`
+    objects for every entry.
     """
     try:
-        manifest_stat = manifest_path.stat()
+        manifest_bytes = manifest_path.read_bytes()
     except OSError:
         return None
-    parts: list[tuple[str, int, int]] = [
-        ("__manifest__", manifest_stat.st_mtime_ns, manifest_stat.st_size)
+    parts: list[tuple[str, str]] = [
+        ("__manifest__", hashlib.sha256(manifest_bytes).hexdigest())
     ]
     try:
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        manifest = SkillManifest.model_validate(payload)
+        manifest = SkillManifest.model_validate(json.loads(manifest_bytes))
     except Exception:
         return tuple(parts)
     for name, entry in sorted(manifest.skills.items()):
         try:
             skill_file = _confined_skill_path(root, entry.skill_path)
-            stat = skill_file.stat()
-            parts.append((name, stat.st_mtime_ns, stat.st_size))
+            with skill_file.open("rb") as handle:
+                raw = handle.read(MAX_SKILL_BYTES + 1)
+            digest = hashlib.sha256(_canonical_bytes(raw)).hexdigest()
+            parts.append((name, digest))
         except (OSError, ValueError):
-            parts.append((name, -1, -1))
+            parts.append((name, "<unreadable>"))
     return tuple(parts)
 
 
