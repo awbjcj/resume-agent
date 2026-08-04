@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     global_daily_signup_limit: int = Field(default=50, ge=1)
     global_weekly_token_budget: int = Field(default=50_000_000, ge=0)
     cost_quota_enforcement: Literal["shadow", "enforce"] = "shadow"
+    # How long one SpendGate decision stays good. Budget is a property of a
+    # phase, not of a call: re-deriving it per call cost ~22 statements each.
+    # A long fan-out still re-checks periodically, so a budget exhausted
+    # mid-run is noticed within this window (and immediately if a charge
+    # exhausts the allowance, which invalidates the decision outright).
+    spend_gate_ttl_seconds: float = Field(default=30.0, ge=0.0)
     global_monthly_cost_quota_micros: int = Field(default=500_000_000, ge=0)
     open_signup_weekly_token_budget: int = Field(default=250_000, ge=0)
     open_signup_max_active_jobs: int = Field(default=100, ge=0)

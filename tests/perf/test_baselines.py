@@ -21,7 +21,7 @@ import pytest
 
 from resume_agent.config import Settings
 from resume_agent.discovery.fit import build_fit_agent, compose_fit_input
-from resume_agent.llm_runner import AgentRunner
+from resume_agent.llm_runner import AgentRunner, resolve_api_key
 from resume_agent.models.profile import Contact, ProfileFacts, Skill
 from resume_agent.tenancy.context import UserContext, use_context
 from resume_agent.tenancy.costs import seed_llm_rates
@@ -37,10 +37,17 @@ CALLS = 10
 JOBS = 20
 REQUESTS = 12
 
-# Post-change ceilings. Each was the measured "before" number until the seam
-# named in the docstring landed; the comment records what it used to be so a
-# reviewer can see the delta without digging through git history.
-MAX_STATEMENTS_PER_CALL = 4.0  # was 15.4 (11 sessions x setup + 3 BEGIN IMMEDIATE)
+# Post-change ceilings. The comment records the measured "before" so a reviewer
+# can see the delta without digging through git history.
+#
+# The two spend numbers are separate on purpose. Policy derivation is what
+# SpendGate owns and is cacheable to nearly nothing; settlement is the billing
+# write — a UsageEvent, its line items, and the quota charge — which cannot be
+# cached away without trading durability for speed, and is not in this plan's
+# scope. Collapsing them into one number would let a settlement regression hide
+# behind the gate's win.
+MAX_GATE_STATEMENTS_PER_CALL = 1.0  # was 13.0
+MAX_STATEMENTS_PER_CALL = 11.0  # was 22.2; floor is the billing write
 MIN_REQUESTS_PER_CLIENT = float(REQUESTS)  # was 1.0 (a client per request)
 
 
@@ -108,8 +115,24 @@ def _tenant(tmp_path):
     return engine, context
 
 
+def test_spend_policy_is_derived_once_per_phase_not_per_call(tmp_path):
+    """Key selection and budget are a property of a phase, not of a call."""
+    engine, context = _tenant(tmp_path)
+
+    with use_context(context), count_queries(engine) as counts:
+        for _ in range(CALLS):
+            # The non-raising half of the gate; it shares the derivation with
+            # the enforcing half, so counting either counts both.
+            resolve_api_key("claude-sonnet-5")
+
+    assert counts.per_unit(CALLS) <= MAX_GATE_STATEMENTS_PER_CALL, str(counts)
+    # A read-only budget check must never take SQLite's exclusive write lock:
+    # under a concurrent fan-out that serialises every sibling behind it.
+    assert counts.exclusive_transactions == 0, str(counts)
+
+
 def test_spend_path_statements_per_llm_call(tmp_path):
-    """The gate resolves policy once per phase, not twice per call."""
+    """End to end, including the billing write that cannot be cached away."""
     engine, context = _tenant(tmp_path)
     runner = AgentRunner(_FakeAgent(), settings=context.settings)
 
@@ -118,8 +141,8 @@ def test_spend_path_statements_per_llm_call(tmp_path):
             runner.run("score this job")
 
     assert counts.per_unit(CALLS) <= MAX_STATEMENTS_PER_CALL, str(counts)
-    # An exclusive write lock per call is what stalls a concurrent fan-out; a
-    # read-only budget check must never take one.
+    # One exclusive transaction per call is the quota charge itself. More than
+    # that means a read has started taking the write lock again.
     assert counts.exclusive_transactions <= CALLS, str(counts)
 
 

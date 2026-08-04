@@ -218,9 +218,13 @@ def record_call(agent: object, response: object) -> None:
                 reasoning_effort=usage.reasoning_effort,
                 reasoning_mode=usage.reasoning_mode,
             )
+            weighted = float(event.weighted_total or 0.0)
             with Session(context.system_engine) as session:
                 session.add(event)
                 session.flush()
+                # Read the id here, not after the commit: commit expires the
+                # instance, and touching it then costs a refresh SELECT.
+                event_id = event.id
                 if priced.rate_id:
                     session.add_all(
                         UsageLineItem(
@@ -234,13 +238,26 @@ def record_call(agent: object, response: object) -> None:
                         for line in priced.lines
                     )
                 session.commit()
-                event_id = event.id
+            snapshot = None
             if not own_key and not context.is_admin and priced.total_micros is not None:
-                charge_shared_cost(
+                snapshot = charge_shared_cost(
                     context.system_engine,
                     context.user_id,
                     priced.total_micros,
                     usage_event_id=event_id,
+                )
+            if not own_key:
+                # The gate's cached decision was made against the budget this
+                # call just spent from. Charging it here is what makes the
+                # cache exact: the call that exhausts a budget is the call that
+                # invalidates the decision, rather than a fan-out coasting on a
+                # stale "yes" until the TTL happens to expire.
+                from resume_agent.tenancy.spend import SpendGate
+
+                SpendGate().settle(
+                    snapshot,
+                    weighted=weighted,
+                    cost_micros=int(priced.total_micros or 0),
                 )
     except Exception:
         logger.warning("usage recording failed", exc_info=True)

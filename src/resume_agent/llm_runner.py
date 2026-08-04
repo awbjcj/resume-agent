@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import threading
 import time
 from collections.abc import Awaitable, Callable, Iterator
 from copy import deepcopy
@@ -73,6 +74,43 @@ def is_transient(exc: BaseException) -> bool:
     return any(klass.__name__ in _TRANSIENT_NAMES for klass in type(exc).__mro__)
 
 
+def _agent_model_id(agent: Any) -> str:
+    """The provider-prefixed model id an agent's model represents.
+
+    The prefix is what ``split_provider`` reads, and a bare id means Anthropic,
+    so an Anthropic model is deliberately left unprefixed rather than being
+    written ``anthropic:...``.
+    """
+    model = getattr(agent, "model", None)
+    if model is None:
+        return str(getattr(agent, "model_id", "") or "")
+    name = str(getattr(model, "id", "") or "")
+    if not name:
+        return ""
+    provider_value = getattr(model, "provider", None)
+    get_provider = getattr(model, "get_provider", None)
+    if not provider_value and callable(get_provider):
+        provider_value = get_provider()
+    from resume_agent.tenancy.costs import normalize_provider
+
+    provider = normalize_provider(str(provider_value or ""))
+    if not provider or provider == "anthropic":
+        return name
+    return f"{provider}:{name}"
+
+
+def record_call(agent: Any, response: Any) -> None:
+    """Forward to the usage recorder through its module.
+
+    Imported by attribute rather than by name so a test (or the perf harness)
+    that patches ``tenancy.usage.record_call`` is honoured here too — binding
+    the function at import time would silently bypass every such patch.
+    """
+    from resume_agent.tenancy import usage
+
+    usage.record_call(agent, response)
+
+
 class AgentRunner:
     """Adapter that narrows third-party agent APIs to ``run`` / ``arun``."""
 
@@ -86,28 +124,73 @@ class AgentRunner:
         self._agent = agent
         self._run_meta = run_meta
         self._settings = settings
-
-    def _refresh_api_key(self, settings: Settings) -> None:
-        if self._settings is None:
-            refresh_agent_api_key(self._agent)
-        else:
-            refresh_agent_api_key(self._agent, settings=settings)
+        # One agno model object is shared by every coroutine in a fan-out, and
+        # applying a key nulls its cached clients. The lock plus the in-flight
+        # count are what stop a key change from pulling the client out from
+        # under a sibling request mid-flight.
+        self._key_lock = threading.Lock()
+        self._inflight = 0
+        self._applied_key: str | None = None
 
     @property
     def run_meta(self) -> AgentRunMeta | None:
         return self._run_meta
 
+    def _enter(self, settings: Settings) -> None:
+        """Resolve spend policy, apply the funded key, and count the call in.
+
+        Raises the same budget errors ``enforce_agent_budget`` always raised.
+        Must be paired with :meth:`_exit`, but only when it returns.
+        """
+        from resume_agent.tenancy.spend import SpendGate
+
+        model = getattr(self._agent, "model", None)
+        model_id = _agent_model_id(self._agent)
+        if model is None or not model_id:
+            with self._key_lock:
+                self._inflight += 1
+            return
+        decision = SpendGate(settings=self._settings).open(model_id)
+        with self._key_lock:
+            self._apply_locked(model, decision)
+            self._inflight += 1
+
+    def _apply_locked(self, model: Any, decision: Any) -> None:
+        from resume_agent.tenancy.context import current_context
+
+        context = current_context()
+        if context is not None:
+            context.selected_model_own_keys[id(model)] = decision.own_key
+        key = decision.api_key or None
+        if key == self._applied_key and getattr(model, "api_key", None) == key:
+            return
+        if self._inflight:
+            # A sibling is mid-request on this model's client. Nulling it now
+            # would fail that call; the change lands on the next call that
+            # finds the runner idle, which is the next phase in practice.
+            return
+        model.api_key = key
+        # Agno caches clients after first use. Clearing them makes the next
+        # request honor the newly selected credential.
+        if hasattr(model, "client"):
+            model.client = None
+        if hasattr(model, "async_client"):
+            model.async_client = None
+        self._applied_key = key
+
+    def _exit(self) -> None:
+        with self._key_lock:
+            self._inflight -= 1
+
     def run(self, prompt: str) -> Any:
         settings = self._settings or get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
-                self._refresh_api_key(settings)
-                from resume_agent.tenancy.limits import enforce_agent_budget
-
-                enforce_agent_budget(self._agent)
-                response = self._agent.run(prompt)
-                from resume_agent.tenancy.usage import record_call
-
+                self._enter(settings)
+                try:
+                    response = self._agent.run(prompt)
+                finally:
+                    self._exit()
                 record_call(self._agent, response)
                 return response
             except Exception as exc:
@@ -120,14 +203,15 @@ class AgentRunner:
         settings = self._settings or get_settings()
         for attempt in range(settings.llm_retries + 1):
             try:
-                self._refresh_api_key(settings)
-                from resume_agent.tenancy.limits import enforce_agent_budget
-
-                enforce_agent_budget(self._agent)
-                response = await self._agent.arun(prompt)
-                from resume_agent.tenancy.usage import record_call
-
-                record_call(self._agent, response)
+                # Both hops are synchronous SQLite I/O, and one of them can
+                # wait on a write lock. On the event loop that the concurrent
+                # fan-out shares, that stalls every sibling call in the batch.
+                await asyncio.to_thread(self._enter, settings)
+                try:
+                    response = await self._agent.arun(prompt)
+                finally:
+                    self._exit()
+                await asyncio.to_thread(record_call, self._agent, response)
                 return response
             except Exception as exc:
                 if attempt >= settings.llm_retries or not is_transient(exc):
@@ -141,16 +225,16 @@ class AgentRunner:
         for attempt in range(settings.llm_retries + 1):
             emitted = False
             try:
-                self._refresh_api_key(settings)
-                from resume_agent.tenancy.limits import enforce_agent_budget
-
-                enforce_agent_budget(self._agent)
-                raw_stream = self._agent.run(
-                    prompt,
-                    stream=True,
-                    stream_events=True,
-                    yield_run_output=True,
-                )
+                self._enter(settings)
+                try:
+                    raw_stream = self._agent.run(
+                        prompt,
+                        stream=True,
+                        stream_events=True,
+                        yield_run_output=True,
+                    )
+                finally:
+                    self._exit()
                 terminal_output: Any | None = None
                 for raw in raw_stream:
                     tag = _stream_event_tag(raw)
@@ -169,8 +253,6 @@ class AgentRunner:
                         "MISSING_RUN_OUTPUT",
                     )
                     return
-                from resume_agent.tenancy.usage import record_call
-
                 record_call(self._agent, terminal_output)
                 if _run_failed(terminal_output):
                     message = (
@@ -719,30 +801,16 @@ def _settings_provider_key(settings: Settings, provider: str) -> str:
 
 
 def resolve_api_key(model_id: str, *, settings: Settings | None = None) -> str:
-    """Select the shared provider key first, then fall back to the user's key."""
-    provider, _ = split_provider(model_id)
-    from resume_agent.tenancy.context import current_context
+    """Select the shared provider key first, then fall back to the user's key.
 
-    context = current_context()
-    if context is not None:
-        platform_key = context.platform_provider_keys.get(provider, "")
-        user_key = context.user_provider_keys.get(provider, "")
-        if platform_key:
-            from resume_agent.tenancy.limits import shared_key_available
+    The non-raising half of the spend seam. It shares one cached policy
+    evaluation with the enforcing half, so "which key?" and "may I spend?" can
+    no longer be answered from two independently derived views of the same five
+    facts.
+    """
+    from resume_agent.tenancy.spend import SpendGate
 
-            use_shared = shared_key_available(provider, split_provider(model_id)[1])
-            use_own = not use_shared and bool(user_key)
-            context.selected_own_key_providers[provider] = use_own
-            return user_key if use_own else platform_key
-        if user_key:
-            context.selected_own_key_providers[provider] = True
-            return user_key
-    key = _settings_provider_key(settings or get_settings(), provider)
-    if context is not None:
-        context.selected_own_key_providers[provider] = (
-            provider in context.own_key_providers
-        )
-    return key
+    return SpendGate(settings=settings).select(model_id).api_key
 
 
 def model_access_available(model_id: str, *, settings: Settings | None = None) -> bool:
