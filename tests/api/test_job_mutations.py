@@ -1,20 +1,56 @@
+from concurrent.futures import Executor, Future
 from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
 from resume_agent.api.app import create_app
 from resume_agent.db import get_session
+from resume_agent.h1b import service as h1b_service
 from resume_agent.h1b.models import (
     H1B_AGENT_UNAVAILABLE_REASON,
     HISTORICAL_ONLY_CAVEAT,
+    H1BEnrichmentReport,
     H1BSponsorshipEvidence,
 )
-from resume_agent.api.routers import jobs as jobs_router
-from resume_agent.tracking.tables import Job, JobStatus
+from resume_agent.tracking.tables import H1BCompanyEvidence, Job, JobStatus
+
+
+class InlineExecutor(Executor):
+    """Runs submitted callables immediately, in-thread — deterministic for tests."""
+
+    def submit(self, fn, /, *args, **kwargs):
+        fut: Future = Future()
+        try:
+            fut.set_result(fn(*args, **kwargs))
+        except Exception as exc:  # noqa: BLE001
+            fut.set_exception(exc)
+        return fut
 
 
 def _client():
     return TestClient(create_app(db_url="sqlite://"))
+
+
+def _h1b_client(tmp_path, *, enabled=True):
+    env = tmp_path / "h1b.env"
+    env.write_text(
+        (
+            "H1B_MCP_ENABLED=true\n"
+            "H1B_MCP_TRANSPORT=stdio\n"
+            "H1B_MCP_COMMAND=server\n"
+            if enabled
+            else ""
+        ),
+        encoding="utf-8",
+    )
+    return TestClient(
+        create_app(
+            db_url="sqlite://",
+            env_path=env,
+            run_executor=InlineExecutor(),
+            runs_root=tmp_path,
+        )
+    )
 
 
 def _seed(app, **kw):
@@ -25,6 +61,25 @@ def _seed(app, **kw):
         s.commit()
         s.refresh(job)
         return job.id
+
+
+def _persist_h1b_cache(engine, report: H1BEnrichmentReport) -> None:
+    """Mirror enrich_companies' durable company-cache write in mocked runs."""
+    with get_session(engine) as session:
+        for normalized, evidence in report.by_company.items():
+            session.add(
+                H1BCompanyEvidence(
+                    normalized_company=normalized,
+                    display_company=evidence.display_company,
+                    status=evidence.status,
+                    evidence_json=evidence.model_dump(mode="json"),
+                    source_url=evidence.source_url,
+                    data_version=evidence.data_version,
+                    retrieved_at=evidence.retrieved_at,
+                    expires_at=evidence.expires_at,
+                )
+            )
+        session.commit()
 
 
 def test_patch_status_approves():
@@ -54,27 +109,24 @@ def test_manual_h1b_check_returns_evidence(monkeypatch, tmp_path):
         caveat=HISTORICAL_ONLY_CAVEAT,
     )
 
-    async def fake_check(session, job, *, settings):
-        assert job.company == "Acme"
+    async def fake_enrich(engine, companies, *, settings, agent_factory, company_resolver_factory=None, force_refresh=False):
         assert settings.h1b_mcp_enabled is True
-        return evidence
+        report = H1BEnrichmentReport(by_company={"acme": evidence})
+        _persist_h1b_cache(engine, report)
+        return report
 
-    monkeypatch.setattr(jobs_router, "check_job_sponsorship", fake_check)
-    env = tmp_path / "h1b.env"
-    env.write_text(
-        "H1B_MCP_ENABLED=true\n"
-        "H1B_MCP_TRANSPORT=stdio\n"
-        "H1B_MCP_COMMAND=server\n",
-        encoding="utf-8",
-    )
-    client = TestClient(create_app(db_url="sqlite://", env_path=env))
+    monkeypatch.setattr(h1b_service, "enrich_companies", fake_enrich)
+    client = _h1b_client(tmp_path)
     with client:
         jid = _seed(client.app, company="Acme")
         response = client.post(f"/api/jobs/{jid}/h1b-sponsorship")
+        assert response.status_code == 202
+        run = client.get(f"/api/runs/{response.json()['runId']}").json()
+        assert run["state"] == "done"
+        detail = client.get(f"/api/jobs/{jid}").json()
 
-    assert response.status_code == 200
-    assert response.json()["capability"] == "available"
-    assert response.json()["evidence"]["status"] == "matched"
+    assert detail["h1BSponsorship"]["capability"] == "available"
+    assert detail["h1BSponsorship"]["evidence"]["status"] == "matched"
 
 
 def test_manual_h1b_check_reports_disabled():
@@ -83,23 +135,12 @@ def test_manual_h1b_check_reports_disabled():
         jid = _seed(client.app, company="Acme")
         response = client.post(f"/api/jobs/{jid}/h1b-sponsorship")
 
-    assert response.status_code == 200
-    assert response.json() == {
-        "capability": "disabled",
-        "evidence": None,
-        "message": "H-1B research is disabled for this workspace. Enable H1B_MCP_ENABLED and configure an MCP command or URL.",
-    }
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "H1B_DISABLED"
 
 
 def test_manual_h1b_check_requires_a_company(tmp_path):
-    env = tmp_path / "h1b.env"
-    env.write_text(
-        "H1B_MCP_ENABLED=true\n"
-        "H1B_MCP_TRANSPORT=stdio\n"
-        "H1B_MCP_COMMAND=server\n",
-        encoding="utf-8",
-    )
-    client = TestClient(create_app(db_url="sqlite://", env_path=env))
+    client = _h1b_client(tmp_path)
     with client:
         jid = _seed(client.app)
         response = client.post(f"/api/jobs/{jid}/h1b-sponsorship")
@@ -121,27 +162,24 @@ def test_manual_h1b_check_reports_unavailable_evidence(monkeypatch, tmp_path):
         unavailable_reason=H1B_AGENT_UNAVAILABLE_REASON,
     )
 
-    async def fake_check(session, job, *, settings):
-        return evidence
+    async def fake_enrich(engine, companies, *, settings, agent_factory, company_resolver_factory=None, force_refresh=False):
+        report = H1BEnrichmentReport(by_company={"acme": evidence})
+        _persist_h1b_cache(engine, report)
+        return report
 
-    monkeypatch.setattr(jobs_router, "check_job_sponsorship", fake_check)
-    env = tmp_path / "h1b.env"
-    env.write_text(
-        "H1B_MCP_ENABLED=true\n"
-        "H1B_MCP_TRANSPORT=stdio\n"
-        "H1B_MCP_COMMAND=server\n",
-        encoding="utf-8",
-    )
-    client = TestClient(create_app(db_url="sqlite://", env_path=env))
+    monkeypatch.setattr(h1b_service, "enrich_companies", fake_enrich)
+    client = _h1b_client(tmp_path)
     with client:
         jid = _seed(client.app, company="Acme")
         response = client.post(f"/api/jobs/{jid}/h1b-sponsorship")
+        assert response.status_code == 202
+        run = client.get(f"/api/runs/{response.json()['runId']}").json()
+        assert run["state"] == "done"
+        detail = client.get(f"/api/jobs/{jid}").json()
 
-    body = response.json()
-    assert response.status_code == 200
-    assert body["capability"] == "unavailable"
-    assert body["message"] == H1B_AGENT_UNAVAILABLE_REASON
-    assert body["evidence"]["unavailableReason"] == H1B_AGENT_UNAVAILABLE_REASON
+    assert detail["h1BSponsorship"]["capability"] == "unavailable"
+    assert detail["h1BSponsorship"]["message"] == H1B_AGENT_UNAVAILABLE_REASON
+    assert detail["h1BSponsorship"]["evidence"]["unavailableReason"] == H1B_AGENT_UNAVAILABLE_REASON
 
 
 def test_patch_archived_then_restore():

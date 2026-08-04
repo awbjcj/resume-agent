@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -8,9 +8,11 @@ from sqlalchemy.orm import defer
 from sqlmodel import Session, select
 
 from resume_agent.discovery.connectors.text import clean_job_description_text
+from resume_agent.h1b.cache import load_company_evidence
 from resume_agent.h1b.models import H1BSponsorshipEvidence
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.taxonomy.company_size import snap as snap_size
+from resume_agent.taxonomy.industries import normalize_company
 from resume_agent.taxonomy.skills import canonical_skill, load_aliases, split_skills
 from resume_agent.tenancy.paths import SKILL_ALIASES_PATH
 from resume_agent.tracking.match_gap import profile_skill_tokens
@@ -149,18 +151,21 @@ class PipelineRow:
     h1b_sponsorship_status: str | None = None
 
 
-def _h1b_sponsorship_status(job: Job) -> str | None:
-    """Return the persisted H-1B evidence status, failing closed if corrupt."""
-    metadata = job.analysis_meta_json
-    if not isinstance(metadata, dict):
+def _h1b_sponsorship_status(
+    job: Job, evidence_by_company: Mapping[str, H1BSponsorshipEvidence]
+) -> str | None:
+    """Return the company's cached H-1B status, or None when uncached."""
+    key = normalize_company(job.company)
+    if not key:
         return None
-    snapshot = metadata.get("h1b_evidence_snapshot")
-    if snapshot is None:
-        return None
-    try:
-        return H1BSponsorshipEvidence.model_validate(snapshot).status
-    except Exception:
-        return None
+    evidence = evidence_by_company.get(key)
+    return evidence.status if evidence is not None else None
+
+
+def _company_evidence(
+    session: Session, jobs: Sequence[Job]
+) -> Mapping[str, H1BSponsorshipEvidence]:
+    return load_company_evidence(session, [job.company for job in jobs])
 
 
 def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> list[SkillTag]:
@@ -188,7 +193,12 @@ def _skill_tags(criteria: dict, tokens: set[str], aliases: dict[str, str]) -> li
     return tags
 
 
-def _shortlist_row(job: Job, tokens: set[str], aliases: dict[str, str]) -> ShortlistRow:
+def _shortlist_row(
+    job: Job,
+    tokens: set[str],
+    aliases: dict[str, str],
+    evidence_by_company: Mapping[str, H1BSponsorshipEvidence],
+) -> ShortlistRow:
     """Project one ``Job`` into the full skill + meta facet row.
 
     Shared by the board list (``shortlist_rows``) and the single-job detail
@@ -223,7 +233,7 @@ def _shortlist_row(job: Job, tokens: set[str], aliases: dict[str, str]) -> Short
         location_city=loc.get("city"),
         is_us=bool(loc.get("is_us")),
         url=job.url,
-        h1b_sponsorship_status=_h1b_sponsorship_status(job),
+        h1b_sponsorship_status=_h1b_sponsorship_status(job, evidence_by_company),
     )
 
 
@@ -240,10 +250,13 @@ def shortlist_rows(
         .where(Job.status == JobStatus.shortlisted.value, archived_col.is_(None))
         .order_by(fit_score_col.desc().nullslast())
     ).all()
-    return project_shortlist_jobs(jobs, facts=facts, aliases_path=aliases_path)
+    return project_shortlist_jobs(
+        session, jobs, facts=facts, aliases_path=aliases_path
+    )
 
 
 def project_shortlist_jobs(
+    session: Session,
     jobs: Sequence[Job],
     *,
     facts: ProfileFacts | None = None,
@@ -252,7 +265,10 @@ def project_shortlist_jobs(
     """Project an already-selected job page into shortlist rows."""
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
-    return [_shortlist_row(job, tokens, aliases) for job in jobs]
+    evidence_by_company = _company_evidence(session, jobs)
+    return [
+        _shortlist_row(job, tokens, aliases, evidence_by_company) for job in jobs
+    ]
 
 
 def job_facets(
@@ -272,7 +288,8 @@ def job_facets(
         return None
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
-    return _shortlist_row(job, tokens, aliases)
+    evidence_by_company = _company_evidence(session, [job])
+    return _shortlist_row(job, tokens, aliases, evidence_by_company)
 
 
 def job_detail_row(
@@ -287,7 +304,7 @@ def job_detail_row(
         return None
     tokens = profile_skill_tokens(facts) if facts is not None else set()
     aliases = load_aliases(aliases_path)
-    facets = _shortlist_row(job, tokens, aliases)
+    facets = _shortlist_row(job, tokens, aliases, {})
     jid = _require_job_id(job)
     versions = resume_versions_for_job(session, jid)
     best = pick_best(versions)
@@ -340,6 +357,7 @@ def project_pipeline_jobs(
     applications = applications_by_job(session, job_ids)
     progressed = progressed_job_ids(session, job_ids)
     aliases = load_aliases(aliases_path)
+    evidence_by_company = _company_evidence(session, jobs)
     rows = []
     for job in jobs:
         job_id = _require_job_id(job)
@@ -387,7 +405,9 @@ def project_pipeline_jobs(
                 needs_attention=best.no_clean_round,
                 regressed=best.regressed,
                 url=job.url,
-                h1b_sponsorship_status=_h1b_sponsorship_status(job),
+                h1b_sponsorship_status=_h1b_sponsorship_status(
+                    job, evidence_by_company
+                ),
             )
         )
     return rows
@@ -412,7 +432,11 @@ _TRIAGE_STATUSES = (
 )
 
 
-def _triage_row(job: Job, progressed: set[int]) -> TriageRow:
+def _triage_row(
+    job: Job,
+    progressed: set[int],
+    evidence_by_company: Mapping[str, H1BSponsorshipEvidence],
+) -> TriageRow:
     job_id = _require_job_id(job)
     return TriageRow(
         job_id=job_id,
@@ -428,7 +452,7 @@ def _triage_row(job: Job, progressed: set[int]) -> TriageRow:
         reject_reason=job.reject_reason,
         reject_category=job.reject_category,
         url=job.url,
-        h1b_sponsorship_status=_h1b_sponsorship_status(job),
+        h1b_sponsorship_status=_h1b_sponsorship_status(job, evidence_by_company),
     )
 
 
@@ -462,4 +486,5 @@ def project_triage_jobs(
     """Project an already-selected job page with page-scoped progress lookups."""
     job_ids = [_require_job_id(job) for job in jobs]
     progressed = progressed_job_ids(session, job_ids)
-    return [_triage_row(job, progressed) for job in jobs]
+    evidence_by_company = _company_evidence(session, jobs)
+    return [_triage_row(job, progressed, evidence_by_company) for job in jobs]

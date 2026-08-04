@@ -8,11 +8,12 @@ an optional ProgressReporter passed straight through.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import Protocol, TypedDict
 
 import httpx
 import asyncio
 import inspect
+from datetime import datetime, timezone
 from playwright.sync_api import Error as PlaywrightError
 from sqlalchemy import func, select, text
 from sqlmodel import Session, col, select as model_select
@@ -32,6 +33,8 @@ from resume_agent.discovery.scraper.dashboard import DashboardScraper
 from resume_agent.discovery.scraper.linkedin import build_linkedin_scraper
 from resume_agent.discovery.search_config import load_search_config
 from resume_agent.discovery.url_ingest.service import job_from_url
+from resume_agent.h1b.cache import load_company_evidence
+from resume_agent.h1b.models import H1BEnrichmentReport, H1BSponsorshipEvidence
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.profile.matrix import (
     SkillMatrix,
@@ -69,11 +72,14 @@ from resume_agent.tenancy.paths import (
     resolve_tenant_path,
 )
 from resume_agent.tracking.tables import Job
-from resume_agent.h1b.models import H1BEnrichmentReport, H1BSponsorshipEvidence
 from resume_agent.tracking.tables import H1BCompanyEvidence, JobStatus
 
 
-class H1BEnricher:
+class H1BEnricher(Protocol):
+    async def enrich(self, engine, companies: list[str]) -> H1BEnrichmentReport: ...
+
+
+class DefaultH1BEnricher:
     async def enrich(self, engine, companies: list[str]) -> H1BEnrichmentReport:
         from resume_agent.h1b.service import (
             DefaultCompanyNameResolverFactory,
@@ -99,7 +105,7 @@ def run_h1b_enrichment(
     scope: StageScope = StageScope(),
     reporter: ProgressReporter | None = None,
 ) -> dict[int, H1BSponsorshipEvidence]:
-    """Research only sponsorship-required, JD-silent jobs after filtering."""
+    """Research filtered companies and return fresh evidence for silent jobs."""
     jobs = [
         job
         for job in session.exec(
@@ -107,54 +113,95 @@ def run_h1b_enrichment(
         ).all()
         if scope.job_ids is None or job.id in scope.job_ids
     ]
-    eligible: list[Job] = []
+    if not config.sponsorship_required:
+        if reporter:
+            reporter.begin(
+                0,
+                "Checking historical sponsorship",
+                phase_index=3,
+                phase_count=4,
+            )
+            reporter.step(0)
+        return {}
+
+    # Research every surviving job's company so each card gets an answer.
+    research_jobs: list[Job] = []
+    job_counts: dict[str, int] = {}
     companies: dict[str, str] = {}
     for job in jobs:
-        criteria = job.criteria_json or {}
-        if not config.sponsorship_required or criteria.get("sponsorship_signal") != "silent":
-            continue
         normalized = normalize_company(job.company)
         if normalized:
-            eligible.append(job)
+            research_jobs.append(job)
+            job_counts[normalized] = job_counts.get(normalized, 0) + 1
             companies.setdefault(normalized, job.company or normalized)
     if reporter:
         reporter.begin(
-            len(eligible),
+            len(research_jobs),
             "Checking historical sponsorship",
             phase_index=3,
             phase_count=4,
         )
-    if not eligible or enricher is None:
+    if not research_jobs:
         if reporter:
-            reporter.step(len(eligible))
+            reporter.step(len(research_jobs))
         return {}
-    outcome = enricher.enrich(session.get_bind(), list(companies.values()))
-    if inspect.isawaitable(outcome):
-        outcome = asyncio.run(outcome)
-    report = H1BEnrichmentReport.model_validate(outcome)
+
+    now = datetime.now(timezone.utc)
+    cached_for_display = load_company_evidence(session, list(companies.values()))
+    fresh_by_company = {
+        key: evidence
+        for key, evidence in cached_for_display.items()
+        if evidence.is_fresh(now)
+    }
+    # Expired rows still render on cards, but refreshing them costs a call and
+    # they must never silently become scorer input if the cap defers them.
+    uncached = sorted(
+        (key for key in companies if key not in fresh_by_company),
+        key=lambda key: (-job_counts[key], key),
+    )
+    cap = get_settings().h1b_enrich_max_companies_per_run
+    selected = uncached if cap == 0 else uncached[:cap]
+
+    report = H1BEnrichmentReport(by_company={})
+    if selected and enricher is not None:
+        outcome = enricher.enrich(session.get_bind(), [companies[key] for key in selected])
+        if inspect.isawaitable(outcome):
+            outcome = asyncio.run(outcome)
+        report = H1BEnrichmentReport.model_validate(outcome)
+
+    available: dict[str, H1BSponsorshipEvidence] = {
+        **fresh_by_company,
+        **report.by_company,
+    }
+    evidence_ids: dict[str, int | None] = {}
+    if available:
+        cache_rows = session.exec(
+            model_select(H1BCompanyEvidence).where(
+                col(H1BCompanyEvidence.normalized_company).in_(list(available))
+            )
+        ).all()
+        evidence_ids = {row.normalized_company: row.id for row in cache_rows}
+
     evidence_by_job: dict[int, H1BSponsorshipEvidence] = {}
-    for job in eligible:
+    for job in research_jobs:
         normalized = normalize_company(job.company)
         if not normalized:
             continue
-        evidence = report.by_company.get(normalized)
+        evidence = available.get(normalized)
         if evidence is None:
             continue
         meta = read_job_analysis_meta(job.analysis_meta_json) or JobAnalysisMeta()
-        row = session.exec(
-            model_select(H1BCompanyEvidence).where(
-                H1BCompanyEvidence.normalized_company == normalized
-            )
-        ).first()
-        meta.h1b_evidence_id = row.id if row is not None else None
-        meta.h1b_evidence_snapshot = evidence.model_dump(mode="json")
+        meta.h1b_evidence_id = evidence_ids.get(normalized)
         job.analysis_meta_json = meta.model_dump(mode="json")
         session.add(job)
-        if job.id is not None:
+        if (
+            job.id is not None
+            and (job.criteria_json or {}).get("sponsorship_signal") == "silent"
+        ):
             evidence_by_job[job.id] = evidence
     session.commit()
     if reporter:
-        reporter.step(len(eligible))
+        reporter.step(len(research_jobs))
     return evidence_by_job
 
 
@@ -281,7 +328,7 @@ def discover_jobs(
     matrix, cluster_map = _skill_artifacts(facts_path, facts)
     bundle = bundle or build_discovery_bundle()
     if h1b_enricher is None and get_settings().h1b_mcp_enabled:
-        h1b_enricher = H1BEnricher()
+        h1b_enricher = DefaultH1BEnricher()
     discover_kwargs = {
         "canonicalizer": bundle.canonicalizer,
         "industry_classifier": bundle.industry_classifier,
@@ -391,7 +438,7 @@ def reprocess_jobs(
     matrix, cluster_map = _skill_artifacts(facts_path, facts)
     bundle = bundle or build_discovery_bundle()
     if h1b_enricher is None and get_settings().h1b_mcp_enabled:
-        h1b_enricher = H1BEnricher()
+        h1b_enricher = DefaultH1BEnricher()
     return reprocess(
         session,
         config,

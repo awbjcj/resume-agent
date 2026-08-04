@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from typing import cast
 
 from fastapi import APIRouter, Depends, Request, Response, UploadFile
@@ -10,11 +11,15 @@ from sqlmodel import Session
 
 from resume_agent.api.deps import (
     get_config_store,
+    get_engine,
     get_interview_dir,
+    get_run_manager,
     get_session,
     get_settings_dep,
 )
 from resume_agent.api.errors import ApiException
+from resume_agent.api.runs.launch import launch, session_work
+from resume_agent.api.runs.manager import RunManager
 from resume_agent.api.schemas.bulk import BulkRequest, BulkResultOut
 from resume_agent.api.schemas.config import ReviewConfigDoc
 from resume_agent.api.schemas.jobs import (
@@ -27,15 +32,15 @@ from resume_agent.api.schemas.jobs import (
     JobsImportError,
     JobsImportReportOut,
 )
-from resume_agent.career_skills.models import read_job_analysis_meta
 from resume_agent.config import Settings
+from resume_agent.h1b.cache import load_company_evidence
 from resume_agent.h1b.models import (
     H1B_DISABLED_MESSAGE,
     H1B_NO_EVIDENCE_MESSAGE,
     H1BSponsorshipEvidence,
 )
 from resume_agent.h1b.service import check_job_sponsorship
-from resume_agent.api.schemas.runs import AddJobTextRequest
+from resume_agent.api.schemas.runs import AddJobTextRequest, RunOut
 from resume_agent.api.uploads import UploadTooLargeError, read_upload
 from resume_agent.services import board
 from resume_agent.services.discovery import ActiveJobQuotaError, add_job_from_text
@@ -95,14 +100,9 @@ def _job_detail_response(
         job = get_job(session, job_id)
         evidence = None
         if job is not None:
-            try:
-                meta = read_job_analysis_meta(job.analysis_meta_json)
-                if meta is not None and meta.h1b_evidence_snapshot is not None:
-                    evidence = H1BSponsorshipEvidence.model_validate(
-                        meta.h1b_evidence_snapshot
-                    )
-            except ValueError:
-                evidence = None
+            key = normalize_company(job.company)
+            if key:
+                evidence = load_company_evidence(session, [job.company]).get(key)
         detail.h1b_sponsorship = _h1b_sponsorship_response(evidence)
     review_doc = cast(ReviewConfigDoc, get_config_store(request).get("review"))
     gate_names = {r.name for r in review_doc.reviewers if r.gate}
@@ -113,21 +113,28 @@ def _job_detail_response(
 
 def _h1b_sponsorship_response(
     evidence: H1BSponsorshipEvidence | None,
+    *,
+    now: datetime | None = None,
 ) -> H1BSponsorshipOut:
     if evidence is None:
         return H1BSponsorshipOut(
             capability="unavailable",
             message=H1B_NO_EVIDENCE_MESSAGE,
         )
+    # Expired evidence still renders -- historical filings do not rot. The server
+    # owns "now" for every other TTL decision, so it owns this label too.
+    stale = not evidence.is_fresh(now or datetime.now(timezone.utc))
     if evidence.status == "unavailable":
         return H1BSponsorshipOut(
             capability="unavailable",
             evidence=H1BSponsorshipEvidenceOut.from_evidence(evidence),
             message=evidence.unavailable_reason,
+            stale=stale,
         )
     return H1BSponsorshipOut(
         capability="available",
         evidence=H1BSponsorshipEvidenceOut.from_evidence(evidence),
+        stale=stale,
     )
 
 
@@ -143,21 +150,21 @@ def get_job_detail(
 
 @router.post(
     "/jobs/{job_id}/h1b-sponsorship",
-    response_model=H1BSponsorshipOut,
+    response_model=RunOut,
+    status_code=202,
 )
 def check_h1b_sponsorship(
     job_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
-) -> H1BSponsorshipOut:
+    mgr: RunManager = Depends(get_run_manager),
+) -> RunOut:
     job = get_job(session, job_id)
     if job is None:
         raise ApiException(404, "NOT_FOUND", f"Job #{job_id} not found")
     if not settings.h1b_mcp_enabled:
-        return H1BSponsorshipOut(
-            capability="disabled",
-            message=H1B_DISABLED_MESSAGE,
-        )
+        raise ApiException(409, "H1B_DISABLED", H1B_DISABLED_MESSAGE)
     if not normalize_company(job.company):
         raise ApiException(
             422,
@@ -165,8 +172,26 @@ def check_h1b_sponsorship(
             "A company is required before checking H-1B sponsorship",
         )
 
-    evidence = asyncio.run(check_job_sponsorship(session, job, settings=settings))
-    return _h1b_sponsorship_response(evidence)
+    engine = get_engine(request)
+
+    def do_check(worker_session: Session, reporter):
+        reporter.begin(1, f"Checking H-1B sponsorship for job #{job_id}")
+        job_row = get_job(worker_session, job_id)
+        if job_row is None:
+            raise ValueError(f"Job #{job_id} not found")
+        asyncio.run(check_job_sponsorship(worker_session, job_row, settings=settings))
+        reporter.step(1)
+        return {"jobId": job_id}
+
+    return launch(
+        mgr,
+        "h1bSponsorship",
+        session_work(engine, do_check),
+        singleton_key=f"h1b-sponsorship:{job_id}",
+        singleton_conflict="raise",
+        meta={"jobId": job_id},
+        busy_message="An H-1B check is already running for this job",
+    )
 
 
 @router.patch("/jobs/{job_id}", response_model=JobDetail)

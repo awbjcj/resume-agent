@@ -14,10 +14,9 @@ import { FitDial } from "./FitDial";
 import { JobMeta } from "./JobMeta";
 import { SkillMatrix } from "./SkillMatrix";
 import { DrawerSkeleton } from "./skeletons";
-import { ApplicationEditor } from "@/features/job/ApplicationEditor";
 import { CoverLettersTab } from "@/features/job/CoverLettersTab";
 import { H1BSponsorshipPanel } from "@/features/job/H1BSponsorshipPanel";
-import { StageManager } from "@/features/job/StageManager";
+import { TrackingTab } from "@/features/job/TrackingTab";
 import { InterviewTab } from "@/features/interview/InterviewTab";
 import { VersionRow } from "@/features/job/VersionRow";
 import { RevisionRunPlaceholders } from "@/features/job/RevisionRunPlaceholders";
@@ -67,7 +66,7 @@ export function JobModal({
   const navEnabled = Boolean(onPrev || onNext);
 
   // Arrow keys step through the list, but never while the user is typing in a
-  // field (Application tab, cover-letter editors, etc.).
+  // field (Tracking tab, cover-letter editors, etc.).
   useEffect(() => {
     if (!navEnabled) return;
     const handler = (event: KeyboardEvent) => {
@@ -217,9 +216,9 @@ export function JobModal({
                         </span>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="application" className={tabTriggerClass}>Application</TabsTrigger>
+                    <TabsTrigger value="tracking" className={tabTriggerClass}>Tracking</TabsTrigger>
                     <TabsTrigger value="interview" className={tabTriggerClass}>Interview</TabsTrigger>
-                    <TabsTrigger value="manage" className={tabTriggerClass}>Management</TabsTrigger>
+                    <TabsTrigger value="sponsorship" className={tabTriggerClass}>Sponsorship</TabsTrigger>
                   </TabsList>
 
                   <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
@@ -287,8 +286,8 @@ export function JobModal({
                       />
                     </TabsContent>
 
-                    <TabsContent value="application" className="mt-0">
-                      <ApplicationEditor jobId={jobId} application={job.application} />
+                    <TabsContent value="tracking" className="mt-0">
+                      <TrackingTab job={job} onDeleted={onClose} />
                     </TabsContent>
 
                     <TabsContent value="interview" className="mt-0">
@@ -299,15 +298,12 @@ export function JobModal({
                       />
                     </TabsContent>
 
-                    <TabsContent value="manage" className="mt-0">
-                      <div className="space-y-6">
-                        <StageManager job={job} onDeleted={onClose} />
-                        <H1BSponsorshipPanel
-                          jobId={jobId}
-                          company={job.company}
-                          initialResult={job.h1BSponsorship}
-                        />
-                      </div>
+                    <TabsContent value="sponsorship" className="mt-0">
+                      <H1BSponsorshipPanel
+                        jobId={jobId}
+                        company={job.company}
+                        initialResult={job.h1BSponsorship}
+                      />
                     </TabsContent>
                   </div>
                 </Tabs>

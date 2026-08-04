@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     h1b_mcp_timeout_seconds: int = Field(default=30, ge=1, le=300)
     h1b_mcp_max_result_chars: int = Field(default=200_000, ge=1_000, le=1_000_000)
     h1b_cache_ttl_days: int = Field(default=30, ge=1, le=365)
+    h1b_enrich_max_companies_per_run: int = Field(default=50, ge=0)
 
     @model_validator(mode="after")
     def validate_h1b_transport(self) -> Settings:

@@ -4040,6 +4040,21 @@ export interface components {
              */
             capability: "disabled" | "available" | "unavailable";
         };
+        /** H1BPeriodStatOut */
+        H1BPeriodStatOut: {
+            /** Certifiedcount */
+            certifiedCount?: number | null;
+            /** Deniedcount */
+            deniedCount?: number | null;
+            /** Filingcount */
+            filingCount?: number | null;
+            /** Period */
+            period: string;
+            /** Wagesummary */
+            wageSummary?: {
+                [key: string]: number;
+            } | null;
+        };
         /** H1BSponsorshipEvidenceOut */
         H1BSponsorshipEvidenceOut: {
             /** Caveat */
@@ -4050,6 +4065,8 @@ export interface components {
             confidence: number;
             /** Dataversion */
             dataVersion: string | null;
+            /** Deniedcount */
+            deniedCount?: number | null;
             /** Displaycompany */
             displayCompany: string | null;
             /**
@@ -4063,6 +4080,8 @@ export interface components {
             fiscalPeriods: string[];
             /** Normalizedcompany */
             normalizedCompany: string;
+            /** Periods */
+            periods?: components["schemas"]["H1BPeriodStatOut"][];
             /**
              * Retrievedat
              * Format: date-time
@@ -4092,6 +4111,11 @@ export interface components {
             evidence?: components["schemas"]["H1BSponsorshipEvidenceOut"] | null;
             /** Message */
             message?: string | null;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -10425,12 +10449,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["H1BSponsorshipOut"];
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

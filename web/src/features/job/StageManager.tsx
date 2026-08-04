@@ -9,17 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useSetStage } from "./use-job-mutations";
-import { useDeleteJob } from "@/features/triage/use-triage-mutations";
 import type { JobDetail } from "./use-job-detail";
 
 const STAGES = ["raw", "shortlisted", "approved", "tailored", "rendered", "rejected"];
 
-export function StageManager({ job, onDeleted }: { job: JobDetail; onDeleted: () => void }) {
+export function StageManager({ job }: { job: JobDetail }) {
   const [stage, setStage] = useState(job.status);
   const setStageMut = useSetStage(job.id);
-  const del = useDeleteJob();
 
   return (
     <div className="space-y-3">
@@ -40,24 +37,7 @@ export function StageManager({ job, onDeleted }: { job: JobDetail; onDeleted: ()
       </div>
       <div className="flex gap-2">
         <Button onClick={() => setStageMut.mutate(stage)}>Set stage</Button>
-        <ConfirmDialog
-          trigger={
-            <Button variant="destructive" disabled={job.hasProgress}>
-              Delete
-            </Button>
-          }
-          title="Delete this job?"
-          description="This cannot be undone."
-          confirmLabel="Confirm delete"
-          onConfirm={() => {
-            del.mutate(job.id);
-            onDeleted();
-          }}
-        />
       </div>
-      {job.hasProgress && (
-        <p className="text-xs text-muted-foreground">Has progress — delete disabled.</p>
-      )}
       {(job.status === "filtered" || job.status === "rejected") &&
         stage !== "filtered" &&
         stage !== "rejected" && (

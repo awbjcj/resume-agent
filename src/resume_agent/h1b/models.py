@@ -33,6 +33,39 @@ class H1BCompanyResolution(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
+class H1BPeriodStat(BaseModel):
+    """One fiscal quarter of historical filing figures for a company."""
+
+    period: str = Field(min_length=1, max_length=32)
+    filing_count: int | None = Field(default=None, ge=0)
+    certified_count: int | None = Field(default=None, ge=0)
+    denied_count: int | None = Field(default=None, ge=0)
+    wage_summary: dict[str, float] | None = None
+
+    @model_validator(mode="after")
+    def validate_outcome_counts(self) -> H1BPeriodStat:
+        if (
+            self.filing_count is not None
+            and self.certified_count is not None
+            and self.denied_count is not None
+            and self.certified_count + self.denied_count > self.filing_count
+        ):
+            raise ValueError(
+                "certified_count + denied_count cannot exceed filing_count"
+            )
+        return self
+
+
+def _rollup(periods: list[H1BPeriodStat], attribute: str) -> int | None:
+    """Sum one metric across periods, yielding None when no period reports it."""
+    present = [
+        value
+        for value in (getattr(period, attribute) for period in periods)
+        if value is not None
+    ]
+    return sum(present) if present else None
+
+
 class H1BSponsorshipEvidence(BaseModel):
     status: Literal["matched", "no_match", "unavailable"]
     normalized_company: str = Field(min_length=1)
@@ -40,6 +73,8 @@ class H1BSponsorshipEvidence(BaseModel):
     fiscal_periods: list[str] = Field(default_factory=list)
     filing_count: int | None = Field(default=None, ge=0)
     certified_count: int | None = Field(default=None, ge=0)
+    denied_count: int | None = Field(default=None, ge=0)
+    periods: list[H1BPeriodStat] = Field(default_factory=list, max_length=4)
     wage_summary: dict[str, float] | None = None
     source_url: str | None = None
     data_version: str | None = None
@@ -70,6 +105,15 @@ class H1BSponsorshipEvidence(BaseModel):
 
     @model_validator(mode="after")
     def validate_historical_contract(self) -> H1BSponsorshipEvidence:
+        if self.periods:
+            labels = [period.period for period in self.periods]
+            if len(set(labels)) != len(labels):
+                raise ValueError("H1B evidence periods must have unique labels")
+            # The rollup is derived, never trusted: a model cannot put a total on
+            # screen that disagrees with the parts shown beneath it.
+            self.filing_count = _rollup(self.periods, "filing_count")
+            self.certified_count = _rollup(self.periods, "certified_count")
+            self.denied_count = _rollup(self.periods, "denied_count")
         if self.expires_at <= self.retrieved_at:
             raise ValueError("H1B evidence must expire after retrieval")
         if self.caveat != HISTORICAL_ONLY_CAVEAT:
@@ -77,7 +121,26 @@ class H1BSponsorshipEvidence(BaseModel):
         if self.certified_count is not None and self.filing_count is not None:
             if self.certified_count > self.filing_count:
                 raise ValueError("certified_count cannot exceed filing_count")
+        if self.denied_count is not None and self.filing_count is not None:
+            if self.denied_count > self.filing_count:
+                raise ValueError("denied_count cannot exceed filing_count")
+        if (
+            self.filing_count is not None
+            and self.certified_count is not None
+            and self.denied_count is not None
+            and self.certified_count + self.denied_count > self.filing_count
+        ):
+            raise ValueError("certified_count + denied_count cannot exceed filing_count")
         return self
+
+    def is_fresh(self, now: datetime) -> bool:
+        """Whether this evidence is still inside its cache TTL at ``now``.
+
+        The single definition of "fresh" -- every caller that needs to decide
+        whether to reuse cached evidence or label it stale for display goes
+        through this instead of re-deriving the ``expires_at`` comparison.
+        """
+        return self.expires_at > now
 
 
 class H1BEnrichmentReport(BaseModel):
