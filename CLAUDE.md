@@ -109,10 +109,10 @@ builder imports a concrete agno model class directly.
   opaque reasoning items. Those replayed items count as later input tokens.
 - **OpenAI must always request a reasoning summary — otherwise agno relabels the
   answer as reasoning.** agno's Responses adapter reads "a `reasoning` config
-  was sent but no `reasoning_summary`" as "the visible output text *is* the
+  was sent but no `reasoning_summary`" as "the visible output text _is_ the
   reasoning" and copies **every** `output_text` delta into `reasoning_content`.
   Because a catalogued id always carries an explicit effort (even `none`), that
-  fired on every OpenAI agent: each delta arrived as a `ReasoningDelta` *and* a
+  fired on every OpenAI agent: each delta arrived as a `ReasoningDelta` _and_ a
   byte-identical `TextDelta`, alternating the two kinds on every token, so the
   chat rendered one "Show reasoning" disclosure plus one markdown block per
   token (239 SSE events on a coach turn where 16 suffice).
@@ -157,7 +157,7 @@ INVALID_ARGUMENT` before generating anything, and agno then hands back the
   formatter is an LLM that extracts a turn from raw notes either way, a missing
   marker **degrades** (the whole response becomes both the visible reply and the
   formatter's notes) and logs a warning; it must never raise. Marker matching
-  tolerates surrounding emphasis and padding but *requires* the `METADATA`
+  tolerates surrounding emphasis and padding but _requires_ the `METADATA`
   token — DeepSeek writes a bare `---` rule as a section break, so matching the
   rules alone would truncate a reply mid-turn. `ProseEmitter` withholds only a
   trailing prefix that can still complete into one of these boundaries; ordinary
