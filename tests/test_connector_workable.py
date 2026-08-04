@@ -38,13 +38,13 @@ def test_workable_fetch_uses_details_endpoint(monkeypatch):
         def json(self):
             return payload
 
-    def fake_get(url, params=None, timeout=None, follow_redirects=None):
+    def fake_get(url, params=None, **kwargs):
         captured.update(url=url, params=params)
         return Response()
 
     import resume_agent.discovery.connectors.workable as connector
 
-    monkeypatch.setattr(connector.httpx, "get", fake_get)
+    monkeypatch.setattr(connector.board, "get", fake_get)
     jobs = fetch_workable(AtsTarget("workable", "careers"), SearchConfig())
 
     assert captured["params"] == {"details": "true"}

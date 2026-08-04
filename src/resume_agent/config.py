@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     # Concurrency + retry for LLM fan-out (discovery + tailor).
     llm_concurrency: int = Field(default=8, ge=1)
     pull_concurrency: int = Field(default=4, ge=1)
+    # Per-host bound on the list-then-detail fan-out. Kept modest so a
+    # concurrent detail pass does not turn a board's 429 retry into a
+    # thundering herd.
+    detail_fetch_concurrency: int = Field(default=4, ge=1)
     llm_retries: int = Field(default=2, ge=0)
     llm_retry_delay: int = Field(default=1, ge=0)
     prompt_cache_enabled: bool = True

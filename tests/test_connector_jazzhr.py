@@ -38,7 +38,7 @@ def test_jazzhr_skip_seen_prevents_detail_request(monkeypatch):
 
     import resume_agent.discovery.connectors.jazzhr as connector
 
-    monkeypatch.setattr(connector.httpx, "get", lambda *args, **kwargs: Response())
+    monkeypatch.setattr(connector.board, "get", lambda *args, **kwargs: Response())
     jobs = fetch_jazzhr(
         AtsTarget("jazzhr", "utilidata"), SearchConfig(), skip_seen=lambda row: True
     )

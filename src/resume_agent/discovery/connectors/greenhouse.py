@@ -1,5 +1,7 @@
 import httpx
 
+from resume_agent.discovery.connectors import http as board
+
 from resume_agent.discovery.connectors.base import (
     FetchResult,
     RawJob,
@@ -17,7 +19,7 @@ _BASE = "https://boards-api.greenhouse.io/v1/boards"
 
 def fetch_greenhouse_board(token: str) -> dict:
     """GET a Greenhouse board's jobs payload with content."""
-    resp = httpx.get(f"{_BASE}/{token}/jobs", params={"content": "true"}, timeout=30)
+    resp = board.get(f"{_BASE}/{token}/jobs", params={"content": "true"})
     resp.raise_for_status()
     return resp.json()
 
@@ -29,8 +31,8 @@ def fetch_greenhouse_job(token: str, job_id: str) -> dict:
     the rendered page, whose markup differs between the legacy ``boards.`` and
     modern ``job-boards.`` layouts.
     """
-    resp = httpx.get(
-        f"{_BASE}/{token}/jobs/{job_id}", params={"content": "true"}, timeout=30
+    resp = board.get(
+        f"{_BASE}/{token}/jobs/{job_id}", params={"content": "true"}
     )
     resp.raise_for_status()
     return resp.json()
@@ -38,7 +40,7 @@ def fetch_greenhouse_job(token: str, job_id: str) -> dict:
 
 def fetch_greenhouse_board_name(token: str) -> str | None:
     """Resolve the organization name from Greenhouse's public board endpoint."""
-    response = httpx.get(f"{_BASE}/{token}", timeout=30)
+    response = board.get(f"{_BASE}/{token}")
     response.raise_for_status()
     name = response.json().get("name")
     return name.strip() if isinstance(name, str) and name.strip() else None

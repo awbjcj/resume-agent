@@ -1,4 +1,5 @@
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
@@ -59,10 +60,9 @@ def fetch_workable(
     limit: int | None = None,
     skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
-    response = httpx.get(
+    response = board.get(
         account_url(target.token),
         params={"details": "true"},
-        timeout=30,
         follow_redirects=True,
     )
     response.raise_for_status()

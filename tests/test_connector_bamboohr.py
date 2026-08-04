@@ -33,7 +33,7 @@ def test_bamboohr_skip_seen_prevents_detail_request(monkeypatch):
 
     import resume_agent.discovery.connectors.bamboohr as connector
 
-    monkeypatch.setattr(connector.httpx, "get", lambda *args, **kwargs: Response())
+    monkeypatch.setattr(connector.board, "get", lambda *args, **kwargs: Response())
     jobs = fetch_bamboohr(
         AtsTarget("bamboohr", "eleven"), SearchConfig(), skip_seen=lambda row: True
     )

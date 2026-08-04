@@ -1,6 +1,7 @@
 import json
 
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.detect import AtsTarget
@@ -46,8 +47,8 @@ def fetch_personio(
     limit: int | None = None,
     skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
-    response = httpx.get(
-        search_url(target.token, target.country), timeout=30, follow_redirects=True
+    response = board.get(
+        search_url(target.token, target.country), follow_redirects=True
     )
     response.raise_for_status()
     return parse_personio(response.text, target.token, target.country)

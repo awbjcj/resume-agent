@@ -10,7 +10,8 @@ import re
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.detect import AtsTarget
@@ -119,11 +120,10 @@ def fetch_google(
     jobs: list[RawJob] = []
     query = primary_search_term(search)
     for page_num in range(1, _MAX_PAGES + 1):
-        response = httpx.get(
+        response = board.get(
             _RESULTS_URL,
             params={"q": query, "page": page_num},
             headers=_HEADERS,
-            timeout=30,
         )
         response.raise_for_status()
         batch = parse_job_rows(extract_job_rows(response.text))

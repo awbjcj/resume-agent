@@ -7,6 +7,8 @@ lives here once. Single-call connectors (adzuna, remoteok) reuse only the tail,
 ``gate_and_limit``.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from typing import Callable, Iterable, TypeVar
 
 import httpx
@@ -104,24 +106,74 @@ def harvest_detailed(
     payload (e.g. a detail page missing its JobPosting JSON-LD) that row is
     skipped too, never the whole batch.
     """
+    candidates = [
+        row
+        for row in rows
+        if title_relevance_gate([row], search)
+        and not (skip_seen is not None and skip_seen(row))
+    ]
     jobs: list[RawJob] = []
-    for row in rows:
-        if not title_relevance_gate([row], search):
-            continue
-        if skip_seen is not None and skip_seen(row):
-            continue
-        try:
-            detail = fetch_detail(row)
-        except httpx.HTTPError:
-            continue
-        if detail is None:
-            continue
-        try:
-            apply_detail(row, detail)
-        except (ValueError, KeyError):
-            continue
-        if relevance_gate([row], search):
-            jobs.append(row)
-            if limit is not None and len(jobs) >= limit:
-                break
+    concurrency = _detail_concurrency()
+    start = 0
+    while start < len(candidates):
+        # Never fetch more details than the limit could still consume. Without
+        # this, a limit=1 run would fetch a whole chunk to keep one row; with
+        # it, the overshoot is bounded by what is genuinely still needed.
+        size = concurrency
+        if limit is not None:
+            size = min(size, max(1, limit - len(jobs)))
+        chunk = candidates[start : start + size]
+        start += size
+        for row, detail in zip(chunk, _fetch_details(chunk, fetch_detail)):
+            if detail is None:
+                continue
+            try:
+                apply_detail(row, detail)
+            except (ValueError, KeyError):
+                continue
+            if relevance_gate([row], search):
+                jobs.append(row)
+                if limit is not None and len(jobs) >= limit:
+                    return jobs
     return jobs
+
+
+def _detail_concurrency() -> int:
+    from resume_agent.config import get_settings
+
+    return max(1, get_settings().detail_fetch_concurrency)
+
+
+def _fetch_details(
+    chunk: list[T], fetch_detail: Callable[[T], dict | None]
+) -> list[dict | None]:
+    """Fetch one chunk's details concurrently, in row order.
+
+    The fetches are independent and network-bound, so they run on threads. A
+    stale detail endpoint skips its own row and never the batch — the same
+    isolation the serial loop had, kept per row rather than per batch. The
+    bound is per call site, which for the two N+1 connectors means per host, so
+    the existing throttle retry is not turned into a thundering herd.
+
+    Each task runs in its **own copy** of the caller's context. A bare thread
+    inherits no ``ContextVar``, which would silently drop both the run's
+    connection pool and — far worse — the active ``UserContext``, so a detail
+    fetch would resolve tenant paths against the wrong workspace. A copy per
+    task, not one shared copy: a ``Context`` cannot be entered twice at once.
+    """
+    if len(chunk) == 1:
+        return [_fetch_one(chunk[0], fetch_detail)]
+    tasks = [(copy_context(), row) for row in chunk]
+    with ThreadPoolExecutor(max_workers=len(chunk)) as pool:
+        return list(
+            pool.map(
+                lambda task: task[0].run(_fetch_one, task[1], fetch_detail), tasks
+            )
+        )
+
+
+def _fetch_one(row: T, fetch_detail: Callable[[T], dict | None]) -> dict | None:
+    try:
+        return fetch_detail(row)
+    except httpx.HTTPError:
+        return None

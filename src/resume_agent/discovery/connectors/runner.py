@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlmodel import Session
 
 from resume_agent.concurrency import Result, gather_isolated
+from resume_agent.discovery.connectors.http import board_session
 from resume_agent.config import get_settings
 from resume_agent.discovery.connectors.base import Connector, FetchResult
 from resume_agent.discovery.connectors.telemetry import record_run
@@ -94,7 +95,12 @@ def _fetch_all(
                 connector.fetch, search, limit=limit, skip_seen=skip_seen
             )
 
-    return asyncio.run(gather_isolated(connectors, fetch_one))
+    # One connection pool for the whole pull. A board pull is list-then-detail
+    # against a handful of hosts, so keep-alive here is the difference between
+    # a TLS handshake per request and one per host. ``asyncio.to_thread``
+    # copies the context, so every worker thread sees this session.
+    with board_session():
+        return asyncio.run(gather_isolated(connectors, fetch_one))
 
 
 def run_pull(

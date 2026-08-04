@@ -1,4 +1,5 @@
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
@@ -44,14 +45,14 @@ def fetch_breezy(
     limit: int | None = None,
     skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
-    response = httpx.get(board_url(target.token), timeout=30)
+    response = board.get(board_url(target.token))
     response.raise_for_status()
     rows = parse_breezy(response.json(), target.token)
 
     def fetch_detail(row: RawJob) -> dict | None:
         if not row.url:
             return None
-        detail = httpx.get(row.url, timeout=30)
+        detail = board.get(row.url)
         detail.raise_for_status()
         return {"html": detail.text}
 

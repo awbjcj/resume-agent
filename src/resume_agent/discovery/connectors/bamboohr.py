@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
@@ -69,14 +70,14 @@ def fetch_bamboohr(
     limit: int | None = None,
     skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
-    response = httpx.get(list_url(target.token), timeout=30)
+    response = board.get(list_url(target.token))
     response.raise_for_status()
     rows = parse_bamboohr(response.json(), target.token)
 
     def fetch_detail(row: BambooHrRow) -> dict | None:
         if not row.opening_id:
             return None
-        detail = httpx.get(detail_url(target.token, row.opening_id), timeout=30)
+        detail = board.get(detail_url(target.token, row.opening_id))
         detail.raise_for_status()
         return detail.json()
 

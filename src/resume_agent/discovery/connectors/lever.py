@@ -1,4 +1,5 @@
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import (
     FetchResult,
@@ -24,14 +25,14 @@ def fetch_lever_board(token: str) -> list:
     Like Greenhouse and Ashby, we fetch every posting in one GET and let the
     local relevance gate decide.
     """
-    resp = httpx.get(f"{_BASE}/{token}", params={"mode": "json"}, timeout=30)
+    resp = board.get(f"{_BASE}/{token}", params={"mode": "json"})
     resp.raise_for_status()
     return resp.json()
 
 
 def fetch_lever_posting(token: str, posting_id: str) -> dict:
     """GET a single Lever posting by id -- same shape as one ``fetch_lever_board`` item."""
-    resp = httpx.get(f"{_BASE}/{token}/{posting_id}", params={"mode": "json"}, timeout=30)
+    resp = board.get(f"{_BASE}/{token}/{posting_id}", params={"mode": "json"})
     resp.raise_for_status()
     return resp.json()
 

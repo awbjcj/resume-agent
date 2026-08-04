@@ -39,7 +39,7 @@ def test_recruitee_fetch_reads_public_offers(monkeypatch):
 
     import resume_agent.discovery.connectors.recruitee as connector
 
-    monkeypatch.setattr(connector.httpx, "get", lambda *args, **kwargs: Response())
+    monkeypatch.setattr(connector.board, "get", lambda *args, **kwargs: Response())
     assert fetch_recruitee(AtsTarget("recruitee", "transperfect"), SearchConfig())[
         0
     ].jd_text

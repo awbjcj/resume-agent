@@ -1,4 +1,5 @@
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import FetchResult, RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
@@ -52,6 +53,6 @@ class RemoteOKConnector:
         return FetchResult(jobs=jobs, filtered=filtered)
 
     def _get_all(self) -> list:
-        resp = httpx.get(_URL, headers={"User-Agent": "resume-agent"}, timeout=30)
+        resp = board.get(_URL, headers={"User-Agent": "resume-agent"})
         resp.raise_for_status()
         return resp.json()

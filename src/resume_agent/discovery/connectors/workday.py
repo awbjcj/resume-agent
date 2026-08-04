@@ -1,10 +1,10 @@
 import json
-import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
@@ -20,47 +20,26 @@ _MAX_OFFSET = (
 )
 _FACETS_DIR = Path("data/workday_facets")
 
-# Large Workday boards (thousands of postings) fire many list + detail requests;
-# an intermittent throttle (429) or transient 5xx must not abort the whole pull.
-_RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
-_RETRY_ATTEMPTS = 4  # one initial call + three retries
-_RETRY_BACKOFF_S = 2.0  # exponential base when the server sends no Retry-After
-_MAX_RETRY_SLEEP_S = 30.0
+# Workday boards throttle aggressively, so a big pull must survive an
+# intermittent 429 or transient 5xx. That retry is no longer Workday's own: it
+# is the default policy of every board endpoint, and lives in
+# ``connectors/http.py`` together with the pool. These names remain as the
+# canonical description of the policy Workday needs.
+_RETRY_STATUSES = board.RETRY_STATUSES
+_RETRY_ATTEMPTS = board.RETRY_ATTEMPTS
+_RETRY_BACKOFF_S = board.RETRY_BACKOFF_S
+_MAX_RETRY_SLEEP_S = board.MAX_RETRY_SLEEP_S
 
 
-def _retry_after_seconds(response: httpx.Response) -> float | None:
-    """Seconds from a numeric Retry-After header; None for absent/date/garbage."""
-    raw = response.headers.get("retry-after")
-    if not raw:
-        return None
-    try:
-        return max(0.0, float(raw))
-    except ValueError:
-        return None  # HTTP-date form is rare here; fall back to backoff
+def _checked(response: httpx.Response) -> httpx.Response:
+    """Raise on a status the pool already retried to exhaustion.
 
-
-def _request_with_retry(send: Callable[[], httpx.Response]) -> httpx.Response:
-    """Issue a Workday request, retrying transient throttles/5xx with backoff.
-
-    Honors a numeric ``Retry-After`` when present, else exponential backoff.
-    After ``_RETRY_ATTEMPTS`` the last error is re-raised so a persistently
-    failing endpoint still surfaces as a per-URL failure upstream (the
-    companies connector isolates it rather than aborting sibling URLs).
+    The session returns the last transient response rather than raising, so a
+    persistently throttled board surfaces here as an ``HTTPStatusError`` and is
+    isolated per URL by the companies connector — never aborting siblings.
     """
-    for attempt in range(_RETRY_ATTEMPTS):
-        try:
-            response = send()
-            response.raise_for_status()
-            return response
-        except httpx.HTTPStatusError as error:
-            status = error.response.status_code
-            if status not in _RETRY_STATUSES or attempt + 1 >= _RETRY_ATTEMPTS:
-                raise
-            delay = _retry_after_seconds(error.response)
-            if delay is None:
-                delay = _RETRY_BACKOFF_S * (2**attempt)
-            time.sleep(min(delay, _MAX_RETRY_SLEEP_S))
-    raise AssertionError("unreachable")  # pragma: no cover
+    response.raise_for_status()
+    return response
 
 
 def default_facets_dir() -> Path:
@@ -238,13 +217,10 @@ def fetch_job_detail(target: AtsTarget, external_path: str) -> dict:
     """GET one Workday posting's cxs detail payload, with the throttle retry.
 
     Workday boards throttle aggressively, so every call -- including a one-off
-    lookup for a pasted URL -- goes through ``_request_with_retry`` rather than
-    a bare ``httpx.get`` that a single 429 would defeat.
+    lookup for a pasted URL -- rides the pooled session's retry rather than a
+    bare ``httpx.get`` that a single 429 would defeat.
     """
-    resp = _request_with_retry(
-        lambda: httpx.get(cxs_detail_url(target, external_path), timeout=30)
-    )
-    return resp.json()
+    return _checked(board.get(cxs_detail_url(target, external_path))).json()
 
 
 def apply_detail(row: WorkdayRow, detail: dict) -> None:
@@ -269,14 +245,12 @@ def _list_page(
     offset: int,
     applied_facets: dict[str, list[str]],
 ) -> dict:
-    response = _request_with_retry(
-        lambda: httpx.post(
+    return _checked(
+        board.post(
             cxs_jobs_url(target),
             json=list_request_body(search, offset, applied_facets),
-            timeout=30,
         )
-    )
-    return response.json()
+    ).json()
 
 
 def _remember_facets(

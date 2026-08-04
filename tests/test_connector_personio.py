@@ -41,13 +41,13 @@ def test_personio_fetch_uses_search_json_with_detected_country(monkeypatch):
         def raise_for_status(self):
             pass
 
-    def fake_get(url, timeout=None, follow_redirects=None):
+    def fake_get(url, **kwargs):
         captured["url"] = url
         return Response()
 
     import resume_agent.discovery.connectors.personio as connector
 
-    monkeypatch.setattr(connector.httpx, "get", fake_get)
+    monkeypatch.setattr(connector.board, "get", fake_get)
     jobs = fetch_personio(AtsTarget("personio", "pitch", country="de"), SearchConfig())
 
     assert captured["url"] == "https://pitch.jobs.personio.de/search.json?language=en"

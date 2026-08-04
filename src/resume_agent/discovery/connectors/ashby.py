@@ -1,4 +1,5 @@
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import (
     FetchResult,
@@ -97,7 +98,7 @@ def parse_ashby(payload: dict, company: str) -> list[RawJob]:
 
 def fetch_ashby_board(token: str) -> dict:
     """GET an Ashby job board's postings payload, including compensation tiers."""
-    resp = httpx.get(f"{_BASE}/{token}?includeCompensation=true", timeout=30)
+    resp = board.get(f"{_BASE}/{token}?includeCompensation=true")
     resp.raise_for_status()
     return resp.json()
 

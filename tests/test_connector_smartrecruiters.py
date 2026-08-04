@@ -49,13 +49,13 @@ def test_smartrecruiters_fetch_wires_list_to_detail(monkeypatch):
         def json(self):
             return self.payload
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, **kwargs):
         calls.append((url, params))
         return Response(list_payload if params is not None else detail_payload)
 
     import resume_agent.discovery.connectors.smartrecruiters as connector
 
-    monkeypatch.setattr(connector.httpx, "get", fake_get)
+    monkeypatch.setattr(connector.board, "get", fake_get)
     jobs = fetch_smartrecruiters(
         AtsTarget("smartrecruiters", "smartrecruiters"),
         SearchConfig(role_anchors=["product"]),
@@ -78,13 +78,13 @@ def test_smartrecruiters_known_url_skips_detail_request(monkeypatch):
         def json(self):
             return list_payload
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, **kwargs):
         calls.append(url)
         return Response()
 
     import resume_agent.discovery.connectors.smartrecruiters as connector
 
-    monkeypatch.setattr(connector.httpx, "get", fake_get)
+    monkeypatch.setattr(connector.board, "get", fake_get)
     jobs = fetch_smartrecruiters(
         AtsTarget("smartrecruiters", "smartrecruiters"),
         SearchConfig(),
