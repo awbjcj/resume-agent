@@ -63,9 +63,12 @@ def test_in_memory_app_keeps_legacy_test_adapter():
 
 
 def test_run_manager_propagates_context_and_uses_workspace_root(tmp_path):
-    manager = RunManager(
-        root=tmp_path / "legacy", executor=ThreadPoolExecutor(max_workers=1)
-    )
+    # The executor is supplied here, so RunManager does not own it and
+    # manager.shutdown() is not a barrier for it. Draining it explicitly is
+    # what makes this test deterministic rather than a race the worker
+    # usually wins.
+    executor = ThreadPoolExecutor(max_workers=1)
+    manager = RunManager(root=tmp_path / "legacy", executor=executor)
     context = UserContext(
         user_id="abc123def456",
         username="alice",
@@ -90,6 +93,7 @@ def test_run_manager_propagates_context_and_uses_workspace_root(tmp_path):
 
     with use_context(context):
         run_id = manager.submit("pull", work)
+    executor.shutdown(wait=True)
     manager.shutdown()
     assert seen == [context]
     assert (context.paths.runs_root / f"{run_id}.json").is_file()

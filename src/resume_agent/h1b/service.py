@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from agno.agent import Agent
 from sqlmodel import Session, select
@@ -18,6 +18,7 @@ from resume_agent.career_skills.models import (
     read_job_analysis_meta,
 )
 from resume_agent.config import Settings
+from resume_agent.h1b.cache import load_company_evidence
 from resume_agent.h1b.mcp import bounded_h1b_result, h1b_tools
 from resume_agent.h1b.models import (
     H1B_AGENT_UNAVAILABLE_REASON,
@@ -263,14 +264,12 @@ async def enrich_companies(
     missing: dict[str, str] = {}
     cache_hits = 0
     with Session(engine) as session:
+        # One query for the batch, through the same seam the display path uses,
+        # instead of a SELECT per company.
+        cached_all = {} if force_refresh else load_company_evidence(session, unique)
         for normalized, display in unique.items():
-            row = session.exec(
-                select(H1BCompanyEvidence).where(
-                    H1BCompanyEvidence.normalized_company == normalized
-                )
-            ).first()
-            cached = None if force_refresh else _fresh_cached(row, now)
-            if cached is None:
+            cached = cached_all.get(normalized)
+            if cached is None or not cached.is_fresh(now):
                 missing[normalized] = display
             else:
                 by_company[normalized] = cached
@@ -379,6 +378,17 @@ async def enrich_companies(
         ]
 
     with Session(engine) as session:
+        # One query for every row this pass will touch, rather than a SELECT
+        # inside the write loop.
+        column = cast(Any, H1BCompanyEvidence.normalized_company)
+        existing = {
+            row.normalized_company: row
+            for row in session.exec(
+                select(H1BCompanyEvidence).where(
+                    column.in_(sorted(normalized for normalized, _ in results))
+                )
+            ).all()
+        }
         for normalized, evidence in results:
             evidence = evidence.model_copy(
                 update={
@@ -392,11 +402,7 @@ async def enrich_companies(
                 }
             )
             by_company[normalized] = evidence
-            row = session.exec(
-                select(H1BCompanyEvidence).where(
-                    H1BCompanyEvidence.normalized_company == normalized
-                )
-            ).first()
+            row = existing.get(normalized)
             if row is None:
                 row = H1BCompanyEvidence(normalized_company=normalized, status=evidence.status, expires_at=evidence.expires_at)
             row.display_company = evidence.display_company

@@ -537,3 +537,44 @@ def test_unparsed_agent_output_is_diagnosed_not_swallowed(monkeypatch, caplog):
     assert "in=1200" in message and "out=4096" in message
     # The tail is what shows a response was cut off.
     assert "max_tokens reached" in message
+
+
+def test_enrichment_reads_and_writes_the_cache_in_batches(monkeypatch):
+    """2N queries for N companies is the display path's mistake, made twice."""
+    import resume_agent.h1b.service as service
+    from scripts.perf_harness import count_queries
+
+    @asynccontextmanager
+    async def fake_tools(_settings):
+        yield object()
+
+    monkeypatch.setattr(service, "h1b_tools", fake_tools)
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+    companies = [f"Company {index}" for index in range(12)]
+
+    class _PerCompanyRunner(FakeRunner):
+        async def arun(self, prompt: str) -> SimpleNamespace:
+            self.calls.append(prompt)
+            key = prompt.split("\n")[1].strip()
+            return SimpleNamespace(content=_evidence(key))
+
+    with count_queries(engine) as counts:
+        report = asyncio.run(
+            enrich_companies(
+                engine,
+                companies,
+                settings=settings,
+                agent_factory=Factory(_PerCompanyRunner()),
+            )
+        )
+
+    assert len(report.by_company) == 12
+    # One batched read before the fan-out, one batched read before the writes.
+    assert counts.by_kind["SELECT"] == 2, str(counts)

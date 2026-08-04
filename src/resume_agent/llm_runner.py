@@ -13,6 +13,7 @@ from typing import Any, Literal, Protocol, TypeVar, cast
 
 from pydantic import BaseModel
 
+from resume_agent.agent_trace import record_agent_run
 from resume_agent.config import Settings, get_settings
 from resume_agent.career_skills.models import AgentRunMeta
 from resume_agent.sessions.stream import (
@@ -197,9 +198,13 @@ class AgentRunner:
                 finally:
                     self._exit()
                 record_call(self._agent, response)
+                record_agent_run(self, response, retries=attempt)
                 return response
             except Exception as exc:
                 if attempt >= settings.llm_retries or not is_transient(exc):
+                    record_agent_run(
+                        self, None, retries=attempt, status="error", error=str(exc)
+                    )
                     raise
                 time.sleep(settings.llm_retry_delay * (2**attempt))
         raise AssertionError("unreachable")
@@ -217,9 +222,13 @@ class AgentRunner:
                 finally:
                     self._exit()
                 await asyncio.to_thread(record_call, self._agent, response)
+                record_agent_run(self, response, retries=attempt)
                 return response
             except Exception as exc:
                 if attempt >= settings.llm_retries or not is_transient(exc):
+                    record_agent_run(
+                        self, None, retries=attempt, status="error", error=str(exc)
+                    )
                     raise
                 await asyncio.sleep(settings.llm_retry_delay * (2**attempt))
         raise AssertionError("unreachable")

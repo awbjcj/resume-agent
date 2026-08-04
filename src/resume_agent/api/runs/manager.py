@@ -30,6 +30,7 @@ from resume_agent.api.runs.models import (
     RunSnapshot,
     parse_run_snapshot,
 )
+from resume_agent.agent_trace import agent_trace
 from resume_agent.api.runs.notify import StreamNotifier
 from resume_agent.progress import (
     RUNS_ROOT,
@@ -90,6 +91,7 @@ class RunProgressReporter(ProgressReporter):
         user_id: str | None = None,
         cancel_check: Callable[[], bool] | None = None,
         meta: dict[str, object] | None = None,
+        notify: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(run_id, root=root)
         self.run_id = run_id
@@ -98,6 +100,14 @@ class RunProgressReporter(ProgressReporter):
         self.user_id = user_id
         self._cancel_check = cancel_check
         self.meta = meta
+        # Wakes SSE subscribers after a progress write lands. The durable JSON
+        # record remains the source of truth; this only removes the poll delay
+        # between the write and a client seeing it.
+        self._notify = notify
+
+    def _wake(self) -> None:
+        if self._notify is not None:
+            self._notify()
 
     def _raise_if_cancelled(self) -> None:
         if self._cancel_check is not None and self._cancel_check():
@@ -127,10 +137,12 @@ class RunProgressReporter(ProgressReporter):
             meta=self.meta,
             **extra,
         )
+        self._wake()
 
     def step(self, current: int, *, label: str | None = None, **extra: object) -> None:
         self._raise_if_cancelled()
         super().step(current, label=label, **extra)
+        self._wake()
 
     def done(self, *, error: str | None = None, **extra: object) -> None:
         self._raise_if_cancelled()
@@ -142,6 +154,7 @@ class RunProgressReporter(ProgressReporter):
             meta=self.meta,
             **extra,
         )
+        self._wake()
 
     def cancelled(self, **extra: object) -> None:
         super().cancelled(
@@ -151,6 +164,7 @@ class RunProgressReporter(ProgressReporter):
             meta=self.meta,
             **extra,
         )
+        self._wake()
 
 
 class RunManager:
@@ -301,6 +315,7 @@ class RunManager:
             user_id=record.get("user_id"),
             cancel_check=lambda: self.is_cancel_requested(run_id),
             meta=record.get("meta") if isinstance(record.get("meta"), dict) else None,
+            notify=self.notifier(run_id).notify,
         )
 
     def submit(
@@ -359,6 +374,13 @@ class RunManager:
                 self._active_singletons[effective_singleton] = run_id
 
             def _runner() -> None:
+                # Every agent call this run makes traces to the run's own
+                # directory, so a slow or expensive run can be read back
+                # afterwards instead of reconstructed from logs.
+                with agent_trace(self.trace_path(run_id)):
+                    _execute()
+
+            def _execute() -> None:
                 try:
                     result = fn(reporter)
                     reporter.done(result=result)
@@ -453,6 +475,10 @@ class RunManager:
 
     def _read_record(self, run_id: str) -> dict | None:
         return read_progress(run_id, root=self._root_for(run_id))
+
+    def trace_path(self, run_id: str) -> Path:
+        """Return the agent-run trace path beside this run's progress record."""
+        return self._root_for(run_id) / f"{run_id}.agents.ndjson"
 
     def stream_path(self, run_id: str) -> Path:
         """Return the event-log path beside this run's progress record."""
@@ -615,6 +641,11 @@ class RunManager:
         atomic_write_text(
             self._root_for(run_id) / f"{run_id}.json", json.dumps(record, indent=2)
         )
+        # Terminal transitions (done, error, cancelled) are written here rather
+        # than through the reporter, so they need their own wakeup or a client
+        # waits out the poll interval for the one event it is actually
+        # waiting for.
+        self.notifier(run_id).notify()
 
 
 def _now() -> str:
