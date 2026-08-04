@@ -391,8 +391,21 @@ _Avoid_: session (a session is one way a UserContext gets established), tenant
 **Budget**:
 A user's rolling 7-day weighted-token allowance against the shared provider
 keys. Recorded always; enforced only for non-admin users on shared keys, and
-checked when a phase starts, not per call.
+resolved **once per phase, not per call** — `SpendGate` (`tenancy/spend.py`)
+holds one decision on the active `UserContext` for
+`Settings.spend_gate_ttl_seconds`, and recording a call decrements that
+decision's remaining headroom so the call that exhausts a budget is the call
+that invalidates it. The TTL is a ceiling on staleness, not the mechanism that
+keeps the decision correct.
 _Avoid_: quota (quotas cap resources, budgets cap spend), token limit
+
+**Spend gate**:
+The single seam that answers both "which key funds this call?" (`select`, never
+raises) and "may I spend?" (`open`, raises) from one evaluation. Before it, the
+two questions were derived independently — twice per call, from three modules —
+and could disagree. Settlement (the `UsageEvent`, its line items, the quota
+charge) is a separate, uncacheable write and is deliberately not part of it.
+_Avoid_: budget check (that names only half of it), key resolver
 
 **Quota**:
 A per-user resource cap that applies to everyone regardless of key or role —

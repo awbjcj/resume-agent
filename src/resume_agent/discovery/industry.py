@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     build_model,
@@ -158,7 +159,7 @@ def classify_industries(
 
 def build_industry_classifier() -> AgentRunner:
     settings = get_settings()
-    model = build_model(settings.cheap_model)
+    model = build_model(settings.cheap_model, cache_system_prompt=prompt_cache_for(settings.cheap_model))
     return AgentRunner(
         Agent(
             model=model,

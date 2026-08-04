@@ -148,7 +148,15 @@ class ApiToken(SystemBase):
 
 class UsageEvent(SystemBase):
     __tablename__ = "usage_events"
-    __table_args__ = (Index("ix_usage_events_user_ts", "user_id", "ts"),)
+    # The per-user index serves the per-user aggregates. The two *global*
+    # aggregates (global_monthly_cost, global_weekly_usage) filter on own_key +
+    # ts with no user_id predicate, so neither existing index applies and both
+    # fell back to a full scan of a table that grows one row per LLM call
+    # forever.
+    __table_args__ = (
+        Index("ix_usage_events_user_ts", "user_id", "ts"),
+        Index("ix_usage_events_own_key_ts", "own_key", "ts"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(12), nullable=False, index=True)

@@ -7,13 +7,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from resume_agent.tenancy.context import current_context
-from resume_agent.tenancy.costs import has_active_rate, normalize_provider
+from resume_agent.tenancy.costs import normalize_provider
 from resume_agent.tenancy.quotas import (
-    DEFAULT_GLOBAL_MONTHLY_COST_QUOTA_MICROS,
-    GlobalCostQuotaExceededError,
     charge_shared_cost,
-    global_monthly_cost,
-    quota_snapshot,
 )
 from resume_agent.tenancy.system_db import SystemSetting, UsageEvent, User
 
@@ -105,60 +101,32 @@ def selected_key_is_own(provider: str, agent: object | None = None) -> bool:
 def shared_key_available(
     provider: str, model_id: str, *, now: datetime | None = None
 ) -> bool:
-    """Whether a Railway/provider key may fund the active user's next call."""
+    """Whether a Railway/provider key may fund the active user's next call.
+
+    Kept as a named predicate for callers that want the question without the
+    key, but the policy itself now lives in one place — see
+    ``tenancy/spend.py``, which derives this and the typed enforcement error
+    from a single evaluation so the two cannot drift apart.
+    """
+    from resume_agent.tenancy.spend import _shared_denial
 
     context = current_context()
     if context is None or provider not in context.platform_provider_keys:
         return False
     if context.system_engine is None:
         return True
-    with Session(context.system_engine) as session:
-        user = session.get(User, context.user_id)
-        if user is not None and not user.shared_key_access:
-            return False
-        override = user.weekly_token_budget if user is not None else None
-    if context.settings.cost_quota_enforcement == "enforce":
-        if not model_id or not has_active_rate(
-            context.system_engine, provider, model_id, now=now
-        ):
-            return False
-        if not context.is_admin:
-            remaining = quota_snapshot(
-                context.system_engine, context.user_id, now=now
-            ).remaining_micros
-            if remaining is not None and remaining <= 0:
-                return False
-        global_budget = (
-            context.settings.global_monthly_cost_quota_micros
-            or DEFAULT_GLOBAL_MONTHLY_COST_QUOTA_MICROS
-        )
-        return not (
-            global_budget
-            and global_monthly_cost(context.system_engine, now=now) >= global_budget
-        )
-    if not context.is_admin:
-        budget = resolve_limit(
-            override,
-            system_default(
-                context.system_engine,
-                "weekly_token_budget",
-                DEFAULT_WEEKLY_TOKEN_BUDGET,
-            ),
-        )
-        if (
-            budget
-            and weekly_usage(context.system_engine, context.user_id, now=now) >= budget
-        ):
-            return False
-    global_budget = context.settings.global_weekly_token_budget
-    return not (
-        global_budget
-        and global_weekly_usage(context.system_engine, now=now) >= global_budget
-    )
+    return _shared_denial(context, provider, model_id, now=now) is None
 
 
 def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
-    """Enforce account eligibility plus user/global spend before an LLM call."""
+    """Enforce account eligibility plus user/global spend before an LLM call.
+
+    ``AgentRunner`` goes through ``SpendGate.open`` directly (it needs the key
+    as well as the verdict). This remains the entry point for callers that
+    already hold a key — direct transcription, principally — and delegates to
+    the same gate, so it shares the same per-phase cached decision.
+    """
+    from resume_agent.tenancy.spend import SpendGate
 
     context = current_context()
     if context is None or context.system_engine is None:
@@ -166,56 +134,8 @@ def enforce_agent_budget(agent: object, *, now: datetime | None = None) -> None:
     provider, model_id = _agent_identity(agent)
     if provider and selected_key_is_own(provider, agent):
         return
-    with Session(context.system_engine) as session:
-        user = session.get(User, context.user_id)
-        if user is not None and not user.shared_key_access:
-            raise BudgetExceededError(
-                "shared platform models are disabled for this account; add your own API key"
-            )
-        override = user.weekly_token_budget if user is not None else None
-    if context.settings.cost_quota_enforcement == "enforce":
-        if not model_id or not has_active_rate(
-            context.system_engine, provider, model_id, now=now
-        ):
-            raise CostRateUnavailableError(
-                f"no active cost rate for {provider or 'unknown'}:{model_id or 'unknown'}"
-            )
-        if context.role != "admin":
-            charge_shared_cost(
-                context.system_engine,
-                context.user_id,
-                0,
-                now=now,
-                preflight=True,
-            )
-        global_budget = (
-            context.settings.global_monthly_cost_quota_micros
-            or DEFAULT_GLOBAL_MONTHLY_COST_QUOTA_MICROS
-        )
-        if (
-            global_budget
-            and global_monthly_cost(context.system_engine, now=now) >= global_budget
-        ):
-            raise GlobalCostQuotaExceededError(
-                "platform monthly cost quota is exhausted"
-            )
-        return
-
-    # Stage one compatibility: shadow-price every call while the previous
-    # weighted-token enforcement remains the active gate.
-    enforce_budget(
-        context.system_engine,
-        user_id=context.user_id,
-        role=context.role,
-        budget_override=override,
-        now=now,
-    )
-    global_budget = context.settings.global_weekly_token_budget
-    if (
-        global_budget
-        and global_weekly_usage(context.system_engine, now=now) >= global_budget
-    ):
-        raise BudgetExceededError("platform weekly token budget is exhausted")
+    prefixed = model_id if provider in ("", "anthropic") else f"{provider}:{model_id}"
+    SpendGate().open(prefixed, now=now)
 
 
 def enforce_budget(

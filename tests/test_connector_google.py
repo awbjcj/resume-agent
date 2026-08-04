@@ -111,11 +111,11 @@ def test_fetch_google_pages_until_valid_empty_blob(monkeypatch):
         def raise_for_status(self):
             pass
 
-    def fake_get(url, params, headers, timeout):
+    def fake_get(url, params=None, headers=None, **kwargs):
         calls.append(dict(params))
         return _Resp(FIXTURE if params["page"] == 1 else _page_html([]))
 
-    monkeypatch.setattr(google.httpx, "get", fake_get)
+    monkeypatch.setattr(google.board, "get", fake_get)
     jobs = google.fetch_google(TARGET, SearchConfig())
     assert [job.title for job in jobs] == [
         "Software Engineer",
@@ -135,7 +135,7 @@ def test_fetch_google_limit_counts_relevant_unseen_rows(monkeypatch):
         def raise_for_status(self):
             pass
 
-    def fake_get(url, params, headers, timeout):
+    def fake_get(url, params=None, headers=None, **kwargs):
         calls.append(params["page"])
         if params["page"] == 1:
             return _Resp(
@@ -148,7 +148,7 @@ def test_fetch_google_limit_counts_relevant_unseen_rows(monkeypatch):
             )
         return _Resp(_page_html([_row(job_id="fresh", title="Platform Engineer")]))
 
-    monkeypatch.setattr(google.httpx, "get", fake_get)
+    monkeypatch.setattr(google.board, "get", fake_get)
     jobs = google.fetch_google(
         TARGET,
         SearchConfig(role_anchors=["Engineer"]),

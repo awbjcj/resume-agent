@@ -98,14 +98,48 @@ Safety ceiling: `_MAX_OFFSET = 1000` (≤51 pages) even if the tenant ignores
 aggressiveness determines how many detail fetches are issued.
 
 **Throttle-resilient.** A big board fires many list + detail requests, so both
-HTTP calls go through `_request_with_retry`: transient statuses (`429`, `500`,
-`502`, `503`, `504`) are retried with backoff — a numeric `Retry-After` is
-honored, else exponential (`_RETRY_BACKOFF_S · 2ⁿ`, capped at
-`_MAX_RETRY_SLEEP_S`) — for `_RETRY_ATTEMPTS` tries before the last error is
-re-raised, so a persistently-throttled board still surfaces as a per-URL failure
-(the companies connector isolates it) rather than aborting sibling URLs.
+HTTP calls carry the retry — but that retry is no longer Workday's own. It is
+the default policy of every board endpoint and lives in `http.py` with the
+pool: transient statuses (`429`, `500`, `502`, `503`, `504`) are retried with
+backoff, honoring a numeric `Retry-After` when present, else exponential
+(`RETRY_BACKOFF_S · 2ⁿ`, capped at `MAX_RETRY_SLEEP_S`), for `RETRY_ATTEMPTS`
+tries. `BoardSession` then *returns* the last transient response rather than
+raising, so Workday's `_checked` is what turns an exhausted retry into an
+`HTTPStatusError` — which is what lets a persistently-throttled board surface
+as a per-URL failure (the companies connector isolates it) rather than aborting
+sibling URLs. Workday's `_RETRY_*` names now alias the shared constants.
+
+**Detail fetches are concurrent.** `harvest_detailed` fans the *detail* half of
+the N+1 out across `Settings.detail_fetch_concurrency` (default 4) threads, each
+running in its own `copy_context()` so the run's pool and the active
+`UserContext` survive the hop. The title gate and the final relevance gate stay
+where they were, results stay in row order, and the `limit` early-break holds
+exactly: chunk size is `min(concurrency, limit - kept)`, so `limit=5` issues 5
+detail fetches, not a speculative chunk of 20.
 
 ---
+
+## Pooled HTTP (`http.py`)
+
+Every connector calls `board.get` / `board.post` rather than module-level
+`httpx.get`, which built a fresh client — and therefore a fresh pool, TCP
+connection, and TLS handshake — per request. `BoardSession` owns the pool
+(HTTP/2, keep-alive), the single timeout, and the retry policy above.
+`board_session()` installs one per pull run via a `ContextVar`; a connector
+called outside a run gets a private session and behaves identically.
+
+`get`/`post` keep `httpx.get`'s contract — they **return** the response and do
+not raise for status — so a call site that tolerates a 404 or inspects the
+status is unchanged. Only transient statuses are retried before that response
+comes back.
+
+This serves **operator-configured** endpoints only. A user-supplied URL still
+goes through `security/outbound.py`, which is deliberately not given this pool
+(see the module docstring: httpx keys its pool on the request origin, which for
+a pinned request is the IP, so a shared pool could cross SNI).
+
+Tests fake at this seam — `monkeypatch.setattr(<module>.board, "get", ...)` —
+not at `httpx`.
 
 ## Relevance gates (`text.py`)
 

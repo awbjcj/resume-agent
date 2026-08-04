@@ -472,3 +472,109 @@ def test_persisted_rows_are_written_at_schema_version_two():
         ).first()
     assert row is not None
     assert row.schema_version == 2
+
+
+class UnparsedRunner(FakeRunner):
+    """An agent whose provider truncated, refused, or 400'd.
+
+    agno leaves ``RunOutput.content`` as the raw ``str`` it could not parse, so
+    this is what every one of those failures looks like from the call site.
+    """
+
+    def __init__(self, body: str = "Error: max_tokens reached before completion"):
+        super().__init__()
+        self.body = body
+
+    async def arun(self, prompt: str) -> SimpleNamespace:
+        self.calls.append(prompt)
+        return SimpleNamespace(
+            content=self.body,
+            model="claude-sonnet-5",
+            status=SimpleNamespace(value="error"),
+            metrics=SimpleNamespace(
+                input_tokens=1200, output_tokens=4096, reasoning_tokens=0
+            ),
+        )
+
+
+def test_unparsed_agent_output_is_diagnosed_not_swallowed(monkeypatch, caplog):
+    """A systematic provider failure must be distinguishable from "no filings"."""
+    import logging
+
+    import resume_agent.h1b.service as service
+
+    @asynccontextmanager
+    async def fake_tools(_settings):
+        yield object()
+
+    monkeypatch.setattr(service, "h1b_tools", fake_tools)
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+
+    with caplog.at_level(logging.ERROR, logger="resume_agent.h1b.service"):
+        report = asyncio.run(
+            enrich_companies(
+                engine,
+                ["Acme, Inc."],
+                settings=settings,
+                agent_factory=Factory(UnparsedRunner()),
+            )
+        )
+
+    # Degrades, never raises: the row is still written and still displayable.
+    assert report.by_company["acme"].status == "unavailable"
+
+    records = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert records, "unparsed provider output must not be logged at warning"
+    message = records[0].getMessage()
+    assert "claude-sonnet-5" in message
+    assert "in=1200" in message and "out=4096" in message
+    # The tail is what shows a response was cut off.
+    assert "max_tokens reached" in message
+
+
+def test_enrichment_reads_and_writes_the_cache_in_batches(monkeypatch):
+    """2N queries for N companies is the display path's mistake, made twice."""
+    import resume_agent.h1b.service as service
+    from scripts.perf_harness import count_queries
+
+    @asynccontextmanager
+    async def fake_tools(_settings):
+        yield object()
+
+    monkeypatch.setattr(service, "h1b_tools", fake_tools)
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
+    companies = [f"Company {index}" for index in range(12)]
+
+    class _PerCompanyRunner(FakeRunner):
+        async def arun(self, prompt: str) -> SimpleNamespace:
+            self.calls.append(prompt)
+            key = prompt.split("\n")[1].strip()
+            return SimpleNamespace(content=_evidence(key))
+
+    with count_queries(engine) as counts:
+        report = asyncio.run(
+            enrich_companies(
+                engine,
+                companies,
+                settings=settings,
+                agent_factory=Factory(_PerCompanyRunner()),
+            )
+        )
+
+    assert len(report.by_company) == 12
+    # One batched read before the fan-out, one batched read before the writes.
+    assert counts.by_kind["SELECT"] == 2, str(counts)

@@ -1,4 +1,5 @@
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
@@ -49,6 +50,6 @@ def fetch_recruitee(
     limit: int | None = None,
     skip_seen: SkipSeen | None = None,
 ) -> list[RawJob]:
-    response = httpx.get(offers_url(target.token), timeout=30)
+    response = board.get(offers_url(target.token))
     response.raise_for_status()
     return parse_recruitee(response.json(), target.token)

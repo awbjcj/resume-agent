@@ -32,7 +32,7 @@ from resume_agent.api.schemas.admin_quotas import (
 )
 from resume_agent.api.schemas.base import Pagination
 from resume_agent.tenancy.context import UserContext
-from resume_agent.tenancy.costs import normalize_provider
+from resume_agent.tenancy.costs import invalidate_rate_cache, normalize_provider
 from resume_agent.tenancy.quotas import (
     InsufficientCreditError,
     IdempotencyConflictError,
@@ -625,4 +625,7 @@ def create_rate(
         session.add(rate)
         session.commit()
         session.refresh(rate)
+        # has_active_rate caches this lookup on the shared-key hot path; an
+        # admin edit must be visible to the next call, not in 60 seconds.
+        invalidate_rate_cache(request.app.state.system_engine)
         return LlmRateOut.model_validate(rate)

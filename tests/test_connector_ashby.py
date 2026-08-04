@@ -77,14 +77,12 @@ def test_fetch_ashby_board_hits_posting_api(monkeypatch):
         def json(self):
             return FIXTURE
 
-    def fake_get(url, timeout):
+    def fake_get(url, **kwargs):
         captured["url"] = url
-        captured["timeout"] = timeout
         return _Resp()
 
-    monkeypatch.setattr(ashby.httpx, "get", fake_get)
+    monkeypatch.setattr(ashby.board, "get", fake_get)
     assert fetch_ashby_board("acme") == FIXTURE
     assert captured == {
         "url": "https://api.ashbyhq.com/posting-api/job-board/acme?includeCompensation=true",
-        "timeout": 30,
     }

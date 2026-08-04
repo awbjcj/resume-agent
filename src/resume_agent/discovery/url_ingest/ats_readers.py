@@ -34,6 +34,8 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
+from resume_agent.discovery.connectors import http as board
+
 from resume_agent.discovery.connectors.ashby import fetch_ashby_board, parse_ashby
 from resume_agent.discovery.connectors.bamboohr import detail_url as bamboohr_detail_url
 from resume_agent.discovery.connectors.base import RawJob
@@ -268,7 +270,7 @@ def _from_json_ld(html: str) -> ExtractedJob | None:
 
 
 def _get_json(url: str, **kwargs) -> dict:
-    resp = httpx.get(url, timeout=30, **kwargs)
+    resp = board.get(url, **kwargs)
     resp.raise_for_status()
     return resp.json()
 
@@ -430,8 +432,8 @@ def _read_personio(target: AtsTarget, url: str, html: str) -> ExtractedJob | Non
         position_id = _segment_after(url, "job")
         if position_id is None:
             return None
-        resp = httpx.get(
-            personio_search_url(target.token, target.country), timeout=30, follow_redirects=True
+        resp = board.get(
+            personio_search_url(target.token, target.country), follow_redirects=True
         )
         resp.raise_for_status()
         rows = parse_personio(resp.text, target.token, target.country)

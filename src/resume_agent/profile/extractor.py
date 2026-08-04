@@ -6,6 +6,7 @@ from resume_agent.prompts.guidance import with_guidance
 
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     acall,
@@ -44,7 +45,7 @@ _INSTRUCTIONS = [
 def build_extractor_agent(model_id: str | None = None) -> Runner:
     """Create the Agno agent that structures resume text into ProfileFacts."""
     s = get_settings()
-    model = build_model(model_id or s.mid_model)
+    model = build_model(model_id or s.mid_model, cache_system_prompt=prompt_cache_for(model_id or s.mid_model))
     return AgentRunner(
         Agent(
             model=model,

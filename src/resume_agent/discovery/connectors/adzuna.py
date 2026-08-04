@@ -1,7 +1,8 @@
 import re
 from urllib.parse import urlsplit
 
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
@@ -266,6 +267,6 @@ class AdzunaConnector:
         if search.max_days_old is not None:
             params["max_days_old"] = search.max_days_old
         # Page 1 preserves the current single-request fetch volume while narrowing the query.
-        resp = httpx.get(f"{_BASE}/{self.country}/search/1", params=params, timeout=30)
+        resp = board.get(f"{_BASE}/{self.country}/search/1", params=params)
         resp.raise_for_status()
         return resp.json()

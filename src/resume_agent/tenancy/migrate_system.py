@@ -81,6 +81,17 @@ def migrate_system_db(engine: Engine) -> None:
                     "WHERE pricing_status = 'LEGACY_UNPRICED'"
                 )
             )
+        if usage_columns:
+            # The global cost/usage aggregates filter on own_key + ts with no
+            # user_id predicate, so neither existing usage index could serve
+            # them. create_all adds this for a fresh database; existing
+            # deployments get it here.
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_usage_events_own_key_ts "
+                    "ON usage_events (own_key, ts)"
+                )
+            )
         connection.execute(
             text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)")
         )

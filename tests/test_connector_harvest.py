@@ -243,3 +243,81 @@ def test_harvest_detailed_stops_at_limit():
     assert [j.title for j in jobs] == ["First Engineer"]
     # Stops fetching details once the limit is met.
     assert fetched == ["First Engineer"]
+
+
+def test_detail_fetches_run_concurrently_per_host(monkeypatch):
+    """The detail fetches are independent; serialising them was the whole cost."""
+    import time
+    from resume_agent.config import Settings, env_settings
+
+    delay = 0.05
+    survivors = 20
+
+    def fetch_detail(row):
+        time.sleep(delay)
+        return {"jd": "engineer work"}
+
+    def apply_detail(row, detail):
+        row.jd_text = detail["jd"]
+
+    rows = [
+        RawJob(source="x", url=f"u{i}", company="C", title="AI Engineer",
+               location="Remote", jd_text="")
+        for i in range(survivors)
+    ]
+
+    env_settings.cache_clear()
+    monkeypatch.setattr(
+        "resume_agent.config.get_settings",
+        lambda: Settings(_env_file=None, detail_fetch_concurrency=4),  # type: ignore[call-arg]
+    )
+
+    started = time.monotonic()
+    jobs = harvest_detailed(
+        rows,
+        fetch_detail,
+        apply_detail,
+        search=SearchConfig(role_anchors=["ai engineer"]),
+        limit=None,
+    )
+    elapsed = time.monotonic() - started
+
+    assert len(jobs) == survivors
+    serial = delay * survivors
+    assert elapsed < serial / 2, f"{elapsed:.3f}s looks serialised (serial={serial}s)"
+
+
+def test_a_limit_still_bounds_how_many_details_are_fetched(monkeypatch):
+    """Concurrency must not turn `limit=5` into "fetch every candidate first"."""
+    from resume_agent.config import Settings
+
+    calls: list[str] = []
+
+    def fetch_detail(row):
+        calls.append(row.url or "")
+        return {"jd": "engineer work"}
+
+    def apply_detail(row, detail):
+        row.jd_text = detail["jd"]
+
+    rows = [
+        RawJob(source="x", url=f"u{i}", company="C", title="AI Engineer",
+               location="Remote", jd_text="")
+        for i in range(20)
+    ]
+    monkeypatch.setattr(
+        "resume_agent.config.get_settings",
+        lambda: Settings(_env_file=None, detail_fetch_concurrency=4),  # type: ignore[call-arg]
+    )
+
+    jobs = harvest_detailed(
+        rows,
+        fetch_detail,
+        apply_detail,
+        search=SearchConfig(role_anchors=["ai engineer"]),
+        limit=5,
+    )
+
+    assert len(jobs) == 5
+    # At most the limit plus one in-flight chunk, never the whole candidate set.
+    assert len(calls) <= 8, calls

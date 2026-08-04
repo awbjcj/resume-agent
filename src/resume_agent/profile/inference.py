@@ -9,6 +9,7 @@ from pydantic import Field
 
 from resume_agent.config import get_settings
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     build_model,
@@ -51,7 +52,7 @@ _INSTRUCTIONS = [
 
 def build_inference_agent(model_id: str | None = None) -> Runner:
     settings = get_settings()
-    model = build_model(model_id or settings.mid_model)
+    model = build_model(model_id or settings.mid_model, cache_system_prompt=prompt_cache_for(model_id or settings.mid_model))
     return AgentRunner(
         Agent(
             model=model,

@@ -2,9 +2,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
 
-from sqlalchemy import String
 from sqlmodel import Session, select
 
 from resume_agent.concurrency import gather_isolated
@@ -20,6 +18,7 @@ from resume_agent.discovery.filter import apply_filters
 from resume_agent.discovery.fit import (  # noqa: F401
     FitScore,
     ascore_fit,
+    bind_profile,
     compose_fit_input,
     score_fit,
 )
@@ -183,18 +182,24 @@ def _prepare_industry_fields(job: Job, taxonomy: IndustryTaxonomy) -> str | None
         criteria.pop(_INDUSTRY_RETRY_KEY, None)
     if criteria != job.criteria_json:
         job.criteria_json = criteria
+    # The persisted marker is what makes the next pass's revisit query an index
+    # seek. It is written on every visit, in both directions, so a row that
+    # canonicalizes stops being scanned rather than being revisited forever.
+    pending = canonical is None and candidate is not None
+    if job.industry_pending != pending:
+        job.industry_pending = pending
     return candidate
 
 
 def _industry_scope(session: Session, batch: list[Job]) -> list[Job]:
-    """Rows this pass can change: the current batch plus revisitable rows."""
-    criteria_text = cast(Any, Job.criteria_json).cast(String)
-    revisitable = session.exec(
-        select(Job).where(
-            criteria_text.like(f'%"{_INDUSTRY_RETRY_KEY}"%')
-            | criteria_text.like('%"sic_major"%')
-        )
-    ).all()
+    """Rows this pass can change: the current batch plus revisitable rows.
+
+    Indexed on ``industry_pending`` rather than a ``LIKE`` over every row's
+    criteria JSON: the old predicate could not use an index, so a table of
+    5,000 canonicalized jobs was fully scanned to find zero work. Existing rows
+    are marked once by ``ensure_industry_pending_column`` at ``init_db``.
+    """
+    revisitable = session.exec(select(Job).where(Job.industry_pending)).all()
     by_id: dict[int | None, Job] = {job.id: job for job in revisitable}
     for job in batch:
         by_id.setdefault(job.id, job)
@@ -296,6 +301,11 @@ def run_score(
     if reporter:
         reporter.begin(len(jobs), "Scoring fit", phase_index=4, phase_count=_DISCOVER_PHASES)
     if jobs:
+        # The profile scores every job in this phase identically, so it goes
+        # into the agent's cacheable system block once instead of leading all N
+        # per-job messages. If the agent cannot take it, it stays in the
+        # message and nothing about the result changes.
+        profile_in_prefix = bind_profile(agent, profile_facts)
         locations = [_job_location_text(job) for job in jobs]
         pairs = list(zip(jobs, locations))
         sem = asyncio.Semaphore(get_settings().llm_concurrency)
@@ -314,7 +324,7 @@ def run_score(
                     lambda pair: ascore_fit(
                         compose_fit_input(
                             pair[0].jd_text,
-                            profile_facts,
+                            None if profile_in_prefix else profile_facts,
                             pair[1],
                             skill_context=_skill_context(pair[0]),
                             sponsorship_evidence=(

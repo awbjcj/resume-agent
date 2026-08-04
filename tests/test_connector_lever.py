@@ -112,13 +112,13 @@ def test_lever_never_pushes_location_even_when_configured(monkeypatch):
         def json(self):
             return []
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, **kwargs):
         captured["params"] = params
         return Response()
 
     import resume_agent.discovery.connectors.lever as lever
 
-    monkeypatch.setattr(lever.httpx, "get", fake_get)
+    monkeypatch.setattr(lever.board, "get", fake_get)
     LeverConnector([LeverBoard(token="acme")]).fetch(
         SearchConfig(locations=["Remote"])
     )

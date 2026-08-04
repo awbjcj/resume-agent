@@ -349,23 +349,47 @@ admin-users API.
   rolling-24h counter independent of per-email/per-IP attempt budgets, capping
   total verification emails sent per day (`Settings.global_daily_signup_limit`)
   regardless of how many distinct emails/IPs originate them.
+- **Spend policy is resolved once per phase, by one seam.** `tenancy/spend.py`'s
+  `SpendGate` owns key selection *and* budget: `select()` answers "which key?"
+  without raising (what `resolve_api_key` asks), `open()` answers "may I
+  spend?" and raises (what `enforce_agent_budget` asks), and both come from a
+  single evaluation so they cannot disagree. The decision is cached on the
+  active `UserContext` — a context *is* a phase — for
+  `Settings.spend_gate_ttl_seconds` (default 30). The cache is **exact, not
+  merely time-bounded**: each decision carries the remaining shared headroom,
+  `record_call` decrements it, and the call that exhausts a budget is the call
+  that drops the decision, so a fan-out cannot coast on a stale "yes". Deriving
+  this per call cost a measured 22.2 SQLite statements and one exclusive
+  `BEGIN IMMEDIATE`; it is now ~0.3 amortised, with the remaining ~9 being the
+  billing write, which is not cacheable. `AgentRunner.arun` runs the gate and
+  `record_call` through `asyncio.to_thread` — both are blocking SQLite I/O, and
+  on the loop the concurrent fan-out shares they serialised the whole batch. A
+  key change is applied only when the runner is idle: one agno model object is
+  shared by every coroutine in a batch, and applying a key nulls its cached
+  clients. `tests/perf/test_baselines.py` and `tests/test_llm_runner_concurrency.py`
+  pin all of this.
 - `tenancy/limits.py::enforce_agent_budget` runs before every LLM call
-  (`llm_runner.py`'s `AgentRunner.run`/`arun` and direct transcription). A
+  (`llm_runner.py`'s `AgentRunner.run`/`arun` and direct transcription), and
+  delegates to `SpendGate`. A
   non-admin account without `shared_key_access` is rejected when its resolved
   provider has no per-user key. In `shadow` mode, the legacy rolling token
   guard remains active while calls dual-record exact token metrics and USD
   micro-cost. In `enforce` mode, an exact active rate is required before a
   shared-key call, user cost allowance and credit balances are checked, and a
   platform-wide UTC calendar-month shared-key cost is checked against
-  `Settings.global_monthly_cost_quota_micros`. Administrators are fully
-  exempt from both the per-user allowance and the platform-wide cap — an
-  admin's own usage is also excluded from the sum that feeds the cap
-  (`global_monthly_cost` / `global_weekly_usage` both filter out
-  `User.role == "admin"`), so admin traffic can never exhaust shared-key
-  budget on behalf of other accounts. This reverses the original ADR-0009
-  design, which counted admin spend against the platform cap; see the
-  ADR's Consequences section for the superseded rationale. BYOK calls
-  retain token and estimated-cost analytics but have zero quota charge.
+  `Settings.global_monthly_cost_quota_micros`. **Administrators are exempt
+  from the per-user allowance and remain bound by the platform-wide cap.**
+  That asymmetry is the design, not an oversight: the per-user allowance
+  protects the platform's budget *allocation*, the platform cap protects its
+  *absolute* spend, and an operator with unbounded absolute spend is exactly
+  the failure the cap exists to prevent. `global_monthly_cost` and
+  `global_weekly_usage` therefore sum **every** shared-key `UsageEvent`, admin
+  rows included — neither joins `User`. ADR-0009's Amendment 2 and ADR-0010
+  record this; ADR-0009's first amendment describes the superseded exemption
+  and is marked as such. Pinned by
+  `tests/tenancy/test_cost_quotas.py::test_admin_usage_counts_toward_global_cost_quota_for_other_users`.
+  BYOK calls retain token and estimated-cost analytics but have zero quota
+  charge.
 - Open self-registration additionally seeds lower active-job and concurrency
   ceilings (`open_signup_max_active_jobs`,
   `open_signup_max_concurrent_runs`). Its legacy token override is retained
@@ -694,6 +718,47 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   **first** materially-richer candidate in specificity order, with logo `![](…)` images stripped).
   Any render/extract failure leaves the snippet intact and is recorded in `.failures`. Enrichment is
   un-exercised by the offline suite (the browser is faked); a pull is slower and pops a window.
+- **Connectors talk HTTP through one pooled seam.**
+  `discovery/connectors/http.py`'s `BoardSession` owns the connection pool, the
+  single `timeout` (it was a bare `timeout=30` in ~15 modules), and the 429/5xx
+  retry that only Workday had. `board_session()` installs one per pull run
+  through a `ContextVar`, so worker threads inherit it and its connections are
+  released when the run ends; a connector called outside a run gets a private
+  session and behaves identically. Measured: 1.0 → 12.0 requests per client on
+  one host. **Scope is operator-configured endpoints only** — board APIs and
+  ATS API URLs rebuilt from a validated `AtsTarget`. A user-supplied URL still
+  goes through `security/outbound.py`, and that gateway is deliberately **not**
+  given this pool: it pins each request to the IP it validated and carries the
+  hostname in an `sni_hostname` extension, but httpx keys its pool on the
+  request origin (the IP), so a shared pool could hand a connection negotiated
+  with one hostname's SNI to a request for another hostname on the same
+  address.
+- **`harvest_detailed` fetches details concurrently, bounded per host** by
+  `Settings.detail_fetch_concurrency` (default 4). Chunk size is
+  `min(concurrency, limit - kept)`, so a `limit=5` run issues 5 detail fetches
+  rather than a full chunk of speculative ones. Each task runs in its own
+  `copy_context()` — a bare thread inherits no `ContextVar`, which would drop
+  both the run's pool and the active `UserContext`.
+- **A run-constant document belongs in the system block, not the per-job
+  message.** `cache_system_prompt` caches the system block only, so the
+  `ProfileFacts` JSON that `compose_fit_input` put first in all N per-job
+  messages was paid for N times at full price (measured: ~65,000 of a 20-job
+  run's 65,420 prompt tokens). `fit.bind_profile` moves it into the agent's
+  description once at the start of the scoring phase and **returns whether it
+  took**; a caller that gets `False` keeps the profile in the message, so what
+  the model is told never depends on whether the optimisation applied. Fact-lock
+  is untouched — identical content, different message position.
+  `llm_runner.prompt_cache_for(model_id)` is the one rule for whether to ask for
+  caching (the `prompt_cache_enabled` switch crossed with provider capability)
+  and every N-per-run builder uses it.
+- **A run's agent calls are traceable.** `agent_trace.py` writes one NDJSON row
+  per agent call under the run's own directory (`{run_id}.agents.ndjson`),
+  scoped by a `ContextVar` that `RunManager.submit`'s worker installs.
+  `UsageEvent` is a billing record and cannot say which agent family produced
+  which artifact, how many retries it took, or whether the cache was hit.
+  **Operational events only** — no prompt, completion, or reasoning content,
+  the same rule `_map_stream_event` enforces. Deliberately minimal: one file per
+  run, no schema, no API surface.
 - **Discovery + tailor LLM calls run concurrently** via asyncio. Each phase keeps a sync public
   signature and runs `asyncio.run(gather_isolated(...))` internally: load rows → fan out the pure
   async LLM siblings (`aextract_job_criteria`, `ascore_fit`, `ajudge_relevance`, `arun_tailor_review`)

@@ -10,6 +10,7 @@ from resume_agent.llm_runner import (
     AgentRunner,
     Runner,
     build_model,
+    prompt_cache_for,
     retry_kwargs,
     use_json_mode_for,
 )
@@ -27,8 +28,14 @@ def model_for_tier(tier: str) -> str:
     )
 
 
-def _prompt_cache() -> bool:
-    return get_settings().prompt_cache_enabled
+def _prompt_cache(model_id: str | None = None) -> bool:
+    """One rule, shared with every other agent builder.
+
+    Previously this read only the setting, so a provider that cannot cache a
+    system block still got the flag. Harmless today (build_model forwards it
+    only to Anthropic) but it is not the rule this file means to state.
+    """
+    return prompt_cache_for(model_id or model_for_tier("mid"))
 
 
 _TAILOR_INSTRUCTIONS = [
@@ -205,7 +212,7 @@ def build_tailor_agent(
     )
     model = build_model(
         resolved_model_id,
-        cache_system_prompt=_prompt_cache(),
+        cache_system_prompt=_prompt_cache(resolved_model_id),
     )
     return AgentRunner(
         Agent(
@@ -246,7 +253,7 @@ def build_reviser_agent(
     )
     model = build_model(
         resolved_model_id,
-        cache_system_prompt=_prompt_cache(),
+        cache_system_prompt=_prompt_cache(resolved_model_id),
     )
     return AgentRunner(
         Agent(
@@ -287,7 +294,7 @@ def build_revision_agent(
     )
     model = build_model(
         resolved_model_id,
-        cache_system_prompt=_prompt_cache(),
+        cache_system_prompt=_prompt_cache(resolved_model_id),
     )
     return AgentRunner(
         Agent(
@@ -337,7 +344,7 @@ def build_reviewer_agent(
     )
     model = build_model(
         resolved_model_id,
-        cache_system_prompt=_prompt_cache(),
+        cache_system_prompt=_prompt_cache(resolved_model_id),
     )
     return AgentRunner(
         Agent(
@@ -397,7 +404,7 @@ def build_merged_advisory_agent(
 ) -> Runner:
     model = build_model(
         model_id or model_for_tier("mid"),
-        cache_system_prompt=_prompt_cache(),
+        cache_system_prompt=_prompt_cache(model_id or model_for_tier("mid")),
     )
     return AgentRunner(
         Agent(

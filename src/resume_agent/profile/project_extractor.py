@@ -12,6 +12,7 @@ from resume_agent.career_skills.agno import skill_kwargs
 from resume_agent.career_skills.models import AgentFamily, AgentRunMeta
 from resume_agent.career_skills.registry import VerifiedSkill, resolve_skill
 from resume_agent.llm_runner import (
+    prompt_cache_for,
     AgentRunner,
     Runner,
     acall,
@@ -54,7 +55,7 @@ def build_project_extractor_agent(
         family=AgentFamily.INTERNAL_PROFILE,
         use="profile_project",
     )
-    model = build_model(resolved_model_id)
+    model = build_model(resolved_model_id, cache_system_prompt=prompt_cache_for(resolved_model_id))
     return AgentRunner(
         Agent(
             model=model,

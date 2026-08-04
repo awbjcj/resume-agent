@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-import httpx
+
+from resume_agent.discovery.connectors import http as board
 
 from resume_agent.discovery.connectors.base import RawJob, SkipSeen
 from resume_agent.discovery.connectors.dates import parse_iso_datetime
@@ -87,8 +88,8 @@ def apply_detail(row: SmartRecruitersRow, detail: dict) -> None:
 
 def _list_pages(target: AtsTarget, search: SearchConfig):
     for offset in range(0, _MAX_OFFSET + 1, _PAGE_SIZE):
-        response = httpx.get(
-            postings_url(target.token), params=list_params(search, offset), timeout=30
+        response = board.get(
+            postings_url(target.token), params=list_params(search, offset)
         )
         response.raise_for_status()
         payload = response.json()
@@ -102,7 +103,7 @@ def _list_pages(target: AtsTarget, search: SearchConfig):
 def _fetch_detail(target: AtsTarget, row: SmartRecruitersRow) -> dict | None:
     if not row.posting_id:
         return None
-    response = httpx.get(detail_url(target.token, row.posting_id), timeout=30)
+    response = board.get(detail_url(target.token, row.posting_id))
     response.raise_for_status()
     return response.json()
 

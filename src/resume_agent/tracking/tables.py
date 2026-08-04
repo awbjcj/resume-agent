@@ -53,6 +53,10 @@ class Job(SQLModel, table=True):
     reject_reason: str | None = None
     reject_category: str | None = None
     gate_override: bool = Field(default=False)
+    # Set when an extracted industry candidate could not be canonicalized, so
+    # the next extract pass can find revisitable rows by index instead of
+    # scanning every job's criteria JSON for a substring.
+    industry_pending: bool = Field(default=False, index=True)
     content_fingerprint: str | None = Field(default=None, index=True)
     posted_at: datetime | None = None
     archived_at: datetime | None = Field(default=None, index=True)

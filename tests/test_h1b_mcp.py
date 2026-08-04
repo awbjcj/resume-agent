@@ -53,11 +53,16 @@ def test_toolkit_exposes_only_prefixed_read_tools():
     assert FakeMCP.instances[0].closed == 1
 
 
-def test_partial_startup_still_closes_toolkit():
+def test_failed_connect_surfaces_its_own_error_without_closing():
+    """A close that never had a connection masks the transport error with its own."""
+
     class FailingMCP(FakeMCP):
         async def connect(self):
             self.connected += 1
             raise RuntimeError("startup")
+
+        async def close(self):
+            raise RuntimeError("close of an unopened stream")
 
     async def run():
         with pytest.raises(RuntimeError, match="startup"):
@@ -65,17 +70,30 @@ def test_partial_startup_still_closes_toolkit():
                 pass
 
     asyncio.run(run())
-    assert FailingMCP.instances[-1].closed == 1
+    assert FailingMCP.instances[-1].closed == 0
 
 
-def test_result_hook_rejects_oversized_provider_payload():
+def test_result_hook_truncates_oversized_payload_into_an_observation():
+    """The loop's contract is that every tool call gets a result, even a denial."""
     hook = bounded_h1b_result(4)
 
     async def run():
-        with pytest.raises(H1BResultTooLarge):
-            await hook(lambda **_: "12345", {})
+        return await hook(lambda **_: "123456789", {})
 
-    asyncio.run(run())
+    result = asyncio.run(run())
+
+    assert result["truncated"] is True
+    assert result["code"] == H1BResultTooLarge.code
+    assert len(result["data"]) == 4
+    assert "over the 4-character limit" in result["reason"]
+
+
+def test_result_hook_passes_a_payload_inside_the_limit_through_untouched():
+    hook = bounded_h1b_result(1_000)
+
+    result = asyncio.run(hook(lambda **_: {"filings": 3}, {}))
+
+    assert result == {"filings": 3}
 
 
 def test_result_hook_runs_through_agno_async_tool_dispatch():

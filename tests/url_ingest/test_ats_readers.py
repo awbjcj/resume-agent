@@ -84,7 +84,7 @@ def test_greenhouse_reader_resolves_the_board_display_name(monkeypatch):
     def fake_get(url, **kw):
         return _Resp(board if url.endswith("/v1/boards/hooli") else job)
 
-    monkeypatch.setattr(ats_readers.httpx, "get", fake_get)
+    monkeypatch.setattr(ats_readers.board, "get", fake_get)
     target = AtsTarget("greenhouse", token="hooli")
     extracted = ATS_READERS["greenhouse"](target, "https://boards.greenhouse.io/hooli/jobs/1", "<html></html>")
     assert extracted is not None
@@ -99,7 +99,7 @@ def test_greenhouse_reader_falls_back_to_token_when_board_name_lookup_fails(monk
             raise httpx.ConnectError("down")
         return _Resp(job)
 
-    monkeypatch.setattr(ats_readers.httpx, "get", fake_get)
+    monkeypatch.setattr(ats_readers.board, "get", fake_get)
     target = AtsTarget("greenhouse", token="hooli")
     extracted = ATS_READERS["greenhouse"](target, "https://boards.greenhouse.io/hooli/jobs/1", "<html></html>")
     assert extracted is not None
@@ -212,7 +212,7 @@ def test_smartrecruiters_falls_back_to_detail_endpoint(monkeypatch):
         "location": {"city": "United States", "region": "REMOTE", "country": "us"},
         "jobAd": {"sections": {"jobDescription": {"text": "<p>Build a great product.</p>"}}},
     }
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(detail))
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(detail))
     target = AtsTarget("smartrecruiters", token="smartrecruiters")
     url = "https://jobs.smartrecruiters.com/smartrecruiters/744000134902606-senior-product-manager"
     extracted = ATS_READERS["smartrecruiters"](target, url, "<html></html>")
@@ -242,7 +242,7 @@ def test_workable_url_form_under_test_is_one_detect_actually_resolves():
 
 def test_workable_falls_back_to_account_listing_by_shortcode(monkeypatch):
     payload = _fixture_json("workable", "account.json")
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(payload))
     target = AtsTarget("workable", token="acme")
     extracted = ATS_READERS["workable"](target, _WORKABLE_URL, "<html></html>")
     assert extracted is not None
@@ -267,7 +267,7 @@ def test_workable_keeps_requirements_and_benefits_sections(monkeypatch):
             }
         ],
     }
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(payload))
     target = AtsTarget("workable", token="acme")
     extracted = ATS_READERS["workable"](target, _WORKABLE_URL, "<html></html>")
     assert extracted is not None
@@ -278,7 +278,7 @@ def test_workable_keeps_requirements_and_benefits_sections(monkeypatch):
 
 def test_workable_returns_none_when_shortcode_not_found(monkeypatch):
     payload = _fixture_json("workable", "account.json")
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(payload))
     target = AtsTarget("workable", token="acme")
     url = "https://apply.workable.com/acme/j/NOTREAL"
     assert ATS_READERS["workable"](target, url, "<html></html>") is None
@@ -298,7 +298,7 @@ def test_personio_falls_back_to_search_filtered_by_id(monkeypatch):
         def text(self):
             return payload_text
 
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _TextResp())
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _TextResp())
     target = AtsTarget("personio", token="pitch", country="com")
     url = "https://pitch.jobs.personio.com/job/160959"
     extracted = ATS_READERS["personio"](target, url, "<html></html>")
@@ -312,7 +312,7 @@ def test_personio_falls_back_to_search_filtered_by_id(monkeypatch):
 
 def test_bamboohr_falls_back_to_detail_endpoint(monkeypatch):
     detail = _fixture_json("bamboohr", "detail.json")
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(detail))
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(detail))
     target = AtsTarget("bamboohr", token="eleven")
     url = "https://eleven.bamboohr.com/careers/132"
     extracted = ATS_READERS["bamboohr"](target, url, "<html></html>")
@@ -363,7 +363,7 @@ def test_workday_falls_back_to_cxs_detail_endpoint(monkeypatch):
             "location": "Detroit, Michigan",
         }
     }
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(detail))
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(detail))
     target = AtsTarget("workday", tenant="generalmotors", datacenter="wd5", site="Careers_GM")
     url = "https://generalmotors.wd5.myworkdayjobs.com/en-US/Careers_GM/job/Detroit-Michigan/Software-Engineer_R123"
     extracted = ATS_READERS["workday"](target, url, "<html></html>")
@@ -437,7 +437,7 @@ def test_workday_reader_uses_the_throttle_retrying_fetch(monkeypatch):
         return {"jobPostingInfo": {"title": "X", "jobDescription": "<p>Body.</p>"}}
 
     monkeypatch.setattr(ats_readers, "fetch_job_detail", _detail)
-    monkeypatch.setattr(ats_readers.httpx, "get", _fail)
+    monkeypatch.setattr(ats_readers.board, "get", _fail)
     assert ATS_READERS["workday"](_WORKDAY_TARGET, _WORKDAY_URL, "<html></html>") is not None
     assert calls == ["/job/Detroit-Michigan/Software-Engineer_R123"]
 
@@ -473,7 +473,7 @@ def test_a_non_json_api_response_is_a_miss_not_an_exception(monkeypatch):
         def json(self):
             raise ValueError("Expecting value: line 1 column 1 (char 0)")
 
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _HtmlResp())
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _HtmlResp())
     target = AtsTarget("smartrecruiters", token="acme")
     url = "https://jobs.smartrecruiters.com/acme/744000134902606-engineer"
     assert ATS_READERS["smartrecruiters"](target, url, "<html></html>") is None
@@ -532,7 +532,7 @@ def test_recruitee_prefers_the_offers_api_which_keeps_requirements(monkeypatch):
             }
         ]
     }
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(payload))
     target = AtsTarget("recruitee", token="channable")
     url = "https://channable.recruitee.com/o/support-engineer"
     extracted = ATS_READERS["recruitee"](target, url, "<html></html>")
@@ -560,7 +560,7 @@ def test_recruitee_matches_the_offer_slug_exactly_not_as_a_substring(monkeypatch
             },
         ]
     }
-    monkeypatch.setattr(ats_readers.httpx, "get", lambda url, **kw: _Resp(payload))
+    monkeypatch.setattr(ats_readers.board, "get", lambda url, **kw: _Resp(payload))
     target = AtsTarget("recruitee", token="channable")
     url = "https://channable.recruitee.com/o/engineer"
     extracted = ATS_READERS["recruitee"](target, url, "<html></html>")
@@ -571,7 +571,7 @@ def test_recruitee_matches_the_offer_slug_exactly_not_as_a_substring(monkeypatch
 
 def test_recruitee_falls_back_to_json_ld_when_the_offers_feed_is_unreachable(monkeypatch):
     monkeypatch.setattr(
-        ats_readers.httpx, "get",
+        ats_readers.board, "get",
         lambda url, **kw: (_ for _ in ()).throw(httpx.ConnectError("down")),
     )
     html = (
@@ -607,7 +607,7 @@ def test_smartrecruiters_oneclick_url_resolves_the_real_company(monkeypatch):
         seen.append(url)
         return _Resp({"name": "Engineer", "jobAd": {"sections": {"jobDescription": {"text": "<p>Body.</p>"}}}})
 
-    monkeypatch.setattr(ats_readers.httpx, "get", _get)
+    monkeypatch.setattr(ats_readers.board, "get", _get)
     target = AtsTarget("smartrecruiters", token="oneclick-ui")
     url = "https://jobs.smartrecruiters.com/oneclick-ui/company/acme/publication/8f1e-4b2c"
     extracted = ATS_READERS["smartrecruiters"](target, url, "<html></html>")

@@ -77,7 +77,16 @@ single, operator-visible number regardless of signup volume.
   wants BYOK-tier resources (compute/storage, not LLM spend) is not
   meaningfully slowed by this decision alone.
 
-## Amendment (2026-07-30)
+## Amendment (2026-07-30) — SUPERSEDED by Amendment 2, below
+
+> **This paragraph no longer describes the runtime.** It is kept for the
+> rationale trail only. `global_monthly_cost` and `global_weekly_usage` do
+> **not** filter out `User.role == "admin"` — neither query joins `User` — and
+> `enforce_agent_budget` does not exempt admins from the platform-wide cap.
+> Admins are exempt from the **per-user allowance** and remain bound by the
+> **platform-wide monthly cap**; see Amendment 2 and ADR-0010 §26. Pinned by
+> `tests/tenancy/test_cost_quotas.py::test_admin_shared_usage_is_bounded_by_global_cost_quota`
+> and `::test_admin_usage_counts_toward_global_cost_quota_for_other_users`.
 
 The platform-wide cap (`global_weekly_token_budget` in shadow mode,
 `global_monthly_cost_quota_micros` in enforce mode) originally applied to

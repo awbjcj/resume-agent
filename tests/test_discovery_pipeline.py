@@ -244,6 +244,10 @@ def test_run_extract_warm_taxonomy_makes_zero_classifier_calls_and_updates_all_s
                     "sic_major": "73",
                     "sic_label": "Software",
                 },
+                # What ensure_industry_pending_column stamps on a legacy row at
+                # init_db. The revisit query is an index seek now, so a row
+                # that wants revisiting has to say so.
+                industry_pending=True,
             ),
         )
         save_job(
@@ -356,6 +360,7 @@ def test_industry_normalization_skips_untouched_rows(tmp_path):
             jd_text="jd",
             status="shortlisted",
             criteria_json={"industry": None, "_industry_candidate": "fintech"},
+            industry_pending=True,
         )
         session.add(settled)
         session.add(pending)
@@ -1021,3 +1026,79 @@ def test_reprocess_scores_manually_overridden_hard_filtered_job():
         assert shortlisted[0].fit_score == 90
         assert shortlisted[0].gate_override is True
         assert not jobs_by_status(s, JobStatus.rejected.value)
+
+
+def test_industry_revisit_query_touches_only_marked_rows(tmp_path):
+    """A table of canonicalized jobs must add zero rows to the revisit pass.
+
+    The old predicate was ``criteria_json LIKE '%"_industry_candidate"%'``,
+    which no index can serve: finding zero work cost a full scan that grew with
+    the table rather than with the work.
+    """
+    from resume_agent.discovery.pipeline import _industry_scope
+
+    taxonomy_path = tmp_path / "industries.json"
+    save_industry_taxonomy(
+        IndustryTaxonomy(aliases={"fintech": "Fintech"}, companies={}),
+        taxonomy_path,
+    )
+
+    with _session() as session:
+        for index in range(200):
+            session.add(
+                Job(
+                    source="x",
+                    company=f"Settled{index}",
+                    title="Engineer",
+                    jd_text="jd",
+                    status="shortlisted",
+                    criteria_json={"industry": "Fintech"},
+                )
+            )
+        marked = Job(
+            source="x",
+            company="RetryCo",
+            title="Engineer",
+            jd_text="jd",
+            status="shortlisted",
+            criteria_json={"industry": None, "_industry_candidate": "fintech"},
+            industry_pending=True,
+        )
+        session.add(marked)
+        session.commit()
+
+        scope = _industry_scope(session, batch=[])
+
+        assert [job.company for job in scope] == ["RetryCo"]
+
+
+def test_canonicalizing_a_row_clears_its_revisit_marker(tmp_path):
+    """A marker written in one direction only would revisit forever."""
+    from resume_agent.discovery.pipeline import _normalize_job_industries
+
+    taxonomy_path = tmp_path / "industries.json"
+    save_industry_taxonomy(
+        IndustryTaxonomy(aliases={"fintech": "Fintech"}, companies={}),
+        taxonomy_path,
+    )
+
+    with _session() as session:
+        job = Job(
+            source="x",
+            company="RetryCo",
+            title="Engineer",
+            jd_text="jd",
+            status="shortlisted",
+            criteria_json={"industry": None, "_industry_candidate": "fintech"},
+            industry_pending=True,
+        )
+        session.add(job)
+        session.commit()
+
+        _normalize_job_industries(session, None, taxonomy_path, batch=[])
+        session.commit()
+        session.refresh(job)
+
+        assert job.criteria_json is not None
+        assert job.criteria_json["industry"] == "Fintech"
+        assert job.industry_pending is False

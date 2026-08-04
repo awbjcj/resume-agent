@@ -120,7 +120,7 @@ def test_adzuna_builds_targeted_params():
     conn = AdzunaConnector("id", "key", country="us")
     captured = {}
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(url, params=None, **kwargs):
         captured["url"] = url
         captured["params"] = params
 
@@ -135,8 +135,8 @@ def test_adzuna_builds_targeted_params():
 
     import resume_agent.discovery.connectors.adzuna as mod
 
-    orig = mod.httpx.get
-    mod.httpx.get = fake_get
+    orig = mod.board.get
+    mod.board.get = fake_get
     try:
         cfg = SearchConfig(
             role_anchors=["ai engineer", "machine learning"],
@@ -149,7 +149,7 @@ def test_adzuna_builds_targeted_params():
         )
         conn.fetch(cfg)
     finally:
-        mod.httpx.get = orig
+        mod.board.get = orig
 
     p = captured["params"]
     assert captured["url"].endswith("/us/search/1")

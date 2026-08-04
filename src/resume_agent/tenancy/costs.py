@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from weakref import WeakKeyDictionary
 
 from sqlalchemy import or_, select
 from sqlalchemy.engine import Engine
@@ -67,6 +69,30 @@ def _cost(units: int, rate_micros: int) -> int:
     return (units * rate_micros + MILLION - 1) // MILLION
 
 
+def _active_rates(
+    engine: Engine, provider: str, model: str, moment: datetime
+) -> list[LlmRate]:
+    with Session(engine) as session:
+        rows = list(
+            session.execute(
+                select(LlmRate)
+                .where(
+                    LlmRate.provider == normalize_provider(provider),
+                    LlmRate.model == model,
+                    LlmRate.effective_from <= moment,
+                    or_(LlmRate.effective_to.is_(None), LlmRate.effective_to > moment),
+                )
+                .order_by(
+                    LlmRate.context_min_tokens.desc(), LlmRate.effective_from.desc()
+                )
+            ).scalars()
+        )
+        # Detach with every column loaded so the cached rows outlive the
+        # session without a lazy load.
+        session.expunge_all()
+    return rows
+
+
 def find_rate(
     engine: Engine,
     provider: str,
@@ -75,37 +101,71 @@ def find_rate(
     input_tokens: int = 0,
     now: datetime | None = None,
 ) -> LlmRate | None:
+    """Resolve the rate row for a call, caching the model's active rate set.
+
+    Context-band selection happens in Python over the cached set rather than in
+    SQL, so a run that prices thousands of calls at different input sizes still
+    issues one query per model per TTL instead of one per call.
+    """
+    cacheable = now is None
+    key = (normalize_provider(provider), model)
+    rows: list[LlmRate] | None = None
+    if cacheable:
+        entry = _rate_rows_cache.setdefault(engine, {}).get(key)
+        if entry is not None and time.monotonic() - entry[0] < RATE_CACHE_TTL_SECONDS:
+            rows = entry[1]
     moment = now or datetime.now(timezone.utc)
-    with Session(engine) as session:
-        return (
-            session.execute(
-                select(LlmRate)
-                .where(
-                    LlmRate.provider == normalize_provider(provider),
-                    LlmRate.model == model,
-                    LlmRate.context_min_tokens <= input_tokens,
-                    or_(
-                        LlmRate.context_max_tokens.is_(None),
-                        LlmRate.context_max_tokens >= input_tokens,
-                    ),
-                    LlmRate.effective_from <= moment,
-                    or_(LlmRate.effective_to.is_(None), LlmRate.effective_to > moment),
-                )
-                .order_by(
-                    LlmRate.context_min_tokens.desc(), LlmRate.effective_from.desc()
-                )
-            )
-            .scalars()
-            .first()
-        )
+    if rows is None:
+        rows = _active_rates(engine, provider, model, moment)
+        if cacheable:
+            _rate_rows_cache.setdefault(engine, {})[key] = (time.monotonic(), rows)
+    for rate in rows:
+        if rate.context_min_tokens <= input_tokens and (
+            rate.context_max_tokens is None or rate.context_max_tokens >= input_tokens
+        ):
+            return rate
+    return None
+
+
+# Rate rows are near-static reference data edited only by an admin, but
+# has_active_rate sits on the hot path in front of every shared-key call and
+# opened its own session each time. The cache is keyed by engine so entries die
+# with the database they describe, which is also what keeps tests isolated.
+RATE_CACHE_TTL_SECONDS = 60.0
+_rate_cache: WeakKeyDictionary[Engine, dict[tuple[str, str], tuple[float, bool]]] = (
+    WeakKeyDictionary()
+)
+
+
+_rate_rows_cache: WeakKeyDictionary[
+    Engine, dict[tuple[str, str], tuple[float, list[LlmRate]]]
+] = WeakKeyDictionary()
+
+
+def invalidate_rate_cache(engine: Engine | None = None) -> None:
+    """Drop cached rate lookups after an admin edits or seeds rates."""
+    if engine is None:
+        _rate_cache.clear()
+        _rate_rows_cache.clear()
+    else:
+        _rate_cache.pop(engine, None)
+        _rate_rows_cache.pop(engine, None)
 
 
 def has_active_rate(
     engine: Engine, provider: str, model: str, *, now: datetime | None = None
 ) -> bool:
+    # An explicit ``now`` is a test or a backfill asking about a different
+    # moment; only the real-clock path is cacheable.
+    cacheable = now is None
+    key = (normalize_provider(provider), model)
+    if cacheable:
+        entry = _rate_cache.setdefault(engine, {}).get(key)
+        if entry is not None and time.monotonic() - entry[0] < RATE_CACHE_TTL_SECONDS:
+            return entry[1]
     moment = now or datetime.now(timezone.utc)
     with Session(engine) as session:
-        return (
+        found = (
             session.execute(
                 select(LlmRate.id).where(
                     LlmRate.provider == normalize_provider(provider),
@@ -116,6 +176,9 @@ def has_active_rate(
             ).first()
             is not None
         )
+    if cacheable:
+        _rate_cache.setdefault(engine, {})[key] = (time.monotonic(), found)
+    return found
 
 
 def calculate_cost(
@@ -397,3 +460,4 @@ def seed_llm_rates(engine: Engine) -> None:
                 )
             )
         session.commit()
+    invalidate_rate_cache(engine)

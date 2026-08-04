@@ -234,7 +234,24 @@ def ensure_quota_account(
 def quota_snapshot(
     engine: Engine, user_id: str, *, now: datetime | None = None
 ) -> QuotaSnapshot:
-    return ensure_quota_account(engine, user_id, now=now)
+    """Read the active period without taking SQLite's exclusive write lock.
+
+    ``ensure_quota_account`` opens ``BEGIN IMMEDIATE`` because it may create an
+    account or roll a period — real writes that must not race. Reading a
+    snapshot is not that, and every shared-key call did it: a read serialised
+    behind every other caller's write lock, on the hot path, for data it was
+    only going to look at. When there is genuinely nothing to create, this
+    returns from a deferred read; only the create/roll case escalates.
+    """
+    moment = now or datetime.now(UTC)
+    with Session(engine) as session:
+        account = session.get(QuotaAccount, user_id)
+        if account is not None and account.active_period_id:
+            period = session.get(QuotaPeriod, account.active_period_id)
+            tier = session.get(QuotaTier, account.tier_id)
+            if period is not None and tier is not None and moment < _aware(period.ends_at):
+                return _snapshot(account, period, tier)
+    return ensure_quota_account(engine, user_id, now=moment)
 
 
 def charge_shared_cost(
@@ -247,17 +264,22 @@ def charge_shared_cost(
     usage_event_id: int | None = None,
 ) -> QuotaSnapshot:
     moment = now or datetime.now(UTC)
-    with Session(engine) as session:
+    if preflight:
+        # A preflight reads the allowance; it changes nothing. Taking the
+        # exclusive write lock for it serialised every shared-key call in a
+        # concurrent fan-out behind every other one.
+        before = quota_snapshot(engine, user_id, now=moment)
+        if before.remaining_micros is not None and before.remaining_micros <= 0:
+            raise CostQuotaExceededError(
+                f"cost quota exhausted; resets at {before.period_end.isoformat()}"
+            )
+        return before
+    # expire_on_commit would expire account/period/tier at the commit below,
+    # so building the return snapshot would re-SELECT all three — three extra
+    # reads on the settle path of every shared-key call.
+    with Session(engine, expire_on_commit=False) as session:
         session.execute(text("BEGIN IMMEDIATE"))
         account, period, tier = _ensure_in_session(session, user_id, moment)
-        before = _snapshot(account, period, tier)
-        if preflight:
-            if before.remaining_micros is not None and before.remaining_micros <= 0:
-                raise CostQuotaExceededError(
-                    f"cost quota exhausted; resets at {before.period_end.isoformat()}"
-                )
-            session.commit()
-            return before
         if amount_micros < 0:
             raise ValueError("cost cannot be negative")
         allowance = period.allowance_micros
