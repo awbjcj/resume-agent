@@ -151,7 +151,7 @@ def run_h1b_enrichment(
     fresh_by_company = {
         key: evidence
         for key, evidence in cached_for_display.items()
-        if evidence.expires_at > now
+        if evidence.is_fresh(now)
     }
     # Expired rows still render on cards, but refreshing them costs a call and
     # they must never silently become scorer input if the cap defers them.

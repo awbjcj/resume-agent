@@ -218,7 +218,7 @@ def _fresh_cached(row: H1BCompanyEvidence | None, now: datetime) -> H1BSponsorsh
         evidence = H1BSponsorshipEvidence.model_validate(row.evidence_json)
     except Exception:
         return None
-    return evidence if evidence.expires_at > now else None
+    return evidence if evidence.is_fresh(now) else None
 
 
 def _agent_output(result: Any, company: str) -> H1BSponsorshipEvidence:

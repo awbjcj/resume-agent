@@ -91,10 +91,14 @@ def _add(session: Session, company: str, signal: str) -> Job:
     return job
 
 
-def test_research_widens_beyond_silent_jobs():
+def test_research_widens_beyond_silent_jobs(monkeypatch):
     engine = _engine()
     config = SearchConfig(sponsorship_required=True)
     enricher = RecordingEnricher()
+    monkeypatch.setattr(
+        "resume_agent.services.discovery.get_settings",
+        lambda: Settings(_env_file=None),  # type: ignore[call-arg]
+    )
     with Session(engine) as session:
         _add(session, "Acme, Inc.", "silent")
         _add(session, "Globex LLC", "explicit_no")
@@ -103,9 +107,13 @@ def test_research_widens_beyond_silent_jobs():
     assert {c.lower() for c in enricher.seen} == {"acme, inc.", "globex llc"}
 
 
-def test_returned_scoring_map_stays_silent_only():
+def test_returned_scoring_map_stays_silent_only(monkeypatch):
     engine = _engine()
     config = SearchConfig(sponsorship_required=True)
+    monkeypatch.setattr(
+        "resume_agent.services.discovery.get_settings",
+        lambda: Settings(_env_file=None),  # type: ignore[call-arg]
+    )
     with Session(engine) as session:
         silent = _add(session, "Acme, Inc.", "silent")
         loud = _add(session, "Globex LLC", "explicit_no")
@@ -130,11 +138,15 @@ def test_nothing_is_researched_when_sponsorship_is_not_required():
     assert enricher.seen == []
 
 
-def test_fresh_cache_hits_still_reach_the_scorer():
+def test_fresh_cache_hits_still_reach_the_scorer(monkeypatch):
     """A company already cached is not re-researched but must still score."""
     engine = _engine()
     config = SearchConfig(sponsorship_required=True)
     enricher = RecordingEnricher()
+    monkeypatch.setattr(
+        "resume_agent.services.discovery.get_settings",
+        lambda: Settings(_env_file=None),  # type: ignore[call-arg]
+    )
 
     acme_evidence = _evidence("acme")
     globex_evidence = _evidence("globex")

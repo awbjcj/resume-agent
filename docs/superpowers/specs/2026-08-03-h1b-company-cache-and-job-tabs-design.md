@@ -18,7 +18,7 @@ defect is on the **read** path: `_job_detail_response`
 (`api/routers/jobs.py:99`) and `_h1b_sponsorship_status`
 (`tracking/queries.py:152`) both read `JobAnalysisMeta.h1b_evidence_snapshot`,
 a per-job frozen copy stashed in `analysis_meta_json`. A job whose company was
-researched via a *different* job has no snapshot of its own, so its card reads
+researched via a _different_ job has no snapshot of its own, so its card reads
 "No H-1B evidence has been checked for this job yet" while a fresh answer sits
 in the cache one query away.
 
@@ -29,7 +29,7 @@ by construction, so most cards start empty even after a full discovery run.
 
 **3. Evidence has no quarterly resolution.** `H1BSponsorshipEvidence` carries
 `fiscal_periods: list[str]` — labels only — alongside a single flat set of
-`filing_count` / `certified_count` / `wage_summary`. It records *which* periods
+`filing_count` / `certified_count` / `wage_summary`. It records _which_ periods
 were examined but collapses their numbers into one total. There is nowhere for
 per-quarter figures to live, so "are they still filing?" is unanswerable.
 
@@ -43,7 +43,7 @@ while an unrelated research panel is buried inside one of them.
 `JobStatus.filtered` does **not** mean "filtered out". It is the stage between
 extract and score: `run_filter` advances survivors to `filtered` and sends
 rejects to `rejected`; `run_score` then reads `filtered` jobs and advances them
-to `shortlisted`. So `run_h1b_enrichment` already runs over every *surviving*
+to `shortlisted`. So `run_h1b_enrichment` already runs over every _surviving_
 job — the narrowing that matters is `sponsorship_signal == "silent"`, not the
 status.
 
@@ -51,13 +51,13 @@ status.
 
 ## Decisions
 
-| # | Decision | Rationale |
-|---|---|---|
-| D1 | The company cache is the **only** display source. | One company = one row = one truth. A refresh on any job instantly updates every card at that company. |
-| D2 | One cache row per company holds a **per-period breakdown plus a rolling 4-quarter total**. | One research call per company; the selector switches views over already-fetched data. |
-| D3 | Discovery **widens** to every surviving job's company, still one call per company. | Cards get answers without the user clicking; the cache and TTL keep marginal cost to one call per genuinely new company. |
-| D4 | Expired rows **still render**, labelled stale. Nothing auto-refreshes. | Historical filings do not rot. Hiding usable data is worse than dating it; auto-refresh on view would spend LLM budget without being asked. |
-| D5 | The merged tab is **"Tracking"** — stage, then application, then a fenced danger zone. Sponsorship becomes a peer tab. | Reads in causal order; tab count stays at 6, so the tab bar does not wrap. |
+| #   | Decision                                                                                                               | Rationale                                                                                                                                   |
+| --- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | The company cache is the **only** display source.                                                                      | One company = one row = one truth. A refresh on any job instantly updates every card at that company.                                       |
+| D2  | One cache row per company holds a **per-period breakdown plus a rolling 4-quarter total**.                             | One research call per company; the selector switches views over already-fetched data.                                                       |
+| D3  | Discovery **widens** to every surviving job's company, still one call per company.                                     | Cards get answers without the user clicking; the cache and TTL keep marginal cost to one call per genuinely new company.                    |
+| D4  | Expired rows **still render**, labelled stale. Nothing auto-refreshes.                                                 | Historical filings do not rot. Hiding usable data is worse than dating it; auto-refresh on view would spend LLM budget without being asked. |
+| D5  | The merged tab is **"Tracking"** — stage, then application, then a fenced danger zone. Sponsorship becomes a peer tab. | Reads in causal order; tab count stays at 6, so the tab bar does not wrap.                                                                  |
 
 ---
 
@@ -83,7 +83,7 @@ filing_count` and all three parts are present, mirroring the existing
 Gains two fields:
 
 ```python
-periods: list[H1BPeriodStat] = Field(default_factory=list, max_length=8)
+periods: list[H1BPeriodStat] = Field(default_factory=list, max_length=4)
 denied_count: int | None = Field(default=None, ge=0)
 ```
 
@@ -94,7 +94,9 @@ tile.
 
 `periods` is validated as follows:
 
-- **Bounded.** At most 8 entries. Agent output is untrusted; this is the same
+- **Bounded.** At most 4 entries. The product presents a rolling four-quarter
+  total, so accepting five through eight entries would make the UI's label
+  false. Agent output is untrusted; this is the same
   posture as `_project_domains` capping clustered domains rather than trusting
   the model.
 - **Unique.** Duplicate `period` labels reject the whole evidence object.
@@ -103,20 +105,24 @@ tile.
   agent's responsibility and is **not** validated. Disorder is cosmetic only —
   it changes the selector's option order and nothing else, because the rollup is
   order-independent and each period's figures are self-contained.
-- **The rollup is derived, never trusted.** When `periods` is non-empty, a
-  `model_validator` **overwrites** top-level `filing_count`, `certified_count`,
-  and `denied_count` with the sum across periods, treating a period's `None` as
-  a zero contribution but yielding `None` for a metric no period reports. The
-  invariant "the total equals the parts" is therefore unbreakable rather than
-  something the model might get wrong, and it is what licenses the UI to label
-  the default view "Last 4 quarters" honestly.
+- **The count rollup is derived, never trusted.** When `periods` is non-empty,
+  a `model_validator` **overwrites** top-level `filing_count`,
+  `certified_count`, and `denied_count` with the sum across periods, treating a
+  period's `None` as a zero contribution but yielding `None` for a metric no
+  period reports. The invariant "the count total equals the parts" is therefore
+  unbreakable rather than something the model might get wrong. A top-level
+  `wage_summary` remains the provider's report-level aggregate: medians and
+  percentiles cannot be summed across quarters without underlying distributions.
+  For legacy flat rows, if all three top-level counts are present,
+  `certified_count + denied_count <= filing_count` is also required.
 
 **"Past 4 quarters" means the 4 most recent quarters the provider has, latest
-included** — not the latest *plus* four more.
+included** — not the latest _plus_ four more.
 
 `fiscal_periods: list[str]` is retained unchanged for backward compatibility. It
-remains the labels-only record; `periods` is the numeric one. When both are
-present the UI reads `periods`.
+remains the labels-only record; `periods` is the numeric one. When `periods` is
+non-empty, all display labels come from it; `fiscal_periods` is used only by the
+legacy flat fallback so stale labels cannot contradict the selected figures.
 
 ### Schema evolution
 
@@ -154,17 +160,18 @@ def load_company_evidence(
 
 ### Consumers
 
-| Site | Change |
-|---|---|
-| `api/routers/jobs.py::_job_detail_response` | Replace the `analysis_meta_json` read with `load_company_evidence(session, [job.company])`. |
-| `tracking/queries.py::_shortlist_row` | Accept a `dict[str, H1BSponsorshipEvidence]` parameter; look up `normalize_company(job.company)`. |
-| Pipeline and triage row projections | Same parameter. |
+| Site                                                          | Change                                                                                                                                                                                                               |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api/routers/jobs.py::_job_detail_response`                   | Replace the `analysis_meta_json` read with `load_company_evidence(session, [job.company])`.                                                                                                                          |
+| `services/board.py::list_board` and the three page projectors | Load one map for the materialized page and thread it to shortlist, pipeline, and triage row builders. `project_shortlist_jobs` must receive the session too; it is the production path for paginated shortlist rows. |
 
 The map is derived **once per request** and threaded in, exactly as
 `derive_filter_values` is already threaded into `board_page` and
 `board_facet_counts`. Doing the lookup inside the row projection would issue one
 query per row and reintroduce the N+1 the board page was explicitly built to
-avoid.
+avoid. `job_detail_row` does not need a status-map lookup: the router performs
+the one full-evidence lookup used by the detail response, avoiding a redundant
+cache query whose status-only result is discarded by `JobDetail`.
 
 ### Retiring the per-job snapshot
 
@@ -172,8 +179,10 @@ avoid.
   being read**. The field stays on the model so existing rows still deserialize;
   existing values go inert. This matches the established posture that dangling
   references are inert rather than errors.
-- `JobAnalysisMeta.h1b_evidence_id` **keeps being written** — a cheap provenance
-  pointer answering "which cache row answered this job".
+- `JobAnalysisMeta.h1b_evidence_id` **keeps being written** for every in-scope,
+  normalizable job whose company has available cache evidence (including a fresh
+  cache hit). It remains a cheap provenance pointer answering "which cache row
+  answered this job"; it is never a display fallback.
 
 ### Staleness
 
@@ -210,7 +219,7 @@ Without this the browser cannot see the breakdown at all.
 Evidence threaded into `compose_fit_input` (`discovery/pipeline.py:320`) stays
 restricted to `silent` jobs. A job whose JD explicitly states no sponsorship is
 available must not have its fit score lifted by the employer's filing history —
-the JD is authoritative for *this* role, the filings are historical.
+the JD is authoritative for _this_ role, the filings are historical.
 
 **`run_h1b_enrichment`'s signature and return type do not change.** It keeps
 returning `dict[int, H1BSponsorshipEvidence]` containing **only** `silent` jobs.
@@ -225,6 +234,12 @@ What changes inside the function:
   company (still gated on `config.sponsorship_required`).
 - **Returned map stays narrow** — built only for jobs whose
   `sponsorship_signal == "silent"`.
+
+The provenance update is deliberately broader than the returned scoring map:
+after fresh cache hits and newly researched rows are merged, every research job
+with available evidence receives `h1b_evidence_id`, but only silent jobs enter
+the return value. This preserves a useful pointer without allowing an
+explicit-no job to influence fit scoring.
 
 `discovery/pipeline.py:482` and `run_score` therefore need **no change at all**.
 Existing scoring behaviour is byte-identical; only card coverage grows. A test
@@ -242,15 +257,23 @@ mid-tier tool-calling agent runs on the first pull.
 New setting: `Settings.h1b_enrich_max_companies_per_run: int = 50`, with
 `0 = unlimited` per the repo's limits convention.
 
-- Bounds **uncached** companies researched per run. Cache hits never count
-  against it. A row that exists but has expired counts as uncached, since
-  refreshing it costs a call.
+- Bounds **uncached** companies researched per run. A fresh cache hit means
+  `expires_at > now` and never counts against it. A row that exists but has
+  expired counts as uncached, since refreshing it costs a call. The read seam
+  intentionally returns expired rows for display, but those rows are
+  display-only until refreshed: they must not enter the scorer merely because
+  the cap deferred their refresh.
 - Selection is deterministic and highest-leverage-first: **descending count of
   eligible jobs at that company within this enrichment pass, ties broken by
   ascending normalized company name.**
 - The remainder is picked up on the next run — no error, no partial-failure
-  record. Those jobs' cards read "Not checked" until then, and the user can
+  record. A never-cached company reads "Not checked" until then; an existing
+  expired row remains visibly stale but does not enter scoring. The user can
   still force any one of them with a manual check.
+
+When every company is already fresh, enrichment is skipped but the fresh-cache
+map still reaches the silent-job scorer. The no-work branch must therefore build
+the return map rather than returning `{}` early.
 
 ---
 
@@ -261,14 +284,14 @@ New setting: `Settings.h1b_enrich_max_companies_per_run: int = 50`, with
 introspected while designing this. **The design assumes a quarterly breakdown is
 obtainable and is built so that being wrong costs nothing.**
 
-The sponsorship agent's instructions gain: call `get_available_data`, take the 4
-most recent quarters, and populate `periods` for each.
+The sponsorship agent's instructions gain: when `get_available_data` is exposed,
+use it to identify the 4 most recent quarters and populate `periods` for each.
 
-| Provider reality | Result |
-|---|---|
-| Quarterly slice available | `periods` has up to 4 entries; selector renders. |
-| No quarterly slice | `periods: []`. Evidence is still **valid**; the UI renders today's flat view. **Not an error, not a failed check.** |
-| Partial coverage (2 of 4 quarters) | 2 entries stored; UI labels the rollup "Last 2 quarters". |
+| Provider reality                   | Result                                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Quarterly slice available          | `periods` has up to 4 entries; selector renders.                                                                    |
+| No quarterly slice                 | `periods: []`. Evidence is still **valid**; the UI renders today's flat view. **Not an error, not a failed check.** |
+| Partial coverage (2 of 4 quarters) | 2 entries stored; UI labels the rollup "Last 2 quarters".                                                           |
 
 The prompt's existing constraints are unchanged: the `caveat` field must match
 `HISTORICAL_ONLY_CAVEAT` exactly, the company name remains untrusted data, and
@@ -309,7 +332,7 @@ triggers are removed.
 ```
 
 `ApplicationEditor` and `StageManager` are **kept as separate components** and
-composed by a thin `TrackingTab`. The merge requested is a *tab* merge, not a
+composed by a thin `TrackingTab`. The merge requested is a _tab_ merge, not a
 component merge; fusing two mutation hooks and two lifecycles into one file
 would buy nothing.
 
@@ -367,9 +390,13 @@ Behaviour:
   `⚠ Checked 47 days ago — may be out of date`, still render every tile, and
   switch the button label to `Refresh`. Nothing auto-fires. The button's
   disabled/spinner state continues to come from the run store, not from the
-  mutation.
+  mutation. The stale notice is independent of the selector, so a stale legacy
+  row with `periods: []` shows it too.
 - The refresh button's helper line states that refreshing updates every job at
   this company — a consequence of D1 the user must not discover by surprise.
+- If a detail-query refresh replaces the selected period, the rendered value
+  falls back to the rollup unless that period still exists. The control must
+  never retain a stale, raw provider label.
 
 **The period `<Select>` must use a children resolver function, not a bare
 `<SelectValue/>`.** This repo's Base UI Select renders the raw value
@@ -388,15 +415,15 @@ opened once. A test pins the label rendering before any interaction.
 > the panel only through the invalidated `["job"]` query, never from the
 > mutation response. This design keeps that contract untouched.
 
-| Condition | Behaviour |
-|---|---|
-| MCP unreachable | `_unavailable(reason=H1B_MCP_UNAVAILABLE_REASON)` with the 5-minute TTL — **unchanged**. Card shows "Research unavailable" plus a retry affordance; never rendered as `no_match`. |
-| `h1b_mcp_enabled = false` | `GET /api/jobs/{id}` reports `capability: "disabled"`; `POST …/h1b-sponsorship` raises `409 H1B_DISABLED`. The Sponsorship tab is still present and explains how to enable it. Unchanged. |
-| No cache row for the company | `capability: "unavailable"`, "Not checked", button reads `Check H-1B`. |
-| Corrupt `evidence_json` | Row skipped by `load_company_evidence`; card reads as unchecked. Fail closed. |
-| Agent returns >8 periods, duplicate labels, or an oversized label | Whole evidence object rejects → `_unavailable`. |
-| Blank company on manual check | Existing `422 VALIDATION_ERROR`. Unchanged. |
-| Per-run cap reached | Remaining companies stay uncached; picked up next run. Not a failure. |
+| Condition                                                         | Behaviour                                                                                                                                                                                 |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MCP unreachable                                                   | `_unavailable(reason=H1B_MCP_UNAVAILABLE_REASON)` with the 5-minute TTL — **unchanged**. Card shows "Research unavailable" plus a retry affordance; never rendered as `no_match`.         |
+| `h1b_mcp_enabled = false`                                         | `GET /api/jobs/{id}` reports `capability: "disabled"`; `POST …/h1b-sponsorship` raises `409 H1B_DISABLED`. The Sponsorship tab is still present and explains how to enable it. Unchanged. |
+| No cache row for the company                                      | `capability: "unavailable"`, "Not checked", button reads `Check H-1B`.                                                                                                                    |
+| Corrupt `evidence_json`                                           | Row skipped by `load_company_evidence`; card reads as unchecked. Fail closed.                                                                                                             |
+| Agent returns >4 periods, duplicate labels, or an oversized label | Whole evidence object rejects → `_unavailable`.                                                                                                                                           |
+| Blank company on manual check                                     | Existing `422 VALIDATION_ERROR`. Unchanged.                                                                                                                                               |
+| Per-run cap reached                                               | Never-cached companies remain unchecked; expired rows remain visible as stale and are refreshed on a later run. Not a failure.                                                            |
 
 ---
 
@@ -411,15 +438,18 @@ opened once. A test pins the label rendering before any interaction.
   disagrees with the sum of its parts, and does the same for `certified_count`
   and `denied_count`.
 - A metric that **no** period reports rolls up to `None`, not `0`.
-- Period cap (>8) and duplicate labels reject the evidence object.
+- Period cap (>4) and duplicate labels reject the evidence object; legacy flat
+  totals also reject `certified_count + denied_count > filing_count`.
 - `H1BSponsorshipEvidenceOut.from_evidence` projects `periods` and
   `denied_count` onto the wire in camelCase.
 - `stale` flips exactly at `expires_at`.
 - Widened enrichment covers non-`silent` companies **while** `run_score`'s
   `sponsorship_evidence` map still contains only `silent` jobs — the regression
-  guard for scoring behaviour.
-- The per-run cap selects deterministically (most jobs first, then name) and
-  cache hits do not consume it.
+  guard for scoring behaviour. All researched/cache-hit jobs receive only the
+  provenance pointer.
+- The per-run cap selects deterministically (most jobs first, then name), fresh
+  cache hits do not consume it, all-fresh runs still reach the scorer, and a
+  stale row deferred by the cap does not.
 
 ### Contract
 
@@ -432,16 +462,18 @@ Regenerate with `bash scripts/gen_ts_client.sh`;
   `SelectValue` regression).
 - Selecting a quarter changes the tiles but **not** the status banner.
 - A `periods: []` result renders the flat view with no selector.
-- A stale row shows the warning and still shows tiles.
+- A stale row — including the flat legacy fallback — shows the warning and still
+  shows its available tiles.
 - `JobModal` exposes exactly the six new tabs and no `Application` or
   `Management` trigger.
 - `TrackingTab` renders both editors and the fenced delete; delete stays
-  disabled when `hasProgress`.
+  disabled when `hasProgress` and closes the modal only after mutation success.
 
 ### Board N+1 pin
 
-A test asserting the board list resolves H-1B status without per-row queries,
-mirroring `test_shortlist_and_triage_rows_never_touch_jd_text`.
+A test exercising the production `services.board.list_board` path for each board
+proves H-1B status resolves without per-row queries, mirroring
+`test_shortlist_and_triage_rows_never_touch_jd_text`.
 
 ---
 

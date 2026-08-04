@@ -123,7 +123,7 @@ def _h1b_sponsorship_response(
         )
     # Expired evidence still renders -- historical filings do not rot. The server
     # owns "now" for every other TTL decision, so it owns this label too.
-    stale = evidence.expires_at <= (now or datetime.now(timezone.utc))
+    stale = not evidence.is_fresh(now or datetime.now(timezone.utc))
     if evidence.status == "unavailable":
         return H1BSponsorshipOut(
             capability="unavailable",

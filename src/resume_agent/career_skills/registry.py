@@ -7,6 +7,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 import yaml
@@ -263,7 +264,54 @@ def resolve_skill(
     )
 
 
+_Fingerprint = tuple[tuple[str, int, int], ...] | None
+_registry_cache: dict[tuple[Path, Path], tuple[_Fingerprint, CareerSkillRegistry]] = {}
+_registry_cache_lock = Lock()
+
+
+def _fingerprint(root: Path, manifest_path: Path) -> _Fingerprint:
+    """Cheap on-disk signature that changes whenever a load-affecting file does.
+
+    Stats only (mtime + size) rather than the read-and-hash `_load` does for
+    every SKILL.md, so a cache hit costs one stat per manifest entry instead of
+    hashing every skill's full contents on every call.
+    """
+    try:
+        manifest_stat = manifest_path.stat()
+    except OSError:
+        return None
+    parts: list[tuple[str, int, int]] = [
+        ("__manifest__", manifest_stat.st_mtime_ns, manifest_stat.st_size)
+    ]
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = SkillManifest.model_validate(payload)
+    except Exception:
+        return tuple(parts)
+    for name, entry in sorted(manifest.skills.items()):
+        try:
+            skill_file = _confined_skill_path(root, entry.skill_path)
+            stat = skill_file.stat()
+            parts.append((name, stat.st_mtime_ns, stat.st_size))
+        except (OSError, ValueError):
+            parts.append((name, -1, -1))
+    return tuple(parts)
+
+
 def registry_for_paths(root: Path | str, manifest: Path | str) -> CareerSkillRegistry:
     root_path = Path(root).expanduser().resolve(strict=False)
     manifest_path = Path(manifest).expanduser().resolve(strict=False)
-    return CareerSkillRegistry._load(root_path, manifest_path)
+    key = (root_path, manifest_path)
+    # The whole check-load-write sequence stays under one critical section
+    # (mirroring the prior SkilledAgentPool.get contract) so two threads
+    # racing a file change can't finish out of order and let the slower
+    # (staler) load overwrite a fresher entry a concurrent caller already
+    # published for the same key.
+    with _registry_cache_lock:
+        fingerprint = _fingerprint(root_path, manifest_path)
+        cached = _registry_cache.get(key)
+        if cached is not None and cached[0] == fingerprint:
+            return cached[1]
+        registry = CareerSkillRegistry._load(root_path, manifest_path)
+        _registry_cache[key] = (fingerprint, registry)
+        return registry

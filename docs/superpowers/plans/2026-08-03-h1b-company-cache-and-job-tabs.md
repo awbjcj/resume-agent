@@ -4,7 +4,7 @@
 
 **Goal:** Make the per-company H-1B cache the single display source for every job card, add a selectable per-quarter breakdown over the last four fiscal quarters, and split the job-detail tabs into `Tracking` (stage + application + delete) and `Sponsorship`.
 
-**Architecture:** A company-level cache table (`h1b_company_evidence`) already exists and is already populated; the defect is that every read path goes through a *per-job frozen snapshot* in `Job.analysis_meta_json`. This plan introduces one batched read seam (`h1b/cache.py::load_company_evidence`), points the job detail and all three board row projections at it, retires the snapshot, extends the evidence model with a per-period breakdown whose rollup is **derived server-side rather than trusted from the model**, widens discovery research to every surviving job's company under a per-run spend cap, and restructures the job-modal tabs.
+**Architecture:** A company-level cache table (`h1b_company_evidence`) already exists and is already populated; the defect is that every read path goes through a _per-job frozen snapshot_ in `Job.analysis_meta_json`. This plan introduces one batched read seam (`h1b/cache.py::load_company_evidence`), points the job detail and all three board row projections at it, retires the snapshot, extends the evidence model with a per-period breakdown whose rollup is **derived server-side rather than trusted from the model**, widens discovery research to every surviving job's company under a per-run spend cap, and restructures the job-modal tabs.
 
 **Tech Stack:** Python 3.13, FastAPI, SQLModel/SQLAlchemy, Pydantic v2, pytest · React 19, TypeScript, TanStack Query, Base UI, Tailwind, Vitest + Testing Library + msw
 
@@ -17,13 +17,45 @@
 - **Backend tests:** `.venv/Scripts/python.exe -m pytest` (offline — no API key, no network). All agent calls are faked.
 - **Lint:** `ruff check` must pass before every commit.
 - **Web tests:** run from the `web/` directory: `npx vitest run <path>`.
-- **Contract regeneration:** after ANY change to `api/schemas/*`, run `bash scripts/gen_ts_client.sh` and commit `contracts/openapi.json` + `contracts/ts/api.ts`. `tests/api/test_openapi_contract.py` is a drift gate and will fail if you skip this.
+- **Contract regeneration:** after ANY change to `api/schemas/*`, run `bash scripts/gen_ts_client.sh` and commit `contracts/openapi.json` + `contracts/ts/api.ts` + the copied SPA schema `web/src/lib/api/schema.ts`. `tests/api/test_openapi_contract.py` is a drift gate and will fail if you skip this. If the Windows Bash wrapper fails before generation because of CRLF/`pipefail`, run the script's equivalent explicitly: `.venv/Scripts/python.exe scripts/export_openapi.py`, `npx --yes openapi-typescript contracts/openapi.json -o contracts/ts/api.ts`, then `Copy-Item contracts/ts/api.ts web/src/lib/api/schema.ts -Force`.
 - **Wire format is camelCase.** Python stays snake_case; `CamelModel` (`api/schemas/base.py`) sets `alias_generator=to_camel`. Never hand-write a camelCase Python field.
 - **The caveat string is fixed.** `HISTORICAL_ONLY_CAVEAT` must appear verbatim in every `H1BSponsorshipEvidence`; the model validator rejects anything else. Copy it from `h1b/models.py`, never retype it.
 - **Additive schema only.** `periods` and `denied_count` default to empty/`None` so every existing `evidence_json` payload still validates. There is **no database migration in this plan**.
-- **Never auto-refresh.** No code path added here may trigger an LLM call as a side effect of *rendering* or *reading*. Refresh happens only from the explicit manual check or a discovery run.
+- **Never auto-refresh.** No code path added here may trigger an LLM call as a side effect of _rendering_ or _reading_. Refresh happens only from the explicit manual check or a discovery run.
 - **Baseline — the manual check is already a background run.** `POST /api/jobs/{job_id}/h1b-sponsorship` returns `202 RunOut` via the launch seam with `singleton_key=f"h1b-sponsorship:{job_id}"`; the panel derives checking/failed state from the run store via `latestArtifactRun(runs, "h1bSponsorship", "jobId", jobId)`, and evidence arrives only through the invalidated `["job"]` query. **Do not convert this back to a synchronous call.**
-- **`normalize_company(value) -> str | None`** — it can return `None` *or* an empty string. Always guard truthiness, never just `is not None`.
+- **`normalize_company(value) -> str | None`** — it can return `None` _or_ an empty string. Always guard truthiness, never just `is not None`.
+
+---
+
+## Correctness Amendments (normative)
+
+These rules resolve the plan/spec edge cases below. They override any earlier
+illustrative snippet that conflicts with them.
+
+1. **Four means four.** `periods` accepts at most four entries, not eight. The
+   derived fields are the three counts only; a report-level `wage_summary` is
+   not mathematically roll-upable. For legacy flat evidence, all three present
+   counts must satisfy `certified_count + denied_count <= filing_count`.
+2. **Only one cache read per rendered surface.** `services.board.list_board`
+   reaches `project_shortlist_jobs`, `project_pipeline_jobs`, or
+   `project_triage_jobs`, so every production projector must receive a map built
+   from its materialized page. `job_detail_row` must not perform a second
+   status-only read: the router performs the one full-evidence detail lookup.
+3. **Freshness has two meanings.** `load_company_evidence` returns expired rows
+   for display. Discovery must derive a separate `fresh_by_company` map
+   (`expires_at > now`) for cap and scoring decisions; an expired row deferred
+   by the cap is displayable but never scorer input.
+4. **No-work is still useful work.** If all companies are fresh, skip the
+   enricher call but build the silent-job scoring map from `fresh_by_company`.
+   Never return `{}` before that mapping. Update `h1b_evidence_id` for every
+   in-scope job with available evidence; return evidence only for `silent` jobs.
+5. **The period UI is resilient to query refreshes.** Use `periods` (not
+   `fiscalPeriods`) whenever periods exist, render stale status independently of
+   the selector, omit the denied metric in the legacy flat fallback, and coerce
+   a selected period that vanished after a refetch back to the rollup.
+6. **Regeneration has three outputs.** `gen_ts_client.sh` also copies
+   `contracts/ts/api.ts` to `web/src/lib/api/schema.ts`; commit and review that
+   local generated copy with `contracts/openapi.json` and `contracts/ts/api.ts`.
 
 ---
 
@@ -31,29 +63,31 @@
 
 **Created**
 
-| Path | Responsibility |
-|---|---|
-| `src/resume_agent/h1b/cache.py` | The only batched read seam over `h1b_company_evidence`. |
-| `tests/test_h1b_cache.py` | Batching, corruption tolerance, expiry passthrough. |
-| `tests/test_h1b_enrichment_scope.py` | Widened research set, narrow scoring map, per-run cap. `run_h1b_enrichment` currently has **zero** test coverage. |
-| `web/src/features/job/TrackingTab.tsx` | Composes stage + application + danger zone. |
-| `web/src/features/job/TrackingTab.test.tsx` | Tab composition and delete gating. |
+| Path                                        | Responsibility                                                                                                    |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `src/resume_agent/h1b/cache.py`             | The only batched read seam over `h1b_company_evidence`.                                                           |
+| `tests/test_h1b_cache.py`                   | Batching, corruption tolerance, expiry passthrough.                                                               |
+| `tests/test_h1b_enrichment_scope.py`        | Widened research set, narrow scoring map, per-run cap. `run_h1b_enrichment` currently has **zero** test coverage. |
+| `web/src/features/job/TrackingTab.tsx`      | Composes stage + application + danger zone.                                                                       |
+| `web/src/features/job/TrackingTab.test.tsx` | Tab composition and delete gating.                                                                                |
 
 **Modified**
 
-| Path | Change |
-|---|---|
-| `src/resume_agent/h1b/models.py` | `H1BPeriodStat`; `periods` + `denied_count` on evidence; derived rollup. |
-| `src/resume_agent/h1b/service.py` | Quarter instructions; `schema_version = 2`; stop writing the snapshot. |
-| `src/resume_agent/api/schemas/jobs.py` | `H1BPeriodStatOut`; `periods`/`deniedCount` on evidence out; `stale` on `H1BSponsorshipOut`. |
-| `src/resume_agent/api/routers/jobs.py` | `_job_detail_response` reads the cache; `_h1b_sponsorship_response` computes `stale`. |
-| `src/resume_agent/tracking/queries.py` | Three row projections take a batched evidence map. |
-| `src/resume_agent/services/discovery.py` | Widen research; keep scoring map narrow; apply cap; stop writing the snapshot. |
-| `src/resume_agent/config.py` | `h1b_enrich_max_companies_per_run`. |
-| `web/src/features/job/H1BSponsorshipPanel.tsx` | Period selector, stale label, shared-cache notice. |
-| `web/src/features/job/StageManager.tsx` | Delete moves out to the danger zone. |
-| `web/src/components/JobModal.tsx` | Tab restructure. |
-| `CLAUDE.md` | Document the cache-is-truth invariant. |
+| Path                                           | Change                                                                                                         |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `src/resume_agent/h1b/models.py`               | `H1BPeriodStat`; `periods` + `denied_count` on evidence; derived rollup.                                       |
+| `src/resume_agent/h1b/service.py`              | Quarter instructions; `schema_version = 2`; stop writing the snapshot.                                         |
+| `src/resume_agent/api/schemas/jobs.py`         | `H1BPeriodStatOut`; `periods`/`deniedCount` on evidence out; `stale` on `H1BSponsorshipOut`.                   |
+| `src/resume_agent/api/routers/jobs.py`         | `_job_detail_response` reads the cache; `_h1b_sponsorship_response` computes `stale`.                          |
+| `src/resume_agent/tracking/queries.py`         | Three row projections take a batched evidence map; detail avoids a redundant status-only lookup.               |
+| `src/resume_agent/services/board.py`           | Pass the DB session to the paginated shortlist projector so the production path can batch-load cache evidence. |
+| `src/resume_agent/services/discovery.py`       | Widen research; keep scoring map narrow; apply cap; stop writing the snapshot.                                 |
+| `src/resume_agent/config.py`                   | `h1b_enrich_max_companies_per_run`.                                                                            |
+| `web/src/features/job/H1BSponsorshipPanel.tsx` | Period selector, stale label, shared-cache notice.                                                             |
+| `web/src/features/job/StageManager.tsx`        | Delete moves out to the danger zone.                                                                           |
+| `web/src/components/JobModal.tsx`              | Tab restructure.                                                                                               |
+| `web/src/lib/api/schema.ts`                    | Generated SPA copy of the OpenAPI TypeScript contract.                                                         |
+| `CLAUDE.md`                                    | Document the cache-is-truth invariant.                                                                         |
 
 **Task dependency order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12
 
@@ -62,14 +96,16 @@
 ### Task 1: Per-period evidence model with a derived rollup
 
 **Files:**
+
 - Modify: `src/resume_agent/h1b/models.py`
 - Test: `tests/test_h1b_models.py` (create)
 
 **Interfaces:**
+
 - Consumes: nothing (first task).
 - Produces: `H1BPeriodStat(period, filing_count, certified_count, denied_count, wage_summary)`; `H1BSponsorshipEvidence.periods: list[H1BPeriodStat]`; `H1BSponsorshipEvidence.denied_count: int | None`. Tasks 2–9 depend on these exact names.
 
-**Why this matters:** the rollup is *derived, never trusted*. A model that returns `filing_count=999` alongside four quarters summing to 412 must not be able to put two contradicting numbers on screen. This is the same posture as `_project_domains` capping clustered domains rather than believing the model.
+**Why this matters:** the rollup is _derived, never trusted_. A model that returns `filing_count=999` alongside four quarters summing to 412 must not be able to put two contradicting numbers on screen. This is the same posture as `_project_domains` capping clustered domains rather than believing the model.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -149,10 +185,10 @@ def test_duplicate_period_labels_reject():
         )
 
 
-def test_more_than_eight_periods_reject():
+def test_more_than_four_periods_reject():
     with pytest.raises(ValidationError):
         _evidence(
-            periods=[H1BPeriodStat(period=f"FY-Q{i}", filing_count=1) for i in range(9)],
+            periods=[H1BPeriodStat(period=f"FY-Q{i}", filing_count=1) for i in range(5)],
         )
 
 
@@ -173,6 +209,11 @@ def test_period_rejects_outcomes_exceeding_filings():
 def test_denied_count_cannot_exceed_filing_count_without_periods():
     with pytest.raises(ValidationError):
         _evidence(filing_count=2, denied_count=3)
+
+
+def test_legacy_total_rejects_combined_outcomes_over_filings():
+    with pytest.raises(ValidationError):
+        _evidence(filing_count=2, certified_count=1, denied_count=2)
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -224,7 +265,7 @@ Add immediately after the existing `certified_count` line:
 
 ```python
     denied_count: int | None = Field(default=None, ge=0)
-    periods: list[H1BPeriodStat] = Field(default_factory=list, max_length=8)
+    periods: list[H1BPeriodStat] = Field(default_factory=list, max_length=4)
 ```
 
 - [ ] **Step 5: Derive the rollup inside the existing contract validator**
@@ -253,13 +294,20 @@ Replace the body of `validate_historical_contract` with:
         if self.denied_count is not None and self.filing_count is not None:
             if self.denied_count > self.filing_count:
                 raise ValueError("denied_count cannot exceed filing_count")
+        if (
+            self.filing_count is not None
+            and self.certified_count is not None
+            and self.denied_count is not None
+            and self.certified_count + self.denied_count > self.filing_count
+        ):
+            raise ValueError("certified_count + denied_count cannot exceed filing_count")
         return self
 ```
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_h1b_models.py -q`
-Expected: PASS (8 passed)
+Expected: PASS (9 passed)
 
 - [ ] **Step 7: Verify nothing else regressed, then lint**
 
@@ -278,10 +326,12 @@ git commit -m "feat: add per-quarter H-1B evidence with a derived rollup"
 ### Task 2: Batched company-cache read seam
 
 **Files:**
+
 - Create: `src/resume_agent/h1b/cache.py`
 - Test: `tests/test_h1b_cache.py` (create)
 
 **Interfaces:**
+
 - Consumes: `H1BSponsorshipEvidence` (Task 1).
 - Produces: `load_company_evidence(session: Session, companies: Sequence[str | None]) -> dict[str, H1BSponsorshipEvidence]`. Tasks 4, 5, and 8 all call this exact signature.
 
@@ -370,6 +420,16 @@ def test_expired_rows_are_returned_not_filtered():
     with Session(engine) as session:
         loaded = load_company_evidence(session, ["Acme, Inc."])
     assert loaded["acme"].status == "matched"
+
+
+def test_schema_version_one_row_deserializes_with_empty_periods():
+    engine = _engine()
+    with Session(engine) as session:
+        # `_seed` uses H1BCompanyEvidence.schema_version's persisted default: 1.
+        _seed(session, "acme")
+    with Session(engine) as session:
+        loaded = load_company_evidence(session, ["Acme, Inc."])
+    assert loaded["acme"].periods == []
 
 
 def test_corrupt_row_is_skipped_not_raised():
@@ -475,7 +535,7 @@ def load_company_evidence(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_h1b_cache.py -q`
-Expected: PASS (4 passed)
+Expected: PASS (5 passed)
 
 - [ ] **Step 5: Lint and commit**
 
@@ -490,11 +550,13 @@ git commit -m "feat: add batched H-1B company cache read seam"
 ### Task 3: Project periods, denied count, and staleness onto the wire
 
 **Files:**
+
 - Modify: `src/resume_agent/api/schemas/jobs.py:169-193`
 - Modify: `src/resume_agent/api/routers/jobs.py:114-131`
 - Test: `tests/api/test_job_h1b_detail.py` (create)
 
 **Interfaces:**
+
 - Consumes: `H1BSponsorshipEvidence.periods`, `.denied_count` (Task 1).
 - Produces: `H1BPeriodStatOut`; `H1BSponsorshipEvidenceOut.periods`, `.denied_count`; `H1BSponsorshipOut.stale: bool`; `_h1b_sponsorship_response(evidence, *, now=None)`. Task 9 consumes the camelCase wire names `periods`, `deniedCount`, `stale`.
 
@@ -553,6 +615,14 @@ def test_expired_evidence_is_stale():
     assert _h1b_sponsorship_response(_evidence(expires_in_days=-1)).stale is True
 
 
+def test_stale_flips_exactly_at_expiry():
+    evidence = _evidence(expires_in_days=1)
+    assert _h1b_sponsorship_response(
+        evidence, now=evidence.expires_at - timedelta(microseconds=1)
+    ).stale is False
+    assert _h1b_sponsorship_response(evidence, now=evidence.expires_at).stale is True
+
+
 def test_missing_evidence_is_not_stale():
     out = _h1b_sponsorship_response(None)
     assert out.capability == "unavailable"
@@ -581,7 +651,7 @@ Then add these two lines to `H1BSponsorshipEvidenceOut`, immediately after `cert
 
 ```python
     denied_count: int | None = None
-    periods: list[H1BPeriodStatOut] = []
+    periods: list[H1BPeriodStatOut] = Field(default_factory=list)
 ```
 
 And add this line to `H1BSponsorshipOut`, after `capability`:
@@ -631,7 +701,7 @@ from datetime import datetime, timezone
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/api/test_job_h1b_detail.py -q`
-Expected: PASS (4 passed)
+Expected: PASS (5 passed)
 
 - [ ] **Step 6: Regenerate the TypeScript contract**
 
@@ -644,7 +714,8 @@ Expected: PASS
 ```bash
 ruff check
 git add src/resume_agent/api/schemas/jobs.py src/resume_agent/api/routers/jobs.py \
-        tests/api/test_job_h1b_detail.py contracts/openapi.json contracts/ts/api.ts
+        tests/api/test_job_h1b_detail.py contracts/openapi.json contracts/ts/api.ts \
+        web/src/lib/api/schema.ts
 git commit -m "feat: expose H-1B periods, denied count, and staleness on the API"
 ```
 
@@ -653,12 +724,14 @@ git commit -m "feat: expose H-1B periods, denied count, and staleness on the API
 ### Task 4: Job detail reads the company cache
 
 **Files:**
+
 - Modify: `src/resume_agent/api/routers/jobs.py:94-106`
 - Test: `tests/api/test_job_h1b_detail.py` (extend)
 
 **Interfaces:**
+
 - Consumes: `load_company_evidence` (Task 2), `_h1b_sponsorship_response` (Task 3).
-- Produces: no new symbols. Behaviour: `GET /api/jobs/{id}` reports evidence for any job whose *company* is cached, regardless of whether that job was ever researched.
+- Produces: no new symbols. Behaviour: `GET /api/jobs/{id}` reports evidence for any job whose _company_ is cached, regardless of whether that job was ever researched.
 
 **Why this matters:** this is the defect the user reported. Job B at Stripe currently reads "not checked" while a fresh answer for Stripe sits one query away.
 
@@ -772,12 +845,15 @@ git commit -m "fix: read H-1B evidence from the company cache on job detail"
 ### Task 5: Board row projections read the cache, batched
 
 **Files:**
-- Modify: `src/resume_agent/tracking/queries.py:152-163, 191-227, 230-255, 258-275, 278-290, 318-393, 415-432, 435+`
+
+- Modify: `src/resume_agent/tracking/queries.py:152-163, 191-227, 230-255, 258-275, 278-290, 318-393, 415-465`
+- Modify: `src/resume_agent/services/board.py:107-114`
 - Test: `tests/test_board_h1b_status.py` (create)
 
 **Interfaces:**
+
 - Consumes: `load_company_evidence` (Task 2).
-- Produces: `_h1b_sponsorship_status(job, evidence_by_company)`; `_shortlist_row(job, tokens, aliases, evidence_by_company)`; `_triage_row(job, progressed, evidence_by_company)`. All public entry points (`shortlist_rows`, `job_facets`, `job_detail_row`, `pipeline_rows`, `triage_rows`) keep their existing signatures.
+- Produces: `_h1b_sponsorship_status(job, evidence_by_company)`; `_shortlist_row(job, tokens, aliases, evidence_by_company)`; `_triage_row(job, progressed, evidence_by_company)`. The public row APIs keep their existing signatures. The internal paginated shortlist projector changes to `project_shortlist_jobs(session, jobs, ...)`, because `services.board.list_board` is the real production caller and must load one map for its page.
 
 **Why this matters:** three call sites read the snapshot. If the detail card and the list badge disagree, that is a bug users will report. The map must be built **once per call**, not per row.
 
@@ -793,7 +869,7 @@ from sqlmodel import Session
 
 from resume_agent.db import init_db, make_engine
 from resume_agent.h1b.models import HISTORICAL_ONLY_CAVEAT, H1BSponsorshipEvidence
-from resume_agent.tracking.queries import shortlist_rows
+from resume_agent.services.board import list_board
 from resume_agent.tracking.tables import H1BCompanyEvidence, Job, JobStatus
 
 
@@ -818,7 +894,7 @@ def _seed_evidence(session: Session, company: str) -> None:
     )
 
 
-def test_shortlist_rows_resolve_h1b_status_in_one_query():
+def test_production_shortlist_page_resolves_h1b_status_in_one_query():
     engine = make_engine("sqlite://")
     init_db(engine)
     with Session(engine) as session:
@@ -845,7 +921,9 @@ def test_shortlist_rows_resolve_h1b_status_in_one_query():
     event.listen(engine, "before_cursor_execute", record)
     try:
         with Session(engine) as session:
-            rows = shortlist_rows(session)
+            rows = list_board(
+                session, "shortlist", with_facets=False
+            ).page.data
     finally:
         event.remove(engine, "before_cursor_execute", record)
 
@@ -853,6 +931,12 @@ def test_shortlist_rows_resolve_h1b_status_in_one_query():
     assert all(row.h1b_sponsorship_status == "matched" for row in rows)
     assert len(statements) == 1, "board rows must not issue one H-1B query per row"
 ```
+
+Add equivalent focused cases for the `pipeline` and `triage` values of
+`list_board` (using jobs in each board's selectable statuses). The cache-query
+assertion applies to each case. Calling `shortlist_rows()` alone is insufficient:
+the API board route calls `services.board.list_board()` and previously bypassed
+the plan's proposed shortlist map.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -886,69 +970,75 @@ from resume_agent.taxonomy.industries import normalize_company
 
 (`H1BSponsorshipEvidence` is already imported at line 11. If `normalize_company` is already imported, do not duplicate it.)
 
-- [ ] **Step 4: Thread the map through the three row builders**
+- [ ] **Step 4: Thread one map through the actual page projectors**
 
-Change `_shortlist_row`'s signature and its `h1b_sponsorship_status=` argument:
-
-```python
-def _shortlist_row(
-    job: Job,
-    tokens: set[str],
-    aliases: dict[str, str],
-    evidence_by_company: Mapping[str, H1BSponsorshipEvidence],
-) -> ShortlistRow:
-```
+Change `_shortlist_row` and `_triage_row` to accept
+`Mapping[str, H1BSponsorshipEvidence]`, and pass that map to
+`_h1b_sponsorship_status`. Add one small private helper so the three projectors
+cannot drift into subtly different cache behavior:
 
 ```python
-        h1b_sponsorship_status=_h1b_sponsorship_status(job, evidence_by_company),
+def _company_evidence(
+    session: Session, jobs: Sequence[Job]
+) -> Mapping[str, H1BSponsorshipEvidence]:
+    return load_company_evidence(session, [job.company for job in jobs])
 ```
 
-Change `_triage_row` the same way:
+Use it exactly once in each materialized-page projector:
 
 ```python
-def _triage_row(
-    job: Job,
-    progressed: set[int],
-    evidence_by_company: Mapping[str, H1BSponsorshipEvidence],
-) -> TriageRow:
+def project_shortlist_jobs(
+    session: Session,
+    jobs: Sequence[Job],
+    *,
+    facts: ProfileFacts | None = None,
+    aliases_path: str | Path = SKILL_ALIASES_PATH,
+) -> list[ShortlistRow]:
+    tokens = profile_skill_tokens(facts) if facts is not None else set()
+    aliases = load_aliases(aliases_path)
+    evidence_by_company = _company_evidence(session, jobs)
+    return [
+        _shortlist_row(job, tokens, aliases, evidence_by_company) for job in jobs
+    ]
 ```
 
-And in the pipeline row builder (around line 390), pass the map into the same keyword argument.
+Do the same before the row loops in `project_pipeline_jobs` and
+`project_triage_jobs`. `archived_rows` already uses `project_triage_jobs`, so it
+inherits the same batched behavior without a fourth implementation.
 
-- [ ] **Step 5: Build the map once in each public entry point**
+- [ ] **Step 5: Update every caller, without adding a duplicate detail read**
 
-In `shortlist_rows`, after the `jobs = session.exec(...)` list is materialized and before the return:
-
-```python
-    evidence_by_company = load_company_evidence(session, [job.company for job in jobs])
-    return [_shortlist_row(job, tokens, aliases, evidence_by_company) for job in jobs]
-```
-
-In `job_facets` and `job_detail_row` (single job each):
-
-```python
-    evidence_by_company = load_company_evidence(session, [job.company])
-```
-
-then pass it as the fourth argument to `_shortlist_row`.
-
-In `pipeline_rows` and `triage_rows`, build the map from the materialized job list the same way as `shortlist_rows` before the row loop, and pass it into each row builder.
+- `shortlist_rows` calls `project_shortlist_jobs(session, jobs, ...)`.
+- `services/board.py::list_board` calls
+  `project_shortlist_jobs(session, jobs, facts=facts)`. This is the missing
+  production path; without it the paginated shortlist API either fails the new
+  signature or keeps reading no cache evidence.
+- `job_facets` builds `_company_evidence(session, [job])` once before calling
+  `_shortlist_row`.
+- `job_detail_row` passes an empty map to `_shortlist_row`. Its inherited
+  `h1b_sponsorship_status` is not part of `JobDetail`; the router's Task 4
+  full-evidence lookup is authoritative and must remain the only cache query for
+  a job-detail request.
+- `pipeline_rows`, `triage_rows`, and `archived_rows` keep their public
+  signatures and delegate to their updated projectors.
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_board_h1b_status.py -q`
-Expected: PASS (1 passed)
+Expected: PASS (3 passed — shortlist, pipeline, and triage production pages)
 
 - [ ] **Step 7: Run the surrounding suites**
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_board_query.py tests/api -q`
-Expected: PASS. If a test file name differs, run `.venv/Scripts/python.exe -m pytest -q -k "board or triage or pipeline"`.
+Run: `.venv/Scripts/python.exe -m pytest tests/tracking/test_board_query.py tests/api -q`
+Expected: PASS. The board query test lives under `tests/tracking/`; do not hide a
+bad path behind a broad `-k` fallback.
 
 - [ ] **Step 8: Lint and commit**
 
 ```bash
 ruff check
-git add src/resume_agent/tracking/queries.py tests/test_board_h1b_status.py
+git add src/resume_agent/tracking/queries.py src/resume_agent/services/board.py \
+        tests/test_board_h1b_status.py
 git commit -m "fix: resolve board H-1B status from the batched company cache"
 ```
 
@@ -957,11 +1047,14 @@ git commit -m "fix: resolve board H-1B status from the batched company cache"
 ### Task 6: Retire the per-job evidence snapshot
 
 **Files:**
+
 - Modify: `src/resume_agent/h1b/service.py:431-442`
 - Modify: `src/resume_agent/services/discovery.py:143-151`
 - Test: `tests/test_h1b_service.py` (extend)
+- Test: `tests/test_h1b_enrichment_scope.py` (assert the discovery path too; created in Task 8)
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: no new symbols. Behaviour: `JobAnalysisMeta.h1b_evidence_snapshot` is never written; `h1b_evidence_id` still is.
 
@@ -975,7 +1068,12 @@ Append to `tests/test_h1b_service.py`:
 def test_manual_check_records_the_cache_pointer_but_no_snapshot():
     engine = make_engine("sqlite://")
     init_db(engine)
-    settings = Settings(_env_file=None, h1b_mcp_enabled=True)  # type: ignore[call-arg]
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
 
     @asynccontextmanager
     async def fake_tools(_settings, **_kwargs):
@@ -1010,6 +1108,12 @@ def test_manual_check_records_the_cache_pointer_but_no_snapshot():
 
 > **Note for the implementer:** `FakeRunner` returns evidence for company `"acme"`, which is what `normalize_company("Acme, Inc.")` produces — that match is required or `_agent_output` raises.
 
+The manual-path test is not sufficient by itself: Task 8 must also assert that
+the widened discovery path leaves `h1b_evidence_snapshot` absent for both a
+`silent` and a non-`silent` job while retaining the appropriate provenance
+pointer. This prevents the later loop rewrite from quietly reintroducing the
+retired payload.
+
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_h1b_service.py -q -k snapshot`
@@ -1017,7 +1121,9 @@ Expected: FAIL — `h1b_evidence_snapshot` is a dict, not `None`
 
 - [ ] **Step 3: Stop writing the snapshot in the manual path**
 
-In `src/resume_agent/h1b/service.py::check_job_sponsorship`, delete this line:
+In `src/resume_agent/h1b/service.py::check_job_sponsorship`, delete this line
+and update its docstring from “attach its snapshot” to “record cache
+provenance”:
 
 ```python
     meta.h1b_evidence_snapshot = evidence.model_dump(mode="json")
@@ -1051,10 +1157,12 @@ git commit -m "refactor: stop writing the per-job H-1B evidence snapshot"
 ### Task 7: Research the last four quarters
 
 **Files:**
+
 - Modify: `src/resume_agent/h1b/service.py:103-140` (agent instructions), `:374-388` (persistence)
 - Test: `tests/test_h1b_service.py` (extend)
 
 **Interfaces:**
+
 - Consumes: `H1BPeriodStat` (Task 1).
 - Produces: cache rows written with `schema_version = 2`.
 
@@ -1066,14 +1174,23 @@ Append to `tests/test_h1b_service.py`:
 
 ```python
 def test_sponsorship_agent_is_instructed_to_collect_four_quarters():
-    settings = Settings(_env_file=None, h1b_mcp_enabled=True)  # type: ignore[call-arg]
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
     from resume_agent.h1b.service import DefaultSponsorshipAgentFactory
 
     runner = DefaultSponsorshipAgentFactory(settings).build(tools=None)
-    instructions = " ".join(runner.agent.instructions)
+    # AgentRunner intentionally narrows the public runner API; tests in this
+    # repository inspect its wrapped agent for prompt-contract assertions.
+    instructions = " ".join(runner._agent.instructions)
     assert "get_available_data" in instructions
     assert "four most recent" in instructions
     assert "periods" in instructions
+    assert runner.run_meta is not None
+    assert runner.run_meta.prompt_policy_version == "h1b-sponsorship-research-v2"
 
 
 def test_persisted_rows_are_written_at_schema_version_two():
@@ -1082,7 +1199,12 @@ def test_persisted_rows_are_written_at_schema_version_two():
 
     engine = make_engine("sqlite://")
     init_db(engine)
-    settings = Settings(_env_file=None, h1b_mcp_enabled=True)  # type: ignore[call-arg]
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        h1b_mcp_enabled=True,
+        h1b_mcp_transport="stdio",
+        h1b_mcp_command="server",
+    )
 
     @asynccontextmanager
     async def fake_tools(_settings, **_kwargs):
@@ -1124,10 +1246,21 @@ Expected: FAIL — instruction text absent; `schema_version` is `1`
 In `DefaultSponsorshipAgentFactory.build`, add these three strings to the `with_guidance(...)` list, after the existing "Return one validated evidence object…" line:
 
 ```python
-                    "Call get_available_data first, then report the four most recent fiscal quarters it lists.",
+                    "When get_available_data is exposed, use it to identify the four most recent fiscal quarters.",
                     "Fill periods with one entry per quarter, newest first, using that quarter's own filing_count, certified_count, denied_count, and wage_summary.",
                     "If the source cannot break figures down by quarter, return periods as an empty list rather than guessing or repeating the total.",
 ```
+
+The tool surface is intentionally unverified. “When ... is exposed” preserves
+the `periods: []` degradation path instead of turning a missing optional tool
+into an agent failure.
+
+- [ ] **Step 3b: Version the changed prompt policy**
+
+In the returned `AgentRunMeta`, change
+`prompt_policy_version="h1b-sponsorship-research-v1"` to
+`"h1b-sponsorship-research-v2"`. Prompt-policy metadata must change with a
+behavioural prompt contract, not merely with its output schema.
 
 - [ ] **Step 4: Write the schema version on persist**
 
@@ -1160,11 +1293,13 @@ git commit -m "feat: research the four most recent H-1B fiscal quarters"
 ### Task 8: Widen discovery research under a per-run cap
 
 **Files:**
+
 - Modify: `src/resume_agent/config.py:78`
 - Modify: `src/resume_agent/services/discovery.py:94-158`
 - Test: `tests/test_h1b_enrichment_scope.py` (create)
 
 **Interfaces:**
+
 - Consumes: `load_company_evidence` (Task 2).
 - Produces: `Settings.h1b_enrich_max_companies_per_run: int`. **`run_h1b_enrichment` keeps its exact current signature and return type** — `dict[int, H1BSponsorshipEvidence]`. `discovery/pipeline.py` needs no change.
 
@@ -1276,7 +1411,7 @@ def test_nothing_is_researched_when_sponsorship_is_not_required():
     assert enricher.seen == []
 
 
-def test_fresh_cache_hits_still_reach_the_scorer(tmp_path):
+def test_fresh_cache_hits_still_reach_the_scorer():
     """A company already cached is not re-researched but must still score."""
     engine = make_engine("sqlite://")
     init_db(engine)
@@ -1284,27 +1419,39 @@ def test_fresh_cache_hits_still_reach_the_scorer(tmp_path):
     enricher = RecordingEnricher()
 
     now = datetime.now(timezone.utc)
-    evidence = _evidence("acme")
+    acme_evidence = _evidence("acme")
+    globex_evidence = _evidence("globex")
     with Session(engine) as session:
         from resume_agent.tracking.tables import H1BCompanyEvidence
 
-        job = _add(session, "Acme, Inc.", "silent")
-        session.add(
-            H1BCompanyEvidence(
-                normalized_company="acme",
-                status="matched",
-                evidence_json=evidence.model_dump(mode="json"),
-                expires_at=now + timedelta(days=30),
-                retrieved_at=now,
+        silent = _add(session, "Acme, Inc.", "silent")
+        explicit_no = _add(session, "Globex LLC", "explicit_no")
+        for company, evidence in (
+            ("acme", acme_evidence),
+            ("globex", globex_evidence),
+        ):
+            session.add(
+                H1BCompanyEvidence(
+                    normalized_company=company,
+                    status="matched",
+                    evidence_json=evidence.model_dump(mode="json"),
+                    expires_at=now + timedelta(days=30),
+                    retrieved_at=now,
+                )
             )
-        )
         session.commit()
-        session.refresh(job)
-        job_id = job.id
+        session.refresh(silent)
+        session.refresh(explicit_no)
+        silent_id, explicit_no_id = silent.id, explicit_no.id
         result = run_h1b_enrichment(session, config, enricher=enricher)
+        for job in (silent, explicit_no):
+            meta = job.analysis_meta_json or {}
+            assert meta.get("h1b_evidence_id") is not None
+            assert meta.get("h1b_evidence_snapshot") is None
 
     assert enricher.seen == [], "a fresh cache hit must not be re-researched"
-    assert job_id in result, "a fresh cache hit must still reach the fit scorer"
+    assert silent_id in result, "a fresh cache hit must still reach the fit scorer"
+    assert explicit_no_id not in result, "an explicit-no JD must not reach the scorer"
 
 
 def test_per_run_cap_takes_the_companies_with_the_most_jobs(monkeypatch):
@@ -1331,6 +1478,19 @@ def test_per_run_cap_takes_the_companies_with_the_most_jobs(monkeypatch):
     assert "acme" in enricher.seen[0].lower()
 ```
 
+Add these cap-edge regressions in the same file:
+
+- With equally frequent normalizable companies and a cap of one, assert the
+  alphabetically earlier normalized key is selected. This pins the documented
+  tie-break rather than only the “most jobs” half of the sort.
+- Seed an **expired** cache row for a silent job and a higher-leverage uncached
+  company, then cap the run at one. Assert the stale job remains out of the
+  returned scorer map when its refresh is deferred; it may still render as stale
+  through the display read seam.
+- Set `h1b_enrich_max_companies_per_run=0` and assert every uncached company is
+  handed to the enricher. This pins the repository convention that zero means
+  unlimited.
+
 > **Note for the implementer:** `SearchConfig` lives in `src/resume_agent/discovery/search_config.py`. If it requires more constructor arguments than `sponsorship_required`, supply the minimum the dataclass demands.
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1346,7 +1506,7 @@ In `src/resume_agent/config.py`, after `h1b_cache_ttl_days`:
     h1b_enrich_max_companies_per_run: int = Field(default=50, ge=0)
 ```
 
-- [ ] **Step 4: Split the research set from the scoring set**
+- [ ] **Step 4: Build the widened research set; keep score eligibility at return time**
 
 Replace the eligibility block at the top of `run_h1b_enrichment` (the `eligible` / `companies` loop) with:
 
@@ -1357,11 +1517,8 @@ Replace the eligibility block at the top of `run_h1b_enrichment` (the `eligible`
             reporter.step(0)
         return {}
 
-    # Research every surviving job's company so each card gets an answer...
+    # Research every surviving job's company so each card gets an answer.
     research_jobs: list[Job] = []
-    # ...but only silent jobs feed the fit scorer: a JD that explicitly refuses
-    # sponsorship must not have its score lifted by the employer's filing history.
-    scoring_jobs: list[Job] = []
     job_counts: dict[str, int] = {}
     companies: dict[str, str] = {}
     for job in jobs:
@@ -1371,8 +1528,6 @@ Replace the eligibility block at the top of `run_h1b_enrichment` (the `eligible`
         research_jobs.append(job)
         job_counts[normalized] = job_counts.get(normalized, 0) + 1
         companies.setdefault(normalized, job.company or normalized)
-        if (job.criteria_json or {}).get("sponsorship_signal") == "silent":
-            scoring_jobs.append(job)
 
     if reporter:
         reporter.begin(
@@ -1387,29 +1542,37 @@ Replace the eligibility block at the top of `run_h1b_enrichment` (the `eligible`
         return {}
 ```
 
-- [ ] **Step 5: Apply the per-run cap**
+- [ ] **Step 5: Separate displayable cache rows from fresh scoring rows, then apply the cap**
 
-Immediately before the `enricher.enrich(...)` call:
+Immediately before the `enricher.enrich(...)` call, load the durable rows once
+but split the maps by freshness. Do **not** return early when `uncached` is empty:
+that branch is how a fully fresh cache reaches the scorer.
 
 ```python
     now = datetime.now(timezone.utc)
-    cached = load_company_evidence(session, list(companies.values()))
-    # An expired row counts as uncached: refreshing it costs a call either way.
-    # Fresh rows are deliberately not re-sent -- the enricher would serve them
-    # from the same cache, and they must not consume the run's budget.
+    cached_for_display = load_company_evidence(session, list(companies.values()))
+    fresh_by_company = {
+        key: evidence
+        for key, evidence in cached_for_display.items()
+        if evidence.expires_at > now
+    }
+    # Expired rows still render on cards, but refreshing them costs a call and
+    # they must never silently become scorer input if the cap defers them.
     uncached = sorted(
-        (key for key in companies if key not in cached or cached[key].expires_at <= now),
-        # Highest leverage first: one call answers every job at that company.
+        (key for key in companies if key not in fresh_by_company),
         key=lambda key: (-job_counts[key], key),
     )
     cap = get_settings().h1b_enrich_max_companies_per_run
-    if cap:
-        uncached = uncached[:cap]
-    if not uncached:
-        if reporter:
-            reporter.step(len(research_jobs))
-        return {}
-    outcome = enricher.enrich(session.get_bind(), [companies[key] for key in uncached])
+    selected = uncached if cap == 0 else uncached[:cap]
+
+    report = H1BEnrichmentReport(by_company={})
+    if selected:
+        outcome = enricher.enrich(
+            session.get_bind(), [companies[key] for key in selected]
+        )
+        if inspect.isawaitable(outcome):
+            outcome = asyncio.run(outcome)
+        report = H1BEnrichmentReport.model_validate(outcome)
 ```
 
 Add these imports to `services/discovery.py` if absent:
@@ -1420,34 +1583,52 @@ from datetime import datetime, timezone
 from resume_agent.h1b.cache import load_company_evidence
 ```
 
-- [ ] **Step 6: Build the return map from scoring jobs, merging cache hits**
+- [ ] **Step 6: Update provenance broadly but keep the returned scorer map narrow**
 
-Replace the `for job in eligible:` loop header with `for job in scoring_jobs:`.
-
-**Critical:** the lookup must merge the fresh-cached evidence with the freshly
-researched evidence. Step 5 stopped sending fresh companies to the enricher, so
-`report.by_company` no longer contains them — reading it alone would silently
-drop scoring evidence that the current code supplies. Immediately after the
-`report = H1BEnrichmentReport.model_validate(outcome)` line, add:
+Fresh rows were not sent to the enricher, so merge only **fresh** cache hits
+with the newly researched report. Query cache row IDs in one batch; do not put a
+per-job lookup inside this loop.
 
 ```python
-    # Fresh cache hits were never sent to the enricher, so they are absent from
-    # the report. The scorer must still see them, exactly as it does today.
-    available: dict[str, H1BSponsorshipEvidence] = {**cached, **report.by_company}
+    available: dict[str, H1BSponsorshipEvidence] = {
+        **fresh_by_company,
+        **report.by_company,
+    }
+    cache_rows = session.exec(
+        model_select(H1BCompanyEvidence).where(
+            H1BCompanyEvidence.normalized_company.in_(list(available))
+        )
+    ).all()
+    evidence_ids = {row.normalized_company: row.id for row in cache_rows}
+
+    evidence_by_job: dict[int, H1BSponsorshipEvidence] = {}
+    for job in research_jobs:
+        normalized = normalize_company(job.company)
+        evidence = available.get(normalized) if normalized else None
+        if evidence is None:
+            continue
+        meta = read_job_analysis_meta(job.analysis_meta_json) or JobAnalysisMeta()
+        meta.h1b_evidence_id = evidence_ids.get(normalized)
+        # `h1b_evidence_snapshot` is retired: do not write it here.
+        job.analysis_meta_json = meta.model_dump(mode="json")
+        session.add(job)
+        if (
+            job.id is not None
+            and (job.criteria_json or {}).get("sponsorship_signal") == "silent"
+        ):
+            evidence_by_job[job.id] = evidence
 ```
 
-and change the per-job lookup inside the loop from
-`report.by_company.get(normalized)` to `available.get(normalized)`.
-
-The loop still writes `meta.h1b_evidence_id` and populates `evidence_by_job`;
-delete the `meta.h1b_evidence_snapshot` line if Task 6 has not already removed it.
-
-Change the final `reporter.step(len(eligible))` to `reporter.step(len(research_jobs))`.
+This deliberately leaves capped-out, expired rows out of `available`: they can
+render as stale, but cannot raise a fit score until a later run refreshes them.
+Change the final `reporter.step(len(eligible))` to
+`reporter.step(len(research_jobs))`.
 
 - [ ] **Step 7: Run the tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_h1b_enrichment_scope.py -q`
-Expected: PASS (5 passed)
+Expected: PASS (8 passed, including fresh-only, stale-deferred, tie-break, and
+zero-is-unlimited cases)
 
 - [ ] **Step 8: Verify the pipeline still wires up unchanged**
 
@@ -1467,10 +1648,12 @@ git commit -m "feat: widen H-1B research to every surviving company under a run 
 ### Task 9: Period selector and stale label in the sponsorship panel
 
 **Files:**
+
 - Modify: `web/src/features/job/H1BSponsorshipPanel.tsx`
 - Test: `web/src/features/job/H1BSponsorshipPanel.test.tsx`
 
 **Interfaces:**
+
 - Consumes: wire fields `periods`, `deniedCount`, `stale` (Task 3).
 - Produces: no exported symbols beyond the existing `H1BSponsorshipPanel`.
 
@@ -1478,7 +1661,9 @@ git commit -m "feat: widen H-1B research to every surviving company under a run 
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `web/src/features/job/H1BSponsorshipPanel.test.tsx`. First extend the existing `matchedEvidence` fixture with the new fields:
+Add to `web/src/features/job/H1BSponsorshipPanel.test.tsx`. Keep the existing
+`matchedEvidence` as the legacy flat fixture, then add a quarterly fixture with
+the new fields:
 
 ```tsx
 const quarterlyEvidence = {
@@ -1513,7 +1698,11 @@ it("defaults to the rolling total and labels it with the period count", () => {
     <H1BSponsorshipPanel
       jobId={42}
       company="Acme"
-      initialResult={{ capability: "available", stale: false, evidence: quarterlyEvidence }}
+      initialResult={{
+        capability: "available",
+        stale: false,
+        evidence: quarterlyEvidence,
+      }}
     />,
     { wrapper },
   );
@@ -1529,7 +1718,11 @@ it("switches figures to one quarter without changing the status banner", async (
     <H1BSponsorshipPanel
       jobId={42}
       company="Acme"
-      initialResult={{ capability: "available", stale: false, evidence: quarterlyEvidence }}
+      initialResult={{
+        capability: "available",
+        stale: false,
+        evidence: quarterlyEvidence,
+      }}
     />,
     { wrapper },
   );
@@ -1543,17 +1736,62 @@ it("switches figures to one quarter without changing the status banner", async (
   expect(screen.getByText("Historical filings found")).toBeInTheDocument();
 });
 
+it("falls back to the rollup when a refetch replaces the selected period", async () => {
+  const { rerender } = render(
+    <H1BSponsorshipPanel
+      jobId={42}
+      company="Acme"
+      initialResult={{
+        capability: "available",
+        stale: false,
+        evidence: quarterlyEvidence,
+      }}
+    />,
+    { wrapper },
+  );
+  fireEvent.click(screen.getByRole("combobox", { name: /period/i }));
+  fireEvent.click(await screen.findByRole("option", { name: /FY2026 Q1/i }));
+
+  rerender(
+    <H1BSponsorshipPanel
+      jobId={42}
+      company="Acme"
+      initialResult={{
+        capability: "available",
+        stale: false,
+        evidence: {
+          ...quarterlyEvidence,
+          filingCount: 4,
+          certifiedCount: 3,
+          deniedCount: 1,
+          periods: [quarterlyEvidence.periods[1]!],
+        },
+      }}
+    />,
+  );
+
+  expect(screen.getByText("Last 1 quarter (total)")).toBeInTheDocument();
+  expect(screen.getByText("4")).toBeInTheDocument();
+});
+
 it("hides the selector when the provider had no quarterly breakdown", () => {
   render(
     <H1BSponsorshipPanel
       jobId={42}
       company="Acme"
-      initialResult={{ capability: "available", stale: false, evidence: matchedEvidence }}
+      initialResult={{
+        capability: "available",
+        stale: false,
+        evidence: matchedEvidence,
+      }}
     />,
     { wrapper },
   );
 
-  expect(screen.queryByRole("combobox", { name: /period/i })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("combobox", { name: /period/i }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("Denied filings")).not.toBeInTheDocument();
   expect(screen.getByText("Historical filings found")).toBeInTheDocument();
 });
 
@@ -1562,7 +1800,11 @@ it("marks stale evidence without hiding its figures", () => {
     <H1BSponsorshipPanel
       jobId={42}
       company="Acme"
-      initialResult={{ capability: "available", stale: true, evidence: quarterlyEvidence }}
+      initialResult={{
+        capability: "available",
+        stale: true,
+        evidence: quarterlyEvidence,
+      }}
     />,
     { wrapper },
   );
@@ -1572,17 +1814,43 @@ it("marks stale evidence without hiding its figures", () => {
   expect(screen.getByRole("button", { name: /refresh/i })).toBeEnabled();
 });
 
+it("shows stale warning for a legacy flat row too", () => {
+  render(
+    <H1BSponsorshipPanel
+      jobId={42}
+      company="Acme"
+      initialResult={{
+        capability: "available",
+        stale: true,
+        evidence: matchedEvidence,
+      }}
+    />,
+    { wrapper },
+  );
+
+  expect(screen.getByText(/may be out of date/i)).toBeInTheDocument();
+  expect(
+    screen.queryByRole("combobox", { name: /period/i }),
+  ).not.toBeInTheDocument();
+});
+
 it("warns that refreshing updates every job at the company", () => {
   render(
     <H1BSponsorshipPanel
       jobId={42}
       company="Acme"
-      initialResult={{ capability: "available", stale: false, evidence: quarterlyEvidence }}
+      initialResult={{
+        capability: "available",
+        stale: false,
+        evidence: quarterlyEvidence,
+      }}
     />,
     { wrapper },
   );
 
-  expect(screen.getByText(/updates every job at this company/i)).toBeInTheDocument();
+  expect(
+    screen.getByText(/updates every job at this company/i),
+  ).toBeInTheDocument();
 });
 ```
 
@@ -1637,115 +1905,157 @@ function EvidenceDetails({
   >;
 }) {
   const wageSummary = Object.entries(metrics.wageSummary ?? {});
-  const details = [
+  const filingPeriods = evidence.periods?.length
+    ? evidence.periods.map((entry) => periodLabel(entry.period))
+    : evidence.fiscalPeriods;
+  const details: Array<readonly [string, string]> = [
     ["Company", evidence.displayCompany ?? evidence.normalizedCompany],
     [
       "Filing periods",
-      evidence.fiscalPeriods.length ? evidence.fiscalPeriods.join(", ") : "Not reported",
+      filingPeriods.length ? filingPeriods.join(", ") : "Not reported",
     ],
-    ["Total filings", metrics.filingCount == null ? "Not reported" : String(metrics.filingCount)],
+    [
+      "Filings",
+      metrics.filingCount == null
+        ? "Not reported"
+        : String(metrics.filingCount),
+    ],
     [
       "Certified filings",
-      metrics.certifiedCount == null ? "Not reported" : String(metrics.certifiedCount),
+      metrics.certifiedCount == null
+        ? "Not reported"
+        : String(metrics.certifiedCount),
     ],
-    [
-      "Denied filings",
-      metrics.deniedCount == null ? "Not reported" : String(metrics.deniedCount),
-    ],
+    ...(evidence.periods?.length
+      ? [
+          [
+            "Denied filings",
+            metrics.deniedCount == null
+              ? "Not reported"
+              : String(metrics.deniedCount),
+          ] as const,
+        ]
+      : []),
     ["Confidence", `${Math.round(evidence.confidence * 100)}%`],
     ["Retrieved", formatDate(evidence.retrievedAt)],
     ["Expires", formatDate(evidence.expiresAt)],
     ["Data version", evidence.dataVersion ?? "Not reported"],
-  ] as const;
+  ];
   // ...rest of the existing body unchanged, using `wageSummary` as before
 }
 ```
+
+`wageSummary` is deliberately the active period's value when a period is
+selected and the provider's top-level report aggregate for the rollup. Do not
+pretend it can be derived by summing quarterly medians or percentiles.
 
 - [ ] **Step 5: Render the selector and stale notice in the component body**
 
 Inside `H1BSponsorshipPanel`, after the existing `status` line:
 
 ```tsx
-  const periods = evidence?.periods ?? [];
-  const [selectedPeriod, setSelectedPeriod] = useState<string>(ROLLUP);
-  const activePeriod =
-    selectedPeriod === ROLLUP
-      ? undefined
-      : periods.find((entry) => entry.period === selectedPeriod);
-  const metrics = activePeriod ?? {
-    filingCount: evidence?.filingCount ?? null,
-    certifiedCount: evidence?.certifiedCount ?? null,
-    deniedCount: evidence?.deniedCount ?? null,
-    wageSummary: evidence?.wageSummary ?? null,
-  };
-  const rollupLabel = `Last ${periods.length} quarter${periods.length === 1 ? "" : "s"} (total)`;
+const periods = evidence?.periods ?? [];
+const [selectedPeriod, setSelectedPeriod] = useState<string>(ROLLUP);
+const effectivePeriod =
+  selectedPeriod === ROLLUP ||
+  periods.some((entry) => entry.period === selectedPeriod)
+    ? selectedPeriod
+    : ROLLUP;
+const activePeriod =
+  effectivePeriod === ROLLUP
+    ? undefined
+    : periods.find((entry) => entry.period === effectivePeriod);
+const metrics = activePeriod ?? {
+  filingCount: evidence?.filingCount ?? null,
+  certifiedCount: evidence?.certifiedCount ?? null,
+  deniedCount: evidence?.deniedCount ?? null,
+  wageSummary: evidence?.wageSummary ?? null,
+};
+const rollupLabel = `Last ${periods.length} quarter${periods.length === 1 ? "" : "s"} (total)`;
 ```
 
 Change the button label so a stale row reads `Refresh`:
 
 ```tsx
-  const buttonLabel = checking
-    ? "Checking…"
-    : result?.capability === "disabled"
-      ? "H-1B disabled"
+const buttonLabel = checking
+  ? "Checking…"
+  : result?.capability === "disabled"
+    ? "H-1B disabled"
+    : result?.stale
+      ? "Refresh"
       : status === "unavailable"
         ? "Try again"
         : status
-          ? result?.stale
-            ? "Refresh"
-            : "Refresh check"
+          ? "Refresh check"
           : "Check H-1B";
 ```
 
 Add the shared-cache notice under the panel heading paragraph:
 
 ```tsx
-            <p className="mt-1 text-xs text-muted-foreground">
-              Refreshing updates every job at this company.
-            </p>
+{
+  company?.trim() && (
+    <p className="mt-1 text-xs text-muted-foreground">
+      Refreshing updates every job at this company.
+    </p>
+  );
+}
 ```
+
+Rename the section ID and its `aria-labelledby` reference from
+`h1b-management-title` to `h1b-sponsorship-title`; the panel no longer belongs
+to Management after Task 11.
 
 And render the selector plus stale line immediately before `<EvidenceDetails …>`:
 
 ```tsx
-      {evidence && status !== "unavailable" && periods.length > 0 && (
-        <div className="mt-5 flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="h1b-period">Period</Label>
-            <Select
-              value={selectedPeriod}
-              onValueChange={(value) => setSelectedPeriod(value ?? ROLLUP)}
-            >
-              <SelectTrigger id="h1b-period" className="w-64">
-                {/* A bare <SelectValue /> renders the raw value until the
-                    dropdown has been opened once -- resolve the label here. */}
-                <SelectValue>
-                  {(value: string) =>
-                    value === ROLLUP ? rollupLabel : periodLabel(String(value))
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ROLLUP}>{rollupLabel}</SelectItem>
-                {periods.map((entry) => (
-                  <SelectItem key={entry.period} value={entry.period}>
-                    {periodLabel(entry.period)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {result?.stale && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              ⚠ Checked {formatDate(evidence.retrievedAt)} — may be out of date
-            </p>
-          )}
-        </div>
-      )}
+{
+  evidence && result?.stale && (
+    <p className="mt-4 text-xs text-amber-700 dark:text-amber-400">
+      ⚠ Checked {formatDate(evidence.retrievedAt)} — may be out of date
+    </p>
+  );
+}
 
-      {evidence && status !== "unavailable" && (
-        <EvidenceDetails evidence={evidence} metrics={metrics} />
-      )}
+{
+  evidence && status !== "unavailable" && periods.length > 0 && (
+    <div className="mt-5 flex flex-wrap items-end gap-3">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="h1b-period">Period</Label>
+        <Select
+          value={effectivePeriod}
+          onValueChange={(value) => setSelectedPeriod(value ?? ROLLUP)}
+        >
+          <SelectTrigger id="h1b-period" className="w-64">
+            {/* A bare <SelectValue /> renders the raw value until the
+                    dropdown has been opened once -- resolve the label here. */}
+            <SelectValue>
+              {(value: string) =>
+                effectivePeriod === ROLLUP
+                  ? rollupLabel
+                  : periodLabel(String(value))
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ROLLUP}>{rollupLabel}</SelectItem>
+            {periods.map((entry) => (
+              <SelectItem key={entry.period} value={entry.period}>
+                {periodLabel(entry.period)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
+{
+  evidence && status !== "unavailable" && (
+    <EvidenceDetails evidence={evidence} metrics={metrics} />
+  );
+}
 ```
 
 Delete the old unconditional `{evidence && status !== "unavailable" && <EvidenceDetails evidence={evidence} />}` line it replaces.
@@ -1770,15 +2080,17 @@ git commit -m "feat: add H-1B period selector and stale labelling to the panel"
 ### Task 10: `TrackingTab` and the fenced danger zone
 
 **Files:**
+
 - Create: `web/src/features/job/TrackingTab.tsx`
 - Create: `web/src/features/job/TrackingTab.test.tsx`
 - Modify: `web/src/features/job/StageManager.tsx`
 
 **Interfaces:**
+
 - Consumes: `StageManager`, `ApplicationEditor`, `useDeleteJob`, `ConfirmDialog`.
 - Produces: `TrackingTab({ job, onDeleted }: { job: JobDetail; onDeleted: () => void })`. Task 11 renders it.
 
-**Why this matters:** the merge requested is a *tab* merge, not a component merge — `ApplicationEditor` and `StageManager` keep their own mutation hooks and lifecycles. Only `Delete` relocates, so a destructive action stops sitting next to the routine `Set stage` button.
+**Why this matters:** the merge requested is a _tab_ merge, not a component merge — `ApplicationEditor` and `StageManager` keep their own mutation hooks and lifecycles. Only `Delete` relocates, so a destructive action stops sitting next to the routine `Set stage` button.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1789,14 +2101,22 @@ import type { ReactNode } from "react";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ mutate: vi.fn() }));
+vi.mock("@/features/triage/use-triage-mutations", () => ({
+  useDeleteJob: () => ({ mutate: mocks.mutate }),
+}));
 
 import { TrackingTab } from "./TrackingTab";
 
 function wrapper({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
     >
       {children}
     </QueryClientProvider>
@@ -1811,6 +2131,8 @@ const baseJob = {
 } as never;
 
 describe("TrackingTab", () => {
+  beforeEach(() => mocks.mutate.mockReset());
+
   it("renders stage, application, and a fenced danger zone", () => {
     render(<TrackingTab job={baseJob} onDeleted={vi.fn()} />, { wrapper });
 
@@ -1822,7 +2144,10 @@ describe("TrackingTab", () => {
 
   it("disables delete when the job has progress", () => {
     render(
-      <TrackingTab job={{ ...baseJob, hasProgress: true } as never} onDeleted={vi.fn()} />,
+      <TrackingTab
+        job={{ ...baseJob, hasProgress: true } as never}
+        onDeleted={vi.fn()}
+      />,
       { wrapper },
     );
 
@@ -1833,6 +2158,20 @@ describe("TrackingTab", () => {
   it("no longer exposes delete from the stage section", () => {
     render(<TrackingTab job={baseJob} onDeleted={vi.fn()} />, { wrapper });
     expect(screen.getAllByRole("button", { name: /delete/i })).toHaveLength(1);
+  });
+
+  it("closes only after the delete mutation succeeds", async () => {
+    const onDeleted = vi.fn();
+    const user = userEvent.setup();
+    render(<TrackingTab job={baseJob} onDeleted={onDeleted} />, { wrapper });
+
+    await user.click(screen.getByRole("button", { name: /delete job/i }));
+    await user.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    expect(onDeleted).not.toHaveBeenCalled();
+    const [, options] = mocks.mutate.mock.calls[0] ?? [];
+    options?.onSuccess?.();
+    expect(onDeleted).toHaveBeenCalledOnce();
   });
 });
 ```
@@ -1861,10 +2200,11 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ApplicationEditor } from "./ApplicationEditor";
 import { StageManager } from "./StageManager";
+import type { ReactNode } from "react";
 import { useDeleteJob } from "@/features/triage/use-triage-mutations";
 import type { JobDetail } from "./use-job-detail";
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+function SectionHeading({ children }: { children: ReactNode }) {
   return (
     <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
       {children}
@@ -1913,10 +2253,7 @@ export function TrackingTab({
             title="Delete this job?"
             description="This cannot be undone."
             confirmLabel="Confirm delete"
-            onConfirm={() => {
-              del.mutate(job.id);
-              onDeleted();
-            }}
+            onConfirm={() => del.mutate(job.id, { onSuccess: onDeleted })}
           />
           {job.hasProgress && (
             <p className="text-xs text-muted-foreground">
@@ -1930,10 +2267,16 @@ export function TrackingTab({
 }
 ```
 
+Do not call `onDeleted()` optimistically. `useDeleteJob` surfaces a failed
+server-side progress guard with a toast; closing the modal before `onSuccess`
+would make a failed deletion look successful. The focused mutation mock above
+captures the `onSuccess` option and proves `onDeleted` is called only through
+that callback.
+
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run (from `web/`): `npx vitest run src/features/job/TrackingTab.test.tsx`
-Expected: PASS (3 passed)
+Expected: PASS (4 passed, including close-only-on-success)
 
 - [ ] **Step 6: Typecheck and commit**
 
@@ -1948,10 +2291,12 @@ git commit -m "feat: add TrackingTab merging stage, application, and delete"
 ### Task 11: Restructure the job-modal tabs
 
 **Files:**
+
 - Modify: `web/src/components/JobModal.tsx:200-312`
 - Test: `web/src/components/JobModal.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `TrackingTab` (Task 10), `H1BSponsorshipPanel` (Task 9).
 - Produces: tab values `jd | versions | coverLetters | tracking | interview | sponsorship`.
 
@@ -1959,7 +2304,9 @@ git commit -m "feat: add TrackingTab merging stage, application, and delete"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `web/src/components/JobModal.test.tsx`:
+Replace the existing `"places H-1B research inside the Management tab"` test
+and add the following tab-set assertion in `web/src/components/JobModal.test.tsx`.
+Do not leave the old Management assertion behind:
 
 This reuses the file's existing `wrap` helper and `jobPayload` factory — do not
 introduce a second harness:
@@ -1969,13 +2316,23 @@ it("exposes tracking and sponsorship tabs and no legacy application or managemen
   server.use(http.get("/api/jobs/42", () => HttpResponse.json(jobPayload())));
   wrap(<JobModal jobId={42} onClose={() => {}} />);
 
-  expect(await screen.findByRole("tab", { name: "Tracking" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("tab", { name: "Tracking" }),
+  ).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Sponsorship" })).toBeInTheDocument();
-  expect(screen.queryByRole("tab", { name: "Application" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("tab", { name: "Management" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("tab", { name: "Application" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("tab", { name: "Management" }),
+  ).not.toBeInTheDocument();
   expect(screen.getAllByRole("tab")).toHaveLength(6);
 });
 ```
+
+The replacement H-1B test must click `Sponsorship` and assert the Historical
+H-1B sponsorship heading is visible there. The tab-count test alone would not
+prove the panel moved out of the old body.
 
 > `jobPayload()` omits `h1BSponsorship` entirely, so the Sponsorship tab renders
 > its "not checked" state — which is exactly the case worth pinning here.
@@ -1985,9 +2342,9 @@ it("exposes tracking and sponsorship tabs and no legacy application or managemen
 Run (from `web/`): `npx vitest run src/components/JobModal.test.tsx`
 Expected: FAIL — no `Tracking` tab
 
-- [ ] **Step 3: Replace the two triggers with the new pair**
+- [ ] **Step 3: Replace the three affected triggers with the new set**
 
-In `JobModal.tsx`, replace these two lines:
+In `JobModal.tsx`, replace these three lines:
 
 ```tsx
                     <TabsTrigger value="application" className={tabTriggerClass}>Application</TabsTrigger>
@@ -2008,21 +2365,21 @@ with:
 Replace the `application` and `manage` `<TabsContent>` blocks with:
 
 ```tsx
-                    <TabsContent value="tracking" className="mt-0">
-                      <TrackingTab job={job} onDeleted={onClose} />
-                    </TabsContent>
+<TabsContent value="tracking" className="mt-0">
+  <TrackingTab job={job} onDeleted={onClose} />
+</TabsContent>
 ```
 
 and, after the `interview` block:
 
 ```tsx
-                    <TabsContent value="sponsorship" className="mt-0">
-                      <H1BSponsorshipPanel
-                        jobId={jobId}
-                        company={job.company}
-                        initialResult={job.h1BSponsorship}
-                      />
-                    </TabsContent>
+<TabsContent value="sponsorship" className="mt-0">
+  <H1BSponsorshipPanel
+    jobId={jobId}
+    company={job.company}
+    initialResult={job.h1BSponsorship}
+  />
+</TabsContent>
 ```
 
 - [ ] **Step 5: Fix the imports**
@@ -2058,9 +2415,11 @@ git commit -m "feat: split job modal into Tracking and Sponsorship tabs"
 ### Task 12: Full verification and documentation
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 
 **Interfaces:**
+
 - Consumes: everything.
 - Produces: the durable statement of the cache-is-truth invariant.
 
@@ -2081,8 +2440,11 @@ Expected: no findings
 
 - [ ] **Step 4: Confirm the contract is not drifted**
 
-Run: `bash scripts/gen_ts_client.sh && git diff --stat contracts/`
-Expected: **no diff** — Task 3 already committed the regenerated contract. A non-empty diff means a schema change landed after Task 3; commit the regenerated files.
+Run: `bash scripts/gen_ts_client.sh && git diff --stat -- contracts/ web/src/lib/api/schema.ts`
+Expected: **no diff** — Task 3 already committed all three generated files. A
+non-empty diff means a schema change landed after Task 3; commit the regenerated
+contract **and** the copied SPA schema. Use the Windows fallback from Global
+Constraints if Bash fails before generation.
 
 - [ ] **Step 5: Document the invariant**
 
@@ -2100,14 +2462,18 @@ In `CLAUDE.md`, under **Known design notes**, add:
   render**, labelled stale via `H1BSponsorshipOut.stale` — historical filings do
   not rot, and nothing auto-refreshes: an LLM call happens only on an explicit
   manual check or a discovery run. Evidence carries a per-quarter `periods`
-  breakdown whose top-level rollup is **derived by the model validator, never
-  trusted from the agent**, so a total can never contradict the parts shown
-  beneath it; `periods: []` is valid and degrades to the flat pre-quarter view.
+  breakdown whose top-level **count** rollup is **derived by the model validator,
+  never trusted from the agent**, so count totals can never contradict the parts
+  shown beneath them; report-level wage summaries remain provider aggregates.
+  `periods: []` is valid and degrades to the flat pre-quarter view.
   Discovery researches every surviving job's company (gated on
   `config.sponsorship_required`, bounded by
   `Settings.h1b_enrich_max_companies_per_run`), but `run_h1b_enrichment` still
   returns **only** `silent` jobs to the fit scorer — a JD that explicitly refuses
-  sponsorship must not have its score lifted by filing history.
+  sponsorship must not have its score lifted by filing history. Fresh cache hits
+  reach that map without an agent call; expired entries deferred by the cap are
+  display-only until refreshed. `h1b_evidence_id` is updated for every covered
+  in-scope job as provenance, while no job writes a snapshot.
 ```
 
 - [ ] **Step 6: Commit**
@@ -2123,8 +2489,29 @@ git commit -m "docs: record the H-1B company-cache invariant"
 
 **Spec coverage**
 
+| Spec section                                                                                        | Task                                   |
+| --------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `H1BPeriodStat`, `periods`, `denied_count`, derived rollup, bounds, uniqueness                      | 1                                      |
+| Additive schema evolution, no migration                                                             | 1 (defaults), 7 (`schema_version = 2`) |
+| `load_company_evidence` batched seam, corruption tolerance, expiry passthrough                      | 2                                      |
+| `H1BPeriodStatOut`, wire projection, `stale`                                                        | 3                                      |
+| Job detail reads the cache                                                                          | 4                                      |
+| Board row projections read the cache; N+1 pin                                                       | 5                                      |
+| Retire the per-job snapshot; keep `h1b_evidence_id`                                                 | 6                                      |
+| Agent instructed to collect four quarters; graceful `periods: []`                                   | 7                                      |
+| Widen research, keep scoring narrow, per-run cap, new setting                                       | 8                                      |
+| Fresh cache hits reach the scorer without being re-researched                                       | 8                                      |
+| Period selector, status banner invariance, stale label, `SelectValue` resolver, shared-cache notice | 9                                      |
+| `TrackingTab`, delete relocation                                                                    | 10                                     |
+| Six-tab restructure                                                                                 | 11                                     |
+| Contract regen gate, CLAUDE.md                                                                      | 3, 12                                 
+
+## Self-Review
+
+**Spec coverage**
+
 | Spec section | Task |
-|---|---|
+| --- | --- |
 | `H1BPeriodStat`, `periods`, `denied_count`, derived rollup, bounds, uniqueness | 1 |
 | Additive schema evolution, no migration | 1 (defaults), 7 (`schema_version = 2`) |
 | `load_company_evidence` batched seam, corruption tolerance, expiry passthrough | 2 |

@@ -133,6 +133,15 @@ class H1BSponsorshipEvidence(BaseModel):
             raise ValueError("certified_count + denied_count cannot exceed filing_count")
         return self
 
+    def is_fresh(self, now: datetime) -> bool:
+        """Whether this evidence is still inside its cache TTL at ``now``.
+
+        The single definition of "fresh" -- every caller that needs to decide
+        whether to reuse cached evidence or label it stale for display goes
+        through this instead of re-deriving the ``expires_at`` comparison.
+        """
+        return self.expires_at > now
+
 
 class H1BEnrichmentReport(BaseModel):
     by_company: dict[str, H1BSponsorshipEvidence]
