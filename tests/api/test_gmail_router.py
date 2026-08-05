@@ -21,10 +21,20 @@ def client(tmp_path):
 
 
 class _FakeFlow:
-    """Stands in for google_auth_oauthlib Flow in both connect and callback."""
+    """Stands in for google_auth_oauthlib Flow in both connect and callback.
 
-    def __init__(self):
+    Models the real object's scope plumbing rather than hard-coding a result:
+    ``credentials`` reads ``oauth2session.scope`` exactly as
+    ``credentials_from_session`` does, so a caller that fails to reconcile the
+    granted scope is visible here instead of being papered over.
+    Scope *validation* is not modelled — that lives inside oauthlib and is
+    covered against the real stack in ``test_gmail_oauth_scope.py``.
+    """
+
+    def __init__(self, granted: list[str] | None = None):
         self.fetched_code = None
+        self._granted = gmail_auth.GMAIL_SCOPES if granted is None else granted
+        self.oauth2session = SimpleNamespace(scope=list(gmail_auth.GMAIL_SCOPES))
 
     def authorization_url(self, **kwargs):
         return (
@@ -34,9 +44,11 @@ class _FakeFlow:
 
     def fetch_token(self, code: str):
         self.fetched_code = code
+        self.oauth2session.token = {"scope": list(self._granted)}
 
     @property
     def credentials(self):
+        scopes = self.oauth2session.scope
         return SimpleNamespace(
             to_json=lambda: json.dumps(
                 {
@@ -45,7 +57,7 @@ class _FakeFlow:
                     "client_id": "cid",
                     "client_secret": "cs",
                     "token_uri": "https://oauth2.googleapis.com/token",
-                    "scopes": gmail_auth.GMAIL_SCOPES,
+                    "scopes": scopes,
                     "expiry": "2099-01-01T00:00:00Z",
                 }
             )
