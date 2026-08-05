@@ -35,11 +35,14 @@ class UserContext:
     selected_model_own_keys: dict[int, bool] = field(
         default_factory=dict, repr=False, compare=False
     )
-    # SpendGate decisions, keyed by model id. The cache lives on the context
-    # rather than in a module global because a context *is* a phase — one
-    # request, or one run worker — so the decision expires with the thing it
-    # was resolved for, and no test can inherit another test's budget state.
-    spend_decisions: dict[str, tuple[float, object]] = field(
+    # SpendGate decisions, keyed by model id. Values are ``spend._CachedDecision``
+    # at runtime; typed as ``object`` here (rather than importing that type) to
+    # avoid a cycle with ``tenancy.spend``, which already imports ``UserContext``.
+    # The cache lives on the context rather than in a module global because a
+    # context *is* a phase — one request, or one run worker — so the decision
+    # expires with the thing it was resolved for, and no test can inherit
+    # another test's budget state.
+    spend_decisions: dict[str, object] = field(
         default_factory=dict, repr=False, compare=False
     )
 
