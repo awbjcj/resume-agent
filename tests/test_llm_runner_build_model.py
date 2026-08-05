@@ -1,4 +1,9 @@
 from types import SimpleNamespace
+from typing import cast
+
+from openai.types.responses import Response
+import pytest
+from pydantic import BaseModel
 
 import resume_agent.llm_runner as llm_runner
 from resume_agent.llm_runner import (
@@ -230,13 +235,17 @@ def test_openai_never_uses_provider_managed_response_state():
 
 
 def test_openai_bounds_the_output_budget():
-    assert build_model(
-        "openai:gpt-5.6-terra", api_key="k"
-    ).max_output_tokens == 16000
+    # Bounded, but not with Anthropic's number. `_anthropic_max_tokens` stays
+    # near 16000 because the SDK enforces a per-model non-streaming ceiling;
+    # the Responses API has no such rule, so copying that figure here rationed
+    # legitimate output and truncated large structured responses. The reasoning
+    # budget is the larger one because on OpenAI -- unlike Anthropic -- thinking
+    # tokens are spent out of this same allowance.
+    assert build_model("openai:gpt-5.6-terra", api_key="k").max_output_tokens == 32000
     assert (
         build_model("openai:gpt-5.6-terra", api_key="k", reasoning=True)
         .max_output_tokens
-        == 32000
+        == 64000
     )
 
 
@@ -350,3 +359,125 @@ def test_responses_shim_keeps_a_populated_reasoning_object():
     )
     params = model.get_request_params(messages=[])
     assert params["reasoning"] == {"effort": "xhigh"}
+
+
+def _truncated_response():
+    """A Responses payload cut off at the request's output-token ceiling."""
+    return SimpleNamespace(
+        id="resp_094b58b7e15b7927",
+        status="incomplete",
+        incomplete_details=SimpleNamespace(reason="max_output_tokens"),
+        error=None,
+        output=[],
+        output_text='{"summary": "half a sen',
+        usage=SimpleNamespace(
+            input_tokens=4200,
+            input_tokens_details=SimpleNamespace(cached_tokens=0),
+            output_tokens=32000,
+            output_tokens_details=SimpleNamespace(reasoning_tokens=11000),
+            total_tokens=36200,
+        ),
+    )
+
+
+def test_responses_shim_records_a_response_cut_off_at_the_token_ceiling():
+    # agno logs `status='incomplete'` and then discards it -- _parse_provider_response
+    # receives the whole Response but carries neither the status nor
+    # incomplete_details into ModelResponse -- so a truncated body reaches the
+    # JSON parsers, fails all three, and arrives at expect_schema as a bare
+    # `str`. Keep the fact on agno's own provider_data channel, which
+    # _response.py copies onto RunOutput.model_provider_data.
+    model = llm_runner._compatible_openai_responses_class()(
+        id="gpt-5.6-terra", api_key="k", max_output_tokens=32000
+    )
+
+    parsed = model._parse_provider_response(cast(Response, _truncated_response()))
+
+    assert parsed.provider_data is not None
+    assert parsed.provider_data[llm_runner.INCOMPLETE_KEY] == {
+        "reason": "max_output_tokens",
+        "ceiling": 32000,
+    }
+
+
+def test_responses_shim_leaves_a_completed_response_alone():
+    model = llm_runner._compatible_openai_responses_class()(
+        id="gpt-5.6-terra", api_key="k"
+    )
+    complete = _truncated_response()
+    complete.status = "completed"
+    complete.incomplete_details = None
+
+    parsed = model._parse_provider_response(cast(Response, complete))
+
+    assert parsed.role == "assistant"
+    assert llm_runner.INCOMPLETE_KEY not in (parsed.provider_data or {})
+
+
+def _run_output(content, *, truncated: bool):
+    return SimpleNamespace(
+        content=content,
+        model="gpt-5.6-terra",
+        model_provider="OpenAI",
+        status="completed",
+        metrics=SimpleNamespace(
+            input_tokens=4200, output_tokens=32000, reasoning_tokens=11000
+        ),
+        model_provider_data=(
+            {llm_runner.INCOMPLETE_KEY: {"reason": "max_output_tokens", "ceiling": 32000}}
+            if truncated
+            else {"response_id": "resp_1"}
+        ),
+    )
+
+
+class _Schema(BaseModel):
+    summary: str
+
+
+def test_unparsed_schema_failure_names_truncation_rather_than_just_got_str():
+    # "Expected _Schema, got str" is true of a truncation, a refusal and a
+    # rejected request alike. Only the ceiling tells you which lever to pull.
+    with pytest.raises(llm_runner.UnparsedAgentOutput) as excinfo:
+        llm_runner.expect_schema(
+            _run_output('{"summary": "half a sen', truncated=True),
+            _Schema,
+            source="profile-extract",
+        )
+
+    message = str(excinfo.value)
+    assert "cut off" in message
+    assert "max_output_tokens" in message
+    assert "ceiling=32000" in message
+
+
+def test_untruncated_schema_failure_does_not_claim_truncation():
+    with pytest.raises(llm_runner.UnparsedAgentOutput) as excinfo:
+        llm_runner.expect_schema(
+            _run_output("Sorry, I cannot help with that.", truncated=False),
+            _Schema,
+            source="profile-extract",
+        )
+
+    assert "cut off" not in str(excinfo.value)
+
+
+def test_truncated_prose_is_rejected_rather_than_returned_as_a_whole_answer():
+    # expect_text's only checks are "not an error status" and "not blank", and a
+    # response cut off mid-sentence passes both -- so half an answer reached the
+    # caller as a complete one. Nothing downstream can tell the difference.
+    with pytest.raises(llm_runner.UnparsedAgentOutput) as excinfo:
+        llm_runner.expect_text(
+            _run_output("Here are the three things you should empha", truncated=True),
+            source="coach-persona",
+        )
+
+    assert "cut off" in str(excinfo.value)
+
+
+def test_complete_prose_is_still_returned():
+    assert (
+        llm_runner.expect_text(_run_output("A whole answer.", truncated=False),
+                               source="coach-persona")
+        == "A whole answer."
+    )
