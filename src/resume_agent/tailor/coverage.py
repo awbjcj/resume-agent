@@ -25,6 +25,15 @@ _HEADER = (
 )
 
 
+class CoverageCritique(ReviewCritique):
+    """Runtime marker for the advisory coverage measurement.
+
+    The persisted/API shape remains ``ReviewCritique``. This subtype exists
+    only while a round is aggregated so a configured reviewer named
+    ``must-have-coverage`` is never shadowed by the deterministic measurement.
+    """
+
+
 class CoverageReport(ExtensibleModel):
     """Which evidenced must-haves reached the produced resume."""
 
@@ -120,12 +129,12 @@ def coverage_report(
 
 def coverage_critique(
     content: ResumeContent, context: SkillMatchContext | None
-) -> ReviewCritique | None:
+) -> CoverageCritique | None:
     """Return an advisory coverage rate, or ``None`` when there is no measure."""
     report = coverage_report(content, context)
     if not report.covered_total:
         return None
-    return ReviewCritique(
+    return CoverageCritique(
         reviewer=COVERAGE_REVIEWER,
         score=round(100 * len(report.rendered) / report.covered_total),
         passed=True,

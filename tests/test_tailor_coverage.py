@@ -10,6 +10,7 @@ from resume_agent.models.review import Severity
 from resume_agent.profile.matrix import MatrixRow, SkillMatch, SkillMatchContext
 from resume_agent.tailor.coverage import (
     COVERAGE_REVIEWER,
+    CoverageCritique,
     coverage_critique,
     coverage_report,
     format_coverage,
@@ -269,6 +270,7 @@ def test_coverage_critique_scores_the_rendered_share_and_never_blocks():
     critique = coverage_critique(content, _context())
 
     assert critique is not None
+    assert isinstance(critique, CoverageCritique)
     assert critique.reviewer == COVERAGE_REVIEWER
     assert critique.passed is True
     assert critique.score == 50

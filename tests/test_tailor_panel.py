@@ -116,6 +116,8 @@ def test_evidence_input_carries_only_referenced_facts():
     text = compose_evidence_review_input(_content(), "Backend role", evidence)
     assert "b1" in text
     assert "SecretRust" not in text
+    assert text.index("JOB DESCRIPTION:") < text.index("RESUME UNDER REVIEW")
+    assert text.index("RESUME UNDER REVIEW") < text.index("SUPPORTING FACTS")
 
 
 def test_review_one_rejects_wrong_type():

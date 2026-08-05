@@ -62,12 +62,12 @@ def compose_evidence_review_input(
 ) -> str:
     """Input for gate reviewers: resume + JD + only referenced facts."""
     return (
+        "JOB DESCRIPTION:\n"
+        f"{_untrusted_content(jd_text)}\n\n"
         "RESUME UNDER REVIEW (JSON):\n"
         f"{content.model_dump_json()}\n\n"
         "SUPPORTING FACTS (the only profile facts this resume cites, keyed by id):\n"
-        f"{json.dumps(evidence)}\n\n"
-        "JOB DESCRIPTION:\n"
-        f"{_untrusted_content(jd_text)}"
+        f"{json.dumps(evidence)}"
     )
 
 
