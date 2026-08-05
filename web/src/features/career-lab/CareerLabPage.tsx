@@ -46,6 +46,13 @@ import {
   type CareerLabContext,
 } from "./use-career-lab";
 
+// Hoisted out of render on purpose. `ChatMessage` is memoized behind a custom
+// comparator that checks `assistantIcon` by reference; an element built inline
+// in JSX is a new object every render, so passing one there fails that check and
+// re-renders — and re-parses the markdown of — every message already in the
+// thread on every stream delta.
+const CAREER_LAB_ICON = <Sparkles className="size-4" aria-hidden="true" />;
+
 export function CareerLabPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -194,7 +201,8 @@ export function CareerLabPage() {
   const durableAdvanced = durableTurns > baseline;
   const showThread = Boolean(active || pending || selectionExchange || runId);
   const canCompose = active?.status === "active" || (!active && (Boolean(pending) || Boolean(selectionExchange) || Boolean(runId)));
-  const chatMessages: ChatThreadMessage[] = (active?.turns ?? []).map((turn, index) => ({
+  const chatTurns = active?.turns ?? [];
+  const chatMessages: ChatThreadMessage[] = chatTurns.map((turn, index) => ({
     id: `${turn.turnId}-${index}`,
     role: turn.role,
     parts: [
@@ -211,6 +219,14 @@ export function CareerLabPage() {
       { id: "selection-assistant", role: "assistant", parts: [{ kind: "notice", message: selectionExchange.assistantText }] },
     );
   }
+
+  // Keyed exactly as `chatMessages` ids are built above. `renderAfter` used to
+  // recover the turn with `find` + an inner `indexOf`, which is quadratic on its
+  // own and runs once per rendered message — cubic in thread length, on every
+  // stream delta. One map built per render makes each lookup O(1).
+  const turnByMessageId = new Map<string, (typeof chatTurns)[number]>(
+    chatTurns.map((turn, index) => [`${turn.turnId}-${index}`, turn]),
+  );
 
   const error = stream.error || runError;
   const historyItems: ChatSessionHistoryItem[] = useMemo(() => (sessions.data?.sessions ?? []).map((row) => ({
@@ -295,10 +311,9 @@ export function CareerLabPage() {
                   streamingActive={stream.status === "streaming"}
                   showReasoning={false}
                   assistantName="Career Lab draft"
-                  assistantIcon={<Sparkles className="size-4" aria-hidden="true" />}
+                  assistantIcon={CAREER_LAB_ICON}
                   renderAfter={(message) => {
-                    const turns = active?.turns ?? [];
-                    const turn = turns.find((candidate) => `${candidate.turnId}-${turns.indexOf(candidate)}` === message.id);
+                    const turn = turnByMessageId.get(message.id);
                     if (!turn?.artifact) return null;
                     return <div className="ml-10 mt-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm"><Badge variant="secondary">Draft</Badge><p className="mt-2 font-medium">{turn.artifact.title}</p><p className="mt-1 text-muted-foreground">{turn.artifact.summary}</p></div>;
                   }}
