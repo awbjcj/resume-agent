@@ -44,6 +44,8 @@ def test_craft_lines_avoid_fabrication_language():
     for line in _all_craft_lines():
         lowered = line.lower()
         for fragment in FABRICATION_FRAGMENTS:
+            if fragment == "invent" and "inventing an outcome to fill the gap fails" in lowered:
+                continue
             assert fragment not in lowered, f"{fragment!r} found in: {line}"
 
 
@@ -85,3 +87,9 @@ def test_match_plan_instructions_keep_integrity_first():
     out = _plan_instructions()
     assert out[: len(_MATCH_PLAN_INSTRUCTIONS)] == _MATCH_PLAN_INSTRUCTIONS
     assert out[len(_MATCH_PLAN_INSTRUCTIONS):] == CRAFT_MATCH_PLAN
+
+
+def test_ats_keyword_rubric_treats_coverage_as_authoritative():
+    text = " ".join(CRAFT_REVIEWERS["ats-keyword"]).lower()
+    assert "must-have coverage" in text
+    assert "gap" in text

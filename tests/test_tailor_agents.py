@@ -97,3 +97,37 @@ def test_tailor_agent_requests_system_prompt_cache(monkeypatch):
 
     assert isinstance(agent, AgentRunner)
     assert agent._agent.model.cache_system_prompt is True
+
+
+def test_writer_and_reviser_forbid_merging_two_facts_into_one_skill_entry():
+    from resume_agent.tailor.agents import (
+        _REVISER_INSTRUCTIONS,
+        _TAILOR_INSTRUCTIONS,
+    )
+
+    for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
+        text = " ".join(block).lower()
+        assert "exactly one" in text and "skills entry" in text
+        assert "category key" in text
+
+
+def test_writer_and_reviser_forbid_derived_tenure():
+    from resume_agent.tailor.agents import (
+        _REVISER_INSTRUCTIONS,
+        _TAILOR_INSTRUCTIONS,
+    )
+
+    for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
+        text = " ".join(block).lower()
+        assert "years of experience" in text or "total years" in text
+
+
+def test_writer_and_reviser_forbid_unstated_beneficiaries():
+    from resume_agent.tailor.agents import (
+        _REVISER_INSTRUCTIONS,
+        _TAILOR_INSTRUCTIONS,
+    )
+
+    for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
+        text = " ".join(block).lower()
+        assert "adoption" in text
