@@ -1,4 +1,5 @@
 from resume_agent.models.profile import (
+    Award,
     Bullet,
     Contact,
     Experience,
@@ -7,6 +8,7 @@ from resume_agent.models.profile import (
 )
 from resume_agent.models.resume import (
     ResumeContent,
+    TailoredAward,
     TailoredBullet,
     TailoredExperience,
     TailoredProject,
@@ -38,6 +40,7 @@ def _facts() -> ProfileFacts:
         projects=[
             Project(id="p1", name="Looms", highlights=["Cut p95 latency to 500ms"])
         ],
+        awards=[Award(id="a1", name="Innovation Award")],
     )
 
 
@@ -122,6 +125,23 @@ def test_project_description_and_bullets_are_checked():
     messages = " ".join(i.message for i in critique.issues)
     assert "4000" in messages
     assert "500" not in messages, "500ms is stated by the project highlight"
+
+
+def test_award_description_numbers_are_checked():
+    content = _resume(
+        awards=[
+            TailoredAward(
+                name="Innovation Award",
+                description="Top 10 performer",
+                provenance="a1",
+            )
+        ]
+    )
+
+    critique = numeric_evidence_critique(content, _facts())
+
+    assert critique.passed is False
+    assert "10" in critique.issues[0].message
 
 
 def test_claim_numbers_skips_numbers_welded_to_letters():

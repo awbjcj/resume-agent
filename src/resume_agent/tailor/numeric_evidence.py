@@ -123,6 +123,8 @@ def numeric_evidence_critique(
                 [bullet.provenance],
                 f"projects/{project.name}/bullet {position + 1}",
             )
+    for award in content.awards:
+        check(award.description, [award.provenance], f"awards/{award.name}")
     for vol in content.volunteer:
         for position, bullet in enumerate(vol.bullets):
             check(
