@@ -266,7 +266,11 @@ async def enrich_companies(
     with Session(engine) as session:
         # One query for the batch, through the same seam the display path uses,
         # instead of a SELECT per company.
-        cached_all = {} if force_refresh else load_company_evidence(session, unique)
+        cached_all = (
+            {}
+            if force_refresh
+            else load_company_evidence(session, list(unique.values()))
+        )
         for normalized, display in unique.items():
             cached = cached_all.get(normalized)
             if cached is None or not cached.is_fresh(now):
