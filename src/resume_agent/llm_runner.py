@@ -424,6 +424,25 @@ class UnparsedAgentOutput(TypeError):
     """
 
 
+#: Where a provider adapter records "this response did not finish". Rides
+#: agno's own ``ModelResponse.provider_data``, which ``agent/_response.py``
+#: copies onto ``RunOutput.model_provider_data`` -- the only channel that
+#: survives from the model adapter to the ``expect_*`` seams without either
+#: mutating the shared model object (one agno model serves every coroutine in a
+#: concurrent batch) or raising, which agno's ``invoke`` would rewrap as a
+#: ``ModelProviderError`` and hide from callers that catch ``UnparsedAgentOutput``.
+INCOMPLETE_KEY = "resume_agent_incomplete"
+
+
+def _incomplete_detail(result: Any) -> dict[str, Any] | None:
+    """The truncation record a provider adapter left on this run, if any."""
+    data = getattr(result, "model_provider_data", None)
+    if not isinstance(data, dict):
+        return None
+    detail = data.get(INCOMPLETE_KEY)
+    return detail if isinstance(detail, dict) else None
+
+
 def _preview(text: str) -> str:
     """Head + tail of ``text``.
 
@@ -456,6 +475,16 @@ def _describe_unparsed(result: Any, content: Any, headline: str) -> str:
     status = getattr(result, "status", None)
     if status is not None:
         fields.append(f"status={getattr(status, 'value', status)}")
+    # The one fact that separates a truncation from a refusal or a rejected
+    # request -- all three of which otherwise read as "got str". Providers report
+    # a finished-but-incomplete response as a *success*, so `status` above says
+    # `completed` and only this names the ceiling that stopped generation.
+    incomplete = _incomplete_detail(result)
+    if incomplete is not None:
+        fields.append(
+            f"cut off: reason={incomplete.get('reason') or '?'} "
+            f"ceiling={incomplete.get('ceiling') or '?'}"
+        )
     metrics = getattr(result, "metrics", None)
     if metrics is not None:
         # reasoning tokens are how we tell whether provider-side thinking was
@@ -515,11 +544,26 @@ def expect_text(result: Any, *, source: str) -> str:
 
     Blank prose is rejected too: it is as unusable to a downstream formatter as
     an error body, and silently formatting it produces the same empty agenda.
+
+    Truncated prose is the third case, and the one this seam used to wave
+    through: a structured call notices a response cut off at the output-token
+    ceiling (half a JSON body parses as nothing), but half a *sentence* is a
+    non-empty ``str`` on a run the provider reports as successful. It passed
+    both checks above and reached the caller as a whole answer.
     """
     content = getattr(result, "content", None)
-    if not _run_failed(result) and isinstance(content, str) and content.strip():
+    truncated = _incomplete_detail(result) is not None
+    if (
+        not truncated
+        and not _run_failed(result)
+        and isinstance(content, str)
+        and content.strip()
+    ):
         return content
-    reason = "run failed" if _run_failed(result) else "no usable text"
+    if truncated:
+        reason = "cut off before finishing"
+    else:
+        reason = "run failed" if _run_failed(result) else "no usable text"
     headline = (
         f"Expected prose from {source} agent, got {type(content).__name__} ({reason})"
     )
@@ -977,7 +1021,38 @@ def _compatible_openai_responses_class():
     from agno.models.openai.responses import OpenAIResponses
 
     class CompatibleOpenAIResponses(OpenAIResponses):
-        """Emit legal reference nodes and omit empty reasoning configuration."""
+        """Emit legal reference nodes, omit empty reasoning, keep truncation."""
+
+        def _parse_provider_response(self, response, **kwargs):
+            """Preserve "this response stopped early" past agno's parser.
+
+            agno reads ``status == "incomplete"``, logs it under a misleading
+            "Background response ..." headline (the check sits outside the
+            background branch, so it fires for every non-streaming call), and
+            then drops it: ``_parse_provider_response`` gets the whole
+            ``Response`` but copies neither the status nor
+            ``incomplete_details`` onto ``ModelResponse``. The truncated body
+            then flows into three JSON parsers, fails all of them, and reaches
+            ``expect_schema`` as a bare ``str`` -- indistinguishable from a
+            refusal or a rejected schema, which is the difference between
+            "raise the output budget" and "fix the prompt".
+
+            Recorded rather than raised: agno's ``invoke`` rewraps any
+            exception as ``ModelProviderError``, which would lose the type
+            anyway *and* escape call sites that deliberately degrade on
+            ``UnparsedAgentOutput``.
+            """
+            parsed = super()._parse_provider_response(response, **kwargs)
+            if getattr(response, "status", None) != "incomplete":
+                return parsed
+            details = getattr(response, "incomplete_details", None)
+            if parsed.provider_data is None:
+                parsed.provider_data = {}
+            parsed.provider_data[INCOMPLETE_KEY] = {
+                "reason": getattr(details, "reason", None) or str(details or "unknown"),
+                "ceiling": self.max_output_tokens,
+            }
+            return parsed
 
         def get_request_params(
             self,
@@ -1165,8 +1240,23 @@ def _openai_effort(model_id: str, *, reasoning: bool) -> str | None:
 
 
 def _openai_max_output_tokens(*, reasoning: bool) -> int:
-    """Leave room for visible output after Responses API reasoning tokens."""
-    return 32000 if reasoning else 16000
+    """Leave room for visible output after Responses API reasoning tokens.
+
+    Deliberately not ``_anthropic_max_tokens``' number. That one sits near
+    16000 because the Anthropic SDK enforces a per-model non-streaming ceiling
+    (``MODEL_NONSTREAMING_TOKENS``) and raises above it -- a real constraint.
+    The Responses API has no equivalent, and copying the figure across rationed
+    output the model was willing to produce: a large structured response
+    stopped at ``incomplete_details.reason="max_output_tokens"`` mid-string,
+    and a body truncated that way parses as nothing, so the whole call was paid
+    for and yielded zero. Being stingy here is a false economy; the ceiling's
+    job is to bound a runaway, not to budget legitimate output.
+
+    The reasoning figure is the larger one because on OpenAI -- unlike
+    Anthropic, where ``thinking`` has its own budget -- reasoning tokens are
+    spent out of this same allowance, so the same visible answer needs more.
+    """
+    return 64000 if reasoning else 32000
 
 
 def _build_openai_responses(
