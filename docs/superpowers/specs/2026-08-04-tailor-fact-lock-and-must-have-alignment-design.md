@@ -230,12 +230,18 @@ snapshot expectations move with these edits.
 
 - per-gate counts for `skill-naming` and `numeric-evidence`, alongside the
   existing `provenance` and `fact-check` counts
-- a must-have coverage rate, joining `jobs.criteria_json` to compute
-  covered-and-rendered over covered
+- a must-have coverage rate from the persisted `CoverageCritique`: its
+  serializable extensible metadata carries `covered_total` and
+  `rendered_total`, and `tailor_health` sums those totals across stored rounds
+  for weighted rendered-over-covered coverage
+- for legacy score-only critiques where those totals are absent, the
+  `must-have-coverage` value falls back to the reviewer-score mean
 
 Both are deterministic, so the before/after comparison needs no LLM judge —
 which matters because `evals/CALIBRATION.md` records the judge as un-anchored,
-supporting only relative arm-to-arm claims. The script stays read-only.
+supporting only relative arm-to-arm claims. The script reads the stored critique
+JSON read-only; it does not join `jobs.criteria_json` or change frozen settings,
+`ResumeContent`, or other persisted model schemas.
 
 Re-measure against the deployed workspace database after the change and append
 the result to `evals/RESULTS.md`.
