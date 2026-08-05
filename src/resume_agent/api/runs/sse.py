@@ -5,9 +5,23 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from typing import Protocol
 
 from resume_agent.api.runs.models import RunSnapshot
+from resume_agent.api.runs.notify import StreamNotifier
 from resume_agent.api.schemas.runs import RunOut
+
+
+class _RunSource(Protocol):
+    """The subset of ``RunManager`` that ``run_events`` needs.
+
+    A structural type rather than ``RunManager`` itself so the perf test's
+    duck-typed manager double satisfies it without inheriting from the real
+    class.
+    """
+
+    def get(self, run_id: str) -> RunSnapshot | None: ...
+    def notifier(self, run_id: str) -> StreamNotifier: ...
 
 
 def record_to_run(snapshot: RunSnapshot) -> RunOut:
@@ -28,7 +42,7 @@ def record_to_run(snapshot: RunSnapshot) -> RunOut:
 
 
 async def run_events(
-    mgr, run_id: str, *, poll_interval: float = 0.5
+    mgr: _RunSource, run_id: str, *, poll_interval: float = 0.5
 ) -> AsyncIterator[dict]:
     """Yield sse-starlette event dicts until the run reaches a terminal state.
 
@@ -48,16 +62,14 @@ async def run_events(
       from a mounted volume; doing it inline let one slow volume stall the API
       loop for *every* connected client.
     """
-    notifier = getattr(mgr, "notifier", None)
-    wakeup = notifier(run_id) if callable(notifier) else None
-    event = wakeup.subscribe() if wakeup is not None else None
+    wakeup = mgr.notifier(run_id)
+    event = wakeup.subscribe()
     try:
         last: str | None = None
         while True:
             # Clear before reading, so a write that lands during the read is
             # still seen as a pending wakeup rather than being swallowed.
-            if event is not None:
-                event.clear()
+            event.clear()
             snapshot = await asyncio.to_thread(mgr.get, run_id)
             if snapshot is None:
                 yield {
@@ -74,13 +86,9 @@ async def run_events(
                 last = serialized
             if run.state in ("done", "error", "cancelled"):
                 return
-            if event is None:
-                await asyncio.sleep(poll_interval)
-                continue
             try:
                 await asyncio.wait_for(event.wait(), timeout=poll_interval)
             except (TimeoutError, asyncio.TimeoutError):
                 pass
     finally:
-        if wakeup is not None and event is not None:
-            wakeup.unsubscribe(event)
+        wakeup.unsubscribe(event)
