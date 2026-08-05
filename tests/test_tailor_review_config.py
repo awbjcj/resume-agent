@@ -58,3 +58,17 @@ def test_fast_mode_fields_load_from_yaml(tmp_path):
 def test_fast_mode_rejects_unknown_writer_tier():
     with pytest.raises(ValidationError):
         ReviewConfig(tailor_tier="typo")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("name", ["provenance", "skill-naming", "numeric-evidence"])
+def test_deterministic_gate_names_are_reserved_from_configured_reviewers(name):
+    with pytest.raises(ValidationError, match=name):
+        ReviewConfig(reviewers=[ReviewerSpec(name=name)])
+
+
+def test_must_have_coverage_remains_a_valid_configured_reviewer_name():
+    config = ReviewConfig(
+        reviewers=[ReviewerSpec(name="must-have-coverage", gate=True, weight=0)]
+    )
+
+    assert config.reviewers[0].name == "must-have-coverage"

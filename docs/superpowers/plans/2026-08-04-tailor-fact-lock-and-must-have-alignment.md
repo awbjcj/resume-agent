@@ -1175,7 +1175,7 @@ Append to `tests/test_tailor_tailoring.py`:
 ```python
 def test_tailor_input_places_coverage_between_criteria_and_jd():
     """Stable-first ordering: coverage is fixed for the job, so it belongs in
-    the cacheable prefix ahead of the volatile blocks."""
+    the stable job-context order ahead of volatile blocks."""
     from resume_agent.models.job import JobCriteria
     from resume_agent.models.profile import Contact, ProfileFacts
     from resume_agent.tailor.tailoring import compose_tailor_input
@@ -1348,9 +1348,10 @@ rides along:
             skill_naming_critique(content, profile_facts),
             numeric_evidence_critique(content, profile_facts),
         ]
-        # Advisory, never a gate: it is not in DETERMINISTIC_GATES and not a
-        # configured reviewer, so it neither blocks the round nor enters the
-        # weighted score. It carries the coverage rate for tailor_health.
+        # Advisory, never a gate: the runtime coverage marker is excluded from
+        # gate and weighted-review selection, while a configured reviewer with
+        # the same name remains valid and authoritative. It carries the
+        # coverage rate for tailor_health.
         if (coverage_measure := coverage_critique(content, skill_context)) is not None:
             deterministic.append(coverage_measure)
 ```
@@ -1373,8 +1374,8 @@ ruff check src/resume_agent/tailor/
 git add src/resume_agent/tailor/ tests/test_tailor_tailoring.py tests/test_tailor_panel.py tests/test_tailor_workflow.py
 git commit -m "feat(tailor): give the writer, reviser, and panel must-have coverage
 
-The coverage block goes into the stable region of each prompt so the cacheable
-prefix survives across rounds. ats-keyword's rubric already told it to
+The coverage block goes into the stable region of each prompt so fixed context
+keeps a stable composition order across rounds. ats-keyword's rubric already told it to
 distinguish a missing keyword from a genuinely missing qualification while
 supplying no data to do so; now it has the data."
 ```

@@ -588,8 +588,8 @@ reaches the run result, the log, and the dashboard.
   It is handed `ats-keyword` and `hiring-manager` critiques, which are entirely
   about fit, so without the JD it was being asked to fix complaints it could not
   read. `compose_revise_input` orders stable context (profile, JD) before
-  volatile context (current resume, this round's critiques) to keep the
-  cacheable prefix intact across rounds. A revision builds on `_best_base` — the
+  volatile context (current resume, this round's critiques) to keep the stable
+  composition order intact across rounds. A revision builds on `_best_base` — the
   best round so far by (gate-clean, score) — not the last, so a regressed round
   cannot become the base for the next one.
 - **A citation slip is not a quality round.** A round that fails _only_ on

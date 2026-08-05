@@ -5,16 +5,11 @@ from pydantic import Field
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.review import ReviewCritique
 from resume_agent.tailor.coverage import CoverageCritique
-from resume_agent.tailor.numeric_evidence import NUMERIC_EVIDENCE_REVIEWER
-from resume_agent.tailor.provenance import PROVENANCE_REVIEWER
-from resume_agent.tailor.review_config import ReviewConfig
-from resume_agent.tailor.skill_naming import SKILL_NAMING_REVIEWER
+from resume_agent.tailor.review_config import RESERVED_REVIEWER_NAMES, ReviewConfig
 
 # Gates decided in-process, not by a configured reviewer agent. They ride in the
 # critiques list like any gate, so aggregate stays the only verdict constructor.
-DETERMINISTIC_GATES = frozenset(
-    {PROVENANCE_REVIEWER, SKILL_NAMING_REVIEWER, NUMERIC_EVIDENCE_REVIEWER}
-)
+DETERMINISTIC_GATES = RESERVED_REVIEWER_NAMES
 
 # The default configured gate when the caller has no ReviewConfig to consult
 # (e.g. reading a stored version outside a request that loaded one). `fact-check`

@@ -71,8 +71,22 @@ def compose_evidence_review_input(
     )
 
 
-def review_one(input_text: str, agent: Runner) -> ReviewCritique:
-    return expect_schema(agent.run(input_text), ReviewCritique, source="reviewer")
+def _validate_reviewer_identity(
+    critique: ReviewCritique, expected_reviewer: str | None
+) -> ReviewCritique:
+    if expected_reviewer is not None and critique.reviewer != expected_reviewer:
+        raise ValueError(
+            "Reviewer output identity mismatch: "
+            f"expected {expected_reviewer!r}, got {critique.reviewer!r}"
+        )
+    return critique
+
+
+def review_one(
+    input_text: str, agent: Runner, *, expected_reviewer: str | None = None
+) -> ReviewCritique:
+    critique = expect_schema(agent.run(input_text), ReviewCritique, source="reviewer")
+    return _validate_reviewer_identity(critique, expected_reviewer)
 
 
 def run_panel(
@@ -87,7 +101,7 @@ def run_panel(
     """Run configured reviewers with the smallest sufficient input per role."""
     if not config.merged_advisory:
         return [
-            review_one(text, reviewer_agents[name])
+            review_one(text, reviewer_agents[name], expected_reviewer=name)
             for name, text in _panel_inputs(
                 content, profile_facts, jd_text, config, coverage=coverage
             )
@@ -98,6 +112,7 @@ def run_panel(
         review_one(
             compose_evidence_review_input(content, jd_text, evidence),
             reviewer_agents[spec.name],
+            expected_reviewer=spec.name,
         )
         for spec in config.reviewers
         if spec.gate
@@ -148,10 +163,15 @@ def _panel_inputs(
 
 
 async def areview_one(
-    input_text: str, agent: Runner, *, sem: asyncio.Semaphore
+    input_text: str,
+    agent: Runner,
+    *,
+    sem: asyncio.Semaphore,
+    expected_reviewer: str | None = None,
 ) -> ReviewCritique:
     result = await acall(agent, input_text, sem=sem)
-    return expect_schema(result, ReviewCritique, source="reviewer")
+    critique = expect_schema(result, ReviewCritique, source="reviewer")
+    return _validate_reviewer_identity(critique, expected_reviewer)
 
 
 async def arun_panel(
@@ -170,7 +190,15 @@ async def arun_panel(
             content, profile_facts, jd_text, config, coverage=coverage
         )
         outputs = await asyncio.gather(
-            *(areview_one(text, reviewer_agents[name], sem=sem) for name, text in inputs),
+            *(
+                areview_one(
+                    text,
+                    reviewer_agents[name],
+                    sem=sem,
+                    expected_reviewer=name,
+                )
+                for name, text in inputs
+            ),
             return_exceptions=True,
         )
         return _settled_critiques(outputs)
@@ -183,6 +211,7 @@ async def arun_panel(
             compose_evidence_review_input(content, jd_text, evidence),
             reviewer_agents[spec.name],
             sem=sem,
+            expected_reviewer=spec.name,
         )
         for spec in gate_specs
     ]

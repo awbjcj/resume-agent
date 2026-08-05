@@ -177,7 +177,8 @@ MUST-HAVE COVERAGE (deterministic; fact ids are evidence pointers, not claims):
 ```
 
 It is wired into three composers, each in the **stable** region of the prompt
-so the cacheable prefix survives across rounds:
+so fixed job context keeps the same composition order ahead of round-specific
+content:
 
 - `compose_tailor_input` — after `JOB CRITERIA`
 - `compose_revise_input` — after `JOB DESCRIPTION`
@@ -275,7 +276,7 @@ Offline throughout; no API key or network, matching the existing suite.
 - `coverage`: block formatting for each of `covered` / `adjacent` / `gap`;
   missing matrix degrades to no block; `coverage_report` counts a must-have
   rendered in a bullet as covered.
-- composer tests pinning the coverage block's position, so the cacheable prefix
+- composer tests pinning the coverage block's position, so stable-before-volatile
   ordering does not silently regress.
 
 ## Risks

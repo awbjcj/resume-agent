@@ -1,10 +1,18 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from resume_agent.config import load_yaml
 from resume_agent.models.base import ExtensibleModel
+
+
+# These names are emitted by deterministic in-process gates and must not be
+# claimed by a configured/model-backed reviewer. ``must-have-coverage`` is
+# intentionally absent: it is also a supported configured reviewer name.
+RESERVED_REVIEWER_NAMES = frozenset(
+    {"provenance", "skill-naming", "numeric-evidence"}
+)
 
 
 class ReviewerSpec(ExtensibleModel):
@@ -38,6 +46,18 @@ class ReviewConfig(ExtensibleModel):
     provenance_retry_budget: int = Field(default=1, ge=0)
     length_budget: LengthBudget = Field(default_factory=LengthBudget)
     style_guide_path: str = "config/style_guide.md"
+
+    @model_validator(mode="after")
+    def _reject_reserved_reviewer_names(self) -> "ReviewConfig":
+        reserved = sorted(
+            {spec.name for spec in self.reviewers if spec.name in RESERVED_REVIEWER_NAMES}
+        )
+        if reserved:
+            names = ", ".join(repr(name) for name in reserved)
+            raise ValueError(
+                f"reviewer names are reserved for deterministic gates: {names}"
+            )
+        return self
 
 
 def load_review_config(path: str | Path) -> ReviewConfig:

@@ -149,6 +149,33 @@ def test_run_panel_routes_gate_to_evidence_and_others_to_lean():
     assert coverage in agents["ats-keyword"].received
 
 
+def test_run_panel_rejects_non_merged_reviewer_identity_mismatch():
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="ats-keyword", weight=1)])
+    agents = {
+        "ats-keyword": _Agent(
+            ReviewCritique(reviewer="recruiter", score=80, passed=True)
+        )
+    }
+
+    with pytest.raises(ValueError, match="expected 'ats-keyword'.*'recruiter'"):
+        run_panel(_content(), _facts(), "Backend role", config, agents)
+
+
+def test_run_panel_rejects_merged_gate_identity_mismatch():
+    config = ReviewConfig(
+        merged_advisory=True,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+    agents = {
+        "fact-check": _Agent(
+            ReviewCritique(reviewer="provenance", score=100, passed=True)
+        )
+    }
+
+    with pytest.raises(ValueError, match="expected 'fact-check'.*'provenance'"):
+        run_panel(_content(), _facts(), "Backend role", config, agents)
+
+
 def test_arun_panel_runs_reviewers_concurrently_in_order():
     import asyncio
     import time
@@ -220,6 +247,53 @@ def test_arun_panel_settles_reviewers_before_raising():
     with pytest.raises(RuntimeError):
         asyncio.run(go())
     assert "slow:done" in events
+
+
+def test_arun_panel_rejects_non_merged_reviewer_identity_mismatch():
+    import asyncio
+
+    from resume_agent.tailor.panel import arun_panel
+
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="ats-keyword", weight=1)])
+    agents = {
+        "ats-keyword": _Agent(
+            ReviewCritique(reviewer="recruiter", score=80, passed=True)
+        )
+    }
+
+    async def go():
+        return await arun_panel(
+            _content(), _facts(), "jd", config, agents, sem=asyncio.Semaphore(8)
+        )
+
+    with pytest.raises(ValueError, match="expected 'ats-keyword'.*'recruiter'"):
+        asyncio.run(go())
+
+
+def test_arun_panel_rejects_merged_gate_identity_mismatch():
+    import asyncio
+
+    from resume_agent.models.review import MergedPanelReview, ReviewCritique
+    from resume_agent.tailor.panel import MERGED_ADVISORY, arun_panel
+
+    config = ReviewConfig(
+        merged_advisory=True,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+    agents = {
+        "fact-check": _Agent(
+            ReviewCritique(reviewer="provenance", score=100, passed=True)
+        ),
+        MERGED_ADVISORY: _Agent(MergedPanelReview()),
+    }
+
+    async def go():
+        return await arun_panel(
+            _content(), _facts(), "jd", config, agents, sem=asyncio.Semaphore(8)
+        )
+
+    with pytest.raises(ValueError, match="expected 'fact-check'.*'provenance'"):
+        asyncio.run(go())
 
 
 def test_split_merged_critiques_returns_config_order():

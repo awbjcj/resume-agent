@@ -103,7 +103,7 @@ def compose_revise_input(
     )
     # Stable-first ordering: the profile and the job are fixed for the whole job,
     # while the resume and the critiques change every round. Keeping the volatile
-    # blocks last preserves the cacheable prefix across rounds.
+    # blocks last preserves a stable composition order across rounds.
     return (
         "CANDIDATE PROFILE (JSON):\n"
         f"{renderable_profile(profile_facts).model_dump_json()}\n\n"

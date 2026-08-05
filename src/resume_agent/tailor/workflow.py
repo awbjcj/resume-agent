@@ -159,9 +159,10 @@ def run_tailor_review(
             skill_naming_critique(content, profile_facts),
             numeric_evidence_critique(content, profile_facts),
         ]
-        # Advisory, never a gate: it is not in DETERMINISTIC_GATES and not a
-        # configured reviewer, so it neither blocks the round nor enters the
-        # weighted score. It carries the coverage rate for tailor_health.
+        # Advisory, never a gate: the runtime coverage marker is excluded from
+        # gate and weighted-review selection, while a configured reviewer with
+        # the same name remains valid and authoritative. It carries the
+        # coverage rate for tailor_health.
         if (coverage_measure := coverage_critique(content, skill_context)) is not None:
             deterministic.append(coverage_measure)
         started = time.monotonic()
@@ -266,9 +267,10 @@ async def arun_tailor_review(
             skill_naming_critique(content, profile_facts),
             numeric_evidence_critique(content, profile_facts),
         ]
-        # Advisory, never a gate: it is not in DETERMINISTIC_GATES and not a
-        # configured reviewer, so it neither blocks the round nor enters the
-        # weighted score. It carries the coverage rate for tailor_health.
+        # Advisory, never a gate: the runtime coverage marker is excluded from
+        # gate and weighted-review selection, while a configured reviewer with
+        # the same name remains valid and authoritative. It carries the
+        # coverage rate for tailor_health.
         if (coverage_measure := coverage_critique(content, skill_context)) is not None:
             deterministic.append(coverage_measure)
         started = time.monotonic()

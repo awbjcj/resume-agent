@@ -156,7 +156,7 @@ def test_reviser_input_includes_the_job_description():
 
 def test_reviser_input_orders_stable_context_before_volatile_context():
     # Profile and JD are fixed for the whole job; the resume and the critiques
-    # change every round. Stable first keeps the cacheable prefix intact.
+    # change every round. Stable first keeps the composition order intact.
     text = compose_revise_input(
         ResumeContent(contact=Contact(name="Ada")),
         [],
@@ -169,7 +169,7 @@ def test_reviser_input_orders_stable_context_before_volatile_context():
 
 
 def test_tailor_input_places_coverage_between_criteria_and_jd():
-    """Job-stable coverage belongs in the cacheable prefix."""
+    """Job-stable coverage stays ahead of volatile round-specific content."""
     text = compose_tailor_input(
         "JD body",
         JobCriteria(),
