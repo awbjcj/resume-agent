@@ -237,6 +237,39 @@ model` heuristic was right only for the catalog and 400'd for any pre-4.6 id
   interview stacks inherit it) — so a bare `isinstance` guard on agent output
   is a regression. `UnparsedAgentOutput` subclasses `TypeError`, so adopting it
   never changes what a caller catches.
+- **A truncated response is a provider _success_, and agno throws away the one
+  field that says otherwise.** OpenAI returns `status="incomplete"` +
+  `incomplete_details.reason="max_output_tokens"` with HTTP 200 when generation
+  stops at the ceiling. agno logs that under the misleading headline
+  `Background response … completed with status 'incomplete'` — the check sits
+  **outside** the `if self.background:` branch, so it fires on every
+  non-streaming call and says nothing about background mode — and then drops
+  it: `_parse_provider_response` receives the whole `Response` but copies
+  neither field onto `ModelResponse`. The truncated body then fails all three
+  JSON parsers and lands in `expect_schema` as a bare `str`, where "got str" is
+  equally true of a refusal or a rejected schema. `CompatibleOpenAIResponses`
+  therefore records `{reason, ceiling}` under `INCOMPLETE_KEY` on agno's own
+  `provider_data`, which `agent/_response.py` copies to
+  `RunOutput.model_provider_data`; `_describe_unparsed` names it in both
+  `expect_*` failures. **Recorded, not raised** — agno's `invoke` rewraps any
+  exception as `ModelProviderError`, losing the type _and_ escaping call sites
+  that deliberately degrade on `UnparsedAgentOutput`
+  (`h1b/service.py::_resolve_company_name`). This also closes a real hole in
+  `expect_text`: half a JSON body parses as nothing, but half a _sentence_ is a
+  non-empty `str` on a successful run, so truncated prose used to reach the
+  caller as a whole answer. Streaming never calls `_parse_provider_response`,
+  so a truncated **streamed** turn is still undetected.
+- **`_openai_max_output_tokens` is deliberately not `_anthropic_max_tokens`.**
+  Anthropic's ~16000 exists because the SDK enforces a per-model non-streaming
+  ceiling (`MODEL_NONSTREAMING_TOKENS`) and raises above it. The Responses API
+  has no equivalent, so copying that figure across rationed output the model
+  was willing to produce and truncated large structured responses mid-string —
+  and a body cut that way parses as nothing, so the call was paid for in full
+  and yielded zero. The ceiling's job is to bound a runaway, not to budget
+  legitimate output: 32000 non-reasoning, **64000** reasoning. The reasoning
+  figure is the larger one because on OpenAI — unlike Anthropic, where
+  `thinking` has its own budget — reasoning tokens are spent out of this same
+  allowance, so the same visible answer needs more headroom.
 
 To add a provider: extend `PROVIDERS`, add its key to `Settings`, and add a branch
 to `build_model` with a lazy import. Nothing else changes.
@@ -350,11 +383,11 @@ admin-users API.
   total verification emails sent per day (`Settings.global_daily_signup_limit`)
   regardless of how many distinct emails/IPs originate them.
 - **Spend policy is resolved once per phase, by one seam.** `tenancy/spend.py`'s
-  `SpendGate` owns key selection *and* budget: `select()` answers "which key?"
+  `SpendGate` owns key selection _and_ budget: `select()` answers "which key?"
   without raising (what `resolve_api_key` asks), `open()` answers "may I
   spend?" and raises (what `enforce_agent_budget` asks), and both come from a
   single evaluation so they cannot disagree. The decision is cached on the
-  active `UserContext` — a context *is* a phase — for
+  active `UserContext` — a context _is_ a phase — for
   `Settings.spend_gate_ttl_seconds` (default 30). The cache is **exact, not
   merely time-bounded**: each decision carries the remaining shared headroom,
   `record_call` decrements it, and the call that exhausts a budget is the call
@@ -380,8 +413,8 @@ admin-users API.
   `Settings.global_monthly_cost_quota_micros`. **Administrators are exempt
   from the per-user allowance and remain bound by the platform-wide cap.**
   That asymmetry is the design, not an oversight: the per-user allowance
-  protects the platform's budget *allocation*, the platform cap protects its
-  *absolute* spend, and an operator with unbounded absolute spend is exactly
+  protects the platform's budget _allocation_, the platform cap protects its
+  _absolute_ spend, and an operator with unbounded absolute spend is exactly
   the failure the cap exists to prevent. `global_monthly_cost` and
   `global_weekly_usage` therefore sum **every** shared-key `UsageEvent`, admin
   rows included — neither joins `User`. ADR-0009's Amendment 2 and ADR-0010
@@ -816,6 +849,28 @@ fitOnePage}`; legacy `template_path` and `output_dir` remain runtime-only CLI
   different existing `google_sub` is never overwritten. Sign-in scopes remain
   identity-only. Gmail consent is a separate incremental flow and keeps its
   readonly + compose scopes; `gmail.send` remains out of scope.
+- **The Gmail token exchange must reconcile scopes; oauthlib cannot.** Connect
+  sends `include_granted_scopes=true`, so Google returns the union of every
+  scope the shared OAuth client holds — the Gmail pair _plus_ the three
+  identity scopes from sign-in. oauthlib reads RFC 6749 §3.3 as a raw set
+  inequality (`OAuth2Token.scope_changed`) and raises a bare `Warning` from
+  inside `fetch_token` on **any** difference, so it cannot tell a harmless
+  incremental superset from a grant missing what was asked for. It fired on
+  every connect by a Google-signed-in user, and the callback's blanket
+  `except Exception` turned it into `?gmail=error` — i.e. adding Google
+  sign-in silently broke Gmail connect for exactly the users it targeted.
+  `_exchange_token` (`api/routers/gmail.py`) is the one seam that clears
+  `oauth2session.scope` to drop that comparison, then makes the distinction
+  explicitly: no `gmail.readonly` in the grant raises `GmailScopeMissing`
+  rather than storing a token that reports a connection the user never gave.
+  It then restores the session scope to what was **granted**, because
+  `Flow.credentials` copies it into `Credentials.scopes` and `to_json` persists
+  only that list — the one `has_compose`/`draftCapable` later read. Storing the
+  _requested_ pair would claim compose access a user may have withheld on
+  Google's granular consent screen. Never call `flow.fetch_token` directly
+  here. Pinned by `tests/api/test_gmail_oauth_scope.py`, which drives the real
+  google-auth-oauthlib stack over a stubbed token endpoint — a faked `Flow`
+  exercises none of this.
 - **Gmail is multi-user; drafts only, never send.** The platform OAuth client
   (`GOOGLE_OAUTH_CLIENT_ID/SECRET`) can be overridden per user via
   `secrets.env`; per-user tokens live at `{workspace}/gmail_token.json`

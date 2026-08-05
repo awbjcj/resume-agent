@@ -219,6 +219,11 @@ def gmail_callback(request: Request, code: str = "", state: str = "", error: str
             "Gmail callback rejected (config/client): %s %s", exc.code, exc.message
         )
         return _finish("error")
+    except GmailScopeMissing:
+        # Distinct from the branch below: the exchange itself succeeded, the
+        # user just withheld Gmail access on the consent screen.
+        logger.warning("Gmail callback: consent granted no Gmail access")
+        return _finish("error")
     except Exception:  # noqa: BLE001 — never render a raw OAuth error page
         logger.exception("Gmail callback token exchange failed")
         return _finish("error")

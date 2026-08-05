@@ -114,20 +114,15 @@ def test_exchange_rejects_a_grant_without_gmail_access():
         _exchange_token(flow, code="abc")
 
 
-def test_callback_connects_when_google_returns_a_superset(tmp_path, monkeypatch):
-    """End-to-end regression for the reported failure.
-
-    Before the fix this redirected to ``?gmail=error`` for every user who had
-    signed in with Google, because the two flows share one OAuth client.
-    """
+def _callback_outcome(tmp_path, monkeypatch, granted: list[str]):
+    """Drive the whole callback with a real Flow over a stubbed token endpoint."""
     from resume_agent.api.app import create_app
     from resume_agent.api.routers import gmail as gmail_router
 
-    granted = " ".join(IDENTITY_SCOPES + gmail_auth.GMAIL_SCOPES)
     monkeypatch.setattr(
         gmail_router,
         "_build_flow",
-        lambda _settings, _redirect_uri: _stubbed_flow(granted),
+        lambda _settings, _redirect_uri: _stubbed_flow(" ".join(granted)),
     )
     app = create_app(
         db_url="sqlite://",
@@ -141,12 +136,34 @@ def test_callback_connects_when_google_returns_a_superset(tmp_path, monkeypatch)
         )
         auth_url = client.get("/api/gmail/connect").json()["authUrl"]
         state = auth_url.split("state=", 1)[1].split("&", 1)[0]
-
         callback = client.get(
             f"/api/gmail/callback?code=abc&state={state}", follow_redirects=False
         )
-        assert "gmail=connected" in callback.headers["location"]
+        return callback.headers["location"], client.get("/api/gmail/status").json()
 
-        status = client.get("/api/gmail/status").json()
-        assert status["connected"] is True
-        assert status["draftCapable"] is True
+
+def test_callback_connects_when_google_returns_a_superset(tmp_path, monkeypatch):
+    """End-to-end regression for the reported failure.
+
+    Before the fix this redirected to ``?gmail=error`` for every user who had
+    signed in with Google, because the two flows share one OAuth client.
+    """
+    location, status = _callback_outcome(
+        tmp_path, monkeypatch, IDENTITY_SCOPES + gmail_auth.GMAIL_SCOPES
+    )
+
+    assert "gmail=connected" in location
+    assert status["connected"] is True
+    assert status["draftCapable"] is True
+
+
+def test_callback_does_not_connect_without_gmail_access(tmp_path, monkeypatch):
+    """oauthlib's blanket check used to block this case as a side effect.
+
+    Relaxing it must not leave a token behind that reports a working Gmail
+    connection the user never granted.
+    """
+    location, status = _callback_outcome(tmp_path, monkeypatch, IDENTITY_SCOPES)
+
+    assert "gmail=error" in location
+    assert status["connected"] is False
