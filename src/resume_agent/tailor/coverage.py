@@ -32,10 +32,14 @@ class CoverageCritique(ReviewCritique):
     only while a round is aggregated so a configured reviewer named
     ``must-have-coverage`` is never shadowed by the deterministic measurement.
 
-    ``covered_total`` and ``rendered_total`` are runtime-only extra fields. They
-    survive the existing JSON persistence as serializable measurement metadata
-    so health reports can aggregate a weighted coverage rate across rounds.
+    ``covered_total`` and ``rendered_total`` are measurement metadata declared
+    here (not inherited from ``ReviewCritique``) so they survive JSON
+    persistence and health reports can aggregate a weighted coverage rate
+    across rounds.
     """
+
+    covered_total: int = 0
+    rendered_total: int = 0
 
 
 class CoverageReport(ExtensibleModel):
