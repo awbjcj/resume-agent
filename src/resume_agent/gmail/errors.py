@@ -12,7 +12,11 @@ class GmailNotConnected(GmailError):
 
 
 class GmailScopeMissing(GmailError):
-    """Token lacks gmail.compose — reconnect to enable drafts."""
+    """Token lacks a required Gmail scope — reconnect and approve it.
+
+    Raised at connect time when the grant carries no gmail.readonly at all, and
+    at draft time when it carries no gmail.compose.
+    """
 
     code = "GMAIL_SCOPE_MISSING"
 

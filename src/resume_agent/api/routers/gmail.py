@@ -23,6 +23,7 @@ from resume_agent.api.public_url import public_url
 from resume_agent.api.schemas.gmail import GmailConnectOut, GmailStatusOut
 from resume_agent.config import Settings, get_settings
 from resume_agent.gmail import auth as gmail_auth
+from resume_agent.gmail.errors import GmailScopeMissing
 from resume_agent.tenancy.context import current_context, use_context
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,48 @@ def _build_flow(settings: Settings, redirect_uri: str) -> Any:
         redirect_uri=redirect_uri,
         autogenerate_code_verifier=False,
     )
+
+
+def _granted_scopes(token: Any) -> list[str]:
+    """Scopes Google says it granted, falling back to what we asked for.
+
+    RFC 6749 makes the response ``scope`` optional when it equals the request,
+    so an absent value means "unchanged", not "nothing granted".
+    """
+    raw = (token or {}).get("scope")
+    if not raw:
+        return list(gmail_auth.GMAIL_SCOPES)
+    return raw.split() if isinstance(raw, str) else list(raw)
+
+
+def _exchange_token(flow: Any, code: str) -> str:
+    """Trade the code for credentials JSON carrying the *granted* scopes.
+
+    Connect asks for incremental authorization, so Google returns the union of
+    every scope this OAuth client already holds — the Gmail pair plus the
+    identity scopes from Google sign-in, which shares the client. oauthlib
+    enforces RFC 6749 section 3.3 as a raw set inequality and raises a bare
+    ``Warning`` from inside ``fetch_token`` on *any* difference, so it cannot
+    tell that harmless superset from a grant that is missing what we asked for.
+    Clearing the session scope drops that blanket comparison; the distinction it
+    failed to make is drawn explicitly below.
+
+    The session scope is then restored to what was actually granted, because
+    ``Flow.credentials`` copies it into ``Credentials.scopes`` and that list is
+    the only scope record ``to_json`` persists — the one ``has_compose`` later
+    reads. Leaving the requested pair there would claim compose access the user
+    may have withheld on Google's granular consent screen.
+    """
+    session = flow.oauth2session
+    session.scope = None
+    flow.fetch_token(code=code)
+    granted = _granted_scopes(session.token)
+    if gmail_auth.SCOPE_READONLY not in granted:
+        raise GmailScopeMissing(
+            "Gmail access was not granted — approve the Gmail permissions to connect."
+        )
+    session.scope = granted
+    return flow.credentials.to_json()
 
 
 def _redirect_uri(request: Request) -> str:
@@ -152,9 +195,8 @@ def gmail_callback(request: Request, code: str = "", state: str = "", error: str
             settings = request.app.state.settings
             _require_client(settings)
             flow = _build_flow(settings, _redirect_uri(request))
-            flow.fetch_token(code=code)
             gmail_auth.save_token_json(
-                flow.credentials.to_json(), request.app.state.data_dir
+                _exchange_token(flow, code), request.app.state.data_dir
             )
         else:
             from resume_agent.tenancy.bootstrap import build_context
@@ -171,8 +213,7 @@ def gmail_callback(request: Request, code: str = "", state: str = "", error: str
                 settings = get_settings()  # effective: user client override wins
                 _require_client(settings)
                 flow = _build_flow(settings, _redirect_uri(request))
-                flow.fetch_token(code=code)
-                gmail_auth.save_token_json(flow.credentials.to_json())
+                gmail_auth.save_token_json(_exchange_token(flow, code))
     except ApiException as exc:
         logger.exception(
             "Gmail callback rejected (config/client): %s %s", exc.code, exc.message
