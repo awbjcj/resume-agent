@@ -274,6 +274,8 @@ def test_coverage_critique_scores_the_rendered_share_and_never_blocks():
     assert critique.reviewer == COVERAGE_REVIEWER
     assert critique.passed is True
     assert critique.score == 50
+    assert critique.model_dump(mode="json")["covered_total"] == 2
+    assert critique.model_dump(mode="json")["rendered_total"] == 1
     assert [i.severity for i in critique.issues] == [Severity.major]
     assert "LangChain" in critique.issues[0].message
 

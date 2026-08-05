@@ -31,6 +31,10 @@ class CoverageCritique(ReviewCritique):
     The persisted/API shape remains ``ReviewCritique``. This subtype exists
     only while a round is aggregated so a configured reviewer named
     ``must-have-coverage`` is never shadowed by the deterministic measurement.
+
+    ``covered_total`` and ``rendered_total`` are runtime-only extra fields. They
+    survive the existing JSON persistence as serializable measurement metadata
+    so health reports can aggregate a weighted coverage rate across rounds.
     """
 
 
@@ -138,6 +142,8 @@ def coverage_critique(
         reviewer=COVERAGE_REVIEWER,
         score=round(100 * len(report.rendered) / report.covered_total),
         passed=True,
+        covered_total=report.covered_total,
+        rendered_total=len(report.rendered),
         issues=[
             ReviewIssue(
                 severity=Severity.major,
