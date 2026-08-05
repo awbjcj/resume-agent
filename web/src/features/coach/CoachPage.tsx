@@ -51,6 +51,13 @@ import {
   useUnarchiveCoachSession,
 } from "./use-coach";
 
+// Hoisted out of render on purpose. `ChatMessage` is memoized behind a custom
+// comparator that checks `assistantIcon` by reference; an element built inline
+// in JSX is a new object every render, so passing one there fails that check and
+// re-renders — and re-parses the markdown of — every message already in the
+// thread on every stream delta.
+const COACH_ICON = <Sparkles className="size-4" aria-hidden="true" />;
+
 function RunError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <Alert variant="destructive">
@@ -258,6 +265,10 @@ export function CoachPage() {
     if (!pending || durableTurns > pending.baseline) return durable;
     return [...durable, { id: "pending-user", role: "user" as const, parts: [{ kind: "text" as const, text: pending.text }] }];
   })();
+  // `renderAfter` runs once per rendered message, so recovering a message's turn
+  // with `indexOf` made the pass quadratic in thread length. One index map keeps
+  // each lookup O(1); ids are unique by construction (`${turn.at}-${index}`).
+  const turnIndexById = new Map(chatMessages.map((message, index) => [message.id, index]));
   const durableAdvanced = durableTurns > attachedBaseline;
   const streamingParts = attachedRunId && !durableAdvanced ? stream.parts : null;
   const busy = send.isPending || runState === "running" || stream.status === "streaming";
@@ -322,7 +333,7 @@ export function CoachPage() {
                   streaming={stream.parts}
                   streamingActive={stream.status === "streaming"}
                   assistantName="Profile coach"
-                  assistantIcon={<Sparkles className="size-4" aria-hidden="true" />}
+                  assistantIcon={COACH_ICON}
                 />
                 {!stream.parts.length ? (
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -365,9 +376,9 @@ export function CoachPage() {
                   streaming={streamingParts}
                   streamingActive={stream.status === "streaming"}
                   assistantName="Profile coach"
-                  assistantIcon={<Sparkles className="size-4" aria-hidden="true" />}
+                  assistantIcon={COACH_ICON}
                   renderAfter={(message) => {
-                    const index = chatMessages.indexOf(message);
+                    const index = turnIndexById.get(message.id) ?? -1;
                     const turn = active.turns?.[index];
                     if (!turn?.researchActions?.length) return null;
                     return (
