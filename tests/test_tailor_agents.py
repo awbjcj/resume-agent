@@ -107,8 +107,15 @@ def test_writer_and_reviser_forbid_merging_two_facts_into_one_skill_entry():
 
     for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
         text = " ".join(block).lower()
-        assert "exactly one" in text and "skills entry" in text
-        assert "category key" in text
+        assert "skills entry names exactly one skill fact" in text
+        assert "never merge two technologies into one entry" in text
+        assert "group related skills using the skills category key instead" in text
+        assert "which is what renders as the section line" in text
+
+    tailor_text = " ".join(_TAILOR_INSTRUCTIONS).lower()
+    assert "jira & confluence rest apis" in tailor_text
+    assert "unit testing (pytest, matlab unit test)" in tailor_text
+    assert "name a technology the cited fact does not cover" in tailor_text
 
 
 def test_writer_and_reviser_forbid_derived_tenure():
@@ -119,7 +126,15 @@ def test_writer_and_reviser_forbid_derived_tenure():
 
     for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
         text = " ".join(block).lower()
-        assert "years of experience" in text or "total years" in text
+        assert (
+            "never state a tenure, duration, or total years of experience unless a fact states that figure"
+            in text
+        )
+        assert (
+            "employment dates are facts; the span between them is arithmetic you may not perform"
+            in text
+        )
+        assert "'3+ years building x' needs a fact that says so" in text
 
 
 def test_writer_and_reviser_forbid_unstated_beneficiaries():
@@ -130,4 +145,9 @@ def test_writer_and_reviser_forbid_unstated_beneficiaries():
 
     for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
         text = " ".join(block).lower()
-        assert "adoption" in text
+        assert (
+            "never name a beneficiary, adoption, saving, or efficiency the fact does not state"
+            in text
+        )
+        assert "improving adoption among non-technical users" in text
+        assert "as unsupported as an invented number" in text
