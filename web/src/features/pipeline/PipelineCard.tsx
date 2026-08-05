@@ -19,7 +19,7 @@ export function PipelineCard({
   footer?: ReactNode;
 }) {
   return (
-    <Card className="min-w-0 flex-col gap-4 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(24,32,38,0.08)]">
+    <Card className="min-w-0 flex-col gap-4 p-5 transition-[box-shadow,transform] duration-200 ease-out-strong hover:-translate-y-0.5 hover:shadow-card-raised hover:ring-primary/40 motion-reduce:hover:translate-y-0">
       <div className="flex items-start gap-3">
       {onSelect && (
         <div className="pt-1">
