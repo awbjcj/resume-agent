@@ -73,3 +73,30 @@ current eval harness. **Artifact:** `evals/reports/2026-07-resume-baseline.json`
 
 The live profile checkpoint produced 70 grouped matrix rows: 0 missing
 assignments and 1 explicit `other` assignment (`vFlash`, 1.4%).
+
+## 2026-08-04 deterministic fact-lock gates + must-have coverage
+
+Ships `skill-naming` and `numeric-evidence` as deterministic gates and wires the
+already-computed `SkillMatchContext` into the writer, reviser, and advisory
+panel. `score_threshold: 85` and `match_plan_enabled: false` remain untouched —
+the Phase D arms below are still unrun.
+
+Pre-change reference is the 2026-07-27 baseline above (77 versions / 26 jobs,
+8/77 gate-clean, ats-keyword mean 55.1, 0/26 jobs reaching threshold).
+
+Re-measure with `python scripts/tailor_health.py <workspace-db>` after a tailor
+run of comparable size and fill in:
+
+| metric | before | after |
+| ------ | ------ | ----- |
+| gate-clean rounds | 8 / 77 | |
+| gate failures — fact-check | 50 | |
+| gate failures — skill-naming | n/a | |
+| gate failures — numeric-evidence | n/a | |
+| ats-keyword mean | 55.1 | |
+| must-have-coverage mean | n/a | |
+
+Success criteria from the spec: zero rounds failing on a compound skill entry;
+the fact-check metric/number bucket falls; the ats-keyword mean rises **without**
+fact-check failures rising; remaining fact-check failures concentrate in
+scope-creep claims.

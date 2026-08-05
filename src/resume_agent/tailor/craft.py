@@ -10,10 +10,12 @@ attributable to writer changes rather than checker drift.
 """
 
 CRAFT_WRITER = [
-    "Write every bullet as an accomplishment: lead with the outcome and its "
-    "number when a cited profile fact supplies one, then the action that "
+    "Write every bullet as an accomplishment. When a cited profile fact supplies "
+    "a number, lead with the outcome and its number, then the action that "
     "produced it. When the cited facts carry no number, lead with the concrete "
-    "action and its scope instead.",
+    "action, its scope, and the specific systems involved - that is a complete "
+    "accomplishment bullet, not a lesser one, and inventing an outcome to fill "
+    "the gap fails the round.",
     "Start bullets with strong past-tense verbs such as built, shipped, scaled, "
     "reduced, led, or designed. Never open with duty phrasing like 'responsible "
     "for', 'helped with', 'worked on', or passive voice.",
@@ -69,6 +71,12 @@ CRAFT_REVIEWERS: dict[str, list[str]] = {
         "would support the exact term ('risk mitigation' where the job says "
         "'risk management'); suggest the exact term. Flag a term repeated far "
         "beyond natural use as stuffing rather than coverage.",
+        "When MUST-HAVE COVERAGE is present it is authoritative. A requirement "
+        "marked 'gap' is a qualification the candidate genuinely lacks: never "
+        "score it as a missing keyword and never suggest adding it. Score "
+        "coverage only over requirements marked 'covered', and treat one marked "
+        "'adjacent' as emphasis material that may never be named as the job's "
+        "own term.",
     ],
     "recruiter": [
         "Apply a six-second scan standard: the summary, first role, and its "

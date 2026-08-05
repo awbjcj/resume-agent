@@ -1,0 +1,183 @@
+"""Must-have coverage: the deterministic answer the pipeline already computes.
+
+``build_skill_match_context`` maps each job requirement to covered, adjacent,
+or gap, together with the matching matrix row and its evidence fact ids. This
+module renders that context for prompt consumers and measures which evidenced
+must-haves reached the generated resume.
+
+Coverage is advisory rather than a gate. A one-page resume may have to leave a
+truthful, evidenced requirement out, and turning that length trade-off into a
+blocking failure would make the tailoring loop unwinnable.
+"""
+
+from pydantic import Field
+
+from resume_agent.models.base import ExtensibleModel
+from resume_agent.models.resume import ResumeContent
+from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
+from resume_agent.profile.matrix import SkillMatch, SkillMatchContext
+from resume_agent.tracking.match_gap import normalize_skill
+
+COVERAGE_REVIEWER: str = "must-have-coverage"
+
+_HEADER = (
+    "MUST-HAVE COVERAGE (deterministic; fact ids are evidence pointers, not claims):"
+)
+
+
+class CoverageCritique(ReviewCritique):
+    """Runtime marker for the advisory coverage measurement.
+
+    The persisted/API shape remains ``ReviewCritique``. This subtype exists
+    only while a round is aggregated so a configured reviewer named
+    ``must-have-coverage`` is never shadowed by the deterministic measurement.
+
+    ``covered_total`` and ``rendered_total`` are runtime-only extra fields. They
+    survive the existing JSON persistence as serializable measurement metadata
+    so health reports can aggregate a weighted coverage rate across rounds.
+    """
+
+
+class CoverageReport(ExtensibleModel):
+    """Which evidenced must-haves reached the produced resume."""
+
+    covered_total: int = 0
+    rendered: list[str] = Field(default_factory=list)
+    missed: list[str] = Field(default_factory=list)
+
+
+# The block carries every requirement tier, so each line names its own. Order
+# alone cannot say whether a `gap` is a must-have the resume must not claim or a
+# tech-stack mention, and the writer prioritizes on exactly that difference.
+_TIERS: dict[str, str] = {
+    "must": "must-have",
+    "nice": "nice-to-have",
+    "tech": "tech stack",
+}
+_TIER_ORDER: dict[str, int] = {"must": 0, "nice": 1, "tech": 2}
+
+
+def _line(match: SkillMatch) -> str:
+    tier = _TIERS.get(match.source, match.source)
+    head = f"- ({tier}) {match.requirement}"
+    if match.coverage == "covered":
+        facts = ", ".join(match.row.evidence_fact_ids) if match.row else ""
+        return f"{head} — covered — facts: {facts}"
+    if match.coverage == "adjacent":
+        label = match.row.display if match.row else "a related skill"
+        return f"{head} — adjacent ({label}) — may inform emphasis, never named"
+    return f"{head} — gap — no profile evidence; do not claim or imply"
+
+
+def format_coverage(context: SkillMatchContext | None) -> str:
+    """Render the coverage block with must-haves before nice-to-haves."""
+    if context is None or not context.matches:
+        return ""
+    ordered = sorted(
+        context.matches, key=lambda match: _TIER_ORDER.get(match.source, 3)
+    )
+    return "\n".join([_HEADER, *(_line(match) for match in ordered)])
+
+
+def _rendered_tokens(content: ResumeContent) -> set[str]:
+    """Normalized names of skills explicitly selected for the resume."""
+    tokens = {
+        normalize_skill(entry.name)
+        for entries in content.skills.values()
+        for entry in entries
+    }
+    tokens.discard("")
+    return tokens
+
+
+def _prose(content: ResumeContent) -> list[str]:
+    """Each bullet normalized and padded, for exact phrase containment.
+
+    Bullets stay separate rather than being joined into one string: joining lets
+    a multi-word requirement match across a bullet boundary, so a bullet ending
+    "...on the machine" followed by one starting "learning pipelines..." would
+    count "machine learning" as rendered.
+
+    Padding prevents a one-letter requirement such as ``R`` from matching every
+    bullet through a bare substring test.
+    """
+    bullets: list[str] = []
+    for experience in content.experience:
+        bullets.extend(bullet.text for bullet in experience.bullets)
+    for project in content.projects:
+        bullets.extend(bullet.text for bullet in project.bullets)
+    for volunteer in content.volunteer:
+        bullets.extend(bullet.text for bullet in volunteer.bullets)
+    return [f" {normalize_skill(text)} " for text in bullets]
+
+
+def _match_tokens(match: SkillMatch) -> set[str]:
+    """Requirement spellings that identify the same matrix row."""
+    values = [match.requirement]
+    if match.row is not None:
+        values.extend((match.row.display, *match.row.aliases, match.row.key))
+    tokens = {normalize_skill(value) for value in values}
+    tokens.discard("")
+    return tokens
+
+
+def coverage_report(
+    content: ResumeContent, context: SkillMatchContext | None
+) -> CoverageReport:
+    """Measure rendered coverage among must-haves with profile evidence."""
+    if context is None:
+        return CoverageReport()
+
+    skill_tokens = _rendered_tokens(content)
+    bullets = _prose(content)
+    rendered: list[str] = []
+    missed: list[str] = []
+    for match in context.matches:
+        if match.source != "must" or match.coverage != "covered":
+            continue
+        tokens = _match_tokens(match)
+        if not tokens:
+            continue
+        if any(
+            token in skill_tokens or any(f" {token} " in text for text in bullets)
+            for token in tokens
+        ):
+            rendered.append(match.requirement)
+        else:
+            missed.append(match.requirement)
+    return CoverageReport(
+        covered_total=len(rendered) + len(missed),
+        rendered=rendered,
+        missed=missed,
+    )
+
+
+def coverage_critique(
+    content: ResumeContent, context: SkillMatchContext | None
+) -> CoverageCritique | None:
+    """Return an advisory coverage rate, or ``None`` when there is no measure."""
+    report = coverage_report(content, context)
+    if not report.covered_total:
+        return None
+    return CoverageCritique(
+        reviewer=COVERAGE_REVIEWER,
+        score=round(100 * len(report.rendered) / report.covered_total),
+        passed=True,
+        covered_total=report.covered_total,
+        rendered_total=len(report.rendered),
+        issues=[
+            ReviewIssue(
+                severity=Severity.major,
+                location="skills",
+                message=(
+                    f"must-have {requirement!r} has profile evidence but does not "
+                    "appear in this resume"
+                ),
+                suggestion=(
+                    "add it as a skills entry, or show it in a bullet, if a truthful "
+                    "cited fact supports it"
+                ),
+            )
+            for requirement in report.missed
+        ],
+    )

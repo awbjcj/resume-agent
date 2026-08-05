@@ -5,7 +5,7 @@ numbers can be re-read after a change instead of re-derived by hand:
 
   * how scores are distributed, and how many rounds have no score at all
   * which gate actually blocked each failing round
-  * what kinds of blocking issue the fact-check reviewer is raising
+  * which blocking issues each gate is raising
 
 Usage:
     python scripts/tailor_health.py <path-to-resume_agent.db> [--json]
@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Buckets for the fact-check blocking issues, most specific pattern first. These
+# Buckets for blocking issues, most specific pattern first. These
 # are the categories the 2026-07-27 investigation found; they are a reporting
 # convenience, not a contract.
 _ISSUE_KINDS: list[tuple[str, re.Pattern[str]]] = [
@@ -35,6 +35,21 @@ _ISSUE_KINDS: list[tuple[str, re.Pattern[str]]] = [
     ("scope/wording", re.compile(r"not supported|no evidence|unsupported")),
 ]
 
+# Every gate that can block a round. ``provenance`` and ``fact-check`` were the
+# original two; ``skill-naming`` and ``numeric-evidence`` are deterministic
+# gates added 2026-08-04 that intercept mechanically-provable violations before
+# the panel runs.
+_GATE_REVIEWERS = frozenset(
+    {"provenance", "fact-check", "skill-naming", "numeric-evidence"}
+)
+_GATE_REVIEWER_ORDER = (
+    "provenance",
+    "fact-check",
+    "skill-naming",
+    "numeric-evidence",
+)
+_COVERAGE_REVIEWER = "must-have-coverage"
+
 
 def _issue_kind(message: str) -> str:
     lowered = message.lower()
@@ -42,6 +57,24 @@ def _issue_kind(message: str) -> str:
         if pattern.search(lowered):
             return name
     return "other"
+
+
+def _coverage_totals(critique: dict[str, Any]) -> tuple[int, int] | None:
+    """Read runtime-only coverage totals, if this is a valid measurement."""
+    if critique.get("reviewer") != _COVERAGE_REVIEWER:
+        return None
+    covered = critique.get("covered_total")
+    rendered = critique.get("rendered_total")
+    if (
+        isinstance(covered, int)
+        and not isinstance(covered, bool)
+        and isinstance(rendered, int)
+        and not isinstance(rendered, bool)
+        and covered >= 0
+        and 0 <= rendered <= covered
+    ):
+        return covered, rendered
+    return None
 
 
 def collect(db_path: Path) -> dict[str, Any]:
@@ -58,9 +91,13 @@ def collect(db_path: Path) -> dict[str, Any]:
         connection.close()
 
     scores: collections.Counter[str] = collections.Counter()
-    gate_failures: collections.Counter[str] = collections.Counter()
+    gate_failures: collections.Counter[str] = collections.Counter(
+        {reviewer: 0 for reviewer in _GATE_REVIEWER_ORDER}
+    )
     issue_kinds: collections.Counter[str] = collections.Counter()
     reviewer_scores: dict[str, list[int]] = collections.defaultdict(list)
+    coverage_rendered = coverage_covered = 0
+    coverage_has_totals = False
     per_job: dict[int, list[tuple[int, int | None, bool]]] = collections.defaultdict(list)
     unscored = zeros = 0
 
@@ -78,15 +115,17 @@ def collect(db_path: Path) -> dict[str, Any]:
             reviewer = critique.get("reviewer", "?")
             if isinstance(critique.get("score"), int):
                 reviewer_scores[reviewer].append(critique["score"])
-            if not critique.get("passed", True) and reviewer in {
-                "provenance",
-                "fact-check",
-            }:
+            if totals := _coverage_totals(critique):
+                covered, rendered = totals
+                coverage_covered += covered
+                coverage_rendered += rendered
+                coverage_has_totals = True
+            if not critique.get("passed", True) and reviewer in _GATE_REVIEWERS:
                 gate_failures[reviewer] += 1
-            if reviewer == "fact-check" and not critique.get("passed", True):
                 for issue in critique.get("issues") or []:
                     if issue.get("severity") == "blocking":
-                        issue_kinds[_issue_kind(issue.get("message", ""))] += 1
+                        kind = _issue_kind(issue.get("message", ""))
+                        issue_kinds[f"{reviewer}: {kind}"] += 1
 
     improved = regressed = same = 0
     for rounds in per_job.values():
@@ -101,6 +140,15 @@ def collect(db_path: Path) -> dict[str, Any]:
             else:
                 same += 1
 
+    reviewer_means = {
+        name: round(sum(values) / len(values), 1)
+        for name, values in sorted(reviewer_scores.items())
+    }
+    if coverage_has_totals and coverage_covered:
+        reviewer_means[_COVERAGE_REVIEWER] = round(
+            100 * coverage_rendered / coverage_covered, 1
+        )
+
     return {
         "versions": len(rows),
         "jobs": len(per_job),
@@ -108,11 +156,8 @@ def collect(db_path: Path) -> dict[str, Any]:
         "unscored": unscored,
         "score_buckets": dict(sorted(scores.items())),
         "gate_failures": dict(gate_failures),
-        "fact_check_issue_kinds": dict(issue_kinds.most_common()),
-        "reviewer_means": {
-            name: round(sum(values) / len(values), 1)
-            for name, values in sorted(reviewer_scores.items())
-        },
+        "blocking_issue_kinds": dict(issue_kinds.most_common()),
+        "reviewer_means": reviewer_means,
         "round_transitions": {
             "improved": improved,
             "regressed": regressed,
@@ -132,8 +177,8 @@ def format_report(report: dict[str, Any]) -> str:
         "gate failures (which gate actually blocked):",
         *(f"  {k:>12}  {v}" for k, v in report["gate_failures"].items()),
         "",
-        "fact-check blocking issues by kind:",
-        *(f"  {k:>14}  {v}" for k, v in report["fact_check_issue_kinds"].items()),
+        "blocking issues by gate and kind:",
+        *(f"  {k:>32}  {v}" for k, v in report["blocking_issue_kinds"].items()),
         "",
         "mean score by reviewer:",
         *(f"  {k:>14}  {v}" for k, v in report["reviewer_means"].items()),

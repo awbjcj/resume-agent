@@ -97,3 +97,57 @@ def test_tailor_agent_requests_system_prompt_cache(monkeypatch):
 
     assert isinstance(agent, AgentRunner)
     assert agent._agent.model.cache_system_prompt is True
+
+
+def test_writer_and_reviser_forbid_merging_two_facts_into_one_skill_entry():
+    from resume_agent.tailor.agents import (
+        _REVISER_INSTRUCTIONS,
+        _TAILOR_INSTRUCTIONS,
+    )
+
+    for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
+        text = " ".join(block).lower()
+        assert "skills entry names exactly one skill fact" in text
+        assert "never merge two technologies into one entry" in text
+        assert "group related skills using the skills category key instead" in text
+        assert "which is what renders as the section line" in text
+
+    tailor_text = " ".join(_TAILOR_INSTRUCTIONS).lower()
+    assert "jira & confluence rest apis" in tailor_text
+    assert "unit testing (pytest, matlab unit test)" in tailor_text
+    assert "name a technology the cited fact does not cover" in tailor_text
+
+
+def test_writer_and_reviser_forbid_derived_tenure():
+    from resume_agent.tailor.agents import (
+        _REVISER_INSTRUCTIONS,
+        _TAILOR_INSTRUCTIONS,
+    )
+
+    for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
+        text = " ".join(block).lower()
+        assert (
+            "never state a tenure, duration, or total years of experience unless a fact states that figure"
+            in text
+        )
+        assert (
+            "employment dates are facts; the span between them is arithmetic you may not perform"
+            in text
+        )
+        assert "'3+ years building x' needs a fact that says so" in text
+
+
+def test_writer_and_reviser_forbid_unstated_beneficiaries():
+    from resume_agent.tailor.agents import (
+        _REVISER_INSTRUCTIONS,
+        _TAILOR_INSTRUCTIONS,
+    )
+
+    for block in (_TAILOR_INSTRUCTIONS, _REVISER_INSTRUCTIONS):
+        text = " ".join(block).lower()
+        assert (
+            "never name a beneficiary, adoption, saving, or efficiency the fact does not state"
+            in text
+        )
+        assert "improving adoption among non-technical users" in text
+        assert "as unsupported as an invented number" in text

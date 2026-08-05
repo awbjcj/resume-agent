@@ -152,6 +152,8 @@ def test_run_case_collects_signals():
     assert {critique.reviewer for critique in result.rounds[0].critiques} == {
         "provenance",
         "fact-check",
+        "skill-naming",
+        "numeric-evidence",
     }
     assert result.probes[0].trap_id == "k8s"
     assert result.probes[0].detected is True

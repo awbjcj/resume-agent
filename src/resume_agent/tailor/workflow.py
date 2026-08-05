@@ -9,16 +9,20 @@ from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
+from resume_agent.models.review import ReviewCritique
 from resume_agent.profile.matrix import SkillMatchContext
+from resume_agent.tailor.coverage import coverage_critique, format_coverage
 from resume_agent.tailor.match_plan import (
     amatch_plan,
     compose_match_plan_input,
     match_plan,
     normalize_match_plan,
 )
+from resume_agent.tailor.numeric_evidence import numeric_evidence_critique
 from resume_agent.tailor.panel import arun_panel, run_panel
 from resume_agent.tailor.provenance import PROVENANCE_REVIEWER, provenance_critique
 from resume_agent.tailor.review_config import ReviewConfig
+from resume_agent.tailor.skill_naming import skill_naming_critique
 from resume_agent.tailor.tailoring import (
     arevise,
     atailor,
@@ -35,6 +39,32 @@ class TailorRound(ExtensibleModel):
     content: ResumeContent
     verdict: PanelVerdict
     stage_seconds: dict[str, float] = Field(default_factory=dict)
+
+
+def _deterministic_critiques(
+    content: ResumeContent,
+    profile_facts: ProfileFacts,
+    skill_context: SkillMatchContext | None,
+) -> list[ReviewCritique]:
+    """Every in-process critique for one round, gates first.
+
+    The gates run before the panel because each is mechanically provable: their
+    issues reach the reviser in the round they were detected rather than costing
+    a premium fact-check round to rediscover.
+
+    Coverage rides along last and is advisory, never a gate. The runtime marker
+    keeps it out of gate and weighted-review selection, while a configured
+    reviewer with the same name remains valid and authoritative. It carries the
+    coverage rate for `tailor_health`.
+    """
+    critiques: list[ReviewCritique] = [
+        provenance_critique(content, profile_facts),
+        skill_naming_critique(content, profile_facts),
+        numeric_evidence_critique(content, profile_facts),
+    ]
+    if (coverage := coverage_critique(content, skill_context)) is not None:
+        critiques.append(coverage)
+    return critiques
 
 
 def _has_regressed(rounds: list[TailorRound]) -> bool:
@@ -135,10 +165,11 @@ def run_tailor_review(
             profile_facts,
         )
         pending["match_plan"] = time.monotonic() - started
+    coverage = format_coverage(skill_context)
     started = time.monotonic()
     content = tailor(
         compose_tailor_input(
-            jd_text, criteria, profile_facts, config.length_budget, plan
+            jd_text, criteria, profile_facts, config.length_budget, plan, coverage
         ),
         tailor_agent,
     )
@@ -147,16 +178,20 @@ def run_tailor_review(
     free_retries = config.provenance_retry_budget
     quality_rounds = 0
     while True:
-        # Provenance is the cheap deterministic gate. It blocks the round on its
-        # own, but the panel still runs: a broken citation says nothing about the
-        # resume's quality, and the reviser needs both kinds of feedback to fix
-        # the round in one pass rather than spending the next round rediscovering
-        # what the panel would have said here.
-        provenance = provenance_critique(content, profile_facts)
+        deterministic = _deterministic_critiques(
+            content, profile_facts, skill_context
+        )
         started = time.monotonic()
-        panel = run_panel(content, profile_facts, jd_text, config, reviewer_agents)
+        panel = run_panel(
+            content,
+            profile_facts,
+            jd_text,
+            config,
+            reviewer_agents,
+            coverage=coverage,
+        )
         pending["panel"] = time.monotonic() - started
-        critiques = [provenance, *panel]
+        critiques = [*deterministic, *panel]
         verdict = aggregate(critiques, config)
 
         rounds.append(
@@ -187,6 +222,7 @@ def run_tailor_review(
                 profile_facts,
                 jd_text,
                 config.length_budget,
+                coverage,
             ),
             reviser_agent,
         )
@@ -225,10 +261,11 @@ async def arun_tailor_review(
             profile_facts,
         )
         pending["match_plan"] = time.monotonic() - started
+    coverage = format_coverage(skill_context)
     started = time.monotonic()
     content = await atailor(
         compose_tailor_input(
-            jd_text, criteria, profile_facts, config.length_budget, plan
+            jd_text, criteria, profile_facts, config.length_budget, plan, coverage
         ),
         tailor_agent,
         sem=sem,
@@ -238,13 +275,21 @@ async def arun_tailor_review(
     free_retries = config.provenance_retry_budget
     quality_rounds = 0
     while True:
-        provenance = provenance_critique(content, profile_facts)
+        deterministic = _deterministic_critiques(
+            content, profile_facts, skill_context
+        )
         started = time.monotonic()
         panel = await arun_panel(
-            content, profile_facts, jd_text, config, reviewer_agents, sem=sem
+            content,
+            profile_facts,
+            jd_text,
+            config,
+            reviewer_agents,
+            sem=sem,
+            coverage=coverage,
         )
         pending["panel"] = time.monotonic() - started
-        critiques = [provenance, *panel]
+        critiques = [*deterministic, *panel]
         verdict = aggregate(critiques, config)
 
         rounds.append(
@@ -273,6 +318,7 @@ async def arun_tailor_review(
                 profile_facts,
                 jd_text,
                 config.length_budget,
+                coverage,
             ),
             reviser_agent,
             sem=sem,

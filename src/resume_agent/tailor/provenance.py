@@ -75,6 +75,46 @@ def referenced_ids(content: ResumeContent) -> set[str]:
     return {fact_id for fact_id, _usage in _referenced_uses(content)}
 
 
+def _inferred_skill_problems(
+    fact_id: str, fact: Any, index: dict[str, Any]
+) -> list[str]:
+    """Why an inferred skill may not be rendered as a skills-section entry.
+
+    Empty means the pointer is renderable. `check_provenance` turns these into
+    invalid-citation messages and `renderable_skill_pointer` reads them as a
+    boolean, so this fact-lock rule is stated exactly once.
+    """
+    problems: list[str] = []
+    if getattr(fact, "category", None) != "hard":
+        problems.append(f"{fact_id}: inferred soft/domain skills cannot be rendered")
+    evidence_ids = getattr(fact, "evidence_fact_ids", []) or []
+    if not evidence_ids:
+        problems.append(f"{fact_id}: inferred skill has no evidence_fact_ids")
+        return problems
+    for evidence_id in evidence_ids:
+        evidence = index.get(evidence_id)
+        if evidence is None:
+            problems.append(
+                f"{fact_id}: inferred skill evidence not found: {evidence_id}"
+            )
+        elif getattr(evidence, "inferred", False):
+            problems.append(
+                f"{fact_id}: inferred skill evidence must be literal: {evidence_id}"
+            )
+    return problems
+
+
+def renderable_skill_pointer(fact: Any, index: dict[str, Any]) -> bool:
+    """True when this skill fact may legally appear as a skills-section entry.
+
+    A literal skill always may. An inferred one may only under the conditions
+    `check_provenance` enforces, which is why both read the same rule.
+    """
+    if not getattr(fact, "inferred", False):
+        return True
+    return not _inferred_skill_problems(getattr(fact, "id", ""), fact, index)
+
+
 def check_provenance(content: ResumeContent, facts: ProfileFacts) -> ProvenanceReport:
     """Validate existence and the restricted use of inferred skill pointers.
 
@@ -100,22 +140,7 @@ def check_provenance(content: ResumeContent, facts: ProfileFacts) -> ProvenanceR
                 f"{fact_id}: inferred provenance is only valid for a skills-section entry"
             )
             continue
-        if getattr(fact, "category", None) != "hard":
-            invalid.add(f"{fact_id}: inferred soft/domain skills cannot be rendered")
-        evidence_ids = getattr(fact, "evidence_fact_ids", []) or []
-        if not evidence_ids:
-            invalid.add(f"{fact_id}: inferred skill has no evidence_fact_ids")
-            continue
-        for evidence_id in evidence_ids:
-            evidence = index.get(evidence_id)
-            if evidence is None:
-                invalid.add(
-                    f"{fact_id}: inferred skill evidence not found: {evidence_id}"
-                )
-            elif getattr(evidence, "inferred", False):
-                invalid.add(
-                    f"{fact_id}: inferred skill evidence must be literal: {evidence_id}"
-                )
+        invalid.update(_inferred_skill_problems(fact_id, fact, index))
     ordered_invalid = sorted(invalid)
     return ProvenanceReport(
         ok=not missing and not ordered_invalid,

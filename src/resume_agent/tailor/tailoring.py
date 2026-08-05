@@ -7,6 +7,7 @@ from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique, Severity
 from resume_agent.tailor.length import format_budget
+from resume_agent.tailor.prompt_blocks import coverage_section, untrusted
 from resume_agent.tailor.provenance import renderable_profile
 from resume_agent.tailor.review_config import LengthBudget
 
@@ -17,6 +18,7 @@ def compose_tailor_input(
     profile_facts: ProfileFacts,
     length_budget: LengthBudget | None = None,
     match_plan: MatchPlan | None = None,
+    coverage: str = "",
 ) -> str:
     budget_line = f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
     plan_line = (
@@ -29,9 +31,10 @@ def compose_tailor_input(
         "CANDIDATE PROFILE (JSON):\n"
         f"{renderable_profile(profile_facts).model_dump_json()}\n\n"
         "JOB CRITERIA (JSON):\n"
-        f"{criteria.model_dump_json()}\n\n"
+        f"{criteria.model_dump_json()}"
+        f"{coverage_section(coverage)}\n\n"
         "JOB DESCRIPTION:\n"
-        f"{jd_text}"
+        f"{untrusted(jd_text)}"
         f"{budget_line}"
         f"{plan_line}"
     )
@@ -52,6 +55,7 @@ def compose_revise_input(
     profile_facts: ProfileFacts,
     jd_text: str,
     length_budget: LengthBudget | None = None,
+    coverage: str = "",
 ) -> str:
     grouped: dict[Severity, list[str]] = {severity: [] for severity in Severity}
     for critique in critiques:
@@ -79,12 +83,13 @@ def compose_revise_input(
     budget_line = f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
     # Stable-first ordering: the profile and the job are fixed for the whole job,
     # while the resume and the critiques change every round. Keeping the volatile
-    # blocks last preserves the cacheable prefix across rounds.
+    # blocks last preserves a stable composition order across rounds.
     return (
         "CANDIDATE PROFILE (JSON):\n"
         f"{renderable_profile(profile_facts).model_dump_json()}\n\n"
         "JOB DESCRIPTION:\n"
-        f"{jd_text}\n\n"
+        f"{untrusted(jd_text)}"
+        f"{coverage_section(coverage)}\n\n"
         "CURRENT RESUME (JSON):\n"
         f"{content.model_dump_json()}\n\n"
         "REVIEWER ISSUES (fix every BLOCKING issue first, then MAJOR, then MINOR; copy "

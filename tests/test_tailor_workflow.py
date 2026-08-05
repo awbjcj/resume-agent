@@ -6,8 +6,13 @@ from resume_agent.models.review import Severity
 from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 from resume_agent.models.review import ReviewCritique, ReviewIssue
 from resume_agent.tailor.review_config import ReviewConfig, ReviewerSpec
-from resume_agent.tailor.verdict import PanelVerdict
-from resume_agent.tailor.workflow import TailorRound, _has_regressed, run_tailor_review
+from resume_agent.tailor.verdict import PanelVerdict, aggregate
+from resume_agent.tailor.workflow import (
+    TailorRound,
+    _has_regressed,
+    _is_citation_slip,
+    run_tailor_review,
+)
 
 
 class _Result:
@@ -163,6 +168,11 @@ def test_arun_tailor_review_passes_with_async_agents():
     assert len(rounds) == 1
     assert rounds[0].round_num == 1
     assert rounds[0].stage_seconds.keys() >= {"draft", "panel"}
+    assert {
+        "provenance",
+        "skill-naming",
+        "numeric-evidence",
+    } <= {critique.reviewer for critique in rounds[0].verdict.critiques}
 
 
 def test_loop_stops_at_max_rounds_when_never_passing():
@@ -256,6 +266,8 @@ def test_broken_provenance_still_runs_the_panel():
     # The advisory panel ran, so the score is a real measurement...
     assert [c.reviewer for c in verdict.critiques] == [
         "provenance",
+        "skill-naming",
+        "numeric-evidence",
         "fact-check",
         "ats-keyword",
     ]
@@ -263,6 +275,41 @@ def test_broken_provenance_still_runs_the_panel():
     # ...and the gate still blocks the round. Fact-lock is unchanged.
     assert verdict.gate_passed is False
     assert verdict.passed is False
+
+
+def test_every_round_carries_the_deterministic_critiques():
+    config = ReviewConfig(
+        max_rounds=1,
+        score_threshold=80,
+        reviewers=[ReviewerSpec(name="ats-keyword", weight=1)],
+    )
+    rounds = run_tailor_review(
+        jd_text="Backend role",
+        criteria=JobCriteria(),
+        profile_facts=ProfileFacts(contact=Contact(name="Ada")),
+        config=config,
+        tailor_agent=_ContentAgent(),
+        reviewer_agents={"ats-keyword": _Good("ats-keyword")},
+        reviser_agent=_ContentAgent(),
+    )
+
+    names = {critique.reviewer for critique in rounds[0].verdict.critiques}
+    assert {"provenance", "skill-naming", "numeric-evidence"} <= names
+
+
+def test_a_new_gate_failure_is_not_granted_the_provenance_free_retry():
+    """A citation slip is provenance ONLY; a numeric failure is a real round."""
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="recruiter", weight=1)])
+    verdict = aggregate(
+        [
+            ReviewCritique(reviewer="provenance", score=0, passed=False),
+            ReviewCritique(reviewer="numeric-evidence", score=0, passed=False),
+            ReviewCritique(reviewer="recruiter", score=70, passed=True),
+        ],
+        config,
+    )
+
+    assert _is_citation_slip(verdict, config) is False
 
 
 def test_match_plan_runs_only_when_enabled_and_is_normalized():

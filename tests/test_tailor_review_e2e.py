@@ -186,6 +186,8 @@ def test_a_citation_slip_scores_normally_gets_a_retry_and_still_fails_its_gate()
     # citation complaint - that is what the panel skip used to cost.
     assert [c.reviewer for c in first.critiques] == [
         "provenance",
+        "skill-naming",
+        "numeric-evidence",
         "fact-check",
         "ats-keyword",
     ]

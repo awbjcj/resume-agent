@@ -621,8 +621,8 @@ reaches the run result, the log, and the dashboard.
   It is handed `ats-keyword` and `hiring-manager` critiques, which are entirely
   about fit, so without the JD it was being asked to fix complaints it could not
   read. `compose_revise_input` orders stable context (profile, JD) before
-  volatile context (current resume, this round's critiques) to keep the
-  cacheable prefix intact across rounds. A revision builds on `_best_base` — the
+  volatile context (current resume, this round's critiques) to keep the stable
+  composition order intact across rounds. A revision builds on `_best_base` — the
   best round so far by (gate-clean, score) — not the last, so a regressed round
   cannot become the base for the next one.
 - **A citation slip is not a quality round.** A round that fails _only_ on
@@ -636,6 +636,45 @@ reaches the run result, the log, and the dashboard.
   provenance-only failure as "Fact-check failed" on rounds where fact-check never
   ran. `verdict.failing_gate_names` owns the rule and `ResumeVersionOut.failedGates`
   carries it to the UI.
+- **A mechanically-provable violation never costs a premium round.**
+  `skill-naming` and `numeric-evidence` join `provenance` in
+  `DETERMINISTIC_GATES` and run before the panel, so the reviser sees them in
+  the round they occurred. `skill-naming` legalizes a displayed name only from
+  the *cited fact's* own name/aliases — the cluster map's alias table is
+  deliberately not consulted, because it maps a token to a canonical cluster
+  token, which is exactly the adjacent-skill rename fact-lock forbids. Only a
+  **compound** name blocks (two or more segments, one unresolved: the writer
+  named a technology it did not cite); an atomic mismatch (`AWS` for `Amazon
+  Web Services`) is advisory, since `CRAFT_WRITER` allows it and no alias table
+  is complete. `numeric-evidence` blocks any standalone quantity absent from the
+  cited fact, tokenized conservatively so `p95`, `L1–L3`, `GPT-4` and `C++` are
+  never claims while `$50K` and `95%` are. `_is_citation_slip` therefore denies
+  the free provenance retry to a round that also failed a new gate, which is
+  correct — neither is a citation slip.
+- **The three gate names are declared by the modules that emit them.**
+  `RESERVED_REVIEWER_NAMES` (`review_config.py`) imports `PROVENANCE_REVIEWER` /
+  `SKILL_NAMING_REVIEWER` / `NUMERIC_EVIDENCE_REVIEWER` rather than restating the
+  literals, and `DETERMINISTIC_GATES` is that frozenset. A configured reviewer
+  may not claim one of those names; `must-have-coverage` is deliberately *not*
+  reserved, because it is also a legal configured reviewer — the deterministic
+  measurement is kept out of gate and weighted-score selection by its runtime
+  `CoverageCritique` type, never by its name.
+- **Must-have coverage is authoritative input and an advisory measurement, not
+  a gate.** `format_coverage` renders the `SkillMatchContext` the pipeline
+  already computes into the writer's, reviser's, and advisory panel's prompts
+  (F1: it used to be computed and discarded under `match_plan_enabled: false`).
+  Every line names its tier, because one header covers must-have, nice-to-have,
+  and tech-stack rows and ordering alone cannot distinguish them.
+  `coverage_report` measures the other direction and each unrendered evidenced
+  must-have becomes a **major** issue — never blocking, because a one-page
+  budget legitimately forces cuts and a gate here would hand the writer an
+  unwinnable round.
+- **The coverage block is never fenced as untrusted; the JD always is.**
+  `prompt_blocks.untrusted()` is the one fence, and it is for third-party text.
+  Wrapping the coverage block in it would contradict `CRAFT_REVIEWERS`'
+  `ats-keyword` rule that "MUST-HAVE COVERAGE is authoritative" in the very same
+  prompt. Deterministic self-generated ground truth and attacker-influenced text
+  need opposite framings.
 - **`score_threshold` and `match_plan_enabled` are unmeasured.** Both shipped
   rosters now set `score_bands: true` on every advisory reviewer (five private
   scales were being averaged against one fixed threshold) and
