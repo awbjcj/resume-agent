@@ -5,13 +5,18 @@ from pydantic import Field, model_validator
 
 from resume_agent.config import load_yaml
 from resume_agent.models.base import ExtensibleModel
-
+from resume_agent.tailor.numeric_evidence import NUMERIC_EVIDENCE_REVIEWER
+from resume_agent.tailor.provenance import PROVENANCE_REVIEWER
+from resume_agent.tailor.skill_naming import SKILL_NAMING_REVIEWER
 
 # These names are emitted by deterministic in-process gates and must not be
-# claimed by a configured/model-backed reviewer. ``must-have-coverage`` is
-# intentionally absent: it is also a supported configured reviewer name.
+# claimed by a configured/model-backed reviewer. Each is imported from the
+# module that emits it rather than restated here, so a rename cannot leave a
+# gate name unreserved while a test that restates the literals still passes.
+# ``must-have-coverage`` is intentionally absent: it is also a supported
+# configured reviewer name.
 RESERVED_REVIEWER_NAMES = frozenset(
-    {"provenance", "skill-naming", "numeric-evidence"}
+    {PROVENANCE_REVIEWER, SKILL_NAMING_REVIEWER, NUMERIC_EVIDENCE_REVIEWER}
 )
 
 

@@ -46,25 +46,36 @@ class CoverageReport(ExtensibleModel):
     missed: list[str] = Field(default_factory=list)
 
 
+# The block carries every requirement tier, so each line names its own. Order
+# alone cannot say whether a `gap` is a must-have the resume must not claim or a
+# tech-stack mention, and the writer prioritizes on exactly that difference.
+_TIERS: dict[str, str] = {
+    "must": "must-have",
+    "nice": "nice-to-have",
+    "tech": "tech stack",
+}
+_TIER_ORDER: dict[str, int] = {"must": 0, "nice": 1, "tech": 2}
+
+
 def _line(match: SkillMatch) -> str:
+    tier = _TIERS.get(match.source, match.source)
+    head = f"- ({tier}) {match.requirement}"
     if match.coverage == "covered":
         facts = ", ".join(match.row.evidence_fact_ids) if match.row else ""
-        return f"- {match.requirement} — covered — facts: {facts}"
+        return f"{head} — covered — facts: {facts}"
     if match.coverage == "adjacent":
         label = match.row.display if match.row else "a related skill"
-        return (
-            f"- {match.requirement} — adjacent ({label}) — may inform emphasis, "
-            "never named"
-        )
-    return f"- {match.requirement} — gap — no profile evidence; do not claim or imply"
+        return f"{head} — adjacent ({label}) — may inform emphasis, never named"
+    return f"{head} — gap — no profile evidence; do not claim or imply"
 
 
 def format_coverage(context: SkillMatchContext | None) -> str:
     """Render the coverage block with must-haves before nice-to-haves."""
     if context is None or not context.matches:
         return ""
-    order = {"must": 0, "nice": 1, "tech": 2}
-    ordered = sorted(context.matches, key=lambda match: order.get(match.source, 3))
+    ordered = sorted(
+        context.matches, key=lambda match: _TIER_ORDER.get(match.source, 3)
+    )
     return "\n".join([_HEADER, *(_line(match) for match in ordered)])
 
 
@@ -79,18 +90,25 @@ def _rendered_tokens(content: ResumeContent) -> set[str]:
     return tokens
 
 
-def _prose(content: ResumeContent) -> str:
-    """Normalized, padded bullets for exact phrase containment."""
-    parts: list[str] = []
+def _prose(content: ResumeContent) -> list[str]:
+    """Each bullet normalized and padded, for exact phrase containment.
+
+    Bullets stay separate rather than being joined into one string: joining lets
+    a multi-word requirement match across a bullet boundary, so a bullet ending
+    "...on the machine" followed by one starting "learning pipelines..." would
+    count "machine learning" as rendered.
+
+    Padding prevents a one-letter requirement such as ``R`` from matching every
+    bullet through a bare substring test.
+    """
+    bullets: list[str] = []
     for experience in content.experience:
-        parts.extend(bullet.text for bullet in experience.bullets)
+        bullets.extend(bullet.text for bullet in experience.bullets)
     for project in content.projects:
-        parts.extend(bullet.text for bullet in project.bullets)
+        bullets.extend(bullet.text for bullet in project.bullets)
     for volunteer in content.volunteer:
-        parts.extend(bullet.text for bullet in volunteer.bullets)
-    # Padding prevents a one-letter requirement such as ``R`` from matching
-    # every prose string through a bare substring test.
-    return f" {normalize_skill(' '.join(parts))} "
+        bullets.extend(bullet.text for bullet in volunteer.bullets)
+    return [f" {normalize_skill(text)} " for text in bullets]
 
 
 def _match_tokens(match: SkillMatch) -> set[str]:
@@ -111,7 +129,7 @@ def coverage_report(
         return CoverageReport()
 
     skill_tokens = _rendered_tokens(content)
-    prose = _prose(content)
+    bullets = _prose(content)
     rendered: list[str] = []
     missed: list[str] = []
     for match in context.matches:
@@ -120,7 +138,10 @@ def coverage_report(
         tokens = _match_tokens(match)
         if not tokens:
             continue
-        if any(token in skill_tokens or f" {token} " in prose for token in tokens):
+        if any(
+            token in skill_tokens or any(f" {token} " in text for text in bullets)
+            for token in tokens
+        ):
             rendered.append(match.requirement)
         else:
             missed.append(match.requirement)

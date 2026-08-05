@@ -83,6 +83,25 @@ def test_number_absent_from_the_cited_fact_blocks():
     assert "40" in critique.issues[0].message
 
 
+def test_a_currency_amount_is_checked_like_any_other_quantity():
+    # "$50K saved" is the invented-outcome class the gate exists to catch; a
+    # leading currency symbol must not carry it past the tokenizer unexamined.
+    content = _bullet_resume("Saved $50K in licensing", "b2")
+
+    critique = numeric_evidence_critique(content, _facts())
+
+    assert critique.passed is False
+    assert "50" in critique.issues[0].message
+
+
+def test_a_currency_amount_the_cited_fact_states_passes():
+    facts = _facts()
+    facts.experience[0].bullets[1].text = "Renegotiated a $50K licensing contract"
+    content = _bullet_resume("Saved $50K in licensing", "b2")
+
+    assert numeric_evidence_critique(content, facts).passed is True
+
+
 def test_a_sibling_bullets_number_does_not_license_the_claim():
     """Citing b2 must not inherit b1's numbers."""
     content = _bullet_resume("Triaged 267 tickets", "b2")

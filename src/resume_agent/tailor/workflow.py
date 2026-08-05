@@ -9,6 +9,7 @@ from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
+from resume_agent.models.review import ReviewCritique
 from resume_agent.profile.matrix import SkillMatchContext
 from resume_agent.tailor.coverage import coverage_critique, format_coverage
 from resume_agent.tailor.match_plan import (
@@ -38,6 +39,32 @@ class TailorRound(ExtensibleModel):
     content: ResumeContent
     verdict: PanelVerdict
     stage_seconds: dict[str, float] = Field(default_factory=dict)
+
+
+def _deterministic_critiques(
+    content: ResumeContent,
+    profile_facts: ProfileFacts,
+    skill_context: SkillMatchContext | None,
+) -> list[ReviewCritique]:
+    """Every in-process critique for one round, gates first.
+
+    The gates run before the panel because each is mechanically provable: their
+    issues reach the reviser in the round they were detected rather than costing
+    a premium fact-check round to rediscover.
+
+    Coverage rides along last and is advisory, never a gate. The runtime marker
+    keeps it out of gate and weighted-review selection, while a configured
+    reviewer with the same name remains valid and authoritative. It carries the
+    coverage rate for `tailor_health`.
+    """
+    critiques: list[ReviewCritique] = [
+        provenance_critique(content, profile_facts),
+        skill_naming_critique(content, profile_facts),
+        numeric_evidence_critique(content, profile_facts),
+    ]
+    if (coverage := coverage_critique(content, skill_context)) is not None:
+        critiques.append(coverage)
+    return critiques
 
 
 def _has_regressed(rounds: list[TailorRound]) -> bool:
@@ -151,20 +178,9 @@ def run_tailor_review(
     free_retries = config.provenance_retry_budget
     quality_rounds = 0
     while True:
-        # Deterministic gates run before the panel: each is mechanically
-        # provable, and their issues reach the reviser in the same round they
-        # were detected rather than costing a premium fact-check round.
-        deterministic = [
-            provenance_critique(content, profile_facts),
-            skill_naming_critique(content, profile_facts),
-            numeric_evidence_critique(content, profile_facts),
-        ]
-        # Advisory, never a gate: the runtime coverage marker is excluded from
-        # gate and weighted-review selection, while a configured reviewer with
-        # the same name remains valid and authoritative. It carries the
-        # coverage rate for tailor_health.
-        if (coverage_measure := coverage_critique(content, skill_context)) is not None:
-            deterministic.append(coverage_measure)
+        deterministic = _deterministic_critiques(
+            content, profile_facts, skill_context
+        )
         started = time.monotonic()
         panel = run_panel(
             content,
@@ -259,20 +275,9 @@ async def arun_tailor_review(
     free_retries = config.provenance_retry_budget
     quality_rounds = 0
     while True:
-        # Deterministic gates run before the panel: each is mechanically
-        # provable, and their issues reach the reviser in the same round they
-        # were detected rather than costing a premium fact-check round.
-        deterministic = [
-            provenance_critique(content, profile_facts),
-            skill_naming_critique(content, profile_facts),
-            numeric_evidence_critique(content, profile_facts),
-        ]
-        # Advisory, never a gate: the runtime coverage marker is excluded from
-        # gate and weighted-review selection, while a configured reviewer with
-        # the same name remains valid and authoritative. It carries the
-        # coverage rate for tailor_health.
-        if (coverage_measure := coverage_critique(content, skill_context)) is not None:
-            deterministic.append(coverage_measure)
+        deterministic = _deterministic_critiques(
+            content, profile_facts, skill_context
+        )
         started = time.monotonic()
         panel = await arun_panel(
             content,

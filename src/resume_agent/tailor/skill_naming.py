@@ -13,11 +13,12 @@ fact-lock forbids a writer from claiming as the job's own term.
 """
 
 import re
+from typing import Any
 
 from resume_agent.models.profile import ProfileFacts, Skill
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique, ReviewIssue, Severity
-from resume_agent.tailor.provenance import index_facts
+from resume_agent.tailor.provenance import index_facts, renderable_skill_pointer
 from resume_agent.tracking.match_gap import normalize_skill
 
 SKILL_NAMING_REVIEWER = "skill-naming"
@@ -44,27 +45,18 @@ def _legal_tokens(fact: Skill) -> set[str]:
     return tokens
 
 
-def _renderable_skill(fact: Skill, index: dict[str, object]) -> bool:
-    """Match ``check_provenance``'s rules for a skill-section pointer."""
-    if not fact.inferred:
-        return True
-    if fact.category != "hard" or not fact.evidence_fact_ids:
-        return False
-    return all(
-        (evidence := index.get(evidence_id)) is not None
-        and not getattr(evidence, "inferred", False)
-        for evidence_id in fact.evidence_fact_ids
-    )
+def _legalizing_fact_ids(segment: str, index: dict[str, Any]) -> list[str]:
+    """Return ids whose own names or aliases match an unresolved segment.
 
-
-def _legalizing_fact_ids(segment: str, index: dict[str, object]) -> list[str]:
-    """Return ids whose own names or aliases match an unresolved segment."""
+    Only pointers the fact-lock would actually accept are offered: suggesting an
+    id `check_provenance` rejects would trade this gate's failure for that one.
+    """
     normalized = normalize_skill(segment)
     return sorted(
         fact_id
         for fact_id, candidate in index.items()
         if isinstance(candidate, Skill)
-        and _renderable_skill(candidate, index)
+        and renderable_skill_pointer(candidate, index)
         and normalized in _legal_tokens(candidate)
     )
 

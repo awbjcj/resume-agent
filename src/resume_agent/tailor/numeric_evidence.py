@@ -28,7 +28,11 @@ NUMERIC_EVIDENCE_REVIEWER = "numeric-evidence"
 _QUANTITY = re.compile(r"^\d[\d,]*(?:\.\d+)?(?:%|\+|x|k|m|b|ms|s)?$", re.IGNORECASE)
 # The digit core of a token, and every digit run inside a fact's text.
 _DIGITS = re.compile(r"\d[\d,]*(?:\.\d+)?")
-_EDGE_PUNCTUATION = "\"'`()[]{}<>,.;:!?—–-"
+# Currency symbols are stripped with the rest of the edge punctuation so a money
+# claim is checked like any other quantity: "$50K saved" is precisely the
+# invented-outcome class this gate exists to catch, and leaving `$` attached made
+# the token fail `_QUANTITY` and pass unexamined.
+_EDGE_PUNCTUATION = "\"'`()[]{}<>,.;:!?—–-$€£¥"
 
 # Identity and structure, not evidence. `bullets` is excluded so citing a parent
 # Experience does not inherit the numbers stated by its child bullets -- the

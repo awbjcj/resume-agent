@@ -53,13 +53,34 @@ def test_format_coverage_lists_must_haves_before_nice_to_haves():
     block = format_coverage(_context())
 
     assert block.startswith("MUST-HAVE COVERAGE")
-    assert "- Python — covered — facts: s1" in block
-    assert "- Kubernetes — gap — no profile evidence; do not claim or imply" in block
+    assert "- (must-have) Python — covered — facts: s1" in block
     assert (
-        "- Terraform — adjacent (Infrastructure as Code) — may inform emphasis, "
-        "never named" in block
+        "- (must-have) Kubernetes — gap — no profile evidence; do not claim or imply"
+        in block
+    )
+    assert (
+        "- (must-have) Terraform — adjacent (Infrastructure as Code) — may inform "
+        "emphasis, never named" in block
     )
     assert block.index("Python") < block.index("Docker")
+
+
+def test_format_coverage_names_the_tier_of_every_requirement():
+    # The block carries all three tiers under one MUST-HAVE header, so ordering
+    # alone cannot tell the writer a nice-to-have gap from a must-have gap.
+    block = format_coverage(_context())
+
+    assert "- (nice-to-have) Docker — covered — facts: s3" in block
+
+
+def test_format_coverage_labels_a_tech_stack_requirement():
+    context = SkillMatchContext(
+        matches=[
+            SkillMatch(requirement="Kafka", source="tech", coverage="gap", row=None)
+        ]
+    )
+
+    assert "- (tech stack) Kafka — gap" in format_coverage(context)
 
 
 def test_format_coverage_degrades_to_empty_without_a_context():
@@ -100,6 +121,38 @@ def test_coverage_report_counts_a_bullet_mention_as_rendered():
 
     assert sorted(report.rendered) == ["LangChain", "Python"]
     assert report.missed == []
+
+
+def test_coverage_report_does_not_match_a_phrase_across_two_bullets():
+    context = SkillMatchContext(
+        matches=[
+            SkillMatch(
+                requirement="Machine Learning",
+                source="must",
+                coverage="covered",
+                row=MatrixRow(key="machine learning", display="Machine Learning"),
+            )
+        ]
+    )
+    content = ResumeContent(
+        contact=Contact(name="Ada"),
+        experience=[
+            TailoredExperience(
+                company="AE",
+                title="Engineer",
+                provenance="e1",
+                bullets=[
+                    TailoredBullet(text="Serviced the machine", provenance="b1"),
+                    TailoredBullet(text="Learning was continuous", provenance="b2"),
+                ],
+            )
+        ],
+    )
+
+    report = coverage_report(content, context)
+
+    assert report.rendered == []
+    assert report.missed == ["Machine Learning"]
 
 
 def test_coverage_report_does_not_count_a_summary_only_mention():

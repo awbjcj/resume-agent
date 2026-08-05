@@ -65,8 +65,6 @@ def _coverage_totals(critique: dict[str, Any]) -> tuple[int, int] | None:
         return None
     covered = critique.get("covered_total")
     rendered = critique.get("rendered_total")
-    if rendered is None and isinstance(critique.get("rendered"), list):
-        rendered = len(critique["rendered"])
     if (
         isinstance(covered, int)
         and not isinstance(covered, bool)
