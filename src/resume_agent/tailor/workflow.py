@@ -10,6 +10,7 @@ from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.profile.matrix import SkillMatchContext
+from resume_agent.tailor.coverage import coverage_critique, format_coverage
 from resume_agent.tailor.match_plan import (
     amatch_plan,
     compose_match_plan_input,
@@ -137,10 +138,11 @@ def run_tailor_review(
             profile_facts,
         )
         pending["match_plan"] = time.monotonic() - started
+    coverage = format_coverage(skill_context)
     started = time.monotonic()
     content = tailor(
         compose_tailor_input(
-            jd_text, criteria, profile_facts, config.length_budget, plan
+            jd_text, criteria, profile_facts, config.length_budget, plan, coverage
         ),
         tailor_agent,
     )
@@ -157,8 +159,20 @@ def run_tailor_review(
             skill_naming_critique(content, profile_facts),
             numeric_evidence_critique(content, profile_facts),
         ]
+        # Advisory, never a gate: it is not in DETERMINISTIC_GATES and not a
+        # configured reviewer, so it neither blocks the round nor enters the
+        # weighted score. It carries the coverage rate for tailor_health.
+        if (coverage_measure := coverage_critique(content, skill_context)) is not None:
+            deterministic.append(coverage_measure)
         started = time.monotonic()
-        panel = run_panel(content, profile_facts, jd_text, config, reviewer_agents)
+        panel = run_panel(
+            content,
+            profile_facts,
+            jd_text,
+            config,
+            reviewer_agents,
+            coverage=coverage,
+        )
         pending["panel"] = time.monotonic() - started
         critiques = [*deterministic, *panel]
         verdict = aggregate(critiques, config)
@@ -191,6 +205,7 @@ def run_tailor_review(
                 profile_facts,
                 jd_text,
                 config.length_budget,
+                coverage,
             ),
             reviser_agent,
         )
@@ -229,10 +244,11 @@ async def arun_tailor_review(
             profile_facts,
         )
         pending["match_plan"] = time.monotonic() - started
+    coverage = format_coverage(skill_context)
     started = time.monotonic()
     content = await atailor(
         compose_tailor_input(
-            jd_text, criteria, profile_facts, config.length_budget, plan
+            jd_text, criteria, profile_facts, config.length_budget, plan, coverage
         ),
         tailor_agent,
         sem=sem,
@@ -250,9 +266,20 @@ async def arun_tailor_review(
             skill_naming_critique(content, profile_facts),
             numeric_evidence_critique(content, profile_facts),
         ]
+        # Advisory, never a gate: it is not in DETERMINISTIC_GATES and not a
+        # configured reviewer, so it neither blocks the round nor enters the
+        # weighted score. It carries the coverage rate for tailor_health.
+        if (coverage_measure := coverage_critique(content, skill_context)) is not None:
+            deterministic.append(coverage_measure)
         started = time.monotonic()
         panel = await arun_panel(
-            content, profile_facts, jd_text, config, reviewer_agents, sem=sem
+            content,
+            profile_facts,
+            jd_text,
+            config,
+            reviewer_agents,
+            sem=sem,
+            coverage=coverage,
         )
         pending["panel"] = time.monotonic() - started
         critiques = [*deterministic, *panel]
@@ -284,6 +311,7 @@ async def arun_tailor_review(
                 profile_facts,
                 jd_text,
                 config.length_budget,
+                coverage,
             ),
             reviser_agent,
             sem=sem,
