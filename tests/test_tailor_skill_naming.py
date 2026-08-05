@@ -22,6 +22,26 @@ def _facts() -> ProfileFacts:
     )
 
 
+def _facts_with_forbidden_inferred_match() -> ProfileFacts:
+    facts = _facts()
+    return facts.model_copy(
+        update={
+            "skills": {
+                **facts.skills,
+                "soft": [
+                    Skill(
+                        id="inferred-soft-langchain",
+                        name="LangChain",
+                        inferred=True,
+                        category="soft",
+                        evidence_fact_ids=["s1"],
+                    )
+                ],
+            }
+        }
+    )
+
+
 def _resume(*skills: TailoredSkill) -> ResumeContent:
     return ResumeContent(contact=Contact(name="Ada"), skills={"Core": list(skills)})
 
@@ -48,6 +68,17 @@ def test_compound_suggestion_names_fact_id_for_extra_segment():
     blocking = [i for i in critique.issues if i.severity is Severity.blocking]
     assert "LangChain" in (blocking[0].suggestion or "")
     assert "s2" in (blocking[0].suggestion or "")
+
+
+def test_compound_suggestion_omits_forbidden_inferred_fact_id():
+    content = _resume(TailoredSkill(name="LLM Agents & LangChain", provenance="s1"))
+
+    critique = skill_naming_critique(content, _facts_with_forbidden_inferred_match())
+
+    blocking = [i for i in critique.issues if i.severity is Severity.blocking]
+    suggestion = blocking[0].suggestion or ""
+    assert "s2" in suggestion, "the usable literal fact must remain identifiable"
+    assert "inferred-soft-langchain" not in suggestion
 
 
 def test_the_same_two_skills_as_separate_entries_pass():

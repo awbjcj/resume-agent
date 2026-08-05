@@ -44,13 +44,28 @@ def _legal_tokens(fact: Skill) -> set[str]:
     return tokens
 
 
+def _renderable_skill(fact: Skill, index: dict[str, object]) -> bool:
+    """Match ``check_provenance``'s rules for a skill-section pointer."""
+    if not fact.inferred:
+        return True
+    if fact.category != "hard" or not fact.evidence_fact_ids:
+        return False
+    return all(
+        (evidence := index.get(evidence_id)) is not None
+        and not getattr(evidence, "inferred", False)
+        for evidence_id in fact.evidence_fact_ids
+    )
+
+
 def _legalizing_fact_ids(segment: str, index: dict[str, object]) -> list[str]:
     """Return ids whose own names or aliases match an unresolved segment."""
     normalized = normalize_skill(segment)
     return sorted(
         fact_id
         for fact_id, candidate in index.items()
-        if isinstance(candidate, Skill) and normalized in _legal_tokens(candidate)
+        if isinstance(candidate, Skill)
+        and _renderable_skill(candidate, index)
+        and normalized in _legal_tokens(candidate)
     )
 
 
