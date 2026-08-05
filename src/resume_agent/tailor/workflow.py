@@ -16,9 +16,11 @@ from resume_agent.tailor.match_plan import (
     match_plan,
     normalize_match_plan,
 )
+from resume_agent.tailor.numeric_evidence import numeric_evidence_critique
 from resume_agent.tailor.panel import arun_panel, run_panel
 from resume_agent.tailor.provenance import PROVENANCE_REVIEWER, provenance_critique
 from resume_agent.tailor.review_config import ReviewConfig
+from resume_agent.tailor.skill_naming import skill_naming_critique
 from resume_agent.tailor.tailoring import (
     arevise,
     atailor,
@@ -147,16 +149,18 @@ def run_tailor_review(
     free_retries = config.provenance_retry_budget
     quality_rounds = 0
     while True:
-        # Provenance is the cheap deterministic gate. It blocks the round on its
-        # own, but the panel still runs: a broken citation says nothing about the
-        # resume's quality, and the reviser needs both kinds of feedback to fix
-        # the round in one pass rather than spending the next round rediscovering
-        # what the panel would have said here.
-        provenance = provenance_critique(content, profile_facts)
+        # Deterministic gates run before the panel: each is mechanically
+        # provable, and their issues reach the reviser in the same round they
+        # were detected rather than costing a premium fact-check round.
+        deterministic = [
+            provenance_critique(content, profile_facts),
+            skill_naming_critique(content, profile_facts),
+            numeric_evidence_critique(content, profile_facts),
+        ]
         started = time.monotonic()
         panel = run_panel(content, profile_facts, jd_text, config, reviewer_agents)
         pending["panel"] = time.monotonic() - started
-        critiques = [provenance, *panel]
+        critiques = [*deterministic, *panel]
         verdict = aggregate(critiques, config)
 
         rounds.append(
@@ -238,13 +242,20 @@ async def arun_tailor_review(
     free_retries = config.provenance_retry_budget
     quality_rounds = 0
     while True:
-        provenance = provenance_critique(content, profile_facts)
+        # Deterministic gates run before the panel: each is mechanically
+        # provable, and their issues reach the reviser in the same round they
+        # were detected rather than costing a premium fact-check round.
+        deterministic = [
+            provenance_critique(content, profile_facts),
+            skill_naming_critique(content, profile_facts),
+            numeric_evidence_critique(content, profile_facts),
+        ]
         started = time.monotonic()
         panel = await arun_panel(
             content, profile_facts, jd_text, config, reviewer_agents, sem=sem
         )
         pending["panel"] = time.monotonic() - started
-        critiques = [provenance, *panel]
+        critiques = [*deterministic, *panel]
         verdict = aggregate(critiques, config)
 
         rounds.append(

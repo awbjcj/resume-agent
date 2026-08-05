@@ -4,12 +4,16 @@ from pydantic import Field
 
 from resume_agent.models.base import ExtensibleModel
 from resume_agent.models.review import ReviewCritique
+from resume_agent.tailor.numeric_evidence import NUMERIC_EVIDENCE_REVIEWER
 from resume_agent.tailor.provenance import PROVENANCE_REVIEWER
 from resume_agent.tailor.review_config import ReviewConfig
+from resume_agent.tailor.skill_naming import SKILL_NAMING_REVIEWER
 
 # Gates decided in-process, not by a configured reviewer agent. They ride in the
 # critiques list like any gate, so aggregate stays the only verdict constructor.
-DETERMINISTIC_GATES = frozenset({PROVENANCE_REVIEWER})
+DETERMINISTIC_GATES = frozenset(
+    {PROVENANCE_REVIEWER, SKILL_NAMING_REVIEWER, NUMERIC_EVIDENCE_REVIEWER}
+)
 
 # The default configured gate when the caller has no ReviewConfig to consult
 # (e.g. reading a stored version outside a request that loaded one). `fact-check`
@@ -26,13 +30,13 @@ def failing_gate_names(
     """Which gates blocked this round, in the order they were recorded.
 
     `fact_check_passed` on a stored version is the AND of every gate, so on its
-    own it cannot say WHICH one failed - and it labelled a provenance-only
+    own it cannot say WHICH one failed - and it labelled a deterministic gate
     failure as a fact-check failure on rounds where fact-check never ran.
 
     `gate_names` should be the configured gate reviewers for the round these
     critiques came from (`{r.name for r in config.reviewers if r.gate}`); it
     defaults to `DEFAULT_GATE_REVIEWERS` only when the caller has no config to
-    consult. `provenance` is always a gate - it is deterministic, not configured.
+    consult. Deterministic gates are always gates, not configured reviewers.
     """
     gates = DETERMINISTIC_GATES | (
         frozenset(gate_names) if gate_names is not None else DEFAULT_GATE_REVIEWERS
@@ -55,8 +59,8 @@ def aggregate(critiques: list[ReviewCritique], config: ReviewConfig) -> PanelVer
     """Combine critiques into one verdict: any failed gate blocks the round.
 
     Gates are the configured reviewer gates plus the deterministic gates
-    (provenance). Each rides in `critiques`, so there is a single verdict shape
-    whether or not the panel ran.
+    (provenance, skill-naming, and numeric-evidence). Each rides in `critiques`,
+    so there is a single verdict shape whether or not the panel ran.
     """
     by_name = {c.reviewer: c for c in critiques}
 

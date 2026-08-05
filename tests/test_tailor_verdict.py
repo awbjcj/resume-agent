@@ -94,3 +94,28 @@ def test_passing_provenance_critique_is_a_gate_not_scored():
     assert verdict.gate_passed is True
     assert verdict.aggregate_score == 85  # provenance's score=100 is excluded
     assert verdict.passed is True
+
+
+def test_new_deterministic_gates_are_registered():
+    from resume_agent.tailor.verdict import DETERMINISTIC_GATES
+
+    assert "skill-naming" in DETERMINISTIC_GATES
+    assert "numeric-evidence" in DETERMINISTIC_GATES
+
+
+def test_a_new_gate_failure_blocks_the_round_and_is_named():
+    from resume_agent.tailor.verdict import failing_gate_names
+
+    config = ReviewConfig(reviewers=[ReviewerSpec(name="recruiter", weight=1)])
+    critiques = [
+        ReviewCritique(reviewer="provenance", score=100, passed=True),
+        ReviewCritique(reviewer="numeric-evidence", score=0, passed=False),
+        ReviewCritique(reviewer="recruiter", score=90, passed=True),
+    ]
+
+    verdict = aggregate(critiques, config)
+
+    assert verdict.gate_passed is False
+    assert verdict.passed is False
+    assert verdict.aggregate_score == 90
+    assert failing_gate_names(critiques, {"recruiter"}) == ["numeric-evidence"]
