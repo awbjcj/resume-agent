@@ -123,10 +123,10 @@ def test_fetch_workday_list_gates_before_detail(monkeypatch):
     """Only the title-matching row triggers a detail call (C: list-gate before N+1)."""
     detail_calls = []
 
-    def fake_post(url, json=None, **kwargs):
+    def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
         return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
 
-    def fake_get(url, **kwargs):
+    def fake_get(url: str, **kwargs: object) -> _Resp:
         detail_calls.append(url)
         return _Resp(DETAIL)
 
@@ -143,10 +143,10 @@ def test_fetch_workday_list_gates_before_detail(monkeypatch):
 def test_fetch_workday_applies_keyword_filter_after_detail(monkeypatch):
     detail_calls = []
 
-    def fake_post(url, json=None, **kwargs):
+    def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
         return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
 
-    def fake_get(url, **kwargs):
+    def fake_get(url: str, **kwargs: object) -> _Resp:
         detail_calls.append(url)
         if "Software-Engineer" in url:
             return _Resp(DETAIL)
@@ -170,7 +170,7 @@ def test_fetch_workday_applies_keyword_filter_after_detail(monkeypatch):
 def test_fetch_workday_request_is_search_shaped(monkeypatch):
     sent = {}
 
-    def fake_post(url, json=None, **kwargs):
+    def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
         sent.setdefault("searchText", json["searchText"])
         return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
 
@@ -183,8 +183,10 @@ def test_fetch_workday_request_is_search_shaped(monkeypatch):
 def test_fetch_workday_honors_limit(monkeypatch):
     page = {"total": 2, "jobPostings": LIST_PAGE["jobPostings"]}
 
-    monkeypatch.setattr(workday.board, "post",
-                        lambda url, json=None, **kwargs: _Resp(page if json["offset"] == 0 else {"total": 2, "jobPostings": []}))
+    def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
+        return _Resp(page if json["offset"] == 0 else {"total": 2, "jobPostings": []})
+
+    monkeypatch.setattr(workday.board, "post", fake_post)
     monkeypatch.setattr(workday.board, "get", lambda url, **kwargs: _Resp(DETAIL))
     jobs = workday.fetch_workday(TARGET, SearchConfig(), limit=1)
     assert len(jobs) == 1
@@ -199,10 +201,10 @@ def test_fetch_workday_isolates_failed_detail_fetch(monkeypatch):
         }
     }
 
-    def fake_post(url, json=None, **kwargs):
+    def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
         return _Resp(LIST_PAGE if json["offset"] == 0 else {"total": 2, "jobPostings": []})
 
-    def fake_get(url, **kwargs):
+    def fake_get(url: str, **kwargs: object) -> _Resp:
         if "Software-Engineer" in url:
             raise httpx.HTTPStatusError(
                 "500", request=httpx.Request("GET", url), response=httpx.Response(500)
@@ -388,7 +390,7 @@ def test_fetch_workday_empty_faceted_restart_reuses_plain_page(
 ):
     bodies = []
 
-    def fake_post(url, json=None, **kwargs):
+    def fake_post(url: str, json: dict[str, object], **kwargs: object) -> _Resp:
         bodies.append(json)
         if json["appliedFacets"]:
             return _Resp({"total": 0, "jobPostings": []})

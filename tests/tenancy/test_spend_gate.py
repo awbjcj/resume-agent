@@ -170,8 +170,8 @@ def test_exhausted_allowance_raises_cost_quota_exceeded_under_enforcement(tmp_pa
 def test_platform_cap_binds_administrators_too(tmp_path):
     """ADR-0009 Amendment 2: exempt from the allowance, not from the cap."""
     engine = _engine(tmp_path, role="admin")
-    settings = Settings(  # type: ignore[call-arg]
-        _env_file=None,
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
         cost_quota_enforcement="enforce",
         global_monthly_cost_quota_micros=1_000,
     )
