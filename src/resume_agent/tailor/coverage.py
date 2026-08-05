@@ -67,12 +67,11 @@ def _rendered_tokens(content: ResumeContent) -> set[str]:
 
 
 def _prose(content: ResumeContent) -> str:
-    """Normalized, padded generated prose for exact phrase containment."""
-    parts = [content.summary or ""]
+    """Normalized, padded bullets for exact phrase containment."""
+    parts: list[str] = []
     for experience in content.experience:
         parts.extend(bullet.text for bullet in experience.bullets)
     for project in content.projects:
-        parts.append(project.description or "")
         parts.extend(bullet.text for bullet in project.bullets)
     for volunteer in content.volunteer:
         parts.extend(bullet.text for bullet in volunteer.bullets)

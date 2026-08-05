@@ -3,6 +3,7 @@ from resume_agent.models.resume import (
     ResumeContent,
     TailoredBullet,
     TailoredExperience,
+    TailoredProject,
     TailoredSkill,
 )
 from resume_agent.models.review import Severity
@@ -100,7 +101,54 @@ def test_coverage_report_counts_a_bullet_mention_as_rendered():
     assert report.missed == []
 
 
-def test_coverage_report_accepts_canonical_row_equivalents():
+def test_coverage_report_does_not_count_a_summary_only_mention():
+    context = SkillMatchContext(
+        matches=[
+            SkillMatch(
+                requirement="LangChain",
+                source="must",
+                coverage="covered",
+                row=MatrixRow(key="langchain", display="LangChain"),
+            )
+        ]
+    )
+    content = ResumeContent(contact=Contact(name="Ada"), summary="LangChain engineer")
+
+    report = coverage_report(content, context)
+
+    assert report.rendered == []
+    assert report.missed == ["LangChain"]
+
+
+def test_coverage_report_does_not_count_a_project_description_only_mention():
+    context = SkillMatchContext(
+        matches=[
+            SkillMatch(
+                requirement="LangChain",
+                source="must",
+                coverage="covered",
+                row=MatrixRow(key="langchain", display="LangChain"),
+            )
+        ]
+    )
+    content = ResumeContent(
+        contact=Contact(name="Ada"),
+        projects=[
+            TailoredProject(
+                name="Agents",
+                description="Built with LangChain",
+                provenance="p1",
+            )
+        ],
+    )
+
+    report = coverage_report(content, context)
+
+    assert report.rendered == []
+    assert report.missed == ["LangChain"]
+
+
+def test_coverage_report_accepts_a_row_display_equivalent_only():
     context = SkillMatchContext(
         matches=[
             SkillMatch(
@@ -108,9 +156,9 @@ def test_coverage_report_accepts_canonical_row_equivalents():
                 source="must",
                 coverage="covered",
                 row=MatrixRow(
-                    key="amazon web services",
+                    key="cloud-provider",
                     display="Amazon Web Services",
-                    aliases=["Amazon Web Services (AWS)"],
+                    aliases=["Cloud"],
                 ),
             )
         ]
@@ -134,6 +182,58 @@ def test_coverage_report_accepts_canonical_row_equivalents():
     report = coverage_report(content, context)
 
     assert report.covered_total == 1
+    assert report.rendered == ["AWS"]
+    assert report.missed == []
+
+
+def test_coverage_report_accepts_a_normalized_requirement_equivalent_only():
+    context = SkillMatchContext(
+        matches=[
+            SkillMatch(
+                requirement="PYTHON!",
+                source="must",
+                coverage="covered",
+                row=MatrixRow(
+                    key="language",
+                    display="Scripting Language",
+                    aliases=["Py"],
+                ),
+            )
+        ]
+    )
+    content = ResumeContent(
+        contact=Contact(name="Ada"),
+        skills={"Core": [TailoredSkill(name="python", provenance="s1")]},
+    )
+
+    report = coverage_report(content, context)
+
+    assert report.rendered == ["PYTHON!"]
+    assert report.missed == []
+
+
+def test_coverage_report_accepts_a_row_alias_equivalent_only():
+    context = SkillMatchContext(
+        matches=[
+            SkillMatch(
+                requirement="AWS",
+                source="must",
+                coverage="covered",
+                row=MatrixRow(
+                    key="cloud-provider",
+                    display="Hosted Platform",
+                    aliases=["Cloud"],
+                ),
+            )
+        ]
+    )
+    content = ResumeContent(
+        contact=Contact(name="Ada"),
+        skills={"Core": [TailoredSkill(name="Cloud", provenance="s1")]},
+    )
+
+    report = coverage_report(content, context)
+
     assert report.rendered == ["AWS"]
     assert report.missed == []
 
