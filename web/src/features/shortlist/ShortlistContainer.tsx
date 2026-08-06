@@ -86,7 +86,7 @@ export function ShortlistContainer() {
         title="The Shortlist"
         sub="The cost gate before the premium tailoring step. Approve only the jobs worth the spend."
       />
-      <div className="mb-5 flex justify-end">
+      <div className="mb-5 flex flex-wrap items-center justify-end gap-2 rounded-lg border bg-card p-3 shadow-card">
         <BoardViewToggle view={view} onChange={setView} />
       </div>
       <MetricRow
