@@ -86,6 +86,9 @@ export function ShortlistContainer() {
         title="The Shortlist"
         sub="The cost gate before the premium tailoring step. Approve only the jobs worth the spend."
       />
+      <div className="mb-5 flex justify-end">
+        <BoardViewToggle view={view} onChange={setView} />
+      </div>
       <MetricRow
         items={[
           ["Awaiting review", total.toLocaleString()],
@@ -94,9 +97,6 @@ export function ShortlistContainer() {
         ]}
       />
       <FilterDesk filter={filters} facets={facets} total={total} onChange={setFilters} />
-      <div className="mb-5 flex justify-end">
-        <BoardViewToggle view={view} onChange={setView} />
-      </div>
       {!rows.length ? (
         <EmptyState
           title={total === 0 ? "Nothing shortlisted yet" : "No jobs loaded"}
