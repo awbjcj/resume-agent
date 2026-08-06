@@ -86,9 +86,6 @@ export function ShortlistContainer() {
         title="The Shortlist"
         sub="The cost gate before the premium tailoring step. Approve only the jobs worth the spend."
       />
-      <div className="mb-5 flex flex-wrap items-center justify-end gap-2 rounded-lg border bg-card p-3 shadow-card">
-        <BoardViewToggle view={view} onChange={setView} />
-      </div>
       <MetricRow
         items={[
           ["Awaiting review", total.toLocaleString()],
@@ -110,6 +107,7 @@ export function ShortlistContainer() {
               setFilters({ ...filters, staleMinDays: days });
               if (days != null) selection.selectAllMatching(total);
             }}
+            viewToggle={<BoardViewToggle view={view} onChange={setView} />}
           />
           <BulkActionBar
             count={selection.count}

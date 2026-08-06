@@ -2,6 +2,8 @@
 // bucket, and every job matching it (not just the loaded page) is selected
 // via the existing "select all matching" scope -- the bulk action bar below
 // then does the actual archive/delete.
+import type { ReactNode } from "react";
+
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const STALE_QUICK_OPTIONS = [30, 45, 60, 90] as const;
@@ -9,9 +11,12 @@ const STALE_QUICK_OPTIONS = [30, 45, 60, 90] as const;
 export function StaleQuickFilters({
   value,
   onSelect,
+  viewToggle,
 }: {
   value: number | null;
   onSelect: (days: number | null) => void;
+  /** Board card/list toggle, rendered at the end of this same row when the page has one. */
+  viewToggle?: ReactNode;
 }) {
   const active =
     value != null && (STALE_QUICK_OPTIONS as readonly number[]).includes(value)
@@ -47,6 +52,7 @@ export function StaleQuickFilters({
       <span className="text-xs text-muted-foreground">
         Selects every matching job so you can archive or delete it below.
       </span>
+      {viewToggle && <div className="ml-auto">{viewToggle}</div>}
     </div>
   );
 }

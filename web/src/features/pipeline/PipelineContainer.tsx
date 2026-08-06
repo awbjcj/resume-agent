@@ -155,7 +155,6 @@ export function PipelineContainer() {
         <Button variant="outline" size="sm" onClick={() => setLaunchMode("coverLetter")}>
           Cover letters…
         </Button>
-        <div className="ml-auto"><BoardViewToggle view={view} onChange={setView} /></div>
       </div>
       <MetricRow
         items={[
@@ -186,6 +185,7 @@ export function PipelineContainer() {
               setFilter({ ...filter, staleMinDays: days });
               if (days != null) selection.selectAllMatching(total);
             }}
+            viewToggle={<BoardViewToggle view={view} onChange={setView} />}
           />
           <BulkActionBar
             count={selection.count}
