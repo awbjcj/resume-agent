@@ -64,5 +64,6 @@ config/search.yaml
 config/style_guide.md
 scratch_diff.txt
 test-output.txt
+.playwright-mcp/
 
 *.tar.gz

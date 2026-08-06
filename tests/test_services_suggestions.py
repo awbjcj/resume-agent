@@ -60,8 +60,8 @@ def _graph():
         target_total=2,
         clusters_stale=False,
         jobs=[
-            JobLite(1, "Stripe", "Backend", "senior"),
-            JobLite(2, "Datadog", "Platform", "mid"),
+            JobLite(1, "Stripe", "Backend", "senior", "shortlisted"),
+            JobLite(2, "Datadog", "Platform", "mid", "shortlisted"),
         ],
         skills=[
             SkillNode(

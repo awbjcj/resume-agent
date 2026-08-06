@@ -11,6 +11,7 @@ import { JobModal } from "@/components/JobModal";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
 import { BoardSkeleton } from "@/components/skeletons";
+import { StaleQuickFilters } from "@/components/StaleQuickFilters";
 import { Button } from "@/components/ui/button";
 import {
   type ShortlistItem,
@@ -103,6 +104,13 @@ export function ShortlistContainer() {
         />
       ) : (
         <>
+          <StaleQuickFilters
+            value={filters.staleMinDays}
+            onSelect={(days) => {
+              setFilters({ ...filters, staleMinDays: days });
+              if (days != null) selection.selectAllMatching(total);
+            }}
+          />
           <BulkActionBar
             count={selection.count}
             isAllMatching={selection.isAllMatching}
@@ -128,6 +136,19 @@ export function ShortlistContainer() {
               preview={() => bulk.preview({ ...bulkArgs, action: "archive" })}
               run={() =>
                 bulk.run({ ...bulkArgs, action: "archive" }).then((result) => {
+                  selection.clear();
+                  return result;
+                })
+              }
+            />
+            <BulkPreviewButton
+              label="Delete"
+              title={`Delete ${selection.count.toLocaleString()} selected job(s)?`}
+              confirmLabel="Confirm delete"
+              variant="destructive"
+              preview={() => bulk.preview({ ...bulkArgs, action: "delete" })}
+              run={() =>
+                bulk.run({ ...bulkArgs, action: "delete" }).then((result) => {
                   selection.clear();
                   return result;
                 })

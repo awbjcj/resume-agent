@@ -7,10 +7,20 @@ type SuggestionKind = "skill" | "domain";
 export const SOURCE_WEIGHT = { must: 3, nice: 2, tech: 1 } as const;
 export const UNASSIGNED_ID = "__unassigned__";
 
+// Mirrors tracking/match_gap.py's TARGET_STATUSES -- every status a job in
+// this payload can have, ordered most- to least-progressed like
+// features/pipeline/pipeline-stages.ts's PIPELINE_STAGE_ORDER.
+export const TARGET_STATUSES = ["tailored", "rendered", "approved", "shortlisted"] as const;
+
+export function defaultTargetStatuses(): Set<string> {
+  return new Set(TARGET_STATUSES);
+}
+
 export interface Filters {
   q: string;
   company: string | null;
   seniority: string | null;
+  statuses: Set<string>;
   gapsOnly: boolean;
   weighting: "essential" | "popular";
 }
@@ -78,6 +88,7 @@ export interface DerivedView {
   jobsForDomain: (domainId: string) => JobLite[];
   companies: string[];
   seniorities: string[];
+  statusCounts: Record<string, number>;
   persistedStateOf: (kind: SuggestionKind, key: string) => "ready" | "stale" | undefined;
 }
 
@@ -114,11 +125,19 @@ export function sortSkillsWithin(
 
 export function deriveView(payload: Payload, filters: Filters): DerivedView {
   const jobById = new Map(payload.jobs.map((job) => [job.id, job]));
-  const filteredJobs = payload.jobs.filter(
+  // Leave-one-out, mirroring the board facet convention: counts reflect every
+  // other active filter but not the stage filter itself, so its own popover
+  // options never vanish as you toggle them.
+  const jobsBeforeStatus = payload.jobs.filter(
     (job) =>
       (!filters.company || job.company === filters.company) &&
       (!filters.seniority || job.seniority === filters.seniority),
   );
+  const statusCounts: Record<string, number> = {};
+  for (const job of jobsBeforeStatus) {
+    statusCounts[job.status] = (statusCounts[job.status] ?? 0) + 1;
+  }
+  const filteredJobs = jobsBeforeStatus.filter((job) => filters.statuses.has(job.status));
   const filteredJobIds = new Set(filteredJobs.map((job) => job.id));
   const edges = payload.edges.filter((edge) => filteredJobIds.has(edge.jobId));
 
@@ -295,6 +314,7 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
     jobsForDomain,
     companies: uniqueSorted(payload.jobs.map((job) => job.company)),
     seniorities: uniqueSorted(payload.jobs.map((job) => job.seniority)),
+    statusCounts,
     persistedStateOf: (kind, key) => persistedStatus.get(targetId({ kind, key })),
   };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { components } from "@/lib/api/schema";
 import {
+  defaultTargetStatuses,
   deriveView,
   sortSkillsWithin,
   targetId,
@@ -16,6 +17,7 @@ const base: Filters = {
   q: "",
   company: null,
   seniority: null,
+  statuses: defaultTargetStatuses(),
   gapsOnly: false,
   weighting: "essential",
 };
@@ -29,8 +31,8 @@ const payload: Payload = {
     { slug: "other", label: "Other", kind: "soft" },
   ],
   jobs: [
-    { id: 1, company: "Stripe", title: "Backend", seniority: "senior" },
-    { id: 2, company: "Datadog", title: "Platform", seniority: "mid" },
+    { id: 1, company: "Stripe", title: "Backend", seniority: "senior", status: "shortlisted" },
+    { id: 2, company: "Datadog", title: "Platform", seniority: "mid", status: "tailored" },
   ],
   skills: [
     {
@@ -183,6 +185,24 @@ describe("deriveView", () => {
       expect.objectContaining({ gapCount: 0, adjacentCount: 1 }),
     );
     expect(gapsOnly.skills).toEqual([]);
+  });
+
+  it("narrows to jobs whose status is in the selected stage set", () => {
+    const view = deriveView(payload, { ...base, statuses: new Set(["tailored"]) });
+
+    expect(view.filteredJobCount).toBe(1);
+    expect(view.jobsForSkill("kubernetes").map((job) => job.company)).toEqual(["Datadog"]);
+  });
+
+  it("computes stage counts before the stage filter narrows jobs, but after other filters", () => {
+    const allStages = deriveView(payload, base);
+    expect(allStages.statusCounts).toEqual({ shortlisted: 1, tailored: 1 });
+
+    const narrowed = deriveView(payload, { ...base, statuses: new Set(["tailored"]) });
+    expect(narrowed.statusCounts).toEqual({ shortlisted: 1, tailored: 1 });
+
+    const byCompany = deriveView(payload, { ...base, company: "Datadog" });
+    expect(byCompany.statusCounts).toEqual({ tailored: 1 });
   });
 
   it("returns filtered demanding jobs by stable skill key", () => {

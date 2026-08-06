@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { Filters as FilterValue } from "./aggregate";
+import { FacetPopover } from "@/components/filters/FacetPopover";
+import { pipelineStageLabel } from "@/features/pipeline/pipeline-stages";
+import { TARGET_STATUSES, type Filters as FilterValue } from "./aggregate";
 
 const ALL = "__all__";
 const CONTROL_LABEL_CLASS =
@@ -26,11 +28,13 @@ export function Filters({
   onChange,
   companies,
   seniorities,
+  statusCounts,
 }: {
   value: FilterValue;
   onChange: (next: FilterValue) => void;
   companies: string[];
   seniorities: string[];
+  statusCounts: Record<string, number>;
 }) {
   const companyItems = [
     { label: "All companies", value: ALL },
@@ -117,6 +121,18 @@ export function Filters({
             </SelectGroup>
           </SelectContent>
         </Select>
+      </Field>
+
+      <Field className="w-full gap-2 sm:w-44">
+        <FieldTitle className={CONTROL_LABEL_CLASS}>Stage</FieldTitle>
+        <FacetPopover
+          label="Stage"
+          counts={{ ...Object.fromEntries(TARGET_STATUSES.map((s) => [s, 0])), ...statusCounts }}
+          selected={value.statuses}
+          onChange={(statuses) => onChange({ ...value, statuses })}
+          getLabel={pipelineStageLabel}
+          presentation="field"
+        />
       </Field>
 
       <Field orientation="horizontal" className="h-9 w-auto gap-2 self-end">

@@ -79,6 +79,7 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(monkeypatch
                 "company": "Stripe",
                 "title": "Platform Engineer",
                 "seniority": "senior",
+                "status": "shortlisted",
             }
         ],
         "skills": [

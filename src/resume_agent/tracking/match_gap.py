@@ -57,6 +57,7 @@ class JobLite:
     company: str | None
     title: str | None
     seniority: str | None
+    status: str
 
 
 @dataclass
@@ -232,6 +233,7 @@ def build_demand_graph(
                 company=job.company,
                 title=job.title,
                 seniority=seniority if isinstance(seniority, str) else None,
+                status=job.status,
             )
         )
 

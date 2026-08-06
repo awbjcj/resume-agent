@@ -4501,6 +4501,8 @@ export interface components {
             id: number;
             /** Seniority */
             seniority?: string | null;
+            /** Status */
+            status: string;
             /** Title */
             title?: string | null;
         };

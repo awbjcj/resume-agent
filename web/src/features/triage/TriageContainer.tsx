@@ -9,6 +9,7 @@ import { JobTable } from "@/components/JobTable";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
 import { BoardSkeleton } from "@/components/skeletons";
+import { StaleQuickFilters } from "@/components/StaleQuickFilters";
 import { Button } from "@/components/ui/button";
 import { useBoardQuery, type TriageItem } from "@/features/board/use-board-query";
 import { useBulkAction } from "@/features/board/use-bulk-action";
@@ -138,6 +139,13 @@ export function TriageContainer() {
         />
       ) : (
         <>
+          <StaleQuickFilters
+            value={filter.staleMinDays}
+            onSelect={(days) => {
+              setFilter({ ...filter, staleMinDays: days });
+              if (days != null) selection.selectAllMatching(total);
+            }}
+          />
           <BulkActionBar
             count={selection.count}
             isAllMatching={selection.isAllMatching}

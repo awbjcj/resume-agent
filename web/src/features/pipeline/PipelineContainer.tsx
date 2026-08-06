@@ -9,6 +9,7 @@ import { JobModal } from "@/components/JobModal";
 import { MetricRow } from "@/components/MetricRow";
 import { PageHeader } from "@/components/PageHeader";
 import { BoardSkeleton } from "@/components/skeletons";
+import { StaleQuickFilters } from "@/components/StaleQuickFilters";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -179,6 +180,13 @@ export function PipelineContainer() {
         />
       ) : (
         <>
+          <StaleQuickFilters
+            value={filter.staleMinDays}
+            onSelect={(days) => {
+              setFilter({ ...filter, staleMinDays: days });
+              if (days != null) selection.selectAllMatching(total);
+            }}
+          />
           <BulkActionBar
             count={selection.count}
             isAllMatching={selection.isAllMatching}

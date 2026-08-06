@@ -69,6 +69,7 @@ def test_build_demand_graph_reads_all_sources_coverage_and_job_facets():
                 company="Acme",
                 title="Platform Engineer",
                 seniority="senior",
+                status=JobStatus.shortlisted.value,
             )
         ]
         assert graph.skills == [

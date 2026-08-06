@@ -4416,6 +4416,10 @@
             ],
             "title": "Seniority"
           },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
           "title": {
             "anyOf": [
               {
@@ -4429,7 +4433,8 @@
           }
         },
         "required": [
-          "id"
+          "id",
+          "status"
         ],
         "title": "JobLiteOut",
         "type": "object"

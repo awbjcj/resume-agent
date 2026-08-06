@@ -21,8 +21,8 @@ const populated = {
   clustersStale: false,
   categories: [{ slug: "cloud-infrastructure", label: "Cloud & Infrastructure", kind: "hard" }],
   jobs: [
-    { id: 1, company: "Stripe", title: "Backend", seniority: "senior" },
-    { id: 2, company: "Datadog", title: "Platform", seniority: "mid" },
+    { id: 1, company: "Stripe", title: "Backend", seniority: "senior", status: "shortlisted" },
+    { id: 2, company: "Datadog", title: "Platform", seniority: "mid", status: "tailored" },
   ],
   skills: [
     {

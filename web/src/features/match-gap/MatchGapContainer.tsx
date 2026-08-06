@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/empty";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  defaultTargetStatuses,
   deriveView,
   targetId,
   type Filters as FilterValue,
@@ -33,6 +34,7 @@ const DEFAULT_FILTERS: FilterValue = {
   q: "",
   company: null,
   seniority: null,
+  statuses: defaultTargetStatuses(),
   gapsOnly: false,
   weighting: "essential",
 };
@@ -119,6 +121,7 @@ export function MatchGapContainer() {
               onChange={setFilters}
               companies={view.companies}
               seniorities={view.seniorities}
+              statusCounts={view.statusCounts}
             />
             <RefreshClustersButton stale={data.clustersStale} onRefresh={refresh} />
           </section>

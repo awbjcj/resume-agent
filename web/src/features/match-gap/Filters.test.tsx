@@ -1,16 +1,25 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { defaultTargetStatuses } from "./aggregate";
 import { Filters } from "./Filters";
 
 describe("Filters", () => {
   it("shows user-facing labels for unfiltered select values", () => {
     render(
       <Filters
-        value={{ q: "", company: null, seniority: null, gapsOnly: false, weighting: "essential" }}
+        value={{
+          q: "",
+          company: null,
+          seniority: null,
+          statuses: defaultTargetStatuses(),
+          gapsOnly: false,
+          weighting: "essential",
+        }}
         onChange={() => {}}
         companies={["Stripe"]}
         seniorities={["senior"]}
+        statusCounts={{}}
       />,
     );
 

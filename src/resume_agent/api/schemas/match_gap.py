@@ -15,6 +15,7 @@ class JobLiteOut(CamelModel):
     company: str | None = None
     title: str | None = None
     seniority: str | None = None
+    status: str
 
 
 class SkillNodeOut(CamelModel):
