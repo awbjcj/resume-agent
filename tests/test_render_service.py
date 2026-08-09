@@ -5,6 +5,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from resume_agent.config import Settings
 from resume_agent.models.resume import ResumeContent
+from resume_agent.models.evidence_portfolio import EvidencePortfolio
 from resume_agent.models.profile import Contact
 from resume_agent.render.render_config import RenderConfig
 from resume_agent.render.service import render_version
@@ -76,6 +77,41 @@ def test_render_version_sets_path_and_marks_rendered(tmp_path):
         assert refreshed is not None
         assert refreshed.pdf_path == str(path)
         assert job.status == JobStatus.rendered.value
+
+
+def test_render_version_passes_frozen_portfolio_highlight_terms(tmp_path):
+    calls = {}
+
+    def fake_render(
+        content, output_path, template_path, *, fit_pages=None, highlight_terms=None
+    ):
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(output_path).write_bytes(b"%PDF-fake")
+        calls["highlight_terms"] = highlight_terms
+        return Path(output_path)
+
+    config = RenderConfig(
+        template_path="templates/resume.typ", output_dir=str(tmp_path / "out")
+    )
+    with _session() as session:
+        job = save_job(session, Job(source="manual", jd_text="jd"))
+        portfolio = EvidencePortfolio(status="planned", highlight_terms=["Python"])
+        version = save_resume_version(
+            session,
+            ResumeVersion(
+                job_id=_require_id(job.id),
+                round=1,
+                content_json=ResumeContent(contact=Contact(name="Ada")).model_dump(
+                    mode="json"
+                ),
+                evidence_portfolio_json=portfolio.model_dump(mode="json"),
+                evidence_portfolio_status="planned",
+            ),
+        )
+
+        render_version(session, _require_id(version.id), config, render_fn=fake_render)
+
+    assert calls["highlight_terms"] == ["Python"]
 
 
 def test_multi_user_render_forces_output_root_and_rejects_legacy_template(tmp_path):

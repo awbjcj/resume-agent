@@ -4,6 +4,7 @@ from typing import Callable
 from sqlmodel import Session
 
 from resume_agent.models.resume import ResumeContent
+from resume_agent.models.evidence_portfolio import EvidencePortfolio
 from resume_agent.render.export import export_job_artifacts, job_dir, resume_pdf_name
 from resume_agent.render.render_config import RenderConfig
 from resume_agent.render.renderer import render_pdf
@@ -45,12 +46,11 @@ def render_version(
     )
     out_path = out_dir / resume_pdf_name(version)
 
-    render_fn(
-        content,
-        out_path,
-        template_path_for(config),
-        fit_pages=1 if config.fit_one_page else None,
-    )
+    render_kwargs = {"fit_pages": 1 if config.fit_one_page else None}
+    if version.evidence_portfolio_json is not None:
+        portfolio = EvidencePortfolio.model_validate(version.evidence_portfolio_json)
+        render_kwargs["highlight_terms"] = portfolio.highlight_terms
+    render_fn(content, out_path, template_path_for(config), **render_kwargs)
 
     version.pdf_path = str(out_path)
     save_resume_version(session, version)

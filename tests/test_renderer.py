@@ -1,4 +1,3 @@
-
 from pypdf import PdfReader
 
 from resume_agent.models.profile import Contact, Education
@@ -31,7 +30,9 @@ def _full_content() -> ResumeContent:
                 title="Staff Engineer",
                 start="2020",
                 end="Present",
-                bullets=[TailoredBullet(text="Cut p99 latency by 40%.", provenance="b1")],
+                bullets=[
+                    TailoredBullet(text="Cut p99 latency by 40%.", provenance="b1")
+                ],
                 provenance="e1",
             )
         ],
@@ -40,12 +41,16 @@ def _full_content() -> ResumeContent:
                 name="Looms",
                 description="A distributed scheduler.",
                 tech=["Python", "Rust"],
-                bullets=[TailoredBullet(text="Open-sourced; 1k stars.", provenance="p1b1")],
+                bullets=[
+                    TailoredBullet(text="Open-sourced; 1k stars.", provenance="p1b1")
+                ],
                 provenance="p1",
             )
         ],
         skills={"languages": [TailoredSkill(name="Python", provenance="s1")]},
-        education=[Education(institution="Cambridge", degree="BA", field="Mathematics")],
+        education=[
+            Education(institution="Cambridge", degree="BA", field="Mathematics")
+        ],
     )
 
 
@@ -91,3 +96,28 @@ def test_project_description_keeps_full_width_with_long_tech_stack(tmp_path):
 
     layout = PdfReader(str(out)).pages[0].extract_text(extraction_mode="layout")
     assert "An agentic AI backend" in layout
+
+
+def test_portfolio_highlighting_does_not_change_extracted_ats_text(tmp_path):
+    highlighted = tmp_path / "highlighted.pdf"
+    plain = tmp_path / "plain.pdf"
+
+    render_pdf(
+        _full_content(),
+        highlighted,
+        template_path="templates/resume.typ",
+        fit_pages=None,
+        highlight_terms=["Python"],
+    )
+    render_pdf(
+        _full_content(),
+        plain,
+        template_path="templates/resume.typ",
+        fit_pages=None,
+        highlight_terms=[],
+    )
+
+    highlighted_text = PdfReader(str(highlighted)).pages[0].extract_text()
+    plain_text = PdfReader(str(plain)).pages[0].extract_text()
+    assert highlighted_text == plain_text
+    assert "Python" in highlighted_text

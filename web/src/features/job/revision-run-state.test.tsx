@@ -24,6 +24,7 @@ const version = {
   origin: "tailor",
   pdfPath: null,
   createdAt: "2026-07-13T00:00:00Z",
+  hasEvidencePortfolio: false,
 };
 
 describe("revision lifecycle UI", () => {
