@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { CheckCircle2, Download, FileText, Loader2, RotateCcw, X } from "lucide-react";
+import { CheckCircle2, Download, Eye, FileText, Loader2, RotateCcw, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { openDownload } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import { useRunStore } from "@/lib/runs/store";
+import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import {
   useRenderVersion,
   useReviseVersion,
@@ -47,6 +48,7 @@ export function VersionRow({
 }) {
   const [instruction, setInstruction] = useState("");
   const [reReview, setReReview] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const checkboxId = useId();
   const render = useRenderVersion(jobId);
   const revise = useReviseVersion(jobId);
@@ -102,18 +104,28 @@ export function VersionRow({
             {applied ? "Applied" : "Use for application"}
           </Button>
           {version.pdfPath ? (
-            <Button size="sm" variant="outline" render={
-              <a
-                href={`/api/resume-versions/${version.id}/pdf`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void openDownload(event.currentTarget.href);
-                }}
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPreviewOpen(true)}
               >
-                <Download className="size-4" aria-hidden="true" />
-                Download
-              </a>
-            } />
+                <Eye className="size-4" aria-hidden="true" />
+                Preview
+              </Button>
+              <Button size="sm" variant="outline" render={
+                <a
+                  href={`/api/resume-versions/${version.id}/pdf`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void openDownload(event.currentTarget.href);
+                  }}
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  Download
+                </a>
+              } />
+            </>
           ) : (
             <Button
               size="sm"
@@ -129,6 +141,19 @@ export function VersionRow({
               Render
             </Button>
           )}
+          {/* Portalled, so it costs nothing here and cannot be unmounted
+              mid-view by `pdfPath` going falsy while the preview is open. */}
+          <PdfPreviewDialog
+            open={previewOpen}
+            onOpenChange={setPreviewOpen}
+            title={
+              isRevision
+                ? "Resume revision preview"
+                : `Round ${version.round} preview`
+            }
+            previewPath={`/api/resume-versions/${version.id}/preview`}
+            downloadPath={`/api/resume-versions/${version.id}/pdf`}
+          />
         </div>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">

@@ -1078,6 +1078,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cover-letters/{cover_letter_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Cover Letter Pdf
+         * @description Serve the rendered PDF inline so the SPA can show it in a preview modal.
+         */
+        get: operations["preview_cover_letter_pdf_api_cover_letters__cover_letter_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cover-letters/{cover_letter_id}/revise": {
         parameters: {
             query?: never;
@@ -2206,6 +2226,26 @@ export interface paths {
         };
         /** Download Pdf */
         get: operations["download_pdf_api_resume_versions__version_id__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-versions/{version_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Pdf
+         * @description Serve the rendered PDF inline so the SPA can show it in a preview modal.
+         */
+        get: operations["preview_pdf_api_resume_versions__version_id__preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9335,6 +9375,39 @@ export interface operations {
             };
         };
     };
+    preview_cover_letter_pdf_api_cover_letters__cover_letter_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cover_letter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     launch_cover_letter_revise_api_cover_letters__cover_letter_id__revise_post: {
         parameters: {
             query?: never;
@@ -11997,6 +12070,39 @@ export interface operations {
         };
     };
     download_pdf_api_resume_versions__version_id__pdf_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_pdf_api_resume_versions__version_id__preview_get: {
         parameters: {
             query?: never;
             header?: {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, Download, FileText, Loader2, RotateCcw, X } from "lucide-react";
+import { CheckCircle2, Download, Eye, FileText, Loader2, RotateCcw, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { openDownload } from "@/lib/api/client";
 import { useRunStore } from "@/lib/runs/store";
+import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import {
   useReviseCoverLetter,
   useSelectCoverLetter,
@@ -39,6 +40,7 @@ export function CoverLetterRow({
   appliedId: number | null;
 }) {
   const [instruction, setInstruction] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const revise = useReviseCoverLetter(jobId);
   const runs = useRunStore((state) => state.runs);
   const reviseRun = latestArtifactRun(
@@ -99,24 +101,45 @@ export function CoverLetterRow({
             {applied ? "Applied" : "Use for application"}
           </Button>
           {coverLetter.pdfPath ? (
-            <Button size="sm" variant="outline" render={
-              <a
-                href={`/api/cover-letters/${coverLetter.id}/pdf`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void openDownload(event.currentTarget.href);
-                }}
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPreviewOpen(true)}
               >
-                <Download className="size-4" aria-hidden="true" />
-                Download
-              </a>
-            } />
+                <Eye className="size-4" aria-hidden="true" />
+                Preview
+              </Button>
+              <Button size="sm" variant="outline" render={
+                <a
+                  href={`/api/cover-letters/${coverLetter.id}/pdf`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void openDownload(event.currentTarget.href);
+                  }}
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  Download
+                </a>
+              } />
+            </>
           ) : (
             <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm text-muted-foreground">
               <FileText className="size-4" aria-hidden="true" />
               No PDF
             </span>
           )}
+          {/* Portalled, so it costs nothing here and cannot be unmounted
+              mid-view by `pdfPath` going falsy while the preview is open. */}
+          <PdfPreviewDialog
+            open={previewOpen}
+            onOpenChange={setPreviewOpen}
+            title={
+              isRevision ? "Cover letter revision preview" : "Cover letter preview"
+            }
+            previewPath={`/api/cover-letters/${coverLetter.id}/preview`}
+            downloadPath={`/api/cover-letters/${coverLetter.id}/pdf`}
+          />
         </div>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
