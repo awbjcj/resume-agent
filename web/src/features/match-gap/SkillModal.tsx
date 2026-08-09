@@ -85,6 +85,11 @@ export function SkillModal({
               <DialogDescription>
                 {skill.jobCount} target {skill.jobCount === 1 ? "job" : "jobs"} · demand score {skill.score}
               </DialogDescription>
+              {skill.domainId === null && skill.groupingStatus && (
+                <p role="status" className="mt-2 text-sm text-muted-foreground">
+                  Grouping {skill.groupingStatus.state}: {skill.groupingStatus.reason}
+                </p>
+              )}
             </DialogHeader>
 
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row">

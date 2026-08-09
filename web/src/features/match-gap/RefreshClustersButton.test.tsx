@@ -6,11 +6,39 @@ import { RefreshClustersButton } from "./RefreshClustersButton";
 
 describe("RefreshClustersButton", () => {
   it("shows launch failure and resets the busy state", async () => {
-    render(<RefreshClustersButton stale onRefresh={async () => false} />);
+    render(
+      <RefreshClustersButton
+        unassignedCount={3}
+        onRegroup={async () => false}
+        onMaintain={async () => true}
+        canUndo={false}
+        onUndo={async () => true}
+        generation={null}
+        maintenanceDue
+      />,
+    );
 
-    await userEvent.click(screen.getByRole("button", { name: /refresh.*clusters/i }));
+    await userEvent.click(screen.getByRole("button", { name: /regroup unassigned/i }));
 
     expect(await screen.findByRole("status")).toHaveTextContent(/couldn't start/i);
-    expect(screen.getByRole("button", { name: /refresh.*clusters/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /regroup unassigned/i })).toBeEnabled();
+  });
+
+  it("disables regroup at zero while leaving maintenance available", () => {
+    render(
+      <RefreshClustersButton
+        unassignedCount={0}
+        onRegroup={async () => true}
+        onMaintain={async () => true}
+        canUndo={false}
+        onUndo={async () => true}
+        generation="abc12345"
+        maintenanceDue={false}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Regroup unassigned (0)" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Maintain taxonomy" })).toBeEnabled();
+    expect(screen.getByText(/taxonomy generation abc12345/i)).toBeVisible();
   });
 });

@@ -264,6 +264,11 @@ export function RankedList({
                                     <p className="mt-1 text-xs text-muted-foreground">
                                       {skill.jobCount} {skill.jobCount === 1 ? "job" : "jobs"} · score {skill.score}
                                     </p>
+                                    {skill.domainId === null && skill.groupingStatus && (
+                                      <p className="mt-1 text-xs text-muted-foreground">
+                                        Grouping {skill.groupingStatus.state}: {skill.groupingStatus.reason}
+                                      </p>
+                                    )}
                                   </div>
                                   <Button
                                     variant="ghost"
