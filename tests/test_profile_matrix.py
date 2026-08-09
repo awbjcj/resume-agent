@@ -17,6 +17,7 @@ from resume_agent.profile.matrix import (
     build_decorated_matrix,
     build_matrix,
     build_skill_match_context,
+    decorate_matrix_groups,
     effective_cluster_map,
     load_matrix,
     load_overrides,
@@ -30,7 +31,8 @@ from resume_agent.profile.group_corrections import (
     corrections_path,
     save_group_corrections,
 )
-from resume_agent.taxonomy.clusters import ClusterMap
+from resume_agent.taxonomy.clusters import ClusterMap, save_cluster_map
+from resume_agent.taxonomy.groups import group_map_path, save_group_map
 
 
 def _facts():
@@ -62,7 +64,9 @@ def _facts():
 
 def test_matrix_rows_are_canonical_with_deduplicated_evidence_and_recency():
     facts = _facts()
-    matrix = build_matrix(facts, ClusterMap.empty(), Overrides(), today=date(2026, 7, 1))
+    matrix = build_matrix(
+        facts, ClusterMap.empty(), Overrides(), today=date(2026, 7, 1)
+    )
     kubernetes = next(row for row in matrix.rows if row.key == "kubernetes")
     bullet = facts.experience[0].bullets[0]
     skill = facts.skills["Platforms"][0]
@@ -85,9 +89,13 @@ def test_matrix_inferred_means_inferred_only():
 
 def test_overrides_ban_and_category():
     overrides = Overrides(ban=["mentorship"], category={"kubernetes": "hard"})
-    matrix = build_matrix(_facts(), ClusterMap.empty(), overrides, today=date(2026, 7, 1))
+    matrix = build_matrix(
+        _facts(), ClusterMap.empty(), overrides, today=date(2026, 7, 1)
+    )
     assert "mentorship" not in [row.key for row in matrix.rows]
-    assert next(row for row in matrix.rows if row.key == "kubernetes").category == "hard"
+    assert (
+        next(row for row in matrix.rows if row.key == "kubernetes").category == "hard"
+    )
 
 
 def test_effective_cluster_map_force_then_forbid_wins():
@@ -122,7 +130,9 @@ def test_override_tokens_covers_alias_forbid_and_category():
 def test_matrix_deterministic_and_round_trips(tmp_path):
     facts = _facts()
     first = build_matrix(facts, ClusterMap.empty(), Overrides(), today=date(2026, 7, 1))
-    second = build_matrix(facts, ClusterMap.empty(), Overrides(), today=date(2026, 7, 1))
+    second = build_matrix(
+        facts, ClusterMap.empty(), Overrides(), today=date(2026, 7, 1)
+    )
     assert [(row.key, row.strength) for row in first.rows] == [
         (row.key, row.strength) for row in second.rows
     ]
@@ -332,13 +342,60 @@ def test_apply_groups_uses_aliases_for_corrections_and_taxonomy():
     )
 
 
+def test_decorated_matrix_uses_the_canonical_tree_then_overrides_and_corrections(
+    tmp_path,
+):
+    profile_dir = tmp_path / "profile"
+    profile_dir.mkdir()
+    facts = ProfileFacts(
+        contact=Contact(name="Ada"),
+        skills={"Languages": [Skill(name="Python")]},
+    )
+    tree = ClusterMap(
+        aliases={"python": "python"},
+        domain_of={"python": "languages"},
+        domain_label={"languages": "Languages"},
+        category_of={"languages": "languages"},
+    )
+    save_cluster_map(tree, profile_dir / "cluster_map.json")
+    # A conflicting legacy map must not override a canonical tree that exists.
+    save_group_map({"python": "ai-ml"}, group_map_path(profile_dir))
+    matrix = build_matrix(facts, tree, Overrides())
+
+    decorate_matrix_groups(
+        matrix, profile_dir, Overrides(group={"python": "frontend-web"})
+    )
+    assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
+        "frontend-web",
+        "override",
+    )
+
+    save_group_corrections(
+        GroupCorrections(
+            corrections={"python": GroupCorrection(group="databases-storage")}
+        ),
+        corrections_path(profile_dir),
+    )
+    decorate_matrix_groups(
+        matrix, profile_dir, Overrides(group={"python": "frontend-web"})
+    )
+    assert (matrix.rows[0].group, matrix.rows[0].group_source) == (
+        "databases-storage",
+        "correction",
+    )
+
+
 def test_matrix_row_without_valid_group_source_still_loads():
-    assert MatrixRow.model_validate(
-        {"key": "python", "display": "Python"}
-    ).group_source is None
-    assert MatrixRow.model_validate(
-        {"key": "python", "display": "Python", "group_source": "bogus"}
-    ).group_source is None
+    assert (
+        MatrixRow.model_validate({"key": "python", "display": "Python"}).group_source
+        is None
+    )
+    assert (
+        MatrixRow.model_validate(
+            {"key": "python", "display": "Python", "group_source": "bogus"}
+        ).group_source
+        is None
+    )
 
 
 def test_build_decorated_matrix_does_not_persist_and_rebuild_does(tmp_path):
@@ -349,9 +406,7 @@ def test_build_decorated_matrix_does_not_persist_and_rebuild_does(tmp_path):
         skills={"Languages": [Skill(name="Python")]},
     )
     save_group_corrections(
-        GroupCorrections(
-            corrections={"python": GroupCorrection(group="ai-ml")}
-        ),
+        GroupCorrections(corrections={"python": GroupCorrection(group="ai-ml")}),
         corrections_path(profile_dir),
     )
 

@@ -109,6 +109,16 @@ def _seed_files(paths: ResetPaths) -> None:
         "[]", encoding="utf-8"
     )
     paths.taxonomy_file.write_text("{}", encoding="utf-8")
+    (paths.taxonomy_file.parent / "taxonomy_state.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    (paths.taxonomy_file.parent / "skill_embeddings.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    (paths.taxonomy_file.parent / "generations").mkdir()
+    (paths.taxonomy_file.parent / "generations" / "old.json").write_text(
+        "{}", encoding="utf-8"
+    )
     (paths.scraper_recipes_dir / "recipe.json").write_text("{}", encoding="utf-8")
     (paths.workday_facets_dir / "acme-ext.json").write_text("{}", encoding="utf-8")
 
@@ -161,6 +171,10 @@ def test_profile_scope_clears_current_corpus_layout_only(session, paths):
     assert not (paths.profile_dir / "sources").exists()
     assert paths.connector_runs_file.exists()
     assert not paths.taxonomy_file.exists()
+    assert not (paths.taxonomy_file.parent / "taxonomy_state.json").exists()
+    assert not (paths.taxonomy_file.parent / "skill_embeddings.json").exists()
+    generations = paths.taxonomy_file.parent / "generations"
+    assert generations.is_dir() and list(generations.iterdir()) == []
     fragments = paths.profile_dir / "fragments"
     assert fragments.is_dir() and list(fragments.iterdir()) == []
     assert (paths.profile_dir / "documents" / "manifest.json").read_text(
@@ -295,4 +309,7 @@ def test_scope_paths_lists_every_destructive_target(paths):
         paths.profile_dir / "matrix.json",
         paths.profile_dir / "cluster_map.json",
         paths.taxonomy_file,
+        paths.taxonomy_file.parent / "taxonomy_state.json",
+        paths.taxonomy_file.parent / "skill_embeddings.json",
+        paths.taxonomy_file.parent / "generations",
     )

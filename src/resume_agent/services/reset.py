@@ -42,6 +42,8 @@ _PROFILE_DIRECTORIES = ("fragments",)
 # profile output. Account-level resets preserve both; users remove/reset sources
 # through the dedicated source controls where that destructive intent is explicit.
 _PROFILE_FILES = ("facts.json", "matrix.json", "cluster_map.json")
+_TAXONOMY_GENERATED_FILES = ("taxonomy_state.json", "skill_embeddings.json")
+_TAXONOMY_GENERATED_DIRECTORIES = ("generations",)
 
 
 @dataclass(frozen=True)
@@ -131,6 +133,18 @@ def _scope_targets(paths: ResetPaths, scope: ResetScope) -> tuple[_ResetTarget, 
             for name in _PROFILE_FILES
         ),
         _ResetTarget("taxonomy", paths.taxonomy_file, False),
+        *(
+            _ResetTarget(
+                "taxonomy", paths.taxonomy_file.parent / name, False
+            )
+            for name in _TAXONOMY_GENERATED_FILES
+        ),
+        *(
+            _ResetTarget(
+                "taxonomy", paths.taxonomy_file.parent / name, True
+            )
+            for name in _TAXONOMY_GENERATED_DIRECTORIES
+        ),
     )
     caches = (
         _ResetTarget("scraper_recipes", paths.scraper_recipes_dir, True),

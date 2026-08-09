@@ -268,6 +268,26 @@ def test_existing_unthemed_canonical_is_themed_without_canonical_call():
     assert outcome.additions.domain_of == {"python": "languages"}
 
 
+def test_legacy_category_hint_follows_an_alias_to_its_canonical():
+    existing = ClusterMap(aliases={"kubernetes": "kubernetes"})
+    canonicalizer = _Canonicalizer(
+        lambda _new, _existing: [["kubernetes", "k8s"]]
+    )
+    themer = _Themer()
+
+    _classify(
+        demanded={"k8s"},
+        existing=existing,
+        canonicalizer=canonicalizer,
+        themer=themer,
+        category_hints={"k8s": "cloud-infra"},
+    )
+
+    assert themer.calls[0]["category_hints"] == {
+        "kubernetes": "cloud-infra"
+    }
+
+
 def test_failed_domain_batch_keeps_alias_but_not_domain():
     outcome = _classify(
         demanded={"python"},
@@ -449,6 +469,27 @@ def test_category_context_lists_all_categories_and_marks_full_ones():
     assert by_slug["languages"]["full"] is True
     assert len(by_slug["languages"]["domains"]) == 3
     assert by_slug["ai-ml"]["domains"] == []
+
+
+def test_soft_target_is_advisory_in_the_incremental_domain_prompt():
+    existing = _map_with_full_category(1)
+    themer = _Themer()
+
+    _classify(
+        demanded={*existing.aliases, "rust"},
+        existing=existing,
+        themer=themer,
+        category_cap=1,
+        allow_category_growth=True,
+    )
+
+    languages = next(
+        category
+        for category in themer.calls[0]["categories"]
+        if category["slug"] == "languages"
+    )
+    assert languages["at_soft_target"] is True
+    assert languages["full"] is False
 
 
 def test_concurrent_batches_cannot_overshoot_category_cap():

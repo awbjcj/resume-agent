@@ -27,6 +27,7 @@ from resume_agent.taxonomy.vocabulary import (
     LEGACY_GROUP_REMAP,
     SKILL_GROUPS as SKILL_GROUPS,
 )
+from resume_agent.taxonomy.clusters import ClusterMap
 from resume_agent.tracking.match_gap import normalize_skill
 
 DEFAULT_GROUPS_PATH = Path("data/taxonomy/skill_groups.json")
@@ -94,6 +95,22 @@ def save_group_map(
                 temporary.unlink(missing_ok=True)
 
 
+def groups_from_cluster_map(cmap: ClusterMap) -> dict[str, str]:
+    """Project the canonical tree's fixed-category axis onto every known token."""
+
+    groups: dict[str, str] = {}
+    for token, canonical in cmap.aliases.items():
+        domain_id = cmap.domain_of.get(canonical)
+        category = cmap.category_of.get(domain_id or "")
+        if category in SKILL_GROUPS:
+            groups[token] = category
+    for canonical, domain_id in cmap.domain_of.items():
+        category = cmap.category_of.get(domain_id)
+        if category in SKILL_GROUPS:
+            groups[canonical] = category
+    return groups
+
+
 class SkillGroupAssignment(ExtensibleModel):
     token: str
     group: str
@@ -112,7 +129,9 @@ _GROUP_INSTRUCTIONS = [
 
 def build_group_classifier_agent() -> Runner:
     settings = get_settings()
-    model = build_model(settings.cheap_model, cache_system_prompt=prompt_cache_for(settings.cheap_model))
+    model = build_model(
+        settings.cheap_model, cache_system_prompt=prompt_cache_for(settings.cheap_model)
+    )
     return AgentRunner(
         Agent(
             model=model,

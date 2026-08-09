@@ -80,6 +80,7 @@ class SkillNode:
     tech: int = 0
     job_count: int = 0
     coverage: Literal["covered", "adjacent", "gap"] = "gap"
+    grouping_status: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         if self.covered or self.coverage == "covered":
@@ -118,6 +119,11 @@ class DemandGraph:
     edges: list[DemandEdge]
     domains: list[DomainNode]
     categories: list[CategoryNode] = field(default_factory=list)
+    taxonomy_generation: str | None = None
+    taxonomy_algorithm_version: str = "legacy"
+    taxonomy_maintenance_due: bool = True
+    unassigned_count: int = 0
+    taxonomy_undo_available: bool = False
 
 
 @dataclass
@@ -131,7 +137,11 @@ class GapRow:
 
     @property
     def demand_share(self) -> int:
-        return round(100 * self.demand_count / self.target_total) if self.target_total else 0
+        return (
+            round(100 * self.demand_count / self.target_total)
+            if self.target_total
+            else 0
+        )
 
 
 @dataclass
@@ -197,6 +207,7 @@ def build_demand_graph(
     cluster_map: "ClusterMap | None" = None,
     *,
     corrections: "TaxonomyCorrections | None" = None,
+    grouping_statuses: Mapping[str, object] | None = None,
 ) -> DemandGraph:
     """Build normalized target-job skill demand for dashboard consumers."""
     from resume_agent.taxonomy.corrections import (
@@ -213,6 +224,29 @@ def build_demand_graph(
     domain_of = cluster_map.domain_of if cluster_map else {}
     domain_label = cluster_map.domain_label if cluster_map else {}
     category_of = cluster_map.category_of if cluster_map else {}
+    grouping_statuses = grouping_statuses or {}
+
+    def grouping_status_for(canonical: str) -> dict[str, str] | None:
+        raw = grouping_statuses.get(canonical)
+        if raw is None:
+            return None
+        dump = getattr(raw, "model_dump", None)
+        payload = dump(mode="json") if callable(dump) else raw
+        if not isinstance(payload, Mapping):
+            return None
+        state = payload.get("state")
+        reason = payload.get("reason")
+        attempted_at = payload.get("last_attempted_at", payload.get("attempted_at"))
+        if state not in ("uncertain", "failed") or not isinstance(reason, str):
+            return None
+        if not isinstance(attempted_at, str):
+            return None
+        return {
+            "state": state,
+            "reason": reason,
+            "last_attempted_at": attempted_at,
+        }
+
     removed = removed_canonical_tokens(corrections, aliases)
     profile_canonical = {aliases.get(token, token) for token in profile_tokens}
     covered_themes = {
@@ -258,13 +292,18 @@ def build_demand_graph(
         members = {
             phrasing: len(job_ids)
             for phrasing, job_ids in sorted(
-                accumulator.member_jobs.items(), key=lambda item: (item[0].casefold(), item[0])
+                accumulator.member_jobs.items(),
+                key=lambda item: (item[0].casefold(), item[0]),
             )
         }
         display = (
             min(
                 members,
-                key=lambda phrasing: (-members[phrasing], phrasing.casefold(), phrasing),
+                key=lambda phrasing: (
+                    -members[phrasing],
+                    phrasing.casefold(),
+                    phrasing,
+                ),
             )
             if members
             else canonical
@@ -288,10 +327,17 @@ def build_demand_graph(
                 tech=len(accumulator.source_jobs["tech"]),
                 job_count=len(accumulator.job_ids),
                 coverage=coverage,
+                grouping_status=(
+                    grouping_status_for(canonical)
+                    if domain_of.get(canonical) is None
+                    else None
+                ),
             )
         )
 
-    source_order = {source: index for index, source in enumerate(("must", "nice", "tech"))}
+    source_order = {
+        source: index for index, source in enumerate(("must", "nice", "tech"))
+    }
     edges = [
         DemandEdge(
             job_id=job_id,
@@ -341,6 +387,7 @@ def build_demand_graph(
         edges=edges,
         domains=domains,
         categories=categories,
+        unassigned_count=sum(node.domain_id is None for node in skill_nodes),
     )
 
 
@@ -398,7 +445,11 @@ def match_gap(
         for token, display in pairs:
             requested.setdefault(canonical.get(token, token), display)
 
-        missing = [display for token, display in requested.items() if token not in profile_canonical]
+        missing = [
+            display
+            for token, display in requested.items()
+            if token not in profile_canonical
+        ]
         per_job[job_id] = missing
 
         for token, display in requested.items():
