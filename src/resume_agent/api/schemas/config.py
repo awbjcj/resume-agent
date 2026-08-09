@@ -42,7 +42,10 @@ class ReviewerEntry(CamelModel):
 
 class LengthBudget(CamelModel):
     max_experiences: int = 4
+    max_projects: int = 2
+    max_evidence_owners: int = 5
     max_bullets_per_role: int = 5
+    max_bullets_per_project: int = 3
     target_total_bullets: int = 20
 
 
@@ -74,6 +77,7 @@ class ReviewConfigDoc(CamelModel):
     merged_advisory: bool = False
     tailor_tier: Literal["cheap", "mid", "premium"] = "premium"
     reviser_tier: Literal["cheap", "mid", "premium"] = "premium"
+    evidence_portfolio_enabled: bool = False
     reviewers: list[ReviewerEntry] = Field(default_factory=_default_reviewers)
     provenance_retry_budget: int = Field(default=1, ge=0)
     length_budget: LengthBudget | None = None

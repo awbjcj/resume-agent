@@ -11,6 +11,7 @@ def test_shipped_fast_config_shape():
     assert cfg.early_stop_on_regression is True
     assert cfg.tailor_tier == "mid"
     assert cfg.reviser_tier == "mid"
+    assert cfg.evidence_portfolio_enabled is False
     gates = [reviewer for reviewer in cfg.reviewers if reviewer.gate]
     assert [gate.name for gate in gates] == ["fact-check"]
     assert gates[0].model_tier == "premium"
@@ -28,6 +29,7 @@ def test_shipped_deep_config_matches_legacy_roster():
     assert cfg.max_rounds == 3
     assert cfg.tailor_tier == "premium"
     assert cfg.reviser_tier == "premium"
+    assert cfg.evidence_portfolio_enabled is False
     assert len(cfg.reviewers) == 5
 
 

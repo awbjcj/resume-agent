@@ -7,6 +7,7 @@ max_rounds: 2
 early_stop_on_regression: true
 score_threshold: 85
 merged_advisory: true
+evidence_portfolio_enabled: false
 tailor_tier: mid
 reviser_tier: mid
 style_guide_path: config/style_guide.md
@@ -40,5 +41,8 @@ reviewers:
 # reviewer. Omit the block to accept these defaults.
 length_budget:
   max_experiences: 4
+  max_projects: 2
+  max_evidence_owners: 5
   max_bullets_per_role: 5
+  max_bullets_per_project: 3
   target_total_bullets: 20

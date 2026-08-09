@@ -1,5 +1,6 @@
-# Eval-only A/B configuration. Production config/review.yaml remains plan-off.
-match_plan_enabled: true
+# Eval-only portfolio arm. Shipped fast/deep configs remain default-off until
+# every quality, safety, latency, and blind-comparison launch gate passes.
+evidence_portfolio_enabled: true
 max_rounds: 3
 score_threshold: 85
 reviewers:
@@ -26,5 +27,8 @@ reviewers:
 
 length_budget:
   max_experiences: 4
+  max_projects: 2
+  max_evidence_owners: 5
   max_bullets_per_role: 5
+  max_bullets_per_project: 3
   target_total_bullets: 20

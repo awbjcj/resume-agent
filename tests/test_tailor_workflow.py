@@ -1,5 +1,3 @@
-import pytest
-
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
 from resume_agent.models.review import Severity
@@ -175,6 +173,72 @@ def test_arun_tailor_review_passes_with_async_agents():
     } <= {critique.reviewer for critique in rounds[0].verdict.critiques}
 
 
+def test_arun_evidence_portfolio_runs_once_and_reaches_the_writer():
+    import asyncio
+
+    from resume_agent.models.evidence_portfolio import (
+        EvidencePortfolio,
+        PortfolioSelection,
+    )
+    from resume_agent.tailor.workflow import arun_tailor_review
+
+    class _AsyncWriter:
+        def __init__(self):
+            self.prompt = ""
+
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            self.prompt = prompt
+            return _Result(ResumeContent(contact=Contact(name="Ada")))
+
+    class _AsyncPlanner:
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, prompt):
+            raise NotImplementedError
+
+        async def arun(self, prompt):
+            self.calls += 1
+            return _Result(
+                EvidencePortfolio(
+                    selections=[
+                        PortfolioSelection(
+                            owner_id="e1",
+                            owner_kind="experience",
+                            selected_fact_ids=["b1"],
+                            rank=1,
+                            bullet_budget=1,
+                        )
+                    ]
+                )
+            )
+
+    writer = _AsyncWriter()
+    planner = _AsyncPlanner()
+
+    async def go():
+        return await arun_tailor_review(
+            "Python role",
+            JobCriteria(must_have_skills=["Python"]),
+            _slip_facts(),
+            ReviewConfig(max_rounds=1, evidence_portfolio_enabled=True),
+            writer,
+            {},
+            writer,
+            evidence_portfolio_agent=planner,
+            sem=asyncio.Semaphore(2),
+        )
+
+    rounds = asyncio.run(go())
+
+    assert planner.calls == 1
+    assert rounds[0].evidence_portfolio is not None
+    assert "EVIDENCE PORTFOLIO" in writer.prompt
+
+
 def test_loop_stops_at_max_rounds_when_never_passing():
     config = ReviewConfig(
         max_rounds=2,
@@ -312,8 +376,12 @@ def test_a_new_gate_failure_is_not_granted_the_provenance_free_retry():
     assert _is_citation_slip(verdict, config) is False
 
 
-def test_match_plan_runs_only_when_enabled_and_is_normalized():
-    from resume_agent.models.match_plan import MatchPlan, MatchPlanRequirement
+def test_evidence_portfolio_runs_once_and_is_normalized():
+    from resume_agent.models.evidence_portfolio import (
+        EvidencePortfolio,
+        PortfolioSelection,
+    )
+    from resume_agent.models.profile import Bullet, Experience
 
     class _CapturingTailor(_ContentAgent):
         def __init__(self):
@@ -330,14 +398,20 @@ def test_match_plan_runs_only_when_enabled_and_is_normalized():
         def run(self, prompt):
             self.calls += 1
             return _Result(
-                MatchPlan(
-                    requirements=[
-                        MatchPlanRequirement(
-                            jd_requirement="Python",
-                            supporting_fact_ids=["missing"],
-                            emphasis="untrusted note",
+                EvidencePortfolio(
+                    status="planned",
+                    selections=[
+                        PortfolioSelection(
+                            owner_id="exp1",
+                            owner_kind="experience",
+                            selected_fact_ids=["b1", "missing"],
+                            rank=1,
+                            bullet_budget=2,
+                            rationale="untrusted note",
                         )
-                    ]
+                    ],
+                    selected_skill_fact_ids=["missing"],
+                    highlight_terms=["missing"],
                 )
             )
 
@@ -347,7 +421,7 @@ def test_match_plan_runs_only_when_enabled_and_is_normalized():
     config = ReviewConfig(
         max_rounds=1,
         score_threshold=80,
-        match_plan_enabled=True,
+        evidence_portfolio_enabled=True,
         reviewers=[ReviewerSpec(name="ats-keyword", weight=1)],
     )
     tailor_agent = _CapturingTailor()
@@ -356,32 +430,51 @@ def test_match_plan_runs_only_when_enabled_and_is_normalized():
     run_tailor_review(
         "Backend",
         JobCriteria(),
-        ProfileFacts(contact=Contact(name="Ada")),
+        ProfileFacts(
+            contact=Contact(name="Ada"),
+            experience=[
+                Experience(
+                    id="exp1",
+                    company="Acme",
+                    title="Engineer",
+                    bullets=[Bullet(id="b1", text="Built an API")],
+                )
+            ],
+        ),
         config,
         tailor_agent,
         {"ats-keyword": _Good("ats-keyword")},
         _ContentAgent(),
-        match_plan_agent=planner,
+        evidence_portfolio_agent=planner,
     )
 
     assert planner.calls == 1
-    assert "MATCH PLAN" in tailor_agent.prompts[0]
-    assert '"gap":true' in tailor_agent.prompts[0]
+    assert "EVIDENCE PORTFOLIO" in tailor_agent.prompts[0]
+    assert '"status":"planned"' in tailor_agent.prompts[0]
     assert "missing" not in tailor_agent.prompts[0]
 
 
-def test_match_plan_enabled_requires_agent():
-    config = ReviewConfig(max_rounds=1, match_plan_enabled=True)
-    with pytest.raises(ValueError, match="requires a match-plan agent"):
-        run_tailor_review(
-            "Backend",
-            JobCriteria(),
-            ProfileFacts(contact=Contact(name="Ada")),
-            config,
-            _ContentAgent(),
-            {},
-            _ContentAgent(),
-        )
+def test_enabled_portfolio_without_agent_uses_deterministic_fallback():
+    class _CapturingTailor(_ContentAgent):
+        def run(self, prompt):
+            self.seen = prompt
+            return super().run(prompt)
+
+    config = ReviewConfig(max_rounds=1, evidence_portfolio_enabled=True)
+    tailor_agent = _CapturingTailor()
+    rounds = run_tailor_review(
+        "Backend",
+        JobCriteria(),
+        ProfileFacts(contact=Contact(name="Ada")),
+        config,
+        tailor_agent,
+        {},
+        _ContentAgent(),
+    )
+
+    assert rounds[0].evidence_portfolio is not None
+    assert rounds[0].evidence_portfolio.status == "deterministic_fallback"
+    assert '"status":"deterministic_fallback"' in tailor_agent.seen
 
 
 def test_early_stop_halts_after_clean_score_regression():
@@ -470,21 +563,36 @@ def test_regression_guard_ignores_unscored_rounds():
     # A clean-but-unscored round carries no quality bar to regress from, so it
     # must neither raise nor count as a baseline.
     assert (
-        _has_regressed([_round(1, gate_passed=True, score=None), _round(2, gate_passed=True, score=50)])
+        _has_regressed(
+            [
+                _round(1, gate_passed=True, score=None),
+                _round(2, gate_passed=True, score=50),
+            ]
+        )
         is False
     )
 
 
 def test_regression_guard_still_catches_a_real_score_drop():
     assert (
-        _has_regressed([_round(1, gate_passed=True, score=80), _round(2, gate_passed=True, score=60)])
+        _has_regressed(
+            [
+                _round(1, gate_passed=True, score=80),
+                _round(2, gate_passed=True, score=60),
+            ]
+        )
         is True
     )
 
 
 def test_regression_guard_catches_a_gate_regression():
     assert (
-        _has_regressed([_round(1, gate_passed=True, score=80), _round(2, gate_passed=False, score=90)])
+        _has_regressed(
+            [
+                _round(1, gate_passed=True, score=80),
+                _round(2, gate_passed=False, score=90),
+            ]
+        )
         is True
     )
 
@@ -516,7 +624,9 @@ def test_revision_builds_on_the_best_round_not_the_last():
         def run(self, prompt):
             self.received.append(prompt)
             self.calls += 1
-            return _Result(ResumeContent(contact=Contact(name=f"revision-{self.calls}")))
+            return _Result(
+                ResumeContent(contact=Contact(name=f"revision-{self.calls}"))
+            )
 
         async def arun(self, prompt):
             return self.run(prompt)
@@ -575,7 +685,9 @@ def test_revision_base_is_unchanged_when_rounds_improve():
         def run(self, prompt):
             self.received.append(prompt)
             self.calls += 1
-            return _Result(ResumeContent(contact=Contact(name=f"revision-{self.calls}")))
+            return _Result(
+                ResumeContent(contact=Contact(name=f"revision-{self.calls}"))
+            )
 
         async def arun(self, prompt):
             return self.run(prompt)
@@ -731,9 +843,7 @@ def test_a_round_failing_the_fact_check_gate_too_is_not_a_free_retry():
     # revision round, and a free retry would just spend tokens.
     class _FailGate:
         def run(self, prompt):
-            return _Result(
-                ReviewCritique(reviewer="fact-check", score=0, passed=False)
-            )
+            return _Result(ReviewCritique(reviewer="fact-check", score=0, passed=False))
 
         async def arun(self, prompt):
             return self.run(prompt)

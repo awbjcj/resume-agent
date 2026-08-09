@@ -2,6 +2,7 @@
 # Each model_tier resolves through CHEAP_MODEL / MID_MODEL / PREMIUM_MODEL.
 max_rounds: 3
 score_threshold: 85
+evidence_portfolio_enabled: false
 # Stop as soon as a round is worse than the best clean one so far. The loop keeps
 # its best round rather than its last, so stopping early never discards work.
 early_stop_on_regression: true
@@ -34,5 +35,8 @@ reviewers:
 
 length_budget:
   max_experiences: 4
+  max_projects: 2
+  max_evidence_owners: 5
   max_bullets_per_role: 5
+  max_bullets_per_project: 3
   target_total_bullets: 20

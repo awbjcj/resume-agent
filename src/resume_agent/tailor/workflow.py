@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 from collections.abc import Mapping
 
@@ -6,20 +7,27 @@ from pydantic import Field
 
 from resume_agent.llm_runner import Runner
 from resume_agent.models.base import ExtensibleModel
+from resume_agent.models.evidence_portfolio import EvidencePortfolio
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique
 from resume_agent.profile.matrix import SkillMatchContext
 from resume_agent.tailor.coverage import coverage_critique, format_coverage
-from resume_agent.tailor.match_plan import (
-    amatch_plan,
-    compose_match_plan_input,
-    match_plan,
-    normalize_match_plan,
+from resume_agent.tailor.evidence_portfolio import (
+    build_evidence_catalog,
+    build_fallback_portfolio,
+    normalize_evidence_portfolio,
 )
+from resume_agent.tailor.length import format_budget
 from resume_agent.tailor.numeric_evidence import numeric_evidence_critique
 from resume_agent.tailor.panel import arun_panel, run_panel
+from resume_agent.tailor.portfolio_alignment import portfolio_alignment_critique
+from resume_agent.tailor.portfolio_planner import (
+    aplan_evidence_portfolio,
+    compose_evidence_portfolio_input,
+    plan_evidence_portfolio,
+)
 from resume_agent.tailor.provenance import PROVENANCE_REVIEWER, provenance_critique
 from resume_agent.tailor.review_config import ReviewConfig
 from resume_agent.tailor.skill_naming import skill_naming_critique
@@ -34,10 +42,14 @@ from resume_agent.tailor.tailoring import (
 from resume_agent.tailor.verdict import PanelVerdict, aggregate, failing_gate_names
 
 
+logger = logging.getLogger(__name__)
+
+
 class TailorRound(ExtensibleModel):
     round_num: int
     content: ResumeContent
     verdict: PanelVerdict
+    evidence_portfolio: EvidencePortfolio | None = None
     stage_seconds: dict[str, float] = Field(default_factory=dict)
 
 
@@ -45,6 +57,7 @@ def _deterministic_critiques(
     content: ResumeContent,
     profile_facts: ProfileFacts,
     skill_context: SkillMatchContext | None,
+    evidence_portfolio: EvidencePortfolio | None = None,
 ) -> list[ReviewCritique]:
     """Every in-process critique for one round, gates first.
 
@@ -64,7 +77,125 @@ def _deterministic_critiques(
     ]
     if (coverage := coverage_critique(content, skill_context)) is not None:
         critiques.append(coverage)
+    if (
+        alignment := portfolio_alignment_critique(content, evidence_portfolio)
+    ) is not None:
+        critiques.append(alignment)
     return critiques
+
+
+def _fallback_warning(error: Exception | None) -> str:
+    reason = type(error).__name__ if error is not None else "planner unavailable"
+    return f"Evidence planner unavailable ({reason}); deterministic fallback used."
+
+
+def _portfolio_is_usable(portfolio: EvidencePortfolio, owner_ids: set[str]) -> bool:
+    return bool(portfolio.selections) and any(
+        selection.owner_id in owner_ids for selection in portfolio.selections
+    )
+
+
+def _plan_portfolio(
+    jd_text: str,
+    criteria: JobCriteria,
+    profile_facts: ProfileFacts,
+    config: ReviewConfig,
+    skill_context: SkillMatchContext | None,
+    agent: Runner | None,
+) -> EvidencePortfolio:
+    catalog = build_evidence_catalog(profile_facts, criteria, skill_context)
+    if agent is not None:
+        try:
+            draft = plan_evidence_portfolio(
+                compose_evidence_portfolio_input(
+                    jd_text,
+                    criteria,
+                    catalog,
+                    budget=format_budget(config.length_budget),
+                ),
+                agent,
+            )
+            if not _portfolio_is_usable(
+                draft, {owner.owner_id for owner in catalog.owners}
+            ):
+                raise ValueError("planner returned no usable owner selection")
+            draft = draft.model_copy(update={"status": "planned", "warning": None})
+            return normalize_evidence_portfolio(
+                draft,
+                catalog,
+                profile_facts,
+                criteria,
+                skill_context,
+                config.length_budget,
+            )
+        except Exception as error:
+            logger.warning(
+                "evidence portfolio planner failed; using fallback", exc_info=error
+            )
+            warning = _fallback_warning(error)
+    else:
+        warning = _fallback_warning(None)
+    return build_fallback_portfolio(
+        catalog,
+        profile_facts,
+        criteria,
+        skill_context,
+        config.length_budget,
+        warning=warning,
+    )
+
+
+async def _aplan_portfolio(
+    jd_text: str,
+    criteria: JobCriteria,
+    profile_facts: ProfileFacts,
+    config: ReviewConfig,
+    skill_context: SkillMatchContext | None,
+    agent: Runner | None,
+    *,
+    sem: asyncio.Semaphore,
+) -> EvidencePortfolio:
+    catalog = build_evidence_catalog(profile_facts, criteria, skill_context)
+    if agent is not None:
+        try:
+            draft = await aplan_evidence_portfolio(
+                compose_evidence_portfolio_input(
+                    jd_text,
+                    criteria,
+                    catalog,
+                    budget=format_budget(config.length_budget),
+                ),
+                agent,
+                sem=sem,
+            )
+            if not _portfolio_is_usable(
+                draft, {owner.owner_id for owner in catalog.owners}
+            ):
+                raise ValueError("planner returned no usable owner selection")
+            draft = draft.model_copy(update={"status": "planned", "warning": None})
+            return normalize_evidence_portfolio(
+                draft,
+                catalog,
+                profile_facts,
+                criteria,
+                skill_context,
+                config.length_budget,
+            )
+        except Exception as error:
+            logger.warning(
+                "evidence portfolio planner failed; using fallback", exc_info=error
+            )
+            warning = _fallback_warning(error)
+    else:
+        warning = _fallback_warning(None)
+    return build_fallback_portfolio(
+        catalog,
+        profile_facts,
+        criteria,
+        skill_context,
+        config.length_budget,
+        warning=warning,
+    )
 
 
 def _has_regressed(rounds: list[TailorRound]) -> bool:
@@ -147,29 +278,32 @@ def run_tailor_review(
     reviser_agent: Runner,
     match_plan_agent: Runner | None = None,
     skill_context: SkillMatchContext | None = None,
+    evidence_portfolio_agent: Runner | None = None,
 ) -> list[TailorRound]:
     """Draft, then gate/review/revise until the round passes or max_rounds is hit."""
     pending: dict[str, float] = {}
-    plan = None
-    if config.match_plan_enabled:
-        if match_plan_agent is None:
-            raise ValueError("match_plan_enabled requires a match-plan agent")
+    portfolio = None
+    if config.portfolio_enabled:
         started = time.monotonic()
-        plan = normalize_match_plan(
-            match_plan(
-                compose_match_plan_input(
-                    jd_text, criteria, profile_facts, skill_context=skill_context
-                ),
-                match_plan_agent,
-            ),
+        portfolio = _plan_portfolio(
+            jd_text,
+            criteria,
             profile_facts,
+            config,
+            skill_context,
+            evidence_portfolio_agent or match_plan_agent,
         )
-        pending["match_plan"] = time.monotonic() - started
+        pending["evidence_portfolio"] = time.monotonic() - started
     coverage = format_coverage(skill_context)
     started = time.monotonic()
     content = tailor(
         compose_tailor_input(
-            jd_text, criteria, profile_facts, config.length_budget, plan, coverage
+            jd_text,
+            criteria,
+            profile_facts,
+            config.length_budget,
+            coverage=coverage,
+            evidence_portfolio=portfolio,
         ),
         tailor_agent,
     )
@@ -179,7 +313,7 @@ def run_tailor_review(
     quality_rounds = 0
     while True:
         deterministic = _deterministic_critiques(
-            content, profile_facts, skill_context
+            content, profile_facts, skill_context, portfolio
         )
         started = time.monotonic()
         panel = run_panel(
@@ -199,6 +333,7 @@ def run_tailor_review(
                 round_num=len(rounds) + 1,
                 content=content,
                 verdict=verdict,
+                evidence_portfolio=portfolio,
                 stage_seconds=pending,
             )
         )
@@ -223,6 +358,7 @@ def run_tailor_review(
                 jd_text,
                 config.length_budget,
                 coverage,
+                portfolio,
             ),
             reviser_agent,
         )
@@ -242,30 +378,33 @@ async def arun_tailor_review(
     skill_context: SkillMatchContext | None = None,
     *,
     sem: asyncio.Semaphore,
+    evidence_portfolio_agent: Runner | None = None,
 ) -> list[TailorRound]:
     """Async twin of run_tailor_review; DB writes happen after callers gather."""
     pending: dict[str, float] = {}
-    plan = None
-    if config.match_plan_enabled:
-        if match_plan_agent is None:
-            raise ValueError("match_plan_enabled requires a match-plan agent")
+    portfolio = None
+    if config.portfolio_enabled:
         started = time.monotonic()
-        plan = normalize_match_plan(
-            await amatch_plan(
-                compose_match_plan_input(
-                    jd_text, criteria, profile_facts, skill_context=skill_context
-                ),
-                match_plan_agent,
-                sem=sem,
-            ),
+        portfolio = await _aplan_portfolio(
+            jd_text,
+            criteria,
             profile_facts,
+            config,
+            skill_context,
+            evidence_portfolio_agent or match_plan_agent,
+            sem=sem,
         )
-        pending["match_plan"] = time.monotonic() - started
+        pending["evidence_portfolio"] = time.monotonic() - started
     coverage = format_coverage(skill_context)
     started = time.monotonic()
     content = await atailor(
         compose_tailor_input(
-            jd_text, criteria, profile_facts, config.length_budget, plan, coverage
+            jd_text,
+            criteria,
+            profile_facts,
+            config.length_budget,
+            coverage=coverage,
+            evidence_portfolio=portfolio,
         ),
         tailor_agent,
         sem=sem,
@@ -276,7 +415,7 @@ async def arun_tailor_review(
     quality_rounds = 0
     while True:
         deterministic = _deterministic_critiques(
-            content, profile_facts, skill_context
+            content, profile_facts, skill_context, portfolio
         )
         started = time.monotonic()
         panel = await arun_panel(
@@ -297,6 +436,7 @@ async def arun_tailor_review(
                 round_num=len(rounds) + 1,
                 content=content,
                 verdict=verdict,
+                evidence_portfolio=portfolio,
                 stage_seconds=pending,
             )
         )
@@ -319,6 +459,7 @@ async def arun_tailor_review(
                 jd_text,
                 config.length_budget,
                 coverage,
+                portfolio,
             ),
             reviser_agent,
             sem=sem,

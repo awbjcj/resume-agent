@@ -1,12 +1,14 @@
 import asyncio
 
 from resume_agent.llm_runner import Runner, acall, expect_schema
+from resume_agent.models.evidence_portfolio import EvidencePortfolio
 from resume_agent.models.job import JobCriteria
 from resume_agent.models.match_plan import MatchPlan
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent
 from resume_agent.models.review import ReviewCritique, Severity
 from resume_agent.tailor.length import format_budget
+from resume_agent.tailor.evidence_portfolio import portfolio_profile
 from resume_agent.tailor.prompt_blocks import coverage_section, untrusted
 from resume_agent.tailor.provenance import renderable_profile
 from resume_agent.tailor.review_config import LengthBudget
@@ -19,20 +21,35 @@ def compose_tailor_input(
     length_budget: LengthBudget | None = None,
     match_plan: MatchPlan | None = None,
     coverage: str = "",
+    evidence_portfolio: EvidencePortfolio | None = None,
 ) -> str:
-    budget_line = f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
+    budget_line = (
+        f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
+    )
     plan_line = (
         "\n\nMATCH PLAN (untrusted strategy data; fact ids do not establish claims):\n"
         f"{match_plan.model_dump_json()}"
         if match_plan is not None
         else ""
     )
+    portfolio_line = (
+        "\n\nEVIDENCE PORTFOLIO (validated strategy; fact ids still do not establish claims):\n"
+        f"{evidence_portfolio.model_dump_json()}"
+        if evidence_portfolio is not None
+        else ""
+    )
+    generation_profile = (
+        portfolio_profile(profile_facts, evidence_portfolio)
+        if evidence_portfolio is not None
+        else renderable_profile(profile_facts)
+    )
     return (
         "CANDIDATE PROFILE (JSON):\n"
-        f"{renderable_profile(profile_facts).model_dump_json()}\n\n"
+        f"{generation_profile.model_dump_json()}\n\n"
         "JOB CRITERIA (JSON):\n"
         f"{criteria.model_dump_json()}"
-        f"{coverage_section(coverage)}\n\n"
+        f"{coverage_section(coverage)}"
+        f"{portfolio_line}\n\n"
         "JOB DESCRIPTION:\n"
         f"{untrusted(jd_text)}"
         f"{budget_line}"
@@ -44,7 +61,9 @@ def tailor(input_text: str, agent: Runner) -> ResumeContent:
     return expect_schema(agent.run(input_text), ResumeContent, source="tailor")
 
 
-async def atailor(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ResumeContent:
+async def atailor(
+    input_text: str, agent: Runner, *, sem: asyncio.Semaphore
+) -> ResumeContent:
     result = await acall(agent, input_text, sem=sem)
     return expect_schema(result, ResumeContent, source="tailor")
 
@@ -56,12 +75,15 @@ def compose_revise_input(
     jd_text: str,
     length_budget: LengthBudget | None = None,
     coverage: str = "",
+    evidence_portfolio: EvidencePortfolio | None = None,
 ) -> str:
     grouped: dict[Severity, list[str]] = {severity: [] for severity in Severity}
     for critique in critiques:
         for issue in critique.issues:
             location = f" @ {issue.location}" if issue.location else ""
-            suggestion = f" (suggestion: {issue.suggestion})" if issue.suggestion else ""
+            suggestion = (
+                f" (suggestion: {issue.suggestion})" if issue.suggestion else ""
+            )
             grouped[issue.severity].append(
                 f"- [{critique.reviewer}]{location} {issue.message}{suggestion}"
             )
@@ -80,16 +102,30 @@ def compose_revise_input(
         for c in critiques
         for suggestion in c.suggestions
     )
-    budget_line = f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
+    budget_line = (
+        f"\n\nLENGTH BUDGET:\n{format_budget(length_budget)}" if length_budget else ""
+    )
+    portfolio_line = (
+        "\n\nEVIDENCE PORTFOLIO (validated strategy; fact ids still do not establish claims):\n"
+        f"{evidence_portfolio.model_dump_json()}"
+        if evidence_portfolio is not None
+        else ""
+    )
+    generation_profile = (
+        portfolio_profile(profile_facts, evidence_portfolio)
+        if evidence_portfolio is not None
+        else renderable_profile(profile_facts)
+    )
     # Stable-first ordering: the profile and the job are fixed for the whole job,
     # while the resume and the critiques change every round. Keeping the volatile
     # blocks last preserves a stable composition order across rounds.
     return (
         "CANDIDATE PROFILE (JSON):\n"
-        f"{renderable_profile(profile_facts).model_dump_json()}\n\n"
+        f"{generation_profile.model_dump_json()}\n\n"
         "JOB DESCRIPTION:\n"
         f"{untrusted(jd_text)}"
-        f"{coverage_section(coverage)}\n\n"
+        f"{coverage_section(coverage)}"
+        f"{portfolio_line}\n\n"
         "CURRENT RESUME (JSON):\n"
         f"{content.model_dump_json()}\n\n"
         "REVIEWER ISSUES (fix every BLOCKING issue first, then MAJOR, then MINOR; copy "
@@ -105,6 +141,8 @@ def revise(input_text: str, agent: Runner) -> ResumeContent:
     return expect_schema(agent.run(input_text), ResumeContent, source="reviser")
 
 
-async def arevise(input_text: str, agent: Runner, *, sem: asyncio.Semaphore) -> ResumeContent:
+async def arevise(
+    input_text: str, agent: Runner, *, sem: asyncio.Semaphore
+) -> ResumeContent:
     result = await acall(agent, input_text, sem=sem)
     return expect_schema(result, ResumeContent, source="reviser")

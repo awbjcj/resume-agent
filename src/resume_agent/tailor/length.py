@@ -6,7 +6,9 @@ def format_budget(budget: LengthBudget) -> str:
     """Render the budget as one prompt instruction for tailor/reviser agents."""
     return (
         f"Target a single page. Use at most {budget.max_experiences} experiences, "
-        f"at most {budget.max_bullets_per_role} bullets per role, and about "
+        f"{budget.max_projects} projects, and {budget.max_evidence_owners} combined "
+        f"evidence owners; at most {budget.max_bullets_per_role} bullets per role, "
+        f"{budget.max_bullets_per_project} bullets per project, and about "
         f"{budget.target_total_bullets} bullets in total. Prefer the most relevant facts; "
         "drop the rest."
     )

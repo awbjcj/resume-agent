@@ -20,6 +20,18 @@ RESERVED_REVIEWER_NAMES = frozenset(
 )
 
 
+def _flag_bool(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off"}:
+            return False
+    return None
+
+
 class ReviewerSpec(ExtensibleModel):
     name: str
     gate: bool = False
@@ -32,7 +44,10 @@ class LengthBudget(ExtensibleModel):
     """One-page guidance handed to the tailor and surfaced to reviewers."""
 
     max_experiences: int = 4
+    max_projects: int = 2
+    max_evidence_owners: int = 5
     max_bullets_per_role: int = 5
+    max_bullets_per_project: int = 3
     target_total_bullets: int = 20
 
 
@@ -40,6 +55,9 @@ class ReviewConfig(ExtensibleModel):
     max_rounds: int = Field(default=3, ge=1)
     score_threshold: int = 85
     reviewers: list[ReviewerSpec] = Field(default_factory=list)
+    evidence_portfolio_enabled: bool = False
+    # One-release compatibility spelling. A before-validator mirrors either
+    # explicitly supplied key onto the other and rejects contradictory YAML.
     match_plan_enabled: bool = False
     merged_advisory: bool = False
     tailor_tier: Literal["cheap", "mid", "premium"] = "premium"
@@ -52,10 +70,43 @@ class ReviewConfig(ExtensibleModel):
     length_budget: LengthBudget = Field(default_factory=LengthBudget)
     style_guide_path: str = "config/style_guide.md"
 
+    @property
+    def portfolio_enabled(self) -> bool:
+        """Canonical runtime value, including legacy objects copied without validation."""
+        return self.evidence_portfolio_enabled or self.match_plan_enabled
+
+    @model_validator(mode="before")
+    @classmethod
+    def _portfolio_flag_alias(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        has_new = "evidence_portfolio_enabled" in data
+        has_old = "match_plan_enabled" in data
+        new_value = _flag_bool(data.get("evidence_portfolio_enabled"))
+        old_value = _flag_bool(data.get("match_plan_enabled"))
+        if (
+            has_new
+            and has_old
+            and None not in (new_value, old_value)
+            and new_value != old_value
+        ):
+            raise ValueError(
+                "evidence_portfolio_enabled conflicts with legacy match_plan_enabled"
+            )
+        if has_new and not has_old:
+            return {**data, "match_plan_enabled": data["evidence_portfolio_enabled"]}
+        if has_old and not has_new:
+            return {**data, "evidence_portfolio_enabled": data["match_plan_enabled"]}
+        return data
+
     @model_validator(mode="after")
     def _reject_reserved_reviewer_names(self) -> "ReviewConfig":
         reserved = sorted(
-            {spec.name for spec in self.reviewers if spec.name in RESERVED_REVIEWER_NAMES}
+            {
+                spec.name
+                for spec in self.reviewers
+                if spec.name in RESERVED_REVIEWER_NAMES
+            }
         )
         if reserved:
             names = ", ".join(repr(name) for name in reserved)
