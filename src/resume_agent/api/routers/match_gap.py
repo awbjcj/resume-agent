@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
 from resume_agent.api.deps import get_engine, get_run_manager, get_session
 from resume_agent.api.runs.launch import launch
 from resume_agent.api.runs.manager import RunManager
-from resume_agent.api.schemas.match_gap import MatchGapOut
+from resume_agent.api.schemas.match_gap import MatchGapOut, RefreshClustersIn
 from resume_agent.api.schemas.runs import RunOut
 from resume_agent.db import get_session as open_session
 from resume_agent.models.profile import Contact, ProfileFacts
@@ -28,6 +31,7 @@ from resume_agent.taxonomy.corrections import (
     corrections_file_path,
     load_taxonomy_corrections,
 )
+from resume_agent.taxonomy.state import load_taxonomy_state
 from resume_agent.tracking.match_gap import build_demand_graph, profile_skill_tokens
 from resume_agent.tenancy.paths import FACTS_PATH as _FACTS_PATH, resolve_tenant_path
 
@@ -56,12 +60,18 @@ def build_match_gap_payload(session: Session) -> MatchGapOut:
         ),
         corrections,
     )
+    taxonomy_state = load_taxonomy_state(resolve_tenant_path(_CLUSTER_PATH))
     graph = build_demand_graph(
         session,
         facts,
         cluster_map=cluster_map,
         corrections=corrections,
+        grouping_statuses=taxonomy_state.grouping_status,
     )
+    graph.taxonomy_generation = taxonomy_state.generation_id
+    graph.taxonomy_algorithm_version = taxonomy_state.algorithm_version
+    graph.taxonomy_maintenance_due = taxonomy_state.maintenance_due
+    graph.taxonomy_undo_available = taxonomy_state.can_undo
     return MatchGapOut.model_validate(
         {
             **graph.__dict__,
@@ -77,12 +87,34 @@ def get_match_gap(session: Session = Depends(get_session)):
     return build_match_gap_payload(session)
 
 
+def _regenerate_bound_matrix(facts: ProfileFacts | None, facts_path: Path) -> bool:
+    if facts is None:
+        return False
+    profile_dir = facts_path.parent
+    overrides = load_overrides(profile_dir / "overrides.yaml")
+    matrix = build_matrix(
+        facts,
+        load_cluster_map(resolve_tenant_path(_CLUSTER_PATH)),
+        overrides,
+    )
+    decorate_matrix_groups(matrix, profile_dir, overrides)
+    save_matrix(matrix, facts_path.with_name("matrix.json"))
+    return True
+
+
 @router.post("/match-gap/refresh-clusters", response_model=RunOut, status_code=202)
 def refresh_match_gap_clusters(
     request: Request,
+    body: RefreshClustersIn | None = None,
     mgr: RunManager = Depends(get_run_manager),
 ):
     engine = get_engine(request)
+    scoped_keys = set(body.skill_keys) if body is not None else None
+    fingerprint = (
+        "all"
+        if scoped_keys is None
+        else hashlib.sha256("\x1f".join(sorted(scoped_keys)).encode()).hexdigest()[:20]
+    )
 
     def work(reporter):
         from resume_agent.services.match_gap import refresh_clusters
@@ -110,19 +142,83 @@ def refresh_match_gap_clusters(
                 reporter=reporter,
                 extra_tokens=extra_tokens,
                 corrections_path=resolve_tenant_path(corrections_file_path()),
+                skill_keys=scoped_keys,
             )
-        if facts is None:
-            result["matrixRegenerated"] = False
-            return result
-
-        matrix = build_matrix(
-            facts,
-            load_cluster_map(resolve_tenant_path(_CLUSTER_PATH)),
-            overrides,
-        )
-        decorate_matrix_groups(matrix, facts_path.parent, overrides)
-        save_matrix(matrix, facts_path.with_name("matrix.json"))
-        result["matrixRegenerated"] = True
+        result["matrixRegenerated"] = _regenerate_bound_matrix(facts, facts_path)
         return result
 
-    return launch(mgr, "refreshClusters", work, singleton_key="refreshClusters")
+    return launch(
+        mgr,
+        "refreshClusters",
+        work,
+        singleton_key=f"refreshClusters:{fingerprint}",
+        meta={"skillKeys": sorted(scoped_keys) if scoped_keys is not None else None},
+    )
+
+
+@router.post("/match-gap/maintain-taxonomy", response_model=RunOut, status_code=202)
+def maintain_match_gap_taxonomy(
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    engine = get_engine(request)
+
+    def work(_reporter):
+        from resume_agent.services.match_gap import maintain_taxonomy
+        from resume_agent.tracking.canonicalize import build_taxonomy_maintenance_agent
+
+        facts_path = resolve_tenant_path(_FACTS_PATH)
+        try:
+            facts = load_facts(facts_path)
+        except (OSError, ValueError):
+            facts = None
+        with open_session(engine) as session:
+            result = maintain_taxonomy(
+                session,
+                judge=build_taxonomy_maintenance_agent(),
+                path=resolve_tenant_path(_CLUSTER_PATH),
+                corrections_path=resolve_tenant_path(corrections_file_path()),
+            )
+        result["matrixRegenerated"] = _regenerate_bound_matrix(facts, facts_path)
+        return result
+
+    return launch(
+        mgr,
+        "maintainTaxonomy",
+        work,
+        singleton_key="taxonomyMaintenance",
+    )
+
+
+@router.post(
+    "/match-gap/undo-taxonomy-maintenance", response_model=RunOut, status_code=202
+)
+def undo_match_gap_taxonomy_maintenance(
+    request: Request,
+    mgr: RunManager = Depends(get_run_manager),
+):
+    engine = get_engine(request)
+
+    def work(_reporter):
+        from resume_agent.services.match_gap import undo_taxonomy_maintenance
+
+        facts_path = resolve_tenant_path(_FACTS_PATH)
+        try:
+            facts = load_facts(facts_path)
+        except (OSError, ValueError):
+            facts = None
+        with open_session(engine) as session:
+            result = undo_taxonomy_maintenance(
+                session,
+                path=resolve_tenant_path(_CLUSTER_PATH),
+                corrections_path=resolve_tenant_path(corrections_file_path()),
+            )
+        result["matrixRegenerated"] = _regenerate_bound_matrix(facts, facts_path)
+        return result
+
+    return launch(
+        mgr,
+        "undoTaxonomyMaintenance",
+        work,
+        singleton_key="taxonomyMaintenance",
+    )

@@ -35,7 +35,9 @@ def test_match_gap_empty_db_returns_empty_graph():
     assert body["clustersStale"] is False
 
 
-def test_match_gap_projects_jobs_skills_edges_domains_and_categories(monkeypatch, tmp_path):
+def test_match_gap_projects_jobs_skills_edges_domains_and_categories(
+    monkeypatch, tmp_path
+):
     cluster_path = tmp_path / "cluster_map.json"
     save_cluster_map(
         ClusterMap(
@@ -94,6 +96,7 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(monkeypatch
                 "nice": 1,
                 "tech": 0,
                 "jobCount": 1,
+                "groupingStatus": None,
             }
         ],
         "edges": [
@@ -125,6 +128,11 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(monkeypatch
         ],
         "categories": [],
         "suggestionStatuses": [],
+        "taxonomyGeneration": None,
+        "taxonomyAlgorithmVersion": "embedding-taxonomy-v1",
+        "taxonomyMaintenanceDue": True,
+        "unassignedCount": 0,
+        "taxonomyUndoAvailable": False,
     }
     assert body["categories"][7] == {
         "slug": "cloud-infra",
@@ -133,7 +141,9 @@ def test_match_gap_projects_jobs_skills_edges_domains_and_categories(monkeypatch
     }
 
 
-def test_match_gap_includes_canonical_persisted_suggestion_status(monkeypatch, tmp_path):
+def test_match_gap_includes_canonical_persisted_suggestion_status(
+    monkeypatch, tmp_path
+):
     cluster_path = tmp_path / "cluster_map.json"
     cluster_map = ClusterMap(
         aliases={"python": "python"},

@@ -1647,6 +1647,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/match-gap/maintain-taxonomy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Maintain Match Gap Taxonomy */
+        post: operations["maintain_match_gap_taxonomy_api_match_gap_maintain_taxonomy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/match-gap/refresh-clusters": {
         parameters: {
             query?: never;
@@ -1658,6 +1675,23 @@ export interface paths {
         put?: never;
         /** Refresh Match Gap Clusters */
         post: operations["refresh_match_gap_clusters_api_match_gap_refresh_clusters_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/match-gap/undo-taxonomy-maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo Match Gap Taxonomy Maintenance */
+        post: operations["undo_match_gap_taxonomy_maintenance_api_match_gap_undo_taxonomy_maintenance_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4124,6 +4158,21 @@ export interface components {
             /** Authurl */
             authUrl: string;
         };
+        /** GroupingStatusOut */
+        GroupingStatusOut: {
+            /**
+             * Lastattemptedat
+             * Format: date-time
+             */
+            lastAttemptedAt: string;
+            /** Reason */
+            reason: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "uncertain" | "failed";
+        };
         /** GuidanceUpdate */
         GuidanceUpdate: {
             /** Guidance */
@@ -4794,6 +4843,28 @@ export interface components {
             suggestionStatuses?: components["schemas"]["SuggestionStatusOut"][];
             /** Targettotal */
             targetTotal: number;
+            /**
+             * Taxonomyalgorithmversion
+             * @default legacy
+             */
+            taxonomyAlgorithmVersion: string;
+            /** Taxonomygeneration */
+            taxonomyGeneration?: string | null;
+            /**
+             * Taxonomymaintenancedue
+             * @default true
+             */
+            taxonomyMaintenanceDue: boolean;
+            /**
+             * Taxonomyundoavailable
+             * @default false
+             */
+            taxonomyUndoAvailable: boolean;
+            /**
+             * Unassignedcount
+             * @default 0
+             */
+            unassignedCount: number;
         };
         /** MatrixOut */
         MatrixOut: {
@@ -5585,6 +5656,14 @@ export interface components {
             /** Stages */
             stages: ("pull" | "extract" | "tailor" | "render")[];
         };
+        /**
+         * RefreshClustersIn
+         * @description Exact visible canonical keys to regroup, bounded at the API boundary.
+         */
+        RefreshClustersIn: {
+            /** Skillkeys */
+            skillKeys: string[];
+        };
         /** RefreshParams */
         RefreshParams: {
             /** Limit */
@@ -6264,6 +6343,7 @@ export interface components {
             covered: boolean;
             /** Domainid */
             domainId?: string | null;
+            groupingStatus?: components["schemas"]["GroupingStatusOut"] | null;
             /** Jobcount */
             jobCount: number;
             /** Key */
@@ -10797,7 +10877,73 @@ export interface operations {
             };
         };
     };
+    maintain_match_gap_taxonomy_api_match_gap_maintain_taxonomy_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     refresh_match_gap_clusters_api_match_gap_refresh_clusters_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RefreshClustersIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_match_gap_taxonomy_maintenance_api_match_gap_undo_taxonomy_maintenance_post: {
         parameters: {
             query?: never;
             header?: {
