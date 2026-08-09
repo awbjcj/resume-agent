@@ -68,13 +68,16 @@ def test_multi_user_downloads_reject_artifacts_outside_workspace(
         == 200
     )
 
-    resume = mu_client.get(f"/api/resume-versions/{version_id}/pdf")
-    cover = mu_client.get(f"/api/cover-letters/{cover_id}/pdf")
+    responses = [
+        mu_client.get(f"/api/resume-versions/{version_id}/pdf"),
+        mu_client.get(f"/api/cover-letters/{cover_id}/pdf"),
+        mu_client.get(f"/api/resume-versions/{version_id}/preview"),
+        mu_client.get(f"/api/cover-letters/{cover_id}/preview"),
+    ]
 
-    assert resume.status_code == 404
-    assert cover.status_code == 404
-    assert b"sensitive host data" not in resume.content
-    assert b"sensitive host data" not in cover.content
+    for response in responses:
+        assert response.status_code == 404
+        assert b"sensitive host data" not in response.content
 
 
 def test_workspace_import_rejects_external_artifact_paths(mu_app, mu_client, tmp_path):

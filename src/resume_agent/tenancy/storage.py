@@ -44,3 +44,15 @@ def artifact_path(path: Path | str) -> Path:
     if context is None:
         return Path(path)
     return _confine(path, context.paths.output_dir, prefix="output")
+
+
+def resolve_artifact_pdf(pdf_path: str | None) -> Path | None:
+    """Resolve a stored ``pdf_path`` to a tenant-confined existing file, or None."""
+
+    if not pdf_path:
+        return None
+    try:
+        path = artifact_path(pdf_path)
+    except TenantPathError:
+        return None
+    return path if path.is_file() else None

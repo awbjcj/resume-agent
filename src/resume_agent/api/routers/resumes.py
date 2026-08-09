@@ -18,7 +18,7 @@ from resume_agent.api.schemas.jobs import (
 from resume_agent.render.export import resume_download_name
 from resume_agent.services.board import select_resume_version
 from resume_agent.services.rendering import render_resume_version
-from resume_agent.tenancy.storage import TenantPathError, artifact_path
+from resume_agent.tenancy.storage import resolve_artifact_pdf
 from resume_agent.tracking.repository import get_job, get_resume_version
 
 router = APIRouter()
@@ -32,11 +32,8 @@ def download_pdf(
     version = get_resume_version(session, version_id)
     if version is None:
         raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
-    try:
-        path = artifact_path(version.pdf_path) if version.pdf_path else None
-    except TenantPathError:
-        path = None
-    if path is None or not path.is_file():
+    path = resolve_artifact_pdf(version.pdf_path)
+    if path is None:
         raise ApiException(404, "NOT_FOUND", "No rendered PDF for this version")
     job = get_job(session, version.job_id)
     filename = resume_download_name(job, version) if job is not None else path.name
@@ -44,6 +41,32 @@ def download_pdf(
         path,
         media_type="application/pdf",
         filename=filename,
+    )
+
+
+@router.get("/resume-versions/{version_id}/preview")
+def preview_pdf(
+    version_id: int, session: Session = Depends(get_session)
+) -> FileResponse:
+    """Serve the rendered PDF inline so the SPA can show it in a preview modal."""
+
+    version = get_resume_version(session, version_id)
+    if version is None:
+        raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
+    path = resolve_artifact_pdf(version.pdf_path)
+    if path is None:
+        raise ApiException(404, "NOT_FOUND", "No rendered PDF for this version")
+    # Streamed, not buffered. ``FileResponse`` only emits a disposition when a
+    # ``filename`` is passed, so ``inline`` is set explicitly here -- an
+    # attachment disposition would defeat the preview.
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; object-src 'self'",
+        },
     )
 
 

@@ -128,10 +128,64 @@ def test_pdf_download_filename_is_friendly(tmp_path):
             vid = v.id
         resp = client.get(f"/api/resume-versions/{vid}/pdf")
     assert resp.status_code == 200
+    # The download route must keep forcing a save dialog even though its
+    # sibling preview route now shares the same FileResponse mechanism.
+    assert resp.headers["content-disposition"].startswith("attachment")
     assert (
         f'filename="Acme_Corp-Senior_Engineer-Resume-v{vid}.pdf"'
         in resp.headers["content-disposition"]
     )
+
+
+def test_pdf_preview_serves_inline_without_attachment_disposition(tmp_path):
+    client = _client()
+    pdf = tmp_path / "ok.pdf"
+    pdf.write_bytes(b"%PDF-1.4 test")
+    with client:
+        with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
+            job = Job(source="manual", jd_text="x", company="Acme Corp")
+            s.add(job)
+            s.commit()
+            s.refresh(job)
+            assert job.id is not None
+            v = ResumeVersion(job_id=job.id, round=0, pdf_path=str(pdf))
+            s.add(v)
+            s.commit()
+            s.refresh(v)
+            vid = v.id
+        resp = client.get(f"/api/resume-versions/{vid}/preview")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content == b"%PDF-1.4 test"
+    # An inline preview must not be handed to the browser as a download.
+    assert "attachment" not in resp.headers.get("content-disposition", "")
+
+
+def test_pdf_preview_404_when_no_file(tmp_path):
+    client = _client()
+    with client:
+        with get_session(client.app.state.engine) as s:  # type: ignore[union-attr]
+            job = Job(source="manual", jd_text="x")
+            s.add(job)
+            s.commit()
+            s.refresh(job)
+            assert job.id is not None
+            v = ResumeVersion(job_id=job.id, round=0, pdf_path=str(tmp_path / "gone.pdf"))
+            s.add(v)
+            s.commit()
+            s.refresh(v)
+            vid = v.id
+        resp = client.get(f"/api/resume-versions/{vid}/preview")
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_pdf_preview_404_for_unknown_version():
+    client = _client()
+    with client:
+        resp = client.get("/api/resume-versions/9999/preview")
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_failed_gates_names_the_gate_that_actually_blocked():

@@ -15005,6 +15005,60 @@
         "summary": "Download Cover Letter Pdf"
       }
     },
+    "/api/cover-letters/{cover_letter_id}/preview": {
+      "get": {
+        "description": "Serve the rendered PDF inline so the SPA can show it in a preview modal.",
+        "operationId": "preview_cover_letter_pdf_api_cover_letters__cover_letter_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cover_letter_id",
+            "required": true,
+            "schema": {
+              "title": "Cover Letter Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Cover Letter Pdf"
+      }
+    },
     "/api/cover-letters/{cover_letter_id}/revise": {
       "post": {
         "operationId": "launch_cover_letter_revise_api_cover_letters__cover_letter_id__revise_post",
@@ -19798,6 +19852,60 @@
           }
         },
         "summary": "Download Pdf"
+      }
+    },
+    "/api/resume-versions/{version_id}/preview": {
+      "get": {
+        "description": "Serve the rendered PDF inline so the SPA can show it in a preview modal.",
+        "operationId": "preview_pdf_api_resume_versions__version_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Pdf"
       }
     },
     "/api/resume-versions/{version_id}/render": {
