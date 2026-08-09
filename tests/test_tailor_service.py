@@ -101,6 +101,39 @@ def test_tailor_job_persists_versions_and_marks_tailored():
     assert reviser_agent.closed is True
 
 
+def test_tailor_job_persists_the_frozen_fallback_portfolio():
+    config = ReviewConfig(
+        max_rounds=1,
+        evidence_portfolio_enabled=True,
+        reviewers=[ReviewerSpec(name="fact-check", gate=True, weight=0)],
+    )
+    with _session() as session:
+        job = save_job(
+            session,
+            Job(
+                source="manual",
+                jd_text="jd",
+                criteria_json=JobCriteria().model_dump(mode="json"),
+            ),
+        )
+        versions = tailor_job(
+            session,
+            job,
+            ProfileFacts(contact=Contact(name="Ada")),
+            config,
+            tailor_agent=_ContentAgent(),
+            reviewer_agents={"fact-check": _FactCheck()},
+            reviser_agent=_ContentAgent(),
+        )
+        assert versions[0].evidence_portfolio_status == "deterministic_fallback"
+        assert versions[0].evidence_portfolio_json is not None
+        assert (
+            versions[0]
+            .evidence_portfolio_json["warning"]
+            .startswith("Evidence planner unavailable")
+        )
+
+
 def test_tailor_jobs_reports_progress_and_returns_per_job(tmp_path):
     from resume_agent.progress import ProgressReporter, read_progress
 
@@ -335,13 +368,19 @@ def test_retailoring_appends_a_new_attempt_and_keeps_old_versions():
             ),
         )
         first = tailor_job(
-            s, job, facts, config,  # type: ignore[call-arg]
+            s,
+            job,
+            facts,
+            config,  # type: ignore[call-arg]
             tailor_agent=_ContentAgent(),
             reviewer_agents={"fact-check": _FactCheck()},
             reviser_agent=_ContentAgent(),
         )
         second = tailor_job(
-            s, job, facts, config,  # type: ignore[call-arg]
+            s,
+            job,
+            facts,
+            config,  # type: ignore[call-arg]
             tailor_agent=_ContentAgent(),
             reviewer_agents={"fact-check": _FactCheck()},
             reviser_agent=_ContentAgent(),
@@ -413,8 +452,12 @@ def test_tailor_jobs_keeps_successful_siblings_when_one_fails():
     with _session() as s:
         good = save_job(
             s,
-            Job(source="manual", jd_text="ok", status=JobStatus.approved.value,
-                criteria_json=JobCriteria().model_dump(mode="json")),
+            Job(
+                source="manual",
+                jd_text="ok",
+                status=JobStatus.approved.value,
+                criteria_json=JobCriteria().model_dump(mode="json"),
+            ),
         )
         outcome = tailor_jobs(
             s,

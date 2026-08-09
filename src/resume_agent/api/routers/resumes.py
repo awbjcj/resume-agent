@@ -11,11 +11,14 @@ from sqlmodel import Session
 from resume_agent.api.deps import get_config_store, get_session
 from resume_agent.api.errors import ApiException
 from resume_agent.api.schemas.config import ReviewConfigDoc
+from resume_agent.api.schemas.evidence_portfolio import EvidencePortfolioOut
 from resume_agent.api.schemas.jobs import (
     ApplicationOut,
     ResumeVersionOut,
 )
 from resume_agent.render.export import resume_download_name
+from resume_agent.models.evidence_portfolio import EvidencePortfolio
+from resume_agent.models.resume import ResumeContent
 from resume_agent.services.board import select_resume_version
 from resume_agent.services.rendering import render_resume_version
 from resume_agent.tenancy.storage import TenantPathError, artifact_path
@@ -23,6 +26,28 @@ from resume_agent.tracking.repository import get_job, get_resume_version
 
 router = APIRouter()
 link_router = APIRouter()
+
+
+def _realized_portfolio_fact_ids(content: ResumeContent) -> set[str]:
+    return {
+        *(
+            fact_id
+            for experience in content.experience
+            for fact_id in (
+                experience.provenance,
+                *(bullet.provenance for bullet in experience.bullets),
+            )
+        ),
+        *(
+            fact_id
+            for project in content.projects
+            for fact_id in (
+                project.provenance,
+                *(bullet.provenance for bullet in project.bullets),
+            )
+        ),
+        *(skill.provenance for entries in content.skills.values() for skill in entries),
+    }
 
 
 @link_router.get("/resume-versions/{version_id}/pdf")
@@ -61,6 +86,39 @@ def render_endpoint(
     review_doc = cast(ReviewConfigDoc, get_config_store(request).get("review"))
     version_out.apply_gate_names({r.name for r in review_doc.reviewers if r.gate})
     return version_out
+
+
+@router.get(
+    "/resume-versions/{version_id}/evidence-portfolio",
+    response_model=EvidencePortfolioOut,
+)
+def evidence_portfolio_endpoint(
+    version_id: int, session: Session = Depends(get_session)
+) -> EvidencePortfolioOut:
+    version = get_resume_version(session, version_id)
+    if version is None:
+        raise ApiException(404, "NOT_FOUND", f"Resume version #{version_id} not found")
+    if version.evidence_portfolio_json is None:
+        raise ApiException(
+            404,
+            "EVIDENCE_PORTFOLIO_NOT_AVAILABLE",
+            "This legacy resume version has no evidence portfolio.",
+        )
+    portfolio = EvidencePortfolio.model_validate(version.evidence_portfolio_json)
+    content = ResumeContent.model_validate(version.content_json or {})
+    allowed = {
+        *(selection.owner_id for selection in portfolio.selections),
+        *(
+            fact_id
+            for selection in portfolio.selections
+            for fact_id in selection.selected_fact_ids
+        ),
+        *portfolio.selected_skill_fact_ids,
+    }
+    outside = sorted(_realized_portfolio_fact_ids(content) - allowed)
+    return EvidencePortfolioOut.from_portfolio(
+        portfolio, realized_outside_fact_ids=outside
+    )
 
 
 @router.post("/jobs/{job_id}/select-resume/{version_id}", response_model=ApplicationOut)

@@ -3026,6 +3026,123 @@
         "title": "ErrorRecordsOut",
         "type": "object"
       },
+      "EvidenceExcerptOut": {
+        "properties": {
+          "factId": {
+            "title": "Factid",
+            "type": "string"
+          },
+          "ownerId": {
+            "title": "Ownerid",
+            "type": "string"
+          },
+          "ownerKind": {
+            "enum": [
+              "experience",
+              "project"
+            ],
+            "title": "Ownerkind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "factId",
+          "ownerId",
+          "ownerKind",
+          "text"
+        ],
+        "title": "EvidenceExcerptOut",
+        "type": "object"
+      },
+      "EvidencePortfolioOut": {
+        "properties": {
+          "evidenceExcerpts": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceExcerptOut"
+            },
+            "title": "Evidenceexcerpts",
+            "type": "array"
+          },
+          "highlightTerms": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Highlightterms",
+            "type": "array"
+          },
+          "omissions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioOmissionOut"
+            },
+            "title": "Omissions",
+            "type": "array"
+          },
+          "realizedOutsideFactIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Realizedoutsidefactids",
+            "type": "array"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRequirementOut"
+            },
+            "title": "Requirements",
+            "type": "array"
+          },
+          "sectionOrder": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sectionorder",
+            "type": "array"
+          },
+          "selectedSkillFactIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Selectedskillfactids",
+            "type": "array"
+          },
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioSelectionOut"
+            },
+            "title": "Selections",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "deterministic_fallback",
+              "inherited"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "EvidencePortfolioOut",
+        "type": "object"
+      },
       "ForgotPasswordRequest": {
         "properties": {
           "email": {
@@ -4518,14 +4635,29 @@
       },
       "LengthBudget": {
         "properties": {
+          "maxBulletsPerProject": {
+            "default": 3,
+            "title": "Maxbulletsperproject",
+            "type": "integer"
+          },
           "maxBulletsPerRole": {
             "default": 5,
             "title": "Maxbulletsperrole",
             "type": "integer"
           },
+          "maxEvidenceOwners": {
+            "default": 5,
+            "title": "Maxevidenceowners",
+            "type": "integer"
+          },
           "maxExperiences": {
             "default": 4,
             "title": "Maxexperiences",
+            "type": "integer"
+          },
+          "maxProjects": {
+            "default": 2,
+            "title": "Maxprojects",
             "type": "integer"
           },
           "targetTotalBullets": {
@@ -5816,6 +5948,151 @@
           "id"
         ],
         "title": "PlanItemOut",
+        "type": "object"
+      },
+      "PortfolioOmissionOut": {
+        "properties": {
+          "ownerId": {
+            "title": "Ownerid",
+            "type": "string"
+          },
+          "ownerKind": {
+            "enum": [
+              "experience",
+              "project"
+            ],
+            "title": "Ownerkind",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ownerId",
+          "ownerKind",
+          "rationale"
+        ],
+        "title": "PortfolioOmissionOut",
+        "type": "object"
+      },
+      "PortfolioRequirementOut": {
+        "properties": {
+          "approvedTerms": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Approvedterms",
+            "type": "array"
+          },
+          "core": {
+            "default": false,
+            "title": "Core",
+            "type": "boolean"
+          },
+          "coverage": {
+            "enum": [
+              "covered",
+              "adjacent",
+              "gap"
+            ],
+            "title": "Coverage",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "skill",
+              "responsibility",
+              "seniority"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "integer"
+          },
+          "rationale": {
+            "default": "",
+            "title": "Rationale",
+            "type": "string"
+          },
+          "supportingFactIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supportingfactids",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "kind",
+          "priority",
+          "coverage"
+        ],
+        "title": "PortfolioRequirementOut",
+        "type": "object"
+      },
+      "PortfolioSelectionOut": {
+        "properties": {
+          "bridge": {
+            "default": false,
+            "title": "Bridge",
+            "type": "boolean"
+          },
+          "bulletBudget": {
+            "title": "Bulletbudget",
+            "type": "integer"
+          },
+          "ownerId": {
+            "title": "Ownerid",
+            "type": "string"
+          },
+          "ownerKind": {
+            "enum": [
+              "experience",
+              "project"
+            ],
+            "title": "Ownerkind",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "rationale": {
+            "default": "",
+            "title": "Rationale",
+            "type": "string"
+          },
+          "requirementTexts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Requirementtexts",
+            "type": "array"
+          },
+          "selectedFactIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Selectedfactids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ownerId",
+          "ownerKind",
+          "rank",
+          "bulletBudget"
+        ],
+        "title": "PortfolioSelectionOut",
         "type": "object"
       },
       "ProfileConfigDoc": {
@@ -7326,6 +7603,17 @@
             ],
             "title": "Critiquejson"
           },
+          "evidencePortfolioStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidenceportfoliostatus"
+          },
           "factCheckPassed": {
             "title": "Factcheckpassed",
             "type": "boolean"
@@ -7336,6 +7624,11 @@
             },
             "title": "Failedgates",
             "type": "array"
+          },
+          "hasEvidencePortfolio": {
+            "default": false,
+            "title": "Hasevidenceportfolio",
+            "type": "boolean"
           },
           "id": {
             "title": "Id",
@@ -7414,6 +7707,11 @@
       },
       "ReviewConfigDoc": {
         "properties": {
+          "evidencePortfolioEnabled": {
+            "default": false,
+            "title": "Evidenceportfolioenabled",
+            "type": "boolean"
+          },
           "lengthBudget": {
             "anyOf": [
               {
@@ -19745,6 +20043,61 @@
           }
         },
         "summary": "Launch Reprocess"
+      }
+    },
+    "/api/resume-versions/{version_id}/evidence-portfolio": {
+      "get": {
+        "operationId": "evidence_portfolio_endpoint_api_resume_versions__version_id__evidence_portfolio_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidencePortfolioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evidence Portfolio Endpoint"
       }
     },
     "/api/resume-versions/{version_id}/pdf": {

@@ -4,6 +4,7 @@ from resume_agent.db import init_db, make_engine
 from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
 from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 from resume_agent.models.review import ReviewCritique
+from resume_agent.models.evidence_portfolio import EvidencePortfolio
 from resume_agent.services.agents import TailorBundle
 from resume_agent.services.revision import revise_resume_version
 from resume_agent.tracking.repository import save_job, save_resume_version
@@ -75,7 +76,13 @@ def test_revise_resume_version_persists_lineage_and_fact_flag(monkeypatch):
         parent = save_resume_version(
             session,
             ResumeVersion(
-                job_id=job.id, round=1, content_json=_content().model_dump(mode="json")
+                job_id=job.id,
+                round=1,
+                content_json=_content().model_dump(mode="json"),
+                evidence_portfolio_json=EvidencePortfolio(status="planned").model_dump(
+                    mode="json"
+                ),
+                evidence_portfolio_status="planned",
             ),
         )
         assert parent.id is not None
@@ -99,6 +106,9 @@ def test_revise_resume_version_persists_lineage_and_fact_flag(monkeypatch):
         # No panel ran (not a re-review), so no reviewer-configured gate
         # applies to this round yet - an empty, KNOWN roster, not None.
         assert child.gate_reviewers_json == []
+        assert child.evidence_portfolio_status == "inherited"
+        assert child.evidence_portfolio_json is not None
+        assert child.evidence_portfolio_json["status"] == "inherited"
 
 
 def test_revise_resume_version_records_gate_roster_on_re_review(monkeypatch, tmp_path):
@@ -108,7 +118,8 @@ def test_revise_resume_version_records_gate_roster_on_re_review(monkeypatch, tmp
         "resume_agent.services.revision.load_facts", lambda path: _facts()
     )
     monkeypatch.setattr(
-        "resume_agent.services.revision.export_job_artifacts", lambda session, job_id: None
+        "resume_agent.services.revision.export_job_artifacts",
+        lambda session, job_id: None,
     )
     review_path = tmp_path / "review.yaml"
     review_path.write_text(
@@ -135,7 +146,9 @@ def test_revise_resume_version_records_gate_roster_on_re_review(monkeypatch, tmp
             ),
         )
         assert parent.id is not None
-        fact_check = _Agent(ReviewCritique(reviewer="fact-check", score=100, passed=True))
+        fact_check = _Agent(
+            ReviewCritique(reviewer="fact-check", score=100, passed=True)
+        )
         ats = _Agent(ReviewCritique(reviewer="ats-keyword", score=100, passed=True))
         bundle = TailorBundle(
             tailor=_Agent(_content()),
