@@ -18,7 +18,7 @@ from resume_agent.tailor.agents import (
     build_tailor_agent,
     model_for_tier,
 )
-from resume_agent.tailor.match_plan import build_match_plan_agent
+from resume_agent.tailor.portfolio_planner import build_evidence_portfolio_agent
 from resume_agent.tailor.review_config import ReviewConfig, load_review_config
 from resume_agent.tailor.style_guide import load_style_guide
 
@@ -39,16 +39,18 @@ def build_eval_bundle(
             score_bands=spec.score_bands,
         )
     revision_agent = build_revision_agent(model_id, style_guide)
+    portfolio_agent = (
+        build_evidence_portfolio_agent(model_id, style_guide)
+        if config.portfolio_enabled
+        else None
+    )
     return TailorBundle(
         tailor=tailor_agent,
         reviser=reviser_agent,
         reviewers=reviewers,
         revision=revision_agent,
-        match_plan=(
-            build_match_plan_agent(model_id, style_guide)
-            if config.match_plan_enabled
-            else None
-        ),
+        match_plan=portfolio_agent,
+        evidence_portfolio=portfolio_agent,
     )
 
 
@@ -105,12 +107,15 @@ def main(argv: list[str] | None = None) -> int:
     artifact_output = output.with_suffix(".json")
     output.parent.mkdir(parents=True, exist_ok=True)
     config_hash = hashlib.sha256(args.config.read_bytes()).hexdigest()
-    commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-        check=False,
-    ).stdout.strip() or "unknown"
+    commit = (
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
+        or "unknown"
+    )
     effective_models = (
         {"all": args.model}
         if args.model
@@ -125,14 +130,12 @@ def main(argv: list[str] | None = None) -> int:
             },
         }
     )
-    if args.model is None and config.match_plan_enabled:
-        effective_models["match-plan"] = model_for_tier("premium")
+    if args.model is None and config.portfolio_enabled:
+        effective_models["evidence-portfolio"] = model_for_tier("premium")
     metadata = {
         "models": json.dumps(effective_models, sort_keys=True),
         "config sha256": config_hash,
-        "style guide sha256": hashlib.sha256(
-            (style_guide or "").encode()
-        ).hexdigest(),
+        "style guide sha256": hashlib.sha256((style_guide or "").encode()).hexdigest(),
         "judge prompt sha256": judge_prompt_hash(),
         "git commit": commit,
     }
@@ -176,9 +179,7 @@ def main(argv: list[str] | None = None) -> int:
                 encoding="utf-8",
             )
 
-    report = render_report(
-        results, config, metadata=metadata, failures=failures
-    )
+    report = render_report(results, config, metadata=metadata, failures=failures)
     print(report)
     return 1 if failures else 0
 

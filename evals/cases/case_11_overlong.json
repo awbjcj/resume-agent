@@ -19,5 +19,10 @@
     }
   ],
   "must_cite": ["e1b1", "e1b2"],
+  "portfolio_expectation": {
+    "label": "overlong_profile",
+    "mandatory_evidence_ids": ["e1b1", "e1b2"],
+    "forbidden_evidence_ids": ["e6b1", "e6b2", "e6b3", "e6b4"]
+  },
   "rubric": ["prioritization", "concision", "relevance"]
 }

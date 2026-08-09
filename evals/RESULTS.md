@@ -100,3 +100,35 @@ Success criteria from the spec: zero rounds failing on a compound skill entry;
 the fact-check metric/number bucket falls; the ats-keyword mean rises **without**
 fact-check failures rising; remaining fact-check failures concentrate in
 scope-creep claims.
+
+## 2026-08-08 evidence-portfolio tailoring — implementation checkpoint
+
+The portfolio arm and its measurement fields are implemented, but no live A/B
+or blind comparison has been run. The shipped fast and deep configurations
+therefore remain `evidence_portfolio_enabled: false`. The legacy
+`match_plan_enabled` spelling is accepted for one release only.
+
+The eval corpus now labels six selection risks: competing roles, stronger
+projects, career-change evidence, overlong profiles, direct-versus-adjacent
+skills, and safe alias paraphrasing. Reports record mandatory-evidence recall,
+forbidden selection/highlight hits, planner fallback rate, measured tailoring
+latency, calls, token usage, and provider cost. The deterministic fallback gate
+is exercised offline; live results must be recorded as artifacts, not inferred
+from that unit gate.
+
+Run both arms with the same explicit model and preserve both Markdown and JSON
+artifacts:
+
+```powershell
+python -m evals.run_eval --config config/review.yaml.example --model <model> --out evals/reports/<stamp>-baseline.md
+python -m evals.run_eval --config config/review.match_plan.yaml --model <model> --out evals/reports/<stamp>-portfolio.md
+```
+
+Activation remains blocked until the portfolio arm demonstrates all of:
+
+- mean relevance improvement of at least five points;
+- at least 90% mandatory-evidence recall and zero forbidden/gap claims;
+- no provenance, fact-lock, trap-recall, or forbidden-highlight regression;
+- at least seven portfolio wins in a blind comparison of ten representative
+  real jobs;
+- acceptable latency, token cost, and fallback rate recorded in the artifacts.

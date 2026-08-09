@@ -1,0 +1,41 @@
+{
+  "contact": {"name": "Morgan Lee", "email": "morgan@example.com"},
+  "summary": "Engineer and technical operations specialist.",
+  "experience": [
+    {
+      "id": "e_current",
+      "company": "Northwind",
+      "title": "Technical Operations Coordinator",
+      "start": "2025",
+      "current": true,
+      "bullets": [
+        {"id": "e_current_b1", "text": "Coordinated weekly release schedules across four teams."}
+      ]
+    },
+    {
+      "id": "e_backend",
+      "company": "Harbor Labs",
+      "title": "Backend Engineer",
+      "start": "2021",
+      "end": "2025",
+      "bullets": [
+        {"id": "e_backend_b1", "text": "Built Python APIs processing 8 million records per day."},
+        {"id": "e_backend_b2", "text": "Reduced PostgreSQL query latency 38% through indexing and profiling."}
+      ]
+    },
+    {
+      "id": "e_support",
+      "company": "Helpdesk Co",
+      "title": "Support Analyst",
+      "start": "2019",
+      "end": "2021",
+      "bullets": [
+        {"id": "e_support_b1", "text": "Resolved customer support tickets."}
+      ]
+    }
+  ],
+  "skills": {
+    "languages": [{"id": "s_python", "name": "Python"}],
+    "databases": [{"id": "s_postgresql", "name": "PostgreSQL"}]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "case_14_stronger_project",
+  "profile_ref": "portfolio_projects",
+  "jd_text": "Machine Learning Platform Engineer. Required: Python, feature pipelines, and APIs supporting production inference.",
+  "criteria": {
+    "seniority": "mid",
+    "tech_stack": ["Python", "FastAPI"],
+    "must_have_skills": ["Python"]
+  },
+  "traps": [
+    {
+      "id": "tensorflow-missing",
+      "kind": "missing_skill",
+      "forbidden_terms": ["TensorFlow"],
+      "description": "The profile has no TensorFlow evidence.",
+      "probe_claim": "Built TensorFlow inference services.",
+      "probe_provenance": "e_general_b1"
+    }
+  ],
+  "must_cite": ["p_ml"],
+  "portfolio_expectation": {
+    "label": "stronger_projects",
+    "mandatory_evidence_ids": ["p_ml"],
+    "forbidden_evidence_ids": ["p_blog"]
+  },
+  "rubric": ["evidence selection", "project relevance", "impact"]
+}

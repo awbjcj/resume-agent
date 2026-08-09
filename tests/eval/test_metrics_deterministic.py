@@ -1,12 +1,18 @@
 from evals.metrics import (
     budget_ok,
     must_cite_covered,
+    portfolio_forbidden_hits,
+    portfolio_mandatory_hits,
     provenance_ok,
     total_bullets,
     trap_avoided,
 )
 from evals.schema import Trap
 from resume_agent.models.profile import Bullet, Contact, Experience, ProfileFacts
+from resume_agent.models.evidence_portfolio import (
+    EvidencePortfolio,
+    PortfolioSelection,
+)
 from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 from resume_agent.tailor.review_config import LengthBudget
 
@@ -99,3 +105,21 @@ def test_budget_ok():
 
 def test_total_bullets_counts_resume_bullets():
     assert total_bullets(_resume()) == 1
+
+
+def test_portfolio_expectation_metrics_count_required_and_forbidden_selection():
+    portfolio = EvidencePortfolio(
+        highlight_terms=["Python", "Flask"],
+        selections=[
+            PortfolioSelection(
+                owner_id="e1",
+                owner_kind="experience",
+                selected_fact_ids=["b1"],
+            )
+        ],
+    )
+
+    assert portfolio_mandatory_hits(portfolio, ["e1", "b1", "missing"]) == (2, 3)
+    assert portfolio_forbidden_hits(
+        portfolio, ["b1", "ghost"], ["flask", "Kubernetes"]
+    ) == ["b1", "highlight:flask"]

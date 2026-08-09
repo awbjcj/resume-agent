@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
 from evals.judge import JudgeVerdict, compose_judge_input, validate_judge_verdict
 from evals.metrics import (
@@ -6,6 +7,8 @@ from evals.metrics import (
     RoundRecord,
     budget_ok,
     must_cite_covered,
+    portfolio_forbidden_hits,
+    portfolio_mandatory_hits,
     provenance_ok,
     trap_avoided,
 )
@@ -17,7 +20,13 @@ from resume_agent.models.job import JobCriteria
 from resume_agent.models.profile import ProfileFacts
 from resume_agent.models.resume import ResumeContent, TailoredBullet, TailoredExperience
 from resume_agent.models.review import Severity
+from resume_agent.profile.matrix import (
+    Overrides,
+    build_matrix,
+    build_skill_match_context,
+)
 from resume_agent.services.agents import TailorBundle
+from resume_agent.taxonomy.clusters import load_cluster_map
 from resume_agent.tailor.panel import compose_evidence_review_input, review_one
 from resume_agent.tailor.provenance import resolve_evidence
 from resume_agent.tailor.review_config import ReviewConfig
@@ -44,6 +53,10 @@ class CaseResult:
     surfaced_round_num: int | None = None
     needs_attention: bool = False
     regressed: bool = False
+    portfolio_status: str | None = None
+    portfolio_mandatory_hits: int = 0
+    portfolio_mandatory_total: int = 0
+    portfolio_forbidden_hits: list[str] = field(default_factory=list)
 
 
 def _surface_round(
@@ -106,8 +119,13 @@ def run_case(
         },
         revision=MeteredRunner(bundle.revision, usage),
         match_plan=(
-            MeteredRunner(bundle.match_plan, usage)
-            if bundle.match_plan is not None
+            MeteredRunner(bundle.evidence_portfolio or bundle.match_plan, usage)
+            if bundle.evidence_portfolio is not None or bundle.match_plan is not None
+            else None
+        ),
+        evidence_portfolio=(
+            MeteredRunner(bundle.evidence_portfolio or bundle.match_plan, usage)
+            if bundle.evidence_portfolio is not None or bundle.match_plan is not None
             else None
         ),
     )
@@ -122,6 +140,12 @@ def run_case(
     else:
         criteria = case.criteria
 
+    skill_context = None
+    if config.portfolio_enabled:
+        cluster_map = load_cluster_map(Path("evals/portfolio_cluster_map.json"))
+        matrix = build_matrix(profile, cluster_map, Overrides())
+        skill_context = build_skill_match_context(criteria, matrix, cluster_map)
+
     tailor_rounds = run_tailor_review(
         jd_text=case.jd_text,
         criteria=criteria,
@@ -130,7 +154,8 @@ def run_case(
         tailor_agent=metered_bundle.tailor,
         reviewer_agents=metered_bundle.reviewers,
         reviser_agent=metered_bundle.reviser,
-        match_plan_agent=metered_bundle.match_plan,
+        evidence_portfolio_agent=metered_bundle.evidence_portfolio,
+        skill_context=skill_context,
     )
     scored_reviewers = {
         spec.name for spec in config.reviewers if not spec.gate and spec.weight > 0
@@ -148,6 +173,7 @@ def run_case(
                 else None
             ),
             critiques=round_.verdict.critiques,
+            phase_seconds=round_.stage_seconds,
         )
         for round_ in tailor_rounds
     ]
@@ -197,6 +223,17 @@ def run_case(
             f"Expected JudgeVerdict from judge, got {type(verdict).__name__}"
         )
     validate_judge_verdict(verdict, case.rubric)
+    portfolio = surfaced.evidence_portfolio
+    expectation = case.portfolio_expectation
+    mandatory_hits, mandatory_total = portfolio_mandatory_hits(
+        portfolio,
+        expectation.mandatory_evidence_ids if expectation else [],
+    )
+    forbidden_hits = portfolio_forbidden_hits(
+        portfolio,
+        expectation.forbidden_evidence_ids if expectation else [],
+        expectation.forbidden_highlight_terms if expectation else [],
+    )
     return CaseResult(
         case_id=case.id,
         jd_text=case.jd_text,
@@ -215,4 +252,8 @@ def run_case(
         surfaced_round_num=surfaced.round_num,
         needs_attention=needs_attention,
         regressed=regressed,
+        portfolio_status=portfolio.status if portfolio is not None else None,
+        portfolio_mandatory_hits=mandatory_hits,
+        portfolio_mandatory_total=mandatory_total,
+        portfolio_forbidden_hits=forbidden_hits,
     )

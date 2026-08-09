@@ -54,6 +54,9 @@ def test_report_has_table_and_aggregate():
     assert "Fact-check probe recall" in markdown
     assert "regressed" in markdown
     assert "total_tokens" in markdown
+    assert "Portfolio fallback rate" in markdown
+    assert "Portfolio mandatory-evidence recall" in markdown
+    assert "Measured tailoring latency" in markdown
 
 
 def test_report_insufficient_data_for_correlation():
