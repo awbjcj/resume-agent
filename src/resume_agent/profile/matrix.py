@@ -20,12 +20,18 @@ from resume_agent.profile.group_corrections import (
     load_group_corrections,
 )
 from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map
+from resume_agent.taxonomy.corrections import (
+    apply_taxonomy_corrections,
+    load_taxonomy_corrections,
+)
 from resume_agent.taxonomy.groups import (
     SKILL_GROUPS,
+    groups_from_cluster_map,
     group_map_path,
     load_group_map,
     sanitize_group_map,
 )
+from resume_agent.taxonomy.state import load_taxonomy_state
 from resume_agent.taxonomy.skills import split_skills
 from resume_agent.tracking.match_gap import normalize_skill
 
@@ -218,7 +224,10 @@ def build_skill_match_context(
                     and cluster_map.domain_of.get(candidate.key) == theme
                 ]
                 if candidates:
-                    row = min(candidates, key=lambda candidate: (-candidate.strength, candidate.key))
+                    row = min(
+                        candidates,
+                        key=lambda candidate: (-candidate.strength, candidate.key),
+                    )
                     coverage = "adjacent"
             matches.append(
                 SkillMatch(
@@ -304,11 +313,7 @@ def build_matrix(
                 evidence_strength.add(skill.id)
             row.aliases = sorted(
                 set(row.aliases)
-                | {
-                    alias
-                    for alias in skill.aliases
-                    if normalize_skill(alias) != key
-                }
+                | {alias for alias in skill.aliases if normalize_skill(alias) != key}
                 | {
                     alias_token
                     for alias_token, head in aliases.items()
@@ -358,9 +363,7 @@ def build_matrix(
                 strength_ids[row.key].add(owner.id)
 
         for owner in owners:
-            bullet_ids = {
-                bullet.id for bullet in getattr(owner, "bullets", [])
-            }
+            bullet_ids = {bullet.id for bullet in getattr(owner, "bullets", [])}
             if owner.id in strength_ids[row.key] and strength_ids[row.key] & bullet_ids:
                 strength_ids[row.key].discard(owner.id)
 
@@ -432,14 +435,28 @@ def decorate_matrix_groups(
 ) -> None:
     """Apply every on-disk skill-group layer through one shared seam."""
     profile_dir = Path(profile_dir)
-    group_map = load_group_map(group_map_path(profile_dir))
+    cluster_path = profile_dir / "cluster_map.json"
+    taxonomy_correction_path = (
+        profile_dir.parent / "taxonomy" / "taxonomy_corrections.json"
+    )
+    tree = apply_taxonomy_corrections(
+        load_cluster_map(cluster_path),
+        load_taxonomy_corrections(taxonomy_correction_path),
+    )
+    group_map = groups_from_cluster_map(tree)
+    # One migration-only display fallback: a legacy map can guide the first
+    # profile rebuild, but is never written or consulted once that rebuild has
+    # recorded its import hash in taxonomy_state.json.
+    if (
+        not group_map
+        and load_taxonomy_state(cluster_path).legacy_group_map_sha256 is None
+    ):
+        group_map = load_group_map(group_map_path(profile_dir))
     corrections = load_group_corrections(corrections_path(profile_dir)).as_map()
     apply_skill_groups(matrix, group_map, overrides, corrections=corrections)
 
 
-def build_decorated_matrix(
-    profile_dir: str | Path, facts: ProfileFacts
-) -> SkillMatrix:
+def build_decorated_matrix(profile_dir: str | Path, facts: ProfileFacts) -> SkillMatrix:
     """Build and decorate a matrix without persisting it."""
     profile_dir = Path(profile_dir)
     overrides = load_overrides(profile_dir / "overrides.yaml")
@@ -495,9 +512,8 @@ def load_matrix(
         return None
     if facts is not None and matrix.facts_sha256 != facts_sha256(facts):
         return None
-    if (
-        cluster_map is not None
-        and matrix.canonical_map_sha256 != canonical_map_sha256(cluster_map)
+    if cluster_map is not None and matrix.canonical_map_sha256 != canonical_map_sha256(
+        cluster_map
     ):
         return None
     return matrix

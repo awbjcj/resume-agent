@@ -45,6 +45,15 @@ def run_corpus_build(
     )
     from resume_agent.taxonomy.clusters import load_cluster_map
     from resume_agent.taxonomy import groups as skill_groups
+    from resume_agent.taxonomy.state import (
+        load_taxonomy_state,
+        mark_legacy_group_map_imported,
+    )
+    from resume_agent.services.match_gap import refresh_clusters
+    from resume_agent.tracking.canonicalize import (
+        build_incremental_canonicalizer_agent,
+        build_incremental_themer_agent,
+    )
 
     if reporter is not None:
         reporter.begin(3, "Extracting and merging source documents")
@@ -68,23 +77,42 @@ def run_corpus_build(
             reporter.step(1, label="Saving facts.json")
         save_facts(facts, str(facts_out))
         if reporter is not None:
-            reporter.step(2, label="Building skill matrix")
+            reporter.step(2, label="Classifying the shared skill taxonomy")
         overrides = load_overrides(Path(profile_dir) / "overrides.yaml")
-        matrix = build_matrix(
+        preliminary = build_matrix(
             facts,
             load_cluster_map(Path(profile_dir) / "cluster_map.json"),
             overrides,
         )
+        cluster_path = Path(profile_dir) / "cluster_map.json"
         taxonomy_path = skill_groups.group_map_path(profile_dir)
-        group_map = skill_groups.load_group_map(taxonomy_path)
-        missing = {row.key for row in matrix.rows} - set(group_map)
+        # ``skill_groups.json`` is a one-time migration hint only.  Once its
+        # original content hash has been recorded, the growing cluster map is
+        # the sole taxonomy source and later edits to the legacy artifact must
+        # not steer a rebuild.
+        legacy_hints = (
+            skill_groups.load_group_map(taxonomy_path)
+            if load_taxonomy_state(cluster_path).legacy_group_map_sha256 is None
+            else {}
+        )
+        current_tree = load_cluster_map(cluster_path)
+        missing = {
+            row.key
+            for row in preliminary.rows
+            if current_tree.domain_of.get(current_tree.aliases.get(row.key, row.key))
+            is None
+        }
         if missing:
-            additions = skill_groups.classify_missing_groups(
-                missing,
-                skill_groups.build_group_classifier_agent(),
+            refresh_clusters(
+                None,
+                canonicalizer=build_incremental_canonicalizer_agent(),
+                themer=build_incremental_themer_agent(),
+                path=cluster_path,
+                demanded_tokens=missing,
+                category_hints=legacy_hints,
             )
-            if additions:
-                skill_groups.save_group_map(additions, taxonomy_path)
+        mark_legacy_group_map_imported(cluster_path, taxonomy_path)
+        matrix = build_matrix(facts, load_cluster_map(cluster_path), overrides)
         decorate_matrix_groups(matrix, profile_dir, overrides)
         save_matrix(matrix, Path(facts_out).with_name("matrix.json"))
     if reporter is not None:

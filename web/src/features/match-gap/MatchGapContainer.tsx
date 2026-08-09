@@ -16,7 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   defaultTargetStatuses,
   deriveView,
+  hasActiveScopeFilters,
   targetId,
+  visibleUnassignedSkillKeys,
   type Filters as FilterValue,
   type SkillRow,
   type SuggestionTarget,
@@ -27,7 +29,12 @@ import { RefreshClustersButton } from "./RefreshClustersButton";
 import { SelectionTray } from "./SelectionTray";
 import { SkillMap } from "./SkillMap";
 import { SkillModal } from "./SkillModal";
-import { useMatchGap, useRefreshClusters } from "./use-match-gap";
+import {
+  useMaintainTaxonomy,
+  useMatchGap,
+  useRefreshClusters,
+  useUndoTaxonomyMaintenance,
+} from "./use-match-gap";
 import { useSuggestionRuns } from "./use-suggestion-runs";
 
 const DEFAULT_FILTERS: FilterValue = {
@@ -42,11 +49,22 @@ const DEFAULT_FILTERS: FilterValue = {
 export function MatchGapContainer() {
   const { data, isLoading, isError, refetch } = useMatchGap();
   const { refresh } = useRefreshClusters();
+  const { maintain } = useMaintainTaxonomy();
+  const { undo } = useUndoTaxonomyMaintenance();
   const [filters, setFilters] = useState<FilterValue>(DEFAULT_FILTERS);
   const [activeView, setActiveView] = useState("map");
   const [selection, setSelection] = useState<SuggestionTarget[]>([]);
   const [openSkill, setOpenSkill] = useState<SkillRow | null>(null);
   const view = useMemo(() => (data ? deriveView(data, filters) : null), [data, filters]);
+  const visibleUnassignedKeys = useMemo(
+    () => (view ? visibleUnassignedSkillKeys(view) : []),
+    [view],
+  );
+  const scopedRegroup = hasActiveScopeFilters(filters);
+  const regroup = useCallback(
+    () => refresh(scopedRegroup ? visibleUnassignedKeys : undefined),
+    [refresh, scopedRegroup, visibleUnassignedKeys],
+  );
   // Taxonomy edits target the whole constellation, so their pickers must not be
   // narrowed by the active filters that shape the *displayed* map/outline.
   const editView = useMemo(
@@ -123,7 +141,15 @@ export function MatchGapContainer() {
               seniorities={view.seniorities}
               statusCounts={view.statusCounts}
             />
-            <RefreshClustersButton stale={data.clustersStale} onRefresh={refresh} />
+            <RefreshClustersButton
+              unassignedCount={visibleUnassignedKeys.length}
+              onRegroup={regroup}
+              onMaintain={maintain}
+              canUndo={data.taxonomyUndoAvailable}
+              onUndo={undo}
+              generation={data.taxonomyGeneration}
+              maintenanceDue={data.taxonomyMaintenanceDue}
+            />
           </section>
 
           <MetricRow

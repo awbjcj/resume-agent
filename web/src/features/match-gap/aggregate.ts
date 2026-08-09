@@ -53,6 +53,34 @@ export interface SkillRow {
   nice: number;
   tech: number;
   members: Record<string, number>;
+  groupingStatus?: {
+    state: "uncertain" | "failed";
+    reason: string;
+    lastAttemptedAt: string;
+  } | null;
+}
+
+/**
+ * Weighting changes rank only; every other filter changes which skill keys are
+ * visible and therefore becomes the server-side regroup scope.
+ */
+export function hasActiveScopeFilters(filters: Filters): boolean {
+  const configuredTargets = new Set<string>(TARGET_STATUSES);
+  return (
+    Boolean(filters.q.trim()) ||
+    filters.company !== null ||
+    filters.seniority !== null ||
+    filters.gapsOnly ||
+    TARGET_STATUSES.some((status) => !filters.statuses.has(status)) ||
+    [...filters.statuses].some((status) => !configuredTargets.has(status))
+  );
+}
+
+export function visibleUnassignedSkillKeys(view: Pick<DerivedView, "skills">): string[] {
+  return view.skills
+    .filter((skill) => skill.domainId === null)
+    .map((skill) => skill.key)
+    .sort();
 }
 
 export interface DomainRow {
@@ -188,6 +216,7 @@ export function deriveView(payload: Payload, filters: Filters): DerivedView {
           nice: counts.nice,
           tech: counts.tech,
           members: node.members,
+          groupingStatus: node.groupingStatus ?? null,
         },
       ];
     })

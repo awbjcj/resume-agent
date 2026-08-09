@@ -4,9 +4,11 @@ import type { components } from "@/lib/api/schema";
 import {
   defaultTargetStatuses,
   deriveView,
+  hasActiveScopeFilters,
   sortSkillsWithin,
   targetId,
   UNASSIGNED_ID,
+  visibleUnassignedSkillKeys,
   type Filters,
   type SkillRow,
 } from "./aggregate";
@@ -25,6 +27,10 @@ const base: Filters = {
 const payload: Payload = {
   targetTotal: 2,
   clustersStale: false,
+  taxonomyAlgorithmVersion: "embedding-taxonomy-v1",
+  taxonomyMaintenanceDue: true,
+  unassignedCount: 0,
+  taxonomyUndoAvailable: false,
   categories: [
     { slug: "cloud-infrastructure", label: "Cloud & Infrastructure", kind: "hard" },
     { slug: "programming-languages", label: "Programming Languages", kind: "hard" },
@@ -244,4 +250,82 @@ it("encodes typed target identity without delimiter collisions", () => {
   expect(targetId({ kind: "skill", key: "c:sharp" })).not.toBe(
     targetId({ kind: "domain", key: "skill:c:sharp" }),
   );
+});
+
+it("uses only visibility filters, never weighting, to scope a regroup", () => {
+  expect(hasActiveScopeFilters({ ...base, weighting: "popular" })).toBe(false);
+  expect(hasActiveScopeFilters({ ...base, company: "Stripe" })).toBe(true);
+  expect(hasActiveScopeFilters({ ...base, statuses: new Set(["tailored"]) })).toBe(true);
+
+  const unassigned: Payload = {
+    ...payload,
+    skills: [
+      ...payload.skills,
+      {
+        key: "graphql",
+        skill: "GraphQL",
+        domainId: null,
+        covered: false,
+        coverage: "gap",
+        members: { GraphQL: 1 },
+        must: 1,
+        nice: 0,
+        tech: 0,
+        jobCount: 1,
+      },
+    ],
+    edges: [
+      ...payload.edges,
+      { jobId: 1, skillKey: "graphql", skill: "GraphQL", source: "must" },
+    ],
+  };
+
+  expect(visibleUnassignedSkillKeys(deriveView(unassigned, base))).toEqual(["graphql"]);
+});
+
+it("scopes visible unassigned skills for company, seniority, stage, search, and gaps", () => {
+  const scoped: Payload = {
+    ...payload,
+    skills: [
+      ...payload.skills,
+      {
+        key: "graphql",
+        skill: "GraphQL",
+        domainId: null,
+        covered: false,
+        coverage: "gap",
+        members: { GraphQL: 1 },
+        must: 1,
+        nice: 0,
+        tech: 0,
+        jobCount: 1,
+      },
+      {
+        key: "redis",
+        skill: "Redis",
+        domainId: null,
+        covered: false,
+        coverage: "adjacent",
+        members: { Redis: 1 },
+        must: 0,
+        nice: 1,
+        tech: 0,
+        jobCount: 1,
+      },
+    ],
+    edges: [
+      ...payload.edges,
+      { jobId: 1, skillKey: "graphql", skill: "GraphQL", source: "must" },
+      { jobId: 2, skillKey: "redis", skill: "Redis", source: "nice" },
+    ],
+  };
+
+  const keys = (filters: Filters) => visibleUnassignedSkillKeys(deriveView(scoped, filters));
+
+  expect(keys({ ...base, company: "Stripe" })).toEqual(["graphql"]);
+  expect(keys({ ...base, seniority: "mid" })).toEqual(["redis"]);
+  expect(keys({ ...base, statuses: new Set(["tailored"]) })).toEqual(["redis"]);
+  expect(keys({ ...base, q: "graph" })).toEqual(["graphql"]);
+  expect(keys({ ...base, gapsOnly: true })).toEqual(["graphql"]);
+  expect(keys({ ...base, weighting: "popular" })).toEqual(["graphql", "redis"]);
 });

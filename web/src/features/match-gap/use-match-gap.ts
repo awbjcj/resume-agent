@@ -16,12 +16,40 @@ export function useMatchGap() {
 
 export function useRefreshClusters() {
   const { launch } = useLaunchRun();
-  const refresh = () =>
+  const refresh = (skillKeys?: string[]) =>
     launch(
       "refreshClusters",
-      () => unwrap(api.POST("/api/match-gap/refresh-clusters", {})),
+      () =>
+        unwrap(
+          api.POST(
+            "/api/match-gap/refresh-clusters",
+            skillKeys === undefined ? {} : { body: { skillKeys } },
+          ),
+        ),
       [...MATCH_GAP_QUERY_KEY],
     );
 
   return { refresh };
+}
+
+export function useMaintainTaxonomy() {
+  const { launch } = useLaunchRun();
+  const maintain = () =>
+    launch(
+      "maintainTaxonomy",
+      () => unwrap(api.POST("/api/match-gap/maintain-taxonomy", {})),
+      [...MATCH_GAP_QUERY_KEY],
+    );
+  return { maintain };
+}
+
+export function useUndoTaxonomyMaintenance() {
+  const { launch } = useLaunchRun();
+  const undo = () =>
+    launch(
+      "undoTaxonomyMaintenance",
+      () => unwrap(api.POST("/api/match-gap/undo-taxonomy-maintenance", {})),
+      [...MATCH_GAP_QUERY_KEY],
+    );
+  return { undo };
 }

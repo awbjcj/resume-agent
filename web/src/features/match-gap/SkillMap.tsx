@@ -264,6 +264,13 @@ export function SkillMap({
                         ? `Explore ${node.label}`
                         : `Open ${node.label} details`
                     }
+                    title={
+                      node.kind === "skill" &&
+                      node.skill?.domainId === null &&
+                      node.skill.groupingStatus
+                        ? `Grouping ${node.skill.groupingStatus.state}: ${node.skill.groupingStatus.reason}`
+                        : undefined
+                    }
                     onClick={() => {
                       if (node.kind !== "skill") {
                         setView(drillTarget(activeView, node));

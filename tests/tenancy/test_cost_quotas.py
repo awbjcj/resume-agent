@@ -112,6 +112,22 @@ def test_seeded_model_prices_use_current_openai_and_deepseek_rates(tmp_path):
         ) == expected
 
 
+def test_embedding_rate_is_seeded_for_shared_key_metering(tmp_path):
+    engine = _engine(tmp_path)
+    priced = calculate_cost(
+        engine,
+        MeteredUsage(
+            provider="openai",
+            model="text-embedding-3-small",
+            input_tokens=1_000_000,
+        ),
+        now=datetime(2026, 8, 2, tzinfo=UTC),
+    )
+
+    assert priced.pricing_status == "PRICED"
+    assert priced.total_micros == 20_000
+
+
 def test_openai_price_version_preserves_previous_gpt_5_6_rate(tmp_path):
     engine = _engine(tmp_path)
     usage = MeteredUsage(
@@ -122,9 +138,7 @@ def test_openai_price_version_preserves_previous_gpt_5_6_rate(tmp_path):
     )
 
     before_update = calculate_cost(engine, usage, now=NOW)
-    after_update = calculate_cost(
-        engine, usage, now=datetime(2026, 8, 2, tzinfo=UTC)
-    )
+    after_update = calculate_cost(engine, usage, now=datetime(2026, 8, 2, tzinfo=UTC))
 
     assert before_update.total_micros == 17_500_000
     assert after_update.total_micros == 14_000_000

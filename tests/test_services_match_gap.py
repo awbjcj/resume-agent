@@ -4,6 +4,7 @@ import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -14,7 +15,12 @@ from resume_agent.taxonomy.classification import (
     ClassificationMetrics,
     ClassificationOutcome,
 )
-from resume_agent.taxonomy.clusters import ClusterMap, load_cluster_map, save_cluster_map
+from resume_agent.taxonomy.clusters import (
+    ClusterMap,
+    load_cluster_map,
+    save_cluster_map,
+)
+from resume_agent.taxonomy.state import load_taxonomy_state
 from resume_agent.tracking.canonicalize import (
     IncrementalDomainGroup,
     IncrementalSkillDomains,
@@ -118,7 +124,7 @@ def test_incremental_refresh_persists_success_and_returns_metrics(tmp_path):
 
 
 def test_existing_alias_and_theme_choices_win(tmp_path):
-    engine = _engine_with_target_skills("K8s", "Kubernetes", "Go")
+    engine = _engine_with_target_skills("K8s", "Kubernetes", "Go", "Rust")
     path = tmp_path / "clusters.json"
     save_cluster_map(
         ClusterMap(
@@ -138,8 +144,13 @@ def test_existing_alias_and_theme_choices_win(tmp_path):
         )
 
     assert load_cluster_map(path) == ClusterMap(
-        aliases={"go": "go", "k8s": "kubernetes", "kubernetes": "kubernetes"},
-        domain_of={"go": "languages", "kubernetes": "infra"},
+        aliases={
+            "go": "go",
+            "k8s": "kubernetes",
+            "kubernetes": "kubernetes",
+            "rust": "rust",
+        },
+        domain_of={"go": "languages", "kubernetes": "infra", "rust": "languages"},
         domain_label={"infra": "Infrastructure", "languages": "Languages"},
         category_of={"infra": "other", "languages": "languages"},
     )
@@ -173,7 +184,7 @@ def test_reconcile_failure_preserves_last_good_cluster_file(tmp_path):
 
 
 def test_theme_failure_remains_unassigned_and_retries_next_refresh(tmp_path):
-    engine = _engine_with_target_skills("Python")
+    engine = _engine_with_target_skills("Python", "Rust")
     path = tmp_path / "clusters.json"
     canonicalizer = _AsyncCanonicalizer()
 
@@ -185,7 +196,7 @@ def test_theme_failure_remains_unassigned_and_retries_next_refresh(tmp_path):
             path=path,
         )
     assert load_cluster_map(path).domain_of == {}
-    assert first["failedDomainTokens"] == 1
+    assert first["failedDomainTokens"] == 2
 
     with get_session(engine) as session:
         second = refresh_clusters(
@@ -196,7 +207,10 @@ def test_theme_failure_remains_unassigned_and_retries_next_refresh(tmp_path):
         )
 
     assert canonicalizer.calls == 2
-    assert load_cluster_map(path).domain_of == {"python": "languages"}
+    assert load_cluster_map(path).domain_of == {
+        "python": "languages",
+        "rust": "languages",
+    }
     assert second["failedDomainTokens"] == 0
 
 
@@ -283,3 +297,127 @@ def test_refresh_keeps_override_only_alias_head_without_job_demand(tmp_path):
         )
     kept = load_cluster_map(path)
     assert kept.aliases == {"go": "go", "golang": "go"}
+
+
+def test_scoped_refresh_changes_only_requested_unassigned_skills(tmp_path):
+    engine = _engine_with_target_skills("Assigned", "Alpha", "Beta", "Hidden")
+    path = tmp_path / "cluster_map.json"
+    original = ClusterMap(
+        aliases={
+            "assigned": "assigned",
+            "hidden": "hidden",
+        },
+        domain_of={"assigned": "stable-domain"},
+        domain_label={"stable-domain": "Stable domain"},
+        category_of={"stable-domain": "backend-apis"},
+    )
+    save_cluster_map(original, path)
+
+    with get_session(engine) as session:
+        result = refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(
+                lambda new, _categories: [
+                    IncrementalDomainGroup(
+                        new_label="Scoped domain",
+                        new_category="languages",
+                        skills=list(new),
+                    )
+                ]
+            ),
+            path=path,
+            skill_keys={"alpha", "beta"},
+        )
+
+    after = load_cluster_map(path)
+    assert result["processedSkillKeys"] == ["alpha", "beta"]
+    assert after.domain_of["assigned"] == "stable-domain"
+    assert after.aliases["hidden"] == "hidden"
+    assert "hidden" not in after.domain_of
+    assert after.domain_of["alpha"] == after.domain_of["beta"] == "scoped-domain"
+
+
+def test_soft_target_allows_a_thirteenth_coherent_domain(tmp_path):
+    engine = _engine_with_target_skills("Vision One", "Vision Two")
+    path = tmp_path / "cluster_map.json"
+    domains = {f"domain-{index}": f"Domain {index}" for index in range(12)}
+    existing = ClusterMap(
+        aliases={f"skill-{index}": f"skill-{index}" for index in range(12)},
+        domain_of={f"skill-{index}": f"domain-{index}" for index in range(12)},
+        domain_label=domains,
+        category_of={domain_id: "ai-ml" for domain_id in domains},
+    )
+    save_cluster_map(existing, path)
+
+    with get_session(engine) as session:
+        result = refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(
+                lambda new, _categories: [
+                    IncrementalDomainGroup(
+                        new_label="Computer Vision",
+                        new_category="ai-ml",
+                        skills=list(new),
+                    )
+                ]
+            ),
+            path=path,
+        )
+
+    after = load_cluster_map(path)
+    assert result["domainsCreated"] == 1
+    assert (
+        len([domain for domain in after.category_of.values() if domain == "ai-ml"])
+        == 13
+    )
+    assert after.domain_of["vision one"] == after.domain_of["vision two"]
+
+
+def test_singleton_new_domain_is_explicitly_recorded_as_uncertain(tmp_path):
+    engine = _engine_with_target_skills("Niche Tool")
+    path = tmp_path / "cluster_map.json"
+
+    with get_session(engine) as session:
+        result = refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(),
+            path=path,
+        )
+
+    assert load_cluster_map(path).domain_of == {}
+    status = load_taxonomy_state(path).grouping_status["niche tool"]
+    assert status.state == "uncertain"
+    assert "coherence gate" in status.reason
+    assert result["uncertainSkills"] == 1
+
+
+def test_fifty_requested_skills_all_receive_an_outcome(tmp_path):
+    tokens = {f"skill {index:02d}" for index in range(50)}
+    engine = _engine_with_target_skills(*sorted(tokens))
+    path = tmp_path / "cluster_map.json"
+
+    with get_session(engine) as session:
+        result = refresh_clusters(
+            session,
+            canonicalizer=_AsyncCanonicalizer(),
+            themer=_AsyncThemer(
+                lambda new, _categories: [
+                    IncrementalDomainGroup(
+                        new_label="Fixture skills",
+                        new_category="tools-platforms",
+                        skills=list(new),
+                    )
+                ]
+            ),
+            path=path,
+            batch_size=10,
+        )
+
+    after = load_cluster_map(path)
+    statuses = load_taxonomy_state(path).grouping_status
+    outcomes = set(after.domain_of) | set(statuses)
+    assert set(cast(list[str], result["processedSkillKeys"])) == tokens
+    assert tokens <= outcomes

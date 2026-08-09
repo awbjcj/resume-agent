@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -74,7 +74,25 @@ class Settings(BaseSettings):
     suggestion_batch_concurrency: int = Field(default=3, ge=1, le=16)
     cluster_batch_size: int = Field(default=60, ge=1, le=500)
     cluster_reconcile_batch_size: int = Field(default=150, ge=1, le=1000)
-    domains_per_category_cap: int = Field(default=12, ge=3, le=15)
+    # A soft organizational target.  ``DOMAINS_PER_CATEGORY_CAP`` remains an
+    # accepted environment alias for one compatibility release, but taxonomy
+    # admission no longer rejects a coherent new domain merely because the
+    # category already has this many domains.
+    domains_per_category_target: int = Field(
+        default=12,
+        ge=3,
+        le=50,
+        validation_alias=AliasChoices(
+            "DOMAINS_PER_CATEGORY_TARGET", "DOMAINS_PER_CATEGORY_CAP"
+        ),
+    )
+    skill_embedding_model: str = "openai:text-embedding-3-small"
+    # The embedding endpoint accepts larger inputs, but keeping this bounded
+    # makes the request behavior predictable and matches the taxonomy cache
+    # transaction size.  ``cached_embeddings`` also clamps injected callers
+    # defensively so a hand-built Settings object cannot exceed this limit.
+    skill_embedding_batch_size: int = Field(default=256, ge=1, le=256)
+    taxonomy_maintenance_max_churn: float = Field(default=0.20, ge=0.01, le=1.0)
     search_mode: Literal["auto", "native", "tool", "off"] = "auto"
     advisor_model: str = ""
     career_skill_root: Path = Path("skills")
@@ -118,6 +136,12 @@ class Settings(BaseSettings):
     gmail_sync_interval_hours: int = Field(default=6, ge=0)  # 0 = scheduler off
     follow_up_days: int = Field(default=14, ge=0)  # 0 = reminders off
     gmail_max_messages: int = Field(default=50, ge=1)
+
+    @property
+    def domains_per_category_cap(self) -> int:
+        """Compatibility alias for callers not yet migrated to the soft target."""
+
+        return self.domains_per_category_target
 
     # Platform mail is process-level configuration. It is intentionally kept
     # outside the per-workspace secrets overlay used by Gmail.

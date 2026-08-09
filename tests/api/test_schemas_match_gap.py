@@ -5,6 +5,7 @@ from resume_agent.api.schemas.match_gap import (
     DemandEdgeOut,
     DomainOut,
     MatchGapOut,
+    RefreshClustersIn,
     SkillNodeOut,
     SuggestionStatusOut,
 )
@@ -35,6 +36,7 @@ def test_skill_node_out_camelizes_stable_identity_and_counts():
         "nice": 1,
         "tech": 0,
         "jobCount": 2,
+        "groupingStatus": None,
     }
 
 
@@ -52,9 +54,7 @@ def test_domain_category_and_suggestion_status_use_named_fields():
     domain = DomainOut.model_validate(
         DomainNode("backend", "Backend", 9, 3, 2, 2, 1, category="backend-apis")
     )
-    category = CategoryOut(
-        slug="backend-apis", label="Backend & APIs", kind="hard"
-    )
+    category = CategoryOut(slug="backend-apis", label="Backend & APIs", kind="hard")
     generated_at = datetime(2026, 6, 27, tzinfo=timezone.utc)
     status = SuggestionStatusOut(
         kind="skill",
@@ -102,8 +102,20 @@ def test_match_gap_out_shape():
         "domains",
         "categories",
         "suggestionStatuses",
+        "taxonomyGeneration",
+        "taxonomyAlgorithmVersion",
+        "taxonomyMaintenanceDue",
+        "unassignedCount",
+        "taxonomyUndoAvailable",
     }
     assert dumped["suggestionStatuses"] == []
+    assert dumped["taxonomyAlgorithmVersion"] == "legacy"
+
+
+def test_refresh_cluster_input_normalizes_deduplicates_and_bounds_keys():
+    request = RefreshClustersIn(skill_keys=[" Python ", "python", "C++"])
+
+    assert request.skill_keys == ["python", "c++"]
 
 
 def test_skill_node_out_serializes_adjacent_coverage():

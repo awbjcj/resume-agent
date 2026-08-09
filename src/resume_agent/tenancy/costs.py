@@ -250,6 +250,10 @@ def seed_llm_rates(engine: Engine) -> None:
         ("openai", "gpt-5.6-sol", 5, 0.5, 6.25, 30, 10_000, openai, 0, None),
         ("openai", "gpt-5.6-terra", 2.5, 0.25, 3.125, 15, 10_000, openai, 0, None),
         ("openai", "gpt-5.6-luna", 1, 0.1, 1.25, 6, 10_000, openai, 0, None),
+        # Embeddings have input-token pricing only.  The direct embedding
+        # client records input tokens through the same shared/personal spend
+        # seam as agent calls, so the zero output rate is intentional.
+        ("openai", "text-embedding-3-small", 0.02, None, None, 0, 0, openai, 0, None),
         ("openai", "gpt-5.5", 5, 0.5, None, 30, 10_000, openai, 0, None),
         ("openai", "gpt-5.5-pro", 30, None, None, 180, 10_000, openai, 0, None),
         ("openai", "gpt-5.4-mini", 0.75, 0.075, None, 4.5, 10_000, openai, 0, None),
@@ -421,7 +425,9 @@ def seed_llm_rates(engine: Engine) -> None:
                 session.add(current_rate)
             current_rate.input_micros_per_million = _micros_per_million(input_rate)
             current_rate.cache_read_micros_per_million = _micros_per_million(cache_read)
-            current_rate.cache_write_micros_per_million = _micros_per_million(cache_write)
+            current_rate.cache_write_micros_per_million = _micros_per_million(
+                cache_write
+            )
             current_rate.output_micros_per_million = _micros_per_million(output_rate)
             current_rate.tool_micros_per_unit = 10_000
             current_rate.source_url = openai

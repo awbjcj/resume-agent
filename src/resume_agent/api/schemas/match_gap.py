@@ -8,6 +8,31 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from resume_agent.api.schemas.base import CamelModel
+from resume_agent.tracking.match_gap import normalize_skill
+
+
+class RefreshClustersIn(CamelModel):
+    """Exact visible canonical keys to regroup, bounded at the API boundary."""
+
+    skill_keys: list[str] = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def normalize_and_dedupe(self) -> "RefreshClustersIn":
+        normalized = list(
+            dict.fromkeys(
+                token for raw in self.skill_keys if (token := normalize_skill(raw))
+            )
+        )
+        if not normalized:
+            raise ValueError("skillKeys must include at least one usable skill key")
+        self.skill_keys = normalized
+        return self
+
+
+class GroupingStatusOut(CamelModel):
+    state: Literal["uncertain", "failed"]
+    reason: str
+    last_attempted_at: datetime
 
 
 class JobLiteOut(CamelModel):
@@ -29,6 +54,7 @@ class SkillNodeOut(CamelModel):
     nice: int
     tech: int
     job_count: int
+    grouping_status: GroupingStatusOut | None = None
 
     @model_validator(mode="after")
     def sync_legacy_covered(self) -> "SkillNodeOut":
@@ -81,3 +107,8 @@ class MatchGapOut(CamelModel):
     domains: list[DomainOut]
     categories: list[CategoryOut]
     suggestion_statuses: list[SuggestionStatusOut] = Field(default_factory=list)
+    taxonomy_generation: str | None = None
+    taxonomy_algorithm_version: str = "legacy"
+    taxonomy_maintenance_due: bool = True
+    unassigned_count: int = 0
+    taxonomy_undo_available: bool = False

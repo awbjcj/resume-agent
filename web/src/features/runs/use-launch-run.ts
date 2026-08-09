@@ -34,6 +34,29 @@ function announceCompletion(run: import("@/lib/runs/store").RunRecord) {
     );
     return;
   }
+  if (run.kind === "refreshClusters") {
+    const result = (run.result as Record<string, unknown> | null) ?? {};
+    const count = (key: string) =>
+      typeof result[key] === "number" ? result[key] : 0;
+    toast.success(
+      `Regroup complete: ${count("assignedSkills")} assigned · ${count("aliasesMerged")} aliases merged · ${count("domainsCreated")} domains created · ${count("uncertainSkills")} uncertain · ${count("failedSkills")} failed · ${count("skippedStaleSkills")} skipped.`,
+    );
+    return;
+  }
+  if (run.kind === "maintainTaxonomy") {
+    const result = (run.result as Record<string, unknown> | null) ?? {};
+    const actions = Array.isArray(result.actions) ? result.actions.length : 0;
+    toast.success(
+      result.changed
+        ? `Taxonomy maintenance applied ${actions} change${actions === 1 ? "" : "s"}.`
+        : "Taxonomy maintenance found no safe changes.",
+    );
+    return;
+  }
+  if (run.kind === "undoTaxonomyMaintenance") {
+    toast.success("Restored the previous taxonomy maintenance generation.");
+    return;
+  }
   toast.success(`${run.kind} completed`);
 }
 

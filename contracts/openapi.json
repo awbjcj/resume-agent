@@ -3214,6 +3214,34 @@
         "title": "GoogleStartOut",
         "type": "object"
       },
+      "GroupingStatusOut": {
+        "properties": {
+          "lastAttemptedAt": {
+            "format": "date-time",
+            "title": "Lastattemptedat",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "uncertain",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "reason",
+          "lastAttemptedAt"
+        ],
+        "title": "GroupingStatusOut",
+        "type": "object"
+      },
       "GuidanceUpdate": {
         "properties": {
           "guidance": {
@@ -5102,6 +5130,37 @@
           },
           "targetTotal": {
             "title": "Targettotal",
+            "type": "integer"
+          },
+          "taxonomyAlgorithmVersion": {
+            "default": "legacy",
+            "title": "Taxonomyalgorithmversion",
+            "type": "string"
+          },
+          "taxonomyGeneration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxonomygeneration"
+          },
+          "taxonomyMaintenanceDue": {
+            "default": true,
+            "title": "Taxonomymaintenancedue",
+            "type": "boolean"
+          },
+          "taxonomyUndoAvailable": {
+            "default": false,
+            "title": "Taxonomyundoavailable",
+            "type": "boolean"
+          },
+          "unassignedCount": {
+            "default": 0,
+            "title": "Unassignedcount",
             "type": "integer"
           }
         },
@@ -7327,6 +7386,25 @@
         "title": "RedoParams",
         "type": "object"
       },
+      "RefreshClustersIn": {
+        "description": "Exact visible canonical keys to regroup, bounded at the API boundary.",
+        "properties": {
+          "skillKeys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Skillkeys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "skillKeys"
+        ],
+        "title": "RefreshClustersIn",
+        "type": "object"
+      },
       "RefreshParams": {
         "properties": {
           "limit": {
@@ -9266,6 +9344,16 @@
               }
             ],
             "title": "Domainid"
+          },
+          "groupingStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupingStatusOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "jobCount": {
             "title": "Jobcount",
@@ -17430,9 +17518,9 @@
         "summary": "Get Match Gap"
       }
     },
-    "/api/match-gap/refresh-clusters": {
+    "/api/match-gap/maintain-taxonomy": {
       "post": {
-        "operationId": "refresh_match_gap_clusters_api_match_gap_refresh_clusters_post",
+        "operationId": "maintain_match_gap_taxonomy_api_match_gap_maintain_taxonomy_post",
         "parameters": [
           {
             "in": "header",
@@ -17473,7 +17561,116 @@
             "description": "Validation Error"
           }
         },
+        "summary": "Maintain Match Gap Taxonomy"
+      }
+    },
+    "/api/match-gap/refresh-clusters": {
+      "post": {
+        "operationId": "refresh_match_gap_clusters_api_match_gap_refresh_clusters_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshClustersIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
         "summary": "Refresh Match Gap Clusters"
+      }
+    },
+    "/api/match-gap/undo-taxonomy-maintenance": {
+      "post": {
+        "operationId": "undo_match_gap_taxonomy_maintenance_api_match_gap_undo_taxonomy_maintenance_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Undo Match Gap Taxonomy Maintenance"
       }
     },
     "/api/notifications": {
