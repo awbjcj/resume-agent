@@ -271,6 +271,7 @@ def test_alignment_requires_core_skill_in_list_and_context_when_available():
     )
 
     critique = portfolio_alignment_critique(content, portfolio)
+    assert critique is not None
 
     assert critique.passed is True
     assert critique.score == 25

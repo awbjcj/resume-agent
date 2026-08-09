@@ -46,7 +46,9 @@ def render_version(
     )
     out_path = out_dir / resume_pdf_name(version)
 
-    render_kwargs = {"fit_pages": 1 if config.fit_one_page else None}
+    render_kwargs: dict[str, int | list[str] | None] = {
+        "fit_pages": 1 if config.fit_one_page else None
+    }
     if version.evidence_portfolio_json is not None:
         portfolio = EvidencePortfolio.model_validate(version.evidence_portfolio_json)
         render_kwargs["highlight_terms"] = portfolio.highlight_terms

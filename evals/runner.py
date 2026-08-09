@@ -118,17 +118,16 @@ def run_case(
             for name, agent in bundle.reviewers.items()
         },
         revision=MeteredRunner(bundle.revision, usage),
-        match_plan=(
-            MeteredRunner(bundle.evidence_portfolio or bundle.match_plan, usage)
-            if bundle.evidence_portfolio is not None or bundle.match_plan is not None
-            else None
-        ),
-        evidence_portfolio=(
-            MeteredRunner(bundle.evidence_portfolio or bundle.match_plan, usage)
-            if bundle.evidence_portfolio is not None or bundle.match_plan is not None
-            else None
-        ),
+        match_plan=None,
+        evidence_portfolio=None,
     )
+    planner = bundle.evidence_portfolio
+    if planner is None:
+        planner = bundle.match_plan
+    if planner is not None:
+        metered_planner = MeteredRunner(planner, usage)
+        metered_bundle.match_plan = metered_planner
+        metered_bundle.evidence_portfolio = metered_planner
     if live_criteria or case.criteria is None:
         if extract_agent is None:
             raise ValueError(

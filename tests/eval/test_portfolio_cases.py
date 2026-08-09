@@ -17,7 +17,13 @@ def test_labeled_portfolio_cases_meet_deterministic_safety_floor():
         for case in load_cases(Path("evals/cases"))
         if case.portfolio_expectation is not None
     ]
-    assert {case.portfolio_expectation.label for case in cases} == {
+    expectations = [
+        expectation
+        for case in cases
+        if (expectation := case.portfolio_expectation) is not None
+    ]
+    assert len(expectations) == len(cases)
+    assert {expectation.label for expectation in expectations} == {
         "competing_roles",
         "stronger_projects",
         "career_change",
